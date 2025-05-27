@@ -1061,7 +1061,7 @@ If you use the toolbox in your research, please consider citing the paper:
 
 ```
 @article{westny2024dronalize,
-  title={Toward Unified Practices in Trajectory Prediction Research on Drone Datasets},
+  title={Toward Unified Practices in Trajectory Prediction Research on Bird's-Eye-View Datasets},
   author={Westny, Theodor and Olofsson, Bj{\"o}rn and Frisk, Erik},
   journal={arXiv preprint arXiv:2405.00604},
   year={2024}
