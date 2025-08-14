@@ -14,6 +14,7 @@
 
 
 from typing import Optional
+
 import torch
 from torchmetrics import Metric
 
@@ -21,33 +22,51 @@ from torchmetrics import Metric
 class ExpDE(Metric):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.add_state('sum', default=torch.tensor(0.0), dist_reduce_fx='sum')
-        self.add_state('count', default=torch.tensor(0), dist_reduce_fx='sum')
+        self.add_state("sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("count", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self,
-               pred: torch.Tensor,
-               trg: torch.Tensor,
-               prob: Optional[torch.Tensor] = None,
-               mask: Optional[torch.Tensor] = None,
-               logits: bool = False,
-               eval_criterion: str = 'FDE',
-               mode_first: bool = False) -> None:
-        """
-        Update the metric state.
-        :param: pred: The predicted trajectory. (N, T, M, 2) or (N, M, T, 2)
-        :param: trg: The ground-truth target trajectory. (N, T, 2)
-        :param: prob: The probability of the predictions. (N, M)
-        :param: mask: The mask for valid positions. (N, T)
-        :param: logits: Whether the probabilities are logits.
-        :param: eval_criterion: Either 'FDE' or 'ADE'.
-        :param: mode_first: Whether the mode is the first dimension.
-        """
+    def update(
+        self,
+        pred: torch.Tensor,
+        trg: torch.Tensor,
+        prob: Optional[torch.Tensor] = None,
+        mask: Optional[torch.Tensor] = None,
+        logits: bool = False,
+        eval_criterion: str = "FDE",
+        mode_first: bool = False,
+    ) -> None:
+        """Update the metric state with a new batch of predictions and targets.
 
-        if eval_criterion not in ['FDE', 'ADE']:
-            raise ValueError(f"eval_criterion must be 'FDE' or 'ADE', got {eval_criterion}")
+        This method computes the expected displacement error by weighting the error of each predicted
+        trajectory mode by its associated probability. It supports two evaluation criteria:
+        - ADE (Average Displacement Error): averaged over all valid time steps.
+        - FDE (Final Displacement Error): evaluated at the final valid time step.
+
+        If a mask is provided, only valid time steps contribute to the error computation.
+
+        Args:
+            pred (torch.Tensor): Predicted trajectories, shape (N, T, M, 2) or (N, M, T, 2) if `mode_first` is True.
+            trg (torch.Tensor): Ground-truth target trajectory, shape (N, T, 2).
+            prob (Optional[torch.Tensor]): Mixture probabilities or logits, shape (N, M). If None, uniform weights are used.
+            mask (Optional[torch.Tensor]): Validity mask over time steps, shape (N, T). Indicates which timesteps to include.
+            logits (bool): Whether `prob` is provided as raw logits (will apply softmax if True).
+            eval_criterion (str): Evaluation criterion, either "FDE" (final step) or "ADE" (average over time).
+            mode_first (bool): If True, assumes mode is the first dimension (N, M, T, 2) and transposes to (N, T, M, 2).
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If `pred` is not 4D or if `eval_criterion` is not in {"FDE", "ADE"}.
+
+        """
+        if eval_criterion not in ["FDE", "ADE"]:
+            msg = f"eval_criterion must be 'FDE' or 'ADE', got {eval_criterion}"
+            raise ValueError(msg)
 
         if pred.dim() != 4:
-            raise ValueError(f"pred must be 4-dimensional, got shape {pred.shape}")
+            msg = f"pred must be 4-dimensional, got shape {pred.shape}"
+            raise ValueError(msg)
 
         if mask is not None and mask.sum() == 0:
             self.count += 1
@@ -61,14 +80,17 @@ class ExpDE(Metric):
 
         if prob is None:
             # Uniform distribution if no probabilities are given
-            prob = torch.ones(batch_size, pred.shape[2], device=pred.device) / pred.shape[2]  # (N, M)
+            prob = (
+                torch.ones(batch_size, pred.shape[2], device=pred.device)
+                / pred.shape[2]
+            )  # (N, M)
         elif logits:
             # Convert logits to probabilities
             prob = torch.nn.functional.softmax(prob, dim=-1)  # (N, M)
 
         trg = trg.unsqueeze(-2).expand(-1, -1, num_modes, -1)  # (N, T, M, 2)
 
-        if eval_criterion == 'ADE':
+        if eval_criterion == "ADE":
             norm = torch.linalg.norm(pred - trg, dim=-1)  # (N, T, M)
 
             if mask is not None:
@@ -86,8 +108,7 @@ class ExpDE(Metric):
             self.sum += exp_ade.sum()
             self.count += exp_ade.size(0)
 
-        elif eval_criterion == 'FDE':
-
+        elif eval_criterion == "FDE":
             if mask is not None:
                 mask_reversed = 1 * mask.flip(dims=[-1])
                 last_idx = seq_len - 1 - mask_reversed.argmax(dim=-1)
@@ -107,7 +128,5 @@ class ExpDE(Metric):
             self.count += exp_fde.size(0)
 
     def compute(self) -> torch.Tensor:
-        """
-        Compute the final metric.
-        """
+        """Compute the final metric."""
         return self.sum / self.count  # type: ignore

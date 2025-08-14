@@ -1,5 +1,6 @@
 import pytest
 import torch
+
 from metrics.log_likelihood import NegativeLogLikelihood
 
 
@@ -15,7 +16,7 @@ def test_nll_valid_distribution(dist: str) -> None:
 @pytest.mark.parametrize("dist", ["invalid", "unrecognized", ""])
 def test_nll_invalid_distribution(dist: str) -> None:
     # Test that an AssertionError is raised for invalid distributions
-    with pytest.raises(ValueError, match=f"Invalid distribution name: {dist}"):
+    with pytest.raises(ValueError, match=f"Distribution '{dist}' is not supported."):
         _ = NegativeLogLikelihood(dist)
 
 

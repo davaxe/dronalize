@@ -1,29 +1,60 @@
 Bootstrap: docker
-From: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+From: pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 %files
-    container_req.txt /opt/requirements.txt
+    pyproject.toml /opt/pyproject.toml
+    README.md      /opt/README.md    # include if [project].readme = "README.md"
 
 %environment
 export PYTHONNOUSERSITE=1
 
 %post
 
-# Set working directory
-mkdir -p /app
-cd /app
+set -e
+python -m pip install --upgrade pip
 
-# Install dependencies from req.txt
-pip install --no-cache-dir -r /opt/requirements.txt
+# Resolve deps from pyproject.toml
+mkdir -p /app && cd /app
+mv /opt/pyproject.toml .
+
+# copy README if referenced in pyproject
+[ -f /opt/README.md ] && mv /opt/README.md .
+
+# Install base deps + container extras from pyproject
+pip install --no-cache-dir .[container]
 
 # Install `torch-cluster`
-pip install --no-cache-dir torch-cluster -f https://data.pyg.org/whl/torch-2.5.0+cu124.html
+pip install --no-cache-dir torch-cluster -f https://data.pyg.org/whl/torch-2.6.0+cu124.html
 
 %runscript
 exec "$@"
 
 %help
 This is a container for the Dronalize project. It contains all the necessary dependencies to run the project.
+
+### BUILD
+To build the .sif file, you have multiple options.
+
+#### Option 1: Pull a Pre-built Image from Docker Hub
+A pre-built image from Docker Hub can be pulled by running the following command:
+
+```
+apptainer pull dronalize.sif docker://westny/dronalize:latest
+```
+
+This will download the **latest** version of the image to your local machine.
+
+#### Option 2: Build the Image Locally
+
+You can build the container by running the following command:
+
+```
+apptainer build dronalize.sif /path/to/definition_file
+```
+
+where `/path/to/definition_file` is the path to the `apptainer.def` file in the repository.
+
+### RUN
 To run the project, you can use the following command:
 ```
 apptainer run dronalize.sif <command> <args>

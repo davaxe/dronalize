@@ -1,4 +1,4 @@
-# Copyright 2024, Theodor Westny. All rights reserved.
+# Copyright 2024-2025, Theodor Westny. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,11 +13,12 @@
 # limitations under the License.
 
 import os
-import numpy as np
-from pandas import read_csv, concat, merge, DataFrame
 
-from preprocessing.road_network import get_lane_graph
-from preprocessing.utils import get_frame_split, compute_acceleration
+import numpy as np
+from pandas import DataFrame, concat, merge, read_csv
+
+from preprocessing.road_network.urban import get_lane_graph
+from preprocessing.utils import compute_acceleration, get_frame_split
 
 
 def add_polar_coordinates(tracks: DataFrame,
@@ -30,7 +31,7 @@ def add_polar_coordinates(tracks: DataFrame,
         df["rho"], df["theta"] = r, a
         return df
 
-    return tracks.groupby("trackId", group_keys=False).apply(polar_to_center)
+    return tracks.groupby("track_id", group_keys=False).apply(polar_to_center)
 
 
 def preprocess_levelxd(path: str,
@@ -70,6 +71,10 @@ def preprocess_levelxd(path: str,
     lane_graph = get_lane_graph(lanelet_path, utm_x0, utm_y0, p0[0], p0[1], return_torch=True)
 
     # Perform some initial renaming
+    if "track_id" not in tracks_meta.columns:
+        tracks_meta.rename(columns={"trackId": "track_id"}, inplace=True)
+        tracks.rename(columns={"trackId": "track_id"}, inplace=True)
+
     if "vx" not in tracks.columns:
         tracks.rename(columns={"xVelocity": "vx"}, inplace=True)
         tracks.rename(columns={"yVelocity": "vy"}, inplace=True)
@@ -83,7 +88,6 @@ def preprocess_levelxd(path: str,
     if "x" not in tracks.columns:
         tracks.rename(columns={"xCenter": "x"}, inplace=True)
         tracks.rename(columns={"yCenter": "y"}, inplace=True)
-
     # Shift the data
     tracks.x = tracks.x - p0[0]
     tracks.y = tracks.y - p0[1]
@@ -195,7 +199,7 @@ def preprocess_sind(path: str,
     tracks = concat([veh_df, ped_df], ignore_index=True)
 
     tracks.rename(columns={'agent_type': 'class'}, inplace=True)
-    tracks.rename(columns={'track_id': 'trackId'}, inplace=True)
+    # tracks.rename(columns={'track_id': 'trackId'}, inplace=True)
     tracks.rename(columns={'frame_id': 'frame'}, inplace=True)
 
     # Perform some shifting of the data
@@ -217,10 +221,10 @@ def preprocess_sind(path: str,
     train_frames, val_frames, test_frames = get_frame_split(final_frame, seed=seed)
     frame_dict = {"train": train_frames, "val": val_frames, "test": test_frames}
 
-    frame_info = tracks.groupby('trackId')['frame'].agg(initialFrame='min', finalFrame='max').reset_index()
-    class_info = tracks[['trackId', 'class']].drop_duplicates()
+    frame_info = tracks.groupby('track_id')['frame'].agg(initialFrame='min', finalFrame='max').reset_index()
+    class_info = tracks[['track_id', 'class']].drop_duplicates()
 
-    tracks_meta = merge(class_info, frame_info, on='trackId')
+    tracks_meta = merge(class_info, frame_info, on='track_id')
 
     shared_args = (rec_id, output_dir, frame_dict, tracks_meta, tracks, lane_graph)
 

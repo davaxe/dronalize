@@ -1,4 +1,4 @@
-# Copyright 2024, Theodor Westny. All rights reserved.
+# Copyright 2024-2025, Theodor Westny. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-import torch
 import numpy as np
 import pandas as pd
+import torch
+
 from preprocessing.road_network.edge_type import EdgeType
 
 
@@ -23,16 +23,16 @@ def section_graph(lane_markings: list[float],
                   road_x: tuple[float, float],
                   spacing: float = 3.0,
                   direction: int = 1) -> dict:
-    """
-    Create a graph representation of a section of a highway.
+    """Create a graph representation of a section of a highway.
+
     :param lane_markings: list of y-coordinates of the lane markings
     :param road_x: tuple of the min. and max. x-coordinates of the road
     :param spacing: spacing between the points
     :param direction: direction of the road:
                 1 positive right (lower section), -1 positive left (upper section)
     :return:
-    """
 
+    """
     pos = []
     node_type = []
 

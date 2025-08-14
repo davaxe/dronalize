@@ -1,0 +1,28 @@
+# Description: Configuration file for the US-101 dataset
+description: US-101 dataset by NGSIM
+
+dataset: us-101
+seed: 42
+sample_freq: 10
+downsample: 1
+input_len: 2
+output_len: 5
+n_inputs: 7
+n_outputs: 7
+skip_lc_samples: 10  # (1 second)
+skip_lk_samples: 40  # (4 seconds)
+
+# Graph
+lane_graph:
+  buffer: 2.0
+  spacing: 10.0
+
+# Recordings
+recordings:
+  0750am-0805am:
+    include: true
+  0805am-0820am:
+    include: true
+  0820am-0835am:
+    include: true
+

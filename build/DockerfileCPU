@@ -1,33 +1,39 @@
-# Use a lightweight Ubuntu base for CPU version
+# syntax=docker/dockerfile:1.7
+
 FROM ubuntu:22.04
 
-# Set environment variable for non-interactive installs
-ENV DEBIAN_FRONTEND=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Install system dependencies for CPU builds
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip \
-    libopenblas-dev \
+# System deps (keep lean)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-pip python3-venv ca-certificates \
+      libopenblas0 \
+    && ln -sf /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Ensure `python` refers to `python3`
-RUN ln -sf /usr/bin/python3 /usr/bin/python
+# Install CPU PyTorch first (so it layers cleanly)
+RUN python -m pip install --upgrade pip && \
+    pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
 
-# Install PyTorch CPU version
-RUN pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+# Copy dependency descriptors first to leverage cache
+COPY pyproject.toml README.md ./
 
-# Copy and install dependencies
-COPY container_req.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+# Install the rest from pyproject:
+# - container: headless OpenCV, zarr
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -e .[container]
 
-# Install `torch-cluster` for CPU version
-RUN pip install --no-cache-dir torch-cluster -f https://data.pyg.org/whl/torch-2.5.0+cpu.html
+# Install `torch-cluster`
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install torch-cluster -f https://data.pyg.org/whl/torch-2.6.0+cpu.html
 
-# Set default command
+
 CMD ["python", "--version"]
 
 # Example build command
-# docker build -t dronalize:latest-cpu -f DockerfileCPU .
+# docker build -t dronalize:latest-cpu -f buld/DockerfileCPU .

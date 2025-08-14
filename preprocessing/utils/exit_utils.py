@@ -1,4 +1,4 @@
-# Copyright 2024, Theodor Westny. All rights reserved.
+# Copyright 2024-2025, Theodor Westny. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import os
+
 import numpy as np
 from pandas import DataFrame, read_csv
 
-from preprocessing.road_network import get_lane_graph
+from preprocessing.road_network.urban import get_lane_graph
 from preprocessing.utils import get_frame_split
 
 
@@ -32,7 +33,7 @@ def add_driving_direction_exits(tracks_meta: DataFrame,
     tracks['drivingDirection'] = np.empty(len(tracks))
     tracks_meta['drivingDirection'] = np.empty(len(tracks_meta))
 
-    # Define a function to process each trackId group
+    # Define a function to process each track_id group
     def process_group(df):
         # Determine driving direction based on the first and last x-values
         x = df['x'].to_numpy()
@@ -46,20 +47,20 @@ def add_driving_direction_exits(tracks_meta: DataFrame,
         return df
 
     # Apply the driving direction calculation to the tracks DataFrame
-    tracks = tracks.groupby('trackId').apply(process_group)
+    tracks = tracks.groupby('track_id').apply(process_group)
 
     # Reset index to maintain DataFrame structure
     tracks = tracks.reset_index(drop=True)
 
     # Update the drivingDirection in tracks_meta based on tracks
     def update_tracks_meta(df):
-        # Get the driving direction for the current trackId from the tracks DataFrame
-        driving_direction = tracks[tracks['trackId'] == df['trackId'].iloc[0]]['drivingDirection'].iloc[0]
+        # Get the driving direction for the current track_id from the tracks DataFrame
+        driving_direction = tracks[tracks['track_id'] == df['track_id'].iloc[0]]['drivingDirection'].iloc[0]
         df['drivingDirection'] = driving_direction
         return df
 
     # Apply the update to the tracks_meta DataFrame
-    tracks_meta = tracks_meta.groupby('trackId').apply(update_tracks_meta)
+    tracks_meta = tracks_meta.groupby('track_id').apply(update_tracks_meta)
     tracks_meta = tracks_meta.reset_index(drop=True)
 
     return tracks_meta, tracks
@@ -90,7 +91,7 @@ def add_maneuver_exits(tracks: DataFrame,
     if debug:
         return tracks
 
-    # Define a function to process each group of trackId
+    # Define a function to process each group of track_id
     def process_group(df):
         if df['laneChange'].nunique() > 1:
             dy = df['latLaneCenterOffset'].to_numpy()
@@ -120,8 +121,8 @@ def add_maneuver_exits(tracks: DataFrame,
 
         return df
 
-    # Group by trackId and apply the maneuver processing to each group
-    tracks = tracks.groupby('trackId').apply(process_group)
+    # Group by track_id and apply the maneuver processing to each group
+    tracks = tracks.groupby('track_id').apply(process_group)
 
     # Reset index to maintain DataFrame structure
     tracks = tracks.reset_index(drop=True)
@@ -172,6 +173,9 @@ def preprocess_exid(path: str,
     lane_graph = {'upper_map': lane_graph, 'lower_map': lane_graph}
 
     # Perform some initial renaming
+    if "track_id" not in tracks_meta.columns:
+        tracks_meta.rename(columns={"trackId": "track_id"}, inplace=True)
+        tracks.rename(columns={"trackId": "track_id"}, inplace=True)
     if "vx" not in tracks.columns:
         tracks.rename(columns={"xVelocity": "vx"}, inplace=True)
         tracks.rename(columns={"yVelocity": "vy"}, inplace=True)
@@ -190,7 +194,7 @@ def preprocess_exid(path: str,
 
     tracks_meta, tracks = add_driving_direction_exits(tracks_meta, tracks)
     tracks = add_maneuver_exits(tracks, debug=debug)
-    tracks_meta["numLaneChanges"] = tracks.groupby("trackId")["laneChange"].sum().values
+    tracks_meta["numLaneChanges"] = tracks.groupby("track_id")["laneChange"].sum().values
 
     # Determine train, val, test split (by frames)
     train_frames, val_frames, test_frames = get_frame_split(tracks_meta.finalFrame.array[-1], seed=seed)

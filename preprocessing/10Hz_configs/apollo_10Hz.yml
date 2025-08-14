@@ -1,0 +1,17 @@
+# Description: Configuration file for the ApolloScape dataset
+description: ApolloScape dataset
+
+dataset: apollo
+seed: 42
+sample_freq: 2        # Original sample frequency is 2Hz, we use 10Hz for compatibility with other datasets (handled in preprocessing)
+downsample: 1
+ori_dt: 0.5           # Original sampling time is 0.5s
+dt: 0.1               # Original dt is 0.5s, we use 0.1s for compatibility with other datasets (handled with interpolation)
+skip_samples: 5       # 0.5 seconds
+input_len: 2
+output_len: 3
+n_inputs: 7
+n_outputs: 7
+
+# Recordings
+recordings: true

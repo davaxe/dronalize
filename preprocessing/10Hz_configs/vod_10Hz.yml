@@ -1,0 +1,17 @@
+# Description: Configuration file for the nuScenes dataset
+description: View-of-Delft dataset
+
+dataset: vod
+seed: 42
+sample_freq: 10
+downsample: 1
+dt: 0.1
+skip_samples: 5       # (0.5 sec)
+input_len: 0.5
+output_len: 3
+n_inputs: 7
+n_outputs: 7
+lane_graph_radius: 150.0  # Radius for lane graph extraction in meters
+
+# Recordings
+recordings: true
