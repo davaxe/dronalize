@@ -1,4 +1,3 @@
-
 # Datasets
 This page provides an overview of the datasets available in the Dronalize toolbox for trajectory prediction. 
 It contains details on each dataset, including links to their respective publications, abstracts, BibTeX entries, preprocessing instructions, and a brief overview of the dataset characteristics.
@@ -33,7 +32,7 @@ It contains details on each dataset, including links to their respective publica
 </details>
 
 <div align="center">  
-  <img src="../media/av.png" alt="Argoverse 1" width="150">
+  <img src="https://github.com/user-attachments/assets/dbdc27f7-cdf7-4509-bc52-ab2c7252d41b" alt="Argoverse 1" width="150">
 </div>
 
 > #### Dataset Overview
@@ -106,7 +105,7 @@ python -m preprocessing.preprocess_argoverse --config argoverse --path ../datase
 </details>
 
 <div align="center">  
-  <img src="../media/av2.png" alt="Argoverse 2" width="200">
+  <img src="https://github.com/user-attachments/assets/80fbda39-79e7-4acf-93b0-8965d894d14b" alt="Argoverse 2" width="200">
 </div>
 
 
@@ -175,8 +174,9 @@ python -m preprocessing.preprocess_av2 --config av2 --path ../datasets
 </details>
 
 <div align="center">  
-  <img src="../media/Waymo_logo.svg" alt="Waymo logo" width="200">
+  <img src=https://github.com/user-attachments/assets/ac50b87c-5d13-4510-906a-5519d94322c1 alt="Waymo logo" width="200">
 </div>
+
 
 > #### Dataset Overview
 > - Composed of 103,354 segments each containing 20 seconds of object tracks at 10Hz and map data for the area covered by the segment.
@@ -244,7 +244,7 @@ python -m preprocessing.preprocess_waymo --config waymo --path ../datasets
 </details>
 
 <div align="center">  
-  <img src="../media/motional.png" alt="motional" width="280">
+  <img src="https://github.com/user-attachments/assets/e4e4a9c8-edfd-4caf-83a4-d8531fc3a282" alt="motional" width="280">
 </div>
 
 > #### Dataset Overview
@@ -322,7 +322,7 @@ python -m preprocessing.preprocess_nuscenes --config nuscenes --path ../datasets
 </details>
 
 <div align="center">  
-  <img src="../media/lyft.png" alt="Lyft logo" width="140">
+  <img src="https://github.com/user-attachments/assets/cacd6d39-1c10-477a-99d9-1d560ac7dad4" alt="Lyft logo" width="140">
 </div>
 
 
@@ -399,7 +399,7 @@ python -m preprocessing.preprocess_lyft --config lyft --path ../datasets
 </details>
 
 <div align="center">  
-  <img src="../media/tudelft.png" alt="TUDelft logo" width="180">
+  <img src="https://github.com/user-attachments/assets/39c44e43-0896-4b93-bea5-e719b67a82a0" alt="TUDelft logo" width="180">
 </div>
 
 
@@ -486,7 +486,7 @@ python -m preprocessing.preprocess_vod --config vod --path ../datasets
 </details>
 
 <div align="center">  
-  <img src=../media/trajectory-prediction.gif alt="ApolloScape.gif">
+  <img src="https://github.com/user-attachments/assets/7bdb09b8-0888-4984-8824-fcf55bfb6f52" alt="ApolloScape logo" width="250">
 </div>
 
 > #### Dataset Overview
@@ -1046,9 +1046,9 @@ python -m preprocessing.preprocess_urban --config uniD --path ../datasets
 
 <table>
   <tr>
-    <td><img src=../media/rdb1.png alt="Roundabout 1"/></td>
-    <td><img src=../media/rdb3.png alt="Roundabout 3"/></td>
-    <td><img src=../media/rdb7.png alt="Roundabout 7"/></td>
+    <td><img src="https://github.com/user-attachments/assets/0c66cbe7-0165-4087-a804-698a701e6187" alt="Roundabout 1"/></td>
+    <td><img src="https://github.com/user-attachments/assets/93fc0058-e636-44db-a1b9-f9939a124bb5" alt="Roundabout 3"/></td>
+    <td><img src="https://github.com/user-attachments/assets/e1871afa-0663-4430-8ea4-2f0d4255c936" alt="Roundabout 7"/></td>
   </tr>
 </table>
 
@@ -1135,7 +1135,7 @@ python -m preprocessing.preprocess_opendd --config opendd --path ../datasets
 </details>
 
 <div align="center">  
-  <img src="../media/ad4che.png" alt="AD4CHE", width="400">
+  <img src="https://github.com/user-attachments/assets/f54b7f20-57df-4675-b6d1-8e0b53f93a79" alt="AD4CHE", width="400">
 </div>
 
 > #### Dataset Overview
@@ -1373,9 +1373,8 @@ python -m preprocessing.preprocess_highway --config A43 --path ../datasets
 </details>
 
 <div align="center">  
-  <img src="../media/i80.jpg" alt="I-80", width="300">
+  <img src=https://github.com/user-attachments/assets/cf8dd343-992f-4c34-be6e-daffa7b4389a alt="I-80", width="300">
 </div>
-
 
 > #### Dataset Overview
 > - 45 minutes of traffic data collected on the I-80 freeway in California, segmented into 15-minute intervals.
@@ -1444,7 +1443,7 @@ python -m preprocessing.preprocess_highway --config i80 --path ../datasets
 </details>
 
 <div align="center">  
-  <img src="../media/us101.jpg" alt="US-101", width="300">
+  <img src=https://github.com/user-attachments/assets/b7813a2e-ad6d-4369-b7d9-fe217cf0b5ce alt="US-101", width="300">
 </div>
 
 > #### Dataset Overview
