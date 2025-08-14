@@ -1,3 +1,3 @@
-from datamodules.dataloader import DroneDataModule
-from datamodules.dataset import DroneDataset
-from datamodules.transforms import CoordinateTransform, CoordinateShift
+from datamodules.dataloader import TrajDataModule
+from datamodules.dataset import TrajDataset
+from datamodules.transforms import CoordinateShift, CoordinateTransform

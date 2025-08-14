@@ -13,43 +13,65 @@
 # limitations under the License.
 
 from typing import Optional
+
 import torch
 from torchmetrics import Metric
+
 from metrics.utils import filter_prediction
 
 
 class MinBrier(Metric):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.add_state('sum', default=torch.tensor(0.0), dist_reduce_fx='sum')
-        self.add_state('count', default=torch.tensor(0), dist_reduce_fx='sum')
+        self.add_state("sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("count", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self,
-               pred: torch.Tensor,
-               trg: torch.Tensor,
-               prob: torch.Tensor,
-               mask: Optional[torch.Tensor] = None,
-               best_idx: Optional[torch.Tensor] = None,
-               logit: bool = False,
-               min_criterion: str = 'FDE',
-               mode_first: bool = False) -> None:
-        """
-        Update the metric state.
-        :param: pred: The predicted trajectory. (N, T, M, 2)
-        :param: trg: The ground-truth target trajectory. (N, T, 2)
-        :param: prob: The probability of the predictions. (N, M)
-        :param: mask: The mask for valid positions. (N, T)
-        :param: best_idx: The index of the best prediction. (N,) (to avoid recomputing it)
-        :param: logit: Whether the probabilities are logits.
-        :param: min_criterion: Either 'FDE', 'ADE', or 'ML'.
-        :param: mode_first: Whether the mode is the first dimension. (default: False)
-        """
-        assert prob is not None, ("Probabilistic criterion requires"
-                                  " the probability of the predictions.")
-        assert pred.dim() == 4, "The predictions must be multi-modal."
+    def update(
+        self,
+        pred: torch.Tensor,
+        trg: torch.Tensor,
+        prob: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        best_idx: Optional[torch.Tensor] = None,
+        logit: bool = False,
+        min_criterion: str = "FDE",
+        mode_first: bool = False,
+    ) -> None:
+        """Update the metric state with predicted trajectories, probabilities, and targets.
 
-        pred, best_idx = filter_prediction(pred, trg, mask, prob, min_criterion,
-                                           best_idx, mode_first=mode_first)
+        This method computes a Brier-style score that penalizes confident but inaccurate
+        predictions. The most likely mode is selected according to the specified criterion
+        (FDE, ADE, or ML), and the distance to the ground-truth at the final timestep is
+        weighted by (1 - predicted probability), reflecting a probabilistic confidence penalty.
+
+        Args:
+            pred (torch.Tensor): Predicted trajectories, shape (N, T, M, 2). Multimodal predictions are required.
+            trg (torch.Tensor): Ground-truth trajectories, shape (N, T, 2).
+            prob (torch.Tensor): Mixture probabilities or logits, shape (N, M).
+            mask (Optional[torch.Tensor]): Validity mask for time steps, shape (N, T). If provided, last valid step is used.
+            best_idx (Optional[torch.Tensor]): Precomputed best mode indices, shape (N,). Avoids recomputing.
+            logit (bool): If True, applies sigmoid to convert logits to probabilities.
+            min_criterion (str): Criterion used for best mode selection, one of {"FDE", "ADE", "ML"}.
+            mode_first (bool): If True, assumes input is (N, M, T, 2) and transposes to (N, T, M, 2).
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If `prob` is None or if `pred` is not 4-dimensional.
+            ValueError: If `min_criterion` is not one of {"FDE", "ADE", "ML"}.
+
+        """
+        if prob is None:
+            msg = "Probabilistic criterion requires the probability of the predictions."
+            raise ValueError(msg)
+        if pred.dim() != 4:
+            msg = f"The prediction tensor must be 4-dimensional, got shape {pred.shape}"
+            raise ValueError(msg)
+
+        pred, best_idx = filter_prediction(
+            pred, trg, mask, prob, min_criterion, best_idx, mode_first=mode_first
+        )
 
         batch_size, seq_len = pred.size()[:2]
 
@@ -79,7 +101,5 @@ class MinBrier(Metric):
         self.count += brier.size(0)
 
     def compute(self) -> torch.Tensor:
-        """
-        Compute the final metric.
-        """
+        """Compute the final metric."""
         return self.sum / self.count  # type: ignore

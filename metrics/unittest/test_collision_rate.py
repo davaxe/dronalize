@@ -1,5 +1,6 @@
 import pytest
 import torch
+
 from metrics.collision_rate import CollisionRate
 
 
@@ -41,5 +42,5 @@ def test_collision_rate_dimension() -> None:
     ptr = torch.cat([torch.tensor([0]), ptr, torch.tensor([batch_size])])
 
     cr = CollisionRate()
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError, match="The prediction tensor must have at least 3 dimensions."):
         cr.update(pred, trg, ptr)

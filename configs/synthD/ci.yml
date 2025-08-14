@@ -20,7 +20,7 @@ dataset: synthD
 # Model Configuration
 model:
   class: Net
-  module: models.prototype.model
+  module: prototype.model
   num_inputs: 5
   num_hidden: 32
   num_outputs: 2
@@ -29,12 +29,12 @@ model:
 # Lightning Module Configuration
 litmodule:
   class: LitModel
-  module: models.prototype.litmodule
+  module: prototype.litmodule
 
 # Data Module Configuration
 datamodule:
-  class: DroneDataModule
-  module: datamodules.dataloader
+  class: TrajDataModule
+  module: dataloader
   batch_size: 16
   root: data
   name: synthD

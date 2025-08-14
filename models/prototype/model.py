@@ -1,4 +1,4 @@
-# Copyright 2024, Theodor Westny. All rights reserved.
+# Copyright 2024-2025, Theodor Westny. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import torch
-from torch import nn
 import torch_geometric.nn as ptg
+from torch import nn
 from torch_geometric.data import HeteroData
 
 
@@ -34,10 +33,15 @@ class Net(nn.Module):
         self.output = nn.Linear(num_hidden, num_outputs)
 
     def forward(self, data: HeteroData) -> torch.Tensor:
-        edge_index = data['agent']['edge_index']
-        x = torch.cat([data['agent']['inp_pos'],
-                       data['agent']['inp_vel'],
-                       data['agent']['inp_yaw']], dim=-1)
+        edge_index = data["agent"]["edge_index"]
+        x = torch.cat(
+            [
+                data["agent"]["inp_pos"],
+                data["agent"]["inp_vel"],
+                data["agent"]["inp_yaw"],
+            ],
+            dim=-1,
+        )
 
         # map_to_agent_edge_index = data['map', 'to', 'agent']['edge_index']
         # map_pos = data['map_point']['position']

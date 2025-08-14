@@ -1,3 +1,11 @@
-from preprocessing.road_network.lane_graph import get_lane_graph
-from preprocessing.road_network.edge_type import EdgeType, EDGE_STYLE_MAPPING, NODE_STYLE_MAPPING
-from preprocessing.road_network.highway_graph import get_highway_graph
+from preprocessing.road_network.edge_type import (
+    EDGE_STYLE_MAPPING,
+    NODE_STYLE_MAPPING,
+    EdgeType,
+)
+
+__all__ = [
+    "EDGE_STYLE_MAPPING",
+    "NODE_STYLE_MAPPING",
+    "EdgeType",
+]

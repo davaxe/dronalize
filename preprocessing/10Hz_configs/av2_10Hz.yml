@@ -1,0 +1,15 @@
+# Description: Configuration file for the Argoverse 2 dataset
+description: Argoverse 2 dataset
+
+dataset: av2
+seed: 42
+sample_freq: 10
+downsample: 1
+skip_samples: 0
+input_len: 5
+output_len: 6
+n_inputs: 7
+n_outputs: 7
+
+# Recordings
+recordings: true

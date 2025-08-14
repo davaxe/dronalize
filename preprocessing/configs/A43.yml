@@ -9,8 +9,8 @@ input_len: 2
 output_len: 5
 n_inputs: 7
 n_outputs: 7
-skip_lc_samples: 12
-skip_lk_samples: 25
+skip_lc_samples: 10 # (1 second)
+skip_lk_samples: 25 # (2.5 seconds)
 
 # Graph
 lane_graph:

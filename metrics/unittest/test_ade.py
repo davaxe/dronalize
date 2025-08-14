@@ -1,8 +1,10 @@
 import torch
+
 from metrics.min_ade import MinADE
 
 
 def test_min_ade_multimodal() -> None:
+    """Test the MinADE metric with multimodal predictions."""
     batch_size, seq_len, num_modes, num_dims = 32, 25, 6, 2
     trg = torch.randn(batch_size, seq_len, num_dims)
     pred = torch.randn(batch_size, seq_len, num_modes, num_dims)
@@ -15,6 +17,7 @@ def test_min_ade_multimodal() -> None:
 
 
 def test_min_ade_unimodal() -> None:
+    """Test the MinADE metric with unimodal predictions."""
     batch_size, seq_len, num_dims = 32, 25, 2
     trg = torch.randn(batch_size, seq_len, num_dims)
     pred = torch.randn(batch_size, seq_len, num_dims)

@@ -13,39 +13,55 @@
 # limitations under the License.
 
 from typing import Optional
+
 import torch
 from torchmetrics import Metric
+
 from metrics.utils import filter_prediction
 
 
 class MinFDE(Metric):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.add_state('sum', default=torch.tensor(0.0), dist_reduce_fx='sum')
-        self.add_state('count', default=torch.tensor(0), dist_reduce_fx='sum')
+        self.add_state("sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("count", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self,
-               pred: torch.Tensor,
-               trg: torch.Tensor,
-               prob: Optional[torch.Tensor] = None,
-               mask: Optional[torch.Tensor] = None,
-               best_idx: Optional[torch.Tensor] = None,
-               min_criterion: str = 'FDE',
-               mode_first: bool = False) -> None:
-        """
-        Update the metric state.
-        :param: pred: The predicted trajectory. (N, T, M, 2) or (N, T, 2)
-        :param: trg: The ground-truth target trajectory. (N, T, 2)
-        :param: prob: The probability of the predictions. (N, M)
-        :param: mask: The mask for valid positions. (N, T)
-        :param: best_idx: The index of the best prediction. (N,) (to avoid recomputing it)
-        :param: min_criterion: Either 'FDE', 'ADE', or 'ML'.
-        :param: mode_first: Whether the mode is the first dimension. (default: False)
-        """
+    def update(
+        self,
+        pred: torch.Tensor,
+        trg: torch.Tensor,
+        prob: Optional[torch.Tensor] = None,
+        mask: Optional[torch.Tensor] = None,
+        best_idx: Optional[torch.Tensor] = None,
+        min_criterion: str = "FDE",
+        mode_first: bool = False,
+    ) -> None:
+        """Update the metric state with predicted trajectories and ground-truth targets.
 
+        This method computes the minimum Final Displacement Error (FDE) between predicted and
+        ground-truth trajectories. For multimodal predictions, the best mode is selected based
+        on a criterion (FDE, ADE, or ML), and the distance at the final valid timestep is used.
+
+        Args:
+            pred (torch.Tensor): Predicted trajectories, shape (N, T, M, 2) for multimodal or (N, T, 2) for filtered.
+            trg (torch.Tensor): Ground-truth target trajectories, shape (N, T, 2).
+            prob (Optional[torch.Tensor]): Mixture probabilities or logits, shape (N, M), used for "ML" mode selection.
+            mask (Optional[torch.Tensor]): Validity mask for time steps, shape (N, T). If provided, the final valid timestep is used.
+            best_idx (Optional[torch.Tensor]): Precomputed best mode indices, shape (N,). Avoids recomputing.
+            min_criterion (str): Criterion for best mode selection, one of {"FDE", "ADE", "ML"}.
+            mode_first (bool): If True, assumes input is (N, M, T, 2) and transposes to (N, T, M, 2).
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If `min_criterion` is not one of {"FDE", "ADE", "ML"}.
+
+        """
         if pred.dim() == 4:
-            pred, _ = filter_prediction(pred, trg, mask, prob, min_criterion,
-                                        best_idx, mode_first=mode_first)
+            pred, _ = filter_prediction(
+                pred, trg, mask, prob, min_criterion, best_idx, mode_first=mode_first
+            )
 
         batch_size, seq_len = pred.size()[:2]
 
@@ -69,7 +85,5 @@ class MinFDE(Metric):
         self.count += fde.size(0)
 
     def compute(self) -> torch.Tensor:
-        """
-        Compute the final metric.
-        """
+        """Compute the final metric."""
         return self.sum / self.count  # type: ignore

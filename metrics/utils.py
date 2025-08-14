@@ -14,24 +14,53 @@
 
 import warnings
 from typing import Optional
+
 import torch
 
 
-def filter_prediction(pred: torch.Tensor,
-                      trg: torch.Tensor,
-                      mask: Optional[torch.Tensor] = None,
-                      prob: Optional[torch.Tensor] = None,
-                      min_criterion: str = 'FDE',
-                      best_idx: Optional[torch.Tensor] = None,
-                      mode_first: bool = False
-                      ) -> tuple[torch.Tensor, torch.Tensor]:
+def filter_prediction(
+    pred: torch.Tensor,
+    trg: torch.Tensor,
+    mask: Optional[torch.Tensor] = None,
+    prob: Optional[torch.Tensor] = None,
+    min_criterion: str = "FDE",
+    best_idx: Optional[torch.Tensor] = None,
+    mode_first: bool = False,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Select the best trajectory prediction mode based on a given selection criterion.
+
+    This function filters a set of multimodal predictions by selecting the most likely or
+    most accurate trajectory mode per sample, according to a specified criterion.
+    It returns a single-mode prediction tensor and the corresponding best mode indices.
+
+    Args:
+        pred (torch.Tensor): Predicted trajectories, shape (N, T, M, 2) or (N, M, T, 2) if `mode_first` is True.
+        trg (torch.Tensor): Ground-truth trajectories, shape (N, T, 2).
+        mask (Optional[torch.Tensor]): Validity mask for time steps, shape (N, T). Used to find last valid index for FDE.
+        prob (Optional[torch.Tensor]): Mixture probabilities or logits, shape (N, M). Required for "ML" criterion.
+        min_criterion (str): Criterion used to select the best mode, one of {"FDE", "ADE", "ML"}.
+        best_idx (Optional[torch.Tensor]): Precomputed best mode indices, shape (N,). If provided, skips selection logic.
+        mode_first (bool): If True, assumes input is shaped (N, M, T, 2) and transposes to (N, T, M, 2).
+
+    Returns:
+        tuple[torch.Tensor, torch.Tensor]:
+            - Filtered single-mode predictions, shape (N, T, 2).
+            - Selected mode indices, shape (N,).
+
+    Raises:
+        ValueError: If `min_criterion` is invalid or if `prob` is not provided for "ML".
+
+    """
     if mode_first:
         # (N, M, T, 2) -> (N, T, M, 2)
         pred = pred.transpose(1, 2)
 
     if pred.size(-1) > 2 or trg.size(-1) > 2:
-        warnings.warn("The last dimension of the prediction or target tensors"
-                      " is greater than 2. Only the first two dimensions will be considered.")
+        warnings.warn(
+            "The last dimension of the prediction or target tensors"
+            " is greater than 2. Only the first two dimensions will be considered.",
+            stacklevel=2,
+        )
         pred = pred[..., :2]
         trg = trg[..., :2]
 
@@ -52,8 +81,9 @@ def filter_prediction(pred: torch.Tensor,
             last_pred = pred[:, -1]
             last_trg = trg[:, -1]
 
-        best_idx = torch.linalg.norm(last_pred - last_trg.unsqueeze(1),
-                                     dim=-1).argmin(dim=-1)  # (N,)
+        best_idx = torch.linalg.norm(last_pred - last_trg.unsqueeze(1), dim=-1).argmin(
+            dim=-1
+        )  # (N,)
 
         pred = pred[torch.arange(batch_size), :, best_idx]  # (N, T, 2)
 
@@ -72,13 +102,15 @@ def filter_prediction(pred: torch.Tensor,
         pred = pred[torch.arange(batch_size), :, best_idx]  # (N, T, 2)
 
     elif min_criterion == "ML":
-        assert prob is not None, ("Probabilistic criterion requires"
-                                  " the probability of the predictions.")
+        if prob is None:
+            msg = "Probabilistic criterion requires the probability of the predictions."
+            raise ValueError(prob)
 
         best_idx = prob.argmax(dim=-1)  # (N,)
         pred = pred[torch.arange(batch_size), :, best_idx]  # (N, T, 2)
 
     else:
-        raise ValueError(f"Invalid criterion: {min_criterion}")
+        msg = f"Invalid criterion: {min_criterion}"
+        raise ValueError(msg)
 
     return pred, best_idx

@@ -1,5 +1,8 @@
+import re
+
 import pytest
 import torch
+
 from metrics.min_brier import MinBrier
 
 
@@ -23,7 +26,7 @@ def test_min_brier_with_none_probability():
     prob = None
 
     min_brier = MinBrier()
-    with pytest.raises(AssertionError, match="Probabilistic criterion requires"
+    with pytest.raises(ValueError, match="Probabilistic criterion requires"
                                              " the probability of the predictions."):
         min_brier.update(pred, trg, prob)
 
@@ -35,5 +38,6 @@ def test_min_brier_with_unimodal_prediction():
     prob = torch.randn(batch_size, num_modes)
 
     min_brier = MinBrier()
-    with pytest.raises(AssertionError, match="The predictions must be multi-modal."):
+    msg = f"The prediction tensor must be 4-dimensional, got shape {pred.shape}"
+    with pytest.raises(ValueError, match=re.escape(msg)):
         min_brier.update(pred, trg, prob)

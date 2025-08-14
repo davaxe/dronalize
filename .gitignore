@@ -3,6 +3,7 @@ data/
 lightning_logs/
 wandb/
 /saved_models/
+media/
 
 ### Apptainer ###
 *.sif

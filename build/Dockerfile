@@ -1,23 +1,35 @@
-# Define build argument for CUDA version (defaults to 12.4)
+# syntax=docker/dockerfile:1.7
+
+# Build args so you can switch CUDA builds at build time
 ARG CUDA_VERSION=12.4
 
-# Select base image for CUDA versions
-FROM pytorch/pytorch:2.5.1-cuda${CUDA_VERSION}-cudnn9-runtime
+# Base image already includes torch==2.6.0 for the right CUDA
+FROM pytorch/pytorch:2.6.0-cuda${CUDA_VERSION}-cudnn9-runtime
 
 ARG CU_VERSION="124"
 
-# Set working directory
+# Avoid interactive tzdata etc.
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# Copy and install dependencies
-COPY container_req.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
+# 1) Copy only files that affect dependency resolution to leverage Docker cache
+COPY pyproject.toml README.md ./
 
-# Install `torch-cluster`
-RUN pip install --no-cache-dir torch-cluster -f https://data.pyg.org/whl/torch-2.5.0+cu${CU_VERSION}.html
+# 2) Install base + container 
+RUN python -m pip install --upgrade pip && \
+    pip install --no-cache-dir .[container]
 
-# Set default command
+# 3) Install `torch-cluster`
+RUN python -m pip install --no-cache-dir \
+    -f https://data.pyg.org/whl/torch-2.6.0+cu${CU_VERSION}.html \
+    torch-cluster
+
+# Default command
 CMD ["python", "--version"]
 
 # Example build command
-# docker build --build-arg CUDA_VERSION=12.4 --build-arg CU_VERSION=124 -t dronalize:latest-cu124 -f Dockerfile .
+# docker build --build-arg CUDA_VERSION=12.4 --build-arg CU_VERSION=124 -t dronalize:latest -f build/Dockerfile .

@@ -12,42 +12,59 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, cast
+from typing import Optional
+
 import torch
 from torchmetrics import Metric
+
 from metrics.utils import filter_prediction
 
 
 class MissRate(Metric):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.add_state('sum', default=torch.tensor(0.0), dist_reduce_fx='sum')
-        self.add_state('count', default=torch.tensor(0), dist_reduce_fx='sum')
+        self.add_state("sum", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("count", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self,
-               pred: torch.Tensor,
-               trg: torch.Tensor,
-               mask: Optional[torch.Tensor] = None,
-               prob: Optional[torch.Tensor] = None,
-               best_idx: Optional[torch.Tensor] = None,
-               miss_criterion: str = 'FDE',
-               miss_threshold: float = 2.0,
-               mode_first: bool = False) -> None:
-        """
-        Update the metric state.
-        :param: pred: The predicted trajectory. (N, T, M, 2) or (N, T, 2)
-        :param: trg: The ground-truth target trajectory. (N, T, 2)
-        :param: prob: The probability of the predictions. (N, M)
-        :param: mask: The mask for valid positions. (N, T)
-        :param: best_idx: The index of the best prediction. (N,) (to avoid recomputing it)
-        :param: min_criterion: Either 'FDE', 'ADE', or 'ML'.
-        :param: miss_threshold: The threshold for a missed prediction. (default: 2.0)
-        :param: mode_first: Whether the mode is the first dimension. (default: False)
-        """
+    def update(
+        self,
+        pred: torch.Tensor,
+        trg: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        prob: Optional[torch.Tensor] = None,
+        best_idx: Optional[torch.Tensor] = None,
+        miss_criterion: str = "FDE",
+        miss_threshold: float = 2.0,
+        mode_first: bool = False,
+    ) -> None:
+        """Update the metric state with predicted and ground-truth trajectories.
 
+        This method computes the Miss Rate, defined as the proportion of agents whose predicted
+        final position deviates from the ground truth by more than `miss_threshold` meters.
+        For multimodal predictions, the best mode is selected according to a criterion (FDE, ADE, or ML)
+        before computing the distance to the target.
+
+        Args:
+            pred (torch.Tensor): Predicted trajectories, shape (N, T, M, 2) for multimodal or (N, T, 2) if already filtered.
+            trg (torch.Tensor): Ground-truth trajectories, shape (N, T, 2).
+            mask (Optional[torch.Tensor]): Validity mask over time steps, shape (N, T). If provided, selects the final valid time step.
+            prob (Optional[torch.Tensor]): Mixture probabilities or logits, shape (N, M), used for "ML" mode selection.
+            best_idx (Optional[torch.Tensor]): Precomputed best mode indices, shape (N,). Avoids recomputing.
+            miss_criterion (str): Criterion for best mode selection, one of {"FDE", "ADE", "ML"}.
+            miss_threshold (float): Distance threshold (in meters) beyond which a prediction is considered a miss.
+            mode_first (bool): If True, assumes input is shaped (N, M, T, 2) and transposes to (N, T, M, 2).
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: If `miss_criterion` is not one of {"FDE", "ADE", "ML"}.
+
+        """
         if pred.dim() == 4:
-            pred, _ = filter_prediction(pred, trg, mask, prob, miss_criterion,
-                                        best_idx, mode_first=mode_first)
+            pred, _ = filter_prediction(
+                pred, trg, mask, prob, miss_criterion, best_idx, mode_first=mode_first
+            )
 
         batch_size, seq_len = pred.size()[:2]
 
@@ -73,7 +90,5 @@ class MissRate(Metric):
         self.count += mr.size(0)
 
     def compute(self) -> torch.Tensor:
-        """
-        Compute the final metric.
-        """
+        """Compute the final metric."""
         return self.sum / self.count  # type: ignore

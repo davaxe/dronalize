@@ -1,4 +1,4 @@
-# Copyright 2024, Theodor Westny. All rights reserved.
+# Copyright 2024-2025, Theodor Westny. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,35 +12,64 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import logging
 import time
 import warnings
 from pathlib import Path
 
 import torch
-from torch.multiprocessing import set_sharing_strategy
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import Callback, ModelCheckpoint
 from lightning.pytorch.loggers import Logger, WandbLogger
-from lightning.pytorch.strategies import Strategy, DDPStrategy
+from lightning.pytorch.strategies import DDPStrategy, Strategy
+from torch.multiprocessing import set_sharing_strategy
 
 from arguments import args
-from utils import load_config, import_from_module
+from utils import import_from_module, load_config
 
-torch.set_float32_matmul_precision('medium')
-warnings.filterwarnings("ignore", ".*Consider increasing the value of the `num_workers` argument*")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+printer = logging.getLogger(__name__)
+
+torch.set_float32_matmul_precision("medium")
+warnings.filterwarnings(
+    "ignore", ".*Consider increasing the value of the `num_workers` argument*",
+)
 warnings.filterwarnings("ignore", ".*Checkpoint directory*")
 
-set_sharing_strategy('file_system')
+set_sharing_strategy("file_system")
 
 # Load configuration and import modules
 config = load_config(args.config)
-TorchModel = import_from_module(config["model"]["module"], config["model"]["class"])
-LitDataModule = import_from_module(config["datamodule"]["module"], config["datamodule"]["class"])
-LitModel = import_from_module(config["litmodule"]["module"], config["litmodule"]["class"])
+TorchModel = import_from_module(
+    "models." + config["model"]["module"], config["model"]["class"],
+)
+LitDataModule = import_from_module(
+    "datamodules." + config["datamodule"]["module"], config["datamodule"]["class"],
+)
+LitModel = import_from_module(
+    "models." + config["litmodule"]["module"], config["litmodule"]["class"],
+)
 
 
 def main(save_name: str) -> None:
+    """Train a PyTorch Lightning model using configuration and runtime arguments.
+
+    This function:
+    - Loads the model, data module, and training configuration from a YAML config file.
+    - Sets up checkpointing, logging (e.g., WandB), and training callbacks.
+    - Dynamically selects devices, strategies, and accelerators based on
+    CUDA availability and user flags.
+    - Initializes the model and datamodule.
+    - Optionally loads a pre-trained checkpoint.
+    - Runs model training using the Lightning `Trainer`.
+
+    Args:
+        save_name (str): The base name used for saving checkpoints and logging runs.
+
+    Raises:
+        AssertionError: If a specified pre-trained model checkpoint cannot be found.
+
+    """
     ds = config["dataset"]
     ckpt_path = Path("saved_models") / ds / save_name
 
@@ -62,7 +91,7 @@ def main(save_name: str) -> None:
             dirpath=str(ckpt_path.parent),
             filename=save_name,
             monitor="val_loss",
-            mode="min"
+            mode="min",
         )
 
         callback_list += [ckpt_cb, ckpt_cb_best]
@@ -71,11 +100,14 @@ def main(save_name: str) -> None:
     strategy: str | Strategy
     if torch.cuda.is_available() and args.use_cuda:
         devices = -1 if torch.cuda.device_count() > 1 else 1
-        strategy = DDPStrategy(find_unused_parameters=True,
-                               gradient_as_bucket_view=True) if devices == -1 else 'auto'
+        strategy = (
+            DDPStrategy(find_unused_parameters=True, gradient_as_bucket_view=True)
+            if devices == -1
+            else "auto"
+        )
         accelerator = "auto"
     else:
-        devices, strategy, accelerator = 1, 'auto', "cpu"
+        devices, strategy, accelerator = 1, "auto", "cpu"
 
     # Setup logger
     logger: bool | Logger
@@ -96,12 +128,16 @@ def main(save_name: str) -> None:
     if args.pre_train:
         pt_ckpt = Path("saved_models") / args.pre_train
         pt_ckpt = pt_ckpt.with_suffix(".ckpt")
-        assert pt_ckpt.exists(), f"Could not find pre-trained model: {pt_ckpt}"
+        if not pt_ckpt.exists():
+            msg = f"Could not find pre-trained model: {pt_ckpt}"
+            raise RuntimeError(msg)
         ckpt_dict = torch.load(pt_ckpt, weights_only=True)
         model.load_state_dict(ckpt_dict["state_dict"], strict=False)
 
-        print(f"\nSuccessfully loaded pre-trained model: {pt_ckpt}\n")
-        print('----------------------------------------------------')
+        msg = f"\nSuccessfully loaded pre-trained model: {pt_ckpt}\n"
+        printer.info(msg)
+        printer.info("----------------------------------------------------")
+
 
     if args.root:
         config["datamodule"]["root"] = args.root
@@ -109,14 +145,16 @@ def main(save_name: str) -> None:
     datamodule = LitDataModule(config["datamodule"], args)
 
     # Setup Lightning Trainer
-    trainer = Trainer(max_epochs=config["training"]["epochs"],
-                      logger=logger,
-                      devices=devices,
-                      strategy=strategy,
-                      accelerator=accelerator,
-                      callbacks=callback_list,
-                      fast_dev_run=args.dry_run,
-                      enable_checkpointing=args.store_model)
+    trainer = Trainer(
+        max_epochs=config["training"]["epochs"],
+        logger=logger,
+        devices=devices,
+        strategy=strategy,
+        accelerator=accelerator,
+        callbacks=callback_list,
+        fast_dev_run=args.dry_run,
+        enable_checkpointing=args.store_model,
+    )
 
     # Start training
     trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt)
@@ -134,8 +172,10 @@ if __name__ == "__main__":
     if args.dry_run:
         full_save_name += "-DEBUG"
 
-    print('----------------------------------------------------')
-    print(f'\nGetting ready to train model: {full_save_name} \n')
-    print('----------------------------------------------------')
+    msg = f"\nGetting ready to train model: {full_save_name} \n"
+
+    printer.info("----------------------------------------------------")
+    printer.info(msg)
+    printer.info("----------------------------------------------------")
 
     main(full_save_name)
