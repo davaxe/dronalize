@@ -231,6 +231,8 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         self.nodes: dict[ID, NODE] = {}
         self.id_adj_list: dict[ID, list[tuple[ID, EdgeType]]] = {}
         self.edge_map: dict[EdgeType, EdgeType] = {}
+        # Extra nodes are nodes that are not connected to any other nodes
+        self.extra_nodes: dict[ID, NODE] = {}
 
     @abstractmethod
     def new_node(
@@ -264,11 +266,30 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             self.id_adj_list[node.id] = []
         return node.id
 
-    def build_graph(self) -> MapGraph:
+    def add_extra_node(self, node: NODE) -> ID:
+        """Add an extra node to the graph.
+
+        Args:
+            node: node to add to the graph.
+
+        Returns:
+            The ID of the added node.
+
+        """
+        if node.id not in self.extra_nodes:
+            self.extra_nodes[node.id] = node
+        return node.id
+
+    def build_graph(self, *, include_extra_nodes: bool = False) -> MapGraph:
         """Build a graph representation of the map.
 
-        This method converts the internal adjacency list and node positions
-        into a `MapGraph` object.
+        This method converts the internal adjacency list and node positions into
+        a `MapGraph` object.
+
+        Args:
+            include_extra_nodes: whether to include extra nodes added by using
+            `add_extra_node` method directly (e.g., traffic lights that are not
+            part of any edges).
 
         Returns:
             A `MapGraph` object representing the graph.
@@ -286,6 +307,14 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             id_to_index,
             edge_map=self.edge_map,
         ).to_torch()
+
+        if include_extra_nodes:
+            n_nodes: int = len(self.extra_nodes)
+            extra_node_positions = torch.zeros((n_nodes, 2), dtype=torch.float32)
+            for i, node in enumerate(self.extra_nodes.values()):
+                extra_node_positions[i, 0] = node.x
+                extra_node_positions[i, 1] = node.y
+            node_positions = torch.cat([node_positions, extra_node_positions], dim=0)
 
         return MapGraph(
             edge_indices=edge_indices,
@@ -603,7 +632,8 @@ class MapGraph:
 
         """
         # Check if the input tensors are empty
-        if node_positions.numel() == 0 or edge_indices.numel() == 0:
+        print(node_positions.shape)
+        if node_positions.numel() == 0 and edge_indices.numel() == 0:
             if return_if_empty:
                 node_positions = torch.zeros((0, 2), dtype=torch.float)
                 edge_indices = torch.zeros((2, 0), dtype=torch.long)
@@ -619,8 +649,9 @@ class MapGraph:
         self.node_positions: torch.Tensor = node_positions
         self.edge_indices: torch.Tensor = edge_indices
         self.num_nodes: int = node_positions.shape[0]
-        self.num_edges: int = edge_indices.shape[1]
-
+        self.num_edges: int = (
+            edge_indices.shape[1] if edge_indices.numel() > 0 else 0
+        )
         self.node_types: torch.Tensor = (
             node_types
             if node_types is not None

@@ -3,9 +3,11 @@ from __future__ import annotations
 import sqlite3
 import struct
 from dataclasses import dataclass
-from enum import IntEnum, IntFlag
+from enum import IntEnum, IntFlag, auto
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal, Protocol, Self
+
+from torch import ge
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -27,35 +29,27 @@ class Endianness(IntEnum):
     BIG = 1
 
     def str_repr(self) -> Literal["little", "big"]:
-        """Return a string representation of the endianness.
-
-        Can be used in some standard python contexts, e.g, `int.from_bytes`.
-
-        Returns:
-            A string indicating the endianness ("little" or "big").
-
-        """
+        """Return a string representation of the endianness."""
         return "little" if self == Endianness.LITTLE else "big"
+
+    def str_symbol(self) -> Literal["<", ">"]:
+        """Return a string representation of the endianness symbol."""
+        return "<" if self == Endianness.LITTLE else ">"
 
 
 class GeometryType(IntEnum):
     """Represents the type of geometry."""
 
-    GEOMETRY = 0
     POINT = 1
     LINESTRING = 2
     POLYGON = 3
-    MULTIPOINT = 4
-    MULTILINESTRING = 5
-    MULTIPOLYGON = 6
-    GEOMETRYCOLLECTION = 7
-    CIRCULAR_STRING = 8
-    COMPOUND_CURVE = 9
-    CURVE_POLYGON = 10
-    MULTI_CURVE = 11
-    MULTI_SURFACE = 12
-    CURVE = 13
-    SURFACE = 14
+
+
+class Dimension(IntEnum):
+    XY = 2
+    XYZ = 3
+    XYM = 3
+    XYZM = 4
 
 
 class Envelope(IntEnum):
@@ -129,7 +123,7 @@ class GeoPackageBinaryFlags(IntFlag):
         return bool(self & GeoPackageBinaryFlags.BYTE_ORDER)
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class GeoPackageBinaryHeader:
     """Represents the header of a GeoPackage binary file."""
 
@@ -185,15 +179,14 @@ class GeoPackageBinaryHeader:
         )
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class WKBPayload:
     """Represents the Well-Known Binary (WKB) payload."""
 
     endianness: Endianness
     geometry_type: GeometryType
     payload: bytes
-    has_z: bool
-    has_m: bool
+    dim: Dimension
 
     @classmethod
     def from_bytes(cls, data: bytes) -> WKBPayload:
@@ -206,93 +199,301 @@ class WKBPayload:
             A WKBPayload instance.
 
         """
-        endianness = Endianness.LITTLE if data[0] == 1 else Endianness.BIG
+        endianness = GeometryParser.parse_byteorder(data)
+        geometry_type_int, dim = GeometryParser.parse_geometry_type(
+            data,
+            byteorder=endianness,
+            offset=1,
+        )
+
+        return cls(endianness, GeometryType(geometry_type_int), data, dim)
+
+    def data(self) -> Iterator[tuple[float, float]]:
+        """Extract data points from the payload."""
+        parser = PARSER_MAP[self.geometry_type]
+        yield from parser.parse(
+            self.payload,
+            byteorder=self.endianness,
+            dim=self.dim,
+        ).points()
+
+
+@dataclass(frozen=True, slots=True)
+class GeometryParser(Protocol):
+    @staticmethod
+    def parse_byteorder(data: bytes) -> Endianness:
+        if data[0] == 1:
+            return Endianness.LITTLE
+        return Endianness.BIG
+
+    @staticmethod
+    def parse_geometry_type(
+        data: bytes,
+        *,
+        byteorder: Endianness,
+        offset: int = 0,
+    ) -> tuple[GeometryType, Dimension]:
         geometry_type_int = int.from_bytes(
-            data[1:5],
-            endianness.str_repr(),
+            data[offset : offset + 4],
+            byteorder.str_repr(),
             signed=False,
         )
+        if geometry_type_int > 3000:
+            dim = Dimension.XYZM
+            geometry_type_int -= 3000
+        elif geometry_type_int > 2000:
+            dim = Dimension.XYM
+            geometry_type_int -= 2000
+        elif geometry_type_int > 1000:
+            dim = Dimension.XYZ
+            geometry_type_int -= 1000
+        else:
+            dim = Dimension.XY
 
-        both_offset, m_offset, z_offset = 3000, 2000, 1000
-        has_z, has_m = False, False
-        if geometry_type_int > both_offset:
-            has_z = True
-            has_m = True
-            geometry_type_int -= both_offset
-        elif geometry_type_int > m_offset:
-            has_z = False
-            has_m = True
-            geometry_type_int -= m_offset
-        elif geometry_type_int > z_offset:
-            has_z = False
-            has_m = False
-            geometry_type_int -= z_offset
+        if geometry_type_int not in {1, 2, 3}:
+            msg = f"Unsupported geometry type: {geometry_type_int}, "
+            msg += f"supported types are: {list(GeometryType)}"
+            raise ValueError(msg)
 
-        payload = data[5 + 4 :]
+        return GeometryType(geometry_type_int), dim
+
+    @classmethod
+    def parse(
+        cls: type[Self],
+        data: bytes,
+        *,
+        byteorder: Endianness,
+        offset: int = 0,
+        dim: Dimension = Dimension.XY,
+    ) -> Self: ...
+
+    def points(self) -> Iterator[tuple[float, float]]: ...
+
+    def n_bytes(self) -> int: ...
+
+
+@dataclass(frozen=True, slots=True)
+class Point(GeometryParser):
+    x: float
+    y: float
+    z: float | None = None
+    m: float | None = None
+
+    @classmethod
+    def parse(
+        cls,
+        data: bytes,
+        *,
+        byteorder: Endianness,
+        offset: int = 0,
+        dim: Dimension = Dimension.XY,
+    ) -> Self:
         return cls(
-            endianness,
-            GeometryType(geometry_type_int),
-            payload,
-            has_z,
-            has_m,
+            *struct.unpack(
+                f"{byteorder.str_symbol()}" + "d" * dim,
+                data[offset : offset + 8 * dim],
+            ),
         )
 
-    @overload
-    def data(
-        self,
-        *,
-        include_z: Literal[False] = False,
-        include_m: Literal[False] = False,
-    ) -> Iterator[tuple[float, float]]: ...
+    def n_bytes(self) -> int:
+        dim = 2
+        dim += 1 if self.z is not None else 0
+        dim += 1 if self.m is not None else 0
+        return 8 * dim
 
-    @overload
-    def data(
-        self,
-        *,
-        include_z: Literal[True],
-        include_m: Literal[False] = False,
-    ) -> Iterator[tuple[float, float, float]]: ...
 
-    @overload
-    def data(
-        self,
-        *,
-        include_z: Literal[False] = False,
-        include_m: Literal[True],
-    ) -> Iterator[tuple[float, float, float]]: ...
+@dataclass(frozen=True, slots=True)
+class LinearRing(GeometryParser):
+    points_list: list[Point]
 
-    @overload
-    def data(
-        self,
+    @classmethod
+    def parse(
+        cls,
+        data: bytes,
         *,
-        include_z: Literal[True],
-        include_m: Literal[True],
-    ) -> Iterator[tuple[float, float, float, float]]: ...
+        byteorder: Endianness,
+        offset: int = 0,
+        dim: Dimension = Dimension.XY,
+    ) -> Self:
+        num_points = int.from_bytes(
+            data[offset : offset + 4],
+            byteorder.str_repr(),
+            signed=False,
+        )
+        points = []
+        for i in range(num_points):
+            point_data = data[offset + 4 + i * 16 : offset + 4 + (i + 1) * 16]
+            points.append(Point.parse(point_data, byteorder=byteorder, dim=dim))
+        return cls(points_list=points)
 
-    def data(
-        self,
+    def n_bytes(self) -> int:
+        return 4 + sum(p.n_bytes() for p in self.points_list)
+
+    def points(self) -> Iterator[tuple[float, float]]:
+        return ((p.x, p.y) for p in self.points_list)
+
+
+@dataclass(frozen=True, slots=True)
+class WKBPoint(GeometryParser):
+    byteorder: Endianness
+    geometry_type: GeometryType
+    point: Point
+
+    @classmethod
+    def parse(
+        cls: type[Self],
+        data: bytes,
         *,
-        include_z: bool = False,
-        include_m: bool = False,
-    ) -> Iterator[tuple[float, ...]]:
-        """Extract data points from the payload."""
-        base_str = "dd"
-        if include_z and self.has_z:
-            base_str += "d"
-        elif include_z and not self.has_z:
-            msg = f"`include_z` was set to {include_z}, but `self.has_z` is {self.has_z}"
+        byteorder: Endianness,
+        offset: int = 0,
+        dim: Dimension = Dimension.XY,
+    ) -> Self:
+        byteorder = GeometryParser.parse_byteorder(data)
+        geometry_type, _dim = GeometryParser.parse_geometry_type(
+            data,
+            byteorder=byteorder,
+            offset=offset + 1,
+        )
+
+        if geometry_type != GeometryType.POINT:
+            msg = f"Expected geometry type `POINT`, got {geometry_type}"
             raise ValueError(msg)
-        if include_m and self.has_m:
-            base_str += "d"
-        elif include_m and not self.has_m:
-            msg = f"`include_m` was set to {include_m}, but `self.has_m` is {self.has_m}"
+        if _dim != dim:
+            msg = f"Dimension mismatch: expected {dim}, got {_dim}"
             raise ValueError(msg)
 
-        for point in struct.iter_unpack(
-            (">" if self.endianness == Endianness.BIG else "<") + base_str,
-            self.payload,
-        ):
-            yield point if include_z or include_m else point[:2]
+        point = Point.parse(data, byteorder=byteorder, offset=offset + 5, dim=dim)
+        return cls(
+            byteorder=byteorder,
+            geometry_type=geometry_type,
+            point=point,
+        )
+
+    def n_bytes(self) -> int:
+        return 1 + 4 + 4 + self.point.n_bytes()
+
+    def points(self) -> Iterator[tuple[float, float]]:
+        yield (self.point.x, self.point.y)
+
+
+@dataclass(frozen=True, slots=True)
+class WKBLineString(GeometryParser):
+    byteorder: Endianness
+    geometry_type: GeometryType
+    points_list: list[Point]
+
+    @classmethod
+    def parse(
+        cls: type[Self],
+        data: bytes,
+        *,
+        byteorder: Endianness,
+        offset: int = 0,
+        dim: Dimension = Dimension.XY,
+    ) -> Self:
+        byteorder = GeometryParser.parse_byteorder(data)
+        geometry_type, _dim = GeometryParser.parse_geometry_type(
+            data,
+            byteorder=byteorder,
+            offset=offset + 1,
+        )
+
+        if geometry_type != GeometryType.LINESTRING:
+            msg = f"Expected geometry type `LINESTRING`, got {geometry_type}"
+            raise ValueError(msg)
+
+        num_points = int.from_bytes(
+            data[offset + 5 : offset + 9],
+            byteorder.str_repr(),
+            signed=False,
+        )
+        points = []
+        point_offset = offset + 9
+        for _ in range(num_points):
+            point = Point.parse(
+                data,
+                byteorder=byteorder,
+                offset=point_offset,
+                dim=dim,
+            )
+            points.append(point)
+            point_offset += point.n_bytes()
+
+        return cls(
+            byteorder=byteorder,
+            geometry_type=geometry_type,
+            points_list=points,
+        )
+
+    def n_bytes(self) -> int:
+        return 1 + 4 + 4 + sum(p.n_bytes() for p in self.points_list)
+
+    def points(self) -> Iterator[tuple[float, float]]:
+        return ((p.x, p.y) for p in self.points_list)
+
+
+@dataclass(frozen=True, slots=True)
+class WKBPolygon(GeometryParser):
+    byteorder: Endianness
+    geometry_type: GeometryType
+    rings: list[LinearRing]
+
+    @classmethod
+    def parse(
+        cls: type[Self],
+        data: bytes,
+        *,
+        byteorder: Endianness,
+        offset: int = 0,
+        dim: Dimension = Dimension.XY,
+    ) -> Self:
+        byteorder = GeometryParser.parse_byteorder(data)
+        geometry_type, _dim = GeometryParser.parse_geometry_type(
+            data,
+            byteorder=byteorder,
+            offset=offset + 1,
+        )
+
+        if geometry_type != GeometryType.POLYGON:
+            msg = f"Expected geometry type `POLYGON`, got {geometry_type}"
+            raise ValueError(msg)
+
+        num_rings = int.from_bytes(
+            data[offset + 5 : offset + 9],
+            byteorder.str_repr(),
+            signed=False,
+        )
+        rings = []
+        ring_offset = offset + 9
+        for _ in range(num_rings):
+            ring = LinearRing.parse(
+                data,
+                byteorder=byteorder,
+                offset=ring_offset,
+                dim=dim,
+            )
+            rings.append(ring)
+            ring_offset += ring.n_bytes()
+
+        return cls(
+            byteorder=byteorder,
+            geometry_type=geometry_type,
+            rings=rings,
+        )
+
+    def n_bytes(self) -> int:
+        return 1 + 4 + 4 + sum(ring.n_bytes() for ring in self.rings)
+
+    def points(self) -> Iterator[tuple[float, float]]:
+        for ring in self.rings:
+            yield from ring.points()
+
+
+PARSER_MAP: dict[GeometryType, type[GeometryParser]] = {
+    GeometryType.POINT: WKBPoint,
+    GeometryType.LINESTRING: WKBLineString,
+    GeometryType.POLYGON: WKBPolygon,
+}
 
 
 if __name__ == "__main__":
@@ -300,12 +501,11 @@ if __name__ == "__main__":
     database = sqlite3.connect(data_path)
     # Get table "boundaries" data "geom"
     cursor = database.cursor()
-    cursor.execute("SELECT geom FROM boundaries")
+    cursor.execute("SELECT geom FROM traffic_lights")
     rows = cursor.fetchall()
     for geom_data, *_ in rows:
         header = GeoPackageBinaryHeader.from_bytes(geom_data)
         payload = WKBPayload.from_bytes(geom_data[header.n_bytes() :])
         for x, y in payload.data():
             print(x, y)
-        break
     database.close()
