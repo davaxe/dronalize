@@ -7,11 +7,13 @@ available in the GeoPackage!
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Hashable, Iterator
+from collections.abc import Callable, Hashable, Iterator
 from dataclasses import dataclass
 from enum import IntEnum
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, Protocol, Self, TypeVar
+
+from pyproj import Transformer
 
 from preprocessing.road_network.edge_type import EdgeType
 from preprocessing.road_network.nuplan.geometry_parser import (
@@ -30,6 +32,17 @@ class NuPlanMap:
         self.map_meta_file = map_meta_file
 
         self.connection = sqlite3.connect(self.gpkg_file)
+
+        # Read metadata
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT key, value FROM meta")
+        cursor = cursor.fetchall()
+        self.metadata = dict(cursor)
+        self.transform = Transformer.from_crs(
+            self.metadata["geographicCoordSystem"],
+            self.metadata["projectedCoordSystem"],
+            always_xy=True,
+        ).transform
 
     @cached_property
     def boundaries(self) -> dict[int, Boundary]:
@@ -100,9 +113,15 @@ class LayerBase(Protocol, Generic[ID]):
         """Convert a database row to an instance of the layer."""
         ...
 
+    def points_transform(
+        self, transform: Callable[[float, float], tuple[float, float]]
+    ) -> Iterator[tuple[float, float]]:
+        """Transform the points of the layer geometry using the given transform function."""
+        yield from self.geometry.data.points_transform(transform)
+
     def points(self) -> Iterator[tuple[float, float]]:
         """Yield the points of the layer geometry."""
-        yield from self.geometry.data.data()
+        yield from self.geometry.data.points()
 
     def edge_type(self) -> EdgeType:
         """Return the edge type for the layer."""

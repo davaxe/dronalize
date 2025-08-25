@@ -74,12 +74,12 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, IntIDNode]):
 
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
         """Create a new node in the graph with given coordinates."""
-        return IntIDNode(x, y, z)
+        return IntIDNode(*self.map.transform(x, y), z=z)
 
     def _add_boundary_edges(self, interp_distance: float | None = None) -> None:
         for boundary in self.map.boundaries.values():
             self.add_node_edges_loop(
-                [IntIDNode(x, y) for x, y in boundary.points()],
+                [self.new_node(x, y) for x, y in boundary.points()],
                 edge_type=boundary.edge_type(),
                 interp_distance=interp_distance,
             )
@@ -87,7 +87,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, IntIDNode]):
     def _add_walkway_edges(self, interp_distance: float | None = None) -> None:
         for walkway in self.map.walkways.values():
             self.add_node_edges_loop(
-                [IntIDNode(x, y) for x, y in walkway.points()],
+                [self.new_node(x, y) for x, y in walkway.points()],
                 edge_type=walkway.edge_type(),
                 interp_distance=interp_distance,
             )
@@ -106,7 +106,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, IntIDNode]):
     ) -> None:
         for stop_polygon in self.map.stop_polygons.values():
             self.add_node_edges_loop(
-                [IntIDNode(x, y) for x, y in stop_polygon.points()],
+                [self.new_node(x, y) for x, y in stop_polygon.points()],
                 edge_type=stop_polygon.edge_type(),
                 interp_distance=interp_distance,
             )
@@ -117,7 +117,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, IntIDNode]):
     ) -> None:
         for car_park_area in self.map.car_park_areas.values():
             self.add_node_edges_loop(
-                [IntIDNode(x, y) for x, y in car_park_area.points()],
+                [self.new_node(x, y) for x, y in car_park_area.points()],
                 edge_type=car_park_area.edge_type(),
                 interp_distance=interp_distance,
             )
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     import matplotlib as mpl
     import matplotlib.pyplot as plt
 
-    mpl.use("Agg")
+    mpl.use("qt5agg")
 
     map_file = Path("data/maps/us-pa-pittsburgh-hazelwood/9.17.1937/map.gpkg")
     map_builder = NuScenesMapGraphBuilder.from_data_file(map_file)
@@ -137,4 +137,4 @@ if __name__ == "__main__":
     positions = map_graph.node_positions.numpy()
     plt.scatter(positions[:, 0], positions[:, 1], s=1, c="red")
     plt.axis("equal")
-    plt.savefig("test_scatter.png")
+    plt.show()

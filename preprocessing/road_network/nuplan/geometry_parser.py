@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-import sqlite3
 import struct
 from dataclasses import dataclass
-from enum import IntEnum, IntFlag, auto
-from pathlib import Path
+from enum import IntEnum, IntFlag
 from typing import TYPE_CHECKING, Literal, Protocol, Self
 
-from torch import ge
-
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
 
 def geometry_from_bytes(
@@ -208,7 +204,14 @@ class WKBPayload:
 
         return cls(endianness, GeometryType(geometry_type_int), data, dim)
 
-    def data(self) -> Iterator[tuple[float, float]]:
+    def points_transform(
+        self,
+        transform: Callable[[float, float], tuple[float, float]],
+    ) -> Iterator[tuple[float, float]]:
+        for x, y in self.points():
+            yield transform(x, y)
+
+    def points(self) -> Iterator[tuple[float, float]]:
         """Extract data points from the payload."""
         parser = PARSER_MAP[self.geometry_type]
         yield from parser.parse(
@@ -266,6 +269,13 @@ class GeometryParser(Protocol):
         offset: int = 0,
         dim: Dimension = Dimension.XY,
     ) -> Self: ...
+
+    def points_transform(
+        self,
+        transform: Callable[[float, float], tuple[float, float]],
+    ) -> Iterator[tuple[float, float]]:
+        for x, y in self.points():
+            yield transform(x, y)
 
     def points(self) -> Iterator[tuple[float, float]]: ...
 
@@ -494,18 +504,3 @@ PARSER_MAP: dict[GeometryType, type[GeometryParser]] = {
     GeometryType.LINESTRING: WKBLineString,
     GeometryType.POLYGON: WKBPolygon,
 }
-
-
-if __name__ == "__main__":
-    data_path = Path("data/maps/sg-one-north/9.17.1964/map.gpkg")
-    database = sqlite3.connect(data_path)
-    # Get table "boundaries" data "geom"
-    cursor = database.cursor()
-    cursor.execute("SELECT geom FROM traffic_lights")
-    rows = cursor.fetchall()
-    for geom_data, *_ in rows:
-        header = GeoPackageBinaryHeader.from_bytes(geom_data)
-        payload = WKBPayload.from_bytes(geom_data[header.n_bytes() :])
-        for x, y in payload.data():
-            print(x, y)
-    database.close()

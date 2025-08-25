@@ -177,23 +177,6 @@ class NuscenesData:
             msg = "data directory must be a Path or a string representing the path."
             raise TypeError(msg)
 
-    # Expected filenames in the data directory, made explicit for type checking.
-    Filename = Literal[
-        "attribute",
-        "calibrated_sensor",
-        "category",
-        "ego_pose",
-        "instance",
-        "log",
-        "map",
-        "sample_annotation",
-        "sample_data",
-        "sample",
-        "scene",
-        "sensor",
-        "visibility",
-    ]
-
     def get_scene_data_by_name(self, scene_name: str) -> pd.DataFrame:
         """Get the SceneData object for a specific scene name."""
         # Find the scene token by name
@@ -274,7 +257,7 @@ class NuscenesData:
         """Get an iterable of all scenes."""
         return (_SceneData(scene["token"], self) for scene in self.scenes.values())
 
-    def _load_json(self, filename: Filename) -> list[dict[str, Any]]:
+    def _load_json(self, filename: str) -> list[dict[str, Any]]:
         file_path = self.data_directory / f"{filename}.json"
         with file_path.open("r") as file:
             return json.load(file)
