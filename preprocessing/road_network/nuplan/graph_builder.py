@@ -74,21 +74,21 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, IntIDNode]):
 
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
         """Create a new node in the graph with given coordinates."""
-        return IntIDNode(*self.map.transform(x, y), z=z)
+        return IntIDNode(x, y, z)
 
     def _add_boundary_edges(self, interp_distance: float | None = None) -> None:
-        for boundary in self.map.boundaries.values():
+        for edge_type, boundary in self.map.boundaries():
             self.add_node_edges_loop(
-                [self.new_node(x, y) for x, y in boundary.points()],
-                edge_type=boundary.edge_type(),
+                [self.new_node(x, y) for x, y in boundary],
+                edge_type=edge_type,
                 interp_distance=interp_distance,
             )
 
     def _add_walkway_edges(self, interp_distance: float | None = None) -> None:
-        for walkway in self.map.walkways.values():
+        for edge_type, walkway in self.map.walkways():
             self.add_node_edges_loop(
-                [self.new_node(x, y) for x, y in walkway.points()],
-                edge_type=walkway.edge_type(),
+                [self.new_node(x, y) for x, y in walkway],
+                edge_type=edge_type,
                 interp_distance=interp_distance,
             )
 
@@ -96,18 +96,18 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, IntIDNode]):
         self,
         interp_distance: float | None = None,  # noqa: ARG002
     ) -> None:
-        for traffic_light in self.map.traffic_lights.values():
-            for x, y in traffic_light.points():
+        for _, traffic_light in self.map.traffic_lights():
+            for x, y in traffic_light:
                 self.add_extra_node(self.new_node(x, y))
 
     def _add_stop_polygon_edges(
         self,
         interp_distance: float | None = None,
     ) -> None:
-        for stop_polygon in self.map.stop_polygons.values():
+        for edge_type, stop_polygon in self.map.stop_polygons():
             self.add_node_edges_loop(
-                [self.new_node(x, y) for x, y in stop_polygon.points()],
-                edge_type=stop_polygon.edge_type(),
+                [self.new_node(x, y) for x, y in stop_polygon],
+                edge_type=edge_type,
                 interp_distance=interp_distance,
             )
 
@@ -115,10 +115,10 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, IntIDNode]):
         self,
         interp_distance: float | None = None,
     ) -> None:
-        for car_park_area in self.map.car_park_areas.values():
+        for edge_type, car_park_area in self.map.carpark_areas():
             self.add_node_edges_loop(
-                [self.new_node(x, y) for x, y in car_park_area.points()],
-                edge_type=car_park_area.edge_type(),
+                [self.new_node(x, y) for x, y in car_park_area],
+                edge_type=edge_type,
                 interp_distance=interp_distance,
             )
 
