@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import binascii
 import sqlite3
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
@@ -13,170 +11,90 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-@dataclass(frozen=True, slots=True)
-class SceneDescription:
-    token: bytes
-    name: str
-    log_token: bytes
-    start_lidar_pc_token: bytes
-    end_lidar_pc_token: bytes
-    num_lidar_pcs: int
+def get_nuplan_scenes_as_pandas(database_path: Path) -> list[pd.DataFrame]:
+    """Get NuPlan scenes as a list of pandas DataFrames.
 
-    @classmethod
-    def from_db(cls, conn: sqlite3.Connection) -> Iterator[SceneDescription]:
-        cursor = conn.cursor()
-        for row in cursor.execute(SCENES_QUERY):
-            yield cls(*row)
+    Args:
+        database_path: Path to the NuPlan database file.
+
+    Returns:
+        A list of pandas DataFrames, each representing a NuPlan scene.
+
+    """
+    return list(get_nuplan_scenes_as_pandas_iter(database_path))
 
 
-@dataclass(frozen=True, slots=True)
-class LidarPC:
-    token: bytes
-    next_token: bytes
-    prev_token: bytes
-    ego_pose_token: bytes
-    timestamp: int
+def get_nuplan_scenes_as_pandas_iter(database_path: Path) -> Iterator[pd.DataFrame]:
+    """Lazily get NuPlan scenes as pandas DataFrames.
 
-    @classmethod
-    def from_db_by_token(
-        cls,
-        conn: sqlite3.Connection,
-        lidar_pc_token: bytes,
-    ) -> LidarPC:
-        query = f"""
-            SELECT lp.token, lp.next_token, lp.prev_token, lp.ego_pose_token, lp.timestamp
-            FROM lidar_pc lp
-            WHERE lp.token = x'{binascii.hexlify(lidar_pc_token).decode()}'
-        """  # noqa: S608
-        cursor = conn.cursor()
-        row = cursor.execute(query).fetchone()
-        return cls(*row)
+    Args:
+        database_path: Path to the NuPlan database file.
 
+    Yields:
+        A pandas DataFrame representing a NuPlan scene.
 
-@dataclass(frozen=True, slots=True)
-class EgoPose:
-    token: bytes
-    x: float
-    y: float
-    qw: float
-    qx: float
-    qy: float
-    qz: float
-    vx: float
-    vy: float
-    acc_x: float
-    acc_y: float
-    epsg: int
-    timestamp: int
+    """
+    # Read-only, shared cache, immutable (good for SQLite perf on static DB files)
+    conn = sqlite3.connect(
+        f"file:{database_path}?mode=ro&immutable=1&cache=shared",
+        uri=True,
+    )
+    # Harmless for read-only workloads; keeps us honest.
+    conn.execute("PRAGMA query_only = 1")
 
-    @classmethod
-    def from_db_by_token(
-        cls,
-        conn: sqlite3.Connection,
-        ego_pose_token: bytes,
-    ) -> EgoPose:
-        query = f"""
-            SELECT ep.token, ep.x, ep.y, ep.qw, ep.qx, ep.qy, ep.qz, ep.vx, ep.vy,
-            ep.acceleration_x, ep.acceleration_y, ep.epsg, ep.timestamp
-            FROM ego_pose ep
-            WHERE ep.token = x'{binascii.hexlify(ego_pose_token).decode()}'
-        """  # noqa: S608
-        cursor = conn.cursor()
-        row = cursor.execute(query).fetchone()
-        return cls(*row)
+    for scene in _SceneHeader.from_db(conn):
+        yield _scene_to_dataframe(conn, scene)
+
+    conn.close()
 
 
-@dataclass(frozen=True, slots=True)
-class LidarBox:
-    token: bytes
-    track_token: bytes
-    next_token: bytes
-    prev_token: bytes
-    x: float
-    y: float
-    vx: float
-    vy: float
-    confidence: float
-
-    @classmethod
-    def from_db_by_token(
-        cls,
-        conn: sqlite3.Connection,
-        lidar_pc_token: bytes,
-    ) -> Iterator[LidarBox]:
-        query = f"""
-            SELECT lb.token, lb.track_token, lb.next_token, lb.prev_token, lb.x, lb.y,
-                   lb.vx, lb.vy, lb.confidence
-            FROM lidar_box lb
-            WHERE lb.lidar_pc_token = x'{binascii.hexlify(lidar_pc_token).decode()}'
-        """  # noqa: S608
-        cursor = conn.cursor()
-        for row in cursor.execute(query):
-            yield cls(*row)
-
-
-@dataclass(frozen=True, slots=True)
-class Track:
-    token: bytes
-    category: str
-    category_description: str
-
-    @classmethod
-    def from_db_by_token(
-        cls,
-        conn: sqlite3.Connection,
-        track_token: bytes,
-    ) -> Track:
-        query = f"""
-            SELECT t.token, t.category_token
-            FROM track t
-            WHERE t.token = x'{binascii.hexlify(track_token).decode()}'
-        """  # noqa: S608
-        cursor = conn.cursor()
-        track_token, category_token = cursor.execute(query).fetchone()
-        category_name, desc = get_category(conn, category_token)
-        return cls(track_token, category_name, desc)
-
-
-@lru_cache(maxsize=128)
-def get_category(conn: sqlite3.Connection, category_token: bytes) -> tuple[str, str]:
-    category_query: str = f"""
-            SELECT c.name, c.description
-            FROM category c
-            WHERE c.token = x'{binascii.hexlify(category_token).decode()}'
-        """  # noqa: S608
-    category_name, category_desc = conn.cursor().execute(category_query).fetchone()
-    return category_name, category_desc
-
-
-def get_map_location(conn: sqlite3.Connection, log_token: bytes) -> str:
-    query = f"""
-        SELECT l.location
-        FROM log l
-        WHERE l.token = x'{binascii.hexlify(log_token).decode()}'
-    """  # noqa: S608
-    cursor = conn.cursor()
-    location, *_ = cursor.execute(query).fetchone()
-    return location
-
-
-SCENES_QUERY = """
-    SELECT s.token AS scene_token, s.name, s.log_token,
-           (SELECT lp.token
-            FROM lidar_pc lp
-            WHERE lp.scene_token = s.token
-            ORDER BY lp.timestamp ASC
-            LIMIT 1) AS start_lidarpc_token,
-           (SELECT lp.token
-            FROM lidar_pc lp
-            WHERE lp.scene_token = s.token
-            ORDER BY lp.timestamp DESC
-            LIMIT 1) AS end_lidarpc_token,
-           COUNT(lp_all.token) AS num_lidar_pcs
-    FROM scene s
-    JOIN lidar_pc lp_all ON lp_all.scene_token = s.token
-    GROUP BY s.token
+# --- Minimal scene header (joined with log to get location once per scene) ---
+_SCENES_QUERY = """
+    SELECT s.token AS scene_token, s.name, s.log_token AS log_token, l.location
+    FROM scene AS s
+    JOIN log   AS l ON l.token = s.log_token
 """
+
+
+# Pull all lidar boxes for a scene in timestamp order (groups by lidar_pc)
+_SCENE_BOXES_QUERY = """
+    SELECT
+        lp.token     AS lidar_pc_token_hex,
+        lp.timestamp      AS lidar_timestamp,
+        lb.track_token AS track_token,
+        lb.x, lb.y, lb.vx, lb.vy, lb.confidence,
+        c.name
+    FROM lidar_pc AS lp
+    JOIN lidar_box AS lb ON lb.lidar_pc_token = lp.token
+    JOIN track AS t ON t.token = lb.track_token
+    JOIN category AS c ON c.token = t.category_token
+    WHERE lp.scene_token = ?
+    ORDER BY lp.timestamp ASC, lp.token ASC, lb.token ASC
+"""
+
+_EGO_POSE_QUERY = """
+    SELECT
+        ep.x, ep.y,
+        ep.qw, ep.qx, ep.qy, ep.qz,
+        ep.vx, ep.vy,
+        ep.acceleration_x, ep.acceleration_y
+    FROM lidar_pc AS lp
+    JOIN ego_pose AS ep ON ep.token = lp.ego_pose_token
+    WHERE lp.scene_token = ?
+    ORDER BY lp.timestamp;
+"""
+
+
+@dataclass(frozen=True, slots=True)
+class _SceneHeader:
+    token: str
+    name: str
+    log_token: str
+    location: str
+
+    @classmethod
+    def from_db(cls, conn: sqlite3.Connection) -> Iterator[_SceneHeader]:
+        yield from (cls(*row) for row in conn.cursor().execute(_SCENES_QUERY))
 
 
 class _Frame(TypedDict):
@@ -186,66 +104,70 @@ class _Frame(TypedDict):
     y: float
     vx: float
     vy: float
+    ax: float | None
+    ay: float | None
+    category_name: str
     scene_name: str
     map: str
 
 
-def get_nuplan_scenes_as_pandas(database_path: Path) -> list[pd.DataFrame]:
-    return list(get_nuplan_scenes_as_pandas_iter(database_path))
-
-
-def get_nuplan_scenes_as_pandas_iter(database_path: Path) -> Iterator[pd.DataFrame]:
-    conn = sqlite3.connect(
-        f"file:{database_path}?mode=ro&immutable=1&cache=shared",
-        uri=True,
-    )
-    for scene_name in SceneDescription.from_db(conn):
-        yield pd.DataFrame(_get_scene_frames(conn, scene_name))
-
-
-def _get_scene_frames(
+def _scene_to_dataframe(
     conn: sqlite3.Connection,
-    scene_name: SceneDescription,
-) -> list[_Frame]:
-    current: LidarPC | None = LidarPC.from_db_by_token(
-        conn,
-        scene_name.start_lidar_pc_token,
-    )
-    map_location = get_map_location(conn, scene_name.log_token)
-    tracks: dict[bytes, int] = {}
+    scene: _SceneHeader,
+) -> pd.DataFrame:
+    cur = conn.cursor()
+    ego_cur = conn.cursor()
+    ego_cur.execute(_EGO_POSE_QUERY, (scene.token,))
 
-    frames: list[_Frame] = []
-    frame_counter = 0
-    while current:
-        for lidar_box in LidarBox.from_db_by_token(conn, current.token):
-            track = Track.from_db_by_token(conn, lidar_box.track_token)
-            track_id = tracks.get(lidar_box.track_token)
-            if track_id is None:
-                track_id = len(tracks) + 1
-                tracks[lidar_box.track_token] = track_id
+    last_pc: bytes | None = None
+    frame_idx = -1
+    track_id_map: dict[bytes, int] = {b"ego": 0}
 
-            frames.append({
-                "frame": frame_counter,
-                "track_id": track_id,
-                "x": lidar_box.x,
-                "y": lidar_box.y,
-                "vx": lidar_box.vx,
-                "vy": lidar_box.vy,
-                "scene_name": scene_name.name,
-                "map": map_location,
+    rows: list[_Frame] = []
+    for row in cur.execute(_SCENE_BOXES_QUERY, (scene.token,)):
+        lidar_pc, _ts, track, x, y, vx, vy, confidence, category = row
+
+        if lidar_pc != last_pc:
+            frame_idx += 1
+            last_pc = lidar_pc
+            x, y, *_, vx, vy, ax, ay = ego_cur.fetchone()
+            rows.append({
+                "frame": frame_idx,
+                "track_id": 0,
+                "x": x,
+                "y": y,
+                "vx": vx,
+                "vy": vy,
+                "ax": ax,
+                "ay": ay,
+                "category_name": "ego-vehicle",
+                "scene_name": scene.name,
+                "map": scene.location,
             })
 
-        if current.next_token is None:
-            current = None
-            break
+        tid = track_id_map.get(track)
+        if tid is None:
+            tid = len(track_id_map)
+            track_id_map[track] = tid
 
-        current = LidarPC.from_db_by_token(conn, current.next_token)
+        rows.append({
+            "frame": frame_idx,
+            "track_id": tid,
+            "x": x,
+            "y": y,
+            "vx": vx,
+            "vy": vy,
+            "ax": None,
+            "ay": None,
+            "category_name": category,
+            "scene_name": scene.name,
+            "map": scene.location,
+        })
 
-    return frames
+    return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":
-    db_path = "data/mini/2021.05.12.22.00.38_veh-35_01008_01518.db"  # adjust
-
-    for scene in get_nuplan_scenes_as_pandas_iter(Path(db_path)):
-        print(scene.head(), scene.shape)
+    db_path = "data/mini/2021.05.12.22.00.38_veh-35_01008_01518.db"
+    for scene_df in get_nuplan_scenes_as_pandas_iter(Path(db_path)):
+        print(scene_df.head(1), scene_df.shape, end="\n\n")

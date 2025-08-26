@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 import numpy as np
@@ -28,6 +27,7 @@ from preprocessing.utils import common
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
 Split = Literal["train", "val", "test"]
 
@@ -188,11 +188,12 @@ class PedestrianSampleLoader:
     ) -> tuple[npt.NDArray[np.bool], npt.NDArray[np.int64]] | None:
         """Check if a sequence window is valid to create a sample."""
         pred_index = self.config.org_obs_len - 1
-        valid_mask: npt.NDArray[np.bool] = (
+        valid_mask: npt.NDArray[np.bool] = np.asarray(
             # If all values in the window are not all NaN
             ~np.isnan(window).all(axis=(1, 2))
             # If the pedestrian has a valid position at the prediction index
-            & ~np.isnan(window[:, pred_index, :]).any(axis=1)
+            & ~np.isnan(window[:, pred_index, :]).any(axis=1),
+            dtype=bool,
         )
 
         if self.config.require_all_valid:
@@ -472,7 +473,7 @@ def _valid_sequences(data: npt.NDArray[np.float32]) -> Iterable[tuple[int, int]]
         ends = np.append(ends, len(data))
 
     # Return list of (start, end) index tuples
-    return zip(starts, ends)
+    return zip(starts, ends, strict=False)
 
 
 def _extrapolate_back_linear(
@@ -504,7 +505,7 @@ def _extrapolate_back_linear(
     k = np.arange(n, 0, -1, dtype=np.float32).reshape(1, n, 1)
     extrapolated = data_ext[:, [0], :] - k * v[:, None, :]
     out = np.concatenate([extrapolated, data_ext], axis=1)
-    return out.squeeze(0) if squeeze_back else out
+    return (out.squeeze(0) if squeeze_back else out).astype(np.float32)
 
 
 def _read_data(data_path: Path, sep: str = "\t") -> pd.DataFrame:
