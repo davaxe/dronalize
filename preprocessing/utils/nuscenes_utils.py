@@ -52,14 +52,6 @@ def get_nuscenes_scenes_as_pandas(
     return nuscenes_data.get_scenes_as_pandas()
 
 
-Location = Literal[
-    "boston-seaport",
-    "singapore-onenorth",
-    "singapore-queenstown",
-    "singapore-hollandvillage",
-]
-
-
 class AttributeDict(TypedDict):
     """Nuscenes attribute data."""
 
@@ -95,7 +87,7 @@ class LogDict(TypedDict):
     logfile: str
     vehicle: str
     date_captured: date
-    location: Location
+    location: str
 
 
 class SampleDict(TypedDict):
@@ -307,7 +299,7 @@ class _Frame(TypedDict):
     full_category: str
     status: StatusStr
     full_status: str
-    map: Location
+    map: str
     scene_name: str
 
 
@@ -326,7 +318,7 @@ class _SceneData:
         self._process_scene()
 
     @property
-    def location(self) -> Location:
+    def location(self) -> str:
         """Get the location of the scene."""
         return self.data.logs[self.scene["log_token"]]["location"]
 
