@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import os  # noqa: I001
+from pathlib import Path
 import pickle
 from multiprocessing import Lock, Pool, Value
 from typing import Any
-import warnings  # noqa: UP035
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -235,8 +236,10 @@ def worker_process_file(args_tuple: tuple[str, str, str, str, dict]):
         raise ValueError(msg)
 
     # Median frame
-    median_frame = tracks["frame"].median().astype(int)
-    agent_coords = tracks[tracks["frame"] == median_frame][["x", "y"]].mean().to_numpy()
+    median_frame = int(tracks["frame"].median())
+    agent_coords = (
+        tracks[tracks["frame"] == median_frame][["x", "y"]].mean().to_numpy()
+    )
 
     lane_graph = map_graph.extract_radius(
         center=agent_coords,
@@ -308,7 +311,7 @@ if __name__ == "__main__":
     print(f"Using config file: {config_file}\n")
 
     # Load config
-    with open(config_file_pth, "r", encoding="utf-8") as conf_file:
+    with open(config_file_pth, encoding="utf-8") as conf_file:
         config = yaml.safe_load(conf_file)
 
     dataset = config["dataset"]
@@ -328,7 +331,8 @@ if __name__ == "__main__":
 
     # Check if train, val, and test directories exist and are populated
     if not all(
-        os.path.exists(p) and os.listdir(p) for p in [train_path, val_path, test_path]
+        os.path.exists(p) and os.listdir(p)
+        for p in [train_path, val_path, test_path]
     ):
         print(
             "Train, val, or test directories are missing or empty."
@@ -389,9 +393,8 @@ if __name__ == "__main__":
     print("Loading map graphs...")
 
     delft_graph = VODMapGraphBuilder.from_json_file(
-        os.path.join(raw_map_path, "delft.json"),
+        Path(os.path.join(raw_map_path, "delft.json")),
     ).build(
-        interpolate=True,
         interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
     )
@@ -404,12 +407,18 @@ if __name__ == "__main__":
     erase_previous_line()
 
     # Create processing tasks
-    for split, path in zip(["train", "val", "test"], [train_path, val_path, test_path]):
+    for split, path in zip(
+        ["train", "val", "test"],
+        [train_path, val_path, test_path],
+        strict=True,
+    ):
         if not os.path.exists(path):
             msg = f"Path {path} does not exist."
             raise ValueError(msg)
         files = sorted([f for f in os.listdir(path) if f.endswith(".csv")])
-        tasks = [(f, split, os.path.join(path, f), output_dir, config) for f in files]
+        tasks = [
+            (f, split, os.path.join(path, f), output_dir, config) for f in files
+        ]
 
         # Determine starting counter value
         set_dir = os.path.join(output_dir, split)
@@ -426,6 +435,7 @@ if __name__ == "__main__":
 
         if args.use_threads:
             cpu_count = os.cpu_count()
+            n_workers = 1
             if cpu_count is None:
                 warnings.warn(
                     "Could not determine the number of CPU cores. Using 1 thread.",

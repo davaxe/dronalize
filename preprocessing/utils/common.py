@@ -124,12 +124,10 @@ def create_tensor_dict(
         data["intention"] = torch.tensor(intentions).long()
 
     if additional_features is not None:
-        data.update(
-            {
-                "inp_r1": input_tensor[..., 7:8],
-                "inp_r2": input_tensor[..., 8:],
-            }
-        )
+        data.update({
+            "inp_r1": input_tensor[..., 7:8],
+            "inp_r2": input_tensor[..., 8:],
+        })
 
     return data
 
@@ -142,7 +140,7 @@ def erase_previous_line(*, double_jump: bool = False) -> None:
         sys.stdout.write("\x1b[1A")
 
 
-def create_directories(args: Namespace, dataset: str | None = None) -> None:
+def create_directories(args: Namespace, dataset: str | None = None) -> str:
     """Create directories for processed data."""
     if dataset is None:
         data_dir = args.dataset + args.add_name
@@ -347,7 +345,9 @@ def get_maneuver(
 ) -> list[int]:
     """Get the maneuver of the agents at a given frame."""
     return [
-        tracks[(tracks.track_id == v_id) & (tracks.frame == frame)][prop].to_numpy()[0]
+        tracks[(tracks.track_id == v_id) & (tracks.frame == frame)][prop].to_numpy()[
+            0
+        ]
         for v_id in agent_ids
     ]
 

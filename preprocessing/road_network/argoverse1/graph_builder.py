@@ -25,7 +25,6 @@ from preprocessing.road_network.common import (
     GraphBuilder,
     IntIDNode,
     MapGraph,
-    check_interpolation_params,
 )
 from preprocessing.road_network.edge_type import EdgeType
 
@@ -75,8 +74,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
     def build(
         self,
         *,
-        interpolate: bool = False,
-        interp_distance: float | None = None,
+        _interp_distance: float | None = None,
     ) -> MapGraph:
         """Build a `MapGraph` from the `Argoverse1Map`.
 
@@ -84,8 +82,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         for `interp_distance`.
 
         Args:
-            interpolate: whether to interpolate edges between nodes.
-            interp_distance: the target distance for interpolation. If None,
+            _interp_distance: the target distance for interpolation. If None,
                 no interpolation is performed.
 
         Returns:
@@ -93,11 +90,6 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             edge types.
 
         """
-        interp_distance = check_interpolation_params(
-            interpolate=interpolate,
-            interp_distance=interp_distance,
-        )
-
         # Dict to store endpoints (start and end) of each lane segment to enable
         # efficient connection of segments after all segments are added
         self._lane_endpoints: dict[

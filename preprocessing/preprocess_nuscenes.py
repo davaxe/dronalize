@@ -13,10 +13,11 @@
 # limitations under the License.
 
 import os  # noqa: I001
+from pathlib import Path
 import pickle
 from multiprocessing import Lock, Pool, Value
 from typing import Any
-import warnings  # noqa: UP035
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -224,7 +225,11 @@ def process_ids(
         )
 
 
-def interpolate_tracks(tracks: pd.DataFrame, dt: float, ori_dt: float) -> pd.DataFrame:
+def interpolate_tracks(
+    tracks: pd.DataFrame,
+    dt: float,
+    ori_dt: float,
+) -> pd.DataFrame:
     """Interpolate the tracks DataFrame to a new time grid based on the specified dt.
 
     Args:
@@ -316,8 +321,10 @@ def worker_process_file(args_tuple: tuple[str, str, str, str, dict]):
         raise ValueError(msg)
 
     # Median frame
-    median_frame = tracks["frame"].median().astype(int)
-    agent_coords = tracks[tracks["frame"] == median_frame][["x", "y"]].mean().to_numpy()
+    median_frame = int(tracks["frame"].median())
+    agent_coords = (
+        tracks[tracks["frame"] == median_frame][["x", "y"]].mean().to_numpy()
+    )
 
     lane_graph = map_graph.extract_radius(
         center=agent_coords,
@@ -403,7 +410,7 @@ if __name__ == "__main__":
     print(f"Using config file: {config_file}\n")
 
     # Load config
-    with open(config_file_pth, "r", encoding="utf-8") as conf_file:
+    with open(config_file_pth, encoding="utf-8") as conf_file:
         config = yaml.safe_load(conf_file)
 
     dataset = config["dataset"]
@@ -420,12 +427,16 @@ if __name__ == "__main__":
     test_path = os.path.join(args.path, dataset, "test")
 
     raw_map_path = os.path.join(
-        args.path, dataset, "nuScenes-map-expansion-v1.3", "expansion"
+        args.path,
+        dataset,
+        "nuScenes-map-expansion-v1.3",
+        "expansion",
     )
 
     # Check if train, val, and test directories exist and are populated
     if not all(
-        os.path.exists(p) and os.listdir(p) for p in [train_path, val_path, test_path]
+        os.path.exists(p) and os.listdir(p)
+        for p in [train_path, val_path, test_path]
     ):
         print(
             (
@@ -440,9 +451,17 @@ if __name__ == "__main__":
 
         # Load raw nuscenes data
         raw_trainval_path = os.path.join(
-            args.path, dataset, "v1.0-trainval_meta", "v1.0-trainval"
+            args.path,
+            dataset,
+            "v1.0-trainval_meta",
+            "v1.0-trainval",
         )
-        raw_test_path = os.path.join(args.path, dataset, "v1.0-test_meta", "v1.0-test")
+        raw_test_path = os.path.join(
+            args.path,
+            dataset,
+            "v1.0-test_meta",
+            "v1.0-test",
+        )
 
         trainval_data = NuscenesData(raw_trainval_path)
         trainval_scenes = trainval_data.get_scenes_as_pandas()
@@ -486,33 +505,29 @@ if __name__ == "__main__":
     print("Loading map graphs...")
 
     boston_graph = NuScenesMapGraphBuilder.from_json_file(
-        os.path.join(raw_map_path, "boston-seaport.json"),
+        (Path(raw_map_path) / "boston-seaport.json"),
     ).build(
-        interpolate=True,
         interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
     )
 
     hollandvillage_graph = NuScenesMapGraphBuilder.from_json_file(
-        os.path.join(raw_map_path, "singapore-hollandvillage.json"),
+        (Path(raw_map_path) / "singapore-hollandvillage.json"),
     ).build(
-        interpolate=True,
         interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
     )
 
     onenorth_graph = NuScenesMapGraphBuilder.from_json_file(
-        os.path.join(raw_map_path, "singapore-onenorth.json"),
+        (Path(raw_map_path) / "singapore-onenorth.json"),
     ).build(
-        interpolate=True,
         interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
     )
 
     queenstown_graph = NuScenesMapGraphBuilder.from_json_file(
-        os.path.join(raw_map_path, "singapore-queenstown.json"),
+        (Path(raw_map_path) / "singapore-queenstown.json"),
     ).build(
-        interpolate=True,
         interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
     )
@@ -528,13 +543,19 @@ if __name__ == "__main__":
     erase_previous_line()
 
     # Create processing tasks
-    for split, path in zip(["train", "val", "test"], [train_path, val_path, test_path]):
+    for split, path in zip(
+        ["train", "val", "test"],
+        [train_path, val_path, test_path],
+        strict=True,
+    ):
         if not os.path.exists(path):
             msg = f"Path {path} does not exist."
             raise FileNotFoundError(msg)
 
         files = sorted([f for f in os.listdir(path) if f.endswith(".csv")])
-        tasks = [(f, split, os.path.join(path, f), output_dir, config) for f in files]
+        tasks = [
+            (f, split, os.path.join(path, f), output_dir, config) for f in files
+        ]
 
         # Determine starting counter value
         set_dir = os.path.join(output_dir, split)
@@ -573,7 +594,7 @@ if __name__ == "__main__":
                         pool.imap(worker_process_file, tasks),
                         total=len(tasks),
                         desc=split.capitalize(),
-                    )
+                    ),
                 )
         else:
             init_worker(save_id_counter, save_lock)

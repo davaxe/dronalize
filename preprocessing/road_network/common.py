@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Hashable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import IntEnum, auto
-from math import ceil, dist
+from math import ceil
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -246,7 +246,12 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
     @abstractmethod
     def build(self) -> MapGraph:
-        """Build a graph representation of the map."""
+        """Build a graph representation of the map.
+
+        Note that this method can take additional parameters as needed by
+        subclasses. But the signature must be compatible with this one, meaning
+        that additional parameters must be keyword-only and have default values.
+        """
         ...
 
     def add_node(self, node: NODE) -> ID:
@@ -405,13 +410,13 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             )
 
     def add_node_edges_loop_gt(
-            self,
-            nodes: Sequence[NODE],
-            *,
-            gt: float,
-            interp_distance: float | None,
-            edge_type: EdgeType,
-            is_polygon: bool = False,
+        self,
+        nodes: Sequence[NODE],
+        *,
+        gt: float,
+        interp_distance: float | None,
+        edge_type: EdgeType,
+        is_polygon: bool = False,
     ) -> None:
         """Add edges between consecutive nodes in a given list.
 
@@ -433,12 +438,15 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
         Raises:
             ValueError: If interp_distance is not None and less than gt.
+
         """
         if interp_distance is not None and interp_distance < gt:
-            msg = "interp_distance must be greater than or equal to gt." \
-                  f" Got interp_distance={interp_distance}, gt={gt}."
+            msg = (
+                "interp_distance must be greater than or equal to gt."
+                f" Got interp_distance={interp_distance}, gt={gt}."
+            )
             raise ValueError(msg)
-        
+
         i, j = 0, 1
         while i < len(nodes) - 1:
             src, dst = nodes[i], nodes[j]
@@ -447,7 +455,8 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 # Increment j to find a node that is >= gt away
                 j += 1
                 continue
-            elif distance < gt:
+
+            if distance < gt:
                 # Always add last node, even if distance < gt
                 self.add_node(src)
                 self.add_node(dst)
@@ -457,7 +466,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                         dst,
                         interp_distance=interp_distance,
                         edge_type=edge_type,
-                    )
+                    ),
                 )
                 if is_polygon:
                     self.add_edges_from_iterable(
@@ -482,7 +491,6 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             )
             i = j
             j = i + 1
-            
 
     def add_edges_from_iterable(
         self,
@@ -591,38 +599,6 @@ def interpolate_position(
         prev_y = interp_y
 
 
-def check_interpolation_params(
-    *,
-    interpolate: bool,
-    interp_distance: float | None,
-) -> float | None:
-    """Check the parameters for interpolation.
-
-    Args:
-        interpolate: whether to interpolate edges between nodes.
-        interp_distance: the target distance for interpolation. If None,
-            no interpolation is performed.
-
-    Raises:
-        ValueError: if `interp_distance` is not provided when `interpolate` is True,
-            or if `interp_distance` is provided when `interpolate` is False.
-
-    Returns:
-        The `interp_distance` if interpolation is enabled, otherwise None.
-
-    """
-    # These cases are most likely user errors -> raise exceptions
-    if interpolate and interp_distance is None:
-        msg = "interp_distance must be provided if interpolate is True."
-        raise ValueError(msg)
-
-    if not interpolate and interp_distance is not None:
-        msg = "interp_distance should be None if interpolate is False."
-        raise ValueError(msg)
-
-    return interp_distance
-
-
 ID = TypeVar("ID", bound=Hashable)
 
 
@@ -712,7 +688,6 @@ class MapGraph:
 
         """
         # Check if the input tensors are empty
-        print(node_positions.shape)
         if node_positions.numel() == 0 and edge_indices.numel() == 0:
             if return_if_empty:
                 node_positions = torch.zeros((0, 2), dtype=torch.float)

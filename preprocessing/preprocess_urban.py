@@ -138,7 +138,7 @@ def process_id(
 
         # Retrieve meta information
         agent_type = class_list_to_int_list(
-            get_meta_property(tr_meta, agent_ids, prop="class")
+            get_meta_property(tr_meta, agent_ids, prop="class"),
         )
 
         # Create the input and target arrays
@@ -147,10 +147,19 @@ def process_id(
 
         for j, v_id in enumerate(agent_ids):
             input_array[j] = get_features(
-                tr, frame, prediction_frame - 1, n_inputs, v_id, add_feats
+                tr,
+                frame,
+                prediction_frame - 1,
+                n_inputs,
+                v_id,
+                add_feats,
             )
             target_array[j] = get_features(
-                tr, prediction_frame, final_frame - 1, n_outputs, v_id
+                tr,
+                prediction_frame,
+                final_frame - 1,
+                n_outputs,
+                v_id,
             )
 
         # Create the agent dictionary
@@ -260,7 +269,7 @@ def process_ids(
         tr_meta[
             (tr_meta.initialFrame == 0)
             & (tr_meta.finalFrame == tr_meta.finalFrame.max())
-        ].track_id.values
+        ].track_id.values,
     )
 
     ta_ids = list(ta_ids_set - parked_vehicles)
@@ -313,7 +322,10 @@ def process_ids(
                 pbar.update()
     else:
         for arg in tqdm(
-            arguments, desc=f"{current_set.capitalize()}", position=1, leave=False
+            arguments,
+            desc=f"{current_set.capitalize()}",
+            position=1,
+            leave=False,
         ):
             worker_function(arg)
 
@@ -337,10 +349,9 @@ if __name__ == "__main__":
         msg = f"Config file {config_file} not found."
         raise FileNotFoundError(msg)
 
-
     print(f"Using config file: {config_file} \n")
 
-    with open(config_file_pth, "r", encoding="utf-8") as conf_file:
+    with open(config_file_pth, encoding="utf-8") as conf_file:
         config = yaml.safe_load(conf_file)
 
     dataset = config["dataset"]
@@ -377,7 +388,8 @@ if __name__ == "__main__":
         if "lanelet" in dirs:
             # update name in directory for consistency
             os.rename(
-                os.path.join(temp_path, "lanelet"), os.path.join(temp_path, "lanelets")
+                os.path.join(temp_path, "lanelet"),
+                os.path.join(temp_path, "lanelets"),
             )
 
     try:

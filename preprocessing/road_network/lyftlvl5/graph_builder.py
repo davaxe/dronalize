@@ -21,7 +21,6 @@ from preprocessing.road_network.common import (
     GraphBuilder,
     IntIDNode,
     MapGraph,
-    check_interpolation_params,
 )
 from preprocessing.road_network.edge_type import EdgeType
 from preprocessing.road_network.lyftlvl5 import parser
@@ -72,13 +71,11 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
     def build(
         self,
         *,
-        interpolate: bool = False,
         interp_distance: float | None = None,
     ) -> MapGraph:
         """Build the map graph from the Lyft LVL5 map.
 
         Args:
-            interpolate: true if edges should be interpolated, false otherwise.
             interp_distance: the approximate distance between interpolated
                 nodes. If None, no interpolation is performed.
 
@@ -86,11 +83,6 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             A `MapGraph` object representing the map graph.
 
         """
-        check_interpolation_params(
-            interpolate=interpolate,
-            interp_distance=interp_distance,
-        )
-
         self._add_road_segment_edges(interp_distance=interp_distance)
         self._add_junction_edges(interp_distance=interp_distance)
 

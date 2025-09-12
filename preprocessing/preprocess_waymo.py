@@ -86,7 +86,9 @@ def process_id(
     # 10 + 1 frames for input, 80 frames for output
     frame = 0
     prediction_frame = 10  # The frame at which we want to predict the future
-    final_frame = int(prediction_frame + fz * output_len)  # 90 frames when output_len=8
+    final_frame = int(
+        prediction_frame + fz * output_len,
+    )  # 90 frames when output_len=8
 
     # The target agent will be the ego vehicle (id0)
     id0 = 0
@@ -113,7 +115,9 @@ def process_id(
     categories = np.array(
         [
             3 if i == 0 or v else 0
-            for i, v in enumerate(get_meta_property(tr, agent_ids, prop="of_interest"))
+            for i, v in enumerate(
+                get_meta_property(tr, agent_ids, prop="of_interest"),
+            )
         ],
     )
 
@@ -165,7 +169,6 @@ def worker_process_file(args_tuple: tuple[str, str, str, str, dict]):
         rec_id = scene.id
         try:
             lane_graph = scene.map.build(
-                interpolate=True,
                 interp_distance=3.0,
             ).to_torch_graph()
         except Exception as e:
@@ -202,14 +205,16 @@ if __name__ == "__main__":
     if args.debug:
         print("DEBUG MODE: ON\n")
 
-    config_file = args.config if args.config.endswith(".yml") else args.config + ".yml"
+    config_file = (
+        args.config if args.config.endswith(".yml") else args.config + ".yml"
+    )
     config_file_pth = os.path.join("preprocessing", "configs", config_file)
 
     if not os.path.exists(config_file_pth):
         msg = f"Config file {config_file} not found."
         raise FileNotFoundError(msg)
 
-    with open(config_file_pth, "r", encoding="utf-8") as conf_file:
+    with open(config_file_pth, encoding="utf-8") as conf_file:
         config = yaml.safe_load(conf_file)
 
     dataset = config["dataset"]
@@ -220,7 +225,11 @@ if __name__ == "__main__":
     val_path = os.path.join(args.path, dataset, "validation")
     test_path = os.path.join(args.path, dataset, "testing")
 
-    for split, path in zip(["train", "val", "test"], [train_path, val_path, test_path]):
+    for split, path in zip(
+        ["train", "val", "test"],
+        [train_path, val_path, test_path],
+        strict=False,
+    ):
         if not os.path.exists(path):
             msg = f"Path {path} does not exist."
             raise FileNotFoundError(msg)
@@ -267,7 +276,7 @@ if __name__ == "__main__":
                         pool.imap(worker_process_file, tasks),
                         total=len(tasks),
                         desc=f"{split.capitalize()}",
-                    )
+                    ),
                 )
         else:
             init_worker(save_id_counter, save_lock)

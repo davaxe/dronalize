@@ -25,7 +25,6 @@ from preprocessing.road_network.common import (
     GraphBuilder,
     IntIDNode,
     MapGraph,
-    check_interpolation_params,
     get_edges_from_adj_list,
 )
 from preprocessing.road_network.edge_type import EdgeType
@@ -75,7 +74,6 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
     def build(
         self,
         *,
-        interpolate: bool = False,
         interp_distance: float | None = None,
     ) -> MapGraph:
         """Build the map graph from OpenDD data.
@@ -93,10 +91,6 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
             edge types.
 
         """
-        interp_distance = check_interpolation_params(
-            interpolate=interpolate,
-            interp_distance=interp_distance,
-        )
         self._add_edges(interp_distance)
 
         node_positions = torch.zeros((len(self.nodes), 2), dtype=torch.float32)
@@ -306,6 +300,8 @@ _MARKING_TYPE_TO_EDGE_TYPE: dict[str, EdgeType] = {
 if __name__ == "__main__":
     # Example usage
     rdb = "rdb1"
-    map_path = Path(f"../datasets/openDD/opendd_v3-{rdb}/{rdb}/map_{rdb}/map_{rdb}.sqlite")
+    map_path = Path(
+        f"../datasets/openDD/opendd_v3-{rdb}/{rdb}/map_{rdb}/map_{rdb}.sqlite"
+    )
     builder = OpenDDMapGraphBuilder.from_sqlite_file(map_path)
-    graph = builder.build(interpolate=True, interp_distance=3.0)
+    graph = builder.build(interp_distance=3.0)

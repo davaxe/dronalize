@@ -16,6 +16,7 @@ import os
 import pickle
 import warnings
 from multiprocessing import Lock, Pool, Value
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -109,7 +110,7 @@ def process_id(
 
     # Retrieve meta information
     agent_type = class_list_to_int_list(
-        get_meta_property(tr, agent_ids, prop="agent_type")
+        get_meta_property(tr, agent_ids, prop="agent_type"),
     )
 
     # Construct the input and target arrays
@@ -238,7 +239,9 @@ if __name__ == "__main__":
     if args.debug:
         print("DEBUG MODE: ON\n")
 
-    config_file = args.config if args.config.endswith(".yml") else args.config + ".yml"
+    config_file = (
+        args.config if args.config.endswith(".yml") else args.config + ".yml"
+    )
     config_file_pth = os.path.join("preprocessing", "configs", config_file)
 
     if not os.path.exists(config_file_pth):
@@ -253,11 +256,25 @@ if __name__ == "__main__":
     print(f"Output directory: {output_dir} \n")
 
     train_path = os.path.join(
-        args.path, dataset, "forecasting_train_v1.1", "train", "data"
+        args.path,
+        dataset,
+        "forecasting_train_v1.1",
+        "train",
+        "data",
     )
-    val_path = os.path.join(args.path, dataset, "forecasting_val_v1.1", "val", "data")
+    val_path = os.path.join(
+        args.path,
+        dataset,
+        "forecasting_val_v1.1",
+        "val",
+        "data",
+    )
     test_path = os.path.join(
-        args.path, dataset, "forecasting_test_v1.1", "test_obs", "data"
+        args.path,
+        dataset,
+        "forecasting_test_v1.1",
+        "test_obs",
+        "data",
     )
     maps_path = os.path.join(args.path, dataset, "hd_maps", "map_files")
 
@@ -273,8 +290,8 @@ if __name__ == "__main__":
         raise FileNotFoundError(msg)
 
     # Initialize map graph builders
-    mia_map_builder = Argoverse1MapGraphBuilder.from_xml_file(miami_map)
-    pit_map_builder = Argoverse1MapGraphBuilder.from_xml_file(pit_map)
+    mia_map_builder = Argoverse1MapGraphBuilder.from_xml_file(Path(miami_map))
+    pit_map_builder = Argoverse1MapGraphBuilder.from_xml_file(Path(pit_map))
 
     # Build the map graphs
     print("Loading map graphs...")
@@ -284,14 +301,20 @@ if __name__ == "__main__":
     # Erase preprocessing message
     erase_previous_line()
 
-    for split, path in zip(["train", "val", "test"], [train_path, val_path, test_path]):
+    for split, path in zip(
+        ["train", "val", "test"],
+        [train_path, val_path, test_path],
+        strict=True,
+    ):
         if not os.path.exists(path):
             msg = f"Path {path} does not exist."
             raise FileNotFoundError(msg)
 
         files = sorted([f for f in os.listdir(path) if f.endswith(".csv")])
 
-        tasks = [(f, split, os.path.join(path, f), output_dir, config) for f in files]
+        tasks = [
+            (f, split, os.path.join(path, f), output_dir, config) for f in files
+        ]
 
         # Determine starting ID
         set_dir = os.path.join(output_dir, split)

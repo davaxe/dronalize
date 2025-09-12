@@ -21,7 +21,6 @@ from preprocessing.road_network.common import (
     GraphBuilder,
     IntIDNode,
     MapGraph,
-    check_interpolation_params,
 )
 from preprocessing.road_network.edge_type import EdgeType
 
@@ -53,7 +52,6 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
     def build(
         self,
         *,
-        interpolate: bool = False,
         interp_distance: float | None = None,
     ) -> MapGraph:
         """Build a `MapGraph` from the `Argoverse2Map`.
@@ -62,7 +60,6 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         for `interp_distance`.
 
         Args:
-            interpolate: whether to interpolate edges between nodes.
             interp_distance: the target distance for interpolation. If None,
                 no interpolation is performed.
 
@@ -71,11 +68,6 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
             edge types.
 
         """
-        check_interpolation_params(
-            interpolate=interpolate,
-            interp_distance=interp_distance,
-        )
-
         self._add_lane_boundary_edges(
             interp_distance=interp_distance,
         )

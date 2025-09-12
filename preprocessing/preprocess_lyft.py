@@ -196,7 +196,6 @@ if __name__ == "__main__":
 
     print("Loading map graph...")
     map_graph = LyftLVL5MapGraphBuilder.from_files(proto_map, meta_map).build(
-        interpolate=True,
         interp_distance=3.0,
     )
     erase_previous_line()
@@ -206,7 +205,9 @@ if __name__ == "__main__":
             msg = f"Path {path} does not exist."
             raise FileNotFoundError(msg)
 
-        scenes_iterator = get_lyft_scenes_as_pandas_lazy(path, start=0, batch_size=1000)
+        scenes_iterator = get_lyft_scenes_as_pandas_lazy(
+            path, start=0, batch_size=1000
+        )
         set_dir = os.path.join(output_dir, split)
         os.makedirs(set_dir, exist_ok=True)
         existing = [
@@ -230,7 +231,7 @@ if __name__ == "__main__":
             if len(tracks) == 0:
                 continue
 
-            median_frame = tracks["frame"].median().astype(int)
+            median_frame = int(tracks["frame"].median())
             agent_coords = (
                 tracks[tracks["frame"] == median_frame][["x", "y"]].mean().to_numpy()
             )
@@ -290,6 +291,7 @@ if __name__ == "__main__":
 
             if args.use_threads:
                 cpu_count = os.cpu_count()
+                n_workers = 1
                 if cpu_count is None:
                     warnings.warn(
                         "Could not determine the number of CPU cores. Using 1 thread.",
@@ -310,7 +312,9 @@ if __name__ == "__main__":
                     list(pool.imap_unordered(worker_function, task_args))
             else:
                 init_worker(save_id_counter, save_lock)
-                for arg in tqdm(task_args, desc=f"{rec_id}", position=1, leave=False):
+                for arg in tqdm(
+                    task_args, desc=f"{rec_id}", position=1, leave=False
+                ):
                     worker_function(arg)
 
     print("Finished.")

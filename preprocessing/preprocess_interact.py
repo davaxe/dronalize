@@ -411,7 +411,7 @@ if __name__ == "__main__":
                     raise FileNotFoundError(msg)
 
                 # get the lane graph
-                lane_graph = get_lane_graph(current_map, return_torch=True)
+                lane_graph = get_lane_graph(str(current_map), return_torch=True)
 
                 # Erase preprocessing message
                 erase_previous_line()

@@ -350,7 +350,7 @@ if __name__ == "__main__":
                 raise FileNotFoundError(msg)
 
             map_builder = OpenDDMapGraphBuilder.from_sqlite_file(map_path)
-            map_graph = map_builder.build(interpolate=True, interp_distance=3.0)
+            map_graph = map_builder.build(interp_distance=3.0)
 
             map_reference = config.get("map_reference", "median")
             if map_reference == "median":
@@ -374,6 +374,9 @@ if __name__ == "__main__":
                     # get the last two lines
                     reference = [float(coord) for coord in world_data[-2:]]
                     reference = torch.tensor(reference, dtype=torch.float32)
+            else:
+                msg = f"Unknown map_reference {map_reference}."
+                raise ValueError(msg)
 
             # Normalize the lane graph coordinates
             map_graph.node_positions[:, 0] -= reference[0]

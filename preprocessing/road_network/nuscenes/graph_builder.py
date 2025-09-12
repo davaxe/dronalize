@@ -22,7 +22,6 @@ from uuid import UUID
 from preprocessing.road_network.common import (
     GraphBuilder,
     MapGraph,
-    check_interpolation_params,
 )
 from preprocessing.road_network.edge_type import EdgeType
 from preprocessing.road_network.nuscenes import parser
@@ -74,14 +73,12 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
     def build(
         self,
         *,
-        interpolate: bool = False,
         interp_distance: float | None = None,
         ignore_edge_types: set[str] | None = None,
     ) -> MapGraph:
         """Build a `MapGraph` from the `NuscenesMap`.
 
         Args:
-            interpolate: whether to interpolate extra nodes between edges.
             interp_distance: the target distance for interpolation. If None,
                 no interpolation is performed.
             ignore_edge_types: a set of edge types to ignore when building the
@@ -92,11 +89,6 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             and edge types.
 
         """
-        check_interpolation_params(
-            interpolate=interpolate,
-            interp_distance=interp_distance,
-        )
-
         if ignore_edge_types is None:
             ignore_edge_types = set()
 
