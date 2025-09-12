@@ -103,7 +103,7 @@ class BaseNode(Protocol, Generic[ID]):
     y: float
     z: float = 0.0
 
-    def distance_to(self, other: BaseNode) -> float:
+    def distance_to(self, other: Self) -> float:
         """Calculate the Euclidean distance to another node."""
         return math.sqrt(
             (self.x - other.x) ** 2
@@ -254,22 +254,41 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         """
         ...
 
-    def add_node(self, node: NODE) -> ID:
+    @overload
+    def add_node(
+        self,
+        node: NODE,
+        *,
+        none_if_exists: Literal[True],
+    ) -> ID | None: ...
+
+    @overload
+    def add_node(
+        self,
+        node: NODE,
+        *,
+        none_if_exists: Literal[False] = False,
+    ) -> ID: ...
+
+    def add_node(self, node: NODE, *, none_if_exists: bool = False) -> ID | None:
         """Add a node to the graph.
 
         If the node already exists, it is not added again.
 
         Args:
             node: node to add to the graph.
+            none_if_exists: if True, return None if the node already exists.
 
         Returns:
-            The ID of the added node.
+            The ID of the added node or `None` if the node already exists
+            and `none_if_exists` is True.
 
         """
         if node.id not in self.nodes:
             self.nodes[node.id] = node
             self.id_adj_list[node.id] = []
-        return node.id
+            return node.id
+        return node.id if not none_if_exists else None
 
     def add_extra_node(self, node: NODE) -> ID:
         """Add an extra node to the graph.
@@ -447,6 +466,17 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             )
             raise ValueError(msg)
 
+        def add(src: NODE, dst: NODE) -> None:
+            self.add_node(dst)
+            self.add_edges_from_iterable(
+                self.interpolate_edge(
+                    src,
+                    dst,
+                    interp_distance=interp_distance,
+                    edge_type=edge_type,
+                ),
+            )
+
         i, j = 0, 1
         while i < len(nodes) - 1:
             src, dst = nodes[i], nodes[j]
@@ -458,16 +488,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
             if distance < gt:
                 # Always add last node, even if distance < gt
-                self.add_node(src)
-                self.add_node(dst)
-                self.add_edges_from_iterable(
-                    self.interpolate_edge(
-                        src,
-                        dst,
-                        interp_distance=interp_distance,
-                        edge_type=edge_type,
-                    ),
-                )
+                add(src, dst)
                 if is_polygon:
                     self.add_edges_from_iterable(
                         self.interpolate_edge(
@@ -479,16 +500,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                     )
                 break
 
-            self.add_node(src)
-            self.add_node(dst)
-            self.add_edges_from_iterable(
-                self.interpolate_edge(
-                    src,
-                    dst,
-                    interp_distance=interp_distance,
-                    edge_type=edge_type,
-                ),
-            )
+            add(src, dst)
             i = j
             j = i + 1
 

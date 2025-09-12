@@ -24,7 +24,6 @@ from preprocessing.road_network.common import (
     GraphBuilder,
     IntIDNode,
     MapGraph,
-    check_interpolation_params,
 )
 from preprocessing.road_network.edge_type import EdgeType
 from preprocessing.road_network.waymo.protos import map_pb2, scenario_pb2
@@ -102,28 +101,23 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
     def build(
         self,
         *,
-        interpolate: bool = False,
         interp_distance: float | None = None,
-        gt: float = 0.5,
+        gt: float | None = None,
     ) -> MapGraph:
         """Build the map graph from the Lyft LVL5 map.
 
         Args:
-            interpolate: true if edges should be interpolated, false otherwise.
             interp_distance: the approximate distance between interpolated
                 nodes. If None, no interpolation is performed.
+            gt: the minimum distance between consecutive nodes. `None` is same
+                as `0.0`.
 
         Returns:
             A `MapGraph` object representing the map graph.
 
         """
-        interp_distance = check_interpolation_params(
-            interpolate=interpolate,
-            interp_distance=interp_distance,
-        )
-
         self._processed_features: set[int] = set()
-        self.gt = gt
+        self.gt = gt if gt is not None else 0.0
 
         self._add_road_edge_edges(interp_distance=interp_distance)
         self._add_road_line_edges(interp_distance=interp_distance)
@@ -166,7 +160,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
             if feature_id in self._processed_features:
                 continue
 
-            nodes = [IntIDNode(x=point.x, y=point.y) for point in speed_bump.polygon]
+            nodes = [
+                self.new_node(x=point.x, y=point.y) for point in speed_bump.polygon
+            ]
             self.add_node_edges_loop(
                 nodes,
                 is_polygon=True,

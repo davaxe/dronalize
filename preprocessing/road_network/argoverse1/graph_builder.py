@@ -29,8 +29,9 @@ from preprocessing.road_network.common import (
 from preprocessing.road_network.edge_type import EdgeType
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
     from pathlib import Path
+
+# TODO: Add support for `gt` when adding edges, see `GraphBuilder.add_node_edges_loop_gt`
 
 
 class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
@@ -74,7 +75,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
     def build(
         self,
         *,
-        _interp_distance: float | None = None,
+        interp_distance: float | None = None,
     ) -> MapGraph:
         """Build a `MapGraph` from the `Argoverse1Map`.
 
@@ -82,7 +83,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         for `interp_distance`.
 
         Args:
-            _interp_distance: the target distance for interpolation. If None,
+            interp_distance: the target distance for interpolation. If None,
                 no interpolation is performed.
 
         Returns:
@@ -96,8 +97,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             int,
             Argoverse1MapGraphBuilder.SegmentEndpoints,
         ] = {}
-
-        self._build_segment_edges()
+        self._build_segment_edges(interp_distance=interp_distance)
         self._connect_lane_segments()
 
         return self.build_graph()
@@ -117,11 +117,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
                 if pre_id in already_connected[segment.id]:
                     continue
 
-                self._connect_endpoints(
-                    pre_id,
-                    segment.id,
-                    *segment.get_border_edge_types(),
-                )
+                self._connect_endpoints(pre_id, segment.id)
                 already_connected[segment.id].add(pre_id)
                 already_connected.setdefault(pre_id, set()).add(segment.id)
 
@@ -129,11 +125,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
                 if suc_id in already_connected[segment.id]:
                     continue
 
-                self._connect_endpoints(
-                    segment.id,
-                    suc_id,
-                    *segment.get_border_edge_types(),
-                )
+                self._connect_endpoints(segment.id, suc_id)
                 already_connected[segment.id].add(suc_id)
                 already_connected.setdefault(suc_id, set()).add(segment.id)
 
@@ -141,8 +133,8 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         self,
         endpoint_from: int,
         endpoint_to: int,
-        left_edge_type: EdgeType,
-        right_edge_type: EdgeType,
+        left_edge_type: EdgeType = EdgeType.VIRTUAL,
+        right_edge_type: EdgeType = EdgeType.VIRTUAL,
     ) -> None:
         """Connect two lane segment endpoints in the graph.
 
@@ -199,7 +191,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         """Add edges for the left and right boundaries of a lane segment."""
         node_ids = list(segment.node_ids)
         centerline = [(self.map_nodes[i].x, self.map_nodes[i].y) for i in node_ids]
-        l_type, r_type = segment.get_border_edge_types()
+        l_type, r_type = EdgeType.VIRTUAL, EdgeType.VIRTUAL
         add_as_polygon = (
             utils.lane_segment_is_regulatory(segment)
             and segment.turn_direction == parser.TurnType.NONE
@@ -219,7 +211,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             )
             added_nodes = self._numpy_add_edge_loop(
                 polygon,
-                edge_type=edge_types,
+                edge_type=list(edge_types),
                 interp_distance=interp_distance,
             )
             l_nodes = added_nodes[: len(left) - 1]
@@ -255,7 +247,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
     def _numpy_add_edge_loop(
         self,
         numpy_nodes: npt.NDArray[np.float64],
-        edge_type: EdgeType | Iterable[EdgeType] = EdgeType.VIRTUAL,
+        edge_type: EdgeType | list[EdgeType] = EdgeType.VIRTUAL,
         interp_distance: float | None = None,
     ) -> list[int]:
         """Add a loop of edges to the graph from a numpy array of nodes positions.
@@ -271,20 +263,21 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
         """
         if isinstance(edge_type, EdgeType):
-            edge_type = repeat(edge_type, times=len(numpy_nodes) - 1)
+            edge_type = list(repeat(edge_type, times=len(numpy_nodes) - 1))
 
         from_id = self.add_node(
-            IntIDNode(x=numpy_nodes[0][0], y=numpy_nodes[0][1]),
+            self.new_node(x=numpy_nodes[0][0], y=numpy_nodes[0][1]),
         )
 
         added_nodes = [from_id]
         for i, e_type in zip(range(len(numpy_nodes) - 1), edge_type, strict=True):
-            dst_node = numpy_nodes[i + 1]
+            dst_node_pos = numpy_nodes[i + 1]
             from_node = self.nodes[from_id]
-            to_node = IntIDNode(x=dst_node[0], y=dst_node[1])
+            dst_node = self.new_node(x=dst_node_pos[0], y=dst_node_pos[1])
+
             for src_id, dst_id, _ in self.interpolate_edge(
                 from_node,
-                to_node,
+                dst_node,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.VIRTUAL,
             ):

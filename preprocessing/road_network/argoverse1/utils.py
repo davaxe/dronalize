@@ -15,6 +15,7 @@
 from collections.abc import Iterable
 
 import numpy as np
+import numpy.typing as npt
 
 from preprocessing.road_network.argoverse1.parser import LaneSegment
 
@@ -54,7 +55,7 @@ def swap_left_and_right(
 def edge_borders_from_centerline(
     centerline: np.ndarray,
     width_scaling_factor: float = 1.0,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """Convert a lane centerline polyline into a rough polygon of the lane's area.
 
     On average, a lane is 3.8 meters in width. Thus, we allow 1.9 m on each
