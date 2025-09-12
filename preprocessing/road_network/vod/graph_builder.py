@@ -66,7 +66,7 @@ class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
         """Create a NuscenesMapGraphBuilder from a file path."""
         return cls(path, debug_parsing=debug_parsing)
 
-    def _add_centerline_edges(self, _interp_distance: float | None = None) -> None:
+    def _add_centerline_edges(self, _interp_distance: float | None) -> None:
         """Add edges for arcline paths."""
         for arcline in self.map.arcline_path_3.values():
             ctrl = np.asarray(arcline.ctrl, dtype=float)
@@ -80,9 +80,10 @@ class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
             u = np.linspace(0, 1, 100)
             xy = spline(u).astype(np.float64)
             x, y = xy[:, 0], xy[:, 1]
-            nodes = [self.new_node(xi, yi) for xi, yi in zip(x, y)]
-            self.add_node_edges_loop(
+            nodes = [self.new_node(xi, yi) for xi, yi in zip(x, y, strict=True)]
+            self.add_node_edges_loop_gt(
                 nodes,
+                gt=self.gt,
                 interp_distance=None,
                 edge_type=EdgeType.STOP,
                 is_polygon=False,

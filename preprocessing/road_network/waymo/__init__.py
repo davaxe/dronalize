@@ -118,10 +118,10 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from matplotlib.collections import LineCollection
 
-    data = Path("data/training.tfrecord-00000-of-01000")
+    data = Path("data/uncompressed_scenario_testing_testing.tfrecord-00000-of-00150")
     scenarios = iter(get_waymo_scenarios_from_tfrecord(data))
     scenario_map = next(scenarios).map
-    map_graph = scenario_map.build(gt=2.5)
+    map_graph = scenario_map.build(gt=2)
     print(map_graph)
 
     # Plot the map

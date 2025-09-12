@@ -109,8 +109,8 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         Args:
             interp_distance: the approximate distance between interpolated
                 nodes. If None, no interpolation is performed.
-            gt: the minimum distance between consecutive nodes. `None` is same
-                as `0.0`.
+            gt: the minimum distance between consecutive nodes. If `None`, no
+                minimum distance is enforced.
 
         Returns:
             A `MapGraph` object representing the map graph.

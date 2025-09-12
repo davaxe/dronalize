@@ -37,10 +37,11 @@ import numpy as np
 import torch
 from torch_geometric.utils import subgraph
 
+from preprocessing.road_network.edge_type import EdgeType
+
 if TYPE_CHECKING:
     import numpy.typing as npt
 
-    from preprocessing.road_network.edge_type import EdgeType
 
 ID = TypeVar("ID", bound=Hashable)
 
@@ -390,20 +391,31 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         nodes: Sequence[NODE],
         *,
         interp_distance: float | None,
-        edge_type: EdgeType,
+        edge_type: EdgeType | Sequence[EdgeType],
         is_polygon: bool = False,
     ) -> None:
         """Add edges between consecutive nodes in a given list.
 
         Args:
             nodes: a sequence of nodes to connect with edges.
-            interp_distance: _If None, no interpolation is performed.
-            edge_type: _type of the edge to be created. Defaults to
-                EdgeType.VIRTUAL.
+            interp_distance: If None, no interpolation is performed.
+            edge_type: type of the edge to be created. Either a single EdgeType or
+                a sequence of EdgeTypes matching the number of edges to be created.
             is_polygon: whether the nodes form a polygon. If True, the last node
                 is connected back to the first node to close the polygon.
 
         """
+        if isinstance(edge_type, EdgeType):
+            edge_type = [edge_type] * (len(nodes) - 1 + int(is_polygon))
+
+        if len(edge_type) != len(nodes) - 1 + int(is_polygon):
+            msg = (
+                "Length of edge_type must be equal to the number of edges to be"
+                f" created. Got {len(edge_type)} edge types for"
+                f" {len(nodes) - 1 + int(is_polygon)} edges."
+            )
+            raise ValueError(msg)
+
         for i in range(len(nodes) - 1):
             src = nodes[i]
             dst = nodes[i + 1]
@@ -414,7 +426,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                     src,
                     dst,
                     interp_distance=interp_distance,
-                    edge_type=edge_type,
+                    edge_type=edge_type[i],
                 ),
             )
 
@@ -424,7 +436,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                     nodes[-1],
                     nodes[0],
                     interp_distance=interp_distance,
-                    edge_type=edge_type,
+                    edge_type=edge_type[-1],
                 ),
             )
 
@@ -434,7 +446,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         *,
         gt: float,
         interp_distance: float | None,
-        edge_type: EdgeType,
+        edge_type: EdgeType | Sequence[EdgeType],
         is_polygon: bool = False,
     ) -> None:
         """Add edges between consecutive nodes in a given list.
@@ -452,13 +464,23 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             nodes: a sequence of nodes to connect with edges.
             gt: minimum distance threshold for adding edges.
             interp_distance: If None, no interpolation is performed.
-            edge_type: type of the edge to be created.
+            edge_type: type of the edge to be created. Either a single EdgeType
+                or a sequence of EdgeTypes matching the number of edges to be
+                created.
             is_polygon: whether the nodes form a polygon. Defaults to False.
 
-        Raises:
-            ValueError: If interp_distance is not None and less than gt.
-
         """
+        if isinstance(edge_type, EdgeType):
+            edge_type = [edge_type] * (len(nodes) - 1 + int(is_polygon))
+
+        if len(edge_type) != len(nodes) - 1 + int(is_polygon):
+            msg = (
+                "Length of edge_type must be equal to the number of edges to be"
+                f" created. Got {len(edge_type)} edge types for"
+                f" {len(nodes) - 1 + int(is_polygon)} edges."
+            )
+            raise ValueError(msg)
+
         if interp_distance is not None and interp_distance < gt:
             msg = (
                 "interp_distance must be greater than or equal to gt."
@@ -466,7 +488,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             )
             raise ValueError(msg)
 
-        def add(src: NODE, dst: NODE) -> None:
+        def add(src: NODE, dst: NODE, edge_type: EdgeType) -> None:
             self.add_node(dst)
             self.add_edges_from_iterable(
                 self.interpolate_edge(
@@ -488,21 +510,22 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
             if distance < gt:
                 # Always add last node, even if distance < gt
-                add(src, dst)
-                if is_polygon:
-                    self.add_edges_from_iterable(
-                        self.interpolate_edge(
-                            nodes[-1],
-                            nodes[0],
-                            interp_distance=interp_distance,
-                            edge_type=edge_type,
-                        ),
-                    )
+                add(src, dst, edge_type[i])
                 break
 
-            add(src, dst)
+            add(src, dst, edge_type[i])
             i = j
             j = i + 1
+
+        if is_polygon:
+            self.add_edges_from_iterable(
+                self.interpolate_edge(
+                    nodes[-1],
+                    nodes[0],
+                    interp_distance=interp_distance,
+                    edge_type=edge_type[-1],
+                ),
+            )
 
     def add_edges_from_iterable(
         self,
