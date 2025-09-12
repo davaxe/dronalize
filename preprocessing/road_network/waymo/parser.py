@@ -104,6 +104,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         *,
         interpolate: bool = False,
         interp_distance: float | None = None,
+        gt: float = 0.5,
     ) -> MapGraph:
         """Build the map graph from the Lyft LVL5 map.
 
@@ -122,6 +123,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         )
 
         self._processed_features: set[int] = set()
+        self.gt = gt
 
         self._add_road_edge_edges(interp_distance=interp_distance)
         self._add_road_line_edges(interp_distance=interp_distance)
@@ -191,8 +193,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
                 continue
 
             nodes = [IntIDNode(x=point.x, y=point.y) for point in lane.polyline]
-            self.add_node_edges_loop(
+            self.add_node_edges_loop_gt(
                 nodes,
+                gt=self.gt,
                 is_polygon=False,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.VIRTUAL,
@@ -227,8 +230,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
                 continue
             nodes = [IntIDNode(x=point.x, y=point.y) for point in driveway.polygon]
 
-            self.add_node_edges_loop(
+            self.add_node_edges_loop_gt(
                 nodes,
+                gt=self.gt,
                 is_polygon=True,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.VIRTUAL,
@@ -243,8 +247,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         for feature_id, road_edge in self.road_edges.items():
             nodes = [IntIDNode(x=point.x, y=point.y) for point in road_edge.polyline]
 
-            self.add_node_edges_loop(
+            self.add_node_edges_loop_gt(
                 nodes,
+                gt=self.gt,
                 is_polygon=False,
                 interp_distance=interp_distance,
                 edge_type=_ROAD_EDGE_TYPE_TO_EDGE_TYPE[road_edge.type],
@@ -259,8 +264,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         for feature_id, road_line in self.road_lines.items():
             nodes = [IntIDNode(x=point.x, y=point.y) for point in road_line.polyline]
 
-            self.add_node_edges_loop(
+            self.add_node_edges_loop_gt(
                 nodes,
+                gt=self.gt,
                 is_polygon=False,
                 interp_distance=interp_distance,
                 edge_type=_ROAD_LINE_TYPE_TO_EDGE_TYPE[road_line.type],

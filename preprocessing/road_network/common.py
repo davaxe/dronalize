@@ -21,7 +21,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Hashable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import IntEnum, auto
-from math import ceil
+from math import ceil, dist
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -403,6 +403,86 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                     edge_type=edge_type,
                 ),
             )
+
+    def add_node_edges_loop_gt(
+            self,
+            nodes: Sequence[NODE],
+            *,
+            gt: float,
+            interp_distance: float | None,
+            edge_type: EdgeType,
+            is_polygon: bool = False,
+    ) -> None:
+        """Add edges between consecutive nodes in a given list.
+
+        The edges are only added if the distance between nodes is greater than
+        the specified `gt` (greater than) threshold. This is useful for
+        filtering out very short segments that may not be relevant for the
+        graph representation.
+
+        By using `gt` and `interp_distance` together, you can control both the
+        minimum distance for adding edges and the maximum distance between
+        interpolated points along those edges.
+
+        Args:
+            nodes: a sequence of nodes to connect with edges.
+            gt: minimum distance threshold for adding edges.
+            interp_distance: If None, no interpolation is performed.
+            edge_type: type of the edge to be created.
+            is_polygon: whether the nodes form a polygon. Defaults to False.
+
+        Raises:
+            ValueError: If interp_distance is not None and less than gt.
+        """
+        if interp_distance is not None and interp_distance < gt:
+            msg = "interp_distance must be greater than or equal to gt." \
+                  f" Got interp_distance={interp_distance}, gt={gt}."
+            raise ValueError(msg)
+        
+        i, j = 0, 1
+        while i < len(nodes) - 1:
+            src, dst = nodes[i], nodes[j]
+            distance = src.distance_to(dst)
+            if distance < gt and j < len(nodes) - 1:
+                # Increment j to find a node that is >= gt away
+                j += 1
+                continue
+            elif distance < gt:
+                # Always add last node, even if distance < gt
+                self.add_node(src)
+                self.add_node(dst)
+                self.add_edges_from_iterable(
+                    self.interpolate_edge(
+                        src,
+                        dst,
+                        interp_distance=interp_distance,
+                        edge_type=edge_type,
+                    )
+                )
+                if is_polygon:
+                    self.add_edges_from_iterable(
+                        self.interpolate_edge(
+                            nodes[-1],
+                            nodes[0],
+                            interp_distance=interp_distance,
+                            edge_type=edge_type,
+                        ),
+                    )
+                break
+
+            self.add_node(src)
+            self.add_node(dst)
+            self.add_edges_from_iterable(
+                self.interpolate_edge(
+                    src,
+                    dst,
+                    interp_distance=interp_distance,
+                    edge_type=edge_type,
+                ),
+            )
+            i = j
+            j = i + 1
+            
 
     def add_edges_from_iterable(
         self,
