@@ -133,8 +133,7 @@ def lane_segment_predecessors(
 ) -> Iterable[LaneSegment]:
     """Get predecessors of a lane segment."""
     return (
-        lane_segments[lane_segment_id]
-        for lane_segment_id in lane_segment.predecessors
+        lane_segments[lane_segment_id] for lane_segment_id in lane_segment.predecessors
     )
 
 

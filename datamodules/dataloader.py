@@ -83,7 +83,6 @@ class TrajDataModule(LightningDataModule):
     def setup(self, stage: str | None = None) -> None:
         """Set up the training, validation, and test datasets."""
         if stage == "fit" or stage is None:
-
             self.train = TrajDataset(
                 root=self.root,
                 dataset=self.dataset,
@@ -101,14 +100,13 @@ class TrajDataModule(LightningDataModule):
             )
 
         if stage == "test" or stage is None:
-
             self.test = TrajDataset(
                 root=self.root,
                 dataset=self.dataset,
                 split="test",
                 transform=self.transform,
-            small_data=self.small_data,
-        )
+                small_data=self.small_data,
+            )
 
     def train_dataloader(self) -> DataLoader:
         """Return the DataLoader for the training dataset."""

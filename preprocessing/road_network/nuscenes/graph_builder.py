@@ -210,8 +210,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         return {
             "nodes": [self.map_nodes[n_id] for n_id, _ in segments],
             "edge_type": [
-                parser.SegmentDividerType.to_edge_type(s_type)
-                for _, s_type in segments
+                parser.SegmentDividerType.to_edge_type(s_type) for _, s_type in segments
             ],
         }
 

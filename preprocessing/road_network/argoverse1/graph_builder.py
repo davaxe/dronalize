@@ -55,9 +55,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             argoverse_map.parse()
 
         super().__init__()
-        self.lane_segments: dict[int, parser.LaneSegment] = (
-            argoverse_map.lane_segments
-        )
+        self.lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
         self.map_nodes: dict[int, IntIDNode] = argoverse_map.nodes
 
         self.max_distance_between_connections: float = 1.0

@@ -679,7 +679,8 @@ def preprocess_ngsim(
     num_lcs = (
         tracks.groupby("track_id")
         .apply(lambda x: x["laneId"].diff().abs().sum())
-        .to_numpy().astype(int)
+        .to_numpy()
+        .astype(int)
     )
     classes = get_meta_property(tracks, tracks["track_id"].unique(), prop="class")
     tracks["drivingDirection"] = 1

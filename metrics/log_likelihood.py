@@ -49,7 +49,7 @@ class NegativeLogLikelihood(Metric):
         warnings.warn(
             "'mode_first' is set to True but the predictions"
             " are not multi-modal. Ignoring the flag.",
-            stacklevel=2
+            stacklevel=2,
         )
         return pred, scale
 

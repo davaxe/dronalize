@@ -12,7 +12,7 @@ def test_exp_de_basic() -> None:
 
     metric = ExpDE()
     # Test both FDE and ADE
-    for criterion in ['FDE', 'ADE']:
+    for criterion in ["FDE", "ADE"]:
         metric.update(pred, trg, prob=None, eval_criterion=criterion)
         result = metric.compute()
         assert isinstance(result, torch.Tensor)
@@ -28,7 +28,7 @@ def test_exp_de_with_mask() -> None:
     prob = torch.ones(batch_size, num_modes) / num_modes  # uniform distribution
 
     metric = ExpDE()
-    for criterion in ['FDE', 'ADE']:
+    for criterion in ["FDE", "ADE"]:
         metric.update(pred, trg, prob, mask=mask, eval_criterion=criterion)
         result = metric.compute()
         assert isinstance(result, torch.Tensor)
@@ -70,7 +70,7 @@ def test_exp_de_zero_displacement() -> None:
     prob = torch.ones(batch_size, num_modes) / num_modes
 
     metric = ExpDE()
-    for criterion in ['FDE', 'ADE']:
+    for criterion in ["FDE", "ADE"]:
         metric.update(pred, trg, prob, eval_criterion=criterion)
         result = metric.compute()
         assert result.item() == pytest.approx(0.0)
@@ -83,8 +83,10 @@ def test_exp_de_invalid_criterion() -> None:
     trg = torch.randn(batch_size, seq_len, num_dims)
 
     metric = ExpDE()
-    with pytest.raises(ValueError, match=f"eval_criterion must be 'FDE' or 'ADE', got INVALID"):
-        metric.update(pred, trg, prob=None, eval_criterion='INVALID')
+    with pytest.raises(
+        ValueError, match=f"eval_criterion must be 'FDE' or 'ADE', got INVALID"
+    ):
+        metric.update(pred, trg, prob=None, eval_criterion="INVALID")
 
 
 def test_exp_de_all_masked() -> None:

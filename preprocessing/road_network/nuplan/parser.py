@@ -211,9 +211,7 @@ class TrafficLight(LayerBase):
     @staticmethod
     def sql() -> str:
         """Return the SQL query for selecting a traffic light."""
-        return (
-            "SELECT fid, geom, light_face_type_fid, creator_id FROM traffic_lights"
-        )
+        return "SELECT fid, geom, light_face_type_fid, creator_id FROM traffic_lights"
 
     @classmethod
     def from_row(
@@ -241,9 +239,7 @@ class StopPolygon(LayerBase):
     @staticmethod
     def sql() -> str:
         """Return the SQL query for selecting a stop polygon."""
-        return (
-            "SELECT fid, geom, stop_polygon_type_fid, creator_id FROM stop_polygons"
-        )
+        return "SELECT fid, geom, stop_polygon_type_fid, creator_id FROM stop_polygons"
 
     @classmethod
     def from_row(cls, row: tuple[int, bytes, int, str | None]) -> StopPolygon:

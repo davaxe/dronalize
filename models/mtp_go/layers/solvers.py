@@ -18,13 +18,15 @@ import torch
 
 
 def forward_euler(
-    model: Callable, x: torch.Tensor, u: torch.Tensor, h: float) -> torch.Tensor:
+    model: Callable, x: torch.Tensor, u: torch.Tensor, h: float
+) -> torch.Tensor:
     """Forward Euler (first-order) method."""
     return x + h * model(x, u)
 
 
 def midpoint(
-    model: Callable, x: torch.Tensor, u: torch.Tensor, h: float) -> torch.Tensor:
+    model: Callable, x: torch.Tensor, u: torch.Tensor, h: float
+) -> torch.Tensor:
     """Explicit midpoint (second-order) method."""
     k1 = model(x, u)
     k2 = model(x + h / 2 * k1, u)

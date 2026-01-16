@@ -205,9 +205,7 @@ if __name__ == "__main__":
             msg = f"Path {path} does not exist."
             raise FileNotFoundError(msg)
 
-        scenes_iterator = get_lyft_scenes_as_pandas_lazy(
-            path, start=0, batch_size=1000
-        )
+        scenes_iterator = get_lyft_scenes_as_pandas_lazy(path, start=0, batch_size=1000)
         set_dir = os.path.join(output_dir, split)
         os.makedirs(set_dir, exist_ok=True)
         existing = [
@@ -312,9 +310,7 @@ if __name__ == "__main__":
                     list(pool.imap_unordered(worker_function, task_args))
             else:
                 init_worker(save_id_counter, save_lock)
-                for arg in tqdm(
-                    task_args, desc=f"{rec_id}", position=1, leave=False
-                ):
+                for arg in tqdm(task_args, desc=f"{rec_id}", position=1, leave=False):
                     worker_function(arg)
 
     print("Finished.")

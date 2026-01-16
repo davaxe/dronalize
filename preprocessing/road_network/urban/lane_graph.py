@@ -130,9 +130,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
         elif rel_type == "stop_line":
             self._process_regulatory_relation(r, EdgeType.STOP)
 
-    def _process_regulatory_relation(
-        self, relation: Any, edge_type: EdgeType
-    ) -> None:
+    def _process_regulatory_relation(self, relation: Any, edge_type: EdgeType) -> None:
         """Process a regulatory relation."""
         for member in relation.members:
             if member.type == "w" and member.role == "ref_line":
@@ -164,9 +162,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
         pos = nx.get_node_attributes(self.graph, "pos")
 
         # Group edges by type
-        edges_by_type: dict[EdgeType, list] = {
-            edge_type: [] for edge_type in EdgeType
-        }
+        edges_by_type: dict[EdgeType, list] = {edge_type: [] for edge_type in EdgeType}
         for u, v, data in self.graph.edges(data=True):
             edge_type = data.get("type", EdgeType.NONE)
             edges_by_type[edge_type].append((u, v))
@@ -192,7 +188,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
                         x_coords,
                         y_coords,
                         color=style["color"],
-                        linewidth= 1,# style["width"],
+                        linewidth=1,  # style["width"],
                         linestyle="--",
                         dashes=style.get("dashes", [5, 5]),
                         zorder=10,
@@ -202,7 +198,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
                         x_coords,
                         y_coords,
                         color=style["color"],
-                        linewidth=1, # style["width"],
+                        linewidth=1,  # style["width"],
                         linestyle=":",
                         dashes=style.get("dashes", [1, 5]),
                         zorder=10,
@@ -212,7 +208,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
                         x_coords,
                         y_coords,
                         color=style["color"],
-                        linewidth=1, # style["width"],
+                        linewidth=1,  # style["width"],
                         linestyle="-",
                         zorder=10,
                     )
@@ -407,9 +403,7 @@ def get_lane_graph(
     # Ensure lanelet_file is a string (decode if bytes)
     if isinstance(lanelet_file, bytes):
         try:
-            lanelet_file = lanelet_file.decode(
-                "utf-8"
-            )  # Assuming UTF-8 encoded bytes
+            lanelet_file = lanelet_file.decode("utf-8")  # Assuming UTF-8 encoded bytes
         except UnicodeDecodeError:
             raise ValueError(
                 "lanelet_file is in bytes format but cannot be decoded to a valid string."
@@ -429,9 +423,7 @@ if __name__ == "__main__":
     y_utm_origin = 0
 
     # Create and plot the graph
-    graph_builder = get_lane_graph(
-        path, x_utm_origin, y_utm_origin, return_torch=False
-    )
+    graph_builder = get_lane_graph(path, x_utm_origin, y_utm_origin, return_torch=False)
     graph_builder.plot(plot_virtual=True)
 
     # Create torch graph

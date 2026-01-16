@@ -235,6 +235,7 @@ class LaneType(BaseEnum):
     THREE = 3
     FOUR = 4
 
+
 @dataclass
 class Node(BaseMapObject[str], BaseNode[str]):
     """A node in the NuScenes map, representing a point in space."""
