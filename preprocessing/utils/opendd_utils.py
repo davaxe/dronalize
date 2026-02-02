@@ -139,7 +139,9 @@ class _Frame(TypedDict):
 if __name__ == "__main__":
     # Example usage
     rdb = "rdb1"
-    db_path = Path(f"../datasets/openDD/opendd_v3-{rdb}/{rdb}/trajectories_{rdb}_v3.sqlite")
+    db_path = Path(
+        f"../datasets/openDD/opendd_v3-{rdb}/{rdb}/trajectories_{rdb}_v3.sqlite"
+    )
 
     for recording in get_opendd_recordings(db_path):
         print(recording.head())

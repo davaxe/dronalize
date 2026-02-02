@@ -67,9 +67,7 @@ class VODData(nuscenes_utils.NuscenesData):
             # Remove all rows where full_category is not vehicle.ego as it is
             # duplicated
             pandas_scene = scene.to_pandas()
-            pandas_scene = pandas_scene[
-                pandas_scene["full_category"] != "vehicle.ego"
-            ]
+            pandas_scene = pandas_scene[pandas_scene["full_category"] != "vehicle.ego"]
             yield pandas_scene
 
 

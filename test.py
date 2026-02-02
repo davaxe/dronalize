@@ -29,7 +29,8 @@ printer = logging.getLogger(__name__)
 
 torch.set_float32_matmul_precision("medium")
 warnings.filterwarnings(
-    "ignore", ".*Consider increasing the value of the `num_workers` argument*",
+    "ignore",
+    ".*Consider increasing the value of the `num_workers` argument*",
 )
 warnings.filterwarnings("ignore", ".*Checkpoint directory*")
 
@@ -38,13 +39,16 @@ set_sharing_strategy("file_system")
 # Load configuration and import modules
 config = load_config(args.config)
 TorchModel = import_from_module(
-    "models." + config["model"]["module"], config["model"]["class"],
+    "models." + config["model"]["module"],
+    config["model"]["class"],
 )
 LitDataModule = import_from_module(
-    "datamodules." + config["datamodule"]["module"], config["datamodule"]["class"],
+    "datamodules." + config["datamodule"]["module"],
+    config["datamodule"]["class"],
 )
 LitModel = import_from_module(
-    "models." + config["litmodule"]["module"], config["litmodule"]["class"],
+    "models." + config["litmodule"]["module"],
+    config["litmodule"]["class"],
 )
 
 

@@ -174,10 +174,12 @@ class LineString(Geometry):
 
         coords_str = geometry_str[len("LINESTRING (") : -1]
         coords = coords_str.split(", ")
-        return cls([
-            IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
-            for coord in coords
-        ])
+        return cls(
+            [
+                IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
+                for coord in coords
+            ]
+        )
 
     def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
         """Iterate over edge connections in the linestring."""
@@ -201,10 +203,12 @@ class Polygon(Geometry):
 
         coords_str = geometry_str[len("POLYGON ((") : -2]
         coords = coords_str.split(", ")
-        return cls([
-            IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
-            for coord in coords
-        ])
+        return cls(
+            [
+                IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
+                for coord in coords
+            ]
+        )
 
     def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
         """Iterate over edge connections in the polygon."""

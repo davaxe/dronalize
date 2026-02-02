@@ -22,15 +22,16 @@ def test_filter_prediction_criterion() -> None:
     mask = torch.randint(0, 2, (batch_size, seq_len))
     prob = torch.randn(batch_size, num_modes)
 
-    for min_criterion in ['FDE', 'ADE', 'ML']:
-        pred_, best_idx_ = filter_prediction(pred, trg, mask, prob,
-                                             min_criterion, mode_first=False)
+    for min_criterion in ["FDE", "ADE", "ML"]:
+        pred_, best_idx_ = filter_prediction(
+            pred, trg, mask, prob, min_criterion, mode_first=False
+        )
         assert pred_.size() == (batch_size, seq_len, num_dims)
         assert best_idx_.size() == (batch_size,)
 
-    invalid_criterion = 'invalid'
+    invalid_criterion = "invalid"
     with pytest.raises(ValueError) as exc:
-        filter_prediction(pred, trg, min_criterion=f'{invalid_criterion}')
+        filter_prediction(pred, trg, min_criterion=f"{invalid_criterion}")
 
         assert exc.value == f"Invalid criterion: {invalid_criterion}"
 
@@ -41,7 +42,7 @@ def test_filter_prediction_mode_consistency() -> None:
     mask = torch.randint(0, 2, (batch_size, seq_len))
     prob = torch.randn(batch_size, num_modes)
 
-    for min_criterion in ['FDE', 'ADE', 'ML']:
+    for min_criterion in ["FDE", "ADE", "ML"]:
         pred = torch.randn(batch_size, seq_len, num_modes, num_dims)
         pred_list = []
         best_idx_list = []
@@ -51,8 +52,9 @@ def test_filter_prediction_mode_consistency() -> None:
             else:
                 pred_ = pred.clone()
 
-            pred_, best_idx_ = filter_prediction(pred_, trg, mask, prob,
-                                                 min_criterion, mode_first=mode_first)
+            pred_, best_idx_ = filter_prediction(
+                pred_, trg, mask, prob, min_criterion, mode_first=mode_first
+            )
 
             pred_list.append(pred_)
             best_idx_list.append(best_idx_)

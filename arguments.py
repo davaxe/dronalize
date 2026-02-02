@@ -30,7 +30,7 @@ def str_to_bool(value: bool | str) -> bool:
         bool: The interpreted boolean value.
 
     Raises:
-        ArgumentTypeError: If the input value cannot be interpreted as a boolean. 
+        ArgumentTypeError: If the input value cannot be interpreted as a boolean.
 
     """
     true_vals = ("yes", "true", "t", "y", "1")

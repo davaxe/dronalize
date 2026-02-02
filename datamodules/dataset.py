@@ -71,7 +71,10 @@ class TrajDataset(Dataset):
 
         """
         super().__init__(
-            root=root, transform=transform, pre_transform=None, pre_filter=None,
+            root=root,
+            transform=transform,
+            pre_transform=None,
+            pre_filter=None,
         )
         if split not in ["train", "val", "test"]:
             msg = "Split must be one of [train, val, test]"

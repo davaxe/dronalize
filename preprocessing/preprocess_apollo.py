@@ -344,7 +344,9 @@ if __name__ == "__main__":
 
     # Get path to 'prediction_train'
     all_train_path = Path(
-        args.path, dataset, "prediction_train",
+        args.path,
+        dataset,
+        "prediction_train",
     )  # path to the training data (.txt files)
     if not all_train_path.exists():
         msg = f"Path {all_train_path} does not exist."
@@ -436,7 +438,10 @@ if __name__ == "__main__":
                     "heading",
                 ]
                 tracks = pd.read_csv(
-                    tracks_path, sep=r"\s+", header=None, names=columns,
+                    tracks_path,
+                    sep=r"\s+",
+                    header=None,
+                    names=columns,
                 )
 
                 # Keep only relevant columns and convert frame to time

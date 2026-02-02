@@ -19,10 +19,12 @@ import torch
 from preprocessing.road_network.edge_type import EdgeType
 
 
-def section_graph(lane_markings: list[float],
-                  road_x: tuple[float, float],
-                  spacing: float = 3.0,
-                  direction: int = 1) -> dict:
+def section_graph(
+    lane_markings: list[float],
+    road_x: tuple[float, float],
+    spacing: float = 3.0,
+    direction: int = 1,
+) -> dict:
     """Create a graph representation of a section of a highway.
 
     :param lane_markings: list of y-coordinates of the lane markings
@@ -59,22 +61,24 @@ def section_graph(lane_markings: list[float],
     pos_arr = np.concatenate(pos, axis=0)
     node_attr = np.concatenate(node_type, axis=0)
 
-    map_data: dict = {
-        'map_point': {},
-        ('map_point', 'to', 'map_point'): {}
-    }
+    map_data: dict = {"map_point": {}, ("map_point", "to", "map_point"): {}}
 
-    map_data['map_point']['num_nodes'] = pos_arr.shape[0]
-    map_data['map_point']['type'] = torch.from_numpy(node_attr).long()
-    map_data['map_point']['position'] = torch.from_numpy(pos_arr).float()
+    map_data["map_point"]["num_nodes"] = pos_arr.shape[0]
+    map_data["map_point"]["type"] = torch.from_numpy(node_attr).long()
+    map_data["map_point"]["position"] = torch.from_numpy(pos_arr).float()
 
     nodes_per_lane = len(x_l)
     node_idx = 0
     edge_index = []
     edge_attr = []
     for j in range(n_markings):
-        edges = np.array([[i, i + 1] for i in range(nodes_per_lane - 1)] +
-                         [[i + 1, i] for i in range(nodes_per_lane - 1)]).T + node_idx
+        edges = (
+            np.array(
+                [[i, i + 1] for i in range(nodes_per_lane - 1)]
+                + [[i + 1, i] for i in range(nodes_per_lane - 1)]
+            ).T
+            + node_idx
+        )
         edge_index.append(edges)
         node_idx += nodes_per_lane
         if j in (0, n_markings - 1):
@@ -86,16 +90,22 @@ def section_graph(lane_markings: list[float],
     edge_indices = np.concatenate(edge_index, axis=1)
     edge_attributes = np.concatenate(edge_attr, axis=0)
 
-    map_data['map_point', 'to', 'map_point']['edge_index'] = torch.from_numpy(edge_indices).long()
-    map_data['map_point', 'to', 'map_point']['type'] = torch.from_numpy(edge_attributes).float()
+    map_data["map_point", "to", "map_point"]["edge_index"] = torch.from_numpy(
+        edge_indices
+    ).long()
+    map_data["map_point", "to", "map_point"]["type"] = torch.from_numpy(
+        edge_attributes
+    ).float()
 
     return map_data
 
 
-def get_highway_graph(rec_meta: pd.DataFrame,
-                      tracks: pd.DataFrame,
-                      spacing: float = 3.0,
-                      buffer: float = 10.0) -> tuple[dict, dict, float, float]:
+def get_highway_graph(
+    rec_meta: pd.DataFrame,
+    tracks: pd.DataFrame,
+    spacing: float = 3.0,
+    buffer: float = 10.0,
+) -> tuple[dict, dict, float, float]:
     """
     Get the graph representation of the highway from the lane markings.
     :param rec_meta: meta dataframe of the recording (used to get the lane markings)
@@ -105,14 +115,14 @@ def get_highway_graph(rec_meta: pd.DataFrame,
     :return:
     """
 
-    ulm = [float(l) for l in list(rec_meta['upperLaneMarkings'])[0].split(';')]
-    llm = [float(l) for l in list(rec_meta['lowerLaneMarkings'])[0].split(';')]
+    ulm = [float(l) for l in list(rec_meta["upperLaneMarkings"])[0].split(";")]
+    llm = [float(l) for l in list(rec_meta["lowerLaneMarkings"])[0].split(";")]
 
     x_min = tracks.x.min()
     x_max = tracks.x.max()
 
     norm_max = int(x_max - x_min) + buffer
-    norm_min = - buffer
+    norm_min = -buffer
 
     # make sure the range is divisible by spacing
     norm_max = norm_max + (spacing - norm_max % spacing)
@@ -133,27 +143,47 @@ if __name__ == "__main__":
     recording_meta = pd.read_csv(f"{ROOT}/{rec_idx}_recordingMeta.csv")
     tracks_csv = pd.read_csv(f"{ROOT}/{rec_idx}_tracks.csv")
 
-    data_upper, data_lower, *_ = get_highway_graph(recording_meta, tracks_csv, spacing=10)
+    data_upper, data_lower, *_ = get_highway_graph(
+        recording_meta, tracks_csv, spacing=10
+    )
 
     plot_data = data_upper
 
     # plt.figure(figsize=(20, 5))
 
     # plot upper lane markings using edge_index
-    for i in range(plot_data['map_point', 'to', 'map_point']['edge_index'].shape[1]):
-        source = plot_data['map_point', 'to', 'map_point']['edge_index'][0, i]
-        target = plot_data['map_point', 'to', 'map_point']['edge_index'][1, i]
-        source_pos = plot_data['map_point']['position'][source]
-        target_pos = plot_data['map_point']['position'][target]
-        COLOR = 'k' if plot_data['map_point', 'to', 'map_point']['type'][i] == EdgeType.ROAD_BORDER.value else 'grey'
-        plt.plot([source_pos[0], target_pos[0]],
-                 [source_pos[1], target_pos[1]], color=COLOR, zorder=1)
+    for i in range(plot_data["map_point", "to", "map_point"]["edge_index"].shape[1]):
+        source = plot_data["map_point", "to", "map_point"]["edge_index"][0, i]
+        target = plot_data["map_point", "to", "map_point"]["edge_index"][1, i]
+        source_pos = plot_data["map_point"]["position"][source]
+        target_pos = plot_data["map_point"]["position"][target]
+        COLOR = (
+            "k"
+            if plot_data["map_point", "to", "map_point"]["type"][i]
+            == EdgeType.ROAD_BORDER.value
+            else "grey"
+        )
+        plt.plot(
+            [source_pos[0], target_pos[0]],
+            [source_pos[1], target_pos[1]],
+            color=COLOR,
+            zorder=1,
+        )
 
     # plot all points
-    for i in range(plot_data['map_point']['position'].shape[0]):
-        COLOR = 'r' if plot_data['map_point']['type'][i] == EdgeType.ROAD_BORDER.value else 'b'
-        plt.scatter(plot_data['map_point']['position'][i, 0],
-                    plot_data['map_point']['position'][i, 1], color=COLOR, s=5, zorder=2)
+    for i in range(plot_data["map_point"]["position"].shape[0]):
+        COLOR = (
+            "r"
+            if plot_data["map_point"]["type"][i] == EdgeType.ROAD_BORDER.value
+            else "b"
+        )
+        plt.scatter(
+            plot_data["map_point"]["position"][i, 0],
+            plot_data["map_point"]["position"][i, 1],
+            color=COLOR,
+            s=5,
+            zorder=2,
+        )
 
     # plt.axis('equal')
     plt.show()

@@ -46,7 +46,7 @@ DATASET_MAPPINGS = {
         tuple(f"{i:02}" for i in range(61, 72 + 1)): "4_cologne_klettenberg",
         tuple(f"{i:02}" for i in range(73, 77 + 1)): "5_aachen_laurensberg",
         tuple(f"{i:02}" for i in range(78, 92 + 1)): "6_merzenich_rather",
-    }
+    },
 }
 
 
@@ -75,7 +75,9 @@ def get_path_for_index(dataset: str, idx: int) -> Optional[str]:
 def load_meta_data(root_dir: str, dataset: str, idx: int) -> tuple[float, float]:
     """Load meta data for the given dataset and index."""
     str_idx = f"0{idx}" if idx < 10 else str(idx)
-    meta_file_path = os.path.join(root_dir, dataset, "data", f"{str_idx}_recordingMeta.csv")
+    meta_file_path = os.path.join(
+        root_dir, dataset, "data", f"{str_idx}_recordingMeta.csv"
+    )
     meta = pd.read_csv(meta_file_path)
     return meta.xUtmOrigin.values[0], meta.yUtmOrigin.values[0]
 
@@ -88,7 +90,7 @@ def plot_tracks(ax: plt.Axes, tracks_path: str, num_samples: int = 100) -> None:
     for tid in track_ids:
         df = tracks[tracks.trackId == tid]
         pos = df[["xCenter", "yCenter"]].values
-        ax.plot(pos[:, 0], pos[:, 1], lw=1, c='tab:purple', zorder=0, alpha=1.)
+        ax.plot(pos[:, 0], pos[:, 1], lw=1, c="tab:purple", zorder=0, alpha=1.0)
 
 
 def main():
@@ -98,7 +100,7 @@ def main():
         "plot_tracks": True,
         "dataset": "inD",
         "index": 0,
-        "num_track_samples": 10
+        "num_track_samples": 10,
     }
 
     # Find root directory and setup paths
@@ -107,39 +109,38 @@ def main():
     # Get path for the given dataset and index
     path = get_path_for_index(plot_config["dataset"], plot_config["index"])
     if not path:
-        raise ValueError(f"Index {plot_config['index']} not found in mapping for dataset {plot_config['dataset']}")
+        raise ValueError(
+            f"Index {plot_config['index']} not found in mapping for dataset {plot_config['dataset']}"
+        )
 
     # Load meta data
     x_utm_origin, y_utm_origin = load_meta_data(
-        root_dir,
-        plot_config["dataset"],
-        plot_config["index"]
+        root_dir, plot_config["dataset"], plot_config["index"]
     )
 
     # Find and load lanelet file
-    lanelet_dir = os.path.join(root_dir, plot_config["dataset"], "maps", "lanelets", path)
+    lanelet_dir = os.path.join(
+        root_dir, plot_config["dataset"], "maps", "lanelets", path
+    )
     lanelet_file = os.path.join(lanelet_dir, os.listdir(lanelet_dir)[0])
 
     # Create and plot graph
     graph_builder = get_lane_graph(
-        lanelet_file,
-        x_utm_origin,
-        y_utm_origin,
-        return_torch=False
+        lanelet_file, x_utm_origin, y_utm_origin, return_torch=False
     )
     fig, ax = graph_builder.plot(
-        plot_virtual=plot_config["plot_virtual"],
-        return_axes=True
+        plot_virtual=plot_config["plot_virtual"], return_axes=True
     )
 
     # Plot tracks if requested
     if plot_config["plot_tracks"]:
-        str_idx = f"0{plot_config['index']}" if plot_config['index'] < 10 else str(plot_config['index'])
+        str_idx = (
+            f"0{plot_config['index']}"
+            if plot_config["index"] < 10
+            else str(plot_config["index"])
+        )
         tracks_path = os.path.join(
-            root_dir,
-            plot_config["dataset"],
-            "data",
-            f"{str_idx}_tracks.csv"
+            root_dir, plot_config["dataset"], "data", f"{str_idx}_tracks.csv"
         )
         plot_tracks(ax, tracks_path, plot_config["num_track_samples"])
 

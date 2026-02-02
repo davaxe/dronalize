@@ -114,7 +114,7 @@ def load_dataset(
 
 def monitor_progress(queue: Queue[int], total: int) -> None:
     """Monitor the progress of dataset loading."""
-    with tqdm(total=20448) as p_bar:  #150349
+    with tqdm(total=20448) as p_bar:  # 150349
         counter = 0
         while counter < total:
             if not queue.get():

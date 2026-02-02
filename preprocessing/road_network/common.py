@@ -113,9 +113,7 @@ class BaseNode(Protocol, Generic[ID]):
     def distance_to(self, other: Self) -> float:
         """Calculate the Euclidean distance to another node."""
         return math.sqrt(
-            (self.x - other.x) ** 2
-            + (self.y - other.y) ** 2
-            + (self.z - other.z) ** 2,
+            (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2,
         )
 
 
@@ -776,9 +774,7 @@ def get_edges_from_adj_list(
 
     """
     if id_to_index is None:
-        id_to_index = {
-            node_id: index for index, node_id in enumerate(adj_list.keys())
-        }
+        id_to_index = {node_id: index for index, node_id in enumerate(adj_list.keys())}
 
     if edge_map is None:
         edge_map = {}
@@ -840,9 +836,7 @@ class MapGraph:
         self.node_positions: torch.Tensor = node_positions
         self.edge_indices: torch.Tensor = edge_indices
         self.num_nodes: int = node_positions.shape[0]
-        self.num_edges: int = (
-            edge_indices.shape[1] if edge_indices.numel() > 0 else 0
-        )
+        self.num_edges: int = edge_indices.shape[1] if edge_indices.numel() > 0 else 0
         self.node_types: torch.Tensor = (
             node_types
             if node_types is not None

@@ -172,13 +172,15 @@ class PedestrianSampleLoader:
             valid_mask_index = len(self.valid_mask)
             self.valid_mask.append(valid_mask)
             for target_ped_index in target_ped:
-                self.sequences.append((
-                    index,
-                    valid_mask_index,
-                    start,
-                    end,
-                    target_ped_index,
-                ))
+                self.sequences.append(
+                    (
+                        index,
+                        valid_mask_index,
+                        start,
+                        end,
+                        target_ped_index,
+                    )
+                )
                 if not self.config.multiple_targets_per_window:
                     break
 
@@ -427,21 +429,19 @@ def _interpolate(
                 # to fill the interpolated space
                 interp_length = (end - start) * factor
                 segment_repeated = np.repeat(segment, factor, axis=0)[:interp_length]
-                interp_data[ped_i, start * factor : end * factor, :] = (
-                    segment_repeated
-                )
+                interp_data[ped_i, start * factor : end * factor, :] = segment_repeated
                 continue
 
             # Interpolation
             original_indices = np.arange(seq_len)
-            target_indices = (
-                np.arange((seq_len - 1) * factor + 1, dtype=float) / factor
-            )
+            target_indices = np.arange((seq_len - 1) * factor + 1, dtype=float) / factor
 
-            interp_segment = np.column_stack([
-                np.interp(target_indices, original_indices, segment[:, 0]),
-                np.interp(target_indices, original_indices, segment[:, 1]),
-            ]).astype(np.float32)
+            interp_segment = np.column_stack(
+                [
+                    np.interp(target_indices, original_indices, segment[:, 0]),
+                    np.interp(target_indices, original_indices, segment[:, 1]),
+                ]
+            ).astype(np.float32)
 
             interp_segment = _extrapolate_back_linear(
                 interp_segment,

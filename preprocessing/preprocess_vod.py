@@ -237,9 +237,7 @@ def worker_process_file(args_tuple: tuple[str, str, str, str, dict]):
 
     # Median frame
     median_frame = int(tracks["frame"].median())
-    agent_coords = (
-        tracks[tracks["frame"] == median_frame][["x", "y"]].mean().to_numpy()
-    )
+    agent_coords = tracks[tracks["frame"] == median_frame][["x", "y"]].mean().to_numpy()
 
     lane_graph = map_graph.extract_radius(
         center=agent_coords,
@@ -331,8 +329,7 @@ if __name__ == "__main__":
 
     # Check if train, val, and test directories exist and are populated
     if not all(
-        os.path.exists(p) and os.listdir(p)
-        for p in [train_path, val_path, test_path]
+        os.path.exists(p) and os.listdir(p) for p in [train_path, val_path, test_path]
     ):
         print(
             "Train, val, or test directories are missing or empty."
@@ -416,9 +413,7 @@ if __name__ == "__main__":
             msg = f"Path {path} does not exist."
             raise ValueError(msg)
         files = sorted([f for f in os.listdir(path) if f.endswith(".csv")])
-        tasks = [
-            (f, split, os.path.join(path, f), output_dir, config) for f in files
-        ]
+        tasks = [(f, split, os.path.join(path, f), output_dir, config) for f in files]
 
         # Determine starting counter value
         set_dir = os.path.join(output_dir, split)

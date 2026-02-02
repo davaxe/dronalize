@@ -26,15 +26,19 @@ def test_min_brier_with_none_probability():
     prob = None
 
     min_brier = MinBrier()
-    with pytest.raises(ValueError, match="Probabilistic criterion requires"
-                                             " the probability of the predictions."):
+    with pytest.raises(
+        ValueError,
+        match="Probabilistic criterion requires the probability of the predictions.",
+    ):
         min_brier.update(pred, trg, prob)
 
 
 def test_min_brier_with_unimodal_prediction():
     batch_size, seq_len, num_modes, num_dims = 32, 25, 6, 2
     trg = torch.randn(batch_size, seq_len, num_dims)
-    pred = torch.randn(batch_size, seq_len, num_dims)  # Assuming this should be multi-modal
+    pred = torch.randn(
+        batch_size, seq_len, num_dims
+    )  # Assuming this should be multi-modal
     prob = torch.randn(batch_size, num_modes)
 
     min_brier = MinBrier()
