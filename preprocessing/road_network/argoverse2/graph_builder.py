@@ -14,7 +14,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
+
+from matplotlib import pyplot as plt
 
 from preprocessing.road_network.argoverse2 import parser
 from preprocessing.road_network.common import (
@@ -25,7 +27,6 @@ from preprocessing.road_network.common import (
 from preprocessing.road_network.edge_type import EdgeType
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
     from pathlib import Path
 
 
@@ -37,7 +38,7 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         super().__init__()
         self.map = map_data
 
-        self.assume_none_as: EdgeType = EdgeType.VIRTUAL
+        self.edge_map: dict[EdgeType, EdgeType] = {EdgeType.NONE: EdgeType.VIRTUAL}
 
     @classmethod
     def from_json_file(cls, json_file: Path) -> Argoverse2GraphBuilder:
@@ -52,6 +53,7 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
     def build(
         self,
         *,
+        min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> MapGraph:
         """Build a `MapGraph` from the `Argoverse2Map`.
@@ -60,6 +62,8 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         for `interp_distance`.
 
         Args:
+            min_distance: the minimum distance between nodes when adding edges.
+                If None, no minimum distance is enforced.
             interp_distance: the target distance for interpolation. If None,
                 no interpolation is performed.
 
@@ -68,99 +72,81 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
             edge types.
 
         """
-        self._add_lane_boundary_edges(
-            interp_distance=interp_distance,
-        )
-        self._add_pedestrian_crossing_edges(
-            interp_distance=interp_distance,
-        )
+        self._add_lane_boundary_edges()
+        self._add_pedestrian_crossing_edges()
 
-        return self.build_graph()
+        return self.build_graph(
+            min_dist=min_distance,
+            interp_distance=interp_distance,
+        )
 
     # --- Private methods ----
 
-    def _add_pedestrian_crossing_edges(
-        self,
-        *,
-        interp_distance: float | None = None,
-    ) -> None:
+    def _add_pedestrian_crossing_edges(self) -> None:
         """Add edges for pedestrian crossings in the map."""
         for crossing in self.map.pedestrian_crossings.values():
-            self.add_node_edges_loop(
+            self.add_path_lazy(
                 nodes=crossing.first_edge,
-                interp_distance=interp_distance,
                 edge_type=EdgeType.PEDESTRIAN_MARKING,
             )
-            self.add_node_edges_loop(
+            self.add_path_lazy(
                 nodes=crossing.second_edge,
-                interp_distance=interp_distance,
                 edge_type=EdgeType.PEDESTRIAN_MARKING,
             )
 
-    def _add_lane_boundary_edges(
-        self,
-        *,
-        interp_distance: float | None = None,
-    ) -> None:
+    def _add_lane_boundary_edges(self) -> None:
         """Add edges for lane boundaries in the map."""
         lane_segments = self.map.segments.copy()
 
         while lane_segments:
-            segment_id, segment = lane_segments.popitem()
-            self.add_edges_from_iterable(
-                self._traverse_lane_segment(
-                    segment_id,
-                    interp_distance=interp_distance,
-                ),
-            )
+            _, segment = lane_segments.popitem()
+            left = self._lane_segment_nodes(segment, side="left")
+            if left is not None:
+                nodes, edge = left
+                self.add_path_lazy(
+                    nodes=nodes,
+                    edge_type=edge,
+                )
 
-    def _traverse_lane_segment(
+            right_nodes = self._lane_segment_nodes(segment, side="right")
+            if right_nodes is not None:
+                nodes, edge = right_nodes
+                self.add_path_lazy(
+                    nodes=nodes,
+                    edge_type=edge,
+                )
+
+    def _lane_segment_nodes(
         self,
-        start: int,
-        *,
-        interp_distance: float | None = None,
-    ) -> Iterable[tuple[int, int, EdgeType]]:
-        """Traverse a lane segment and yield edges for its boundaries.
+        segment: parser.LaneSegment,
+        side: Literal["left", "right"],
+    ) -> tuple[list[IntIDNode], EdgeType] | None:
+        """Get all nodes for a lane segment's boundaries."""
+        boundary = (
+            segment.left_boundary if side == "left" else segment.right_boundary
+        )
+        if boundary is None:
+            return None
 
-        Starts with the left boundary if available, then the right boundary.
-        """
-        lane = self.map.segments[start]
-        left_boundary: parser.LaneBoundary | None = lane.left_boundary
-        if left_boundary:
-            yield from self._traverse_boundary(
-                left_boundary,
-                interp_distance=interp_distance,
-            )
-
-        right_boundary: parser.LaneBoundary | None = lane.right_boundary
-        if right_boundary:
-            yield from self._traverse_boundary(
-                right_boundary,
-                interp_distance=interp_distance,
-            )
-
-    def _traverse_boundary(
-        self,
-        boundary: parser.LaneBoundary,
-        *,
-        interp_distance: float | None = None,
-    ) -> Iterable[tuple[int, int, EdgeType]]:
-        """Traverse a lane boundary and yield edges for its nodes.
-
-        This method will add nodes to the graph and yield edges, but edges are
-        not added to the adjacency list directly.
-        """
+        nodes = boundary.nodes
         edge_type = boundary.get_edge_type()
-        if edge_type == EdgeType.NONE:
-            edge_type = self.assume_none_as
+        return nodes, edge_type
 
-        for i in range(len(boundary.nodes) - 1):
-            src = boundary.nodes[i]
-            dst = boundary.nodes[i + 1]
 
-            yield from self.interpolate_edge(
-                src,
-                dst,
-                edge_type=edge_type,
-                interp_distance=interp_distance,
-            )
+if __name__ == "__main__":
+    from pathlib import Path
+
+    # Example usage
+    json_path = Path(
+        "../datasets/av2/test/407afee5-aa3d-43cc-a258-1ffa52ee735f/log_map_archive_407afee5-aa3d-43cc-a258-1ffa52ee735f.json"
+    )
+    builder = Argoverse2GraphBuilder.from_json_file(json_path)
+    graph = builder.build(
+        min_distance=5.0,
+        interp_distance=None,
+    )
+
+    print(f"Number of nodes: {len(graph.node_types)}")
+
+    graph.plot_graph()
+    plt.savefig("test_argoverse2_graph.pdf")

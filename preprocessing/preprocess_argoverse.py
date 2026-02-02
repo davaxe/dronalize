@@ -239,9 +239,7 @@ if __name__ == "__main__":
     if args.debug:
         print("DEBUG MODE: ON\n")
 
-    config_file = (
-        args.config if args.config.endswith(".yml") else args.config + ".yml"
-    )
+    config_file = args.config if args.config.endswith(".yml") else args.config + ".yml"
     config_file_pth = os.path.join("preprocessing", "configs", config_file)
 
     if not os.path.exists(config_file_pth):
@@ -312,9 +310,7 @@ if __name__ == "__main__":
 
         files = sorted([f for f in os.listdir(path) if f.endswith(".csv")])
 
-        tasks = [
-            (f, split, os.path.join(path, f), output_dir, config) for f in files
-        ]
+        tasks = [(f, split, os.path.join(path, f), output_dir, config) for f in files]
 
         # Determine starting ID
         set_dir = os.path.join(output_dir, split)

@@ -18,8 +18,9 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from collections.abc import Hashable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from math import ceil
 from typing import (
@@ -29,12 +30,17 @@ from typing import (
     Literal,
     Protocol,
     Self,
+    TypedDict,
     TypeVar,
     overload,
 )
 
 import numpy as np
 import torch
+from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.collections import LineCollection
+from matplotlib.lines import Line2D
 from torch_geometric.utils import subgraph
 
 from preprocessing.road_network.edge_type import EdgeType
@@ -219,6 +225,13 @@ class BaseEnum(IntEnum):
 NODE = TypeVar("NODE", bound=BaseNode)
 
 
+class _PendingPathDict(TypedDict, Generic[NODE]):
+    nodes: Sequence[NODE]
+    edge_type: EdgeType | Sequence[EdgeType]
+    is_polygon: bool
+
+
+@dataclass
 class GraphBuilder(ABC, Generic[ID, NODE]):
     """Abstract base class for graph builders.
 
@@ -227,13 +240,28 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     representation of the map.
     """
 
-    def __init__(self) -> None:
-        """Initialize the graph builder with empty structures."""
-        self.nodes: dict[ID, NODE] = {}
-        self.id_adj_list: dict[ID, list[tuple[ID, EdgeType]]] = {}
-        self.edge_map: dict[EdgeType, EdgeType] = {}
-        # Extra nodes are nodes that are not connected to any other nodes
-        self.extra_nodes: dict[ID, NODE] = {}
+    nodes: dict[ID, NODE] = field(default_factory=dict, init=False)
+    """All nodes in the graph."""
+
+    id_adj_list: dict[ID, list[tuple[ID, EdgeType]]] = field(
+        default_factory=dict,
+        init=False,
+    )
+    """Adjacency list mapping node IDs to list of (neighbor_id, edge_type)."""
+
+    edge_map: dict[EdgeType, EdgeType] = field(default_factory=dict, init=False)
+    """Optionally remap edge types during graph building by adding entries"""
+
+    extra_nodes: dict[ID, NODE] = field(default_factory=dict, init=False)
+    """Extra nodes are nodes that are not connected to any other nodes, e.g., traffic lights."""
+
+    _pending_paths: list[_PendingPathDict[NODE]] = field(
+        default_factory=list,
+        repr=False,
+        init=False,
+    )
+    """List of pending paths to be added after all nodes are parsed. Used for
+    lazy evaluation."""
 
     @abstractmethod
     def new_node(
@@ -305,7 +333,13 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             self.extra_nodes[node.id] = node
         return node.id
 
-    def build_graph(self, *, include_extra_nodes: bool = False) -> MapGraph:
+    def build_graph(
+        self,
+        *,
+        include_extra_nodes: bool = False,
+        min_dist: float | None = None,
+        interp_distance: float | None = None,
+    ) -> MapGraph:
         """Build a graph representation of the map.
 
         This method converts the internal adjacency list and node positions into
@@ -315,11 +349,21 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             include_extra_nodes: whether to include extra nodes added by using
             `add_extra_node` method directly (e.g., traffic lights that are not
             part of any edges).
+            min_dist: the minimum distance between nodes when adding edges.
+                If None, no minimum distance is enforced.
+            interp_distance: the target distance for interpolation. If None,
+                no interpolation is performed.
 
         Returns:
             A `MapGraph` object representing the graph.
 
         """
+        if self._pending_paths:
+            self._process_pending_paths(
+                min_dist=min_dist,
+                interp_distance=interp_distance,
+            )
+
         node_positions = torch.zeros((len(self.nodes), 2), dtype=torch.float32)
         id_to_index: dict[ID, int] = {}
         for i, node in enumerate(self.nodes.values()):
@@ -357,7 +401,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         """Interpolate an edge between two nodes.
 
         This method generates intermediate edges between two nodes, ensuring
-        that the distance between consecutive points is at most `target_distance`.
+        that the distance between consecutive points is at most `interp_distance`.
 
         Args:
             src: source node.
@@ -440,11 +484,11 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 ),
             )
 
-    def add_node_edges_loop_gt(
+    def add_node_edges_loop_min_dist(
         self,
         nodes: Sequence[NODE],
         *,
-        gt: float,
+        min_dist: float | None,
         interp_distance: float | None,
         edge_type: EdgeType | Sequence[EdgeType],
         is_polygon: bool = False,
@@ -452,17 +496,17 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         """Add edges between consecutive nodes in a given list.
 
         The edges are only added if the distance between nodes is greater than
-        the specified `gt` (greater than) threshold. This is useful for
+        the specified `min_dist` (greater than) threshold. This is useful for
         filtering out very short segments that may not be relevant for the
         graph representation.
 
-        By using `gt` and `interp_distance` together, you can control both the
+        By using `min_dist` and `interp_distance` together, you can control both the
         minimum distance for adding edges and the maximum distance between
         interpolated points along those edges.
 
         Args:
             nodes: a sequence of nodes to connect with edges.
-            gt: minimum distance threshold for adding edges.
+            min_dist: minimum distance threshold for adding edges.
             interp_distance: If None, no interpolation is performed.
             edge_type: type of the edge to be created. Either a single EdgeType
                 or a sequence of EdgeTypes matching the number of edges to be
@@ -470,6 +514,15 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             is_polygon: whether the nodes form a polygon. Defaults to False.
 
         """
+        if min_dist is None:
+            self.add_node_edges_loop(
+                nodes=nodes,
+                interp_distance=interp_distance,
+                edge_type=edge_type,
+                is_polygon=is_polygon,
+            )
+            return
+
         if isinstance(edge_type, EdgeType):
             edge_type = [edge_type] * (len(nodes) - 1 + int(is_polygon))
 
@@ -481,10 +534,10 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             )
             raise ValueError(msg)
 
-        if interp_distance is not None and interp_distance < gt:
+        if interp_distance is not None and interp_distance < min_dist:
             msg = (
-                "interp_distance must be greater than or equal to gt."
-                f" Got interp_distance={interp_distance}, gt={gt}."
+                "interp_distance must be greater than or equal to min_dist."
+                f" Got interp_distance={interp_distance}, min_dist={min_dist}."
             )
             raise ValueError(msg)
 
@@ -503,13 +556,13 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         while i < len(nodes) - 1:
             src, dst = nodes[i], nodes[j]
             distance = src.distance_to(dst)
-            if distance < gt and j < len(nodes) - 1:
-                # Increment j to find a node that is >= gt away
+            if distance < min_dist and j < len(nodes) - 1:
+                # Increment j to find a node that is >= min_dist away
                 j += 1
                 continue
 
-            if distance < gt:
-                # Always add last node, even if distance < gt
+            if distance < min_dist:
+                # Always add last node, even if distance < min_dist
                 add(src, dst, edge_type[i])
                 break
 
@@ -518,6 +571,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             j = i + 1
 
         if is_polygon:
+            # Last edge is added in all cases if `is_polygon` is True
             self.add_edges_from_iterable(
                 self.interpolate_edge(
                     nodes[-1],
@@ -561,6 +615,53 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             self.id_adj_list[from_id] = []
         if (to_id, edge_type) not in self.id_adj_list[from_id]:
             self.id_adj_list[from_id].append((to_id, edge_type))
+
+    def add_path_lazy(
+        self,
+        nodes: Sequence[NODE],
+        edge_type: EdgeType | Sequence[EdgeType],
+        *,
+        is_polygon: bool = False,
+    ) -> None:
+        """Add a sequence (path) of nodes to be processed later.
+
+        Args:
+            nodes: nodes
+            edge_type: edges between the nodes.
+            is_polygon: _whether the nodes form a polygon. If True, the last node
+                is connected back to the first node to close the polygon.
+
+        """
+        self._pending_paths.append({
+            "nodes": nodes,
+            "edge_type": edge_type,
+            "is_polygon": is_polygon,
+        })
+
+    def _process_pending_paths(
+        self,
+        min_dist: float | None,
+        interp_distance: float | None,
+    ) -> None:
+        for path_data in self._pending_paths:
+            if min_dist is None:
+                self.add_node_edges_loop(
+                    nodes=path_data["nodes"],
+                    interp_distance=interp_distance,
+                    edge_type=path_data["edge_type"],
+                    is_polygon=path_data["is_polygon"],
+                )
+            else:
+                self.add_node_edges_loop_min_dist(
+                    nodes=path_data["nodes"],
+                    min_dist=min_dist,
+                    interp_distance=interp_distance,
+                    edge_type=path_data["edge_type"],
+                    is_polygon=path_data["is_polygon"],
+                )
+
+        # Clear buffer to prevent double-processing if built twice
+        self._pending_paths.clear()
 
 
 class InterpolationStage(IntEnum):
@@ -772,6 +873,56 @@ class MapGraph:
                 "type": self.edge_types,
             },
         }
+
+    def plot_graph(self) -> Axes:
+        """Visualize the map graph using Matplotlib."""
+        _fig, ax = plt.subplots(figsize=(10, 10))
+
+        # Dictionary to group line segments by their EdgeType
+        # Key: EdgeType, Value: list of segments [(x1, y1), (x2, y2)]
+        lines_by_type: defaultdict[EdgeType, list[list[tuple[float, float]]]] = (
+            defaultdict(list)
+        )
+
+        # 1. Group segments by type
+        for i in range(self.edge_indices.shape[1]):
+            src_idx = int(self.edge_indices[0, i].item())
+            dst_idx = int(self.edge_indices[1, i].item())
+            src_pos = self.node_positions[src_idx].numpy()
+            dst_pos = self.node_positions[dst_idx].numpy()
+            edge_type = EdgeType(self.edge_types[i].item())
+            lines_by_type[edge_type].append([tuple(src_pos), tuple(dst_pos)])
+
+        legend_elements = []
+
+        for edge_type, segments in lines_by_type.items():
+            style_kwargs = edge_type.edge_style()
+            _ = style_kwargs.pop("dashes", None)
+
+            lc = LineCollection(segments, **style_kwargs)
+            ax.add_collection(lc)
+            legend_elements.append(
+                Line2D(
+                    [0],
+                    [0],
+                    label=f"Edge Type {edge_type.name}",
+                    **style_kwargs,
+                ),
+            )
+
+        ax.autoscale()
+        ax.set_aspect("equal", "box")
+        ax.set_title("Argoverse1 Map Graph")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+
+        ax.legend(
+            handles=legend_elements,
+            title="Edge Types",
+            loc="upper right",
+        )
+
+        return ax
 
     @overload
     def extract_radius(

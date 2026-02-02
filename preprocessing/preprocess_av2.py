@@ -172,9 +172,7 @@ def worker_process_file(args_tuple: tuple[str, str, str, str, dict]):
         find_file_with_extension(folder_path, ".parquet"),
     )
 
-    map_file = os.path.join(
-        folder_path, find_file_with_extension(folder_path, ".json")
-    )
+    map_file = os.path.join(folder_path, find_file_with_extension(folder_path, ".json"))
 
     tracks = pd.read_parquet(parquet_file)
     tracks = tracks.rename(
@@ -238,9 +236,7 @@ if __name__ == "__main__":
     if args.debug:
         print("DEBUG MODE: ON\n")
 
-    config_file = (
-        args.config if args.config.endswith(".yml") else args.config + ".yml"
-    )
+    config_file = args.config if args.config.endswith(".yml") else args.config + ".yml"
     config_file_pth = os.path.join("preprocessing", "configs", config_file)
 
     if not os.path.exists(config_file_pth):
@@ -258,16 +254,14 @@ if __name__ == "__main__":
     val_path = os.path.join(args.path, dataset, "val")
     test_path = os.path.join(args.path, dataset, "test")
 
-    for split, path in zip(
-        ["train", "val", "test"], [train_path, val_path, test_path]
-    ):
+    for split, path in zip(["train", "val", "test"], [train_path, val_path, test_path]):
         if not os.path.exists(path):
             msg = f"Path {path} does not exist."
             raise FileNotFoundError(msg)
 
-        folders = sorted([
-            f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))
-        ])
+        folders = sorted(
+            [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+        )
 
         tasks = [(f, split, path, output_dir, config) for f in folders]
 

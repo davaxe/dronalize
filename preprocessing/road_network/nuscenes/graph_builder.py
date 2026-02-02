@@ -49,7 +49,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             "lane": self._add_lane_edges,
             "carpark": self._add_carpark_edges,
         }
-        self.gt: float = 0.0
+        self.min_distance: float = 0.0
 
     @classmethod
     def from_json_file(
@@ -75,7 +75,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         self,
         *,
         interp_distance: float | None = None,
-        gt: float | None = None,
+        min_distance: float | None = None,
         ignore_edge_types: set[str] | None = None,
     ) -> MapGraph:
         """Build a `MapGraph` from the `NuscenesMap`.
@@ -83,7 +83,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         Args:
             interp_distance: the target distance for interpolation. If None,
                 no interpolation is performed.
-            gt: the minimum distance between consecutive nodes. If None,
+            min_distance: the minimum distance between consecutive nodes. If None,
                 no minimum distance is enforced.
             ignore_edge_types: a set of edge types to ignore when building the
                 graph.
@@ -96,7 +96,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         if ignore_edge_types is None:
             ignore_edge_types = set()
 
-        self.gt = gt if gt is not None else 0.0
+        self.min_distance = min_distance if min_distance is not None else 0.0
 
         for edge_type, method in self.edge_type_methods.items():
             if edge_type not in ignore_edge_types:
@@ -109,39 +109,39 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
     def _add_road_divider_edges(self, interp_distance: float | None) -> None:
         for road_divider in self.map.road_dividers.values():
             line: parser.Line = self.map.lines[road_divider.line]
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 [self.map_nodes[i] for i in line.nodes],
-                gt=self.gt,
+                min_dist=self.min_distance,
                 edge_type=EdgeType.LINE_THICK,
                 interp_distance=interp_distance,
             )
 
     def _add_lane_divider_edges(self, interp_distance: float | None) -> None:
         for lane_divider in self.map.lane_dividers.values():
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 **self._extract_edges(lane_divider.segment_types),
-                gt=self.gt,
+                min_dist=self.min_distance,
                 interp_distance=interp_distance,
             )
 
     def _add_lane_edges(self, interp_distance: float | None) -> None:
         for lane in self.map.lanes.values():
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 **self._extract_edges(lane.left_lane_divider_segments),
-                gt=self.gt,
+                min_dist=self.min_distance,
                 interp_distance=interp_distance,
             )
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 **self._extract_edges(lane.right_lane_divider_segments),
-                gt=self.gt,
+                min_dist=self.min_distance,
                 interp_distance=interp_distance,
             )
             if self.lane_polygon_edge is not None:
                 lane_polygon: parser.Polygon = self.map.polygons[lane.polygon]
                 nodes: list[str] = lane_polygon.exterior_nodes
-                self.add_node_edges_loop_gt(
+                self.add_node_edges_loop_min_dist(
                     [self.map_nodes[i] for i in nodes],
-                    gt=self.gt,
+                    min_dist=self.min_distance,
                     is_polygon=True,
                     edge_type=self.lane_polygon_edge,
                     interp_distance=interp_distance,
