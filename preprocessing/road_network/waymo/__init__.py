@@ -121,7 +121,7 @@ if __name__ == "__main__":
     data = Path("data/uncompressed_scenario_testing_testing.tfrecord-00000-of-00150")
     scenarios = iter(get_waymo_scenarios_from_tfrecord(data))
     scenario_map = next(scenarios).map
-    map_graph = scenario_map.build(gt=2)
+    map_graph = scenario_map.build(min_distance=2)
     print(map_graph)
 
     # Plot the map

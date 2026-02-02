@@ -111,7 +111,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             line: parser.Line = self.map.lines[road_divider.line]
             self.add_node_edges_loop_min_dist(
                 [self.map_nodes[i] for i in line.nodes],
-                min_dist=self.min_distance,
+                min_distance=self.min_distance,
                 edge_type=EdgeType.LINE_THICK,
                 interp_distance=interp_distance,
             )
@@ -120,7 +120,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         for lane_divider in self.map.lane_dividers.values():
             self.add_node_edges_loop_min_dist(
                 **self._extract_edges(lane_divider.segment_types),
-                min_dist=self.min_distance,
+                min_distance=self.min_distance,
                 interp_distance=interp_distance,
             )
 
@@ -128,12 +128,12 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         for lane in self.map.lanes.values():
             self.add_node_edges_loop_min_dist(
                 **self._extract_edges(lane.left_lane_divider_segments),
-                min_dist=self.min_distance,
+                min_distance=self.min_distance,
                 interp_distance=interp_distance,
             )
             self.add_node_edges_loop_min_dist(
                 **self._extract_edges(lane.right_lane_divider_segments),
-                min_dist=self.min_distance,
+                min_distance=self.min_distance,
                 interp_distance=interp_distance,
             )
             if self.lane_polygon_edge is not None:
@@ -141,7 +141,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
                 nodes: list[str] = lane_polygon.exterior_nodes
                 self.add_node_edges_loop_min_dist(
                     [self.map_nodes[i] for i in nodes],
-                    min_dist=self.min_distance,
+                    min_distance=self.min_distance,
                     is_polygon=True,
                     edge_type=self.lane_polygon_edge,
                     interp_distance=interp_distance,
@@ -210,7 +210,8 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         return {
             "nodes": [self.map_nodes[n_id] for n_id, _ in segments],
             "edge_type": [
-                parser.SegmentDividerType.to_edge_type(s_type) for _, s_type in segments
+                parser.SegmentDividerType.to_edge_type(s_type)
+                for _, s_type in segments
             ],
         }
 

@@ -28,6 +28,8 @@ from preprocessing.road_network.lyftlvl5 import parser
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+# TODO: Add support for min_distance parameter
+
 
 class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
     """Builder for a map graph from a Lyft LVL5 map."""

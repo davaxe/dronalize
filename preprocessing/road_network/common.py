@@ -38,7 +38,6 @@ from typing import (
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
-from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 from torch_geometric.utils import subgraph
@@ -47,6 +46,7 @@ from preprocessing.road_network.edge_type import EdgeType
 
 if TYPE_CHECKING:
     import numpy.typing as npt
+    from matplotlib.axes import Axes
 
 
 ID = TypeVar("ID", bound=Hashable)
@@ -113,7 +113,9 @@ class BaseNode(Protocol, Generic[ID]):
     def distance_to(self, other: Self) -> float:
         """Calculate the Euclidean distance to another node."""
         return math.sqrt(
-            (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2,
+            (self.x - other.x) ** 2
+            + (self.y - other.y) ** 2
+            + (self.z - other.z) ** 2,
         )
 
 
@@ -486,7 +488,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         self,
         nodes: Sequence[NODE],
         *,
-        min_dist: float | None,
+        min_distance: float | None,
         interp_distance: float | None,
         edge_type: EdgeType | Sequence[EdgeType],
         is_polygon: bool = False,
@@ -512,7 +514,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             is_polygon: whether the nodes form a polygon. Defaults to False.
 
         """
-        if min_dist is None:
+        if min_distance is None:
             self.add_node_edges_loop(
                 nodes=nodes,
                 interp_distance=interp_distance,
@@ -532,10 +534,10 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             )
             raise ValueError(msg)
 
-        if interp_distance is not None and interp_distance < min_dist:
+        if interp_distance is not None and interp_distance < min_distance:
             msg = (
                 "interp_distance must be greater than or equal to min_dist."
-                f" Got interp_distance={interp_distance}, min_dist={min_dist}."
+                f" Got interp_distance={interp_distance}, min_dist={min_distance}."
             )
             raise ValueError(msg)
 
@@ -554,12 +556,12 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         while i < len(nodes) - 1:
             src, dst = nodes[i], nodes[j]
             distance = src.distance_to(dst)
-            if distance < min_dist and j < len(nodes) - 1:
+            if distance < min_distance and j < len(nodes) - 1:
                 # Increment j to find a node that is >= min_dist away
                 j += 1
                 continue
 
-            if distance < min_dist:
+            if distance < min_distance:
                 # Always add last node, even if distance < min_dist
                 add(src, dst, edge_type[i])
                 break
@@ -630,13 +632,11 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 is connected back to the first node to close the polygon.
 
         """
-        self._pending_paths.append(
-            {
-                "nodes": nodes,
-                "edge_type": edge_type,
-                "is_polygon": is_polygon,
-            }
-        )
+        self._pending_paths.append({
+            "nodes": nodes,
+            "edge_type": edge_type,
+            "is_polygon": is_polygon,
+        })
 
     def _process_pending_paths(
         self,
@@ -654,7 +654,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             else:
                 self.add_node_edges_loop_min_dist(
                     nodes=path_data["nodes"],
-                    min_dist=min_dist,
+                    min_distance=min_dist,
                     interp_distance=interp_distance,
                     edge_type=path_data["edge_type"],
                     is_polygon=path_data["is_polygon"],
@@ -776,7 +776,9 @@ def get_edges_from_adj_list(
 
     """
     if id_to_index is None:
-        id_to_index = {node_id: index for index, node_id in enumerate(adj_list.keys())}
+        id_to_index = {
+            node_id: index for index, node_id in enumerate(adj_list.keys())
+        }
 
     if edge_map is None:
         edge_map = {}
@@ -838,7 +840,9 @@ class MapGraph:
         self.node_positions: torch.Tensor = node_positions
         self.edge_indices: torch.Tensor = edge_indices
         self.num_nodes: int = node_positions.shape[0]
-        self.num_edges: int = edge_indices.shape[1] if edge_indices.numel() > 0 else 0
+        self.num_edges: int = (
+            edge_indices.shape[1] if edge_indices.numel() > 0 else 0
+        )
         self.node_types: torch.Tensor = (
             node_types
             if node_types is not None

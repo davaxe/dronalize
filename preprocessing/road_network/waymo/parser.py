@@ -102,14 +102,14 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         self,
         *,
         interp_distance: float | None = None,
-        gt: float | None = None,
+        min_distance: float | None = None,
     ) -> MapGraph:
         """Build the map graph from the Lyft LVL5 map.
 
         Args:
             interp_distance: the approximate distance between interpolated
                 nodes. If None, no interpolation is performed.
-            gt: the minimum distance between consecutive nodes. If `None`, no
+            min_distance: the minimum distance between consecutive nodes. If `None`, no
                 minimum distance is enforced.
 
         Returns:
@@ -117,7 +117,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
         """
         self._processed_features: set[int] = set()
-        self.gt = gt if gt is not None else 0.0
+        self.min_distance = min_distance if min_distance is not None else 0.0
 
         self._add_road_edge_edges(interp_distance=interp_distance)
         self._add_road_line_edges(interp_distance=interp_distance)
@@ -189,9 +189,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
                 continue
 
             nodes = [IntIDNode(x=point.x, y=point.y) for point in lane.polyline]
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 nodes,
-                gt=self.gt,
+                min_distance=self.min_distance,
                 is_polygon=False,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.VIRTUAL,
@@ -226,9 +226,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
                 continue
             nodes = [IntIDNode(x=point.x, y=point.y) for point in driveway.polygon]
 
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 nodes,
-                gt=self.gt,
+                min_distance=self.min_distance,
                 is_polygon=True,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.VIRTUAL,
@@ -243,9 +243,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         for feature_id, road_edge in self.road_edges.items():
             nodes = [IntIDNode(x=point.x, y=point.y) for point in road_edge.polyline]
 
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 nodes,
-                gt=self.gt,
+                min_distance=self.min_distance,
                 is_polygon=False,
                 interp_distance=interp_distance,
                 edge_type=_ROAD_EDGE_TYPE_TO_EDGE_TYPE[road_edge.type],
@@ -260,9 +260,9 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         for feature_id, road_line in self.road_lines.items():
             nodes = [IntIDNode(x=point.x, y=point.y) for point in road_line.polyline]
 
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 nodes,
-                gt=self.gt,
+                min_distance=self.min_distance,
                 is_polygon=False,
                 interp_distance=interp_distance,
                 edge_type=_ROAD_LINE_TYPE_TO_EDGE_TYPE[road_line.type],

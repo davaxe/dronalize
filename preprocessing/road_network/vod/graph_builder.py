@@ -26,8 +26,8 @@ from preprocessing.road_network.edge_type import EdgeType
 if TYPE_CHECKING:
     from pathlib import Path
 
-# TODO: Add centerlines correctly by using `arcline_path_3` available in the VOD
-# map
+# TODO:
+# - Add centerlines correctly by using `arcline_path_3` available in the VOD map
 
 
 class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
@@ -81,9 +81,9 @@ class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
             xy = spline(u).astype(np.float64)
             x, y = xy[:, 0], xy[:, 1]
             nodes = [self.new_node(xi, yi) for xi, yi in zip(x, y, strict=True)]
-            self.add_node_edges_loop_gt(
+            self.add_node_edges_loop_min_dist(
                 nodes,
-                gt=self.gt,
+                min_distance=self.min_distance,
                 interp_distance=None,
                 edge_type=EdgeType.STOP,
                 is_polygon=False,
