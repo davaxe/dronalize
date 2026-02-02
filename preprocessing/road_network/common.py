@@ -630,11 +630,13 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 is connected back to the first node to close the polygon.
 
         """
-        self._pending_paths.append({
-            "nodes": nodes,
-            "edge_type": edge_type,
-            "is_polygon": is_polygon,
-        })
+        self._pending_paths.append(
+            {
+                "nodes": nodes,
+                "edge_type": edge_type,
+                "is_polygon": is_polygon,
+            }
+        )
 
     def _process_pending_paths(
         self,

@@ -122,9 +122,7 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         side: Literal["left", "right"],
     ) -> tuple[list[IntIDNode], EdgeType] | None:
         """Get all nodes for a lane segment's boundaries."""
-        boundary = (
-            segment.left_boundary if side == "left" else segment.right_boundary
-        )
+        boundary = segment.left_boundary if side == "left" else segment.right_boundary
         if boundary is None:
             return None
 
