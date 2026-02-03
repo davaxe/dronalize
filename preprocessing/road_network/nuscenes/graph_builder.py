@@ -21,7 +21,6 @@ from uuid import UUID
 
 from preprocessing.road_network.common import (
     GraphBuilder,
-    MapGraph,
 )
 from preprocessing.road_network.edge_type import EdgeType
 from preprocessing.road_network.nuscenes import parser
@@ -33,7 +32,11 @@ if TYPE_CHECKING:
 class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
     """A builder for creating a MapGraph from a NuscenesMap."""
 
-    def __init__(self, nuscenes_map: parser.NuScenesMap) -> None:
+    def __init__(
+        self,
+        nuscenes_map: parser.NuScenesMap,
+        ignore_edge_types: set[str] | None = None,
+    ) -> None:
         """Initialize the graph builder with a NuscenesMap."""
         super().__init__()
         self.map: parser.NuScenesMap = nuscenes_map
@@ -50,6 +53,9 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             "carpark": self._add_carpark_edges,
         }
         self.min_distance: float = 0.0
+        self.ignore_edge_types: set[str] = (
+            ignore_edge_types if ignore_edge_types is not None else set()
+        )
 
     @classmethod
     def from_json_file(
@@ -57,10 +63,14 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         path: Path,
         *,
         debug_parsing: bool = False,
+        ignore_edge_types: set[str] | None = None,
     ) -> Self:
         """Create a NuscenesMapGraphBuilder from a file path."""
-        nuscenes_map = parser.NuScenesMap(path, enable_debug_prints=debug_parsing)
-        return cls(nuscenes_map)
+        nuscenes_map = parser.NuScenesMap(
+            path,
+            enable_debug_prints=debug_parsing,
+        )
+        return cls(nuscenes_map, ignore_edge_types=ignore_edge_types)
 
     def new_node(self, x: float, y: float, z: float = 0) -> parser.Node:
         """Create a new node with the given coordinates."""
@@ -71,13 +81,11 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             z=z,
         )
 
-    def build(
+    def build_impl(
         self,
-        *,
-        interp_distance: float | None = None,
         min_distance: float | None = None,
-        ignore_edge_types: set[str] | None = None,
-    ) -> MapGraph:
+        interp_distance: float | None = None,
+    ) -> None:
         """Build a `MapGraph` from the `NuscenesMap`.
 
         Args:
@@ -85,24 +93,13 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
                 no interpolation is performed.
             min_distance: the minimum distance between consecutive nodes. If None,
                 no minimum distance is enforced.
-            ignore_edge_types: a set of edge types to ignore when building the
-                graph.
-
-        Returns:
-            A `MapGraph` object containing the node positions, edge indices,
-            and edge types.
 
         """
-        if ignore_edge_types is None:
-            ignore_edge_types = set()
-
         self.min_distance = min_distance if min_distance is not None else 0.0
 
         for edge_type, method in self.edge_type_methods.items():
-            if edge_type not in ignore_edge_types:
+            if edge_type not in self.ignore_edge_types:
                 method(interp_distance=interp_distance)
-
-        return self.build_graph()
 
     # --- Private methods ---
 
@@ -126,16 +123,19 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
 
     def _add_lane_edges(self, interp_distance: float | None) -> None:
         for lane in self.map.lanes.values():
-            self.add_node_edges_loop_min_dist(
-                **self._extract_edges(lane.left_lane_divider_segments),
-                min_distance=self.min_distance,
-                interp_distance=interp_distance,
-            )
-            self.add_node_edges_loop_min_dist(
-                **self._extract_edges(lane.right_lane_divider_segments),
-                min_distance=self.min_distance,
-                interp_distance=interp_distance,
-            )
+            if lane.left_lane_divider_segments:
+                self.add_node_edges_loop_min_dist(
+                    **self._extract_edges(lane.left_lane_divider_segments),
+                    min_distance=self.min_distance,
+                    interp_distance=interp_distance,
+                )
+            if lane.right_lane_divider_segments:
+                self.add_node_edges_loop_min_dist(
+                    **self._extract_edges(lane.right_lane_divider_segments),
+                    min_distance=self.min_distance,
+                    interp_distance=interp_distance,
+                )
+
             if self.lane_polygon_edge is not None:
                 lane_polygon: parser.Polygon = self.map.polygons[lane.polygon]
                 nodes: list[str] = lane_polygon.exterior_nodes
@@ -211,7 +211,8 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             "nodes": [self.map_nodes[n_id] for n_id, _ in segments],
             "edge_type": [
                 parser.SegmentDividerType.to_edge_type(s_type)
-                for _, s_type in segments
+                # The last segment type is always `NIL` as it is meaningless
+                for _, s_type in segments[0:-1]
             ],
         }
 

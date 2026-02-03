@@ -33,15 +33,26 @@ if TYPE_CHECKING:
 class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
     """A builder for creating a MapGraph from a VOD map."""
 
-    def __init__(self, path: Path, *, debug_parsing: bool = False) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        debug_parsing: bool = False,
+        ignore_edge_types: set[str] | None = None,
+    ) -> None:
         """Initialize the VODMapGraphBuilder.
 
         Args:
             path: Path to the VOD map JSON file.
             debug_parsing: If True, enables debug prints for parsing issues.
+            ignore_edge_types: A set of edge type names to ignore during graph
+                construction.
 
         """
         nuscenes_map = nuscenes.NuScenesMap(path, enable_debug_prints=debug_parsing)
+        self.ignore_edge_types = (
+            ignore_edge_types if ignore_edge_types is not None else set()
+        )
 
         super().__init__(nuscenes_map)
         self.lane_polygon_edge: None | EdgeType = EdgeType.LINE_THIN
@@ -62,9 +73,14 @@ class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
         path: Path,
         *,
         debug_parsing: bool = False,
+        ignore_edge_types: set[str] | None = None,
     ) -> Self:
         """Create a NuscenesMapGraphBuilder from a file path."""
-        return cls(path, debug_parsing=debug_parsing)
+        return cls(
+            path,
+            debug_parsing=debug_parsing,
+            ignore_edge_types=ignore_edge_types,
+        )
 
     def _add_centerline_edges(self, _interp_distance: float | None) -> None:
         """Add edges for arcline paths."""

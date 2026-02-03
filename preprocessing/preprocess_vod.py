@@ -391,9 +391,9 @@ if __name__ == "__main__":
 
     delft_graph = VODMapGraphBuilder.from_json_file(
         Path(os.path.join(raw_map_path, "delft.json")),
+        ignore_edge_types={"traffic_light"},
     ).build(
         interp_distance=3.0,
-        ignore_edge_types={"traffic_light"},
     )
 
     map_graphs = {

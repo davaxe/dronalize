@@ -503,31 +503,23 @@ if __name__ == "__main__":
 
     boston_graph = NuScenesMapGraphBuilder.from_json_file(
         (Path(raw_map_path) / "boston-seaport.json"),
-    ).build(
-        interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
-    )
+    ).build(interp_distance=3.0)
 
     hollandvillage_graph = NuScenesMapGraphBuilder.from_json_file(
         (Path(raw_map_path) / "singapore-hollandvillage.json"),
-    ).build(
-        interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
-    )
+    ).build(interp_distance=3.0)
 
     onenorth_graph = NuScenesMapGraphBuilder.from_json_file(
         (Path(raw_map_path) / "singapore-onenorth.json"),
-    ).build(
-        interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
-    )
+    ).build(interp_distance=3.0)
 
     queenstown_graph = NuScenesMapGraphBuilder.from_json_file(
         (Path(raw_map_path) / "singapore-queenstown.json"),
-    ).build(
-        interp_distance=3.0,
         ignore_edge_types={"traffic_light"},
-    )
+    ).build(interp_distance=3.0)
 
     map_graphs = {
         "boston-seaport": boston_graph,

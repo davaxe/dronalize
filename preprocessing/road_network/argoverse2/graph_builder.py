@@ -16,13 +16,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from matplotlib import pyplot as plt
-
 from preprocessing.road_network.argoverse2 import parser
 from preprocessing.road_network.common import (
     GraphBuilder,
     IntIDNode,
-    MapGraph,
 )
 from preprocessing.road_network.edge_type import EdgeType
 
@@ -50,16 +47,12 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         """Create a new node with the given coordinates."""
         return IntIDNode(x, y, z)
 
-    def build(
+    def build_impl(
         self,
-        *,
         min_distance: float | None = None,
         interp_distance: float | None = None,
-    ) -> MapGraph:
+    ) -> None:
         """Build a `MapGraph` from the `Argoverse2Map`.
-
-        To perform interpolation, set `interpolate` to True and provide a value
-        for `interp_distance`.
 
         Args:
             min_distance: the minimum distance between nodes when adding edges.
@@ -67,18 +60,10 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
             interp_distance: the target distance for interpolation. If None,
                 no interpolation is performed.
 
-        Returns:
-            A `MapGraph` object containing the node positions, edge indices, and
-            edge types.
-
         """
+        _, _ = min_distance, interp_distance
         self._add_lane_boundary_edges()
         self._add_pedestrian_crossing_edges()
-
-        return self.build_graph(
-            min_dist=min_distance,
-            interp_distance=interp_distance,
-        )
 
     # --- Private methods ----
 
@@ -129,22 +114,3 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         nodes = boundary.nodes
         edge_type = boundary.get_edge_type()
         return nodes, edge_type
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    # Example usage
-    json_path = Path(
-        "../datasets/av2/test/407afee5-aa3d-43cc-a258-1ffa52ee735f/log_map_archive_407afee5-aa3d-43cc-a258-1ffa52ee735f.json"
-    )
-    builder = Argoverse2GraphBuilder.from_json_file(json_path)
-    graph = builder.build(
-        min_distance=5.0,
-        interp_distance=None,
-    )
-
-    print(f"Number of nodes: {len(graph.node_types)}")
-
-    graph.plot_graph()
-    plt.savefig("test_argoverse2_graph.pdf")

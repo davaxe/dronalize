@@ -110,34 +110,3 @@ def _read_tfrecord(path: Path) -> Iterable[bytes]:
         yield data
 
     file.close()
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    import matplotlib.pyplot as plt
-    from matplotlib.collections import LineCollection
-
-    data = Path("data/uncompressed_scenario_testing_testing.tfrecord-00000-of-00150")
-    scenarios = iter(get_waymo_scenarios_from_tfrecord(data))
-    scenario_map = next(scenarios).map
-    map_graph = scenario_map.build(min_distance=2)
-    print(map_graph)
-
-    # Plot the map
-    edge_index = map_graph.edge_indices
-    segments = []
-    colors = []
-    for i in range(edge_index.shape[1]):
-        edge_type = EdgeType(map_graph.edge_types[i].item())
-        src = map_graph.node_positions[edge_index[0, i]]
-        dst = map_graph.node_positions[edge_index[1, i]]
-        segments.append([src, dst])
-        colors.append(edge_type.edge_style()["color"])
-
-    lines = LineCollection(segments=segments, colors=colors, linewidths=1)
-
-    plt.gca().add_collection(lines)
-    plt.axis("equal")
-
-    plt.show()

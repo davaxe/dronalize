@@ -113,9 +113,7 @@ class BaseNode(Protocol, Generic[ID]):
     def distance_to(self, other: Self) -> float:
         """Calculate the Euclidean distance to another node."""
         return math.sqrt(
-            (self.x - other.x) ** 2
-            + (self.y - other.y) ** 2
-            + (self.z - other.z) ** 2,
+            (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2,
         )
 
 
@@ -274,14 +272,29 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         ...
 
     @abstractmethod
-    def build(self) -> MapGraph:
-        """Build a graph representation of the map.
+    def build_impl(
+        self,
+        min_distance: float | None = None,
+        interp_distance: float | None = None,
+    ) -> None:
+        """Prepare internal structure for building the map graph.
 
-        Note that this method can take additional parameters as needed by
-        subclasses. But the signature must be compatible with this one, meaning
-        that additional parameters must be keyword-only and have default values.
+        This means that the method should populate the internal data structures:
+            - `self.nodes`
+            - `self.id_adj_list`
+            - `self.extra_nodes` (optional)
+            - `self._pending_paths` (optional, if lazy evaluation is used)
+
+        The function will be called automatically by the `build` method (if it
+        is not overridden).
+
+        Args:
+            min_distance: minimum distance between nodes when adding edges.
+                If None, no minimum distance is enforced.
+            interp_distance: the target distance for interpolation. If None,
+                no interpolation is performed.
+
         """
-        ...
 
     @overload
     def add_node(
@@ -333,12 +346,45 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             self.extra_nodes[node.id] = node
         return node.id
 
+    def build(
+        self,
+        min_distance: float | None = None,
+        interp_distance: float | None = None,
+    ) -> MapGraph:
+        """Build a graph representation of the map.
+
+        Args:
+            min_distance: the minimum distance between nodes when adding edges.
+                If None, no minimum distance is enforced.
+            interp_distance: the target distance for interpolation. If None,
+                no interpolation is performed.
+
+        Returns:
+            A `MapGraph` object representing the graph.
+
+        """
+        min_distance, interp_distance = self._resolve_distance(
+            min_distance,
+            interp_distance,
+        )
+
+        self.build_impl(
+            min_distance=min_distance,
+            interp_distance=interp_distance,
+        )
+
+        if self._pending_paths:
+            self._process_pending_paths(
+                min_distance=min_distance,
+                interp_distance=interp_distance,
+            )
+
+        return self.build_graph()
+
     def build_graph(
         self,
         *,
         include_extra_nodes: bool = False,
-        min_dist: float | None = None,
-        interp_distance: float | None = None,
     ) -> MapGraph:
         """Build a graph representation of the map.
 
@@ -349,21 +395,11 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             include_extra_nodes: whether to include extra nodes added by using
             `add_extra_node` method directly (e.g., traffic lights that are not
             part of any edges).
-            min_dist: the minimum distance between nodes when adding edges.
-                If None, no minimum distance is enforced.
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
 
         Returns:
             A `MapGraph` object representing the graph.
 
         """
-        if self._pending_paths:
-            self._process_pending_paths(
-                min_dist=min_dist,
-                interp_distance=interp_distance,
-            )
-
         node_positions = torch.zeros((len(self.nodes), 2), dtype=torch.float32)
         id_to_index: dict[ID, int] = {}
         for i, node in enumerate(self.nodes.values()):
@@ -496,17 +532,17 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         """Add edges between consecutive nodes in a given list.
 
         The edges are only added if the distance between nodes is greater than
-        the specified `min_dist` (greater than) threshold. This is useful for
-        filtering out very short segments that may not be relevant for the
+        the specified `min_distance` (greater than) threshold. This is useful
+        for filtering out very short segments that may not be relevant for the
         graph representation.
 
-        By using `min_dist` and `interp_distance` together, you can control both the
-        minimum distance for adding edges and the maximum distance between
-        interpolated points along those edges.
+        By using `min_distance` and `interp_distance` together, you can control
+        both the minimum distance for adding edges and the maximum distance
+        between interpolated points along those edges.
 
         Args:
             nodes: a sequence of nodes to connect with edges.
-            min_dist: minimum distance threshold for adding edges.
+            min_distance: minimum distance threshold for adding edges.
             interp_distance: If None, no interpolation is performed.
             edge_type: type of the edge to be created. Either a single EdgeType
                 or a sequence of EdgeTypes matching the number of edges to be
@@ -536,8 +572,8 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
         if interp_distance is not None and interp_distance < min_distance:
             msg = (
-                "interp_distance must be greater than or equal to min_dist."
-                f" Got interp_distance={interp_distance}, min_dist={min_distance}."
+                "interp_distance must be greater than or equal to min_distance."
+                f" Got interp_distance={interp_distance}, min_distance={min_distance}."
             )
             raise ValueError(msg)
 
@@ -557,12 +593,12 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             src, dst = nodes[i], nodes[j]
             distance = src.distance_to(dst)
             if distance < min_distance and j < len(nodes) - 1:
-                # Increment j to find a node that is >= min_dist away
+                # Increment j to find a node that is >= min_distance away
                 j += 1
                 continue
 
             if distance < min_distance:
-                # Always add last node, even if distance < min_dist
+                # Always add last node, even if distance < min_distance
                 add(src, dst, edge_type[i])
                 break
 
@@ -632,19 +668,21 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 is connected back to the first node to close the polygon.
 
         """
-        self._pending_paths.append({
-            "nodes": nodes,
-            "edge_type": edge_type,
-            "is_polygon": is_polygon,
-        })
+        self._pending_paths.append(
+            {
+                "nodes": nodes,
+                "edge_type": edge_type,
+                "is_polygon": is_polygon,
+            }
+        )
 
     def _process_pending_paths(
         self,
-        min_dist: float | None,
+        min_distance: float | None,
         interp_distance: float | None,
     ) -> None:
         for path_data in self._pending_paths:
-            if min_dist is None:
+            if min_distance is None:
                 self.add_node_edges_loop(
                     nodes=path_data["nodes"],
                     interp_distance=interp_distance,
@@ -654,7 +692,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             else:
                 self.add_node_edges_loop_min_dist(
                     nodes=path_data["nodes"],
-                    min_distance=min_dist,
+                    min_distance=min_distance,
                     interp_distance=interp_distance,
                     edge_type=path_data["edge_type"],
                     is_polygon=path_data["is_polygon"],
@@ -662,6 +700,22 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
         # Clear buffer to prevent double-processing if built twice
         self._pending_paths.clear()
+
+    def _resolve_distance(
+        self,
+        min_distance: float | None,
+        interp_distance: float | None,
+    ) -> tuple[float | None, float | None]:
+        _min_distance = min_distance if min_distance is not None else 0.0
+        _interp_distance = interp_distance if interp_distance is not None else np.inf
+        if _interp_distance <= 0.0:
+            msg = "interp_distance must be greater than 0."
+            raise ValueError(msg)
+        if _min_distance < 0.0 or _min_distance > _interp_distance:
+            msg = f"min_distance must be in the range [0, interp_distance] ([0, {_interp_distance}])."
+            raise ValueError(msg)
+
+        return min_distance, interp_distance
 
 
 class InterpolationStage(IntEnum):
@@ -776,9 +830,7 @@ def get_edges_from_adj_list(
 
     """
     if id_to_index is None:
-        id_to_index = {
-            node_id: index for index, node_id in enumerate(adj_list.keys())
-        }
+        id_to_index = {node_id: index for index, node_id in enumerate(adj_list.keys())}
 
     if edge_map is None:
         edge_map = {}
@@ -840,9 +892,7 @@ class MapGraph:
         self.node_positions: torch.Tensor = node_positions
         self.edge_indices: torch.Tensor = edge_indices
         self.num_nodes: int = node_positions.shape[0]
-        self.num_edges: int = (
-            edge_indices.shape[1] if edge_indices.numel() > 0 else 0
-        )
+        self.num_edges: int = edge_indices.shape[1] if edge_indices.numel() > 0 else 0
         self.node_types: torch.Tensor = (
             node_types
             if node_types is not None

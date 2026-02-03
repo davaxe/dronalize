@@ -19,13 +19,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, Self
 
-import torch
-
 from preprocessing.road_network.common import (
     GraphBuilder,
     IntIDNode,
-    MapGraph,
-    get_edges_from_adj_list,
 )
 from preprocessing.road_network.edge_type import EdgeType
 
@@ -71,47 +67,26 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         """Create a new node with the given coordinates."""
         return IntIDNode(x, y, z)
 
-    def build(
+    def build_impl(
         self,
-        *,
+        min_distance: float | None = None,
         interp_distance: float | None = None,
-    ) -> MapGraph:
-        """Build the map graph from OpenDD data.
-
-        To perform interpolation, set `interpolate` to True and provide a value
-        for `interp_distance`.
+    ) -> None:
+        """Build the internal data for the map graph from OpenDD data.
 
         Args:
-            interpolate: whether to interpolate edges between nodes.
+            min_distance: the minimum distance between nodes when adding edges.
             interp_distance: the target distance for interpolation. If None,
                 no interpolation is performed.
 
-        Returns:
-            A `MapGraph` object containing the node positions, edge indices, and
-            edge types.
-
         """
-        self._add_edges(interp_distance)
+        self._add_edges(min_distance, interp_distance)
 
-        node_positions = torch.zeros((len(self.nodes), 2), dtype=torch.float32)
-        id_to_index: dict[int, int] = {}
-        for i, node in enumerate(self.nodes.values()):
-            id_to_index[node.id] = i
-            node_positions[i, 0] = node.x
-            node_positions[i, 1] = node.y
-
-        edge_indices, edge_types = get_edges_from_adj_list(
-            self.id_adj_list,
-            id_to_index,
-        ).to_torch()
-
-        return MapGraph(
-            edge_indices=edge_indices,
-            node_positions=node_positions,
-            edge_types=edge_types,
-        )
-
-    def _add_edges(self, interp_distance: float | None) -> None:
+    def _add_edges(
+        self,
+        min_distance: float | None,
+        interp_distance: float | None,
+    ) -> None:
         """Add edges to the graph based on the adjacency list."""
         self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         table_names = [row[0] for row in self.cursor.fetchall()]
@@ -123,30 +98,28 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
             if map_data_row is None:
                 continue
 
-            self._process_map_row(map_data_row, interp_distance)
+            self._process_map_row(map_data_row, min_distance, interp_distance)
 
     def _process_map_row(
         self,
         map_data_row: MapDataRow,
+        min_distance: float | None,
         interp_distance: float | None,
     ) -> None:
         """Process a single map data row and update the graph."""
-        for src_node, dst_node in map_data_row.geometry.connections():
-            edge_type = map_data_row.edge_type()
-            self.add_edges_from_iterable(
-                self.interpolate_edge(
-                    src_node,
-                    dst_node,
-                    interp_distance=interp_distance,
-                    edge_type=edge_type,
-                ),
-            )
+        self.add_node_edges_loop_min_dist(
+            map_data_row.geometry.coordinates(),
+            min_distance=min_distance,
+            interp_distance=interp_distance,
+            edge_type=map_data_row.edge_type(),
+            is_polygon=isinstance(map_data_row.geometry, Polygon),
+        )
 
 
 class Geometry(Protocol):
     """Protocol for geometry types."""
 
-    coordinates: list[IntIDNode]
+    _coordinates: list[IntIDNode]
 
     @classmethod
     def from_str(cls, geometry_str: str) -> Self:
@@ -157,12 +130,16 @@ class Geometry(Protocol):
         """Iterate over edge connections in the geometry."""
         ...
 
+    def coordinates(self) -> list[IntIDNode]:
+        """Get the coordinates of the geometry."""
+        return self._coordinates
+
 
 @dataclass
 class LineString(Geometry):
     """A LineString geometry type."""
 
-    coordinates: list[IntIDNode]
+    _coordinates: list[IntIDNode]
 
     @classmethod
     def from_str(cls, geometry_str: str) -> LineString:
@@ -178,20 +155,20 @@ class LineString(Geometry):
             [
                 IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
                 for coord in coords
-            ]
+            ],
         )
 
     def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
         """Iterate over edge connections in the linestring."""
-        for i in range(len(self.coordinates) - 1):
-            yield (self.coordinates[i], self.coordinates[i + 1])
+        for i in range(len(self._coordinates) - 1):
+            yield (self._coordinates[i], self._coordinates[i + 1])
 
 
 @dataclass(frozen=True, slots=True)
 class Polygon(Geometry):
     """A Polygon geometry type."""
 
-    coordinates: list[IntIDNode]
+    _coordinates: list[IntIDNode]
 
     @classmethod
     def from_str(cls, geometry_str: str) -> Polygon:
@@ -203,19 +180,18 @@ class Polygon(Geometry):
 
         coords_str = geometry_str[len("POLYGON ((") : -2]
         coords = coords_str.split(", ")
-        return cls(
-            [
-                IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
-                for coord in coords
-            ]
-        )
+        nodes = [
+            IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
+            for coord in coords[:-1]
+        ]
+        return cls(nodes)
 
     def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
         """Iterate over edge connections in the polygon."""
-        for i in range(len(self.coordinates)):
+        for i in range(len(self._coordinates)):
             yield (
-                self.coordinates[i],
-                self.coordinates[(i + 1) % len(self.coordinates)],
+                self._coordinates[i],
+                self._coordinates[(i + 1) % len(self._coordinates)],
             )
 
 
@@ -297,15 +273,4 @@ _MARKING_TYPE_TO_EDGE_TYPE: dict[str, EdgeType] = {
     "NO_MARKING": EdgeType.VIRTUAL,
     "SHADED_AREA_MARKING": EdgeType.VIRTUAL,
     "GUARDRAIL": EdgeType.GUARD_RAIL,
-    # TODO: Add more mapping types as needed, rdb1 and rdb2 have been checked!
 }
-
-
-if __name__ == "__main__":
-    # Example usage
-    rdb = "rdb1"
-    map_path = Path(
-        f"../datasets/openDD/opendd_v3-{rdb}/{rdb}/map_{rdb}/map_{rdb}.sqlite"
-    )
-    builder = OpenDDMapGraphBuilder.from_sqlite_file(map_path)
-    graph = builder.build(interp_distance=3.0)

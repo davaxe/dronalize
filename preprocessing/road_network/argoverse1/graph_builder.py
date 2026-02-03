@@ -17,7 +17,6 @@ from __future__ import annotations
 from itertools import chain, repeat
 from typing import TYPE_CHECKING, TypedDict
 
-import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 
@@ -25,7 +24,6 @@ from preprocessing.road_network.argoverse1 import parser, utils
 from preprocessing.road_network.common import (
     GraphBuilder,
     IntIDNode,
-    MapGraph,
 )
 from preprocessing.road_network.edge_type import EdgeType
 
@@ -69,26 +67,18 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         """Create a new node with the given coordinates."""
         return IntIDNode(x=x, y=y, z=z)
 
-    def build(
+    def build_impl(
         self,
-        *,
         min_distance: float | None = None,
         interp_distance: float | None = None,
-    ) -> MapGraph:
+    ) -> None:
         """Build a `MapGraph` from the `Argoverse1Map`.
 
-        To perform interpolation, set `interpolate` to True and provide a value
-        for `interp_distance`.
-
         Args:
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
             min_distance: the minimum distance between nodes when adding edges.
                 If None, no minimum distance is enforced.
-
-        Returns:
-            A `MapGraph` object containing the node positions, edge indices, and
-            edge types.
+            interp_distance: the target distance for interpolation. If None,
+                no interpolation is performed.
 
         """
         # Dict to store endpoints (start and end) of each lane segment to enable
@@ -102,11 +92,6 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             min_distance=min_distance,
         )
         self._connect_lane_segments()
-
-        return self.build_graph(
-            min_dist=min_distance,
-            interp_distance=interp_distance,
-        )
 
     # --- Private methods ---
 
@@ -325,8 +310,6 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
                 added_nodes.append(d_id)
                 interp_prev_id = d_id
 
-            # --- Crucial Step: Advance the chain ---
-            # The 'dst_node' of this segment becomes the 'prev_node' of the next
             prev_node = dst_node
             prev_id = interp_prev_id  # The last ID added is our new anchor
 
@@ -336,23 +319,3 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             edge_idx += 1
 
         return added_nodes
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    # Example usage
-    path = Path(
-        "../datasets/argoverse/hd_maps/map_files/pruned_argoverse_MIA_10316_vector_map.xml"
-    )
-    builder = Argoverse1MapGraphBuilder.from_xml_file(path)
-    graph = builder.build(
-        min_distance=1.2,
-        interp_distance=3.5,
-    )
-
-    print(f"Number of nodes: {len(graph.node_types)}")
-    graph = graph.extract_radius((-30.0, 2470), 100.0)
-
-    graph.plot_graph()
-    plt.savefig("test.pdf")

@@ -23,7 +23,6 @@ from preprocessing.road_network.common import (
     CategoryStr,
     GraphBuilder,
     IntIDNode,
-    MapGraph,
 )
 from preprocessing.road_network.edge_type import EdgeType
 from preprocessing.road_network.waymo.protos import map_pb2, scenario_pb2
@@ -98,36 +97,29 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         """Create a new node with the given coordinates."""
         return IntIDNode(x=x, y=y, z=z)
 
-    def build(
+    def build_impl(
         self,
-        *,
-        interp_distance: float | None = None,
         min_distance: float | None = None,
-    ) -> MapGraph:
+        interp_distance: float | None = None,
+    ) -> None:
         """Build the map graph from the Lyft LVL5 map.
 
         Args:
-            interp_distance: the approximate distance between interpolated
-                nodes. If None, no interpolation is performed.
             min_distance: the minimum distance between consecutive nodes. If `None`, no
                 minimum distance is enforced.
-
-        Returns:
-            A `MapGraph` object representing the map graph.
+            interp_distance: the approximate distance between interpolated
+                nodes. If None, no interpolation is performed.
 
         """
         self._processed_features: set[int] = set()
-        self.min_distance = min_distance if min_distance is not None else 0.0
 
-        self._add_road_edge_edges(interp_distance=interp_distance)
-        self._add_road_line_edges(interp_distance=interp_distance)
-        self._add_crosswalk_edges(interp_distance=interp_distance)
-        self._add_driveway_edges(interp_distance=interp_distance)
-        self._add_speed_bump_edges(interp_distance=interp_distance)
-        self._add_lane_edges(interp_distance=interp_distance)
+        self._add_road_edge_edges(min_distance, interp_distance)
+        self._add_road_line_edges(min_distance, interp_distance)
+        self._add_crosswalk_edges(min_distance, interp_distance)
+        self._add_driveway_edges(min_distance, interp_distance)
+        self._add_speed_bump_edges(min_distance, interp_distance)
+        self._add_lane_edges(min_distance, interp_distance)
         self._add_stop_sign_nodes()
-
-        return self.build_graph()
 
     def _process_map_features(
         self,
@@ -153,6 +145,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
     def _add_speed_bump_edges(
         self,
+        min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
         """Add edges for speed bumps to the map graph."""
@@ -163,9 +156,10 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
             nodes = [
                 self.new_node(x=point.x, y=point.y) for point in speed_bump.polygon
             ]
-            self.add_node_edges_loop(
+            self.add_node_edges_loop_min_dist(
                 nodes,
                 is_polygon=True,
+                min_distance=min_distance,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.REGULATORY,
             )
@@ -180,7 +174,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
     def _add_lane_edges(
         self,
-        *,
+        min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
         """Process a lane center feature and update nodes and id_adj_list."""
@@ -191,8 +185,8 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
             nodes = [IntIDNode(x=point.x, y=point.y) for point in lane.polyline]
             self.add_node_edges_loop_min_dist(
                 nodes,
-                min_distance=self.min_distance,
                 is_polygon=False,
+                min_distance=min_distance,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.VIRTUAL,
             )
@@ -200,6 +194,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
     def _add_crosswalk_edges(
         self,
+        min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
         """Process a crosswalk feature and update nodes and id_adj_list."""
@@ -208,9 +203,10 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
                 continue
             nodes = [IntIDNode(x=point.x, y=point.y) for point in crosswalk.polygon]
 
-            self.add_node_edges_loop(
+            self.add_node_edges_loop_min_dist(
                 nodes,
                 is_polygon=True,
+                min_distance=min_distance,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.PEDESTRIAN_MARKING,
             )
@@ -218,6 +214,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
     def _add_driveway_edges(
         self,
+        min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
         """Process a driveway feature and update nodes and id_adj_list."""
@@ -228,8 +225,8 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
             self.add_node_edges_loop_min_dist(
                 nodes,
-                min_distance=self.min_distance,
                 is_polygon=True,
+                min_distance=min_distance,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.VIRTUAL,
             )
@@ -237,6 +234,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
     def _add_road_edge_edges(
         self,
+        min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
         """Process a road edge feature and update nodes and id_adj_list."""
@@ -245,8 +243,8 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
             self.add_node_edges_loop_min_dist(
                 nodes,
-                min_distance=self.min_distance,
                 is_polygon=False,
+                min_distance=min_distance,
                 interp_distance=interp_distance,
                 edge_type=_ROAD_EDGE_TYPE_TO_EDGE_TYPE[road_edge.type],
             )
@@ -254,6 +252,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
     def _add_road_line_edges(
         self,
+        min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
         """Process a road line feature and update nodes and id_adj_list."""
@@ -262,7 +261,7 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
 
             self.add_node_edges_loop_min_dist(
                 nodes,
-                min_distance=self.min_distance,
+                min_distance=min_distance,
                 is_polygon=False,
                 interp_distance=interp_distance,
                 edge_type=_ROAD_LINE_TYPE_TO_EDGE_TYPE[road_line.type],
@@ -351,9 +350,6 @@ _ROAD_LINE_TYPE_TO_EDGE_TYPE: dict[int, EdgeType] = {
     map_pb2.RoadLine.TYPE_SOLID_DOUBLE_YELLOW: EdgeType.LINE_THIN_DOUBLE,
     map_pb2.RoadLine.TYPE_PASSING_DOUBLE_YELLOW: EdgeType.LINE_THIN_DOUBLE,
 }
-
-# TODO: Double type???
-
 
 _ROAD_EDGE_TYPE_TO_EDGE_TYPE: dict[int, EdgeType] = {
     map_pb2.RoadEdge.TYPE_UNKNOWN: EdgeType.VIRTUAL,
