@@ -172,15 +172,13 @@ class PedestrianSampleLoader:
             valid_mask_index = len(self.valid_mask)
             self.valid_mask.append(valid_mask)
             for target_ped_index in target_ped:
-                self.sequences.append(
-                    (
-                        index,
-                        valid_mask_index,
-                        start,
-                        end,
-                        target_ped_index,
-                    )
-                )
+                self.sequences.append((
+                    index,
+                    valid_mask_index,
+                    start,
+                    end,
+                    target_ped_index,
+                ))
                 if not self.config.multiple_targets_per_window:
                     break
 
@@ -190,7 +188,7 @@ class PedestrianSampleLoader:
     ) -> tuple[npt.NDArray[np.bool], npt.NDArray[np.int64]] | None:
         """Check if a sequence window is valid to create a sample."""
         pred_index = self.config.org_obs_len - 1
-        valid_mask: npt.NDArray[np.bool] = (
+        valid_mask: npt.NDArray[np.bool] = np.asarray(
             # If all values in the window are not all NaN
             ~np.isnan(window).all(axis=(1, 2))
             # If the pedestrian has a valid position at the prediction index
@@ -429,19 +427,21 @@ def _interpolate(
                 # to fill the interpolated space
                 interp_length = (end - start) * factor
                 segment_repeated = np.repeat(segment, factor, axis=0)[:interp_length]
-                interp_data[ped_i, start * factor : end * factor, :] = segment_repeated
+                interp_data[ped_i, start * factor : end * factor, :] = (
+                    segment_repeated
+                )
                 continue
 
             # Interpolation
             original_indices = np.arange(seq_len)
-            target_indices = np.arange((seq_len - 1) * factor + 1, dtype=float) / factor
+            target_indices = (
+                np.arange((seq_len - 1) * factor + 1, dtype=float) / factor
+            )
 
-            interp_segment = np.column_stack(
-                [
-                    np.interp(target_indices, original_indices, segment[:, 0]),
-                    np.interp(target_indices, original_indices, segment[:, 1]),
-                ]
-            ).astype(np.float32)
+            interp_segment = np.column_stack([
+                np.interp(target_indices, original_indices, segment[:, 0]),
+                np.interp(target_indices, original_indices, segment[:, 1]),
+            ]).astype(np.float32)
 
             interp_segment = _extrapolate_back_linear(
                 interp_segment,
@@ -472,7 +472,7 @@ def _valid_sequences(data: npt.NDArray[np.float32]) -> Iterable[tuple[int, int]]
         ends = np.append(ends, len(data))
 
     # Return list of (start, end) index tuples
-    return zip(starts, ends)
+    return zip(starts, ends, strict=True)
 
 
 def _extrapolate_back_linear(
@@ -503,7 +503,7 @@ def _extrapolate_back_linear(
     v = data_ext[:, 1, :] - data_ext[:, 0, :]
     k = np.arange(n, 0, -1, dtype=np.float32).reshape(1, n, 1)
     extrapolated = data_ext[:, [0], :] - k * v[:, None, :]
-    out = np.concatenate([extrapolated, data_ext], axis=1)
+    out = np.concatenate([extrapolated, data_ext], axis=1, dtype=np.float32)
     return out.squeeze(0) if squeeze_back else out
 
 
