@@ -143,9 +143,7 @@ def plot_agent_trajectories(
 
         # Plot trajectory history
         segments, alphas, myfade = create_trajectory_fade(pos[i], color)
-        lc = LineCollection(
-            segments, array=alphas, cmap=myfade, linewidth=5, zorder=0
-        )
+        lc = LineCollection(segments, array=alphas, cmap=myfade, linewidth=5, zorder=0)
         ax.add_collection(lc)
 
         # Plot current position

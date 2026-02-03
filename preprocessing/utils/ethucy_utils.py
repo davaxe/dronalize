@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 import numpy as np
@@ -28,6 +27,7 @@ from preprocessing.utils import common
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
 Split = Literal["train", "val", "test"]
 
@@ -190,7 +190,7 @@ class PedestrianSampleLoader:
     ) -> tuple[npt.NDArray[np.bool], npt.NDArray[np.int64]] | None:
         """Check if a sequence window is valid to create a sample."""
         pred_index = self.config.org_obs_len - 1
-        valid_mask: npt.NDArray[np.bool] = (
+        valid_mask: npt.NDArray[np.bool] = np.asarray(
             # If all values in the window are not all NaN
             ~np.isnan(window).all(axis=(1, 2))
             # If the pedestrian has a valid position at the prediction index
@@ -472,7 +472,7 @@ def _valid_sequences(data: npt.NDArray[np.float32]) -> Iterable[tuple[int, int]]
         ends = np.append(ends, len(data))
 
     # Return list of (start, end) index tuples
-    return zip(starts, ends)
+    return zip(starts, ends, strict=True)
 
 
 def _extrapolate_back_linear(
@@ -503,7 +503,7 @@ def _extrapolate_back_linear(
     v = data_ext[:, 1, :] - data_ext[:, 0, :]
     k = np.arange(n, 0, -1, dtype=np.float32).reshape(1, n, 1)
     extrapolated = data_ext[:, [0], :] - k * v[:, None, :]
-    out = np.concatenate([extrapolated, data_ext], axis=1)
+    out = np.concatenate([extrapolated, data_ext], axis=1, dtype=np.float32)
     return out.squeeze(0) if squeeze_back else out
 
 
@@ -568,3 +568,19 @@ class _PedestrianDataIterator(Iterator):
 
         self.index += 1
         return self.loader[self.index - 1]
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    config = PedestrianLoaderConfig(
+        data_root=Path("./data"),
+        dataset={"hotel"},
+        split="train",
+        org_sample_time=0.4,
+        interpolation_factor=1,
+    )
+    loader = PedestrianSampleLoader(config)
+    count: int = 0
+    for i, sample in enumerate(loader):
+        count += 1

@@ -50,31 +50,35 @@ def create_sequential_gnn(
         hidden_input_size = hidden_size
 
     if layers == 1:
-        module_lst.append((
-            create_gnn_layer(
-                gnn_layer,
-                input_size,
-                output_size,
-                bias=False,
-                att_heads=n_heads,
-                att_concat=False,
-                edge_dim=edge_dim,
-            ),
-            "x, edge_index, edge_attr -> x",
-        ))
+        module_lst.append(
+            (
+                create_gnn_layer(
+                    gnn_layer,
+                    input_size,
+                    output_size,
+                    bias=False,
+                    att_heads=n_heads,
+                    att_concat=False,
+                    edge_dim=edge_dim,
+                ),
+                "x, edge_index, edge_attr -> x",
+            )
+        )
     else:
-        module_lst.append((
-            create_gnn_layer(
-                gnn_layer,
-                hidden_input_size,
-                output_size,
-                bias=False,
-                att_heads=n_heads,
-                att_concat=False,
-                edge_dim=edge_dim,
-            ),
-            "x, edge_index, edge_attr -> x",
-        ))
+        module_lst.append(
+            (
+                create_gnn_layer(
+                    gnn_layer,
+                    hidden_input_size,
+                    output_size,
+                    bias=False,
+                    att_heads=n_heads,
+                    att_concat=False,
+                    edge_dim=edge_dim,
+                ),
+                "x, edge_index, edge_attr -> x",
+            )
+        )
         ith_layer = layers - 1
         while ith_layer > 1:
             module_lst.insert(0, act)

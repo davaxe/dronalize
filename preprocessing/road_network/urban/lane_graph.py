@@ -167,9 +167,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
         pos = nx.get_node_attributes(self.graph, "pos")
 
         # Group edges by type
-        edges_by_type: dict[EdgeType, list] = {
-            edge_type: [] for edge_type in EdgeType
-        }
+        edges_by_type: dict[EdgeType, list] = {edge_type: [] for edge_type in EdgeType}
         for u, v, data in self.graph.edges(data=True):
             edge_type = data.get("type", EdgeType.NONE)
             edges_by_type[edge_type].append((u, v))
@@ -453,9 +451,7 @@ if __name__ == "__main__":
     y_utm_origin = 0
 
     # Create and plot the graph
-    graph_builder = get_lane_graph(
-        path, x_utm_origin, y_utm_origin, return_torch=False
-    )
+    graph_builder = get_lane_graph(path, x_utm_origin, y_utm_origin, return_torch=False)
     graph_builder.plot(plot_virtual=True)
 
     # Create torch graph

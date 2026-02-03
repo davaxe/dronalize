@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pandas.core.api import DataFrame as DataFrame
+from pandas.core.api import DataFrame
 
 from preprocessing.utils import nuscenes_utils
 

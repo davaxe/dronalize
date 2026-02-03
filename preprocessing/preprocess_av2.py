@@ -102,9 +102,11 @@ def process_id(
         tr[tr["track_id"].isin(valid_sa_ids)]
         .groupby("track_id")
         .filter(
-            lambda df: not df["agent_type"]
-            .isin(["static", "background", "construction", "riderless_bicycle"])
-            .any()
+            lambda df: (
+                not df["agent_type"]
+                .isin(["static", "background", "construction", "riderless_bicycle"])
+                .any()
+            )
         )["track_id"]
         .unique()
     )
