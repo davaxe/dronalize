@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, override
 
 from preprocessing.road_network.argoverse2 import parser
 from preprocessing.road_network.common import (
@@ -43,24 +43,17 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         map_data = parser.Argoverse2Map(json_file)
         return cls(map_data)
 
+    @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        """Create a new node with the given coordinates."""
         return IntIDNode(x, y, z)
 
+    @override
     def build_impl(
         self,
         min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
-        """Build a `MapGraph` from the `Argoverse2Map`.
-
-        Args:
-            min_distance: the minimum distance between nodes when adding edges.
-                If None, no minimum distance is enforced.
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
-
-        """
+        # Used implicitly when `self.add_path_lazy` is called
         _, _ = min_distance, interp_distance
         self._add_lane_boundary_edges()
         self._add_pedestrian_crossing_edges()
@@ -107,7 +100,9 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         side: Literal["left", "right"],
     ) -> tuple[list[IntIDNode], EdgeType] | None:
         """Get all nodes for a lane segment's boundaries."""
-        boundary = segment.left_boundary if side == "left" else segment.right_boundary
+        boundary = (
+            segment.left_boundary if side == "left" else segment.right_boundary
+        )
         if boundary is None:
             return None
 

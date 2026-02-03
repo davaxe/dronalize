@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import warnings
-from typing import Optional
 
 import torch
 
@@ -21,10 +20,10 @@ import torch
 def filter_prediction(
     pred: torch.Tensor,
     trg: torch.Tensor,
-    mask: Optional[torch.Tensor] = None,
-    prob: Optional[torch.Tensor] = None,
+    mask: torch.Tensor | None = None,
+    prob: torch.Tensor | None = None,
     min_criterion: str = "FDE",
-    best_idx: Optional[torch.Tensor] = None,
+    best_idx: torch.Tensor | None = None,
     mode_first: bool = False,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Select the best trajectory prediction mode based on a given selection criterion.
@@ -81,9 +80,9 @@ def filter_prediction(
             last_pred = pred[:, -1]
             last_trg = trg[:, -1]
 
-        best_idx = torch.linalg.norm(last_pred - last_trg.unsqueeze(1), dim=-1).argmin(
-            dim=-1
-        )  # (N,)
+        best_idx = torch.linalg.norm(
+            last_pred - last_trg.unsqueeze(1), dim=-1
+        ).argmin(dim=-1)  # (N,)
 
         pred = pred[torch.arange(batch_size), :, best_idx]  # (N, T, 2)
 

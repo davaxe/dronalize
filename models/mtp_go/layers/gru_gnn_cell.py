@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
 
 import torch
 from torch import nn
@@ -29,7 +28,7 @@ class GRUGNNCell(nn.Module):
         n_layers: int = 1,
         dropout: float = 0.1,
         gnn_layer: str = "gat+",
-        edge_dim: Optional[int] = None,
+        edge_dim: int | None = None,
     ) -> None:
         super().__init__()
         self.input_size = input_size
@@ -86,8 +85,8 @@ class GRUGNNCell(nn.Module):
         self,
         x: torch.Tensor,
         edge_index: torch.Tensor,
-        h: Optional[torch.Tensor] = None,
-        edge_attr: Optional[torch.Tensor] = None,
+        h: torch.Tensor | None = None,
+        edge_attr: torch.Tensor | None = None,
     ) -> torch.Tensor:
         #  Implements GRUCell update:
         #  https://pytorch.org/docs/stable/generated/torch.nn.GRUCell.html

@@ -17,7 +17,7 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, Self
+from typing import TYPE_CHECKING, Any, Protocol, Self, override
 
 from preprocessing.road_network.common import (
     GraphBuilder,
@@ -63,23 +63,16 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
         return cls(sqlite_file)
 
+    @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        """Create a new node with the given coordinates."""
         return IntIDNode(x, y, z)
 
+    @override
     def build_impl(
         self,
         min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
-        """Build the internal data for the map graph from OpenDD data.
-
-        Args:
-            min_distance: the minimum distance between nodes when adding edges.
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
-
-        """
         self._add_edges(min_distance, interp_distance)
 
     def _add_edges(

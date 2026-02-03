@@ -13,12 +13,12 @@
 # limitations under the License.
 
 import random
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib import colors
+from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
 from torch_geometric.utils import subgraph
 
@@ -51,7 +51,7 @@ def plot_map_edges(
             )
 
 
-def get_agent_color(idx: int, ma_idx: Optional[torch.Tensor] = None) -> str:
+def get_agent_color(idx: int, ma_idx: torch.Tensor | None = None) -> str:
     """Determine agent color based on index and type."""
     if ma_idx is None:
         # Random colors for non-ego vehicles when ma_idx not provided
@@ -132,10 +132,10 @@ def create_trajectory_fade(pos: torch.Tensor, color: str) -> tuple:
 
 
 def plot_agent_trajectories(
-    ax: plt.Axes,
+    ax: Axes,
     pos: torch.Tensor,
     gt: torch.Tensor,
-    ma_idx: Optional[torch.Tensor] = None,
+    ma_idx: torch.Tensor | None = None,
 ) -> None:
     """Plot agent trajectories with history and ground truth."""
     for i in range(pos.shape[0]):
@@ -143,7 +143,9 @@ def plot_agent_trajectories(
 
         # Plot trajectory history
         segments, alphas, myfade = create_trajectory_fade(pos[i], color)
-        lc = LineCollection(segments, array=alphas, cmap=myfade, linewidth=5, zorder=0)
+        lc = LineCollection(
+            segments, array=alphas, cmap=myfade, linewidth=5, zorder=0
+        )
         ax.add_collection(lc)
 
         # Plot current position
@@ -164,7 +166,7 @@ def plot_agent_trajectories(
 
 
 def setup_plot_axes(
-    ax: plt.Axes, xlim: Optional[tuple] = None, ylim: Optional[tuple] = None
+    ax: Axes, xlim: tuple | None = None, ylim: tuple | None = None
 ) -> None:
     """Configure plot axes settings."""
     ax.set_aspect("equal")
@@ -177,10 +179,10 @@ def setup_plot_axes(
 
 
 def plot_polar_connections(
-    ax: plt.Axes,
-    rho: Optional[torch.Tensor] = None,
-    theta: Optional[torch.Tensor] = None,
-    ma_idx: Optional[torch.Tensor] = None,
+    ax: Axes,
+    rho: torch.Tensor | None = None,
+    theta: torch.Tensor | None = None,
+    ma_idx: torch.Tensor | None = None,
 ) -> None:
     if rho is None or theta is None:
         return
@@ -212,10 +214,10 @@ def plot_polar_connections(
 
 
 def plot_lane_displacement(
-    ax: plt.Axes,
+    ax: Axes,
     pos: torch.Tensor,
     lane_disp: torch.Tensor,
-    ma_idx: Optional[torch.Tensor] = None,
+    ma_idx: torch.Tensor | None = None,
     arrow_scale: float = 10.0,
 ) -> None:
     """

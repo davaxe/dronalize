@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
 
 import torch
 import torch_geometric as ptg
@@ -35,7 +34,7 @@ def create_sequential_gnn(
     activation: str = "elu",
     alpha: float = 0.2,
     gnn_layer: str = "gat+",
-    edge_dim: Optional[int] = None,
+    edge_dim: int | None = None,
 ):
     act_params = {"inplace": True}
     if activation == "lrelu":
@@ -51,35 +50,31 @@ def create_sequential_gnn(
         hidden_input_size = hidden_size
 
     if layers == 1:
-        module_lst.append(
-            (
-                create_gnn_layer(
-                    gnn_layer,
-                    input_size,
-                    output_size,
-                    bias=False,
-                    att_heads=n_heads,
-                    att_concat=False,
-                    edge_dim=edge_dim,
-                ),
-                "x, edge_index, edge_attr -> x",
-            )
-        )
+        module_lst.append((
+            create_gnn_layer(
+                gnn_layer,
+                input_size,
+                output_size,
+                bias=False,
+                att_heads=n_heads,
+                att_concat=False,
+                edge_dim=edge_dim,
+            ),
+            "x, edge_index, edge_attr -> x",
+        ))
     else:
-        module_lst.append(
-            (
-                create_gnn_layer(
-                    gnn_layer,
-                    hidden_input_size,
-                    output_size,
-                    bias=False,
-                    att_heads=n_heads,
-                    att_concat=False,
-                    edge_dim=edge_dim,
-                ),
-                "x, edge_index, edge_attr -> x",
-            )
-        )
+        module_lst.append((
+            create_gnn_layer(
+                gnn_layer,
+                hidden_input_size,
+                output_size,
+                bias=False,
+                att_heads=n_heads,
+                att_concat=False,
+                edge_dim=edge_dim,
+            ),
+            "x, edge_index, edge_attr -> x",
+        ))
         ith_layer = layers - 1
         while ith_layer > 1:
             module_lst.insert(0, act)
@@ -135,7 +130,10 @@ def create_gnn_layer(
         )
     elif layer_type == "graphconv":
         gc_layer = ptg.nn.GraphConv(
-            in_channels=in_channels, out_channels=out_channels, bias=bias, aggr=aggr_fn
+            in_channels=in_channels,
+            out_channels=out_channels,
+            bias=bias,
+            aggr=aggr_fn,
         )
     elif layer_type == "gat+":
         gc_layer = NeighborAttConv(

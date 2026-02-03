@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Literal, overload
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -21,6 +22,8 @@ import numpy as np
 import osmium as osm
 import torch
 import utm
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from preprocessing.road_network.edge_type import (
     EDGE_STYLE_MAPPING,
@@ -52,11 +55,9 @@ class LaneGraphBuilder(osm.SimpleHandler):
         self.node_idx = 0
         self.zone = self._initialize_utm_zone()
 
-    def _initialize_utm_zone(self) -> Optional[int]:
+    def _initialize_utm_zone(self) -> int | None:
         """Initialize UTM zone if needed."""
         if self.position.utm_x0 == 0 and self.position.utm_y0 == 0:
-            import math
-
             self.position.utm_x0, self.position.utm_y0, *_ = utm.from_latlon(0, 0)
             return math.floor((0.0 + 180.0) / 6) + 1
         return None
@@ -130,7 +131,11 @@ class LaneGraphBuilder(osm.SimpleHandler):
         elif rel_type == "stop_line":
             self._process_regulatory_relation(r, EdgeType.STOP)
 
-    def _process_regulatory_relation(self, relation: Any, edge_type: EdgeType) -> None:
+    def _process_regulatory_relation(
+        self,
+        relation: Any,
+        edge_type: EdgeType,
+    ) -> None:
         """Process a regulatory relation."""
         for member in relation.members:
             if member.type == "w" and member.role == "ref_line":
@@ -150,7 +155,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
         return_axes: bool = False,
         dpi: int = 300,
         save_fig: bool = False,
-    ) -> None | tuple[plt.Figure, plt.Axes]:
+    ) -> None | tuple[Figure, Axes]:
         """Plot the lane graph with enhanced line styles."""
         fig = plt.figure(dpi=dpi)
         ax = fig.add_subplot(111)
@@ -162,7 +167,9 @@ class LaneGraphBuilder(osm.SimpleHandler):
         pos = nx.get_node_attributes(self.graph, "pos")
 
         # Group edges by type
-        edges_by_type: dict[EdgeType, list] = {edge_type: [] for edge_type in EdgeType}
+        edges_by_type: dict[EdgeType, list] = {
+            edge_type: [] for edge_type in EdgeType
+        }
         for u, v, data in self.graph.edges(data=True):
             edge_type = data.get("type", EdgeType.NONE)
             edges_by_type[edge_type].append((u, v))
@@ -174,7 +181,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
             if not edges:
                 continue
 
-            style: dict[str, Any] = EDGE_STYLE_MAPPING[edge_type]
+            style = EDGE_STYLE_MAPPING[edge_type]
             edge_coords = np.array([(pos[u], pos[v]) for u, v in edges])
 
             # Separate x and y coordinates
@@ -330,7 +337,7 @@ def plot_torch_graph(
                     x_coords,
                     y_coords,
                     color=style["color"],
-                    linewidth=style["width"],
+                    linewidth=style["linewidth"],
                     linestyle="--",
                     dashes=style.get("dashes", [5, 5]),
                     zorder=10,
@@ -340,7 +347,7 @@ def plot_torch_graph(
                     x_coords,
                     y_coords,
                     color=style["color"],
-                    linewidth=style["width"],
+                    linewidth=style["linewidth"],
                     linestyle=":",
                     dashes=style.get("dashes", [1, 5]),
                     zorder=10,
@@ -350,7 +357,7 @@ def plot_torch_graph(
                     x_coords,
                     y_coords,
                     color=style["color"],
-                    linewidth=style["width"],
+                    linewidth=style["linewidth"],
                     linestyle="-",
                     zorder=10,
                 )
@@ -371,7 +378,7 @@ def plot_torch_graph(
             if not nodes or (not plot_virtual and node_type == EdgeType.VIRTUAL):
                 continue
 
-            node_style: dict[str, Any] = NODE_STYLE_MAPPING[node_type]
+            node_style = NODE_STYLE_MAPPING[node_type]
             node_arr = np.array(nodes)
 
             if len(node_arr) > 0:
@@ -379,7 +386,7 @@ def plot_torch_graph(
                     node_arr[:, 0],
                     node_arr[:, 1],
                     c=node_style["color"],
-                    s=node_style["size"] * node_size,
+                    s=node_style["s"] * node_size,
                     zorder=20,
                     # edgecolor='black',
                     linewidth=0.5,
@@ -390,28 +397,51 @@ def plot_torch_graph(
     plt.show()
 
 
+@overload
 def get_lane_graph(
     lanelet_file: str | bytes,
     utm_x0: float = 0.0,
     utm_y0: float = 0.0,
     map_x0: float = 0.0,
     map_y0: float = 0.0,
-    return_torch: bool = False,
-) -> Any:
-    """Create a lane graph from a lanelet file."""
+    *,
+    return_torch: Literal[True],
+) -> dict: ...
 
+
+@overload
+def get_lane_graph(
+    lanelet_file: str | bytes,
+    utm_x0: float = 0.0,
+    utm_y0: float = 0.0,
+    map_x0: float = 0.0,
+    map_y0: float = 0.0,
+    *,
+    return_torch: Literal[False] = False,  # Default value allows optional usage
+) -> LaneGraphBuilder: ...
+
+
+def get_lane_graph(
+    lanelet_file: str | bytes,
+    utm_x0: float = 0.0,
+    utm_y0: float = 0.0,
+    map_x0: float = 0.0,
+    map_y0: float = 0.0,
+    *,
+    return_torch: bool = False,
+) -> dict[Any, Any] | LaneGraphBuilder:
+    """Create a lane graph from a lanelet file."""
     # Ensure lanelet_file is a string (decode if bytes)
     if isinstance(lanelet_file, bytes):
         try:
-            lanelet_file = lanelet_file.decode("utf-8")  # Assuming UTF-8 encoded bytes
+            lanelet_file = lanelet_file.decode("utf-8")
         except UnicodeDecodeError:
-            raise ValueError(
-                "lanelet_file is in bytes format but cannot be decoded to a valid string."
-            )
+            msg = "lanelet_file is in bytes format but cannot be decoded to a valid string."
+            raise ValueError(msg)
 
     position = MapPosition(utm_x0, utm_y0, map_x0, map_y0)
     graph_builder = LaneGraphBuilder(position)
-    graph_builder.apply_file(lanelet_file)
+    graph_builder.apply_file(str(lanelet_file))
 
     return create_torch_graph(graph_builder.graph) if return_torch else graph_builder
 
@@ -423,7 +453,9 @@ if __name__ == "__main__":
     y_utm_origin = 0
 
     # Create and plot the graph
-    graph_builder = get_lane_graph(path, x_utm_origin, y_utm_origin, return_torch=False)
+    graph_builder = get_lane_graph(
+        path, x_utm_origin, y_utm_origin, return_torch=False
+    )
     graph_builder.plot(plot_virtual=True)
 
     # Create torch graph

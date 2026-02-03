@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypedDict, override
 
 import pandas as pd
 
@@ -93,24 +93,16 @@ class WaymoMap(GraphBuilder[int, IntIDNode]):
         """Check if the map is empty."""
         return self._no_map_features
 
+    @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        """Create a new node with the given coordinates."""
         return IntIDNode(x=x, y=y, z=z)
 
+    @override
     def build_impl(
         self,
         min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
-        """Build the map graph from the Lyft LVL5 map.
-
-        Args:
-            min_distance: the minimum distance between consecutive nodes. If `None`, no
-                minimum distance is enforced.
-            interp_distance: the approximate distance between interpolated
-                nodes. If None, no interpolation is performed.
-
-        """
         self._processed_features: set[int] = set()
 
         self._add_road_edge_edges(min_distance, interp_distance)

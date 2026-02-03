@@ -13,13 +13,13 @@
 # limitations under the License.
 
 import os
-from typing import Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.axes import Axes
 
-from preprocessing.road_network import get_lane_graph
+from preprocessing.road_network.urban.lane_graph import get_lane_graph
 
 # Dataset mappings
 DATASET_MAPPINGS = {
@@ -58,7 +58,7 @@ def find_root_directory() -> str:
     return os.path.join(root, "datasets")
 
 
-def get_path_for_index(dataset: str, idx: int) -> Optional[str]:
+def get_path_for_index(dataset: str, idx: int) -> str | None:
     """Get the corresponding path for a given dataset and index."""
     str_idx = f"0{idx}" if idx < 10 else str(idx)
     mapping = DATASET_MAPPINGS.get(dataset)
@@ -82,7 +82,7 @@ def load_meta_data(root_dir: str, dataset: str, idx: int) -> tuple[float, float]
     return meta.xUtmOrigin.values[0], meta.yUtmOrigin.values[0]
 
 
-def plot_tracks(ax: plt.Axes, tracks_path: str, num_samples: int = 100) -> None:
+def plot_tracks(ax: Axes, tracks_path: str, num_samples: int = 100) -> None:
     """Plot random track samples on the given axes."""
     tracks = pd.read_csv(tracks_path)
     track_ids = np.random.choice(tracks.trackId.unique(), num_samples)
@@ -128,9 +128,14 @@ def main():
     graph_builder = get_lane_graph(
         lanelet_file, x_utm_origin, y_utm_origin, return_torch=False
     )
-    fig, ax = graph_builder.plot(
-        plot_virtual=plot_config["plot_virtual"], return_axes=True
+    res = graph_builder.plot(
+        plot_virtual=plot_config["plot_virtual"],
+        return_axes=True,
     )
+    if res is None:
+        return
+
+    _fig, ax = res
 
     # Plot tracks if requested
     if plot_config["plot_tracks"]:

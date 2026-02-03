@@ -15,7 +15,8 @@
 from __future__ import annotations
 
 from itertools import chain, repeat
-from typing import TYPE_CHECKING, TypedDict
+from pydoc import doc
+from typing import TYPE_CHECKING, TypedDict, override
 
 import numpy as np
 import numpy.typing as npt
@@ -52,7 +53,9 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             argoverse_map.parse()
 
         super().__init__()
-        self.lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
+        self.lane_segments: dict[int, parser.LaneSegment] = (
+            argoverse_map.lane_segments
+        )
         self.map_nodes: dict[int, IntIDNode] = argoverse_map.nodes
 
         self.max_distance_between_connections: float = 1.0
@@ -63,24 +66,16 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         argoverse_map = parser.Argoverse1Map.from_xml_file(path)
         return cls(argoverse_map)
 
+    @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        """Create a new node with the given coordinates."""
         return IntIDNode(x=x, y=y, z=z)
 
+    @override
     def build_impl(
         self,
         min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
-        """Build a `MapGraph` from the `Argoverse1Map`.
-
-        Args:
-            min_distance: the minimum distance between nodes when adding edges.
-                If None, no minimum distance is enforced.
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
-
-        """
         # Dict to store endpoints (start and end) of each lane segment to enable
         # efficient connection of segments after all segments are added
         self._lane_endpoints: dict[
@@ -289,7 +284,9 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
                 continue
 
             dst_node = self.new_node(x=dst_vec[0], y=dst_vec[1])
-            current_edge_type = edge_type_list[min(edge_idx, len(edge_type_list) - 1)]
+            current_edge_type = edge_type_list[
+                min(edge_idx, len(edge_type_list) - 1)
+            ]
 
             for s, d, e in self.interpolate_edge(
                 prev_node,  # REUSE the existing node object

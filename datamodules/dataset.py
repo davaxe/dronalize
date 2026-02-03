@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import os
 import pickle
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from torch_geometric.data import Dataset, HeteroData
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class TrajDataset(Dataset):

@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-from typing import Optional
-
 import torch
 from torchmetrics import Metric
 
@@ -29,8 +27,8 @@ class ExpDE(Metric):
         self,
         pred: torch.Tensor,
         trg: torch.Tensor,
-        prob: Optional[torch.Tensor] = None,
-        mask: Optional[torch.Tensor] = None,
+        prob: torch.Tensor | None = None,
+        mask: torch.Tensor | None = None,
         logits: bool = False,
         eval_criterion: str = "FDE",
         mode_first: bool = False,

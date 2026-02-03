@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self, TypedDict
+from typing import TYPE_CHECKING, Self, TypedDict, override
 from uuid import UUID
 
 from preprocessing.road_network.common import (
@@ -72,6 +72,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         )
         return cls(nuscenes_map, ignore_edge_types=ignore_edge_types)
 
+    @override
     def new_node(self, x: float, y: float, z: float = 0) -> parser.Node:
         """Create a new node with the given coordinates."""
         return parser.Node(
@@ -81,22 +82,13 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             z=z,
         )
 
+    @override
     def build_impl(
         self,
         min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
-        """Build a `MapGraph` from the `NuscenesMap`.
-
-        Args:
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
-            min_distance: the minimum distance between consecutive nodes. If None,
-                no minimum distance is enforced.
-
-        """
         self.min_distance = min_distance if min_distance is not None else 0.0
-
         for edge_type, method in self.edge_type_methods.items():
             if edge_type not in self.ignore_edge_types:
                 method(interp_distance=interp_distance)

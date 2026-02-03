@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import override
 
 from preprocessing.road_network.common import (
     GraphBuilder,
@@ -61,24 +62,17 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         lyft_map = parser.LyftLVL5Map(map_path, meta_json)
         return cls(lyft_map)
 
+    @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        """Create a new node with the given coordinates."""
         return IntIDNode(x, y, z)
 
+    @override
     def build_impl(
         self,
         min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> None:
-        """Build the map graph from the Lyft LVL5 map.
-
-        Args:
-            min_distance: the minimum distance between consecutive nodes. If `None`, no
-                minimum distance is enforced.
-            interp_distance: the approximate distance between interpolated
-                nodes. If None, no interpolation is performed.
-
-        """
+        # Used implicitly when `self.add_path_lazy` is called
         _, _ = min_distance, interp_distance
         self._add_road_segment_edges()
         self._add_junction_edges()

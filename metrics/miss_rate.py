@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
 
 import torch
 from torchmetrics import Metric
@@ -30,9 +29,9 @@ class MissRate(Metric):
         self,
         pred: torch.Tensor,
         trg: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        prob: Optional[torch.Tensor] = None,
-        best_idx: Optional[torch.Tensor] = None,
+        mask: torch.Tensor | None = None,
+        prob: torch.Tensor | None = None,
+        best_idx: torch.Tensor | None = None,
         miss_criterion: str = "FDE",
         miss_threshold: float = 2.0,
         mode_first: bool = False,
@@ -63,7 +62,13 @@ class MissRate(Metric):
         """
         if pred.dim() == 4:
             pred, _ = filter_prediction(
-                pred, trg, mask, prob, miss_criterion, best_idx, mode_first=mode_first
+                pred,
+                trg,
+                mask,
+                prob,
+                miss_criterion,
+                best_idx,
+                mode_first=mode_first,
             )
 
         batch_size, seq_len = pred.size()[:2]

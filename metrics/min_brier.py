@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
 
 import torch
 from torchmetrics import Metric
@@ -31,8 +30,8 @@ class MinBrier(Metric):
         pred: torch.Tensor,
         trg: torch.Tensor,
         prob: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        best_idx: Optional[torch.Tensor] = None,
+        mask: torch.Tensor | None = None,
+        best_idx: torch.Tensor | None = None,
         logit: bool = False,
         min_criterion: str = "FDE",
         mode_first: bool = False,

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable
+from collections.abc import Callable
 
 import torch
 
@@ -33,7 +33,9 @@ def midpoint(
     return x + h * k2
 
 
-def heun(model: Callable, x: torch.Tensor, u: torch.Tensor, h: float) -> torch.Tensor:
+def heun(
+    model: Callable, x: torch.Tensor, u: torch.Tensor, h: float
+) -> torch.Tensor:
     """Heun's (second-order) method."""
     k1 = model(x, u)
     k2 = model(x + h * k1, u)
@@ -48,7 +50,9 @@ def rk3(model: Callable, x: torch.Tensor, u: torch.Tensor, h: float) -> torch.Te
     return x + h / 6 * (k1 + 4 * k2 + k3)
 
 
-def ssprk3(model: Callable, x: torch.Tensor, u: torch.Tensor, h: float) -> torch.Tensor:
+def ssprk3(
+    model: Callable, x: torch.Tensor, u: torch.Tensor, h: float
+) -> torch.Tensor:
     """Third-order Strong Stability Preserving Runge-Kutta (SSPRK3)."""
     k1 = model(x, u)
     k2 = model(x + h * k1, u)

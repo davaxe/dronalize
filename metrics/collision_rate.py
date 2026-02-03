@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from math import comb
-from typing import Optional
 
 import torch
 from torchmetrics import Metric
@@ -32,9 +31,9 @@ class CollisionRate(Metric):
         pred: torch.Tensor,
         trg: torch.Tensor,
         ptr: torch.Tensor,
-        prob: Optional[torch.Tensor] = None,
-        mask: Optional[torch.Tensor] = None,
-        best_idx: Optional[torch.Tensor] = None,
+        prob: torch.Tensor | None = None,
+        mask: torch.Tensor | None = None,
+        best_idx: torch.Tensor | None = None,
         collision_criterion: str = "FDE",
         collision_threshold: float = 1.0,
         mode_first: bool = False,

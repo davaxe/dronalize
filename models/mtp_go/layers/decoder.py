@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional
-
 import torch
 from torch import nn
 
@@ -93,7 +91,7 @@ class GRUGNNDecoder(nn.Module):
         x1: torch.Tensor,
         x2: torch.Tensor,
         x3: torch.Tensor,
-        batch_size: Optional[int] = None,
+        batch_size: int | None = None,
     ) -> torch.Tensor:
         if batch_size is None:
             batch_size = x1.size(0)

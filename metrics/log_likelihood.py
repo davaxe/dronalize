@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import warnings
-from typing import Any, Optional
+from typing import Any
 
 import torch
 import torch.distributions as tdist
@@ -57,7 +57,9 @@ class NegativeLogLikelihood(Metric):
         self, pred: torch.Tensor, scale: torch.Tensor, is_tril: bool
     ) -> Any:
         if self.dist.__name__ == "MultivariateNormal":
-            assert scale.size(-1) == scale.size(-2), "Covariance matrix must be square."
+            assert scale.size(-1) == scale.size(-2), (
+                "Covariance matrix must be square."
+            )
             if not is_tril:
                 scale = torch.linalg.cholesky(scale)
             return self.dist(loc=pred, scale_tril=scale)
@@ -68,8 +70,8 @@ class NegativeLogLikelihood(Metric):
         pred: torch.Tensor,
         trg: torch.Tensor,
         scale: torch.Tensor,
-        prob: Optional[torch.Tensor] = None,
-        mask: Optional[torch.Tensor] = None,
+        prob: torch.Tensor | None = None,
+        mask: torch.Tensor | None = None,
         logits: bool = False,
         is_tril: bool = False,
         mode_first: bool = False,
