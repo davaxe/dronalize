@@ -19,10 +19,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast, override
 
 import polars as pl
-from scipy.signal import resample
 
-from preprocessing.trajectory.interface import DataProcessor, Frame
-from preprocessing.trajectory.resample import plot_comparison, resample_tracks
+from preprocessing.trajectory.interface import Category, DataProcessor, Frame
+from preprocessing.trajectory.resample import resample_tracks
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -57,7 +56,7 @@ class Config:
     require_all_valid: bool = True
     """If True, requires all pedestrians in a sequence to have valid positions."""
 
-    target_sample_time: float = 0.8
+    target_sample_time: float = 0.1
     """The target time interval for resampling the trajectories, in seconds."""
 
     multiple_targets_per_window: bool = False
@@ -86,6 +85,7 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
         for dataset in datasets:
             data_dir = self.config.data_root / dataset / self.config.split
             for data_file in data_dir.iterdir():
+                print(data_file)
                 yield (
                     data_file.name,
                     # The source is a loaded polars DataFrame containing the xy
@@ -96,36 +96,49 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
 
     @override
     def load_raw(self, source: pl.DataFrame) -> Iterable[pl.DataFrame]:
-        window_size: int = self.config.org_obs_len + self.config.org_pred_len
-        print(source["id"].n_unique())
-        org = source.clone()
+        ratio = self.config.target_sample_time / self.config.org_sample_time
+        # For some data sources (files) there are some pedestrians with only
+        # one frame of data, which is pointless and will cause issues during
+        # resampling, so we filter them out here.
+        source = source.filter(pl.col("frame").n_unique().over("id") > 1)
         source = resample_tracks(
             source,
-            dt=self.config.target_sample_time,
-            org_dt=self.config.org_sample_time,
+            ratio=ratio,
             group_by="id",
-            interpolate_columns=["x", "y"],
+            pos_columns=["x", "y"],
+            add_velocity=True,
         )
-        window_size = int(
-            window_size
+
+        adj_window_size = int(
+            (self.config.org_obs_len + self.config.org_pred_len)
             * self.config.org_sample_time
             / self.config.target_sample_time
         )
+
         max_frame = cast("int | None", source["frame"].max())
-        plot_comparison(org, source, group_by="id", n_groups=50)
-        if max_frame is not None:
-            max_frame = int(max_frame) + 1
-            for start_frame in range(
-                0, max_frame - window_size + 1, self.config.window_skip
-            ):
-                yield source.filter(
-                    (pl.col("frame") >= start_frame)
-                    & (pl.col("frame") < start_frame + window_size)
+        if max_frame is None:
+            return
+
+        for start_frame in range(
+            0, int(max_frame) - adj_window_size + 1, self.config.window_skip
+        ):
+            yield source.filter(
+                pl.col("frame").is_between(
+                    start_frame,
+                    start_frame + adj_window_size,
+                    closed="left",
                 )
+            )
 
     @override
-    def normalize(self, df: pl.DataFrame) -> pl.DataFrame:
-        raise NotImplementedError
+    def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
+        # Input is a scene DataFrame of length (obs_len + pred_len) *
+        # num_pedestrians, with columns "frame", "id", "x", "y", "vx", "vy".
+        # Output should be a filtered DataFrame of the same format.
+        return df.with_columns(
+            pl.lit(Category.PEDESTRIAN).alias("agent_class"),
+            pl.lit(0.0).alias("yaw"),
+        )
 
     def _read_data_file(self, path: Path) -> pl.DataFrame:
         return pl.read_csv(
@@ -152,6 +165,8 @@ if __name__ == "__main__":
         split="train",
     )
     processor = EthUcyProcessor(config)
-    for source_name, df in processor.sources():
-        for raw in processor.load_raw(df):
-            ...
+    for scene in processor.process_scenes():
+        n_unique = scene.inner["id"].n_unique()
+        steps = scene.inner["frame"].n_unique()
+        print(f"Scene {scene.identifier}: {n_unique} pedestrians, {steps} steps")
+        break

@@ -27,16 +27,7 @@ class Category(StrEnum):
     UNKNOWN = auto()
 
 
-class Status(StrEnum):
-    """Enumeration of agent status."""
-
-    UNKNOWN = auto()
-    MOVING = auto()
-    STOPPED = auto()
-
-
 CategoryPL = pl.Enum(Category)
-StatusPL = pl.Enum(Status)
 
 
 class FrameDict(TypedDict):
@@ -44,7 +35,7 @@ class FrameDict(TypedDict):
 
     frame: int
     """Frame index."""
-    track_id: int
+    id: int
     """Unique track identifier."""
     x: float
     """x position in meters."""
@@ -58,8 +49,6 @@ class FrameDict(TypedDict):
     """Orientation in radians."""
     agent_class: Category
     """Class of the agent/object."""
-    status: Status
-    """Status of the agent/object."""
 
 
 T_Dict = TypeVar("T_Dict", bound=FrameDict)
@@ -74,7 +63,7 @@ class BaseFrame(Generic[T_Dict]):
 
     frame: int
     """Frame index."""
-    track_id: int
+    id: int
     """Unique track identifier."""
     x: float
     """x position in meters."""
@@ -88,8 +77,6 @@ class BaseFrame(Generic[T_Dict]):
     """Orientation in radians."""
     category: Category = Category.UNKNOWN
     """Category of the agent/object."""
-    status: Status = Status.UNKNOWN
-    """Status of the agent/object."""
 
     def __post_init__(self) -> None:
         """Initialize derived attributes."""
@@ -170,7 +157,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         """Read the raw data source into one or more DataFrame(s) (any schema)."""
 
     @abstractmethod
-    def normalize(self, df: pl.DataFrame) -> pl.DataFrame:
+    def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
         """Convert the raw DataFrame into the common schema."""
 
     def post_process(self, df: pl.DataFrame) -> pl.DataFrame:
@@ -197,18 +184,21 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         5. Validate output schema (Optional, default True).
         """
 
-        def _step(df: pl.DataFrame) -> pl.DataFrame:
-            df = self.normalize(df)
+        def _step(raw_df: pl.DataFrame) -> pl.DataFrame | None:
+            normalized_df = self.normalize(raw_df)
+            if normalized_df is None:
+                return None
             if validate_intermediate:
-                self._validate_schema(df)
-
-            df = self.post_process(df)
+                self._validate_schema(normalized_df)
+            df = self.post_process(normalized_df)
             if validate_output:
                 self._validate_schema(df)
             return df
 
-        for df in self.load_raw(input_data):
-            yield _step(df)
+        for raw_df in self.load_raw(input_data):
+            df = _step(raw_df)
+            if df is not None:
+                yield df
 
     def process_scenes(self) -> Iterable[Scene[T_ID, T_Frame]]:
         """Iterate over all sources and process them.
@@ -238,13 +228,13 @@ class FrameStreamProcessor(DataProcessor[T_ID, T_Source, T_Frame], ABC):
         """Yield frames one by one from the raw source."""
 
     @override
-    def load_raw(self, source: T_Source) -> pl.DataFrame:
+    def load_raw(self, source: T_Source) -> Iterable[pl.DataFrame]:
         frames = [f.to_dict() for f in self.iter_frames(source)]
 
         if not frames:
-            return pl.DataFrame(schema=T_Frame.__annotations__)
+            return [pl.DataFrame(schema=T_Frame.__annotations__)]
 
-        return pl.DataFrame(frames)
+        return [pl.DataFrame(frames)]
 
     @override
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame:

@@ -1,206 +1,387 @@
 from collections.abc import Sequence
 from fractions import Fraction
+from typing import Literal, overload
 
-import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 import polars as pl
-import polars.selectors as cs
-import seaborn as sns
-from scipy.interpolate import CubicSpline
+from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
 
 def resample_tracks(
     data: pl.DataFrame,
-    dt: float,
-    org_dt: float,
+    ratio: float | Fraction,
     frame_column: str = "frame",
-    interpolate_columns: str | Sequence[str] | None = None,
+    pos_columns: Sequence[str] = ("x", "y"),
+    vel_columns: Sequence[str] | None = None,
     group_by: str | Sequence[str] | None = None,
+    *,
+    add_velocity: bool = False,
 ) -> pl.DataFrame:
-    fraction = Fraction(dt / org_dt).limit_denominator()
-    up, down = fraction.denominator, fraction.numerator
+    """Resample the track trajectories by a fraction.
+
+    The required columns are:
+    1. Column for frame index, specified by `frame_column`.
+    2. Columns for positions to be interpolated, specified by `pos_columns`.
+    3. (Optional) Columns for velocities, specified by `vel_columns`. If
+        provided, these are used for Hermite spline interpolation. If not provided,
+        cubic spline interpolation is used instead.
+
+    To add estimated velocities calculated from the spline interpolation, set
+    `add_velocity=True`. This will not do anything if velocity columns are
+    already provided.
+
+    Args:
+        data: trajectory data.
+        ratio: ratio of new sampling frequency.
+        frame_column: column for frame index. Defaults to "frame".
+        pos_columns: columns for position. Defaults to ("x", "y").
+        vel_columns: columns for velocity. If provided, they are used for Hermite
+            spline interpolation.
+        group_by: columns to group by. Defaults to None.
+        add_velocity: whether to add velocity columns if not provided. Defaults to False.
+
+    Returns:
+        Resampled trajectory data.
+
+    """
+    if pos_columns is None and vel_columns is not None:
+        msg = "Position columns must be provided if velocity columns are provided."
+        raise ValueError(msg)
+
+    fraction = Fraction(ratio).limit_denominator()
+    down, up = fraction.numerator, fraction.denominator
     if down == 1 and up == 1:
         return data
 
-    # Ensure group_by is a list for consistency
     group_cols = [group_by] if isinstance(group_by, str) else list(group_by or [])
-    return (
+    aggregations: list[pl.Expr] = []
+    res_col_names: list[str] = []
+
+    for i, p_col in enumerate(pos_columns):
+        v_col = vel_columns[i] if vel_columns and i < len(vel_columns) else None
+        alias_name = f"_res_{p_col}"
+        res_col_names.append(alias_name)
+
+        struct_input = (
+            pl.struct(pos=pl.col(p_col), vel=pl.col(v_col))
+            if v_col
+            else pl.struct(pos=pl.col(p_col))
+        )
+
+        aggregations.append(
+            struct_input.map_batches(
+                lambda series, v=v_col: _resample_batch(
+                    series,
+                    up,
+                    down,
+                    add_velocity=add_velocity,
+                    has_velocity=v is not None,
+                ),
+            ).alias(alias_name)
+        )
+
+    # Extend the frame count to match the new number of samples after resampling
+    aggregations.append(
+        pl
+        .col(frame_column)
+        .map_batches(
+            lambda series: pl.Series(
+                np.arange(int(np.ceil(len(series) * up / down))) + series[0]
+            )
+        )
+        .alias(frame_column)
+    )
+
+    res = (
         data
         .sort([*group_cols, frame_column])
         .group_by(group_cols)
-        .agg([
-            # Resample all float columns
-            cs.float().map_batches(lambda s: _resample_track(s, up, down)),
-            pl
-            .col(frame_column)
-            .map_batches(lambda s: _generate_new_frames(s, up, down))
-            .alias(frame_column),
-        ])
-        .explode(cs.all().exclude(group_cols))
+        .agg(aggregations)
+        .explode([*res_col_names, frame_column])
+    )
+
+    return _reform(res, pos_columns, vel_columns, add_velocity=add_velocity).drop(
+        res_col_names
     )
 
 
-def _resample_track(series: pl.Series, up: int, down: int) -> pl.Series:
-    if series.len() < 2:
-        return series
+def _reform(
+    df: pl.DataFrame,
+    pos_cols: Sequence[str],
+    vel_cols: Sequence[str] | None = None,
+    *,
+    add_velocity: bool = False,
+) -> pl.DataFrame:
+    for i, p_col in enumerate(pos_cols):
+        v_col = vel_cols[i] if vel_cols and i < len(vel_cols) else None
+        struct_col = f"_res_{p_col}"
+        df = df.with_columns(pl.col(struct_col).struct.field("pos").alias(p_col))
+        if v_col:
+            df = df.with_columns(pl.col(struct_col).struct.field("vel").alias(v_col))
+        elif add_velocity:
+            # If no v_col was provided but we calculated it, name it "v{p_col}"
+            df = df.with_columns(
+                pl.col(struct_col).struct.field("vel").alias(f"v{p_col}")
+            )
+    return df
 
-    x_old = np.arange(len(series))
-    # Calculate new length to match your dt logic
-    new_len = int(np.ceil(len(series) * up / down))
-    x_new = np.linspace(0, len(series) - 1, new_len)
 
-    # Create the spline and evaluate at new points
-    cs = CubicSpline(x_old, series.to_numpy(), bc_type="clamped")
-    return pl.Series(cs(x_new))
+def _apply_interpolation(
+    pos: npt.NDArray[np.float64],
+    vel: npt.NDArray[np.float64] | None,
+    up: int,
+    down: int,
+    *,
+    method: Literal["spline", "linear"] = "spline",
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
 
+    n_old = len(pos)
+    n_new = int(np.ceil(n_old * up / down))
+    t = np.arange(n_old, dtype=np.float64)
+    t_new = np.linspace(0, n_old - 1, n_new, dtype=np.float64)
 
-def _generate_new_frames(series: pl.Series, up: int, down: int) -> pl.Series:
-    if series.len() < 2:
-        return series
-    new_len = int(np.ceil(len(series) * up / down))
-    start_frame = series.item(0)
-    return pl.Series(np.arange(new_len) + start_frame)
-
-
-def plot_comparison(
-    original_df: pl.DataFrame,
-    resampled_df: pl.DataFrame,
-    group_by: str = "track_id",
-    n_groups: int | None = None,
-):
-    # 1. Filter logic
-    if n_groups is not None:
-        selected_ids = original_df.select(group_by).unique().head(n_groups)
-        original_df = original_df.join(selected_ids, on=group_by, how="semi")
-        resampled_df = resampled_df.join(selected_ids, on=group_by, how="semi")
-
-    # 2. Create a consistent color mapping
-    # This ensures Track 5 is the same color in both plots
-    unique_ids = original_df.select(group_by).unique().to_series().to_list()
-
-    # "tab10" is high contrast for few items; "husl" is distinct for many items
-    palette_name = "tab10" if len(unique_ids) <= 10 else "husl"
-    colors = sns.color_palette(palette_name, n_colors=len(unique_ids))
-    color_map = dict(zip(unique_ids, colors))
-
-    fig, axes = plt.subplots(1, 2, figsize=(16, 7), sharex=True, sharey=True)
-    dataframes = [original_df.to_pandas(), resampled_df.to_pandas()]
-    titles = ["Original (Low Frequency)", "Resampled (Spline Interpolation)"]
-
-    for i, (df, ax) in enumerate(zip(dataframes, axes)):
-        sns.lineplot(
-            data=df,
-            x="x",
-            y="y",
-            hue=group_by,
-            ax=ax,
-            palette=color_map,  # Use the fixed dictionary here
-            alpha=0.8,  # Increased opacity for better visibility
-            linewidth=2,  # Slightly thicker lines
-            marker="o",
-            markersize=4,
-            markeredgecolor="white",  # Adds a tiny border to points to pop against background
-            markeredgewidth=0.5,
-            sort=False,
-            legend=False,
+    if method == "spline":
+        pos_new, vel_new = cubic_spline_interpolation(
+            t,
+            t_new,
+            pos,
+            vel=vel,
+            hermite=vel is not None,
+            include_first_derivative=True,
         )
-
-        # Plot Start/End markers
-        unique_groups = df[group_by].unique()
-        for tid in unique_groups:
-            subset = df[df[group_by] == tid]
-            if len(subset) == 0:
-                continue
-
-            # Start: Green Circle with black edge for contrast
-            ax.plot(
-                subset["x"].iloc[0],
-                subset["y"].iloc[0],
-                marker="o",
-                color="#2ecc71",
-                markersize=8,
-                markeredgecolor="black",
-                label="Start" if tid == unique_groups[0] and i == 0 else "",
-                zorder=10,
-            )
-            # End: Red X with black edge
-            ax.plot(
-                subset["x"].iloc[-1],
-                subset["y"].iloc[-1],
-                marker="X",
-                color="#e74c3c",
-                markersize=8,
-                markeredgecolor="black",
-                label="End" if tid == unique_groups[0] and i == 0 else "",
-                zorder=10,
-            )
-
-        ax.set_title(titles[i], fontsize=12, pad=15, fontweight="bold")
-        ax.grid(True, linestyle="--", alpha=0.3)
-        ax.set_xlabel("X Position")
-
-    axes[0].set_ylabel("Y Position")
-
-    # Add single legend
-    if n_groups is not None and n_groups > 0:
-        fig.legend(loc="upper right", bbox_to_anchor=(0.98, 0.98), frameon=True)
-
-    plt.tight_layout()
-    plt.show()
+    elif method == "linear":
+        pos_new, vel_new = linear_interpolation(
+            t,
+            t_new,
+            pos,
+            include_first_derivative=True,
+        )
+    return pos_new, vel_new
 
 
-def generate_test_suite():
-    # 1. Lissajous Curve (Complex curvature)
-    t1 = np.linspace(0, 2 * np.pi, 50)
-    df1 = pl.DataFrame({
-        "frame": np.arange(len(t1)),
-        "x": 10 * np.sin(2 * t1),
-        "y": 10 * np.cos(3 * t1),
-        "track_id": 1,
-    })
-
-    # 2. Damped Spiral (Increasing frequency/tightening turns)
-    t2 = np.linspace(0, 4 * np.pi, 50)
-    r = 15 / (1 + 0.1 * t2)
-    df2 = pl.DataFrame({
-        "frame": np.arange(len(t2)),
-        "x": r * np.cos(t2) + 25,
-        "y": r * np.sin(t2),
-        "track_id": 2,
-    })
-
-    # 3. Straight Line (Testing for artifacts/overshoot)
-    # We use the same number of points to keep it consistent
-    t3 = np.linspace(0, 1, 50)
-    df3 = pl.DataFrame({
-        "frame": np.arange(len(t3)),
-        "x": np.linspace(0, 30, 50),
-        "y": np.linspace(-15, -15, 50),  # Constant Y
-        "track_id": 3,
-    })
-
-    return pl.concat([df1, df2, df3]).with_columns([
-        pl.col("x").cast(pl.Float64),
-        pl.col("y").cast(pl.Float64),
-        pl.col("frame").cast(pl.Int64),
-        pl.col("track_id").cast(pl.Int64),
-    ])
+@overload
+def cubic_spline_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    vel: npt.NDArray[np.float64] | None = None,
+    hermite: bool = False,
+    include_first_derivative: Literal[False] = False,
+    include_second_derivative: Literal[False] = False,
+) -> npt.NDArray[np.float64]: ...
 
 
-if __name__ == "__main__":
-    # 1. Generate the complex data
-    df_complex = generate_test_suite()
+@overload
+def cubic_spline_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    vel: npt.NDArray[np.float64] | None = None,
+    hermite: bool = False,
+    include_first_derivative: Literal[True],
+    include_second_derivative: Literal[False] = False,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]: ...
 
-    # 3. Resample (dt=0.2, org_dt=1.0 means 5x upsampling)
-    dt_new = 0.4
-    dt_org = 1.0
 
-    df_resampled = resample_tracks(
-        df_complex, dt=dt_new, org_dt=dt_org, group_by="track_id"
+@overload
+def cubic_spline_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    vel: npt.NDArray[np.float64],
+    hermite: bool = False,
+    include_first_derivative: Literal[False] = False,
+    include_second_derivative: Literal[True],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]: ...
+
+
+@overload
+def cubic_spline_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    vel: npt.NDArray[np.float64] | None = None,
+    hermite: bool = False,
+    include_first_derivative: Literal[True],
+    include_second_derivative: Literal[True],
+) -> tuple[
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+]: ...
+
+
+def cubic_spline_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    vel: npt.NDArray[np.float64] | None = None,
+    hermite: bool = False,
+    include_first_derivative: bool = False,
+    include_second_derivative: bool = False,
+) -> tuple[npt.NDArray[np.float64], ...] | npt.NDArray[np.float64]:
+    """Interpolate positions using CubicSpline or CubicHermiteSpline.
+
+    If `vel` is provided and `hermite=True`, Hermite spline interpolation is
+    used. It is possible to return the first and second derivatives (velocity
+    and acceleration) along with the interpolated positions by setting
+    `include_first_derivative` and `include_second_derivative` to True.
+
+
+    Args:
+        pos: original positions to interpolate, shape (n_samples, n_dims).
+        t: original time points corresponding to `pos`, shape (n_samples,).
+        t_new: new time points at which to interpolate, shape (n_new_samples,).
+        vel: original velocities corresponding to `pos`, shape (n_samples, n_dims).
+            Needed if `hermite=True`.
+        hermite: whether to use Hermite spline interpolation.
+        include_first_derivative: whether to include the first derivative in the
+            output.
+        include_second_derivative: whether to include the second derivative in
+            the output.
+
+    Returns:
+        (interpolated positions, [optional] interpolated velocities, [optional]
+        interpolated accelerations)
+
+    """
+    if hermite and vel is not None:
+        spline = CubicHermiteSpline(t, pos, vel)
+    else:
+        spline = CubicSpline(t, pos, bc_type="clamped")
+
+    results = [spline(t_new)]
+    for nu, include in [
+        (1, include_first_derivative),
+        (2, include_second_derivative),
+    ]:
+        if include:
+            results.append(spline(t_new, nu))
+    return tuple(results) if len(results) > 1 else results[0]
+
+
+@overload
+def linear_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    include_first_derivative: Literal[False] = False,
+    include_second_derivative: Literal[False] = False,
+) -> npt.NDArray[np.float64]: ...
+
+
+@overload
+def linear_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    include_first_derivative: Literal[True],
+    include_second_derivative: Literal[False] = False,
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]: ...
+
+
+@overload
+def linear_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    include_first_derivative: Literal[False] = False,
+    include_second_derivative: Literal[True],
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]: ...
+
+
+@overload
+def linear_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    include_first_derivative: Literal[True],
+    include_second_derivative: Literal[True],
+) -> tuple[
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+    npt.NDArray[np.float64],
+]: ...
+
+
+def linear_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    include_first_derivative: bool = False,
+    include_second_derivative: bool = False,
+) -> tuple[npt.NDArray[np.float64], ...] | npt.NDArray[np.float64]:
+    """Linearly interpolate positions.
+
+    The velocity and acceleration are estimated using finite differences on the
+    interpolated positions, so they may be noisy and not very accurate.
+
+    Args:
+        pos: original positions to interpolate, shape (n_samples, n_dims).
+        t: original time points corresponding to `pos`, shape (n_samples,).
+        t_new: new time points at which to interpolate, shape (n_new_samples,).
+        include_first_derivative: whether to include the first derivative in the
+            output. Defaults to False.
+        include_second_derivative: whether to include the second derivative in the
+            output. Defaults to False.
+
+    Returns:
+        (interpolated positions, [optional] interpolated velocities, [optional]
+        interpolated accelerations)
+
+    """
+    # Estimate velocity and acceleration using finite differences
+    pos = np.interp(t_new, t, pos)
+    results = [pos]
+    if include_first_derivative:
+        vel = np.gradient(pos, t_new)
+        results.append(vel)
+    if include_second_derivative:
+        acc = np.gradient(
+            results[-1] if include_first_derivative else np.gradient(pos, t_new),
+            t_new,
+        )
+        results.append(acc)
+    return tuple(results) if len(results) > 1 else results[0]
+
+
+def _resample_batch(
+    s: pl.Series,
+    up: int,
+    down: int,
+    *,
+    has_velocity: bool,
+    add_velocity: bool = False,
+) -> pl.Series:
+    if s.len() <= 1:
+        print(s)
+        return s
+
+    df_struct = s.struct.unnest()
+    pos_res, vel_res = _apply_interpolation(
+        df_struct["pos"].to_numpy(),
+        df_struct["vel"].to_numpy() if has_velocity else None,
+        up,
+        down,
     )
-    print(df_resampled)
+    if has_velocity:
+        return pl.Series([
+            {"pos": p, "vel": v} for p, v in zip(pos_res, vel_res, strict=True)
+        ])
 
-    plot_comparison(df_complex, df_resampled)
-
-    print(f"Original row count: {len(df_complex)}")
-    print(f"Resampled row count: {len(df_resampled)}")
+    if add_velocity:
+        return pl.Series([
+            {"pos": p, "vel": v} for p, v in zip(pos_res, vel_res, strict=True)
+        ])
+    return pl.Series([{"pos": p} for p in pos_res])
