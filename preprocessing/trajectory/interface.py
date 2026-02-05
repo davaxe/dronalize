@@ -1,9 +1,7 @@
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from dataclasses import field
 from enum import StrEnum, auto
-from pathlib import Path
 from typing import Generic, TypedDict, TypeVar, cast, override
 
 import polars as pl
@@ -151,7 +149,7 @@ class Scene(Generic[T_ID, T_Frame]):
             yield cast("T_Frame", row)
 
 
-@dataclass(slots=True, frozen=True, init=False)
+@dataclass(slots=True)
 class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
     """Interface for processing raw data sources into a standardized format.
 
@@ -161,12 +159,6 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
     int).
     """
 
-    data_root: Path = field(default_factory=Path)
-
-    def __init__(self, data_root: Path | str) -> None:
-        """Initialize the DataProcessor."""
-        object.__setattr__(self, "data_root", Path(data_root))
-
     # --- Abstract Steps (The "Blanks" to fill) ---
 
     @abstractmethod
@@ -174,8 +166,8 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         """Discover and yield identifiers for each scene to process."""
 
     @abstractmethod
-    def load_raw(self, source: T_Source) -> pl.DataFrame:
-        """Read the raw data source into a DataFrame (any schema)."""
+    def load_raw(self, source: T_Source) -> Iterable[pl.DataFrame]:
+        """Read the raw data source into one or more DataFrame(s) (any schema)."""
 
     @abstractmethod
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame:
@@ -188,13 +180,13 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         """
         return df
 
-    def process_item(
+    def process_next(
         self,
         input_data: T_Source,
         *,
         validate_output: bool = True,
         validate_intermediate: bool = False,
-    ) -> pl.DataFrame:
+    ) -> Iterable[pl.DataFrame]:
         """Process a single data item through the pipeline.
 
         Steps:
@@ -204,18 +196,19 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         4. Post-process the data.
         5. Validate output schema (Optional, default True).
         """
-        df = self.load_raw(input_data)
-        df = self.normalize(df)
 
-        if validate_intermediate:
-            self._validate_schema(df)
+        def _step(df: pl.DataFrame) -> pl.DataFrame:
+            df = self.normalize(df)
+            if validate_intermediate:
+                self._validate_schema(df)
 
-        df = self.post_process(df)
+            df = self.post_process(df)
+            if validate_output:
+                self._validate_schema(df)
+            return df
 
-        if validate_output:
-            self._validate_schema(df)
-
-        return df
+        for df in self.load_raw(input_data):
+            yield _step(df)
 
     def process_scenes(self) -> Iterable[Scene[T_ID, T_Frame]]:
         """Iterate over all sources and process them.
@@ -223,7 +216,8 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         This will lazy-load and process each source one at a time.
         """
         for source_id, source in self.sources():
-            yield Scene(inner=self.process_item(source), identifier=source_id)
+            for df in self.process_next(source):
+                yield Scene[T_ID, T_Frame](inner=df, identifier=source_id)
 
     def _validate_schema(self, df: pl.DataFrame) -> None:
         # FrameDict keys are required
@@ -235,7 +229,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
             raise ValueError(msg)
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class FrameStreamProcessor(DataProcessor[T_ID, T_Source, T_Frame], ABC):
     """DataProcessor specialized for frame-by-frame data sources."""
 

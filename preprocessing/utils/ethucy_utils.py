@@ -16,7 +16,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 import numpy as np
@@ -28,6 +27,7 @@ from preprocessing.utils import common
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
 Split = Literal["train", "val", "test"]
 

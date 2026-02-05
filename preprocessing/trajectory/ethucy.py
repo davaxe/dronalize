@@ -1,0 +1,157 @@
+# Copyright 2024-2025, Theodor Westny. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal, cast, override
+
+import polars as pl
+from scipy.signal import resample
+
+from preprocessing.trajectory.interface import DataProcessor, Frame
+from preprocessing.trajectory.resample import plot_comparison, resample_tracks
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+
+@dataclass(frozen=True, slots=True)
+class Config:
+    """Configuration for pedestrian data loading."""
+
+    data_root: Path
+    """Root directory for the pedestrian data, should contain subdirectories for
+    each dataset."""
+
+    dataset: str | set[str]
+    """Name of the dataset to load, e.g., 'eth', 'hotel', 'univ', 'zara1'."""
+
+    split: Literal["train", "val", "test"] = "train"
+    """Data split to load, can be 'train', 'val', or 'test'."""
+
+    org_obs_len: int = 8
+    """Length of the observation sequence in frames."""
+
+    org_pred_len: int = 12
+    """Length of the prediction sequence in frames."""
+
+    min_pedestrian: int = 2
+    """Minimum number of pedestrians required in a sequence to be valid."""
+
+    org_sample_time: float = 0.4
+    """Time interval between frames in seconds."""
+
+    require_all_valid: bool = True
+    """If True, requires all pedestrians in a sequence to have valid positions."""
+
+    target_sample_time: float = 0.8
+    """The target time interval for resampling the trajectories, in seconds."""
+
+    multiple_targets_per_window: bool = False
+    """If True, allows multiple target pedestrians per sequence window."""
+
+    window_skip: int = 1
+    """Number of samples between sliding windows in the sequence."""
+
+    sep: str = "\t"
+    """Separator used in the csv-like data files"""
+
+
+@dataclass(slots=True)
+class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
+    """Processor for ETH/UCY pedestrian trajectory datasets."""
+
+    config: Config
+    _source_counter: int = field(default=0, init=False)
+
+    @override
+    def sources(self) -> Iterable[tuple[str, pl.DataFrame]]:
+        if not isinstance(self.config.dataset, set):
+            datasets = {self.config.dataset}
+        else:
+            datasets = self.config.dataset
+        for dataset in datasets:
+            data_dir = self.config.data_root / dataset / self.config.split
+            for data_file in data_dir.iterdir():
+                yield (
+                    data_file.name,
+                    # The source is a loaded polars DataFrame containing the xy
+                    # trajectory data of all pedestrian for a certain scene.
+                    self._read_data_file(data_file),
+                )
+                self._source_counter += 1
+
+    @override
+    def load_raw(self, source: pl.DataFrame) -> Iterable[pl.DataFrame]:
+        window_size: int = self.config.org_obs_len + self.config.org_pred_len
+        print(source["id"].n_unique())
+        org = source.clone()
+        source = resample_tracks(
+            source,
+            dt=self.config.target_sample_time,
+            org_dt=self.config.org_sample_time,
+            group_by="id",
+            interpolate_columns=["x", "y"],
+        )
+        window_size = int(
+            window_size
+            * self.config.org_sample_time
+            / self.config.target_sample_time
+        )
+        max_frame = cast("int | None", source["frame"].max())
+        plot_comparison(org, source, group_by="id", n_groups=50)
+        if max_frame is not None:
+            max_frame = int(max_frame) + 1
+            for start_frame in range(
+                0, max_frame - window_size + 1, self.config.window_skip
+            ):
+                yield source.filter(
+                    (pl.col("frame") >= start_frame)
+                    & (pl.col("frame") < start_frame + window_size)
+                )
+
+    @override
+    def normalize(self, df: pl.DataFrame) -> pl.DataFrame:
+        raise NotImplementedError
+
+    def _read_data_file(self, path: Path) -> pl.DataFrame:
+        return pl.read_csv(
+            path,
+            has_header=False,
+            separator=self.config.sep,
+            new_columns=["frame", "id", "x", "y"],
+            schema={
+                "frame": pl.Float32,
+                "id": pl.Float32,
+                "x": pl.Float64,
+                "y": pl.Float64,
+            },
+        ).with_columns(
+            ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int64),
+            pl.col("id").cast(pl.Int64),
+        )
+
+
+if __name__ == "__main__":
+    config = Config(
+        data_root=Path("data"),
+        dataset={"hotel"},
+        split="train",
+    )
+    processor = EthUcyProcessor(config)
+    for source_name, df in processor.sources():
+        for raw in processor.load_raw(df):
+            ...
