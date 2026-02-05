@@ -345,7 +345,9 @@ def _get_category_from_label_probabilities(
 if __name__ == "__main__":
     # Example usage
     root = Path(__file__).parent.parent.parent.parent
-    directory = root / "datasets" / "lyftlvl5" / "validate" / "validate.zarr"  # 16220
+    directory = (
+        root / "datasets" / "lyftlvl5" / "validate" / "validate.zarr"
+    )  # 16220
 
     # Example usage
     scenes = get_lyft_scenes_as_pandas_lazy(directory, start=0, batch_size=1000)

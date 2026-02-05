@@ -1,16 +1,16 @@
-import datetime
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from enum import IntEnum, auto
-from typing import Generic, TypedDict, TypeVar, cast
+from dataclasses import field
+from enum import StrEnum, auto
+from pathlib import Path
+from typing import Generic, TypedDict, TypeVar, cast, override
 
-import numpy as np
 import polars as pl
 from attr import asdict, dataclass
 
 
-class Category(IntEnum):
+class Category(StrEnum):
     """Enumeration of categories of agents / objects."""
 
     CAR = auto()
@@ -29,12 +29,16 @@ class Category(IntEnum):
     UNKNOWN = auto()
 
 
-class Status(IntEnum):
+class Status(StrEnum):
     """Enumeration of agent status."""
 
     UNKNOWN = auto()
     MOVING = auto()
     STOPPED = auto()
+
+
+CategoryPL = pl.Enum(Category)
+StatusPL = pl.Enum(Status)
 
 
 class FrameDict(TypedDict):
@@ -60,7 +64,7 @@ class FrameDict(TypedDict):
     """Status of the agent/object."""
 
 
-T_Dict = TypeVar("T_Dict", bound="FrameDict")
+T_Dict = TypeVar("T_Dict", bound=FrameDict)
 
 
 @dataclass(slots=True, frozen=True)
@@ -115,168 +119,149 @@ class Frame(BaseFrame[FrameDict]):
     """
 
 
-T_Frame = TypeVar("T_Frame", bound=BaseFrame)
+T_Frame = TypeVar("T_Frame", bound=BaseFrame[FrameDict])
+T_Source = TypeVar("T_Source")
+T_ID = TypeVar("T_ID")
 
 
-class DataProcessor(ABC, Generic[T_Frame]):
-    """Common interface for data processing classes."""
+@dataclass(slots=True, frozen=True)
+class Scene(Generic[T_ID, T_Frame]):
+    """Scene data class wrapping a DataFrame and its identifier.
+
+    The dataframe is expected to atleast contain all columns defined in FrameDict.
+    """
+
+    inner: pl.DataFrame
+    """Inner DataFrame containing the scene data."""
+    identifier: T_ID
+    """Identifier for the scene (e.g., file name, index)."""
+
+    def __post_init__(self) -> None:
+        """Validate the inner DataFrame schema."""
+        required_cols = FrameDict.__annotations__.keys()
+        missing = set(required_cols) - set(self.inner.columns)
+
+        if missing:
+            msg = f"Scene DataFrame missing required columns: {missing}"
+            raise ValueError(msg)
+
+    def frames(self) -> Iterable[T_Frame]:
+        """Yield frames as data class instances."""
+        for row in self.inner.iter_rows(named=True):
+            yield cast("T_Frame", row)
+
+
+@dataclass(slots=True, frozen=True, init=False)
+class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
+    """Interface for processing raw data sources into a standardized format.
+
+    Generic over the data scene source type and identifier type. Source type can
+    be anything (e.g., file path, URL, database connection, raw data).
+    Identifier type is used to unique identify each scene source (e.g., str,
+    int).
+    """
+
+    data_root: Path = field(default_factory=Path)
+
+    def __init__(self, data_root: Path | str) -> None:
+        """Initialize the DataProcessor."""
+        object.__setattr__(self, "data_root", Path(data_root))
+
+    # --- Abstract Steps (The "Blanks" to fill) ---
 
     @abstractmethod
-    def parse_raw_data(self) -> Iterable[T_Frame]:
-        """Parse the raw data into an iterable of Frame objects.
-
-        Returns:
-            An iterable of Frame objects.
-
-        """
-        ...
+    def sources(self) -> Iterable[tuple[T_ID, T_Source]]:
+        """Discover and yield identifiers for each scene to process."""
 
     @abstractmethod
-    def process(self) -> pl.DataFrame:
-        """Process the raw data into a common `polars.Dataframe` format.
+    def load_raw(self, source: T_Source) -> pl.DataFrame:
+        """Read the raw data source into a DataFrame (any schema)."""
 
-        Returns:
-            Processed data as dataframe
+    @abstractmethod
+    def normalize(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Convert the raw DataFrame into the common schema."""
 
+    def post_process(self, df: pl.DataFrame) -> pl.DataFrame:
+        """Post-process step after normalization and before validation.
+
+        This is an optional step that can be overridden by subclasses.
         """
-        return pl.DataFrame([frame.to_dict() for frame in self.parse_raw_data()])
+        return df
+
+    def process_item(
+        self,
+        input_data: T_Source,
+        *,
+        validate_output: bool = True,
+        validate_intermediate: bool = False,
+    ) -> pl.DataFrame:
+        """Process a single data item through the pipeline.
+
+        Steps:
+        1. Load raw data.
+        2. Normalize to common schema.
+        3. Validate intermediate schema (Optional, default False).
+        4. Post-process the data.
+        5. Validate output schema (Optional, default True).
+        """
+        df = self.load_raw(input_data)
+        df = self.normalize(df)
+
+        if validate_intermediate:
+            self._validate_schema(df)
+
+        df = self.post_process(df)
+
+        if validate_output:
+            self._validate_schema(df)
+
+        return df
+
+    def process_scenes(self) -> Iterable[Scene[T_ID, T_Frame]]:
+        """Iterate over all sources and process them.
+
+        This will lazy-load and process each source one at a time.
+        """
+        for source_id, source in self.sources():
+            yield Scene(inner=self.process_item(source), identifier=source_id)
+
+    def _validate_schema(self, df: pl.DataFrame) -> None:
+        # FrameDict keys are required
+        required_cols = FrameDict.__annotations__.keys()
+        missing = set(required_cols) - set(df.columns)
+
+        if missing:
+            msg = f"processor output missing required columns: {missing}"
+            raise ValueError(msg)
 
 
-def estimate_velocity(data: pl.DataFrame, dt: float) -> pl.DataFrame:
-    """Estimate velocities and yaw if missing in the input dataframe.
+@dataclass(slots=True, frozen=True)
+class FrameStreamProcessor(DataProcessor[T_ID, T_Source, T_Frame], ABC):
+    """DataProcessor specialized for frame-by-frame data sources."""
 
-    Args:
-        data: Input dataframe in common format.
-        dt: Time difference between frames in seconds.
+    @abstractmethod
+    def iter_frames(self, source: T_Source) -> Iterable[T_Frame]:
+        """Yield frames one by one from the raw source."""
 
-    Returns:
-        Dataframe with estimated velocities and yaw.
+    @override
+    def load_raw(self, source: T_Source) -> pl.DataFrame:
+        frames = [f.to_dict() for f in self.iter_frames(source)]
 
-    """
-    # 1. Ensure columns exist to prevent schema errors
-    df = data
-    for col in ["vx", "vy", "yaw"]:
-        if col not in df.columns:
-            df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias(col))
+        if not frames:
+            return pl.DataFrame(schema=T_Frame.__annotations__)
 
-    # Sort for temporal consistency
-    df = df.sort(["track_id", "frame"])
+        return pl.DataFrame(frames)
 
-    df = df.with_columns(
-        pl.col("x").diff().over("track_id").fill_null(0.0).alias("_dx"),
-        pl.col("y").diff().over("track_id").fill_null(0.0).alias("_dy"),
-    )
-
-    df = df.with_columns(
-        pl.coalesce([pl.col("vx"), pl.col("_dx") / dt]).alias("vx"),
-        pl.coalesce([pl.col("vy"), pl.col("_dy") / dt]).alias("vy"),
-    )
-
-    df = df.with_columns(
-        pl.coalesce([
-            pl.col("yaw"),
-            pl.arctan2(pl.col("vy"), pl.col("vx")),
-        ]).alias("yaw")
-    )
-
-    return df.drop(["_dx", "_dy"])
-
-
-def upsample(
-    data: pl.DataFrame,
-    org_dt: float,
-    target_dt: float,
-    group_by: str = "track_id",
-) -> pl.DataFrame:
-    """Upsample data input from `org_dt` to `target_dt`.
-
-    Uses linear interpolation.
-
-    Args:
-        data: data to upsample
-        org_dt: original time difference between frames in seconds
-        target_dt: target time difference between frames in seconds
-        group_by: column name to group by for upsampling. Defaults to "track_id".
-
-    Returns:
-        upsampled dataframe
-
-    """
-    us_per_frame = int(org_dt * 1e6)
-    base_time = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
-    data = data.with_columns([
-        ((pl.col("vx") ** 2 + pl.col("vy") ** 2) ** 0.5).alias("_speed"),
-        pl
-        .struct(["vx", "vy"])
-        .map_batches(
-            lambda s: np.unwrap(
-                np.arctan2(s.struct.field("vy"), s.struct.field("vx"))
-            )
-        )
-        .alias("_v_angle"),
-        pl.col("yaw").map_batches(lambda s: np.unwrap(s.to_numpy())).alias("yaw"),
-    ])
-
-    interp_cols = ["x", "y", "frame", "_speed", "_v_angle", "yaw"]
-    fill_cols = [c for c in data.columns if c not in interp_cols and c != "time"]
-    data = (
-        data
-        .with_columns(
-            (
-                (pl.col("frame") * us_per_frame).cast(pl.Duration("us")) + base_time
-            ).alias("time")
-        )
-        .upsample(
-            time_column="time",
-            every=datetime.timedelta(seconds=target_dt),
-            group_by=group_by,
-        )
-        .with_columns([
-            pl.col(interp_cols).interpolate(),
-            pl.col(fill_cols).forward_fill(),
+    @override
+    def normalize(self, df: pl.DataFrame) -> pl.DataFrame:
+        return df.select([
+            pl.col("frame").cast(pl.Int64),
+            pl.col("track_id").cast(pl.Int64),
+            pl.col("x").cast(pl.Float64),
+            pl.col("y").cast(pl.Float64),
+            pl.col("vx").cast(pl.Float64),
+            pl.col("vy").cast(pl.Float64),
+            pl.col("yaw").cast(pl.Float64),
+            pl.col("agent_class").cast(pl.Int64),
+            pl.col("status").cast(pl.Int64),
         ])
-    )
-
-    return data.with_columns([
-        # Reconstruct Velocities
-        (pl.col("_speed") * pl.col("_v_angle").cos()).alias("vx"),
-        (pl.col("_speed") * pl.col("_v_angle").sin()).alias("vy"),
-        # Wrap Yaw and Velocity Angle
-        *(
-            (pl.col(c) + math.pi) % (2 * math.pi) - math.pi
-            for c in ["yaw", "_v_angle"]
-        ),
-        # Fix Frame Index
-        (pl.col("frame") * (org_dt / target_dt)).cast(pl.Int64).alias("frame"),
-    ]).drop(["time", "_speed", "_v_angle"])
-
-
-def downsample(
-    data: pl.DataFrame,
-    org_dt: float,
-    target_dt: float,
-    group_by: str = "track_id",
-) -> pl.DataFrame:
-    """Downsample data input from `org_dt` to `target_dt`.
-
-    Will be downsampled to the nearest integer factor of the original framerate.
-
-    Args:
-        data: data to downsample
-        org_dt: original time difference between frames in seconds
-        target_dt: target time difference between frames in seconds
-        group_by: column name to group by for downsampling. Defaults to "track_id".
-
-    Returns:
-        downsampled dataframe
-
-    """
-    factor = int(target_dt / org_dt)
-
-    if factor <= 1:
-        return data
-
-    data = data.filter((pl.col("frame").over(group_by) % factor) == 0)
-    return data.with_columns(
-        (pl.col("frame") / factor).cast(pl.Int64).alias("frame")
-    )

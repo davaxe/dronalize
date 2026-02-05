@@ -28,18 +28,18 @@ dependencies = [
     "osmium==4.0.2",
     "pyproj==3.7.1",
     "lark",
-
     # numpy by Python version
     "numpy==2.2.3; python_version < '3.11'",
     "numpy==2.2.6; python_version >= '3.11'",
-
     # scipy by Python version
     "scipy==1.15.2; python_version < '3.11'",
     "scipy==1.16.1; python_version >= '3.11'",
-
     # networkx by Python version
     "networkx==3.4.2; python_version < '3.11'",
     "networkx==3.5; python_version >= '3.11'",
+    "polars>=1.37.1",
+    "polars-splines>=0.1.2",
+    "scipy-stubs>=1.15.3.0",
 ]
 
 [project.optional-dependencies]
@@ -47,13 +47,13 @@ dependencies = [
 pyg = ["torch-cluster"]
 
 # Dataset-specific extras
-lyft = ["zarr==3.0.9"]
+lyft = ["zarr>=2.18.2"]
 ad4che = ["opencv-python"]
 
 # Container-specific (headless versions for Docker/servers)
 container = [
     "opencv-python-headless",
-    "zarr==3.0.9",
+    "zarr>=2.18.2",
 ]
 
 # Development tools
@@ -65,8 +65,22 @@ dev = [
 ]
 
 # Convenience combinations
-all-datasets = ["zarr==3.0.9", "opencv-python"]
+all-datasets = ["zarr>=2.18.2", "opencv-python"]
 dev-cuda = ["torch-cluster", "pytest", "ruff", "pre-commit", "mypy"]
+all = [
+    "torch-cluster",
+    "zarr>=2.18.2",
+    "opencv-python",
+    "pytest",
+    "ruff",
+    "pre-commit",
+    "mypy",
+]
+
+[tool.uv]
+find-links = [
+    "https://data.pyg.org/whl/torch-2.6.0+cu124.html",
+]
 
 # Don't install local packages - just manage dependencies
 [tool.setuptools]
@@ -96,23 +110,22 @@ select = ["ALL"]
 # ---------------------------------------------------------------------------
 # Installation instructions:
 #
-# 1. Base dependencies:
-#    pip install .
+# Prerequisite: Install uv (https://docs.astral.sh/uv/getting-started/installation/)
 #
-# 2. Install torch-cluster (required for PyG):
-#    CUDA 12.4: pip install .[pyg] -f https://data.pyg.org/whl/torch-2.6.0+cu124.html
-#    CPU only:  pip install .[pyg] -f https://data.pyg.org/whl/torch-2.6.0+cpu.html
+# 1. Create a virtual environment and verify lockfile:
+#    uv lock
 #
-# 3. Optional datasets:
-#    Lyft L5 support: pip install .[lyft]
-#    AD4CHE support:  pip install .[ad4che]
-#    All datasets:    pip install .[all-datasets]
+# 2. Install dependencies (creates .venv automatically):
+#    uv sync
 #
-# 4. Development setup:
-#    pip install .[dev] -f https://data.pyg.org/whl/torch-2.6.0+cu124.html
-#    Or with convenience group: pip install .[dev-cuda]
+# 3. Install with optional features (e.g. PyG support, dev tools):
+#    uv sync --extra dev-cuda
+#    # Or for specific extras:
+#    uv sync --extra lyft --extra ad4che
 #
-# 5. Container/headless setup:
-#    pip install .[container]
+# 4. Running commands:
+#    uv run python train.py ...
+#    uv run pytest
+# ---------------------------------------------------------------------------
 #
 # ---------------------------------------------------------------------------
