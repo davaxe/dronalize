@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, override
@@ -167,14 +168,19 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
         )
 
     def _read_data_file(self, path: Path) -> pl.DataFrame:
-        return pl.read_csv(
-            path,
-            has_header=False,
-            separator=self.config.sep,
-            new_columns=["frame", "id", "x", "y"],
-        ).with_columns(
-            ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int64),
-            pl.col("id").cast(pl.Int64),
+        return (
+            pl
+            .scan_csv(
+                path,
+                has_header=False,
+                separator=self.config.sep,
+                new_columns=["frame", "id", "x", "y"],
+            )
+            .with_columns(
+                ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int64),
+                pl.col("id").cast(pl.Int64),
+            )
+            .collect()
         )
 
 
@@ -186,9 +192,11 @@ if __name__ == "__main__":
         org_sample_time=0.4,
         target_sample_time=0.1,
     )
+    start_time = time.time()
+    print("Starting processing...")
     processor = EthUcyProcessor(config)
     count: int = 0
     for scene in processor.process_scenes():
         count += 1
 
-    print(f"Processed {count} scenes.")
+    print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds.")

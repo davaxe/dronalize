@@ -57,50 +57,40 @@ def resample_tracks(
         return data
 
     group_cols = [group_by] if isinstance(group_by, str) else list(group_by or [])
-    aggregations: list[pl.Expr] = []
-    res_col_names: list[str] = []
 
-    for i, p_col in enumerate(pos_columns):
-        v_col = vel_columns[i] if vel_columns and i < len(vel_columns) else None
-        alias_name = f"_res_{p_col}"
-        res_col_names.append(alias_name)
+    # Pack all relevant columns into a single struct for batch processing
+    input_cols = [pl.col(c) for c in pos_columns]
+    if vel_columns:
+        input_cols.extend([pl.col(c) for c in vel_columns])
 
-        struct_input = (
-            pl.struct(pos=pl.col(p_col), vel=pl.col(v_col))
-            if v_col
-            else pl.struct(pos=pl.col(p_col))
+    struct_input = pl.struct(input_cols)
+    resampled_struct = struct_input.map_batches(
+        lambda series: _resample_batch(
+            series,
+            up,
+            down,
+            pos_cols=pos_columns,
+            vel_cols=vel_columns,
+            add_velocity=add_velocity,
         )
+    ).alias("_resampled_batch")
 
-        aggregations.append(
-            struct_input.map_batches(
-                lambda series, v=v_col: _resample_batch(
-                    series,
-                    up,
-                    down,
-                    add_velocity=add_velocity,
-                    has_velocity=v is not None,
-                ),
-            ).alias(alias_name)
-        )
-
-    # Extend the frame count to match the new number of samples after resampling
-    aggregations.append(
+    aggregations = [
+        resampled_struct,
+        # Generate new frames to match the new length
         pl
         .col(frame_column)
         .map_batches(lambda series: _generate_new_frames(series, up, down))
-        .alias(frame_column)
-    )
+        .alias(frame_column),
+    ]
 
-    res = (
+    return (
         data
         .sort([*group_cols, frame_column])
         .group_by(group_cols)
         .agg(aggregations)
-        .explode([*res_col_names, frame_column])
-    )
-
-    return _reform(res, pos_columns, vel_columns, add_velocity=add_velocity).drop(
-        res_col_names
+        .explode(["_resampled_batch", frame_column])
+        .unnest("_resampled_batch")
     )
 
 
@@ -121,27 +111,6 @@ def _generate_new_frames(
     if integer:
         return pl.Series(np.arange(n_new))
     return pl.Series(np.arange(n_new) * step_size)
-
-
-def _reform(
-    df: T_DataFame,
-    pos_cols: Sequence[str],
-    vel_cols: Sequence[str] | None = None,
-    *,
-    add_velocity: bool = False,
-) -> T_DataFame:
-    for i, p_col in enumerate(pos_cols):
-        v_col = vel_cols[i] if vel_cols and i < len(vel_cols) else None
-        struct_col = f"_res_{p_col}"
-        df = df.with_columns(pl.col(struct_col).struct.field("pos").alias(p_col))
-        if v_col:
-            df = df.with_columns(pl.col(struct_col).struct.field("vel").alias(v_col))
-        elif add_velocity:
-            # If no v_col was provided but we calculated it, name it "v{p_col}"
-            df = df.with_columns(
-                pl.col(struct_col).struct.field("vel").alias(f"v{p_col}")
-            )
-    return df
 
 
 def _apply_interpolation(
@@ -385,26 +354,40 @@ def _resample_batch(
     up: int,
     down: int,
     *,
-    has_velocity: bool,
+    pos_cols: Sequence[str],
+    vel_cols: Sequence[str] | None,
     add_velocity: bool = False,
 ) -> pl.Series:
     if s.len() <= 1:
         return s
 
     df_struct = s.struct.unnest()
-    pos_res, vel_res = _apply_interpolation(
-        df_struct["pos"].to_numpy(),
-        df_struct["vel"].to_numpy() if has_velocity else None,
+    pos_data = df_struct.select(pos_cols).to_numpy()
+    vel_data = None
+    if vel_cols:
+        vel_data = df_struct.select(vel_cols).to_numpy()
+
+    pos_new, vel_new = _apply_interpolation(
+        pos_data,
+        vel_data,
         up,
         down,
     )
-    if has_velocity:
-        return pl.Series([
-            {"pos": p, "vel": v} for p, v in zip(pos_res, vel_res, strict=True)
-        ])
 
-    if add_velocity:
-        return pl.Series([
-            {"pos": p, "vel": v} for p, v in zip(pos_res, vel_res, strict=True)
-        ])
-    return pl.Series([{"pos": p} for p in pos_res])
+    out_data: dict[str, npt.NDArray[np.float64]] = {}
+    for i, col in enumerate(pos_cols):
+        out_data[col] = pos_new[:, i]
+
+    # Handle velocities
+    if vel_cols:
+        # If velocity columns existed, update them
+        for i, col in enumerate(vel_cols):
+            out_data[col] = vel_new[:, i]
+    elif add_velocity:
+        # If requested to add velocity, name them "v{pos_col}"
+        for i, col in enumerate(pos_cols):
+            col_name = vel_cols[i] if vel_cols and i < len(vel_cols) else f"v{col}"
+            out_data[col_name] = vel_new[:, i]
+
+    # Return as a Struct Series so it remains a single column in the aggregation
+    return pl.DataFrame(out_data).to_struct(s.name)
