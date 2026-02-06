@@ -1,15 +1,17 @@
 from collections.abc import Sequence
 from fractions import Fraction
-from typing import Literal, overload
+from typing import Literal, TypeVar, overload
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
 from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
+T_DataFame = TypeVar("T_DataFame", pl.DataFrame, pl.LazyFrame)
+
 
 def resample_tracks(
-    data: pl.DataFrame,
+    data: T_DataFame,
     ratio: float | Fraction,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
@@ -17,7 +19,7 @@ def resample_tracks(
     group_by: str | Sequence[str] | None = None,
     *,
     add_velocity: bool = False,
-) -> pl.DataFrame:
+) -> T_DataFame:
     """Resample the track trajectories by a fraction.
 
     The required columns are:
@@ -50,8 +52,8 @@ def resample_tracks(
         raise ValueError(msg)
 
     fraction = Fraction(ratio).limit_denominator()
-    down, up = fraction.numerator, fraction.denominator
-    if down == 1 and up == 1:
+    up, down = fraction.numerator, fraction.denominator
+    if down == 1 and up == 1 and not add_velocity:
         return data
 
     group_cols = [group_by] if isinstance(group_by, str) else list(group_by or [])
@@ -85,11 +87,7 @@ def resample_tracks(
     aggregations.append(
         pl
         .col(frame_column)
-        .map_batches(
-            lambda series: pl.Series(
-                np.arange(int(np.ceil(len(series) * up / down))) + series[0]
-            )
-        )
+        .map_batches(lambda series: _generate_new_frames(series, up, down))
         .alias(frame_column)
     )
 
@@ -106,13 +104,32 @@ def resample_tracks(
     )
 
 
+def _generate_new_frames(
+    series: pl.Series,
+    up: int,
+    down: int,
+    *,
+    integer: bool = True,
+) -> pl.Series:
+    n_old = series.len()
+    if n_old <= 1:
+        return series
+
+    max_time = n_old - 1
+    step_size = down / up
+    n_new = int(np.floor(max_time / step_size)) + 1
+    if integer:
+        return pl.Series(np.arange(n_new))
+    return pl.Series(np.arange(n_new) * step_size)
+
+
 def _reform(
-    df: pl.DataFrame,
+    df: T_DataFame,
     pos_cols: Sequence[str],
     vel_cols: Sequence[str] | None = None,
     *,
     add_velocity: bool = False,
-) -> pl.DataFrame:
+) -> T_DataFame:
     for i, p_col in enumerate(pos_cols):
         v_col = vel_cols[i] if vel_cols and i < len(vel_cols) else None
         struct_col = f"_res_{p_col}"
@@ -137,9 +154,16 @@ def _apply_interpolation(
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
 
     n_old = len(pos)
-    n_new = int(np.ceil(n_old * up / down))
+    # Frequency ratio is up/down, so Period ratio (step size) is down/up
+    step_size = down / up
     t = np.arange(n_old, dtype=np.float64)
-    t_new = np.linspace(0, n_old - 1, n_new, dtype=np.float64)
+
+    # We calculate exactly how many steps fit in the duration (n_old - 1)
+    # Using floor ensures we don't extrapolate past the end.
+    max_time = n_old - 1
+    n_new = int(np.floor(max_time / step_size)) + 1
+    # We generate indices 0, 1, ... M and scale them by step_size.
+    t_new = np.arange(n_new, dtype=np.float64) * step_size
 
     if method == "spline":
         pos_new, vel_new = cubic_spline_interpolation(
@@ -365,7 +389,6 @@ def _resample_batch(
     add_velocity: bool = False,
 ) -> pl.Series:
     if s.len() <= 1:
-        print(s)
         return s
 
     df_struct = s.struct.unnest()

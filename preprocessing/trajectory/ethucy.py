@@ -14,14 +14,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, cast, override
+from typing import TYPE_CHECKING, Literal, override
 
 import polars as pl
 
 from preprocessing.trajectory.interface import Category, DataProcessor, Frame
 from preprocessing.trajectory.resample import resample_tracks
+from preprocessing.trajectory.utils import yaw_from_vel
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -69,12 +70,23 @@ class Config:
     """Separator used in the csv-like data files"""
 
 
-@dataclass(slots=True)
 class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
     """Processor for ETH/UCY pedestrian trajectory datasets."""
 
-    config: Config
-    _source_counter: int = field(default=0, init=False)
+    def __init__(self, config: Config) -> None:
+        """Initialize with the given configuration."""
+        super().__init__(validate_output=False)
+        self.config = config
+
+    @property
+    def sequence_length(self) -> int:
+        """Total sequence length (observation + prediction) in frames."""
+        return self.config.org_obs_len + self.config.org_pred_len
+
+    @property
+    def resampling_ratio(self) -> float:
+        """Ratio of target sample time to original sample time."""
+        return self.config.org_sample_time / self.config.target_sample_time
 
     @override
     def sources(self) -> Iterable[tuple[str, pl.DataFrame]]:
@@ -84,60 +96,74 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
             datasets = self.config.dataset
         for dataset in datasets:
             data_dir = self.config.data_root / dataset / self.config.split
-            for data_file in data_dir.iterdir():
-                print(data_file)
+            # Sort to ensure consistent order across runs and systems.
+            for data_file in sorted(data_dir.iterdir()):
                 yield (
                     data_file.name,
-                    # The source is a loaded polars DataFrame containing the xy
+                    # The source is a loaded polars LazyFrame containing the xy
                     # trajectory data of all pedestrian for a certain scene.
                     self._read_data_file(data_file),
                 )
-                self._source_counter += 1
 
     @override
     def load_raw(self, source: pl.DataFrame) -> Iterable[pl.DataFrame]:
-        ratio = self.config.target_sample_time / self.config.org_sample_time
         # For some data sources (files) there are some pedestrians with only
         # one frame of data, which is pointless and will cause issues during
         # resampling, so we filter them out here.
         source = source.filter(pl.col("frame").n_unique().over("id") > 1)
-        source = resample_tracks(
-            source,
-            ratio=ratio,
-            group_by="id",
-            pos_columns=["x", "y"],
-            add_velocity=True,
-        )
-
-        adj_window_size = int(
-            (self.config.org_obs_len + self.config.org_pred_len)
-            * self.config.org_sample_time
-            / self.config.target_sample_time
-        )
-
-        max_frame = cast("int | None", source["frame"].max())
+        max_frame = source.select(pl.col("frame").max()).item() + 1
         if max_frame is None:
             return
 
+        sequence_length = self.sequence_length
         for start_frame in range(
-            0, int(max_frame) - adj_window_size + 1, self.config.window_skip
+            0,
+            int(max_frame) - sequence_length + 1,
+            self.config.window_skip,
         ):
-            yield source.filter(
+            window = source.filter(
                 pl.col("frame").is_between(
                     start_frame,
-                    start_frame + adj_window_size,
+                    start_frame + sequence_length,
                     closed="left",
                 )
             )
+            if window.is_empty():
+                continue
+
+            yield window
 
     @override
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
         # Input is a scene DataFrame of length (obs_len + pred_len) *
         # num_pedestrians, with columns "frame", "id", "x", "y", "vx", "vy".
-        # Output should be a filtered DataFrame of the same format.
-        return df.with_columns(
+        if df.is_empty():
+            return None
+
+        start = df.select(pl.col("frame").min()).item()
+        pred_frame = start + self.config.org_obs_len - 1
+        if df.filter(pl.col("frame") == pred_frame).is_empty():
+            return None
+
+        if self.config.require_all_valid:
+            df = df.filter(pl.col("frame").len().over("id") == self.sequence_length)
+
+        if (
+            df.is_empty()
+            or df.select(pl.col("id").n_unique()).item() < self.config.min_pedestrian
+        ):
+            return None
+
+        df = resample_tracks(
+            df,
+            ratio=self.resampling_ratio,
+            group_by="id",
+            pos_columns=["x", "y"],
+            add_velocity=True,
+        )
+
+        return yaw_from_vel(df, yaw_col="yaw").with_columns(
             pl.lit(Category.PEDESTRIAN).alias("agent_class"),
-            pl.lit(0.0).alias("yaw"),
         )
 
     def _read_data_file(self, path: Path) -> pl.DataFrame:
@@ -146,12 +172,6 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
             has_header=False,
             separator=self.config.sep,
             new_columns=["frame", "id", "x", "y"],
-            schema={
-                "frame": pl.Float32,
-                "id": pl.Float32,
-                "x": pl.Float64,
-                "y": pl.Float64,
-            },
         ).with_columns(
             ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int64),
             pl.col("id").cast(pl.Int64),
@@ -163,10 +183,12 @@ if __name__ == "__main__":
         data_root=Path("data"),
         dataset={"hotel"},
         split="train",
+        org_sample_time=0.4,
+        target_sample_time=0.1,
     )
     processor = EthUcyProcessor(config)
+    count: int = 0
     for scene in processor.process_scenes():
-        n_unique = scene.inner["id"].n_unique()
-        steps = scene.inner["frame"].n_unique()
-        print(f"Scene {scene.identifier}: {n_unique} pedestrians, {steps} steps")
-        break
+        count += 1
+
+    print(f"Processed {count} scenes.")

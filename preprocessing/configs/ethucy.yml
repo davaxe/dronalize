@@ -1,11 +1,11 @@
 description: ETH and UCY datasets
 
 datasets:
-  eth: {include: true}
+  eth: {include: false}
   hotel: {include: true}
-  univ: {include: true}
-  zara1: {include: true}
-  zara2: {include: true}
+  univ: {include: false}
+  zara1: {include: false}
+  zara2: {include: false}
 
 # To get original samples as in https://github.com/agrimgupta92/sgan use:
 # org_obs_len: 8

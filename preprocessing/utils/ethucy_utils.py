@@ -568,3 +568,20 @@ class _PedestrianDataIterator(Iterator):
 
         self.index += 1
         return self.loader[self.index - 1]
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    config = PedestrianLoaderConfig(
+        data_root=Path("./data"),
+        dataset={"hotel"},
+        split="train",
+        org_sample_time=0.4,
+        interpolation_factor=1,
+    )
+    loader = PedestrianSampleLoader(config)
+    print(f"Number of sequences: {len(loader)}")
+    count: int = 0
+    for i, sample in enumerate(loader):
+        count += 1

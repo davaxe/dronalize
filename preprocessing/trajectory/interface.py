@@ -1,6 +1,6 @@
 import math
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from enum import StrEnum, auto
 from typing import Generic, TypedDict, TypeVar, cast, override
 
@@ -118,8 +118,9 @@ class Scene(Generic[T_ID, T_Frame]):
 
     inner: pl.DataFrame
     """Inner DataFrame containing the scene data."""
-    identifier: T_ID
+    source_identifier: T_ID
     """Identifier for the scene (e.g., file name, index)."""
+    scene_number: int
 
     def __post_init__(self) -> None:
         """Validate the inner DataFrame schema."""
@@ -136,7 +137,9 @@ class Scene(Generic[T_ID, T_Frame]):
             yield cast("T_Frame", row)
 
 
-@dataclass(slots=True)
+IDMapping = Callable[[int, T_ID], T_ID]
+
+
 class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
     """Interface for processing raw data sources into a standardized format.
 
@@ -145,6 +148,20 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
     Identifier type is used to unique identify each scene source (e.g., str,
     int).
     """
+
+    def __init__(
+        self,
+        id_mapping: IDMapping[T_ID] | None = None,
+        *,
+        validate_output: bool = True,
+        validate_intermediate: bool = False,
+    ) -> None:
+        """Initialize internal state."""
+        self._count: int = 0
+        self._source_counter: int = 0
+        self._id_mapping = id_mapping
+        self._validate_output = validate_output
+        self._validate_intermediate = validate_intermediate
 
     # --- Abstract Steps (The "Blanks" to fill) ---
 
@@ -169,7 +186,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
 
     def process_next(
         self,
-        input_data: T_Source,
+        source: T_Source,
         *,
         validate_output: bool = True,
         validate_intermediate: bool = False,
@@ -195,7 +212,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
                 self._validate_schema(df)
             return df
 
-        for raw_df in self.load_raw(input_data):
+        for raw_df in self.load_raw(source):
             df = _step(raw_df)
             if df is not None:
                 yield df
@@ -206,8 +223,20 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         This will lazy-load and process each source one at a time.
         """
         for source_id, source in self.sources():
-            for df in self.process_next(source):
-                yield Scene[T_ID, T_Frame](inner=df, identifier=source_id)
+            self._source_counter += 1
+            for scene_df in self.process_next(
+                source,
+                validate_intermediate=self._validate_intermediate,
+                validate_output=self._validate_output,
+            ):
+                yield Scene[T_ID, T_Frame](
+                    inner=scene_df,
+                    source_identifier=source_id
+                    if self._id_mapping is None
+                    else self._id_mapping(self._source_counter, source_id),
+                    scene_number=self._count,
+                )
+                self._count += 1
 
     def _validate_schema(self, df: pl.DataFrame) -> None:
         # FrameDict keys are required
@@ -232,12 +261,11 @@ class FrameStreamProcessor(DataProcessor[T_ID, T_Source, T_Frame], ABC):
         frames = [f.to_dict() for f in self.iter_frames(source)]
 
         if not frames:
-            return [pl.DataFrame(schema=T_Frame.__annotations__)]
-
+            return []
         return [pl.DataFrame(frames)]
 
     @override
-    def normalize(self, df: pl.DataFrame) -> pl.DataFrame:
+    def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
         return df.select([
             pl.col("frame").cast(pl.Int64),
             pl.col("track_id").cast(pl.Int64),
