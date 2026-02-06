@@ -1,33 +1,16 @@
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
-from enum import StrEnum, auto
 from typing import Generic, TypedDict, TypeVar, cast, override
 
 import polars as pl
 from attr import asdict, dataclass
 
-
-class Category(StrEnum):
-    """Enumeration of categories of agents / objects."""
-
-    CAR = auto()
-    VAN = auto()
-    TRAILER = auto()
-    TRUCK = auto()
-    TRAM = auto()
-    BUS = auto()
-    MOTORCYCLE = auto()
-    BICYCLE = auto()
-    PEDESTRIAN = auto()
-    TRICYCLE = auto()
-    ANIMAL = auto()
-    STATIC_OBJECT = auto()
-    MOVEABLE_OBJECT = auto()
-    UNKNOWN = auto()
-
-
-CategoryPL = pl.Enum(Category)
+from preprocessing.trajectory.utils import (
+    AgentData,
+    Category,
+    convert_to_agent_data_dict,
+)
 
 
 class FrameDict(TypedDict):
@@ -121,6 +104,11 @@ class Scene(Generic[T_ID, T_Frame]):
     source_identifier: T_ID
     """Identifier for the scene (e.g., file name, index)."""
     scene_number: int
+    """Unique scene number assigned during processing."""
+    input_len: int
+    """Number of observed frames."""
+    output_len: int
+    """Number of predicted frames."""
 
     def __post_init__(self) -> None:
         """Validate the inner DataFrame schema."""
@@ -135,6 +123,31 @@ class Scene(Generic[T_ID, T_Frame]):
         """Yield frames as data class instances."""
         for row in self.inner.iter_rows(named=True):
             yield cast("T_Frame", row)
+
+    def to_agent_data(
+        self,
+        target_id: int | None = None,
+    ) -> AgentData:
+        """Convert `Scene` into a agent dictionary.
+
+        The dictionary is in format that is later compatible with pytorch
+        geometric HeteroData.
+
+        Args:
+            target_id: Optional track ID to use as the target node. If None, the
+                first valid track will be used as the target.
+
+        Returns:
+            Dictionary containing the agent data according to the
+            AgentData TypedDict.
+
+        """
+        return convert_to_agent_data_dict(
+            self.inner,
+            input_len=self.input_len,
+            output_len=self.output_len,
+            target_agent=target_id,
+        )
 
 
 IDMapping = Callable[[int, T_ID], T_ID]
@@ -164,6 +177,14 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         self._validate_intermediate = validate_intermediate
 
     # --- Abstract Steps (The "Blanks" to fill) ---
+
+    @abstractmethod
+    def input_len(self) -> int:
+        """Observation length in frames (resulting value in Scene)."""
+
+    @abstractmethod
+    def output_len(self) -> int:
+        """Prediction length in frames (resulting value in Scene)."""
 
     @abstractmethod
     def sources(self) -> Iterable[tuple[T_ID, T_Source]]:
@@ -235,6 +256,8 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
                     if self._id_mapping is None
                     else self._id_mapping(self._source_counter, source_id),
                     scene_number=self._count,
+                    input_len=self.input_len(),
+                    output_len=self.output_len(),
                 )
                 self._count += 1
 
@@ -267,13 +290,12 @@ class FrameStreamProcessor(DataProcessor[T_ID, T_Source, T_Frame], ABC):
     @override
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
         return df.select([
-            pl.col("frame").cast(pl.Int64),
-            pl.col("track_id").cast(pl.Int64),
+            pl.col("frame").cast(pl.Int32),
+            pl.col("track_id").cast(pl.Int32),
             pl.col("x").cast(pl.Float64),
             pl.col("y").cast(pl.Float64),
             pl.col("vx").cast(pl.Float64),
             pl.col("vy").cast(pl.Float64),
             pl.col("yaw").cast(pl.Float64),
-            pl.col("agent_class").cast(pl.Int64),
-            pl.col("status").cast(pl.Int64),
+            pl.col("agent_class").cast(pl.Int32),
         ])

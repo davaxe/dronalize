@@ -90,6 +90,15 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
         return self.config.org_sample_time / self.config.target_sample_time
 
     @override
+    def input_len(self) -> int:
+        return int((self.config.org_obs_len - 1) * self.resampling_ratio + 1)
+
+    @override
+    def output_len(self) -> int:
+        total_len = int((self.sequence_length - 1) * self.resampling_ratio + 1)
+        return total_len - self.input_len()
+
+    @override
     def sources(self) -> Iterable[tuple[str, pl.DataFrame]]:
         if not isinstance(self.config.dataset, set):
             datasets = {self.config.dataset}
@@ -116,23 +125,17 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
         if max_frame is None:
             return
 
-        sequence_length = self.sequence_length
-        for start_frame in range(
-            0,
-            int(max_frame) - sequence_length + 1,
-            self.config.window_skip,
+        # IMPORTANT: The data is already sorted by ["id", "frame"] due to the
+        # way we read it, so we can just use group_by_dynamic to create the
+        # sliding windows of frames.
+        for _, window in source.group_by_dynamic(
+            "frame",
+            every=f"{self.config.window_skip}i",
+            period=f"{self.sequence_length}i",
+            include_boundaries=False,
         ):
-            window = source.filter(
-                pl.col("frame").is_between(
-                    start_frame,
-                    start_frame + sequence_length,
-                    closed="left",
-                )
-            )
-            if window.is_empty():
-                continue
-
-            yield window
+            if not window.is_empty():
+                yield window
 
     @override
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
@@ -175,10 +178,16 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
                 has_header=False,
                 separator=self.config.sep,
                 new_columns=["frame", "id", "x", "y"],
+                schema={
+                    "frame": pl.Int32,
+                    "id": pl.Int32,
+                    "x": pl.Float64,
+                    "y": pl.Float64,
+                },
             )
             .with_columns(
-                ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int64),
-                pl.col("id").cast(pl.Int64),
+                ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
+                pl.col("id").cast(pl.Int32),
             )
             .collect()
         )
@@ -193,10 +202,11 @@ if __name__ == "__main__":
         target_sample_time=0.1,
     )
     start_time = time.time()
-    print("Starting processing...")
     processor = EthUcyProcessor(config)
     count: int = 0
     for scene in processor.process_scenes():
         count += 1
+        print(scene.to_agent_data())
+        break
 
     print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds.")

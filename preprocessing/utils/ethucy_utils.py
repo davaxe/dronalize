@@ -581,7 +581,6 @@ if __name__ == "__main__":
         interpolation_factor=1,
     )
     loader = PedestrianSampleLoader(config)
-    print(f"Number of sequences: {len(loader)}")
     count: int = 0
     for i, sample in enumerate(loader):
         count += 1

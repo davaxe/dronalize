@@ -81,7 +81,8 @@ def resample_tracks(
         pl
         .col(frame_column)
         .map_batches(lambda series: _generate_new_frames(series, up, down))
-        .alias(frame_column),
+        .alias(frame_column)
+        .cast(pl.Int32),
     ]
 
     return (
@@ -110,7 +111,7 @@ def _generate_new_frames(
     n_new = int(np.floor(max_time / step_size)) + 1
     if integer:
         return pl.Series(np.arange(n_new))
-    return pl.Series(np.arange(n_new) * step_size)
+    return pl.Series(np.arange(n_new, dtype=np.int32) * step_size)
 
 
 def _apply_interpolation(
