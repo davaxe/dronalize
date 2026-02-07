@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
@@ -344,14 +345,12 @@ def _get_category_from_label_probabilities(
 
 if __name__ == "__main__":
     # Example usage
-    root = Path(__file__).parent.parent.parent.parent
-    directory = (
-        root / "datasets" / "lyftlvl5" / "validate" / "validate.zarr"
-    )  # 16220
+    directory = Path("data/sample/sample.zarr")  # 16220
 
     # Example usage
     scenes = get_lyft_scenes_as_pandas_lazy(directory, start=0, batch_size=1000)
+    start_time = time.time()
     for scene_df in scenes:
-        # save a scene to a CSV file
-        print(scene_df.head())
+        print(scene_df)
         break
+    print(f"Processed scenes in {time.time() - start_time:.2f} seconds.")

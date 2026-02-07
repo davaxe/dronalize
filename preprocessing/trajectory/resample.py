@@ -19,6 +19,8 @@ def resample_tracks(
     group_by: str | Sequence[str] | None = None,
     *,
     add_velocity: bool = False,
+    add_acceleration: bool = False,
+    acceleration_cols: Sequence[str] | None = None,
 ) -> T_DataFame:
     """Resample the track trajectories by a fraction.
 
@@ -41,7 +43,13 @@ def resample_tracks(
         vel_columns: columns for velocity. If provided, they are used for Hermite
             spline interpolation.
         group_by: columns to group by. Defaults to None.
-        add_velocity: whether to add velocity columns if not provided. Defaults to False.
+        add_velocity: whether to add velocity columns if not provided. Defaults
+            to False.
+        add_acceleration: whether to add acceleration columns if not provided.
+            Defaults to False.
+        acceleration_cols: names for the acceleration columns if `add_acceleration`
+            is True. If not provided, they will be named "a{pos_col}" corresponding
+            to the position columns.
 
     Returns:
         Resampled trajectory data.
@@ -72,22 +80,22 @@ def resample_tracks(
             pos_cols=pos_columns,
             vel_cols=vel_columns,
             add_velocity=add_velocity,
+            add_acceleration=add_acceleration,
+            acceleration_cols=acceleration_cols,
         )
     ).alias("_resampled_batch")
 
     aggregations = [
         resampled_struct,
         # Generate new frames to match the new length
-        pl
-        .col(frame_column)
+        pl.col(frame_column)
         .map_batches(lambda series: _generate_new_frames(series, up, down))
         .alias(frame_column)
         .cast(pl.Int32),
     ]
 
     return (
-        data
-        .sort([*group_cols, frame_column])
+        data.sort([*group_cols, frame_column])
         .group_by(group_cols)
         .agg(aggregations)
         .explode(["_resampled_batch", frame_column])
@@ -121,7 +129,9 @@ def _apply_interpolation(
     down: int,
     *,
     method: Literal["spline", "linear"] = "spline",
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    include_first_derivative: bool = False,
+    include_second_derivative: bool = False,
+) -> tuple[npt.NDArray[np.float64], ...]:
 
     n_old = len(pos)
     # Frequency ratio is up/down, so Period ratio (step size) is down/up
@@ -136,22 +146,24 @@ def _apply_interpolation(
     t_new = np.arange(n_new, dtype=np.float64) * step_size
 
     if method == "spline":
-        pos_new, vel_new = cubic_spline_interpolation(
+        res = cubic_spline_interpolation(
             t,
             t_new,
             pos,
             vel=vel,
             hermite=vel is not None,
-            include_first_derivative=True,
+            include_first_derivative=include_first_derivative,
+            include_second_derivative=include_second_derivative,
         )
     elif method == "linear":
-        pos_new, vel_new = linear_interpolation(
+        res = linear_interpolation(
             t,
             t_new,
             pos,
-            include_first_derivative=True,
+            include_first_derivative=include_first_derivative,
+            include_second_derivative=include_second_derivative,
         )
-    return pos_new, vel_new
+    return tuple(res) if isinstance(res, tuple) else (res,)
 
 
 @overload
@@ -210,6 +222,7 @@ def cubic_spline_interpolation(
 ]: ...
 
 
+@overload
 def cubic_spline_interpolation(
     t: npt.NDArray[np.float64],
     t_new: npt.NDArray[np.float64],
@@ -219,7 +232,19 @@ def cubic_spline_interpolation(
     hermite: bool = False,
     include_first_derivative: bool = False,
     include_second_derivative: bool = False,
-) -> tuple[npt.NDArray[np.float64], ...] | npt.NDArray[np.float64]:
+) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], ...]: ...
+
+
+def cubic_spline_interpolation(
+    t: npt.NDArray[np.float64],
+    t_new: npt.NDArray[np.float64],
+    pos: npt.NDArray[np.float64],
+    *,
+    vel: npt.NDArray[np.float64] | None = None,
+    hermite: bool = False,
+    include_first_derivative: bool = False,
+    include_second_derivative: bool = False,
+) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], ...]:
     """Interpolate positions using CubicSpline or CubicHermiteSpline.
 
     If `vel` is provided and `hermite=True`, Hermite spline interpolation is
@@ -315,7 +340,7 @@ def linear_interpolation(
     *,
     include_first_derivative: bool = False,
     include_second_derivative: bool = False,
-) -> tuple[npt.NDArray[np.float64], ...] | npt.NDArray[np.float64]:
+) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], ...]:
     """Linearly interpolate positions.
 
     The velocity and acceleration are estimated using finite differences on the
@@ -358,6 +383,8 @@ def _resample_batch(
     pos_cols: Sequence[str],
     vel_cols: Sequence[str] | None,
     add_velocity: bool = False,
+    add_acceleration: bool = False,
+    acceleration_cols: Sequence[str] | None = None,
 ) -> pl.Series:
     if s.len() <= 1:
         return s
@@ -368,27 +395,31 @@ def _resample_batch(
     if vel_cols:
         vel_data = df_struct.select(vel_cols).to_numpy()
 
-    pos_new, vel_new = _apply_interpolation(
+    res = _apply_interpolation(
         pos_data,
         vel_data,
         up,
         down,
+        include_first_derivative=add_velocity,
+        include_second_derivative=add_acceleration,
     )
 
+    pos_new = res[0]
     out_data: dict[str, npt.NDArray[np.float64]] = {}
     for i, col in enumerate(pos_cols):
         out_data[col] = pos_new[:, i]
 
-    # Handle velocities
-    if vel_cols:
-        # If velocity columns existed, update them
-        for i, col in enumerate(vel_cols):
+    if len(res) > 1 and (vel_cols or add_velocity):
+        vel_new = res[1]
+        target_cols = vel_cols or [f"v{c}" for c in pos_cols]
+        for i, col in enumerate(target_cols):
             out_data[col] = vel_new[:, i]
-    elif add_velocity:
-        # If requested to add velocity, name them "v{pos_col}"
-        for i, col in enumerate(pos_cols):
-            col_name = vel_cols[i] if vel_cols and i < len(vel_cols) else f"v{col}"
-            out_data[col_name] = vel_new[:, i]
+
+    if len(res) > 2 and add_acceleration:
+        acc_new = res[2]
+        target_cols = acceleration_cols or [f"a{c}" for c in pos_cols]
+        for i, col in enumerate(target_cols):
+            out_data[col] = acc_new[:, i]
 
     # Return as a Struct Series so it remains a single column in the aggregation
     return pl.DataFrame(out_data).to_struct(s.name)

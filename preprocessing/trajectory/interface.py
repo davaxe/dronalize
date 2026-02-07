@@ -28,6 +28,10 @@ class FrameDict(TypedDict):
     """x velocity in m/s."""
     vy: float
     """y velocity in m/s."""
+    ax: float
+    """x acceleration in m/s^2."""
+    ay: float
+    """y acceleration in m/s^2."""
     yaw: float
     """Orientation in radians."""
     agent_class: Category
@@ -289,13 +293,15 @@ class FrameStreamProcessor(DataProcessor[T_ID, T_Source, T_Frame], ABC):
 
     @override
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
-        return df.select([
-            pl.col("frame").cast(pl.Int32),
-            pl.col("track_id").cast(pl.Int32),
-            pl.col("x").cast(pl.Float64),
-            pl.col("y").cast(pl.Float64),
-            pl.col("vx").cast(pl.Float64),
-            pl.col("vy").cast(pl.Float64),
-            pl.col("yaw").cast(pl.Float64),
-            pl.col("agent_class").cast(pl.Int32),
-        ])
+        return df.select(
+            [
+                pl.col("frame").cast(pl.Int32),
+                pl.col("track_id").cast(pl.Int32),
+                pl.col("x").cast(pl.Float64),
+                pl.col("y").cast(pl.Float64),
+                pl.col("vx").cast(pl.Float64),
+                pl.col("vy").cast(pl.Float64),
+                pl.col("yaw").cast(pl.Float64),
+                pl.col("agent_class").cast(pl.Int32),
+            ]
+        )

@@ -57,9 +57,7 @@ class NegativeLogLikelihood(Metric):
         self, pred: torch.Tensor, scale: torch.Tensor, is_tril: bool
     ) -> Any:
         if self.dist.__name__ == "MultivariateNormal":
-            assert scale.size(-1) == scale.size(-2), (
-                "Covariance matrix must be square."
-            )
+            assert scale.size(-1) == scale.size(-2), "Covariance matrix must be square."
             if not is_tril:
                 scale = torch.linalg.cholesky(scale)
             return self.dist(loc=pred, scale_tril=scale)

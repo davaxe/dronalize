@@ -76,7 +76,7 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
 
     def __init__(self, config: Config) -> None:
         """Initialize with the given configuration."""
-        super().__init__(validate_output=False)
+        super().__init__(validate_output=True)
         self.config = config
 
     @property
@@ -164,6 +164,7 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
             group_by="id",
             pos_columns=["x", "y"],
             add_velocity=True,
+            add_acceleration=True,
         )
 
         return yaw_from_vel(df, yaw_col="yaw").with_columns(
@@ -172,8 +173,7 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
 
     def _read_data_file(self, path: Path) -> pl.DataFrame:
         return (
-            pl
-            .scan_csv(
+            pl.scan_csv(
                 path,
                 has_header=False,
                 separator=self.config.sep,
@@ -197,16 +197,12 @@ if __name__ == "__main__":
     config = Config(
         data_root=Path("data"),
         dataset={"hotel"},
-        split="train",
+        split="test",
         org_sample_time=0.4,
         target_sample_time=0.1,
     )
-    start_time = time.time()
     processor = EthUcyProcessor(config)
     count: int = 0
+    total_time = 0.0
     for scene in processor.process_scenes():
-        count += 1
-        print(scene.to_agent_data())
-        break
-
-    print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds.")
+        ...

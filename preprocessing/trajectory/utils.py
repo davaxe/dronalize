@@ -26,6 +26,7 @@ class Category(IntEnum):
     STATIC_OBJECT = auto()
     MOVEABLE_OBJECT = auto()
     UNKNOWN = auto()
+    EMERGENCY_VEHICLE = auto()
 
 
 class AgentData(TypedDict):
@@ -79,9 +80,7 @@ def yaw_from_vel(
         Data frame or lazy frame with the estimated yaw column added.
 
     """
-    return data.with_columns(
-        pl.arctan2(pl.col(vy_col), pl.col(vx_col)).alias(yaw_col)
-    )
+    return data.with_columns(pl.arctan2(pl.col(vy_col), pl.col(vx_col)).alias(yaw_col))
 
 
 def yaw_from_pos(
@@ -138,72 +137,73 @@ def convert_to_agent_data_dict(
         AgentData TypedDict.
 
     """
-    target_agent = _extract_target_agent(
-        data,
-        input_len=input_len,
-        output_len=output_len,
-        target_agent=target_agent,
+    target_agent_id = _extract_target_agent(data, input_len, output_len, target_agent)
+    time_steps = input_len + output_len
+    start_frame = data["frame"].min()
+    unique_ids = data["id"].unique().to_list()
+    if target_agent_id in unique_ids:
+        unique_ids.remove(target_agent_id)
+    sorted_ids = [target_agent_id, *sorted(unique_ids)]
+
+    num_agents = len(sorted_ids)
+    # Create a mapping dict: {track_id: tensor_row_index}
+    id_to_idx_map = {uid: i for i, uid in enumerate(sorted_ids)}
+
+    # We add 'row_idx' (agent) and 'col_idx' (time) columns to the dataframe
+    # Casting to proper types ensures numpy compatibility
+    df_indexed = data.with_columns(
+        [
+            pl.col("id")
+            .replace(id_to_idx_map, default=None)
+            .cast(pl.Int32)
+            .alias("row_idx"),
+            (pl.col("frame") - start_frame).cast(pl.Int32).alias("col_idx"),
+        ]
     )
 
-    agent_id_to_index: dict[int, int] = {target_agent: 0}
-    time_steps = input_len + output_len
-    start: int = int(data.select(pl.col("frame").min()).item())
-    num_agents: int = int(data.select(pl.col("id").n_unique()).item())
-    agent_id_to_index.update({
-        agent_id: index
-        for index, agent_id in enumerate(
-            data.select(pl.col("id").unique()).to_series().to_list()
-        )
-    })
-    # TODO: Acceleration is not currently available:
-    # - Is it needed? If so, add it soon.
-    # - If not, it can be removed from `AgentData` and rest of codebase.
-    base_shape = (num_agents, time_steps, 2)
-    pos, vel, acc, yaw = _full_nan(base_shape, n=4)
+    # Extract coordinate arrays (N_samples,)
+    # We extract all data points in one go
+    row_indices = df_indexed["row_idx"].to_numpy()
+    col_indices = df_indexed["col_idx"].to_numpy()
+
+    pos, vel, acc = _full_zeros((num_agents, time_steps, 2), n=3)
+    yaw = np.zeros((num_agents, time_steps), dtype=np.float32)
     mask = np.zeros((num_agents, time_steps), dtype=bool)
-    type_array = np.full((num_agents,), fill_value=-1, dtype=np.int32)
-    for (agent_id, *_), group in data.group_by("id"):
-        index = agent_id_to_index[agent_id]
-        frames = group.select(pl.col("frame")).to_series().to_numpy()
-        pos_array = group.select(pl.col(["x", "y"])).to_numpy()
-        vel_array = group.select(pl.col(["vx", "vy"])).to_numpy()
-        yaw_array = group.select(pl.col("yaw")).to_numpy()
-        category = group.select(pl.col("agent_class").first()).item()
 
-        pos[index, frames - start] = pos_array
-        vel[index, frames - start] = vel_array
-        yaw[index, frames - start] = yaw_array
-        mask[index, frames - start] = True
+    # Fill the arrays using the row and column indices
+    pos[row_indices, col_indices] = df_indexed.select(["x", "y"]).to_numpy()
+    vel[row_indices, col_indices] = df_indexed.select(["vx", "vy"]).to_numpy()
+    acc[row_indices, col_indices] = df_indexed.select(["ax", "ay"]).to_numpy()
+    yaw[row_indices, col_indices] = df_indexed["yaw"].to_numpy()
+    mask[row_indices, col_indices] = True
+    type_df = df_indexed.unique(subset="row_idx", keep="first").sort("row_idx")
 
-        if category_mapping is not None:
-            type_array[index] = category_mapping.get(Category(category), -1)
-        else:
-            type_array[index] = category
-
-    # Set invalid values to 0.0 to avoid NaN
-    for arr in (pos, vel, acc, yaw):
-        arr[~mask] = 0.0
+    # Ensure the type array is aligned with row indices 0..N
+    # (The sort above guarantees this because row_idx is 0..N)
+    raw_categories = type_df["agent_class"].to_numpy()
+    if category_mapping:
+        type_array = np.array(
+            [category_mapping.get(Category(c), -1) for c in raw_categories],
+            dtype=np.int32,
+        )
+    else:
+        type_array = raw_categories.astype(np.int32)
 
     return AgentData(
         num_nodes=num_agents,
-        ta_index=target_agent if target_agent is not None else 0,
-        # Explicitly convert to expected datatype to ensure compatibility with
-        # downstream code, even if the input data may already be in the correct
-        # format.
+        ta_index=0,  # Target agent is forced to index 0
         type=torch.from_numpy(type_array).int(),
-        inp_pos=torch.from_numpy(pos[:, :input_len, :]).float(),
-        inp_vel=torch.from_numpy(vel[:, :input_len, :]).float(),
-        inp_acc=torch.from_numpy(acc[:, :input_len, :]).float(),
-        inp_yaw=torch.from_numpy(yaw[:, :input_len]).float(),
-        trg_pos=torch.from_numpy(pos[:, input_len:, :]).float(),
-        trg_vel=torch.from_numpy(vel[:, input_len:, :]).float(),
-        trg_acc=torch.from_numpy(acc[:, input_len:, :]).float(),
-        trg_yaw=torch.from_numpy(yaw[:, input_len:]).float(),
-        input_mask=torch.from_numpy(mask[:, :input_len]).bool(),
-        valid_mask=torch.from_numpy(mask[:, input_len:]).bool(),
-        # TODO: Update to use actual masks for MA and SA instead of dummy masks.
-        # Possibly use the function `get_masks` from `..common` to compute
-        # these two masks below.
+        inp_pos=torch.from_numpy(pos[:, :input_len]),
+        inp_vel=torch.from_numpy(vel[:, :input_len]),
+        inp_acc=torch.from_numpy(acc[:, :input_len]),
+        inp_yaw=torch.from_numpy(yaw[:, :input_len]),
+        trg_pos=torch.from_numpy(pos[:, input_len:]),
+        trg_vel=torch.from_numpy(vel[:, input_len:]),
+        trg_acc=torch.from_numpy(acc[:, input_len:]),
+        trg_yaw=torch.from_numpy(yaw[:, input_len:]),
+        input_mask=torch.from_numpy(mask[:, :input_len]),
+        valid_mask=torch.from_numpy(mask[:, input_len:]),
+        # TODO: Correctly implement these masks
         ma_mask=torch.empty(1),
         sa_mask=torch.empty(1),
     )
@@ -219,8 +219,7 @@ def _extract_target_agent(
         # Target agent needs to have valid data for the entire sequence (input +
         # output).
         candidates = (
-            data
-            .group_by("id")
+            data.group_by("id")
             .agg(
                 valid_frames=pl.col("frame").n_unique(),
             )
@@ -236,8 +235,7 @@ def _extract_target_agent(
         return int(candidates.select(pl.col("id").first()).item())
 
     target_agent_frames = (
-        data
-        .filter(pl.col("id") == target_agent)
+        data.filter(pl.col("id") == target_agent)
         .select(pl.col("frame").n_unique())
         .item()
     )
@@ -250,6 +248,14 @@ def _extract_target_agent(
         raise ValueError(msg)
 
     return target_agent
+
+
+def _full_zeros(
+    shape: tuple[int, ...],
+    n: int = 2,
+    dtype: npt.DTypeLike = np.float32,
+) -> tuple[npt.NDArray[np.float32], ...]:
+    return tuple(np.zeros(shape, dtype=dtype) for _ in range(n))
 
 
 def _full_nan(

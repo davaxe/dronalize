@@ -53,9 +53,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             argoverse_map.parse()
 
         super().__init__()
-        self.lane_segments: dict[int, parser.LaneSegment] = (
-            argoverse_map.lane_segments
-        )
+        self.lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
         self.map_nodes: dict[int, IntIDNode] = argoverse_map.nodes
 
         self.max_distance_between_connections: float = 1.0
@@ -284,9 +282,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
                 continue
 
             dst_node = self.new_node(x=dst_vec[0], y=dst_vec[1])
-            current_edge_type = edge_type_list[
-                min(edge_idx, len(edge_type_list) - 1)
-            ]
+            current_edge_type = edge_type_list[min(edge_idx, len(edge_type_list) - 1)]
 
             for s, d, e in self.interpolate_edge(
                 prev_node,  # REUSE the existing node object

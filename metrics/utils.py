@@ -80,9 +80,9 @@ def filter_prediction(
             last_pred = pred[:, -1]
             last_trg = trg[:, -1]
 
-        best_idx = torch.linalg.norm(
-            last_pred - last_trg.unsqueeze(1), dim=-1
-        ).argmin(dim=-1)  # (N,)
+        best_idx = torch.linalg.norm(last_pred - last_trg.unsqueeze(1), dim=-1).argmin(
+            dim=-1
+        )  # (N,)
 
         pred = pred[torch.arange(batch_size), :, best_idx]  # (N, T, 2)
 
