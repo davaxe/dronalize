@@ -1,7 +1,7 @@
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
-from typing import Generic, TypedDict, TypeVar, cast, override
+from typing import Generic, Self, TypedDict, TypeVar, cast, override
 
 import polars as pl
 from attr import asdict, dataclass
@@ -11,6 +11,90 @@ from preprocessing.trajectory.utils import (
     Category,
     convert_to_agent_data_dict,
 )
+
+
+@dataclass(slots=True)
+class SceneFiltering:
+    """Configuration for filtering scenes based on pedestrian presence and validity."""
+
+    min_agents: int = 2
+    """Minimum number of agents required in a scene to be valid."""
+
+    require_all_valid: bool = False
+    """If True, requires all agents in a scene to have valid positions for all
+    time-steps."""
+
+    require_prediction_frame: bool = True
+    """If True, requires all agents to have valid positions at the first prediction
+    frame."""
+
+
+@dataclass(slots=True)
+class WindowParams:
+    """Configuration for sliding window sampling of scenes."""
+
+    window_size: int
+    """Number of frames in each window."""
+
+    step_size: int
+    """Number of frames to skip between windows."""
+
+
+@dataclass(slots=True)
+class ProcessorConfig:
+    """Base configuration dataclass for trajectory data processing.
+
+    This can be extended by specific dataset processors to include additional
+    parameters.
+    """
+
+    input_len: int
+    """Observation length in frames."""
+
+    output_len: int
+    """Prediction length in frames."""
+
+    sample_time: float
+    """Time interval between frames in seconds."""
+
+    target_sample_time: float | None = None
+    """The target time interval for resampling the trajectories, in seconds. If
+    None, no resampling will be performed."""
+
+    window_params: WindowParams | None = None
+    """Used for datasets where multiple samples can be generated from a single
+    scene by using a sliding window approach. If None, it is assumed that each
+    scene corresponds to exactly one sample."""
+
+    scene_filtering: SceneFiltering | None = None
+    """Configuration for filtering scenes based on pedestrian presence and validity."""
+
+    def window_parameters(
+        self, step_size: int, window_size: int | None = None
+    ) -> Self:
+        """Set the window parameters for sliding window sampling."""
+        self.window_params = WindowParams(
+            window_size=window_size
+            if window_size is not None
+            else self.input_len + self.output_len,
+            step_size=step_size,
+        )
+        return self
+
+    def scene_filtering_parameters(
+        self,
+        min_agents: int = 2,
+        *,
+        require_all_valid: bool = False,
+        require_prediction_frame: bool = True,
+    ) -> Self:
+        """Set the scene filtering parameters."""
+        self.scene_filtering = SceneFiltering(
+            min_agents=min_agents,
+            require_all_valid=require_all_valid,
+            require_prediction_frame=require_prediction_frame,
+        )
+        return self
 
 
 class FrameDict(TypedDict):
@@ -168,6 +252,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
 
     def __init__(
         self,
+        processor_config: ProcessorConfig,
         id_mapping: IDMapping[T_ID] | None = None,
         *,
         validate_output: bool = True,
@@ -179,16 +264,48 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         self._id_mapping = id_mapping
         self._validate_output = validate_output
         self._validate_intermediate = validate_intermediate
+        self._processor_config = processor_config
 
     # --- Abstract Steps (The "Blanks" to fill) ---
 
-    @abstractmethod
+    @property
+    def processor_config(self) -> ProcessorConfig:
+        """Return the processor configuration."""
+        return self._processor_config
+
+    @property
+    def original_input_len(self) -> int:
+        """Original observation length in frames (before resampling)."""
+        return self.processor_config.input_len
+
+    @property
+    def original_output_len(self) -> int:
+        """Original prediction length in frames (before resampling)."""
+        return self.processor_config.output_len
+
+    @property
+    def sequence_length(self) -> int:
+        """Total sequence length (observation + prediction) in frames."""
+        return self.processor_config.input_len + self.processor_config.output_len
+
+    @property
+    def resampling_ratio(self) -> float:
+        """Ratio of target sample time to original sample time."""
+        if self.processor_config.target_sample_time is None:
+            return 1.0
+        return (
+            self.processor_config.sample_time
+            / self.processor_config.target_sample_time
+        )
+
     def input_len(self) -> int:
         """Observation length in frames (resulting value in Scene)."""
+        return int((self.original_input_len - 1) * self.resampling_ratio + 1)
 
-    @abstractmethod
     def output_len(self) -> int:
         """Prediction length in frames (resulting value in Scene)."""
+        total_len = int((self.sequence_length - 1) * self.resampling_ratio + 1)
+        return total_len - self.input_len()
 
     @abstractmethod
     def sources(self) -> Iterable[tuple[T_ID, T_Source]]:
@@ -293,15 +410,13 @@ class FrameStreamProcessor(DataProcessor[T_ID, T_Source, T_Frame], ABC):
 
     @override
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
-        return df.select(
-            [
-                pl.col("frame").cast(pl.Int32),
-                pl.col("track_id").cast(pl.Int32),
-                pl.col("x").cast(pl.Float64),
-                pl.col("y").cast(pl.Float64),
-                pl.col("vx").cast(pl.Float64),
-                pl.col("vy").cast(pl.Float64),
-                pl.col("yaw").cast(pl.Float64),
-                pl.col("agent_class").cast(pl.Int32),
-            ]
-        )
+        return df.select([
+            pl.col("frame").cast(pl.Int32),
+            pl.col("track_id").cast(pl.Int32),
+            pl.col("x").cast(pl.Float64),
+            pl.col("y").cast(pl.Float64),
+            pl.col("vx").cast(pl.Float64),
+            pl.col("vy").cast(pl.Float64),
+            pl.col("yaw").cast(pl.Float64),
+            pl.col("agent_class").cast(pl.Int32),
+        ])

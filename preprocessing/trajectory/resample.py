@@ -9,6 +9,10 @@ from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
 T_DataFame = TypeVar("T_DataFame", pl.DataFrame, pl.LazyFrame)
 
+# TODO: `resample_tracks` is currently slow. Probably due to the use of `map_batches`.
+# Idea for optimization:
+# 1. Implement the resampling logic in a way that can be applied to the entire DataFrame at once.
+
 
 def resample_tracks(
     data: T_DataFame,
@@ -82,25 +86,44 @@ def resample_tracks(
             add_velocity=add_velocity,
             add_acceleration=add_acceleration,
             acceleration_cols=acceleration_cols,
-        )
+        ),
+        return_dtype=_return_type(
+            add_velocity=add_velocity, add_acceleration=add_acceleration
+        ),
     ).alias("_resampled_batch")
 
+    mod_cols = [*group_cols, *pos_columns, *(vel_columns or []), frame_column]
+    other_cols = [c for c in data.columns if c not in mod_cols]
     aggregations = [
         resampled_struct,
         # Generate new frames to match the new length
-        pl.col(frame_column)
-        .map_batches(lambda series: _generate_new_frames(series, up, down))
+        pl
+        .col(frame_column)
+        .map_batches(
+            lambda series: _generate_new_frames(series, up, down),
+            return_dtype=pl.Int32,
+        )
         .alias(frame_column)
         .cast(pl.Int32),
+        pl.col(other_cols).first(),
     ]
 
     return (
-        data.sort([*group_cols, frame_column])
+        data
         .group_by(group_cols)
         .agg(aggregations)
         .explode(["_resampled_batch", frame_column])
         .unnest("_resampled_batch")
     )
+
+
+def _return_type(*, add_velocity: bool, add_acceleration: bool) -> pl.Struct:
+    fields = {"x": pl.Float64, "y": pl.Float64}
+    if add_velocity:
+        fields.update({"vx": pl.Float64, "vy": pl.Float64})
+    if add_acceleration:
+        fields.update({"ax": pl.Float64, "ay": pl.Float64})
+    return pl.Struct(fields)
 
 
 def _generate_new_frames(
@@ -118,7 +141,7 @@ def _generate_new_frames(
     step_size = down / up
     n_new = int(np.floor(max_time / step_size)) + 1
     if integer:
-        return pl.Series(np.arange(n_new))
+        return pl.Series(np.arange(n_new, dtype=np.int32))
     return pl.Series(np.arange(n_new, dtype=np.int32) * step_size)
 
 
@@ -128,7 +151,6 @@ def _apply_interpolation(
     up: int,
     down: int,
     *,
-    method: Literal["spline", "linear"] = "spline",
     include_first_derivative: bool = False,
     include_second_derivative: bool = False,
 ) -> tuple[npt.NDArray[np.float64], ...]:
@@ -145,24 +167,15 @@ def _apply_interpolation(
     # We generate indices 0, 1, ... M and scale them by step_size.
     t_new = np.arange(n_new, dtype=np.float64) * step_size
 
-    if method == "spline":
-        res = cubic_spline_interpolation(
-            t,
-            t_new,
-            pos,
-            vel=vel,
-            hermite=vel is not None,
-            include_first_derivative=include_first_derivative,
-            include_second_derivative=include_second_derivative,
-        )
-    elif method == "linear":
-        res = linear_interpolation(
-            t,
-            t_new,
-            pos,
-            include_first_derivative=include_first_derivative,
-            include_second_derivative=include_second_derivative,
-        )
+    res = cubic_spline_interpolation(
+        t,
+        t_new,
+        pos,
+        vel=vel,
+        hermite=vel is not None,
+        include_first_derivative=include_first_derivative,
+        include_second_derivative=include_second_derivative,
+    )
     return tuple(res) if isinstance(res, tuple) else (res,)
 
 
@@ -282,96 +295,6 @@ def cubic_spline_interpolation(
     ]:
         if include:
             results.append(spline(t_new, nu))
-    return tuple(results) if len(results) > 1 else results[0]
-
-
-@overload
-def linear_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
-    *,
-    include_first_derivative: Literal[False] = False,
-    include_second_derivative: Literal[False] = False,
-) -> npt.NDArray[np.float64]: ...
-
-
-@overload
-def linear_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
-    *,
-    include_first_derivative: Literal[True],
-    include_second_derivative: Literal[False] = False,
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]: ...
-
-
-@overload
-def linear_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
-    *,
-    include_first_derivative: Literal[False] = False,
-    include_second_derivative: Literal[True],
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]: ...
-
-
-@overload
-def linear_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
-    *,
-    include_first_derivative: Literal[True],
-    include_second_derivative: Literal[True],
-) -> tuple[
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-]: ...
-
-
-def linear_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
-    *,
-    include_first_derivative: bool = False,
-    include_second_derivative: bool = False,
-) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], ...]:
-    """Linearly interpolate positions.
-
-    The velocity and acceleration are estimated using finite differences on the
-    interpolated positions, so they may be noisy and not very accurate.
-
-    Args:
-        pos: original positions to interpolate, shape (n_samples, n_dims).
-        t: original time points corresponding to `pos`, shape (n_samples,).
-        t_new: new time points at which to interpolate, shape (n_new_samples,).
-        include_first_derivative: whether to include the first derivative in the
-            output. Defaults to False.
-        include_second_derivative: whether to include the second derivative in the
-            output. Defaults to False.
-
-    Returns:
-        (interpolated positions, [optional] interpolated velocities, [optional]
-        interpolated accelerations)
-
-    """
-    # Estimate velocity and acceleration using finite differences
-    pos = np.interp(t_new, t, pos)
-    results = [pos]
-    if include_first_derivative:
-        vel = np.gradient(pos, t_new)
-        results.append(vel)
-    if include_second_derivative:
-        acc = np.gradient(
-            results[-1] if include_first_derivative else np.gradient(pos, t_new),
-            t_new,
-        )
-        results.append(acc)
     return tuple(results) if len(results) > 1 else results[0]
 
 

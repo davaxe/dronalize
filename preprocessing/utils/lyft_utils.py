@@ -350,7 +350,7 @@ if __name__ == "__main__":
     # Example usage
     scenes = get_lyft_scenes_as_pandas_lazy(directory, start=0, batch_size=1000)
     start_time = time.time()
+    count = 0
     for scene_df in scenes:
-        print(scene_df)
-        break
-    print(f"Processed scenes in {time.time() - start_time:.2f} seconds.")
+        count += 1
+    print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds.")

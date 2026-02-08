@@ -236,43 +236,37 @@ def _generate_test_vel() -> pl.DataFrame:
     dx = 2 * np.cos(2 * t) * dt
     dy = -3 * np.sin(3 * t) * dt
 
-    return pl.DataFrame(
-        {
-            "frame": np.arange(len(t)),
-            "x": x,
-            "y": y,
-            "vx": dx,
-            "vy": dy,
-            "track_id": 1,
-        }
-    ).cast(
-        {
-            "x": pl.Float64,
-            "y": pl.Float64,
-            "vx": pl.Float64,
-            "vy": pl.Float64,
-            "frame": pl.Int64,
-            "track_id": pl.Int64,
-        }
-    )
+    return pl.DataFrame({
+        "frame": np.arange(len(t)),
+        "x": x,
+        "y": y,
+        "vx": dx,
+        "vy": dy,
+        "track_id": 1,
+        "category": 14,
+    }).cast({
+        "x": pl.Float64,
+        "y": pl.Float64,
+        "vx": pl.Float64,
+        "vy": pl.Float64,
+        "frame": pl.Int64,
+        "track_id": pl.Int64,
+        "category": pl.Int64,
+    })
 
 
 def _generate_simple() -> pl.DataFrame:
-    return pl.DataFrame(
-        {
-            "frame": np.arange(2),
-            "x": [0.0, 1.0],
-            "y": [0.0, 1.0],
-            "track_id": 1,
-        }
-    ).cast(
-        {
-            "x": pl.Float64,
-            "y": pl.Float64,
-            "frame": pl.Int64,
-            "track_id": pl.Int64,
-        }
-    )
+    return pl.DataFrame({
+        "frame": np.arange(2),
+        "x": [0.0, 1.0],
+        "y": [0.0, 1.0],
+        "track_id": 1,
+    }).cast({
+        "x": pl.Float64,
+        "y": pl.Float64,
+        "frame": pl.Int64,
+        "track_id": pl.Int64,
+    })
 
 
 if __name__ == "__main__":
@@ -290,8 +284,8 @@ if __name__ == "__main__":
         ratio=dt_org / dt_new,
         group_by="track_id",
         pos_columns=["x", "y"],
-        # vel_columns=["vx", "vy"],
-        add_velocity=True,
+        vel_columns=["vx", "vy"],
+        # add_velocity=True,
     )
     print(df_resampled.filter(pl.col("track_id") == 1))
 

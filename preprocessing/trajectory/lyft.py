@@ -9,8 +9,15 @@ import numpy.typing as npt
 import polars as pl
 import zarr
 
-from preprocessing.trajectory.interface import DataProcessor, Frame
-from preprocessing.trajectory.utils import Category
+from preprocessing.trajectory.interface import DataProcessor, Frame, ProcessorConfig
+from preprocessing.trajectory.plot import plot_comparison
+from preprocessing.trajectory.resample import resample_tracks
+from preprocessing.trajectory.utils import (
+    Category,
+    filter_scene,
+    sliding_window,
+    yaw_from_vel,
+)
 
 
 @dataclass
@@ -27,25 +34,27 @@ class LyftProcessor(DataProcessor[int, _Source, Frame]):
         self,
         zarr_path: Path | str,
         scene_batch_size: int | None = 1000,
+        config: ProcessorConfig | None = None,
     ) -> None:
-        super().__init__(validate_output=True)
+        if config is None:
+            config = self._default_config()
+
+        super().__init__(processor_config=config, validate_output=False)
         self._zarr_path = Path(zarr_path)
-        self._scenes: zarr.Array = zarr.open_array(self._zarr_path / "scenes", mode="r")
-        self._frames: zarr.Array = zarr.open_array(self._zarr_path / "frames", mode="r")
-        self._agents: zarr.Array = zarr.open_array(self._zarr_path / "agents", mode="r")
+        self._scenes: zarr.Array = zarr.open_array(
+            self._zarr_path / "scenes", mode="r"
+        )
+        self._frames: zarr.Array = zarr.open_array(
+            self._zarr_path / "frames", mode="r"
+        )
+        self._agents: zarr.Array = zarr.open_array(
+            self._zarr_path / "agents", mode="r"
+        )
 
         self._total_scenes: int = int(self._scenes.shape[0])
         self._batch_size: int = (
             scene_batch_size if scene_batch_size is not None else self._total_scenes
         )
-
-    @override
-    def input_len(self) -> int:
-        raise NotImplementedError
-
-    @override
-    def output_len(self) -> int:
-        raise NotImplementedError
 
     @override
     def sources(self) -> Iterable[tuple[int, _Source]]:
@@ -73,22 +82,56 @@ class LyftProcessor(DataProcessor[int, _Source, Frame]):
         agents_np = cast("npt.NDArray", self._agents[agent_start:agent_end])
 
         for scene_data in scenes_np:
-            # TODO: This is ~25 seconds sequence; need to split into smaller scene
-            # chunks for correct format, i.e.
-            yield _scene_to_polars(
-                scene=_LyftScene(scene_data=scene_data),
+            _, scenes = _scene_to_polars(
+                scene_data,
                 frames=frames_np,
                 agents=agents_np,
                 frame_offset=frame_start,
                 agent_offset=agent_start,
-            )[1]
+            )
+            if self.processor_config.window_params is None:
+                yield scenes
+                continue
+
+            yield from sliding_window(
+                scenes,
+                window_size=self.sequence_length,
+                step_size=self.processor_config.window_params.step_size,
+                sliding_col="frame",
+                is_sorted=False,
+            )
 
     @override
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
-        # TODO: Add correct normalization step
-        print(df.filter(pl.col("id") == 1))
-        print(df.select(pl.col("id").n_unique()))
-        return df
+        df = df.filter(pl.col("frame").n_unique().over("id") > 1)
+        df_filtered = filter_scene(df, self.processor_config)
+        if df_filtered is None:
+            return None
+
+        return yaw_from_vel(
+            resample_tracks(
+                df_filtered,
+                ratio=self.resampling_ratio,
+                group_by="id",
+                pos_columns=["x", "y"],
+                add_velocity=True,
+                add_acceleration=True,
+            ),
+            yaw_col="yaw",
+        )
+
+    @staticmethod
+    def _default_config() -> ProcessorConfig:
+        return (
+            ProcessorConfig(
+                input_len=20,
+                output_len=50,
+                sample_time=0.1,
+                target_sample_time=0.1,
+            )
+            .window_parameters(step_size=20)
+            .scene_filtering_parameters(min_agents=1, require_prediction_frame=True)
+        )
 
 
 @dataclass
@@ -109,40 +152,39 @@ class _LyftScene:
         return (int(start), int(end))
 
 
-_CATEGORY_LOOKUP = np.array(
-    [
-        Category.UNKNOWN.value,  # 0
-        Category.UNKNOWN.value,  # 1
-        Category.UNKNOWN.value,  # 2
-        Category.CAR.value,  # 3
-        Category.VAN.value,  # 4
-        Category.TRAM.value,  # 5
-        Category.BUS.value,  # 6
-        Category.TRUCK.value,  # 7
-        Category.EMERGENCY_VEHICLE.value,  # 8
-        Category.UNKNOWN.value,  # 9
-        Category.BICYCLE.value,  # 10
-        Category.MOTORCYCLE.value,  # 11
-        Category.BICYCLE.value,  # 12
-        Category.MOTORCYCLE.value,  # 13
-        Category.PEDESTRIAN.value,  # 14
-        Category.ANIMAL.value,  # 15
-        Category.UNKNOWN.value,  # 16
-        Category.UNKNOWN.value,
-        Category.UNKNOWN.value,
-        Category.UNKNOWN.value,
-    ]
-)
+_CATEGORY_LOOKUP = np.array([
+    Category.UNKNOWN.value,  # 0
+    Category.UNKNOWN.value,  # 1
+    Category.UNKNOWN.value,  # 2
+    Category.CAR.value,  # 3
+    Category.VAN.value,  # 4
+    Category.TRAM.value,  # 5
+    Category.BUS.value,  # 6
+    Category.TRUCK.value,  # 7
+    Category.EMERGENCY_VEHICLE.value,  # 8
+    Category.UNKNOWN.value,  # 9
+    Category.BICYCLE.value,  # 10
+    Category.MOTORCYCLE.value,  # 11
+    Category.BICYCLE.value,  # 12
+    Category.MOTORCYCLE.value,  # 13
+    Category.PEDESTRIAN.value,  # 14
+    Category.ANIMAL.value,  # 15
+    Category.UNKNOWN.value,  # 16
+    Category.UNKNOWN.value,
+    Category.UNKNOWN.value,
+    Category.UNKNOWN.value,
+])
 
 
 def _scene_to_polars(
-    scene: _LyftScene,
+    scene_data: npt.NDArray,
     frames: npt.NDArray,
     agents: npt.NDArray,
     frame_offset: int = 0,
     agent_offset: int = 0,
 ) -> tuple[str, pl.DataFrame]:
     # This function has been optimized for performance using vectorized operations.
+    scene = _LyftScene(scene_data=scene_data)
     scene_start, scene_end = scene.frame_interval
     local_f_start = scene_start - frame_offset
     local_f_end = scene_end - frame_offset
@@ -156,15 +198,13 @@ def _scene_to_polars(
     ego_y = scene_frames["ego_translation"][:, 1]
 
     # Create Ego DataFrame
-    ego_df = pl.DataFrame(
-        {
-            "frame": ego_frames,
-            "id": ego_ids,
-            "x": ego_x,
-            "y": ego_y,
-            "agent_class": np.full(n_frames, Category.CAR.value, dtype=np.int32),
-        }
-    )
+    ego_df = pl.DataFrame({
+        "frame": ego_frames,
+        "id": ego_ids,
+        "x": ego_x,
+        "y": ego_y,
+        "agent_class": np.full(n_frames, Category.CAR.value, dtype=np.int32),
+    })
 
     intervals = scene_frames["agent_index_interval"]
     counts = intervals[:, 1] - intervals[:, 0]
@@ -203,15 +243,13 @@ def _scene_to_polars(
     safe_indices = np.minimum(max_indices, len(_CATEGORY_LOOKUP) - 1)
     agent_classes = _CATEGORY_LOOKUP[safe_indices].astype(np.int32)
 
-    agent_df = pl.DataFrame(
-        {
-            "frame": agent_frame_indices,
-            "id": agent_ids,
-            "x": agent_x,
-            "y": agent_y,
-            "agent_class": agent_classes,
-        }
-    )
+    agent_df = pl.DataFrame({
+        "frame": agent_frame_indices,
+        "id": agent_ids,
+        "x": agent_x,
+        "y": agent_y,
+        "agent_class": agent_classes,
+    })
     return scene.scene_name, pl.concat([ego_df, agent_df])
 
 
@@ -222,8 +260,13 @@ if __name__ == "__main__":
     # Example usage
     scenes = LyftProcessor(directory, scene_batch_size=1000)
     start_time = time.time()
+    count: int = 0
     for scene_df in scenes.process_scenes():
-        # save a scene to a CSV file
-        print(scene_df.inner)
+        count += 1
+        if count % 50 == 0:
+            print(
+                f"Processed {count} scenes in {time.time() - start_time:.2f} seconds"
+            )
         break
-    print(f"Processed scenes in {time.time() - start_time:.2f} seconds.")
+
+    print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds")

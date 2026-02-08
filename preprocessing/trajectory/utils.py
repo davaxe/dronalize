@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 from enum import IntEnum, auto
-from typing import TypedDict, TypeVar
+from typing import TYPE_CHECKING, TypedDict, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
 import torch
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from preprocessing.trajectory.interface import ProcessorConfig
 
 T_DataFame = TypeVar("T_DataFame", pl.DataFrame, pl.LazyFrame)
 
@@ -80,7 +87,9 @@ def yaw_from_vel(
         Data frame or lazy frame with the estimated yaw column added.
 
     """
-    return data.with_columns(pl.arctan2(pl.col(vy_col), pl.col(vx_col)).alias(yaw_col))
+    return data.with_columns(
+        pl.arctan2(pl.col(vy_col), pl.col(vx_col)).alias(yaw_col)
+    )
 
 
 def yaw_from_pos(
@@ -107,6 +116,87 @@ def yaw_from_pos(
             pl.col(x_col).diff(),
         ).alias(yaw_col)
     )
+
+
+def filter_scene(data: pl.DataFrame, config: ProcessorConfig) -> pl.DataFrame | None:
+    """Filter a scene based on the provided configuration.
+
+    Args:
+        data: Input DataFrame containing the scene data.
+        config: ProcessorConfig object containing the filtering criteria.
+
+    Returns:
+        Filtered DataFrame if the scene meets the criteria, otherwise None.
+
+    """
+    if data.is_empty():
+        return None
+
+    if config.scene_filtering is None:
+        return data
+
+    filtering = config.scene_filtering
+    start = data.select(pl.col("frame").min()).item()
+    pred_frame = start + config.input_len - 1
+    if (
+        filtering.require_prediction_frame
+        and data.filter(pl.col("frame") == pred_frame).is_empty()
+    ):
+        return None
+
+    if filtering.require_all_valid:
+        data = data.filter(
+            pl.col("frame").n_unique().over("id")
+            == config.input_len + config.output_len
+        )
+
+    if (
+        data.is_empty()
+        or data.select(pl.col("id").n_unique()).item() < filtering.min_agents
+    ):
+        return None
+
+    return data
+
+
+def sliding_window(
+    data: pl.DataFrame,
+    window_size: int,
+    step_size: int,
+    sliding_col: str = "frame",
+    *,
+    is_sorted: bool = False,
+    include_boundaries: bool = False,
+) -> Iterable[pl.DataFrame]:
+    """Generate sliding windows from a DataFrame.
+
+    Args:
+        data: Input DataFrame to generate windows from.
+        window_size: Number of rows in each window.
+        step_size: Number of rows to move the window at each step.
+        sliding_col: Column name to use for determining the window boundaries.
+            Defaults to "frame".
+        is_sorted: Whether the input DataFrame is already sorted by the sliding_col.
+            If False, the function will sort the DataFrame by sliding_col before
+            generating windows. Defaults to False.
+        include_boundaries: Passed to `group_by_dynamic` to include window
+            boundaries in the output. Defaults to False.
+
+    Yields:
+        DataFrames corresponding to each sliding window.
+
+    """
+    if not is_sorted:
+        data = data.sort(sliding_col)
+
+    for _, window in data.group_by_dynamic(
+        sliding_col,
+        every=f"{step_size}i",
+        period=f"{window_size}i",
+        include_boundaries=include_boundaries,
+    ):
+        if not window.is_empty():
+            yield window
 
 
 def convert_to_agent_data_dict(
@@ -137,7 +227,9 @@ def convert_to_agent_data_dict(
         AgentData TypedDict.
 
     """
-    target_agent_id = _extract_target_agent(data, input_len, output_len, target_agent)
+    target_agent_id = _extract_target_agent(
+        data, input_len, output_len, target_agent
+    )
     time_steps = input_len + output_len
     start_frame = data["frame"].min()
     unique_ids = data["id"].unique().to_list()
@@ -151,15 +243,14 @@ def convert_to_agent_data_dict(
 
     # We add 'row_idx' (agent) and 'col_idx' (time) columns to the dataframe
     # Casting to proper types ensures numpy compatibility
-    df_indexed = data.with_columns(
-        [
-            pl.col("id")
-            .replace(id_to_idx_map, default=None)
-            .cast(pl.Int32)
-            .alias("row_idx"),
-            (pl.col("frame") - start_frame).cast(pl.Int32).alias("col_idx"),
-        ]
-    )
+    df_indexed = data.with_columns([
+        pl
+        .col("id")
+        .replace(id_to_idx_map, default=None)
+        .cast(pl.Int32)
+        .alias("row_idx"),
+        (pl.col("frame") - start_frame).cast(pl.Int32).alias("col_idx"),
+    ])
 
     # Extract coordinate arrays (N_samples,)
     # We extract all data points in one go
@@ -219,7 +310,8 @@ def _extract_target_agent(
         # Target agent needs to have valid data for the entire sequence (input +
         # output).
         candidates = (
-            data.group_by("id")
+            data
+            .group_by("id")
             .agg(
                 valid_frames=pl.col("frame").n_unique(),
             )
@@ -235,7 +327,8 @@ def _extract_target_agent(
         return int(candidates.select(pl.col("id").first()).item())
 
     target_agent_frames = (
-        data.filter(pl.col("id") == target_agent)
+        data
+        .filter(pl.col("id") == target_agent)
         .select(pl.col("frame").n_unique())
         .item()
     )
@@ -264,3 +357,13 @@ def _full_nan(
     dtype: npt.DTypeLike = np.float32,
 ) -> tuple[npt.NDArray[np.float32], ...]:
     return tuple(np.full(shape, np.nan, dtype=dtype) for _ in range(n))
+
+
+if __name__ == "__main__":
+    # Example usage of the utility functions
+    df = pl.DataFrame({
+        "id": [1, 1, 1, 1, 1, 1, 2, 2, 2],
+        "frame": [0, 1, 2, 3, 4, 5, 0, 1, 2],
+    })
+    for window in sliding_window(df, window_size=2, step_size=1):
+        print(window.sort(["id", "frame"]))

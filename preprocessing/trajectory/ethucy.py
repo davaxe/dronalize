@@ -14,106 +14,57 @@
 
 from __future__ import annotations
 
-import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, override
 
 import polars as pl
 
-from preprocessing.trajectory.interface import Category, DataProcessor, Frame
+from preprocessing.trajectory.interface import (
+    Category,
+    DataProcessor,
+    Frame,
+    ProcessorConfig,
+)
 from preprocessing.trajectory.resample import resample_tracks
-from preprocessing.trajectory.utils import yaw_from_vel
+from preprocessing.trajectory.utils import (
+    filter_scene,
+    sliding_window,
+    yaw_from_vel,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
-
-@dataclass(frozen=True, slots=True)
-class Config:
-    """Configuration for pedestrian data loading."""
-
-    data_root: Path
-    """Root directory for the pedestrian data, should contain subdirectories for
-    each dataset."""
-
-    dataset: str | set[str]
-    """Name of the dataset to load, e.g., 'eth', 'hotel', 'univ', 'zara1'."""
-
-    split: Literal["train", "val", "test"] = "train"
-    """Data split to load, can be 'train', 'val', or 'test'."""
-
-    org_obs_len: int = 8
-    """Length of the observation sequence in frames."""
-
-    org_pred_len: int = 12
-    """Length of the prediction sequence in frames."""
-
-    min_pedestrian: int = 2
-    """Minimum number of pedestrians required in a sequence to be valid."""
-
-    org_sample_time: float = 0.4
-    """Time interval between frames in seconds."""
-
-    require_all_valid: bool = True
-    """If True, requires all pedestrians in a sequence to have valid positions."""
-
-    target_sample_time: float = 0.1
-    """The target time interval for resampling the trajectories, in seconds."""
-
-    multiple_targets_per_window: bool = False
-    """If True, allows multiple target pedestrians per sequence window."""
-
-    window_skip: int = 1
-    """Number of samples between sliding windows in the sequence."""
-
-    sep: str = "\t"
-    """Separator used in the csv-like data files"""
+    from collections.abc import Iterable, Sequence
 
 
 class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
     """Processor for ETH/UCY pedestrian trajectory datasets."""
 
-    def __init__(self, config: Config) -> None:
+    def __init__(
+        self,
+        data_root: Path,
+        dataset: str | Sequence[str],
+        config: ProcessorConfig | None = None,
+        split: Literal["train", "val", "test"] = "train",
+    ) -> None:
         """Initialize with the given configuration."""
-        super().__init__(validate_output=True)
-        self.config = config
+        if config is None:
+            config = self._default_config()
 
-    @property
-    def sequence_length(self) -> int:
-        """Total sequence length (observation + prediction) in frames."""
-        return self.config.org_obs_len + self.config.org_pred_len
-
-    @property
-    def resampling_ratio(self) -> float:
-        """Ratio of target sample time to original sample time."""
-        return self.config.org_sample_time / self.config.target_sample_time
-
-    @override
-    def input_len(self) -> int:
-        return int((self.config.org_obs_len - 1) * self.resampling_ratio + 1)
-
-    @override
-    def output_len(self) -> int:
-        total_len = int((self.sequence_length - 1) * self.resampling_ratio + 1)
-        return total_len - self.input_len()
+        super().__init__(processor_config=config, validate_output=True)
+        self._data_root = data_root
+        self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
+        self._split = split
+        self._window_params = self.processor_config.window_params
+        self._filtering_params = self.processor_config.scene_filtering
 
     @override
     def sources(self) -> Iterable[tuple[str, pl.DataFrame]]:
-        if not isinstance(self.config.dataset, set):
-            datasets = {self.config.dataset}
-        else:
-            datasets = self.config.dataset
-        for dataset in datasets:
-            data_dir = self.config.data_root / dataset / self.config.split
+        for dataset in self._dataset:
+            data_dir = self._data_root / dataset / self._split
+            print(f"Loading data from {data_dir}...")
             # Sort to ensure consistent order across runs and systems.
             for data_file in sorted(data_dir.iterdir()):
-                yield (
-                    data_file.name,
-                    # The source is a loaded polars LazyFrame containing the xy
-                    # trajectory data of all pedestrian for a certain scene.
-                    self._read_data_file(data_file),
-                )
+                yield (data_file.name, self._read_data_file(data_file))
 
     @override
     def load_raw(self, source: pl.DataFrame) -> Iterable[pl.DataFrame]:
@@ -121,45 +72,28 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
         # one frame of data, which is pointless and will cause issues during
         # resampling, so we filter them out here.
         source = source.filter(pl.col("frame").n_unique().over("id") > 1)
-        max_frame = source.select(pl.col("frame").max()).item() + 1
-        if max_frame is None:
-            return
 
-        # IMPORTANT: The data is already sorted by ["id", "frame"] due to the
-        # way we read it, so we can just use group_by_dynamic to create the
-        # sliding windows of frames.
-        for _, window in source.group_by_dynamic(
-            "frame",
-            every=f"{self.config.window_skip}i",
-            period=f"{self.sequence_length}i",
-            include_boundaries=False,
-        ):
-            if not window.is_empty():
-                yield window
+        if self._window_params is None:
+            yield source
+        else:
+            yield from sliding_window(
+                source,
+                window_size=self.sequence_length,
+                step_size=self._window_params.step_size,
+                sliding_col="frame",
+                is_sorted=True,
+            )
 
     @override
     def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
         # Input is a scene DataFrame of length (obs_len + pred_len) *
         # num_pedestrians, with columns "frame", "id", "x", "y", "vx", "vy".
-        if df.is_empty():
-            return None
-
-        start = df.select(pl.col("frame").min()).item()
-        pred_frame = start + self.config.org_obs_len - 1
-        if df.filter(pl.col("frame") == pred_frame).is_empty():
-            return None
-
-        if self.config.require_all_valid:
-            df = df.filter(pl.col("frame").len().over("id") == self.sequence_length)
-
-        if (
-            df.is_empty()
-            or df.select(pl.col("id").n_unique()).item() < self.config.min_pedestrian
-        ):
+        df_filtered = filter_scene(df, self.processor_config)
+        if df_filtered is None:
             return None
 
         df = resample_tracks(
-            df,
+            df_filtered,
             ratio=self.resampling_ratio,
             group_by="id",
             pos_columns=["x", "y"],
@@ -173,10 +107,11 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
 
     def _read_data_file(self, path: Path) -> pl.DataFrame:
         return (
-            pl.scan_csv(
+            pl
+            .scan_csv(
                 path,
                 has_header=False,
-                separator=self.config.sep,
+                separator="\t",
                 new_columns=["frame", "id", "x", "y"],
                 schema={
                     "frame": pl.Int32,
@@ -192,17 +127,27 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
             .collect()
         )
 
+    @staticmethod
+    def _default_config() -> ProcessorConfig:
+        return (
+            ProcessorConfig(
+                input_len=8,
+                output_len=12,
+                sample_time=0.4,
+                target_sample_time=0.1,
+            )
+            .window_parameters(step_size=1)
+            .scene_filtering_parameters(require_all_valid=True)
+        )
+
 
 if __name__ == "__main__":
-    config = Config(
-        data_root=Path("data"),
-        dataset={"hotel"},
-        split="test",
-        org_sample_time=0.4,
-        target_sample_time=0.1,
+    processor = EthUcyProcessor(
+        data_root=Path("data"), dataset="hotel", split="test"
     )
-    processor = EthUcyProcessor(config)
     count: int = 0
     total_time = 0.0
     for scene in processor.process_scenes():
-        ...
+        count += 1
+
+    print(f"Processed {count} scenes.")
