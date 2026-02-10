@@ -11,7 +11,6 @@ import zarr
 
 from preprocessing.trajectory.interface import (
     DataProcessor,
-    Frame,
     ProcessorConfig,
     Resampling,
 )
@@ -31,7 +30,7 @@ class _Source:
     interval: tuple[int, int]
 
 
-class LyftProcessor(DataProcessor[int, _Source, Frame]):
+class LyftProcessor(DataProcessor[int, _Source]):
     """Processor for Lyft Level 5 dataset stored in Zarr format."""
 
     def __init__(
@@ -70,7 +69,7 @@ class LyftProcessor(DataProcessor[int, _Source, Frame]):
             current += self._batch_size
 
     @override
-    def load_raw(self, source: _Source) -> Iterable[pl.DataFrame]:
+    def load_raw(self, source: _Source) -> Iterable[pl.LazyFrame]:
         scene_interval = source.interval
         if scene_interval is not None:
             start, end = scene_interval
@@ -93,24 +92,25 @@ class LyftProcessor(DataProcessor[int, _Source, Frame]):
                 frame_offset=frame_start,
                 agent_offset=agent_start,
             )
+
             if self.processor_config.window_params is None:
-                yield scenes
+                yield scenes.lazy()
                 continue
 
-            yield from sliding_window(
+            for window in sliding_window(
                 scenes,
                 window_size=self.sequence_length,
                 step_size=self.processor_config.window_params.step_size,
                 sliding_col="frame",
                 is_sorted=False,
-            )
+                return_iterable=True,
+            ):
+                yield window.lazy()
 
     @override
-    def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
+    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         df = df.filter(pl.col("frame").n_unique().over("id") > 1)
         df_filtered = filter_scene(df, self.processor_config)
-        if df_filtered is None:
-            return None
 
         resampling = self.processor_config.resampling or Resampling(1, 1)
         return yaw_from_vel(
@@ -123,7 +123,7 @@ class LyftProcessor(DataProcessor[int, _Source, Frame]):
                 add_second_derivative=True,
                 method=resampling.method,
                 dt=self.processor_config.sample_time,
-                derivative_rename=self._derivative_name(),
+                derivative_rename=self.derivative_names(),
             ),
             yaw_col="yaw",
         )
@@ -139,13 +139,6 @@ class LyftProcessor(DataProcessor[int, _Source, Frame]):
             .window_parameters(step_size=20)
             .scene_filtering_parameters(min_agents=1, require_prediction_frame=True)
         )
-
-    @staticmethod
-    def _derivative_name() -> dict[int, list[str]]:
-        return {
-            1: ["vx", "vy"],
-            2: ["ax", "ay"],
-        }
 
 
 @dataclass
@@ -268,15 +261,16 @@ def _scene_to_polars(
 
 
 def main():
+    """Test."""
     start_time = time.time()
     directory = Path(
         "/home/west/Developer/behavior-prediction/datasets/lyft/validate/validate.zarr"
     )
     # directory = Path("data/sample/sample.zarr")
-    processor = LyftProcessor(directory, 100)
-    total_scenes = 194608
-    count = 9
-    for scene in processor.scenes_iter():
+    processor = LyftProcessor(directory, 1000)
+    _total_scenes = 194608
+    count = 0
+    for _scene in processor.scenes_iter():
         if count % 250 == 0:
             print(
                 f"Processed {count} scenes in {time.time() - start_time:.2f} seconds."

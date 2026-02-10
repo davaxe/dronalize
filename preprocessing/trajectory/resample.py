@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Literal, TypeVar, overload
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-import polars.selectors as slc
 from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
 from preprocessing.trajectory.utils import derivative
@@ -16,10 +15,6 @@ if TYPE_CHECKING:
 
 T_DataFrame = TypeVar("T_DataFrame", pl.DataFrame, pl.LazyFrame)
 
-# TODO: `resample_tracks` is currently slow. Probably due to the use of `map_batches`.
-# Idea for optimization:
-# 1. Implement the resampling logic in a way that can be applied to the entire DataFrame at once.
-
 
 def resample_tracks(
     data: T_DataFrame,
@@ -27,14 +22,14 @@ def resample_tracks(
     down: int = 1,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
-    group_by: str | None = None,
+    group_by: str | Sequence[str] | None = None,
     *,
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     dt: float = 1.0,
     method: Literal["fast", "spline"] = "fast",
     derivative_rename: dict[int, list[str]] | None = None,
-) -> pl.DataFrame:
+) -> T_DataFrame:
     """Resample trajectory data to a new sampling rate.
 
     This function adjusts the temporal resolution of track data by upsampling and
@@ -51,7 +46,7 @@ def resample_tracks(
             Defaults to "frame".
         pos_columns: List of column names representing spatial coordinates
             (e.g., x, y, z). Defaults to ("x", "y").
-        group_by: Column name used to partition data into individual tracks
+        group_by: Column names used to partition data into individual tracks
             (e.g., "track_id"). If None, data is treated as a single track.
             Defaults to None.
         add_derivative: Whether to calculate and append the first derivative
@@ -71,6 +66,7 @@ def resample_tracks(
         requested derivatives.
 
     """
+    group_by = [group_by] if isinstance(group_by, str) else list(group_by or [])
     if method == "fast":
         # Just upsampling needed.
         upsampled = _resample_dataframe(
@@ -100,7 +96,7 @@ def resample_tracks(
             )
         return upsampled
 
-    resampled = _resample_dataframe_spline(
+    return _resample_dataframe_spline(
         data,
         up,
         down,
@@ -111,7 +107,6 @@ def resample_tracks(
         add_second_derivative=add_second_derivative,
         derivative_rename=derivative_rename,
     )
-    return resampled if isinstance(resampled, pl.DataFrame) else resampled.collect()
 
 
 def _resample_dataframe_spline(
@@ -120,7 +115,7 @@ def _resample_dataframe_spline(
     down: int = 1,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
-    group_by: str | Sequence[str] | None = None,
+    group_by: Sequence[str] | None = None,
     *,
     add_derivative: bool = False,
     add_second_derivative: bool = False,
@@ -157,7 +152,7 @@ def _resample_dataframe_spline(
     if down == 1 and up == 1 and not add_derivative and not add_second_derivative:
         return data
 
-    group_cols = [group_by] if isinstance(group_by, str) else list(group_by or [])
+    group_cols = list(group_by or [])
 
     # Pack all relevant columns into a single struct for batch processing
     struct_input = pl.struct([pl.col(c) for c in pos_columns])
@@ -335,19 +330,16 @@ def _resample_dataframe(
     up: int,
     down: int,
     frame_column: str = "frame",
-    group_by: str | None = None,
+    group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> pl.DataFrame:
-    data_ = data.collect() if isinstance(data, pl.LazyFrame) else data
-    cols: list[str] = data_.columns
+) -> T_DataFrame:
     up, down = Fraction(up, down).as_integer_ratio()
     data_ = (
-        data_
+        data
         if up <= 1
-        else _upsample_dataframe(data_, up, frame_column, group_by, forward_fill)
+        else _upsample_dataframe(data, up, frame_column, group_by, forward_fill)
     )
-    data_ = data_ if down <= 1 else _downsample_dataframe(data_, down, frame_column)
-    return data_.drop(slc.all().exclude(cols))
+    return data_ if down <= 1 else _downsample_dataframe(data_, down, frame_column)
 
 
 def _downsample_dataframe(
@@ -385,9 +377,9 @@ def _upsample_dataframe(
     data: T_DataFrame,
     factor: int,
     frame_column: str = "frame",
-    group_by: str | None = None,
+    group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> pl.DataFrame:
+) -> T_DataFrame:
     """Upsample by an integer factor using linear interpolation.
 
     Args:
@@ -401,15 +393,15 @@ def _upsample_dataframe(
         Upsampled DataFrame.
 
     """
-    data_ = data.collect() if isinstance(data, pl.LazyFrame) else data
-
     if factor == 1:
-        return data_
+        return data
     if factor < 0:
         msg = "upsampling factor must be positive"
         raise ValueError(msg)
 
-    data_scaled = data_.with_columns(pl.col(frame_column) * factor)
+    is_eager = isinstance(data, pl.DataFrame)
+    lf = data.lazy() if is_eager else data
+    data_scaled = lf.with_columns(pl.col(frame_column) * factor)
     upsampled = (
         data_scaled
         .group_by(group_by)
@@ -423,9 +415,9 @@ def _upsample_dataframe(
         .explode(frame_column)
     )
 
-    on = [group_by, frame_column] if group_by else [frame_column]
+    on = [*group_by, frame_column] if group_by else [frame_column]
     exclude: list[str] = [*on, *(forward_fill or [])]
-    return (
+    result = (
         upsampled
         .join(data_scaled, on=on, how="left")
         .sort(on)
@@ -434,6 +426,7 @@ def _upsample_dataframe(
             pl.col(forward_fill).forward_fill() if forward_fill else [],
         )
     )
+    return result.collect() if is_eager else result  # pyright: ignore[reportReturnType]
 
 
 @overload

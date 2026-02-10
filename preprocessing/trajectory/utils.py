@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from enum import IntEnum, auto
-from typing import TYPE_CHECKING, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Literal, TypedDict, TypeVar, overload
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+import polars.selectors as sl
 import torch
+from scipy.signal import step
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -69,6 +71,20 @@ class AgentData(TypedDict):
     sa_mask: torch.Tensor
 
 
+def lazy(data: pl.DataFrame | pl.LazyFrame) -> pl.LazyFrame:
+    """Convert a DataFrame to a LazyFrame if necessary."""
+    if isinstance(data, pl.DataFrame):
+        return data.lazy()
+    return data
+
+
+def collect(data: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame:
+    """Resolve a LazyFrame to a DataFrame if necessary."""
+    if isinstance(data, pl.LazyFrame):
+        return data.collect()
+    return data
+
+
 def yaw_from_vel(
     data: T_DataFame,
     vx_col: str = "vx",
@@ -119,14 +135,38 @@ def yaw_from_pos(
 
 
 def derivative(
-    data: pl.DataFrame,
+    data: T_DataFame,
     *x: str,
     dt: float = 1.0,
     n: int = 1,
     include_intermediate: bool = False,
     group_by: str | list[str] | None = None,
     derivative_rename: dict[int, list[str]] | None = None,
-) -> pl.DataFrame:
+) -> T_DataFame:
+    """Compute the n-th order derivative for specified columns using `np.gradient`.
+
+    Calculates numerical derivatives for one or multiple columns. If multiple
+    orders are requested via `include_intermediate`, all steps from $1$ to $n$
+    are returned.
+
+    Note:
+        Raises an exception if the dataset contains fewer than two datapoints
+        per group, as `np.gradient` requires sufficient padding.
+
+    Args:
+        data: Input DataFrame or LazyFrame.
+        *x: Names of columns to differentiate.
+        dt: Constant time step between samples. Defaults to 1.0.
+        n: The maximum order of the derivative. Defaults to 1.
+        include_intermediate: If True, retains all derivatives from 1 to n-1.
+        group_by: Column(s) used to partition data before calculation.
+        derivative_rename: Mapping of order to a list of new column names.
+            Format: `{order: [name_x1, name_x2, ...]}`.
+
+    Returns:
+        The original data structure with new derivative columns appended.
+
+    """
     derivative_rename = {} if derivative_rename is None else derivative_rename
 
     def calc_grad(s: pl.Series) -> np.ndarray:
@@ -168,57 +208,112 @@ def derivative(
     return data
 
 
-def filter_scene(data: pl.DataFrame, config: ProcessorConfig) -> pl.DataFrame | None:
-    """Filter a scene based on the provided configuration.
+def filter_scene(
+    data: T_DataFame,
+    config: ProcessorConfig,
+    group_by: str | None = None,
+) -> T_DataFame:
+    """Filter scenes based on configuration.
 
     Args:
-        data: Input DataFrame containing the scene data.
-        config: ProcessorConfig object containing the filtering criteria.
+        data: input data.
+        config: ProcessorConfig object with filtering criteria.
+        group_by: Optional column name to group by.
 
     Returns:
-        Filtered DataFrame if the scene meets the criteria, otherwise None.
+        DataFrame or LazyFrame with filtered scene(s).
 
     """
-    if data.is_empty():
-        return None
-
     if config.scene_filtering is None:
         return data
 
     filtering = config.scene_filtering
-    start = data.select(pl.col("frame").min()).item()
-    pred_frame = start + config.input_len - 1
-    if (
-        filtering.require_prediction_frame
-        and data.filter(pl.col("frame") == pred_frame).is_empty()
-    ):
-        return None
 
+    # 1. Filter Invalid Agents (Rows)
+    # Equivalent to: df.filter(pl.col("frame").n_unique().over("id") == total_len)
+    # We must ensure we group by [scene, agent] if a scene grouper exists.
     if filtering.require_all_valid:
+        total_len = config.input_len + config.output_len
+
+        # If we have a scene grouper, we must partition the agent check by it
+        # to avoid ID collisions across scenes (unless IDs are globally unique).
+        agent_window = [group_by, "id"] if group_by else "id"
+
         data = data.filter(
-            pl.col("frame").n_unique().over("id")
-            == config.input_len + config.output_len
+            pl.col("frame").n_unique().over(agent_window) == total_len
         )
 
-    if (
-        data.is_empty()
-        or data.select(pl.col("id").n_unique()).item() < filtering.min_agents
-    ):
-        return None
+    # 2. Filter Invalid Scenes (Groups)
+    # We define a window to calculate statistics per scene.
+    # If no group_by is provided, we treat the whole frame as one group (or no-op).
+    scene_window = group_by or pl.lit(1)
 
-    return data
+    # Criteria A: Minimum Agents
+    # We check the count of unique IDs remaining in the scene/group.
+    # Note: This runs AFTER the agent filter above, matching your original logic.
+    has_enough_agents = (
+        pl.col("id").n_unique().over(scene_window) >= filtering.min_agents
+    )
+
+    # Criteria B: Prediction Frame Existence
+    # Logic: min(frame) + input_len - 1 must exist in the group.
+    if filtering.require_prediction_frame:
+        start_frame = pl.col("frame").min().over(scene_window)
+        target_frame = start_frame + config.input_len - 1
+
+        # Check if any row in the group matches the target frame
+        has_pred_frame = (pl.col("frame") == target_frame).any().over(scene_window)
+
+        # Combine the boolean masks
+        scene_mask = has_enough_agents & has_pred_frame
+    else:
+        scene_mask = has_enough_agents
+
+    # Apply the scene-level mask
+    return data.filter(scene_mask)
 
 
+@overload
 def sliding_window(
-    data: pl.DataFrame,
+    data: T_DataFame,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
     *,
     is_sorted: bool = False,
     include_boundaries: bool = False,
-) -> Iterable[pl.DataFrame]:
+    return_iterable: Literal[True] = True,
+) -> Iterable[pl.DataFrame]: ...
+
+
+@overload
+def sliding_window(
+    data: T_DataFame,
+    window_size: int,
+    step_size: int,
+    sliding_col: str = "frame",
+    *,
+    is_sorted: bool = False,
+    include_boundaries: bool = False,
+    return_iterable: Literal[False],
+) -> T_DataFame: ...
+
+
+def sliding_window(
+    data: T_DataFame,
+    window_size: int,
+    step_size: int,
+    sliding_col: str = "frame",
+    *,
+    is_sorted: bool = False,
+    include_boundaries: bool = False,
+    return_iterable: bool = True,
+) -> Iterable[pl.DataFrame] | T_DataFame:
     """Generate sliding windows from a DataFrame.
+
+    When returning as an iterable, the function yields DataFrames for each
+    window. This means that if the input was a `pl.LazyFrame` it will be
+    collected.
 
     Args:
         data: Input DataFrame to generate windows from.
@@ -231,6 +326,8 @@ def sliding_window(
             generating windows. Defaults to False.
         include_boundaries: Passed to `group_by_dynamic` to include window
             boundaries in the output. Defaults to False.
+        return_iterable: Whether to return an iterable of DataFrames or a single
+            DataFrame containing all windows. Defaults to True.
 
     Yields:
         DataFrames corresponding to each sliding window.
@@ -239,6 +336,32 @@ def sliding_window(
     if not is_sorted:
         data = data.sort(sliding_col)
 
+    if return_iterable:
+        return _sliding_window_iterable(
+            collect(data),
+            window_size,
+            step_size,
+            sliding_col,
+            include_boundaries=include_boundaries,
+        )
+
+    return _sliding_window(
+        data,
+        window_size,
+        step_size,
+        sliding_col,
+        include_boundaries=include_boundaries,
+    )
+
+
+def _sliding_window_iterable(
+    data: pl.DataFrame,
+    window_size: int,
+    step_size: int,
+    sliding_col: str = "frame",
+    *,
+    include_boundaries: bool = False,
+) -> Iterable[pl.DataFrame]:
     for _, window in data.group_by_dynamic(
         sliding_col,
         every=f"{step_size}i",
@@ -247,6 +370,33 @@ def sliding_window(
     ):
         if not window.is_empty():
             yield window
+
+
+def _sliding_window(
+    data: T_DataFame,
+    window_size: int,
+    step_size: int,
+    sliding_col: str = "frame",
+    *,
+    include_boundaries: bool = False,
+) -> T_DataFame:
+    return (
+        data
+        .group_by_dynamic(
+            sliding_col,
+            every=f"{step_size}i",
+            period=f"{window_size}i",
+            include_boundaries=include_boundaries,
+        )
+        .agg(
+            pl.col(sliding_col).alias(f"{sliding_col}_actual"),
+            pl.all().exclude(sliding_col),
+        )
+        .with_row_index("window_index")
+        .explode(sl.all().exclude("window_index", sliding_col))
+        .drop(sliding_col)
+        .rename({f"{sliding_col}_actual": sliding_col})
+    )
 
 
 def convert_to_agent_data_dict(
@@ -412,8 +562,17 @@ def _full_nan(
 if __name__ == "__main__":
     # Example usage of the utility functions
     df = pl.DataFrame({
-        "id": [1, 1, 1, 1, 1, 1, 2, 2, 2],
-        "frame": [0, 1, 2, 3, 4, 5, 0, 1, 2],
+        "x": [1, 1, 1, 1],
+        "y": [1, 2, 3, 4],
     })
-    for window in sliding_window(df, window_size=2, step_size=1):
-        print(window.sort(["id", "frame"]))
+    rename_map = {
+        1: ["vel_x", "vel_y"],
+    }
+    df = derivative(
+        df,
+        "x",
+        "y",
+        derivative_rename=rename_map,
+        n=1,
+    )
+    print(df)

@@ -1,12 +1,16 @@
-import math
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
-from concurrent.futures import ProcessPoolExecutor
+from collections.abc import Callable, Hashable, Iterable
 from fractions import Fraction
-from typing import Generic, Literal, Self, TypedDict, TypeVar, cast, override
+from typing import (
+    Generic,
+    Literal,
+    Self,
+    TypedDict,
+    TypeVar,
+)
 
 import polars as pl
-from attr import asdict, dataclass
+from attr import dataclass
 
 from preprocessing.trajectory.utils import (
     AgentData,
@@ -154,66 +158,12 @@ class FrameDict(TypedDict):
     """Class of the agent/object."""
 
 
-T_Dict = TypeVar("T_Dict", bound=FrameDict)
-
-
-@dataclass(slots=True, frozen=True)
-class BaseFrame(Generic[T_Dict]):
-    """Data class representing a single frame of an object's trajectory.
-
-    Can be extended for different data representations.
-    """
-
-    frame: int
-    """Frame index."""
-    id: int
-    """Unique track identifier."""
-    x: float
-    """x position in meters."""
-    y: float
-    """y position in meters."""
-    vx: float | None = None
-    """x velocity in m/s."""
-    vy: float | None = None
-    """y velocity in m/s."""
-    yaw: float | None = None
-    """Orientation in radians."""
-    category: Category = Category.UNKNOWN
-    """Category of the agent/object."""
-
-    def __post_init__(self) -> None:
-        """Initialize derived attributes."""
-        if self.vx is not None and self.vy is not None and self.yaw is None:
-            object.__setattr__(
-                self,
-                "yaw",
-                math.atan2(self.vy, self.vx),
-            )
-
-    def to_dict(self) -> T_Dict:
-        """Convert to dictionary representation.
-
-        Returns:
-            Dictionary representation of the Frame.
-
-        """
-        return cast("T_Dict", asdict(self))
-
-
-class Frame(BaseFrame[FrameDict]):
-    """Data class representing a single frame of an object's trajectory.
-
-    This is equivalent to a single row in the common dataframe format.
-    """
-
-
-T_Frame = TypeVar("T_Frame", bound=BaseFrame[FrameDict])
 T_Source = TypeVar("T_Source")
-T_ID = TypeVar("T_ID")
+T_ID = TypeVar("T_ID", bound=(Hashable))
 
 
 @dataclass(slots=True, frozen=True)
-class Scene(Generic[T_ID, T_Frame]):
+class Scene(Generic[T_ID]):
     """Scene data class wrapping a DataFrame and its identifier.
 
     The dataframe is expected to atleast contain all columns defined in FrameDict.
@@ -238,11 +188,6 @@ class Scene(Generic[T_ID, T_Frame]):
         if missing:
             msg = f"Scene DataFrame missing required columns: {missing}"
             raise ValueError(msg)
-
-    def frames(self) -> Iterable[T_Frame]:
-        """Yield frames as data class instances."""
-        for row in self.inner.iter_rows(named=True):
-            yield cast("T_Frame", row)
 
     def to_agent_data(
         self,
@@ -273,7 +218,7 @@ class Scene(Generic[T_ID, T_Frame]):
 IDMapping = Callable[[int, T_ID], T_ID]
 
 
-class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
+class DataProcessor(ABC, Generic[T_ID, T_Source]):
     """Interface for processing raw data sources into a standardized format.
 
     Generic over the data scene source type and identifier type. Source type can
@@ -348,26 +293,26 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         """Discover and yield identifiers for each scene to process."""
 
     @abstractmethod
-    def load_raw(self, source: T_Source) -> Iterable[pl.DataFrame]:
+    def load_raw(self, source: T_Source) -> Iterable[pl.LazyFrame]:
         """Read the raw data source into one or more DataFrame(s) (any schema)."""
 
     @abstractmethod
-    def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
+    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         """Convert the raw DataFrame into the common schema."""
 
-    def post_process(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Post-process step after normalization and before validation.
-
-        This is an optional step that can be overridden by subclasses.
-        """
-        return df
+    @staticmethod
+    def derivative_names() -> dict[int, list[str]]:
+        """Return the names of the derivatives for velocity and acceleration."""
+        return {
+            1: ["vx", "vy"],
+            2: ["ax", "ay"],
+        }
 
     def process_next(
         self,
         source: T_Source,
         *,
         validate_output: bool = True,
-        validate_intermediate: bool = False,
     ) -> Iterable[pl.DataFrame]:
         """Process a single data item through the pipeline.
 
@@ -379,23 +324,26 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         5. Validate output schema (Optional, default True).
         """
 
-        def _step(raw_df: pl.DataFrame) -> pl.DataFrame | None:
+        def _step(
+            raw_df: pl.LazyFrame,
+        ) -> pl.DataFrame | None:
             normalized_df = self.normalize(raw_df)
-            if normalized_df is None:
+            try:
+                df = normalized_df.collect()
+            except ValueError:
+                # Error cases can be caused by:
+                # 1. Empty scenes (due to filtering or missing data)
                 return None
-            if validate_intermediate:
-                self._validate_schema(normalized_df)
-            df = self.post_process(normalized_df)
             if validate_output:
-                self._validate_schema(df)
-            return df
+                self._validate_schema(df.schema)
+            return df if not df.is_empty() else None
 
         for raw_df in self.load_raw(source):
             df = _step(raw_df)
             if df is not None:
                 yield df
 
-    def scenes_iter(self) -> Iterable[Scene[T_ID, T_Frame]]:
+    def scenes_iter(self) -> Iterable[Scene[T_ID]]:
         """Iterate over all sources and process them into scenes.
 
         This will lazy-load and process each source one at a time.
@@ -404,15 +352,12 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
             self._source_counter += 1
             for scene_df in self.process_next(
                 source,
-                validate_intermediate=self._validate_intermediate,
                 validate_output=self._validate_output,
             ):
                 yield self._create_scene(scene_df, source_id)
 
-    def _create_scene(
-        self, df: pl.DataFrame, source_id: T_ID
-    ) -> Scene[T_ID, T_Frame]:
-        scene = Scene[T_ID, T_Frame](
+    def _create_scene(self, df: pl.DataFrame, source_id: T_ID) -> Scene[T_ID]:
+        scene = Scene[T_ID](
             inner=df,
             source_identifier=source_id
             if self._id_mapping is None
@@ -424,64 +369,11 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         self._count += 1
         return scene
 
-    def _process_worker(
-        self,
-        source: T_Source,
-    ) -> list[pl.DataFrame]:
-        """Worker method to process a single source completely.
-
-        Returns a list of DataFrames because one source can yield multiple scenes.
-        This runs inside the worker process.
-        """
-        results = []
-
-        # Steps reused from original process_next logic
-        for raw_df in self.load_raw(source):
-            normalized_df = self.normalize(raw_df)
-
-            if normalized_df is None:
-                continue
-
-            df = self.post_process(normalized_df)
-            results.append(df)
-
-        return results
-
-    def _validate_schema(self, df: pl.DataFrame) -> None:
-        # FrameDict keys are required
+    def _validate_schema(self, schema: pl.Schema) -> None:
+        """Validate columns using LazyFrame schema without collecting data."""
         required_cols = FrameDict.__annotations__.keys()
-        missing = set(required_cols) - set(df.columns)
+        missing = set(required_cols) - set(schema.names())
 
         if missing:
-            msg = f"processor output missing required columns: {missing}"
+            msg = f"Processor output missing required columns: {missing}"
             raise ValueError(msg)
-
-
-@dataclass(slots=True)
-class FrameStreamProcessor(DataProcessor[T_ID, T_Source, T_Frame], ABC):
-    """DataProcessor specialized for frame-by-frame data sources."""
-
-    @abstractmethod
-    def iter_frames(self, source: T_Source) -> Iterable[T_Frame]:
-        """Yield frames one by one from the raw source."""
-
-    @override
-    def load_raw(self, source: T_Source) -> Iterable[pl.DataFrame]:
-        frames = [f.to_dict() for f in self.iter_frames(source)]
-
-        if not frames:
-            return []
-        return [pl.DataFrame(frames)]
-
-    @override
-    def normalize(self, df: pl.DataFrame) -> pl.DataFrame | None:
-        return df.select([
-            pl.col("frame").cast(pl.Int32),
-            pl.col("track_id").cast(pl.Int32),
-            pl.col("x").cast(pl.Float64),
-            pl.col("y").cast(pl.Float64),
-            pl.col("vx").cast(pl.Float64),
-            pl.col("vy").cast(pl.Float64),
-            pl.col("yaw").cast(pl.Float64),
-            pl.col("agent_class").cast(pl.Int32),
-        ])
