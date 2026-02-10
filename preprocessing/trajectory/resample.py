@@ -84,6 +84,7 @@ def resample_tracks(
                 dt=dt,
                 include_intermediate=add_derivative,
                 derivative_rename=derivative_rename,
+                group_by=group_by,
             )
         elif add_derivative:
             upsampled = derivative(
@@ -93,6 +94,7 @@ def resample_tracks(
                 dt=dt,
                 include_intermediate=add_derivative,
                 derivative_rename=derivative_rename,
+                group_by=group_by,
             )
         return upsampled
 

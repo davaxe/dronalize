@@ -14,6 +14,7 @@ from preprocessing.trajectory.interface import (
     ProcessorConfig,
     Resampling,
 )
+from preprocessing.trajectory.plot import plot_comparison
 from preprocessing.trajectory.resample import resample_tracks
 from preprocessing.trajectory.utils import (
     Category,
@@ -83,50 +84,59 @@ class LyftProcessor(DataProcessor[int, _Source]):
         agent_start = np.min(frames_np[:]["agent_index_interval"])
         agent_end = np.max(frames_np[:]["agent_index_interval"])
         agents_np = cast("npt.NDArray", self._agents[agent_start:agent_end])
+        resampling = self.processor_config.resampling or Resampling(1, 1)
 
         for scene_data in scenes_np:
-            _, scenes = _scene_to_polars(
+            scenes = _scene_to_polars(
                 scene_data,
                 frames=frames_np,
                 agents=agents_np,
                 frame_offset=frame_start,
                 agent_offset=agent_start,
-            )
+            )[1].lazy()
 
-            if self.processor_config.window_params is None:
-                yield scenes.lazy()
-                continue
+            group_by: list[str] = []
+            if self.processor_config.window_params is not None:
+                scenes = sliding_window(
+                    scenes,
+                    window_size=self.sequence_length,
+                    step_size=self.processor_config.window_params.step_size,
+                    sliding_col="frame",
+                    is_sorted=False,
+                    return_iterable=False,
+                )
+                group_by.append("window_index")
 
-            for window in sliding_window(
+            source_filtered = filter_scene(
                 scenes,
-                window_size=self.sequence_length,
-                step_size=self.processor_config.window_params.step_size,
-                sliding_col="frame",
-                is_sorted=False,
-                return_iterable=True,
-            ):
-                yield window.lazy()
+                self.processor_config,
+                group_by=group_by[-1] if len(group_by) > 0 else None,
+            )
+            group_by.append("id")
+            source_filtered = source_filtered.filter(pl.len().over(group_by) >= 2)
 
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        df = df.filter(pl.col("frame").n_unique().over("id") > 1)
-        df_filtered = filter_scene(df, self.processor_config)
-
-        resampling = self.processor_config.resampling or Resampling(1, 1)
-        return yaw_from_vel(
-            resample_tracks(
-                df_filtered,
+            processed_source = resample_tracks(
+                source_filtered,
                 resampling.up,
                 resampling.down,
-                group_by="id",
+                group_by=group_by,
                 add_derivative=True,
                 add_second_derivative=True,
                 method=resampling.method,
                 dt=self.processor_config.sample_time,
                 derivative_rename=self.derivative_names(),
-            ),
-            yaw_col="yaw",
-        )
+            )
+
+            if self.processor_config.window_params is None:
+                yield processed_source.lazy()
+                return
+
+            for _, group in processed_source.collect().group_by("window_index"):
+                yield group.lazy().drop("window_index")
+
+    @override
+    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
+        return yaw_from_vel(df, yaw_col="yaw")
 
     @staticmethod
     def _default_config() -> ProcessorConfig:
@@ -266,7 +276,7 @@ def main():
     directory = Path(
         "/home/west/Developer/behavior-prediction/datasets/lyft/validate/validate.zarr"
     )
-    # directory = Path("data/sample/sample.zarr")
+    directory = Path("data/sample/sample.zarr")
     processor = LyftProcessor(directory, 1000)
     _total_scenes = 194608
     count = 0

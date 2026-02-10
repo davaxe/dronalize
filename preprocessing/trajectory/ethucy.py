@@ -72,7 +72,6 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
         source = source.filter(pl.col("frame").n_unique().over("id") > 1)
         resampling = self.processor_config.resampling or Resampling(1, 1)
         group_by: list[str] = []
-
         # Apply sliding window logic if parameters are present
         if self._window_params is not None:
             source = sliding_window(

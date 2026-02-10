@@ -8,10 +8,9 @@ import numpy.typing as npt
 import polars as pl
 import polars.selectors as sl
 import torch
-from scipy.signal import step
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
 
     from preprocessing.trajectory.interface import ProcessorConfig
 
@@ -140,10 +139,10 @@ def derivative(
     dt: float = 1.0,
     n: int = 1,
     include_intermediate: bool = False,
-    group_by: str | list[str] | None = None,
+    group_by: str | Sequence[str] | None = None,
     derivative_rename: dict[int, list[str]] | None = None,
 ) -> T_DataFame:
-    """Compute the n-th order derivative for specified columns using `np.gradient`.
+    """Compute the n-th order derivative for columns using finite differences.
 
     Calculates numerical derivatives for one or multiple columns. If multiple
     orders are requested via `include_intermediate`, all steps from $1$ to $n$
@@ -169,13 +168,19 @@ def derivative(
     """
     derivative_rename = {} if derivative_rename is None else derivative_rename
 
-    def calc_grad(s: pl.Series) -> np.ndarray:
-        # np.gradient returns a numpy array of the same shape
-        return np.gradient(s.to_numpy(), dt)
+    def get_gradient_expr(col_name: str) -> pl.Expr:
+        col = pl.col(col_name)
+        # Central difference: (next - prev) / 2dt
+        central = (col.shift(-1) - col.shift(1)) / (2 * dt)
+        # Forward difference (for the first element): (next - current) / dt
+        forward = (col.shift(-1) - col) / dt
+        # Backward difference (for the last element): (current - prev) / dt
+        backward = (col - col.shift(1)) / dt
+        # Coalesce: Use central, fill start with forward, fill end with backward
+        return central.fill_null(forward).fill_null(backward)
 
-    current_col_names: list[str] = list(x)
-    intermediate_cols: list[str] = []
-
+    current_col_names = list(x)
+    intermediate_cols = []
     for i in range(1, n + 1):
         next_step_exprs = []
         next_col_names = []
@@ -186,9 +191,11 @@ def derivative(
 
         for j, col_name in enumerate(current_col_names):
             new_name = rename_list[j]
-            grad_expr = pl.col(col_name).map_batches(
-                calc_grad, return_dtype=pl.Float64
-            )
+
+            # Generate the native expression
+            grad_expr = get_gradient_expr(col_name)
+
+            # Apply grouping if requested
             if group_by is not None:
                 grad_expr = grad_expr.over(group_by)
 
@@ -198,10 +205,11 @@ def derivative(
             if i < n:
                 intermediate_cols.append(new_name)
 
+        # Append columns for this order
         data = data.with_columns(next_step_exprs)
         current_col_names = next_col_names
 
-    # 4. Cleanup
+    # 3. Cleanup
     if not include_intermediate:
         data = data.drop(intermediate_cols)
 
@@ -211,7 +219,7 @@ def derivative(
 def filter_scene(
     data: T_DataFame,
     config: ProcessorConfig,
-    group_by: str | None = None,
+    group_by: str | Sequence[str] | None = None,
 ) -> T_DataFame:
     """Filter scenes based on configuration.
 
@@ -224,6 +232,7 @@ def filter_scene(
         DataFrame or LazyFrame with filtered scene(s).
 
     """
+    group_by = [group_by] if isinstance(group_by, str) else list(group_by or [])
     if config.scene_filtering is None:
         return data
 
@@ -237,7 +246,7 @@ def filter_scene(
 
         # If we have a scene grouper, we must partition the agent check by it
         # to avoid ID collisions across scenes (unless IDs are globally unique).
-        agent_window = [group_by, "id"] if group_by else "id"
+        agent_window = [*group_by, "id"] if group_by else ["id"]
 
         data = data.filter(
             pl.col("frame").n_unique().over(agent_window) == total_len
@@ -280,6 +289,7 @@ def sliding_window(
     step_size: int,
     sliding_col: str = "frame",
     *,
+    group_by: str | None = None,
     is_sorted: bool = False,
     include_boundaries: bool = False,
     return_iterable: Literal[True] = True,
@@ -293,6 +303,7 @@ def sliding_window(
     step_size: int,
     sliding_col: str = "frame",
     *,
+    group_by: str | None = None,
     is_sorted: bool = False,
     include_boundaries: bool = False,
     return_iterable: Literal[False],
@@ -305,6 +316,7 @@ def sliding_window(
     step_size: int,
     sliding_col: str = "frame",
     *,
+    group_by: str | None = None,
     is_sorted: bool = False,
     include_boundaries: bool = False,
     return_iterable: bool = True,
@@ -328,13 +340,15 @@ def sliding_window(
             boundaries in the output. Defaults to False.
         return_iterable: Whether to return an iterable of DataFrames or a single
             DataFrame containing all windows. Defaults to True.
+        group_by: Optional column name(s) to group by before applying the sliding window.
+            This allows for generating windows within each group separately.
 
     Yields:
         DataFrames corresponding to each sliding window.
 
     """
     if not is_sorted:
-        data = data.sort(sliding_col)
+        data = data.sort([sliding_col, group_by] if group_by else sliding_col)
 
     if return_iterable:
         return _sliding_window_iterable(
@@ -360,6 +374,7 @@ def _sliding_window_iterable(
     step_size: int,
     sliding_col: str = "frame",
     *,
+    group_by: str | None = None,
     include_boundaries: bool = False,
 ) -> Iterable[pl.DataFrame]:
     for _, window in data.group_by_dynamic(
@@ -367,6 +382,7 @@ def _sliding_window_iterable(
         every=f"{step_size}i",
         period=f"{window_size}i",
         include_boundaries=include_boundaries,
+        group_by=group_by,
     ):
         if not window.is_empty():
             yield window
@@ -378,6 +394,7 @@ def _sliding_window(
     step_size: int,
     sliding_col: str = "frame",
     *,
+    group_by: str | None = None,
     include_boundaries: bool = False,
 ) -> T_DataFame:
     return (
@@ -387,6 +404,7 @@ def _sliding_window(
             every=f"{step_size}i",
             period=f"{window_size}i",
             include_boundaries=include_boundaries,
+            group_by=group_by,
         )
         .agg(
             pl.col(sliding_col).alias(f"{sliding_col}_actual"),
