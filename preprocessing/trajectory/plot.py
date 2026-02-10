@@ -275,17 +275,10 @@ if __name__ == "__main__":
     print("Original DataFrame:")
     print(df_complex)
 
-    # 3. Resample (dt=0.2, org_dt=1.0 means 5x upsampling)
-    dt_new = 0.1
-    dt_org = 0.4
-    print("Ratio: ", dt_new / dt_org)
+    dt_org = 1
+    print("Ratio: ", dt_org)
     df_resampled = resample_tracks(
-        df_complex,
-        ratio=dt_org / dt_new,
-        group_by="track_id",
-        pos_columns=["x", "y"],
-        vel_columns=["vx", "vy"],
-        # add_velocity=True,
+        df_complex, up=3, down=1, group_by="track_id", method="spline"
     )
     print(df_resampled.filter(pl.col("track_id") == 1))
 

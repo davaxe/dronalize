@@ -1,7 +1,9 @@
 import math
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
-from typing import Generic, Self, TypedDict, TypeVar, cast, override
+from concurrent.futures import ProcessPoolExecutor
+from fractions import Fraction
+from typing import Generic, Literal, Self, TypedDict, TypeVar, cast, override
 
 import polars as pl
 from attr import asdict, dataclass
@@ -41,6 +43,27 @@ class WindowParams:
 
 
 @dataclass(slots=True)
+class Resampling:
+    """Configuration for resampling trajectories."""
+
+    up: int
+    """Upsampling factor."""
+    down: int
+    """Downsampling factor."""
+    method: Literal["fast", "spline"] = "fast"
+    """Method used for resampling."""
+
+    def __post_init__(self) -> None:
+        """Simplify the resampling ratio to its smallest integer ratio form."""
+        self.up, self.down = Fraction(self.up, self.down).as_integer_ratio()
+
+    @property
+    def factors(self) -> tuple[int, int]:
+        """(up, down) resampling factors."""
+        return (self.up, self.down)
+
+
+@dataclass(slots=True)
 class ProcessorConfig:
     """Base configuration dataclass for trajectory data processing.
 
@@ -57,9 +80,8 @@ class ProcessorConfig:
     sample_time: float
     """Time interval between frames in seconds."""
 
-    target_sample_time: float | None = None
-    """The target time interval for resampling the trajectories, in seconds. If
-    None, no resampling will be performed."""
+    resampling: Resampling | None = None
+    """Resampling config if applicable."""
 
     window_params: WindowParams | None = None
     """Used for datasets where multiple samples can be generated from a single
@@ -94,6 +116,16 @@ class ProcessorConfig:
             require_all_valid=require_all_valid,
             require_prediction_frame=require_prediction_frame,
         )
+        return self
+
+    def resampling_parameters(
+        self,
+        up: int,
+        down: int,
+        method: Literal["fast", "spline"] = "fast",
+    ) -> Self:
+        """Set the resampling parameters."""
+        self.resampling = Resampling(up=up, down=down, method=method)
         return self
 
 
@@ -289,23 +321,27 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
         return self.processor_config.input_len + self.processor_config.output_len
 
     @property
-    def resampling_ratio(self) -> float:
-        """Ratio of target sample time to original sample time."""
-        if self.processor_config.target_sample_time is None:
-            return 1.0
-        return (
-            self.processor_config.sample_time
-            / self.processor_config.target_sample_time
-        )
-
     def input_len(self) -> int:
         """Observation length in frames (resulting value in Scene)."""
-        return int((self.original_input_len - 1) * self.resampling_ratio + 1)
+        up, down = (
+            self.processor_config.resampling.factors
+            if self.processor_config.resampling
+            else (1, 1)
+        )
+        ratio = up / down
+        return int((self.original_input_len - 1) * ratio + 1)
 
+    @property
     def output_len(self) -> int:
         """Prediction length in frames (resulting value in Scene)."""
-        total_len = int((self.sequence_length - 1) * self.resampling_ratio + 1)
-        return total_len - self.input_len()
+        up, down = (
+            self.processor_config.resampling.factors
+            if self.processor_config.resampling
+            else (1, 1)
+        )
+        ratio = up / down
+        total_len = int((self.sequence_length - 1) * ratio + 1)
+        return total_len - self.input_len
 
     @abstractmethod
     def sources(self) -> Iterable[tuple[T_ID, T_Source]]:
@@ -359,8 +395,8 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
             if df is not None:
                 yield df
 
-    def process_scenes(self) -> Iterable[Scene[T_ID, T_Frame]]:
-        """Iterate over all sources and process them.
+    def scenes_iter(self) -> Iterable[Scene[T_ID, T_Frame]]:
+        """Iterate over all sources and process them into scenes.
 
         This will lazy-load and process each source one at a time.
         """
@@ -371,16 +407,45 @@ class DataProcessor(ABC, Generic[T_ID, T_Source, T_Frame]):
                 validate_intermediate=self._validate_intermediate,
                 validate_output=self._validate_output,
             ):
-                yield Scene[T_ID, T_Frame](
-                    inner=scene_df,
-                    source_identifier=source_id
-                    if self._id_mapping is None
-                    else self._id_mapping(self._source_counter, source_id),
-                    scene_number=self._count,
-                    input_len=self.input_len(),
-                    output_len=self.output_len(),
-                )
-                self._count += 1
+                yield self._create_scene(scene_df, source_id)
+
+    def _create_scene(
+        self, df: pl.DataFrame, source_id: T_ID
+    ) -> Scene[T_ID, T_Frame]:
+        scene = Scene[T_ID, T_Frame](
+            inner=df,
+            source_identifier=source_id
+            if self._id_mapping is None
+            else self._id_mapping(self._source_counter, source_id),
+            scene_number=self._count,
+            input_len=self.input_len,
+            output_len=self.output_len,
+        )
+        self._count += 1
+        return scene
+
+    def _process_worker(
+        self,
+        source: T_Source,
+    ) -> list[pl.DataFrame]:
+        """Worker method to process a single source completely.
+
+        Returns a list of DataFrames because one source can yield multiple scenes.
+        This runs inside the worker process.
+        """
+        results = []
+
+        # Steps reused from original process_next logic
+        for raw_df in self.load_raw(source):
+            normalized_df = self.normalize(raw_df)
+
+            if normalized_df is None:
+                continue
+
+            df = self.post_process(normalized_df)
+            results.append(df)
+
+        return results
 
     def _validate_schema(self, df: pl.DataFrame) -> None:
         # FrameDict keys are required

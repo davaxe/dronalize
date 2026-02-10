@@ -9,8 +9,12 @@ import numpy.typing as npt
 import polars as pl
 import zarr
 
-from preprocessing.trajectory.interface import DataProcessor, Frame, ProcessorConfig
-from preprocessing.trajectory.plot import plot_comparison
+from preprocessing.trajectory.interface import (
+    DataProcessor,
+    Frame,
+    ProcessorConfig,
+    Resampling,
+)
 from preprocessing.trajectory.resample import resample_tracks
 from preprocessing.trajectory.utils import (
     Category,
@@ -108,14 +112,18 @@ class LyftProcessor(DataProcessor[int, _Source, Frame]):
         if df_filtered is None:
             return None
 
+        resampling = self.processor_config.resampling or Resampling(1, 1)
         return yaw_from_vel(
             resample_tracks(
                 df_filtered,
-                ratio=self.resampling_ratio,
+                resampling.up,
+                resampling.down,
                 group_by="id",
-                pos_columns=["x", "y"],
-                add_velocity=True,
-                add_acceleration=True,
+                add_derivative=True,
+                add_second_derivative=True,
+                method=resampling.method,
+                dt=self.processor_config.sample_time,
+                derivative_rename=self._derivative_name(),
             ),
             yaw_col="yaw",
         )
@@ -127,11 +135,17 @@ class LyftProcessor(DataProcessor[int, _Source, Frame]):
                 input_len=20,
                 output_len=50,
                 sample_time=0.1,
-                target_sample_time=0.1,
             )
             .window_parameters(step_size=20)
             .scene_filtering_parameters(min_agents=1, require_prediction_frame=True)
         )
+
+    @staticmethod
+    def _derivative_name() -> dict[int, list[str]]:
+        return {
+            1: ["vx", "vy"],
+            2: ["ax", "ay"],
+        }
 
 
 @dataclass
@@ -253,20 +267,23 @@ def _scene_to_polars(
     return scene.scene_name, pl.concat([ego_df, agent_df])
 
 
-if __name__ == "__main__":
-    # Example usage
-    directory = Path("data/sample/sample.zarr")  # 16220
-
-    # Example usage
-    scenes = LyftProcessor(directory, scene_batch_size=1000)
+def main():
     start_time = time.time()
-    count: int = 0
-    for scene_df in scenes.process_scenes():
-        count += 1
-        if count % 50 == 0:
+    directory = Path(
+        "/home/west/Developer/behavior-prediction/datasets/lyft/validate/validate.zarr"
+    )
+    # directory = Path("data/sample/sample.zarr")
+    processor = LyftProcessor(directory, 100)
+    total_scenes = 194608
+    count = 9
+    for scene in processor.scenes_iter():
+        if count % 250 == 0:
             print(
-                f"Processed {count} scenes in {time.time() - start_time:.2f} seconds"
+                f"Processed {count} scenes in {time.time() - start_time:.2f} seconds."
             )
-        break
+        count += 1
+    print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds.")
 
-    print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds")
+
+if __name__ == "__main__":
+    main()

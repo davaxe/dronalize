@@ -118,6 +118,56 @@ def yaw_from_pos(
     )
 
 
+def derivative(
+    data: pl.DataFrame,
+    *x: str,
+    dt: float = 1.0,
+    n: int = 1,
+    include_intermediate: bool = False,
+    group_by: str | list[str] | None = None,
+    derivative_rename: dict[int, list[str]] | None = None,
+) -> pl.DataFrame:
+    derivative_rename = {} if derivative_rename is None else derivative_rename
+
+    def calc_grad(s: pl.Series) -> np.ndarray:
+        # np.gradient returns a numpy array of the same shape
+        return np.gradient(s.to_numpy(), dt)
+
+    current_col_names: list[str] = list(x)
+    intermediate_cols: list[str] = []
+
+    for i in range(1, n + 1):
+        next_step_exprs = []
+        next_col_names = []
+
+        rename_list = derivative_rename.get(
+            i, [f"d{i}_{original_root}" for original_root in x]
+        )
+
+        for j, col_name in enumerate(current_col_names):
+            new_name = rename_list[j]
+            grad_expr = pl.col(col_name).map_batches(
+                calc_grad, return_dtype=pl.Float64
+            )
+            if group_by is not None:
+                grad_expr = grad_expr.over(group_by)
+
+            next_step_exprs.append(grad_expr.alias(new_name))
+            next_col_names.append(new_name)
+
+            if i < n:
+                intermediate_cols.append(new_name)
+
+        data = data.with_columns(next_step_exprs)
+        current_col_names = next_col_names
+
+    # 4. Cleanup
+    if not include_intermediate:
+        data = data.drop(intermediate_cols)
+
+    return data
+
+
 def filter_scene(data: pl.DataFrame, config: ProcessorConfig) -> pl.DataFrame | None:
     """Filter a scene based on the provided configuration.
 

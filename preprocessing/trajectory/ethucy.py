@@ -24,6 +24,7 @@ from preprocessing.trajectory.interface import (
     DataProcessor,
     Frame,
     ProcessorConfig,
+    Resampling,
 )
 from preprocessing.trajectory.resample import resample_tracks
 from preprocessing.trajectory.utils import (
@@ -92,13 +93,16 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
         if df_filtered is None:
             return None
 
+        resampling = self.processor_config.resampling or Resampling(1, 1)
         df = resample_tracks(
             df_filtered,
-            ratio=self.resampling_ratio,
+            resampling.up,
+            resampling.down,
             group_by="id",
-            pos_columns=["x", "y"],
-            add_velocity=True,
-            add_acceleration=True,
+            add_derivative=True,
+            add_second_derivative=True,
+            method=resampling.method,
+            dt=self.processor_config.sample_time,
         )
 
         return yaw_from_vel(df, yaw_col="yaw").with_columns(
@@ -134,10 +138,10 @@ class EthUcyProcessor(DataProcessor[str, pl.DataFrame, Frame]):
                 input_len=8,
                 output_len=12,
                 sample_time=0.4,
-                target_sample_time=0.1,
             )
             .window_parameters(step_size=1)
             .scene_filtering_parameters(require_all_valid=True)
+            .resampling_parameters(4, 1, method="fast")
         )
 
 
@@ -147,7 +151,7 @@ if __name__ == "__main__":
     )
     count: int = 0
     total_time = 0.0
-    for scene in processor.process_scenes():
+    for scene in processor.scenes_iter():
         count += 1
 
     print(f"Processed {count} scenes.")
