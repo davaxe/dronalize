@@ -1,5 +1,5 @@
-import time
-from collections.abc import Iterable
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast, override
@@ -10,19 +10,21 @@ import polars as pl
 from zarr.creation import open_array
 
 from preprocessing.trajectory.interface import (
+    Category,
     DataProcessor,
     ProcessorConfig,
     Resampling,
 )
-from preprocessing.trajectory.resample import resample_tracks
 from preprocessing.trajectory.utils import (
-    Category,
     filter_scene_expr,
     sliding_window,
     yaw_from_vel,
 )
+from preprocessing.trajectory.utils.resample import resample_tracks
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from zarr.core import Array
 
 
@@ -91,7 +93,7 @@ class LyftProcessor(DataProcessor[int, _Source]):
                 agent_offset=agent_start,
             )[1].lazy()
             scenes = scenes.filter(
-                pl.col("agent_class") != Category.UNIMPORTANT.value
+                pl.col("agent_category") != Category.UNIMPORTANT.value
             )
 
             group_by: list[str] = []
@@ -217,7 +219,7 @@ def _scene_to_polars(
         "id": ego_ids,
         "x": ego_x,
         "y": ego_y,
-        "agent_class": np.full(n_frames, Category.CAR.value, dtype=np.int32),
+        "agent_category": np.full(n_frames, Category.CAR.value, dtype=np.int32),
     })
 
     intervals = scene_frames["agent_index_interval"]
@@ -255,19 +257,21 @@ def _scene_to_polars(
     max_indices = np.argmax(probs, axis=1)
     # Map indices to Category values using the lookup table
     safe_indices = np.minimum(max_indices, len(_CATEGORY_LOOKUP) - 1)
-    agent_classes = _CATEGORY_LOOKUP[safe_indices].astype(np.int32)
+    agent_categories = _CATEGORY_LOOKUP[safe_indices].astype(np.int32)
 
     agent_df = pl.DataFrame({
         "frame": agent_frame_indices,
         "id": agent_ids,
         "x": agent_x,
         "y": agent_y,
-        "agent_class": agent_classes,
+        "agent_category": agent_categories,
     })
     return scene.scene_name, pl.concat([ego_df, agent_df])
 
 
 def main():
+    import time
+
     """Test."""
     start_time = time.time()
     directory = Path(

@@ -8,7 +8,7 @@ import numpy.typing as npt
 import polars as pl
 from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
-from preprocessing.trajectory.utils import derivative
+from preprocessing.trajectory.utils.derivative import derivative
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

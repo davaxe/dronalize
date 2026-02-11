@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Hashable, Iterable, Sequence
 from fractions import Fraction
 from typing import (
+    TYPE_CHECKING,
     Generic,
     Literal,
     Self,
@@ -9,14 +12,17 @@ from typing import (
     TypeVar,
 )
 
-import polars as pl
 from attr import dataclass
 
 from preprocessing.trajectory.utils import (
     AgentData,
-    Category,
     convert_to_agent_data_dict,
 )
+
+if TYPE_CHECKING:
+    import polars as pl
+
+    from preprocessing.trajectory.categories import Category
 
 
 @dataclass(slots=True)
@@ -37,8 +43,8 @@ class SceneFiltering:
     require_frames: Sequence[int] | None = None
     """Specific frames offset required for the scene to be considered valid."""
 
-    filter_agent_class: set[Category] | None = None
-    """Set of agent classes to filter out from scenes."""
+    filter_agent_category: set[Category] | None = None
+    """Set of agent categories to filter out from scenes."""
 
 
 @dataclass(slots=True)
@@ -160,8 +166,8 @@ class FrameDict(TypedDict):
     """y acceleration in m/s^2."""
     yaw: float
     """Orientation in radians."""
-    agent_class: Category
-    """Class of the agent/object."""
+    agent_category: Category
+    """Category of the agent/object."""
 
 
 T_Source = TypeVar("T_Source")

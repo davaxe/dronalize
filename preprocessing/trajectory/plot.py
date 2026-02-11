@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 import seaborn as sns
 
-from preprocessing.trajectory.resample import resample_tracks
+from preprocessing.trajectory.utils.resample import resample_tracks
 
 
 def plot_comparison(

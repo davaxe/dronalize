@@ -1,17 +1,3 @@
-# Copyright 2024-2025, Theodor Westny. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from __future__ import annotations
 
 import time
@@ -26,12 +12,12 @@ from preprocessing.trajectory.interface import (
     ProcessorConfig,
     Resampling,
 )
-from preprocessing.trajectory.resample import resample_tracks
 from preprocessing.trajectory.utils import (
     filter_scene_expr,
     sliding_window,
     yaw_from_vel,
 )
+from preprocessing.trajectory.utils.resample import resample_tracks
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -113,7 +99,7 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df, yaw_col="yaw").with_columns(
-            pl.lit(Category.PEDESTRIAN).alias("agent_class"),
+            pl.lit(Category.PEDESTRIAN).alias("agent_category"),
         )
 
     def _read_data_file(self, path: Path) -> pl.LazyFrame:
