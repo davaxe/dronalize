@@ -19,8 +19,6 @@ dependencies = [
     "torch_geometric==2.6.1",
     "lightning==2.5.2",
     "wandb==0.21.0",
-    "pandas==2.3.1",
-    "pyarrow==21.0.0",
     "scikit-learn",
     "matplotlib",
     "tqdm",
@@ -28,18 +26,16 @@ dependencies = [
     "osmium==4.0.2",
     "pyproj==3.7.1",
     "lark",
-    # numpy by Python version
-    "numpy==2.2.3; python_version < '3.11'",
-    "numpy==2.2.6; python_version >= '3.11'",
-    # scipy by Python version
-    "scipy==1.15.2; python_version < '3.11'",
-    "scipy==1.16.1; python_version >= '3.11'",
-    # networkx by Python version
-    "networkx==3.4.2; python_version < '3.11'",
-    "networkx==3.5; python_version >= '3.11'",
-    "polars>=1.37.1",
-    "polars-splines>=0.1.2",
+    "pandas>=2.3.3",
+    "polars>=1.38.1",
+    "numpy>=2.2.3",
+    "scipy>=1.15.2",
     "scipy-stubs>=1.15.3.0",
+    "networkx>=3.4.2",
+    "polars-splines>=0.1.2",
+    "pyarrow>=23.0.0",
+    "numcodecs<=0.13",
+    "zarr<3",
 ]
 
 [project.optional-dependencies]
@@ -47,13 +43,14 @@ dependencies = [
 pyg = ["torch-cluster"]
 
 # Dataset-specific extras
-lyft = ["zarr>=2.18.2"]
+lyft = [
+    "zarr<3",
+]
 ad4che = ["opencv-python"]
 
 # Container-specific (headless versions for Docker/servers)
 container = [
     "opencv-python-headless",
-    "zarr>=2.18.2",
 ]
 
 # Development tools
@@ -65,11 +62,13 @@ dev = [
 ]
 
 # Convenience combinations
-all-datasets = ["zarr>=2.18.2", "opencv-python"]
+all-datasets = [
+ "opencv-python",
+]
+
 dev-cuda = ["torch-cluster", "pytest", "ruff", "pre-commit", "mypy"]
 all = [
     "torch-cluster",
-    "zarr>=2.18.2",
     "opencv-python",
     "pytest",
     "ruff",

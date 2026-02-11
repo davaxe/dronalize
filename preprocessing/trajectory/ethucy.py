@@ -28,7 +28,7 @@ from preprocessing.trajectory.interface import (
 )
 from preprocessing.trajectory.resample import resample_tracks
 from preprocessing.trajectory.utils import (
-    filter_scene,
+    filter_scene_expr,
     sliding_window,
     yaw_from_vel,
 )
@@ -84,10 +84,11 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
             )
             group_by.append("window_index")
 
-        source_filtered = filter_scene(
-            source,
-            self.processor_config,
-            group_by=group_by[-1] if len(group_by) > 0 else None,
+        source_filtered = source.filter(
+            filter_scene_expr(
+                self.processor_config,
+                group_by=group_by[-1] if len(group_by) > 0 else None,
+            )
         )
         group_by.append("id")
 
@@ -142,13 +143,13 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
             )
             .window_parameters(step_size=1)
             .scene_filtering_parameters(require_all_valid=True)
-            .resampling_parameters(4, 1, method="fast")
+            .resampling_parameters(4, 1, method="spline")
         )
 
 
 if __name__ == "__main__":
     processor = EthUcyProcessor(
-        data_root=Path("data"), dataset="hotel", split="train"
+        data_root=Path("data"), dataset="hotel", split="test"
     )
     start_time = time.perf_counter()
     count: int = 0

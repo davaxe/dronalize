@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Hashable, Iterable
+from collections.abc import Callable, Hashable, Iterable, Sequence
 from fractions import Fraction
 from typing import (
     Generic,
@@ -33,6 +33,12 @@ class SceneFiltering:
     require_prediction_frame: bool = True
     """If True, requires all agents to have valid positions at the first prediction
     frame."""
+
+    require_frames: Sequence[int] | None = None
+    """Specific frames offset required for the scene to be considered valid."""
+
+    filter_agent_class: set[Category] | None = None
+    """Set of agent classes to filter out from scenes."""
 
 
 @dataclass(slots=True)

@@ -33,8 +33,9 @@ class Category(IntEnum):
     ANIMAL = auto()
     STATIC_OBJECT = auto()
     MOVEABLE_OBJECT = auto()
-    UNKNOWN = auto()
     EMERGENCY_VEHICLE = auto()
+    UNKNOWN = auto()
+    UNIMPORTANT = auto()
 
 
 class AgentData(TypedDict):
@@ -168,118 +169,125 @@ def derivative(
     """
     derivative_rename = {} if derivative_rename is None else derivative_rename
 
-    def get_gradient_expr(col_name: str) -> pl.Expr:
-        col = pl.col(col_name)
-        # Central difference: (next - prev) / 2dt
-        central = (col.shift(-1) - col.shift(1)) / (2 * dt)
-        # Forward difference (for the first element): (next - current) / dt
-        forward = (col.shift(-1) - col) / dt
-        # Backward difference (for the last element): (current - prev) / dt
-        backward = (col - col.shift(1)) / dt
-        # Coalesce: Use central, fill start with forward, fill end with backward
-        return central.fill_null(forward).fill_null(backward)
+    def get_gradient_expr(input_expr: pl.Expr) -> pl.Expr:
+        """Finite difference logic that nests expressions."""
+        central = (input_expr.shift(-1) - input_expr.shift(1)) / (2 * dt)
+        forward = (input_expr.shift(-1) - input_expr) / dt
+        backward = (input_expr - input_expr.shift(1)) / dt
+        expr = central.fill_null(forward).fill_null(backward)
+        return expr.over(group_by) if group_by is not None else expr
 
-    current_col_names = list(x)
-    intermediate_cols = []
+    all_expressions: list[pl.Expr] = []
+
+    # Track the actual Expr object, not the string name
+    current_exprs = [pl.col(col_name) for col_name in x]
+
     for i in range(1, n + 1):
-        next_step_exprs = []
-        next_col_names = []
-
         rename_list = derivative_rename.get(
             i, [f"d{i}_{original_root}" for original_root in x]
         )
 
-        for j, col_name in enumerate(current_col_names):
-            new_name = rename_list[j]
+        next_order_exprs = []
+        for j, expr in enumerate(current_exprs):
+            # Compute the next derivative using the current expression object
+            grad_expr = get_gradient_expr(expr)
 
-            # Generate the native expression
-            grad_expr = get_gradient_expr(col_name)
+            # Alias it for the output
+            aliased_expr = grad_expr.alias(rename_list[j])
 
-            # Apply grouping if requested
-            if group_by is not None:
-                grad_expr = grad_expr.over(group_by)
+            # Store the unaliased grad_expr for the NEXT iteration's calculation
+            next_order_exprs.append(grad_expr)
+            if i == n or include_intermediate:
+                all_expressions.append(aliased_expr)
 
-            next_step_exprs.append(grad_expr.alias(new_name))
-            next_col_names.append(new_name)
+        current_exprs = next_order_exprs
 
-            if i < n:
-                intermediate_cols.append(new_name)
-
-        # Append columns for this order
-        data = data.with_columns(next_step_exprs)
-        current_col_names = next_col_names
-
-    # 3. Cleanup
-    if not include_intermediate:
-        data = data.drop(intermediate_cols)
-
-    return data
+    return data.with_columns(all_expressions)
 
 
-def filter_scene(
-    data: T_DataFame,
+def filter_scene_expr(
     config: ProcessorConfig,
     group_by: str | Sequence[str] | None = None,
-) -> T_DataFame:
+    agent_id: str = "id",
+    frame_column: str = "frame",
+    category_column: str | None = "agent_class",
+) -> pl.Expr:
     """Filter scenes based on configuration.
 
     Args:
-        data: input data.
         config: ProcessorConfig object with filtering criteria.
         group_by: Optional column name to group by.
+        agent_id: Column name representing the agent ID.
+        frame_column: Column name representing the frame index.
 
     Returns:
-        DataFrame or LazyFrame with filtered scene(s).
+        Expression for filtering scenes based on the configuration.
 
     """
-    group_by = [group_by] if isinstance(group_by, str) else list(group_by or [])
     if config.scene_filtering is None:
-        return data
+        return pl.lit(value=True)
 
     filtering = config.scene_filtering
-
-    # 1. Filter Invalid Agents (Rows)
-    # Equivalent to: df.filter(pl.col("frame").n_unique().over("id") == total_len)
-    # We must ensure we group by [scene, agent] if a scene grouper exists.
-    if filtering.require_all_valid:
-        total_len = config.input_len + config.output_len
-
-        # If we have a scene grouper, we must partition the agent check by it
-        # to avoid ID collisions across scenes (unless IDs are globally unique).
-        agent_window = [*group_by, "id"] if group_by else ["id"]
-
-        data = data.filter(
-            pl.col("frame").n_unique().over(agent_window) == total_len
-        )
-
-    # 2. Filter Invalid Scenes (Groups)
-    # We define a window to calculate statistics per scene.
-    # If no group_by is provided, we treat the whole frame as one group (or no-op).
+    group_by = [group_by] if isinstance(group_by, str) else list(group_by or [])
     scene_window = group_by or pl.lit(1)
 
-    # Criteria A: Minimum Agents
-    # We check the count of unique IDs remaining in the scene/group.
-    # Note: This runs AFTER the agent filter above, matching your original logic.
-    has_enough_agents = (
-        pl.col("id").n_unique().over(scene_window) >= filtering.min_agents
-    )
+    conditions = []
 
-    # Criteria B: Prediction Frame Existence
-    # Logic: min(frame) + input_len - 1 must exist in the group.
+    # 1. Base Frame Filtering (Relative offsets check)
+    if filtering.require_frames is not None:
+        required_set = set(filtering.require_frames)
+        n_required = len(required_set)
+
+        # Calculate frame relative to the start of the group
+        # We need the min frame per group to normalize offsets
+        relative_frame = pl.col(frame_column) - pl.col(frame_column).min().over(
+            scene_window
+        )
+
+        # Count unique relative frames that match the requirement
+        has_all_frames = (
+            relative_frame
+            .filter(relative_frame.is_in(required_set))
+            .n_unique()
+            .over(scene_window)
+            == n_required
+        )
+        conditions.append(has_all_frames)
+
+    # 2. Individual Agent Validity (Track length)
+    # We define this expression so we can use it for both row filtering AND the min_agents count
+    agent_validity = pl.lit(value=True)
+
+    if filtering.require_all_valid:
+        total_len = config.input_len + config.output_len
+        agent_window = [*group_by, agent_id] if group_by else [agent_id]
+
+        agent_valid_expr = pl.len().over(agent_window) == total_len
+        conditions.append(agent_valid_expr)
+        agent_validity = agent_valid_expr
+
+    # 3. Scene-Level: Minimum Valid Agents
+    if filtering.min_agents > 1:
+        # Count UNIQUE agents that are valid (passed step 2) within the scene
+        valid_agent_count = (
+            pl.col(agent_id).filter(agent_validity).n_unique().over(scene_window)
+        )
+        conditions.append(valid_agent_count >= filtering.min_agents)
+
+    # 4. Scene-Level: Prediction Frame Existence
     if filtering.require_prediction_frame:
-        start_frame = pl.col("frame").min().over(scene_window)
+        start_frame = pl.col(frame_column).min().over(scene_window)
         target_frame = start_frame + config.input_len - 1
 
-        # Check if any row in the group matches the target frame
-        has_pred_frame = (pl.col("frame") == target_frame).any().over(scene_window)
+        has_pred_frame = (
+            (pl.col(frame_column) == target_frame).any().over(scene_window)
+        )
+        conditions.append(has_pred_frame)
 
-        # Combine the boolean masks
-        scene_mask = has_enough_agents & has_pred_frame
-    else:
-        scene_mask = has_enough_agents
+    if not conditions:
+        return pl.lit(value=True)
 
-    # Apply the scene-level mask
-    return data.filter(scene_mask)
+    return pl.all_horizontal(conditions)
 
 
 @overload
@@ -569,28 +577,17 @@ def _full_zeros(
     return tuple(np.zeros(shape, dtype=dtype) for _ in range(n))
 
 
-def _full_nan(
-    shape: tuple[int, ...],
-    n: int = 2,
-    dtype: npt.DTypeLike = np.float32,
-) -> tuple[npt.NDArray[np.float32], ...]:
-    return tuple(np.full(shape, np.nan, dtype=dtype) for _ in range(n))
-
-
 if __name__ == "__main__":
     # Example usage of the utility functions
     df = pl.DataFrame({
         "x": [1, 1, 1, 1],
-        "y": [1, 2, 3, 4],
+        "y": [1, 2, 3, 5],
     })
     rename_map = {
         1: ["vel_x", "vel_y"],
+        2: ["acc_x", "acc_y"],
     }
     df = derivative(
-        df,
-        "x",
-        "y",
-        derivative_rename=rename_map,
-        n=1,
+        df, "x", "y", derivative_rename=rename_map, n=2, include_intermediate=True
     )
     print(df)

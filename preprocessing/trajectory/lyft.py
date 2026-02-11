@@ -2,26 +2,28 @@ import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast, override
+from typing import TYPE_CHECKING, cast, override
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-import zarr
+from zarr.creation import open_array
 
 from preprocessing.trajectory.interface import (
     DataProcessor,
     ProcessorConfig,
     Resampling,
 )
-from preprocessing.trajectory.plot import plot_comparison
 from preprocessing.trajectory.resample import resample_tracks
 from preprocessing.trajectory.utils import (
     Category,
-    filter_scene,
+    filter_scene_expr,
     sliding_window,
     yaw_from_vel,
 )
+
+if TYPE_CHECKING:
+    from zarr.core import Array
 
 
 @dataclass
@@ -45,15 +47,9 @@ class LyftProcessor(DataProcessor[int, _Source]):
 
         super().__init__(processor_config=config, validate_output=False)
         self._zarr_path = Path(zarr_path)
-        self._scenes: zarr.Array = zarr.open_array(
-            self._zarr_path / "scenes", mode="r"
-        )
-        self._frames: zarr.Array = zarr.open_array(
-            self._zarr_path / "frames", mode="r"
-        )
-        self._agents: zarr.Array = zarr.open_array(
-            self._zarr_path / "agents", mode="r"
-        )
+        self._scenes: Array = open_array(self._zarr_path / "scenes", mode="r")
+        self._frames: Array = open_array(self._zarr_path / "frames", mode="r")
+        self._agents: Array = open_array(self._zarr_path / "agents", mode="r")
 
         self._total_scenes: int = int(self._scenes.shape[0])
         self._batch_size: int = (
@@ -94,6 +90,9 @@ class LyftProcessor(DataProcessor[int, _Source]):
                 frame_offset=frame_start,
                 agent_offset=agent_start,
             )[1].lazy()
+            scenes = scenes.filter(
+                pl.col("agent_class") != Category.UNIMPORTANT.value
+            )
 
             group_by: list[str] = []
             if self.processor_config.window_params is not None:
@@ -107,10 +106,11 @@ class LyftProcessor(DataProcessor[int, _Source]):
                 )
                 group_by.append("window_index")
 
-            source_filtered = filter_scene(
-                scenes,
-                self.processor_config,
-                group_by=group_by[-1] if len(group_by) > 0 else None,
+            source_filtered = scenes.filter(
+                filter_scene_expr(
+                    self.processor_config,
+                    group_by=group_by[-1] if len(group_by) > 0 else None,
+                )
             )
             group_by.append("id")
             source_filtered = source_filtered.filter(pl.len().over(group_by) >= 2)
@@ -170,26 +170,23 @@ class _LyftScene:
 
 
 _CATEGORY_LOOKUP = np.array([
-    Category.UNKNOWN.value,  # 0
-    Category.UNKNOWN.value,  # 1
-    Category.UNKNOWN.value,  # 2
+    Category.UNIMPORTANT.value,  # 0 (not set)
+    Category.UNKNOWN.value,  # 1 (unknown)
+    Category.UNIMPORTANT.value,  # 2 (don't care)
     Category.CAR.value,  # 3
     Category.VAN.value,  # 4
     Category.TRAM.value,  # 5
     Category.BUS.value,  # 6
     Category.TRUCK.value,  # 7
     Category.EMERGENCY_VEHICLE.value,  # 8
-    Category.UNKNOWN.value,  # 9
+    Category.UNKNOWN.value,  # 9 ("other_vehicle")
     Category.BICYCLE.value,  # 10
     Category.MOTORCYCLE.value,  # 11
     Category.BICYCLE.value,  # 12
     Category.MOTORCYCLE.value,  # 13
     Category.PEDESTRIAN.value,  # 14
     Category.ANIMAL.value,  # 15
-    Category.UNKNOWN.value,  # 16
-    Category.UNKNOWN.value,
-    Category.UNKNOWN.value,
-    Category.UNKNOWN.value,
+    Category.UNIMPORTANT.value,  # 16 (don't care)
 ])
 
 
@@ -277,7 +274,7 @@ def main():
         "/home/west/Developer/behavior-prediction/datasets/lyft/validate/validate.zarr"
     )
     directory = Path("data/sample/sample.zarr")
-    processor = LyftProcessor(directory, 1000)
+    processor = LyftProcessor(directory, 100)
     _total_scenes = 194608
     count = 0
     for _scene in processor.scenes_iter():

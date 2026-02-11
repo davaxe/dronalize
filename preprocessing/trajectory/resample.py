@@ -84,7 +84,6 @@ def resample_tracks(
                 dt=dt,
                 include_intermediate=add_derivative,
                 derivative_rename=derivative_rename,
-                group_by=group_by,
             )
         elif add_derivative:
             upsampled = derivative(
@@ -94,7 +93,6 @@ def resample_tracks(
                 dt=dt,
                 include_intermediate=add_derivative,
                 derivative_rename=derivative_rename,
-                group_by=group_by,
             )
         return upsampled
 
@@ -156,8 +154,9 @@ def _resample_dataframe_spline(
 
     group_cols = list(group_by or [])
 
-    # Pack all relevant columns into a single struct for batch processing
+    # Pack relevant columns for the spline calculation
     struct_input = pl.struct([pl.col(c) for c in pos_columns])
+
     resampled_struct = struct_input.map_batches(
         lambda series: _resample_batch(
             series,
@@ -177,19 +176,10 @@ def _resample_dataframe_spline(
     ).alias("_resampled_batch")
 
     mod_cols = [*group_cols, *pos_columns, frame_column]
-    other_cols = [c for c in data.columns if c not in mod_cols]
     aggregations = [
         resampled_struct,
-        # Generate new frames to match the new length
-        pl
-        .col(frame_column)
-        .map_batches(
-            lambda series: _generate_new_frames(series, up, down),
-            return_dtype=pl.Int32,
-        )
-        .alias(frame_column)
-        .cast(pl.Int32),
-        pl.col(other_cols).first(),
+        _new_frames_expr(up, down, frame_column),
+        pl.exclude(mod_cols).first(),
     ]
 
     return (
@@ -274,23 +264,20 @@ def _return_type(
     return pl.Struct(fields)
 
 
-def _generate_new_frames(
-    series: pl.Series,
+def _new_frames_expr(
     up: int,
     down: int,
-    *,
-    integer: bool = True,
-) -> pl.Series:
-    n_old = series.len()
-    if n_old <= 1:
-        return series
-
-    max_time = n_old - 1
-    step_size = down / up
-    n_new = int(np.floor(max_time / step_size)) + 1
-    if integer:
-        return pl.Series(np.arange(n_new, dtype=np.int32))
-    return pl.Series(np.arange(n_new, dtype=np.int32) * step_size)
+    frame_column: str,
+) -> pl.Expr:
+    n_new_expr = ((pl.len() - 1) * up).floordiv(down) + 1
+    start_expr = (
+        pl
+        .when(pl.len() <= 1)
+        .then(pl.col(frame_column).first())
+        .otherwise(pl.lit(0))
+    )
+    end_expr = pl.when(pl.len() <= 1).then(start_expr + 1).otherwise(n_new_expr)
+    return pl.int_range(start_expr, end_expr, dtype=pl.Int32).alias(frame_column)
 
 
 def _apply_interpolation(
