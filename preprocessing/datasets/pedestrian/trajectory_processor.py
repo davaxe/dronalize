@@ -1,0 +1,115 @@
+"""Processor for ETH/UCY pedestrian trajectory datasets.
+
+Datasets include the following subsets:
+- ETH: "eth" and "hotel"
+- UCY: "univ", "zara01", and "zara02"
+
+"""
+
+from __future__ import annotations
+
+import time
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
+
+import polars as pl
+from typing_extensions import override
+
+from preprocessing.common.trajectory_utils.basic import yaw_from_vel
+from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
+from preprocessing.core import AgentCategory
+from preprocessing.core.interface import (
+    DataProcessor,
+    ProcessorConfig,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+
+class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
+    """Processor for ETH/UCY pedestrian trajectory datasets."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        dataset: str | Sequence[str],
+        config: ProcessorConfig | None = None,
+        split: Literal["train", "val", "test"] = "train",
+    ) -> None:
+        """Initialize with the given configuration."""
+        super().__init__(processor_config=config, enforce_schema=True)
+        self._data_root = data_root
+        self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
+        self._split = split
+        self._window_params = self.processor_config.window_params
+        self._filtering_params = self.processor_config.scene_filtering
+
+    @override
+    def sources(self) -> Iterable[tuple[str, pl.LazyFrame]]:
+        for dataset in self._dataset:
+            data_dir = self._data_root / dataset / self._split
+            # Sort to ensure consistent order across runs and systems.
+            for data_file in sorted(data_dir.iterdir()):
+                yield (data_file.name, EthUcyProcessor._read_data_file(data_file))
+
+    @override
+    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
+        yield from prepare_agent_trajectories(
+            source,
+            self.processor_config,
+            add_derivative=True,
+            add_second_derivative=True,
+            sliding_col="frame",
+            agent_category_col=None,
+            derivative_rename=self.derivative_names(),
+        )
+
+    @override
+    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
+        return yaw_from_vel(df, yaw_col="yaw").with_columns(
+            pl.lit(AgentCategory.PEDESTRIAN).alias("agent_category"),
+        )
+
+    @override
+    def default_config(self) -> ProcessorConfig:
+        return (
+            ProcessorConfig(
+                input_len=8,
+                output_len=12,
+                sample_time=0.4,
+            )
+            .window_parameters(step_size=1)
+            .scene_filtering_parameters(require_all_valid=True)
+            .resampling_parameters(4, 1, method="spline")
+        )
+
+    @staticmethod
+    def _read_data_file(path: Path) -> pl.LazyFrame:
+        return pl.scan_csv(
+            path,
+            has_header=False,
+            separator="\t",
+            new_columns=["frame", "id", "x", "y"],
+            schema={
+                "frame": pl.Int32,
+                "id": pl.Int32,
+                "x": pl.Float64,
+                "y": pl.Float64,
+            },
+        ).with_columns(
+            ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
+            pl.col("id").cast(pl.Int32),
+        )
+
+
+if __name__ == "__main__":
+    processor = EthUcyProcessor(data_root=Path("data"), dataset="hotel", split="train")
+    start_time = time.perf_counter()
+    count: int = 0
+    total_time = 0.0
+    for _scene in processor.scenes_iter():
+        count += 1
+
+    end_time = time.perf_counter()
+    print(f"Processed {count} scenes in {end_time - start_time:.2f} seconds.")

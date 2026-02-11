@@ -1,0 +1,89 @@
+syntax = "proto2";
+
+package waymo.open_dataset.map;
+
+// --- PRIMITIVES ---
+
+message MapPoint {
+  optional double x = 1;
+  optional double y = 2;
+  optional double z = 3;
+}
+
+// --- FEATURES ---
+
+message LaneCenter {
+  optional double speed_limit_mph = 1;
+  repeated MapPoint polyline = 8;
+  
+  // Optional: Neighbors if you need graph connectivity
+  // repeated int64 entry_lanes = 9 [packed = true];
+  // repeated int64 exit_lanes = 10 [packed = true];
+}
+
+message RoadLine {
+  enum RoadLineType {
+    TYPE_UNKNOWN = 0;
+    TYPE_BROKEN_SINGLE_WHITE = 1;
+    TYPE_SOLID_SINGLE_WHITE = 2;
+    TYPE_SOLID_DOUBLE_WHITE = 3;
+    TYPE_BROKEN_SINGLE_YELLOW = 4;
+    TYPE_BROKEN_DOUBLE_YELLOW = 5;
+    TYPE_SOLID_SINGLE_YELLOW = 6;
+    TYPE_SOLID_DOUBLE_YELLOW = 7;
+    TYPE_PASSING_DOUBLE_YELLOW = 8;
+  }
+  optional RoadLineType type = 1;
+  repeated MapPoint polyline = 2;
+}
+
+message RoadEdge {
+  enum RoadEdgeType {
+    TYPE_UNKNOWN = 0;
+    TYPE_ROAD_EDGE_BOUNDARY = 1;
+    TYPE_ROAD_EDGE_MEDIAN = 2;
+  }
+  optional RoadEdgeType type = 1;
+  repeated MapPoint polyline = 2;
+}
+
+message StopSign {
+  repeated int64 lane = 1;
+  optional MapPoint position = 2;
+}
+
+message Crosswalk {
+  repeated MapPoint polygon = 1;
+}
+
+message SpeedBump {
+  repeated MapPoint polygon = 1;
+}
+
+message Driveway {
+  repeated MapPoint polygon = 1;
+}
+
+// --- THE MAIN MAP FEATURE ---
+
+message MapFeature {
+  optional int64 id = 1;
+
+  oneof feature_data {
+    LaneCenter lane = 3;
+    RoadLine road_line = 4;
+    RoadEdge road_edge = 5;
+    StopSign stop_sign = 7;
+    Crosswalk crosswalk = 8;
+    SpeedBump speed_bump = 9;
+    Driveway driveway = 10;
+  }
+}
+
+// --- THE CONTAINER ---
+
+// This mimics the structure of the main Scenario proto but ONLY includes the map field.
+// Field 8 is "map_features" in the original Scenario message.
+message LeanMapContainer {
+    repeated MapFeature map_features = 8;
+}
