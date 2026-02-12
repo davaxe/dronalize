@@ -125,6 +125,7 @@ class LyftProcessor(DataProcessor[int, _Source]):
                 method=resampling.method,
                 dt=self.processor_config.sample_time,
                 derivative_rename=self.derivative_names(),
+                forward_fill=["agent_category"],
             )
 
             if self.processor_config.window_params is None:

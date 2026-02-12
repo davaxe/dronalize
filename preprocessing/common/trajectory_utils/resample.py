@@ -29,6 +29,7 @@ def resample_tracks(
     dt: float = 1.0,
     method: Literal["fast", "spline"] = "fast",
     derivative_rename: dict[int, list[str]] | None = None,
+    forward_fill: Sequence[str] | None = None,
 ) -> T_DataFrame:
     """Resample trajectory data to a new sampling rate.
 
@@ -60,6 +61,7 @@ def resample_tracks(
             and more accurate derivatives. Defaults to "fast".
         derivative_rename: Mapping to define custom names for the resulting
             derivative columns. Defaults to None.
+        forward_fill: Columns to forward fill instead of interpolate.
 
     Returns:
         A Polars DataFrame containing the resampled coordinates and any
@@ -75,6 +77,7 @@ def resample_tracks(
             down=down,
             frame_column=frame_column,
             group_by=group_by,
+            forward_fill=forward_fill,
         )
         if add_second_derivative:
             upsampled = derivative(
@@ -220,7 +223,7 @@ def _resample_batch(
     )
 
     pos_new = res[0]
-    out_data: dict[str, npt.NDArray[np.float64]] = {}
+    out_data: dict[str, npt.NDArray[np.float32]] = {}
     for i, col in enumerate(pos_cols):
         out_data[col] = pos_new[:, i]
 
@@ -248,17 +251,17 @@ def _return_type(
     derivative_rename: dict[int, list[str]] | None = None,
 ) -> pl.Struct:
     derivative_rename = derivative_rename or {}
-    fields = dict.fromkeys(pos_cols, pl.Float64)
+    fields = dict.fromkeys(pos_cols, pl.Float32)
     if add_derivative:
         fields.update(
             dict.fromkeys(
-                derivative_rename.get(1, [f"v{c}" for c in pos_cols]), pl.Float64
+                derivative_rename.get(1, [f"v{c}" for c in pos_cols]), pl.Float32
             )
         )
     if add_second_derivative:
         fields.update(
             dict.fromkeys(
-                derivative_rename.get(2, [f"a{c}" for c in pos_cols]), pl.Float64
+                derivative_rename.get(2, [f"a{c}" for c in pos_cols]), pl.Float32
             )
         )
     return pl.Struct(fields)
@@ -281,26 +284,26 @@ def _new_frames_expr(
 
 
 def _apply_interpolation(
-    pos: npt.NDArray[np.float64],
-    vel: npt.NDArray[np.float64] | None,
+    pos: npt.NDArray[np.float32],
+    vel: npt.NDArray[np.float32] | None,
     up: int,
     down: int,
     *,
     include_first_derivative: bool = False,
     include_second_derivative: bool = False,
-) -> tuple[npt.NDArray[np.float64], ...]:
+) -> tuple[npt.NDArray[np.float32], ...]:
 
     n_old = len(pos)
     # Frequency ratio is up/down, so Period ratio (step size) is down/up
     step_size = down / up
-    t = np.arange(n_old, dtype=np.float64)
+    t = np.arange(n_old, dtype=np.float32)
 
     # Calculate exactly how many steps fit in the duration (n_old - 1)
     # Using floor ensures we don't extrapolate past the end.
     max_time = n_old - 1
     n_new = int(np.floor(max_time / step_size)) + 1
     # We generate indices 0, 1, ... M and scale them by step_size.
-    t_new = np.arange(n_new, dtype=np.float64) * step_size
+    t_new = np.arange(n_new, dtype=np.float32) * step_size
 
     res = cubic_spline_interpolation(
         t,
@@ -399,6 +402,7 @@ def _upsample_dataframe(
                 pl.col(frame_column).min(),
                 pl.col(frame_column).max() + 1,
                 step=1,
+                dtype=pl.Int32,
             ).alias(frame_column)
         )
         .explode(frame_column)
@@ -406,97 +410,94 @@ def _upsample_dataframe(
 
     on = [*group_by, frame_column] if group_by else [frame_column]
     exclude: list[str] = [*on, *(forward_fill or [])]
+    exprs = [pl.all().exclude(exclude).interpolate()]
+    if forward_fill:
+        exprs.append(pl.col(forward_fill).forward_fill())
     result = (
-        upsampled
-        .join(data_scaled, on=on, how="left")
-        .sort(on)
-        .with_columns(
-            pl.all().exclude(exclude).interpolate(),
-            pl.col(forward_fill).forward_fill() if forward_fill else [],
-        )
+        upsampled.join(data_scaled, on=on, how="left").sort(on).with_columns(*exprs)
     )
     return result.collect() if is_eager else result  # pyright: ignore[reportReturnType]
 
 
 @overload
 def cubic_spline_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
+    t: npt.NDArray[np.float32],
+    t_new: npt.NDArray[np.float32],
+    pos: npt.NDArray[np.float32],
     *,
-    vel: npt.NDArray[np.float64] | None = None,
+    vel: npt.NDArray[np.float32] | None = None,
     hermite: bool = False,
     include_first_derivative: Literal[False] = False,
     include_second_derivative: Literal[False] = False,
-) -> npt.NDArray[np.float64]: ...
+) -> npt.NDArray[np.float32]: ...
 
 
 @overload
 def cubic_spline_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
+    t: npt.NDArray[np.float32],
+    t_new: npt.NDArray[np.float32],
+    pos: npt.NDArray[np.float32],
     *,
-    vel: npt.NDArray[np.float64] | None = None,
+    vel: npt.NDArray[np.float32] | None = None,
     hermite: bool = False,
     include_first_derivative: Literal[True],
     include_second_derivative: Literal[False] = False,
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]: ...
+) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]: ...
 
 
 @overload
 def cubic_spline_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
+    t: npt.NDArray[np.float32],
+    t_new: npt.NDArray[np.float32],
+    pos: npt.NDArray[np.float32],
     *,
-    vel: npt.NDArray[np.float64],
+    vel: npt.NDArray[np.float32] | None = None,
     hermite: bool = False,
     include_first_derivative: Literal[False] = False,
     include_second_derivative: Literal[True],
-) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]: ...
+) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]: ...
 
 
 @overload
 def cubic_spline_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
+    t: npt.NDArray[np.float32],
+    t_new: npt.NDArray[np.float32],
+    pos: npt.NDArray[np.float32],
     *,
-    vel: npt.NDArray[np.float64] | None = None,
+    vel: npt.NDArray[np.float32] | None = None,
     hermite: bool = False,
     include_first_derivative: Literal[True],
     include_second_derivative: Literal[True],
 ) -> tuple[
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
+    npt.NDArray[np.float32],
+    npt.NDArray[np.float32],
+    npt.NDArray[np.float32],
 ]: ...
 
 
 @overload
 def cubic_spline_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
+    t: npt.NDArray[np.float32],
+    t_new: npt.NDArray[np.float32],
+    pos: npt.NDArray[np.float32],
     *,
-    vel: npt.NDArray[np.float64] | None = None,
+    vel: npt.NDArray[np.float32] | None = None,
     hermite: bool = False,
     include_first_derivative: bool = False,
     include_second_derivative: bool = False,
-) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], ...]: ...
+) -> npt.NDArray[np.float32] | tuple[npt.NDArray[np.float32], ...]: ...
 
 
 def cubic_spline_interpolation(
-    t: npt.NDArray[np.float64],
-    t_new: npt.NDArray[np.float64],
-    pos: npt.NDArray[np.float64],
+    t: npt.NDArray[np.float32],
+    t_new: npt.NDArray[np.float32],
+    pos: npt.NDArray[np.float32],
     *,
-    vel: npt.NDArray[np.float64] | None = None,
+    vel: npt.NDArray[np.float32] | None = None,
     hermite: bool = False,
     include_first_derivative: bool = False,
     include_second_derivative: bool = False,
-) -> npt.NDArray[np.float64] | tuple[npt.NDArray[np.float64], ...]:
+) -> npt.NDArray[np.float32] | tuple[npt.NDArray[np.float32], ...]:
     """Interpolate positions using CubicSpline or CubicHermiteSpline.
 
     If `vel` is provided and `hermite=True`, Hermite spline interpolation is
@@ -527,11 +528,11 @@ def cubic_spline_interpolation(
     else:
         spline = CubicSpline(t, pos, bc_type="clamped")
 
-    results = [spline(t_new)]
+    results = [spline(t_new).astype(np.float32)]
     for nu, include in [
         (1, include_first_derivative),
         (2, include_second_derivative),
     ]:
         if include:
-            results.append(spline(t_new, nu))
+            results.append(spline(t_new, nu).astype(np.float32))
     return tuple(results) if len(results) > 1 else results[0]

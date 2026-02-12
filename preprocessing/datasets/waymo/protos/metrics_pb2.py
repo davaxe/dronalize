@@ -13,9 +13,9 @@ from google.protobuf.internal import builder as _builder
 _sym_db = _symbol_database.Default()
 
 
-import preprocessing.road_network.waymo.protos as dataset__pb2
-import preprocessing.road_network.waymo.protos as label__pb2
-from preprocessing.road_network.waymo.protos import (
+import preprocessing.datasets.waymo.protos as dataset__pb2
+import preprocessing.datasets.waymo.protos as label__pb2
+from preprocessing.datasets.waymo.protos import (
     breakdown_pb2 as protos_dot_breakdown__pb2,
 )
 

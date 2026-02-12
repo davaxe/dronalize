@@ -13,7 +13,7 @@ from google.protobuf.internal import builder as _builder
 _sym_db = _symbol_database.Default()
 
 
-import preprocessing.road_network.waymo.protos.dataset_pb2 as dataset__pb2
+import preprocessing.datasets.waymo.protos.dataset_pb2 as dataset__pb2
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n\x1aprotos/camera_tokens.proto\x12\x12waymo.open_dataset\x1a\rdataset.proto"\\\n\x0c\x43\x61meraTokens\x12\x38\n\x0b\x63\x61mera_name\x18\x01 \x01(\x0e\x32#.waymo.open_dataset.CameraName.Name\x12\x12\n\x06tokens\x18\x02 \x03(\rB\x02\x10\x01"L\n\x11\x46rameCameraTokens\x12\x37\n\rcamera_tokens\x18\x01 \x03(\x0b\x32 .waymo.open_dataset.CameraTokens'

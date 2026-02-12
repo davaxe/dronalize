@@ -13,7 +13,7 @@ from google.protobuf.internal import builder as _builder
 _sym_db = _symbol_database.Default()
 
 
-from preprocessing.road_network.waymo.protos import (
+from preprocessing.datasets.waymo.protos import (
     keypoint_pb2 as protos_dot_keypoint__pb2,
 )
 

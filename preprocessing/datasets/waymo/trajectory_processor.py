@@ -3,14 +3,23 @@ from __future__ import annotations
 import struct
 from dataclasses import replace
 from pathlib import Path
-from tkinter import NO
 from typing import TYPE_CHECKING, Literal, override
 
 import polars as pl
 
 # Assuming these exist in your project
+from preprocessing.common.trajectory_utils import (
+    derivative,
+    filter_scene_expr,
+    resample_tracks,
+)
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig, Scene
+from preprocessing.core.interface import (
+    DataProcessor,
+    ProcessorConfig,
+    Resampling,
+    Scene,
+)
 from preprocessing.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from preprocessing.datasets.waymo.protos import (
     lean_map_pb2,
@@ -23,7 +32,15 @@ if TYPE_CHECKING:
 
     from preprocessing.core.map_graph import MapGraph
 
-FilterStr = Literal["*.tfrecord*", "*training.tfrecord*"]  # abbreviated for brevity
+FilterStr = Literal[
+    "*training.tfrecord*",
+    "*training_20s.tfrecord*",
+    "*validation.tfrecord*",
+    "validation_interactive.tfrecord*",
+    "*testing.tfrecord*",
+    "*testing_interactive.tfrecord*",
+    "*.tfrecord*",
+]
 
 
 class WaymoProcessor(DataProcessor[str, Path]):
@@ -39,7 +56,7 @@ class WaymoProcessor(DataProcessor[str, Path]):
     ):
         super().__init__(
             processor_config=processor_config or self._default_config(),
-            enforce_schema=False,
+            enforce_schema=True,
         )
         self._data_dir: Path = (
             Path(data_dir) if isinstance(data_dir, str) else data_dir
@@ -77,12 +94,40 @@ class WaymoProcessor(DataProcessor[str, Path]):
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        # TODO: 1. Filter
-        #       2. Resample
-        #       3. Add acceleration
-        return df
+        resampling = self.processor_config.resampling or Resampling(1, 1)
+        df_filtered = df.filter(
+            filter_scene_expr(
+                self.processor_config,
+                category_column="agent_category",
+            )
+        )
+        df_resampled = resample_tracks(
+            df_filtered,
+            resampling.up,
+            resampling.down,
+            group_by=["id"],
+            add_derivative=resampling.method == "spline",
+            add_second_derivative=resampling.method == "spline",
+            method=resampling.method,
+            dt=self.processor_config.sample_time,
+            derivative_rename=self.derivative_names(),
+            forward_fill=["agent_category"],
+        )
+
+        if resampling.method != "spline":
+            df_resampled = derivative(
+                df_resampled,
+                "vx",
+                "vy",
+                dt=self.processor_config.sample_time,
+                derivative_rename={1: ["ax", "ay"]},
+            )
+
+        # Change autonomous vehicle to id 0 (from id -1)
+        return df_resampled.with_columns(pl.col("id") + 1)
 
     def modify_scene(self, scene: Scene) -> Scene:
+        """Add map data to the scene if map inclusion is enabled."""
         if self._include_map:
             return replace(scene, map=self._current_map)
         return scene
@@ -131,7 +176,7 @@ def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFram
             "vx": l_vx,
             "vy": l_vy,
             "yaw": l_yaw,
-            "category": l_cat,
+            "agent_category": l_cat,
         },
         schema={
             "frame": pl.Int32,
@@ -141,7 +186,7 @@ def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFram
             "vx": pl.Float32,
             "vy": pl.Float32,
             "yaw": pl.Float32,
-            "category": pl.Int32,
+            "agent_category": pl.Int32,
         },
     )
 
@@ -193,17 +238,17 @@ if __name__ == "__main__":
     # Recommendation: Use ProcessPoolExecutor here for actual parallel processing
     # because Protobuf parsing + Python loops are CPU bound and single-threaded.
     directory = Path(
-        "/home/west/Developer/behavior-prediction/datasets/waymo/training"
+        "/home/west/Developer/behavior-prediction/datasets/waymo/validation"
     )
 
-    processor = WaymoProcessor(directory, "*training.tfrecord*")
+    processor = WaymoProcessor(directory, "*validation.tfrecord*", include_map=False)
 
     start_time = time.perf_counter()
     print("Starting processing...")
     count = 0
     # This loop will now yield one large  per file instead of per scene
     for scene in processor.scenes_iter():
-        if count % 10 == 0:
+        if count % 500 == 0:
             print(
                 f"Processed {count} scenes in {time.perf_counter() - start_time:.2f}s"
             )
