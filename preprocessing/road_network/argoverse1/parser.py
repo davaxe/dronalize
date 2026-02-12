@@ -15,12 +15,10 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from dataclasses import field
+from dataclasses import dataclass, field
 from enum import auto
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
-
-from attr import dataclass
 
 from preprocessing.road_network.common import BaseEnum, BaseMapObject, IntIDNode
 from preprocessing.road_network.edge_type import EdgeType

@@ -34,8 +34,8 @@ dependencies = [
     "networkx>=3.4.2",
     "polars-splines>=0.1.2",
     "pyarrow>=23.0.0",
-    "numcodecs<=0.13",
     "zarr<3",
+    "numcodecs>=0.13.1",
 ]
 
 [project.optional-dependencies]
@@ -101,7 +101,7 @@ addopts = [
 
 [tool.ruff]
 # Exclude proto compiled files from linting and formatting
-extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*"]
+extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*", "old"]
 
 [tool.ruff.lint]
 select = ["ALL"]
