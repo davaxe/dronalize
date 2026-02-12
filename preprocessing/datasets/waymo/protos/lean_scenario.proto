@@ -1,0 +1,43 @@
+syntax = "proto2";
+
+package waymo.open_dataset;
+
+// Minimized ObjectState: Keeps only position, velocity, heading, and validity.
+// Drops dimensions (len/width/height) and Z-axis.
+message LeanObjectState {
+  optional double center_x = 2;
+  optional double center_y = 3;
+  
+  // Note: Original uses float for these, must match exactly.
+  optional float heading = 8;
+  optional float velocity_x = 9;
+  optional float velocity_y = 10;
+  
+  optional bool valid = 11;
+}
+
+// Minimized Track: Keeps ID, Type, and States.
+message LeanTrack {
+  optional int32 id = 1;
+  
+  // We use int32 here instead of the enum. 
+  // In Python, this returns the integer value (1=Vehicle, 2=Pedestrian, etc.),
+  // which works perfectly with your _OBJECT_TYPE_TO_CATEGORY dictionary.
+  optional int32 object_type = 2;
+
+  repeated LeanObjectState states = 3;
+}
+
+// Minimized Scenario: Keeps ID, SDC index, Interest list, and Tracks.
+message LeanScenario {
+  // optional string scenario_id = 5;
+  
+  // The autonomous vehicle track index
+  optional int32 sdc_track_index = 6;
+  
+  // Interactive objects list
+  // repeated int32 objects_of_interest = 4;
+
+  repeated LeanTrack tracks = 2;
+
+}

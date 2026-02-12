@@ -86,6 +86,14 @@ class BaseNode(Protocol, Generic[ID]):
             + (self.z - other.z) ** 2,
         )
 
+    def distance_sq_to(self, other: Self) -> float:
+        """Calculate the squared Euclidean distance to another node."""
+        return (
+            (self.x - other.x) ** 2
+            + (self.y - other.y) ** 2
+            + (self.z - other.z) ** 2
+        )
+
 
 @dataclass(init=False)
 class IntIdBaseMapObject(BaseMapObject[int]):
@@ -208,20 +216,17 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     representation of the map.
     """
 
-    nodes: dict[ID, NODE] = field(default_factory=dict, init=False)
-    """All nodes in the graph."""
-
-    id_adj_list: dict[ID, list[tuple[ID, EdgeType]]] = field(
-        default_factory=dict,
-        init=False,
-    )
-    """Adjacency list mapping node IDs to list of (neighbor_id, edge_type)."""
-
     edge_map: dict[EdgeType, EdgeType] = field(default_factory=dict, init=False)
     """Optionally remap edge types during graph building by adding entries"""
 
-    extra_nodes: dict[ID, NODE] = field(default_factory=dict, init=False)
-    """Extra nodes are nodes that are not connected to any other nodes, e.g., traffic lights."""
+    _x: list[float] = field(default_factory=list, init=False)
+    _y: list[float] = field(default_factory=list, init=False)
+    _id_to_index: dict[ID, int] = field(default_factory=dict, init=False)
+
+    _edge_src: list[int] = field(default_factory=list, init=False)
+    _edge_dst: list[int] = field(default_factory=list, init=False)
+    _edge_types: list[int] = field(default_factory=list, init=False)
+    _seen_edges: set[tuple[int, int, int]] = field(default_factory=set, init=False)
 
     _pending_paths: list[_PendingPathDict[NODE]] = field(
         default_factory=list,
@@ -296,11 +301,22 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             and `none_if_exists` is True.
 
         """
-        if node.id not in self.nodes:
-            self.nodes[node.id] = node
-            self.id_adj_list[node.id] = []
-            return node.id
-        return node.id if not none_if_exists else None
+        if node.id in self._id_to_index:
+            return None if none_if_exists else node.id
+
+        # 1. Assign next available index
+        idx = len(self._x)
+        self._id_to_index[node.id] = idx
+
+        # 2. Store data in SoA (Structure of Arrays)
+        self._x.append(node.x)
+        self._y.append(node.y)
+
+        # Note: We are discarding the 'node' object here to save RAM/Time.
+        # If you strictly need access to 'self.nodes[id]' later in your code,
+        # you would have to reconstruct it or keep the dict (at perf cost).
+
+        return node.id
 
     def add_extra_node(self, node: NODE) -> ID:
         """Add an extra node to the graph.
@@ -312,9 +328,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             The ID of the added node.
 
         """
-        if node.id not in self.extra_nodes:
-            self.extra_nodes[node.id] = node
-        return node.id
+        return self.add_node(node)
 
     def build(
         self,
@@ -351,11 +365,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
         return self.build_graph()
 
-    def build_graph(
-        self,
-        *,
-        include_extra_nodes: bool = False,
-    ) -> MapGraph:
+    def build_graph(self) -> MapGraph:
         """Build a graph representation of the map.
 
         This method converts the internal adjacency list and node positions into
@@ -370,26 +380,15 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             A `MapGraph` object representing the graph.
 
         """
-        node_positions = torch.zeros((len(self.nodes), 2), dtype=torch.float32)
-        id_to_index: dict[ID, int] = {}
-        for i, node in enumerate(self.nodes.values()):
-            id_to_index[node.id] = i
-            node_positions[i, 0] = node.x
-            node_positions[i, 1] = node.y
+        x_tensor = torch.tensor(self._x, dtype=torch.float32)
+        y_tensor = torch.tensor(self._y, dtype=torch.float32)
+        node_positions = torch.stack([x_tensor, y_tensor], dim=1)
 
-        edge_indices, edge_types = get_edges_from_adj_list(
-            self.id_adj_list,
-            id_to_index,
-            edge_map=self.edge_map,
-        ).to_torch()
-
-        if include_extra_nodes:
-            n_nodes: int = len(self.extra_nodes)
-            extra_node_positions = torch.zeros((n_nodes, 2), dtype=torch.float32)
-            for i, node in enumerate(self.extra_nodes.values()):
-                extra_node_positions[i, 0] = node.x
-                extra_node_positions[i, 1] = node.y
-            node_positions = torch.cat([node_positions, extra_node_positions], dim=0)
+        # 2. Convert Edges to Tensor
+        edge_indices = torch.tensor(
+            [self._edge_src, self._edge_dst], dtype=torch.int64
+        )
+        edge_types = torch.tensor(self._edge_types, dtype=torch.int64)
 
         return MapGraph(
             edge_indices=edge_indices,
@@ -558,16 +557,15 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 ),
             )
 
+        min_dist_sq = min_distance**2 if min_distance is not None else 0.0
         i, j = 0, 1
         while i < len(nodes) - 1:
             src, dst = nodes[i], nodes[j]
-            distance = src.distance_to(dst)
-            if distance < min_distance and j < len(nodes) - 1:
-                # Increment j to find a node that is >= min_distance away
+            distance_sq = src.distance_sq_to(dst)
+            if distance_sq < min_dist_sq and j < len(nodes) - 1:
                 j += 1
                 continue
-
-            if distance < min_distance:
+            if distance_sq < min_dist_sq:
                 # Always add last node, even if distance < min_distance
                 add(src, dst, edge_type[i])
                 break
@@ -617,10 +615,28 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             edge_type: type of the edge.
 
         """
-        if from_id not in self.id_adj_list:
-            self.id_adj_list[from_id] = []
-        if (to_id, edge_type) not in self.id_adj_list[from_id]:
-            self.id_adj_list[from_id].append((to_id, edge_type))
+        if from_id not in self._id_to_index or to_id not in self._id_to_index:
+            # Optional: Raise error here if strict safety is needed
+            return
+
+        u = self._id_to_index[from_id]
+        v = self._id_to_index[to_id]
+
+        # Apply edge mapping immediately if present
+        edge_type_val = self.edge_map.get(edge_type, edge_type)
+        edge_type_int = int(edge_type_val)
+
+        # Check for duplicates (much faster with a set of ints than checking lists)
+        edge_key = (u, v, edge_type_int)
+        if edge_key in self._seen_edges:
+            return
+
+        self._seen_edges.add(edge_key)
+
+        # Append to COO lists
+        self._edge_src.append(u)
+        self._edge_dst.append(v)
+        self._edge_types.append(edge_type_int)
 
     def add_path_lazy(
         self,
@@ -730,41 +746,42 @@ def interpolate_position(
     dst_x, dst_y = dst
     dx: float = dst_x - src_x
     dy: float = dst_y - src_y
-    distance: float = (dx**2 + dy**2) ** 0.5
+    distance = math.hypot(dx, dy)
     if distance <= target_distance:
         yield InterpolationStage.LAST, src, dst
         return
 
-    num_segments: int = ceil(distance / target_distance)
+    # Pre-calculate steps to avoid division in loop
+    num_segments = ceil(distance / target_distance)
+    step_x = dx / num_segments
+    step_y = dy / num_segments
 
-    prev_x: float = src_x
-    prev_y: float = src_y
+    prev_x, prev_y = src_x, src_y
     for i in range(1, num_segments + 1):
-        t = i / num_segments
-        interp_x = src_x + t * dx
-        interp_y = src_y + t * dy
+        curr_x = src_x + i * step_x
+        curr_y = src_y + i * step_y
+
         stage = (
             InterpolationStage.FIRST
-            if i == 0
+            if i == 1
             else InterpolationStage.LAST
-            if i == num_segments - 1
+            if i == num_segments
             else InterpolationStage.INTERMEDIATE
         )
 
-        yield stage, (prev_x, prev_y), (interp_x, interp_y)
-
-        prev_x = interp_x
-        prev_y = interp_y
+        yield stage, (prev_x, prev_y), (curr_x, curr_y)
+        prev_x, prev_y = curr_x, curr_y
 
 
 ID = TypeVar("ID", bound=Hashable)
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class Edges:
     """A collection of edges in a graph."""
 
-    edge_indices: list[tuple[int, int]]
+    src_indices: list[int]
+    dst_indices: list[int]
     edge_types: list[EdgeType]
 
     def to_torch(self) -> tuple[torch.Tensor, torch.Tensor]:
@@ -774,10 +791,11 @@ class Edges:
             edge_indices (2xN), edge_types (Nx1) where N is the number of edges.
 
         """
-        return (
-            torch.tensor(self.edge_indices, dtype=torch.int64).t(),
-            torch.tensor(self.edge_types, dtype=torch.int64),
+        edge_index = torch.tensor(
+            [self.src_indices, self.dst_indices], dtype=torch.long
         )
+        edge_attr = torch.tensor(self.edge_types, dtype=torch.long)
+        return edge_index, edge_attr
 
 
 def get_edges_from_adj_list(
@@ -802,16 +820,23 @@ def get_edges_from_adj_list(
             node_id: index for index, node_id in enumerate(adj_list.keys())
         }
 
-    if edge_map is None:
-        edge_map = {}
+    # Use flat lists instead of list of tuples
+    src_indices: list[int] = []
+    dst_indices: list[int] = []
+    edge_types_list: list[EdgeType] = []  # Assuming EdgeType is IntEnum
 
-    edge_indices: list[tuple[int, int]] = []
-    edge_types: list[EdgeType] = []
+    # Resolve edge_map.get outside the inner loop if possible,
+    # or keep as is if dynamic.
+
     for from_id, to_list in adj_list.items():
+        from_idx = id_to_index[from_id]
         for to_id, edge_type in to_list:
-            from_index = id_to_index[from_id]
-            to_index = id_to_index[to_id]
-            edge_indices.append((from_index, to_index))
-            edge_types.append(edge_map.get(edge_type, edge_type))
+            src_indices.append(from_idx)
+            dst_indices.append(id_to_index[to_id])
 
-    return Edges(edge_indices, edge_types)
+            # fast path for edge map
+            etype = edge_map.get(edge_type, edge_type) if edge_map else edge_type
+            edge_types_list.append(etype)
+
+    # Return a structure that handles flat lists
+    return Edges(src_indices, dst_indices, edge_types_list)

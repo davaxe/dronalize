@@ -17,6 +17,7 @@ import polars as pl
 from preprocessing.common.trajectory_utils import (
     convert_to_agent_data_dict,
 )
+from preprocessing.core.map_graph import MapGraph
 
 if TYPE_CHECKING:
     from preprocessing.common.agent_data import AgentData
@@ -190,6 +191,10 @@ class Scene(Generic[T_ID]):
     """Number of observed frames."""
     output_len: int
     """Number of predicted frames."""
+    map: MapGraph | None = None
+    """Map graph associated with the scene. In some cases (e.g., Waymo), the map
+    and trajectory are stored in the same file, and it can be useful to include
+    the map graph in the scene data to avoid recomputing it for each scene."""
 
     def to_agent_data(
         self,
@@ -345,13 +350,20 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
             2: ["ax", "ay"],
         }
 
+    def modify_scene(self, scene: Scene[T_ID]) -> Scene[T_ID]:
+        """Modify a scene in place.
+
+        Overload this method if required. This is called as the last step
+        for each scenes return by the `scenes_iter`.
+        """
+        return scene
+
     def process_next(self, source: T_Source) -> Iterable[pl.DataFrame]:
         """Process a single data item through the pipeline.
 
         Steps:
-        1. Load raw data.
+        1. Load raw data for all sources.
         2. Normalize to common schema.
-        4. Post-process the data.
         """
 
         def _step(
@@ -379,7 +391,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         for source_id, source in self.sources():
             self._source_counter += 1
             for scene_df in self.process_next(source):
-                yield self._create_scene(scene_df, source_id)
+                yield self.modify_scene(self._create_scene(scene_df, source_id))
 
     def _create_scene(self, df: pl.DataFrame, source_id: T_ID) -> Scene[T_ID]:
         scene = Scene[T_ID](
