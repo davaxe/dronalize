@@ -19,11 +19,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Self, TypedDict, override
 from uuid import UUID
 
-from preprocessing.road_network.common import (
-    GraphBuilder,
-)
-from preprocessing.road_network.edge_type import EdgeType
-from preprocessing.road_network.nuscenes import parser
+from preprocessing.core.categories import EdgeType
+from preprocessing.core.interface.map import GraphBuilder
+from preprocessing.datasets.nuscenes.map import parser
 
 if TYPE_CHECKING:
     from pathlib import Path

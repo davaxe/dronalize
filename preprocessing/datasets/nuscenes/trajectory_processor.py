@@ -123,6 +123,9 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
             combined_df.partition_by("scene_token", as_dict=True),
         )
 
+        self._status_to_filter: list[str] = ["parked", "undefined"]
+        self._full_category_contains: list[str] = ["object"]
+
     @override
     def sources(self) -> Iterable[tuple[tuple[str, str], str]]:
         for token, df in self._scene_cache.items():
@@ -145,8 +148,11 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
             .lazy()
         )
         scenes = scenes.filter(
-            pl.col("status") != "parked",
-            ~pl.col("full_category").str.contains("object"),
+            ~pl.col("status").is_in(self._status_to_filter),
+            *[
+                ~pl.col("full_category").str.contains(category)
+                for category in self._full_category_contains
+            ],
         ).drop(["status", "full_category", "full_status"])
 
         group_by: list[str] = []

@@ -1,17 +1,3 @@
-# Copyright 2024-2025, Theodor Westny. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,8 +6,9 @@ from typing import TYPE_CHECKING, Self
 import numpy as np
 from scipy.interpolate import BSpline
 
-from preprocessing.road_network import nuscenes
-from preprocessing.road_network.edge_type import EdgeType
+from preprocessing.core.categories import EdgeType
+from preprocessing.datasets.nuscenes.map.graph_builder import NuScenesMapGraphBuilder
+from preprocessing.datasets.nuscenes.map.parser import NuScenesMap
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,7 +17,7 @@ if TYPE_CHECKING:
 # - Add centerlines correctly by using `arcline_path_3` available in the VOD map
 
 
-class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
+class VODMapGraphBuilder(NuScenesMapGraphBuilder):
     """A builder for creating a MapGraph from a VOD map."""
 
     def __init__(
@@ -49,7 +36,7 @@ class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
                 construction.
 
         """
-        nuscenes_map = nuscenes.NuScenesMap(path, enable_debug_prints=debug_parsing)
+        nuscenes_map = NuScenesMap(path, enable_debug_prints=debug_parsing)
         self.ignore_edge_types = (
             ignore_edge_types if ignore_edge_types is not None else set()
         )
@@ -75,7 +62,7 @@ class VODMapGraphBuilder(nuscenes.NuScenesMapGraphBuilder):
         debug_parsing: bool = False,
         ignore_edge_types: set[str] | None = None,
     ) -> Self:
-        """Create a NuscenesMapGraphBuilder from a file path."""
+        """Create a VODMapGraphBuilder from a file path."""
         return cls(
             path,
             debug_parsing=debug_parsing,

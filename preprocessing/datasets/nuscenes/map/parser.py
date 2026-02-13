@@ -44,8 +44,8 @@ from typing import (
     cast,
 )
 
-from preprocessing.road_network.common import BaseEnum, BaseMapObject, BaseNode
-from preprocessing.road_network.edge_type import EdgeType
+from preprocessing.core.categories import EdgeType
+from preprocessing.core.interface.map import BaseEnum, BaseMapObject, BaseNode
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
