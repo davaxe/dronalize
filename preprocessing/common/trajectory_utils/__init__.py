@@ -27,4 +27,4 @@ from preprocessing.common.trajectory_utils.window import (
 if TYPE_CHECKING:
     import polars as pl
 
-    T_DataFame = TypeVar("T_DataFame", pl.DataFrame, pl.LazyFrame)
+    T_DataFrame = TypeVar("T_DataFrame", pl.DataFrame, pl.LazyFrame)

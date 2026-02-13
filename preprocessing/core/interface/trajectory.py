@@ -183,8 +183,8 @@ class Scene(Generic[T_ID]):
 
     inner: pl.DataFrame
     """Inner DataFrame containing the scene data."""
-    source_identifier: T_ID
-    """Identifier for the scene (e.g., file name, index)."""
+    identifier: T_ID
+    """Identifier for the scene (e.g., file name, index, scene name/token)."""
     scene_number: int
     """Unique scene number assigned during processing."""
     input_len: int
@@ -354,7 +354,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         """Modify a scene in place.
 
         Overload this method if required. This is called as the last step
-        for each scenes return by the `scenes_iter`.
+        for each scenes return by the `sce
         """
         return scene
 
@@ -396,7 +396,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
     def _create_scene(self, df: pl.DataFrame, source_id: T_ID) -> Scene[T_ID]:
         scene = Scene[T_ID](
             inner=df,
-            source_identifier=source_id
+            identifier=source_id
             if self._id_mapping is None
             else self._id_mapping(self._source_counter, source_id),
             scene_number=self._count,
