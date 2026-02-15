@@ -107,19 +107,12 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
 if __name__ == "__main__":
     import time
 
-    import matplotlib.pyplot as plt
-
-    base = Path(
-        "/home/west/Developer/behavior-prediction/datasets/lyft/semantic_map"
-    )
+    base = Path("/home/west/Developer/behavior-prediction/datasets/lyft/semantic_map")
     map_path = base / "semantic_map.pb"
     meta_path = base / "meta.json"
     start_time = time.perf_counter()
     map_builder = LyftLVL5MapGraphBuilder.from_files(map_path, meta_path)
     map_graph = map_builder.build(interp_distance=3, min_distance=1)
-
-    map_graph.plot_graph()
-    plt.show()
 
 
 # previous results:MapGraph(num_nodes=228860, num_edges=216920, node_positions_shape=torch.Size([228860, 2]), edge_indices_shape=torch.Size([2, 216920]))

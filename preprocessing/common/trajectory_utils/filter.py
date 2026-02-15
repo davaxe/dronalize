@@ -7,18 +7,18 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from preprocessing.trajectory.interface import ProcessorConfig
-    from preprocessing.trajectory.utils.common import T_DataFame
+    from preprocessing.common.trajectory_utils import T_DataFrame
+    from preprocessing.core.interface import ProcessorConfig
 
 
 def filter_scene(
-    data: T_DataFame,
+    data: T_DataFrame,
     config: ProcessorConfig,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
     category_column: str | None = None,
-) -> T_DataFame:
+) -> T_DataFrame:
     """Filter scenes based on configuration.
 
     Args:
@@ -77,9 +77,7 @@ def filter_scene_expr(
     valid_type_expr = pl.lit(value=True)
     if filtering.filter_agent_category is not None and category_column is not None:
         # Identify rows that are NOT in the removal list
-        valid_type_expr = ~pl.col(category_column).is_in(
-            filtering.filter_agent_category
-        )
+        valid_type_expr = ~pl.col(category_column).is_in(filtering.filter_agent_category)
         conditions.append(valid_type_expr)
 
     # 1. Base Frame Filtering (Relative offsets check)
@@ -87,15 +85,10 @@ def filter_scene_expr(
         required_set = set(filtering.require_frames)
         n_required = len(required_set)
 
-        relative_frame = pl.col(frame_column) - pl.col(frame_column).min().over(
-            scene_window
-        )
+        relative_frame = pl.col(frame_column) - pl.col(frame_column).min().over(scene_window)
 
         has_all_frames = (
-            relative_frame
-            .filter(relative_frame.is_in(required_set))
-            .n_unique()
-            .over(scene_window)
+            relative_frame.filter(relative_frame.is_in(required_set)).n_unique().over(scene_window)
             == n_required
         )
         conditions.append(has_all_frames)
@@ -119,9 +112,7 @@ def filter_scene_expr(
     # 3. Scene-Level: Minimum Valid Agents
     if filtering.min_agents > 0:
         # Count UNIQUE agents that are valid (passed type check and/or length check)
-        valid_agent_count = (
-            pl.col(agent_id).filter(agent_validity).n_unique().over(scene_window)
-        )
+        valid_agent_count = pl.col(agent_id).filter(agent_validity).n_unique().over(scene_window)
         conditions.append(valid_agent_count >= filtering.min_agents)
 
     # 4. Scene-Level: Prediction Frame Existence
@@ -129,9 +120,7 @@ def filter_scene_expr(
         start_frame = pl.col(frame_column).min().over(scene_window)
         target_frame = start_frame + config.input_len - 1
 
-        has_pred_frame = (
-            (pl.col(frame_column) == target_frame).any().over(scene_window)
-        )
+        has_pred_frame = (pl.col(frame_column) == target_frame).any().over(scene_window)
         conditions.append(has_pred_frame)
 
     if not conditions:

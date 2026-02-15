@@ -18,7 +18,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from enum import auto
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from preprocessing.road_network.common import BaseEnum, BaseMapObject, IntIDNode
 from preprocessing.road_network.edge_type import EdgeType
@@ -135,7 +135,7 @@ class LaneSegment:
         segment.id = lane_id
         for sub_element in element:
             # Cast inspired from argoverse1 official code
-            way_field = cast("list[tuple[str, str]]", list(sub_element.items()))
+            way_field: list[tuple[str, str]] = list(sub_element.items())
             field_name = way_field[0][0]
             if field_name == "ref":
                 node_id = int(way_field[0][1])

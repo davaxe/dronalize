@@ -17,11 +17,11 @@ import polars as pl
 from preprocessing.common.trajectory_utils import (
     convert_to_agent_data_dict,
 )
-from preprocessing.core.map_graph import MapGraph
 
 if TYPE_CHECKING:
     from preprocessing.common.agent_data import AgentData
     from preprocessing.core.categories import AgentCategory
+    from preprocessing.core.map_graph import MapGraph
 
 
 @dataclass(slots=True)
@@ -51,9 +51,7 @@ class SceneFiltering:
             self.filter_agent_category, set
         ):
             self.filter_agent_category = set(self.filter_agent_category)
-        if self.require_frames is not None and not isinstance(
-            self.require_frames, set
-        ):
+        if self.require_frames is not None and not isinstance(self.require_frames, set):
             self.require_frames = set(self.require_frames)
 
 
@@ -117,9 +115,7 @@ class ProcessorConfig:
     scene_filtering: SceneFiltering | None = None
     """Configuration for filtering scenes based on pedestrian presence and validity."""
 
-    def window_parameters(
-        self, step_size: int, window_size: int | None = None
-    ) -> Self:
+    def window_parameters(self, step_size: int, window_size: int | None = None) -> Self:
         """Set the window parameters for sliding window sampling."""
         self.window_params = WindowParams(
             window_size=window_size
@@ -238,25 +234,27 @@ class Scene(Generic[T_ID]):
             schema = Scene._base_schema()
         return replace(
             self,
-            inner=self.inner.select([
-                pl.col(name).cast(dtype) for name, dtype in schema.items()
-            ]),
+            inner=self.inner.select(
+                [pl.col(name).cast(dtype) for name, dtype in schema.items()]
+            ),
         )
 
     @staticmethod
     def _base_schema() -> pl.Schema:
-        return pl.Schema({
-            "frame": pl.Int32(),
-            "id": pl.Int32(),
-            "x": pl.Float32(),
-            "y": pl.Float32(),
-            "vx": pl.Float32(),
-            "vy": pl.Float32(),
-            "ax": pl.Float32(),
-            "ay": pl.Float32(),
-            "yaw": pl.Float32(),
-            "agent_category": pl.Int32(),
-        })
+        return pl.Schema(
+            {
+                "frame": pl.Int32(),
+                "id": pl.Int32(),
+                "x": pl.Float32(),
+                "y": pl.Float32(),
+                "vx": pl.Float32(),
+                "vy": pl.Float32(),
+                "ax": pl.Float32(),
+                "ay": pl.Float32(),
+                "yaw": pl.Float32(),
+                "agent_category": pl.Int32(),
+            }
+        )
 
 
 IDMapping = Callable[[int, T_ID], T_ID]

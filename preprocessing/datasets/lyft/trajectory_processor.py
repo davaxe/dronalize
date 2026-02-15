@@ -175,25 +175,27 @@ class _LyftScene:
         return (int(start), int(end))
 
 
-_CATEGORY_LOOKUP = np.array([
-    AgentCategory.UNIMPORTANT.value,  # 0 (not set)
-    AgentCategory.UNKNOWN.value,  # 1 (unknown)
-    AgentCategory.UNIMPORTANT.value,  # 2 (don't care)
-    AgentCategory.CAR.value,  # 3
-    AgentCategory.VAN.value,  # 4
-    AgentCategory.TRAM.value,  # 5
-    AgentCategory.BUS.value,  # 6
-    AgentCategory.TRUCK.value,  # 7
-    AgentCategory.EMERGENCY_VEHICLE.value,  # 8
-    AgentCategory.UNKNOWN.value,  # 9 ("other_vehicle")
-    AgentCategory.BICYCLE.value,  # 10
-    AgentCategory.MOTORCYCLE.value,  # 11
-    AgentCategory.BICYCLE.value,  # 12
-    AgentCategory.MOTORCYCLE.value,  # 13
-    AgentCategory.PEDESTRIAN.value,  # 14
-    AgentCategory.ANIMAL.value,  # 15
-    AgentCategory.UNIMPORTANT.value,  # 16 (don't care)
-])
+_CATEGORY_LOOKUP = np.array(
+    [
+        AgentCategory.UNIMPORTANT.value,  # 0 (not set)
+        AgentCategory.UNKNOWN.value,  # 1 (unknown)
+        AgentCategory.UNIMPORTANT.value,  # 2 (don't care)
+        AgentCategory.CAR.value,  # 3
+        AgentCategory.VAN.value,  # 4
+        AgentCategory.TRAM.value,  # 5
+        AgentCategory.BUS.value,  # 6
+        AgentCategory.TRUCK.value,  # 7
+        AgentCategory.EMERGENCY_VEHICLE.value,  # 8
+        AgentCategory.UNKNOWN.value,  # 9 ("other_vehicle")
+        AgentCategory.BICYCLE.value,  # 10
+        AgentCategory.MOTORCYCLE.value,  # 11
+        AgentCategory.BICYCLE.value,  # 12
+        AgentCategory.MOTORCYCLE.value,  # 13
+        AgentCategory.PEDESTRIAN.value,  # 14
+        AgentCategory.ANIMAL.value,  # 15
+        AgentCategory.UNIMPORTANT.value,  # 16 (don't care)
+    ]
+)
 
 
 def _scene_to_polars(
@@ -218,13 +220,17 @@ def _scene_to_polars(
     ego_y = scene_frames["ego_translation"][:, 1]
 
     # Create Ego DataFrame
-    ego_df = pl.DataFrame({
-        "frame": ego_frames,
-        "id": ego_ids,
-        "x": ego_x,
-        "y": ego_y,
-        "agent_category": np.full(n_frames, AgentCategory.CAR.value, dtype=np.int32),
-    })
+    ego_df = pl.DataFrame(
+        {
+            "frame": ego_frames,
+            "id": ego_ids,
+            "x": ego_x,
+            "y": ego_y,
+            "agent_category": np.full(
+                n_frames, AgentCategory.CAR.value, dtype=np.int32
+            ),
+        }
+    )
 
     intervals = scene_frames["agent_index_interval"]
     counts = intervals[:, 1] - intervals[:, 0]
@@ -263,13 +269,15 @@ def _scene_to_polars(
     safe_indices = np.minimum(max_indices, len(_CATEGORY_LOOKUP) - 1)
     agent_categories = _CATEGORY_LOOKUP[safe_indices].astype(np.int32)
 
-    agent_df = pl.DataFrame({
-        "frame": agent_frame_indices,
-        "id": agent_ids,
-        "x": agent_x,
-        "y": agent_y,
-        "agent_category": agent_categories,
-    })
+    agent_df = pl.DataFrame(
+        {
+            "frame": agent_frame_indices,
+            "id": agent_ids,
+            "x": agent_x,
+            "y": agent_y,
+            "agent_category": agent_categories,
+        }
+    )
     return scene.scene_name, pl.concat([ego_df, agent_df])
 
 

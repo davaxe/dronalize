@@ -44,6 +44,8 @@ FilterStr = Literal[
 
 
 class WaymoProcessor(DataProcessor[str, Path]):
+    """Processor for Waymo Open Dataset scenarios stored in TFRecord format."""
+
     def __init__(
         self,
         data_dir: Path | str,
@@ -53,14 +55,36 @@ class WaymoProcessor(DataProcessor[str, Path]):
         include_map: bool = True,
         interp_distance: float | None = None,
         min_distance: float | None = 1.5,
-    ):
+    ) -> None:
+        """Initialize.
+
+        The WAYMO dataset stores map and scenario data together in TFRecord
+        files, in a protobuf format. That is why it is possible to include map
+        data in the processing pipeline without a separate map file. However,
+        including map decreases the total processing speed, but is faster than
+        loading map data separately for each scenario. The map data
+
+        `interp_distance` and `min_distance` parameters control the density of
+        map points after processing, and do not do anything if map inclusion is
+        disabled.
+
+        Args:
+            data_dir: directory containing the TFRecord files.
+            filter_str: string pattern to filter TFRecord files
+                (e.g., "*validation.tfrecord*").
+            processor_config: Configuration if not default.
+            include_map: Whether to include map data in the scene. Defaults to True.
+            interp_distance: Distance threshold for interpolating map points.
+                Defaults to None (no interpolation).
+            min_distance: Minimum distance between map points after processing.
+                Defaults to 1.5 meters.
+
+        """
         super().__init__(
             processor_config=processor_config or self._default_config(),
             enforce_schema=True,
         )
-        self._data_dir: Path = (
-            Path(data_dir) if isinstance(data_dir, str) else data_dir
-        )
+        self._data_dir: Path = Path(data_dir) if isinstance(data_dir, str) else data_dir
         self._filter_str: FilterStr = filter_str
         self._include_map: bool = include_map
         self._interp_distance: float | None = interp_distance
@@ -83,9 +107,7 @@ class WaymoProcessor(DataProcessor[str, Path]):
                 map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
                 # Note: This overwrites _current_map repeatedly;
                 # acceptable if modify_scene uses the map immediately after this yield.
-                self._current_map = WaymoMapGraphBuilder.from_proto(
-                    map_data.map_features
-                ).build(
+                self._current_map = WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
                     min_distance=self._min_distance,
                     interp_distance=self._interp_distance,
                 )
@@ -237,23 +259,16 @@ if __name__ == "__main__":
 
     # Recommendation: Use ProcessPoolExecutor here for actual parallel processing
     # because Protobuf parsing + Python loops are CPU bound and single-threaded.
-    directory = Path(
-        "/home/west/Developer/behavior-prediction/datasets/waymo/validation"
-    )
+    directory = Path("/home/west/Developer/behavior-prediction/datasets/waymo/validation")
 
     processor = WaymoProcessor(directory, "*validation.tfrecord*", include_map=False)
-
     start_time = time.perf_counter()
     print("Starting processing...")
     count = 0
     # This loop will now yield one large  per file instead of per scene
-    for scene in processor.scenes_iter():
+    for _scene in processor.scenes_iter():
         if count % 500 == 0:
-            print(
-                f"Processed {count} scenes in {time.perf_counter() - start_time:.2f}s"
-            )
+            print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f}s")
         count += 1
 
-    print(
-        f"Finished processing {count} scenes in {time.perf_counter() - start_time:.2f}s"
-    )
+    print(f"Finished processing {count} scenes in {time.perf_counter() - start_time:.2f}s")

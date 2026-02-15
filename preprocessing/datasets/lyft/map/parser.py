@@ -744,8 +744,8 @@ def _geodetic_to_ecef(
     alt: float,
 ) -> tuple[float, float, float]:
     # WGS84 constants
-    semimajor_axis = 6378137.0  # meters
-    semiminor_axis = 6356752.31424518
+    semi_major_axis = 6378137.0  # meters
+    semi_minor_axis = 6356752.31424518
 
     sin_lat = math.sin(lat)
     cos_lat = math.cos(lat)
@@ -753,15 +753,15 @@ def _geodetic_to_ecef(
     cos_lon = math.cos(lon)
 
     # Radius of curvature in the prime vertical
-    n = semimajor_axis**2 / math.hypot(
-        semimajor_axis * cos_lat,
-        semiminor_axis * sin_lat,
+    n = semi_major_axis**2 / math.hypot(
+        semi_major_axis * cos_lat,
+        semi_minor_axis * sin_lat,
     )
 
     # ECEF coordinates
     x = (n + alt) * cos_lat * cos_lon
     y = (n + alt) * cos_lat * sin_lon
-    z = (n * (semiminor_axis / semimajor_axis) ** 2 + alt) * sin_lat
+    z = (n * (semi_minor_axis / semi_major_axis) ** 2 + alt) * sin_lat
 
     return x, y, z
 
@@ -791,8 +791,6 @@ if __name__ == "__main__":
     lyft_map = LyftLVL5Map(map_path, meta_path)
     print(f"Loaded {len(lyft_map.lanes)} lanes")
     print(f"Loaded {len(lyft_map.road_network_segments)} road network segments")
-    print(
-        f"Loaded {len(lyft_map.traffic_control_elements)} traffic control elements"
-    )
+    print(f"Loaded {len(lyft_map.traffic_control_elements)} traffic control elements")
     print(f"Loaded {len(lyft_map.road_network_nodes)} road network nodes")
     print(f"Loaded {len(lyft_map.junctions)} junctions")

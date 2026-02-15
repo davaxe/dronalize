@@ -10,12 +10,12 @@ from preprocessing.common.trajectory_utils import collect
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from preprocessing.common.trajectory_utils import T_DataFame
+    from preprocessing.common.trajectory_utils import T_DataFrame
 
 
 @overload
 def sliding_window(
-    data: T_DataFame,
+    data: T_DataFrame,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
@@ -29,7 +29,7 @@ def sliding_window(
 
 @overload
 def sliding_window(
-    data: T_DataFame,
+    data: T_DataFrame,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
@@ -38,11 +38,11 @@ def sliding_window(
     is_sorted: bool = False,
     include_boundaries: bool = False,
     return_iterable: Literal[False],
-) -> T_DataFame: ...
+) -> T_DataFrame: ...
 
 
 def sliding_window(
-    data: T_DataFame,
+    data: T_DataFrame,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
@@ -51,7 +51,7 @@ def sliding_window(
     is_sorted: bool = False,
     include_boundaries: bool = False,
     return_iterable: bool = True,
-) -> Iterable[pl.DataFrame] | T_DataFame:
+) -> Iterable[pl.DataFrame] | T_DataFrame:
     """Generate sliding windows from a DataFrame.
 
     When returning as an iterable, the function yields DataFrames for each
@@ -74,8 +74,9 @@ def sliding_window(
         group_by: Optional column name(s) to group by before applying the sliding window.
             This allows for generating windows within each group separately.
 
-    Yields:
-        DataFrames corresponding to each sliding window.
+    Returns:
+        DataFrames corresponding to each sliding window. Either as an iterable of DataFrames or a
+        single DataFrame with all windows, depending on the `return_iterable` flag.
 
     """
     if not is_sorted:
@@ -120,14 +121,14 @@ def _sliding_window_iterable(
 
 
 def _sliding_window(
-    data: T_DataFame,
+    data: T_DataFrame,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
     *,
     group_by: str | None = None,
     include_boundaries: bool = False,
-) -> T_DataFame:
+) -> T_DataFrame:
     return (
         data
         .group_by_dynamic(

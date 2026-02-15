@@ -586,7 +586,7 @@ def _many_from_dict(
     objects: dict[str, T] = {}
     failed = []
     for item in data:
-        obj: T | None = cast("T | None", cls.try_from_dict(item))
+        obj: T | None = cls.try_from_dict(item)
         if obj is None:
             if debug:
                 failed.append(item)

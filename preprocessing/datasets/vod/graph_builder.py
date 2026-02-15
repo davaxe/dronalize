@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 from pathlib import Path
 from typing import TYPE_CHECKING, Self
 
@@ -37,9 +38,7 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
 
         """
         nuscenes_map = NuScenesMap(path, enable_debug_prints=debug_parsing)
-        self.ignore_edge_types = (
-            ignore_edge_types if ignore_edge_types is not None else set()
-        )
+        self.ignore_edge_types = ignore_edge_types if ignore_edge_types is not None else set()
 
         super().__init__(nuscenes_map)
         self.lane_polygon_edge: None | EdgeType = EdgeType.LINE_THIN
@@ -83,7 +82,7 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
             u = np.linspace(0, 1, 100)
             xy = spline(u).astype(np.float64)
             x, y = xy[:, 0], xy[:, 1]
-            nodes = [self.new_node(xi, yi) for xi, yi in zip(x, y, strict=True)]
+            nodes = list(itertools.starmap(self.new_node, zip(x, y, strict=True)))
             self.add_node_edges_loop_min_dist(
                 nodes,
                 min_distance=self.min_distance,

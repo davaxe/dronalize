@@ -3,9 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypeVar
 
 from preprocessing.common.trajectory_utils.basic import (
-    collect,
-    yaw_from_pos,
-    yaw_from_vel,
+    collect as collect,
+)
+from preprocessing.common.trajectory_utils.basic import (
+    yaw_from_pos as yaw_from_pos,
+)
+from preprocessing.common.trajectory_utils.basic import (
+    yaw_from_vel as yaw_from_vel,
 )
 from preprocessing.common.trajectory_utils.convert import (
     convert_to_agent_data_dict as convert_to_agent_data_dict,

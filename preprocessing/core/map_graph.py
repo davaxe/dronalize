@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
@@ -11,16 +10,10 @@ from typing import (
 
 import numpy as np
 import torch
-from matplotlib import pyplot as plt
-from matplotlib.collections import LineCollection
-from matplotlib.lines import Line2D
 from torch_geometric.utils import subgraph
-
-from preprocessing.road_network.edge_type import EdgeType
 
 if TYPE_CHECKING:
     import numpy.typing as npt
-    from matplotlib.axes import Axes
 
 
 @dataclass(init=False, repr=False)
@@ -68,9 +61,7 @@ class MapGraph:
         self.node_positions: torch.Tensor = node_positions
         self.edge_indices: torch.Tensor = edge_indices
         self.num_nodes: int = node_positions.shape[0]
-        self.num_edges: int = (
-            edge_indices.shape[1] if edge_indices.numel() > 0 else 0
-        )
+        self.num_edges: int = edge_indices.shape[1] if edge_indices.numel() > 0 else 0
         self.node_types: torch.Tensor = (
             node_types
             if node_types is not None
@@ -101,56 +92,6 @@ class MapGraph:
                 "type": self.edge_types,
             },
         }
-
-    def plot_graph(self) -> Axes:
-        """Visualize the map graph using Matplotlib."""
-        _fig, ax = plt.subplots(figsize=(10, 10))
-
-        # Dictionary to group line segments by their EdgeType
-        # Key: EdgeType, Value: list of segments [(x1, y1), (x2, y2)]
-        lines_by_type: defaultdict[EdgeType, list[list[tuple[float, float]]]] = (
-            defaultdict(list)
-        )
-
-        # 1. Group segments by type
-        for i in range(self.edge_indices.shape[1]):
-            src_idx = int(self.edge_indices[0, i].item())
-            dst_idx = int(self.edge_indices[1, i].item())
-            src_pos = self.node_positions[src_idx].numpy()
-            dst_pos = self.node_positions[dst_idx].numpy()
-            edge_type = EdgeType(self.edge_types[i].item())
-            lines_by_type[edge_type].append([tuple(src_pos), tuple(dst_pos)])
-
-        legend_elements = []
-
-        for edge_type, segments in lines_by_type.items():
-            style_kwargs = edge_type.edge_style()
-            _ = style_kwargs.pop("dashes", None)
-
-            lc = LineCollection(segments, **style_kwargs)
-            ax.add_collection(lc)
-            legend_elements.append(
-                Line2D(
-                    [0],
-                    [0],
-                    label=f"Edge Type {edge_type.name}",
-                    **style_kwargs,
-                ),
-            )
-
-        ax.autoscale()
-        ax.set_aspect("equal", "box")
-        ax.set_title("Argoverse1 Map Graph")
-        ax.set_xlabel("x")
-        ax.set_ylabel("y")
-
-        ax.legend(
-            handles=legend_elements,
-            title="Edge Types",
-            loc="upper right",
-        )
-
-        return ax
 
     @overload
     def extract_radius(
@@ -199,7 +140,7 @@ class MapGraph:
             center = torch.tensor(center, dtype=torch.float32)
 
         # Calculate distances from center to all nodes
-        distances = torch.norm(self.node_positions - center, dim=-1)
+        distances: torch.Tensor = torch.norm(self.node_positions - center, dim=-1)
 
         # Find nodes within radius
         within_radius_mask = distances <= radius

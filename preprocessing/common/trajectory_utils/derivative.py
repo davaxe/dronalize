@@ -7,18 +7,18 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from preprocessing.common.trajectory_utils import T_DataFame
+    from preprocessing.common.trajectory_utils import T_DataFrame
 
 
 def derivative(
-    data: T_DataFame,
+    data: T_DataFrame,
     *x: str,
     dt: float = 1.0,
     n: int = 1,
     include_intermediate: bool = False,
     group_by: str | Sequence[str] | None = None,
     derivative_rename: dict[int, list[str]] | None = None,
-) -> T_DataFame:
+) -> T_DataFrame:
     """Compute the n-th order derivative for columns using finite differences.
 
     Calculates numerical derivatives for one or multiple columns. If multiple
@@ -67,11 +67,7 @@ def derivative(
         for j, expr in enumerate(current_exprs):
             # Compute the next derivative using the current expression object
             grad_expr = get_gradient_expr(expr)
-
-            # Alias it for the output
             aliased_expr = grad_expr.alias(rename_list[j])
-
-            # Store the unaliased grad_expr for the NEXT iteration's calculation
             next_order_exprs.append(grad_expr)
             if i == n or include_intermediate:
                 all_expressions.append(aliased_expr)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import TYPE_CHECKING, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -13,7 +13,7 @@ from preprocessing.common.trajectory_utils import derivative
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-T_DataFrame = TypeVar("T_DataFrame", pl.DataFrame, pl.LazyFrame)
+    from preprocessing.common.trajectory_utils import T_DataFrame
 
 
 def resample_tracks(
@@ -186,8 +186,7 @@ def _resample_dataframe_spline(
     ]
 
     return (
-        data
-        .group_by(group_cols)
+        data.group_by(group_cols)
         .agg(aggregations)
         .explode(["_resampled_batch", frame_column])
         .unnest("_resampled_batch")
@@ -274,10 +273,7 @@ def _new_frames_expr(
 ) -> pl.Expr:
     n_new_expr = ((pl.len() - 1) * up).floordiv(down) + 1
     start_expr = (
-        pl
-        .when(pl.len() <= 1)
-        .then(pl.col(frame_column).first())
-        .otherwise(pl.lit(0))
+        pl.when(pl.len() <= 1).then(pl.col(frame_column).first()).otherwise(pl.lit(0))
     )
     end_expr = pl.when(pl.len() <= 1).then(start_expr + 1).otherwise(n_new_expr)
     return pl.int_range(start_expr, end_expr, dtype=pl.Int32).alias(frame_column)
@@ -392,11 +388,10 @@ def _upsample_dataframe(
         raise ValueError(msg)
 
     is_eager = isinstance(data, pl.DataFrame)
-    lf = data.lazy() if is_eager else data
+    lf: pl.LazyFrame = cast("pl.LazyFrame", data.lazy() if is_eager else data)
     data_scaled = lf.with_columns(pl.col(frame_column) * factor)
     upsampled = (
-        data_scaled
-        .group_by(group_by)
+        data_scaled.group_by(group_by)
         .agg(
             pl.int_range(
                 pl.col(frame_column).min(),
@@ -416,7 +411,11 @@ def _upsample_dataframe(
     result = (
         upsampled.join(data_scaled, on=on, how="left").sort(on).with_columns(*exprs)
     )
-    return result.collect() if is_eager else result  # pyright: ignore[reportReturnType]
+
+    if isinstance(result, pl.LazyFrame) and is_eager:
+        return result.collect()
+
+    return result
 
 
 @overload

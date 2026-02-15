@@ -1,9 +1,9 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
+from preprocessing.common.trajectory_utils import filter_scene
 from preprocessing.core.categories import AgentCategory
-from preprocessing.trajectory.interface import ProcessorConfig, SceneFiltering
-from preprocessing.trajectory.utils import filter_scene
+from preprocessing.core.interface import ProcessorConfig, SceneFiltering
 
 
 def test_no_scene_filtering() -> None:
@@ -21,16 +21,18 @@ def test_no_scene_filtering() -> None:
 
 def test_filter_agent_category() -> None:
     """Test that specific agent categories are filtered out correctly."""
-    df = pl.DataFrame({
-        "scene": [1, 1, 1],
-        "id": [1, 2, 3],
-        "frame": [0, 0, 0],
-        "category": [
-            AgentCategory.CAR,
-            AgentCategory.PEDESTRIAN,
-            AgentCategory.UNIMPORTANT,
-        ],
-    })
+    df = pl.DataFrame(
+        {
+            "scene": [1, 1, 1],
+            "id": [1, 2, 3],
+            "frame": [0, 0, 0],
+            "category": [
+                AgentCategory.CAR,
+                AgentCategory.PEDESTRIAN,
+                AgentCategory.UNIMPORTANT,
+            ],
+        }
+    )
 
     config = ProcessorConfig(
         input_len=1,
@@ -51,11 +53,13 @@ def test_filter_agent_category() -> None:
 
 def test_min_agents_threshold() -> None:
     """Test that scenes failing the minimum valid agent count are dropped."""
-    df = pl.DataFrame({
-        "scene": [1, 1, 2],  # Scene 1 has 2 agents, Scene 2 has 1 agent
-        "id": [1, 2, 3],
-        "frame": [0, 0, 0],
-    })
+    df = pl.DataFrame(
+        {
+            "scene": [1, 1, 2],  # Scene 1 has 2 agents, Scene 2 has 1 agent
+            "id": [1, 2, 3],
+            "frame": [0, 0, 0],
+        }
+    )
 
     config = ProcessorConfig(
         input_len=1,
@@ -74,12 +78,14 @@ def test_min_agents_threshold() -> None:
 def test_require_all_valid() -> None:
     """Test length validation per agent, and its impact on scene min_agents."""
     # input_len=2 + output_len=2 = 4 required frames
-    df = pl.DataFrame({
-        "scene": [1, 1, 1, 1, 1, 1, 1],
-        # Agent 1 has 4 frames (valid), Agent 2 has 3 (invalid)
-        "id": [1, 1, 1, 1, 2, 2, 2],
-        "frame": [0, 1, 2, 3, 0, 1, 2],
-    })
+    df = pl.DataFrame(
+        {
+            "scene": [1, 1, 1, 1, 1, 1, 1],
+            # Agent 1 has 4 frames (valid), Agent 2 has 3 (invalid)
+            "id": [1, 1, 1, 1, 2, 2, 2],
+            "frame": [0, 1, 2, 3, 0, 1, 2],
+        }
+    )
 
     # Case A: require 2 valid agents. Since agent 2 is invalid, scene 1 only
     # has 1 valid agent. The entire scene should drop.
@@ -111,13 +117,15 @@ def test_require_all_valid() -> None:
 
 def test_require_frames() -> None:
     """Test that scenes are kept only if specific relative frame offsets exist."""
-    df = pl.DataFrame({
-        "scene": [1, 1, 1, 2, 2],
-        "id": [1, 1, 1, 2, 2],
-        "frame": [10, 12, 14, 20, 22],
-        # Scene 1 relative frames: 0, 2, 4
-        # Scene 2 relative frames: 0, 2
-    })
+    df = pl.DataFrame(
+        {
+            "scene": [1, 1, 1, 2, 2],
+            "id": [1, 1, 1, 2, 2],
+            "frame": [10, 12, 14, 20, 22],
+            # Scene 1 relative frames: 0, 2, 4
+            # Scene 2 relative frames: 0, 2
+        }
+    )
 
     config = ProcessorConfig(
         input_len=1,
@@ -139,12 +147,14 @@ def test_require_frames() -> None:
 def test_require_prediction_frame() -> None:
     """Test checking for the specific target frame (start + input_len - 1)."""
     # input_len=3 means target frame offset is (3 - 1) = 2.
-    df = pl.DataFrame({
-        "scene": [1, 1, 1, 2, 2],
-        "id": [1, 1, 1, 2, 2],
-        # Scene 1 has relative frame 2. Scene 2 does not.
-        "frame": [0, 1, 2, 10, 11],
-    })
+    df = pl.DataFrame(
+        {
+            "scene": [1, 1, 1, 2, 2],
+            "id": [1, 1, 1, 2, 2],
+            # Scene 1 has relative frame 2. Scene 2 does not.
+            "frame": [0, 1, 2, 10, 11],
+        }
+    )
 
     config = ProcessorConfig(
         input_len=3,
@@ -160,17 +170,19 @@ def test_require_prediction_frame() -> None:
 
 def test_complex_interaction() -> None:
     """Test valid type filtering interacting with min_agents threshold."""
-    df = pl.DataFrame({
-        "scene": [1, 1, 1, 1],
-        "id": [1, 2, 3, 4],
-        "frame": [0, 0, 0, 0],
-        "category": [
-            AgentCategory.CAR,
-            AgentCategory.PEDESTRIAN,
-            AgentCategory.UNIMPORTANT,
-            AgentCategory.UNIMPORTANT,
-        ],
-    })
+    df = pl.DataFrame(
+        {
+            "scene": [1, 1, 1, 1],
+            "id": [1, 2, 3, 4],
+            "frame": [0, 0, 0, 0],
+            "category": [
+                AgentCategory.CAR,
+                AgentCategory.PEDESTRIAN,
+                AgentCategory.UNIMPORTANT,
+                AgentCategory.UNIMPORTANT,
+            ],
+        }
+    )
 
     # We have 4 agents total, but 2 are UNIMPORTANT.
     # If we require min_agents=3, the 2 valid ones won't meet the threshold.

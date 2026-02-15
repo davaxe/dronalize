@@ -50,7 +50,7 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
             data_dir = self._data_root / dataset / self._split
             # Sort to ensure consistent order across runs and systems.
             for data_file in sorted(data_dir.iterdir()):
-                yield (data_file.name, self._read_data_file(data_file))
+                yield (data_file.name, EthUcyProcessor._read_data_file(data_file))
 
     @override
     def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
@@ -102,7 +102,8 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
             pl.lit(AgentCategory.PEDESTRIAN).alias("agent_category"),
         )
 
-    def _read_data_file(self, path: Path) -> pl.LazyFrame:
+    @staticmethod
+    def _read_data_file(path: Path) -> pl.LazyFrame:
         return pl.scan_csv(
             path,
             has_header=False,
@@ -134,9 +135,7 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
 
 
 if __name__ == "__main__":
-    processor = EthUcyProcessor(
-        data_root=Path("data"), dataset="hotel", split="test"
-    )
+    processor = EthUcyProcessor(data_root=Path("data"), dataset="hotel", split="test")
     start_time = time.perf_counter()
     count: int = 0
     total_time = 0.0

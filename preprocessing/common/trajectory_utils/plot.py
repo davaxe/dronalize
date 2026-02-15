@@ -15,7 +15,7 @@ def plot_comparison(
     n_groups: int | None = None,
     *,
     show_counts: bool = False,
-):
+) -> None:
     # 1. Filter logic
     if n_groups is not None:
         selected_ids = first_df.select(group_by).unique().head(n_groups)
@@ -138,7 +138,7 @@ def plot_overlaid_comparison(
     labels: list[str] | None = None,
     group_by: str = "id",
     n_groups: int | None = None,
-):
+) -> None:
     if labels is not None and len(dfs) != len(labels):
         msg = f"Length of labels ({len(labels)}) must match number of DataFrames ({len(dfs)})."
         raise ValueError(msg)
@@ -164,9 +164,7 @@ def plot_overlaid_comparison(
     color_map = dict(zip(unique_ids, palette, strict=True))
 
     # 3. Plotting Loop
-    for df_idx, (df_pl, label) in enumerate(
-        zip(dfs, labels or [None] * len(dfs), strict=True)
-    ):
+    for df_idx, (df_pl, label) in enumerate(zip(dfs, labels or [None] * len(dfs), strict=True)):
         df = df_pl.filter(pl.col(group_by).is_in(unique_ids)).to_pandas()
         style = line_styles[df_idx % len(line_styles)]
 
@@ -279,9 +277,7 @@ if __name__ == "__main__":
 
     dt_org = 1
     print("Ratio: ", dt_org)
-    df_resampled = resample_tracks(
-        df_complex, up=3, down=1, group_by="track_id", method="spline"
-    )
+    df_resampled = resample_tracks(df_complex, up=3, down=1, group_by="track_id", method="spline")
     print(df_resampled.filter(pl.col("track_id") == 1))
 
     plot_comparison(df_complex, df_resampled)

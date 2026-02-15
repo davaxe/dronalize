@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 if TYPE_CHECKING:
-    from preprocessing.common.trajectory_utils import T_DataFame
+    from preprocessing.common.trajectory_utils import T_DataFrame
 
 
 def lazy(data: pl.DataFrame | pl.LazyFrame) -> pl.LazyFrame:
@@ -23,11 +23,11 @@ def collect(data: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame:
 
 
 def yaw_from_vel(
-    data: T_DataFame,
+    data: T_DataFrame,
     vx_col: str = "vx",
     vy_col: str = "vy",
     yaw_col: str = "yaw",
-) -> T_DataFame:
+) -> T_DataFrame:
     """Estimate yaw from velocity vector.
 
     Args:
@@ -40,17 +40,15 @@ def yaw_from_vel(
         Data frame or lazy frame with the estimated yaw column added.
 
     """
-    return data.with_columns(
-        pl.arctan2(pl.col(vy_col), pl.col(vx_col)).alias(yaw_col)
-    )
+    return data.with_columns(pl.arctan2(pl.col(vy_col), pl.col(vx_col)).alias(yaw_col))
 
 
 def yaw_from_pos(
-    data: T_DataFame,
+    data: T_DataFrame,
     x_col: str = "x",
     y_col: str = "y",
     yaw_col: str = "yaw",
-) -> T_DataFame:
+) -> T_DataFrame:
     """Estimate yaw from position differences.
 
     Args:

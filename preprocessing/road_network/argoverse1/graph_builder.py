@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 from itertools import chain, repeat
-from pydoc import doc
 from typing import TYPE_CHECKING, TypedDict, override
 
 import numpy as np

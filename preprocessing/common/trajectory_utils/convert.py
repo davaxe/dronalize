@@ -36,9 +36,7 @@ def convert_to_agent_data_dict(
         AgentData TypedDict.
 
     """
-    target_agent_id = _extract_target_agent(
-        data, input_len, output_len, target_agent
-    )
+    target_agent_id = _extract_target_agent(data, input_len, output_len, target_agent)
     time_steps = input_len + output_len
     start_frame = data["frame"].min()
     unique_ids = data["id"].unique().to_list()
@@ -52,14 +50,15 @@ def convert_to_agent_data_dict(
 
     # We add 'row_idx' (agent) and 'col_idx' (time) columns to the dataframe
     # Casting to proper types ensures numpy compatibility
-    df_indexed = data.with_columns([
-        pl
-        .col("id")
-        .replace(id_to_idx_map, default=None)
-        .cast(pl.Int32)
-        .alias("row_idx"),
-        (pl.col("frame") - start_frame).cast(pl.Int32).alias("col_idx"),
-    ])
+    df_indexed = data.with_columns(
+        [
+            pl.col("id")
+            .replace(id_to_idx_map, default=None)
+            .cast(pl.Int32)
+            .alias("row_idx"),
+            (pl.col("frame") - start_frame).cast(pl.Int32).alias("col_idx"),
+        ]
+    )
 
     # Extract coordinate arrays (N_samples,)
     # We extract all data points in one go
@@ -119,8 +118,7 @@ def _extract_target_agent(
         # Target agent needs to have valid data for the entire sequence (input +
         # output).
         candidates = (
-            data
-            .group_by("id")
+            data.group_by("id")
             .agg(
                 valid_frames=pl.col("frame").n_unique(),
             )
@@ -136,8 +134,7 @@ def _extract_target_agent(
         return int(candidates.select(pl.col("id").first()).item())
 
     target_agent_frames = (
-        data
-        .filter(pl.col("id") == target_agent)
+        data.filter(pl.col("id") == target_agent)
         .select(pl.col("frame").n_unique())
         .item()
     )

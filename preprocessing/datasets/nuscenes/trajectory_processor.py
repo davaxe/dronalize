@@ -18,8 +18,6 @@ from preprocessing.datasets.lyft.trajectory_processor import sliding_window
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from preprocessing.common.trajectory_utils import T_DataFrame
-
 
 class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
     """Nuscenes trajectory processor.
@@ -57,14 +55,12 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
 
         """
         super().__init__(
-            processor_config or self._default_config(), enforce_schema=True
+            processor_config or NuScenesProcessor._default_config(), enforce_schema=True
         )
         self.data_dir = Path(data_directory)
         self._dfs: dict[str, pl.LazyFrame] = {}
         self._use_parquet = use_parquet_cache
-        self._parquet_dir = (
-            Path(parquet_dir) if parquet_dir is not None else self.data_dir
-        )
+        self._parquet_dir = Path(parquet_dir) if parquet_dir is not None else self.data_dir
 
         # Cache for the processed data: {scene_token: DataFrame}
         self._scene_cache: dict[str, pl.DataFrame] = {}
@@ -91,9 +87,7 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
         )
 
         # 2. Process Ego
-        ego_lf = extract_ego_tracks(
-            timeline_lf, self._dfs["sample_data"], self._dfs["ego_pose"]
-        )
+        ego_lf = extract_ego_tracks(timeline_lf, self._dfs["sample_data"], self._dfs["ego_pose"])
 
         # 3. Process Agents (with explicit mappings passed in)
         agents_lf = extract_agent_tracks(
@@ -201,7 +195,8 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df)
 
-    def _default_config(self) -> ProcessorConfig:
+    @staticmethod
+    def _default_config() -> ProcessorConfig:
         return (
             ProcessorConfig(4, 12, 0.5)
             .resampling_parameters(up=5, down=1)
@@ -252,10 +247,10 @@ def load_cached_table(
 
 
 def build_scene_timeline(
-    sample_lf: T_DataFrame,
-    scene_lf: T_DataFrame,
-    log_lf: T_DataFrame,
-) -> T_DataFrame:
+    sample_lf: pl.LazyFrame,
+    scene_lf: pl.LazyFrame,
+    log_lf: pl.LazyFrame,
+) -> pl.LazyFrame:
     """Build scene timeline.
 
     Args:
@@ -378,9 +373,7 @@ def extract_agent_tracks(
         .join(timeline_lf, on="sample_token")
         .join(instance_lf, left_on="instance_token", right_on="token")
         .join(cat_lookup, left_on="category_token", right_on="cat_token")
-        .with_columns(
-            pl.col("attribute_tokens").list.first().alias("first_attr_token")
-        )
+        .with_columns(pl.col("attribute_tokens").list.first().alias("first_attr_token"))
         .join(
             attr_lookup,
             left_on="first_attr_token",
@@ -388,12 +381,7 @@ def extract_agent_tracks(
             how="left",
         )
         .with_columns(
-            pl
-            .col("instance_token")
-            .rank("dense")
-            .over("scene_token")
-            .cast(pl.Int32)
-            .alias("id")
+            pl.col("instance_token").rank("dense").over("scene_token").cast(pl.Int32).alias("id")
         )
         .select(
             *("scene_token", "scene_name", "map", "frame", "id"),

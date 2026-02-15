@@ -81,17 +81,13 @@ class BaseNode(Protocol, Generic[ID]):
     def distance_to(self, other: Self) -> float:
         """Calculate the Euclidean distance to another node."""
         return math.sqrt(
-            (self.x - other.x) ** 2
-            + (self.y - other.y) ** 2
-            + (self.z - other.z) ** 2,
+            (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2,
         )
 
     def distance_sq_to(self, other: Self) -> float:
         """Calculate the squared Euclidean distance to another node."""
         return (
-            (self.x - other.x) ** 2
-            + (self.y - other.y) ** 2
-            + (self.z - other.z) ** 2
+            (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2
         )
 
 
@@ -385,9 +381,7 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         node_positions = torch.stack([x_tensor, y_tensor], dim=1)
 
         # 2. Convert Edges to Tensor
-        edge_indices = torch.tensor(
-            [self._edge_src, self._edge_dst], dtype=torch.int64
-        )
+        edge_indices = torch.tensor([self._edge_src, self._edge_dst], dtype=torch.int64)
         edge_types = torch.tensor(self._edge_types, dtype=torch.int64)
 
         return MapGraph(
@@ -654,11 +648,13 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 is connected back to the first node to close the polygon.
 
         """
-        self._pending_paths.append({
-            "nodes": nodes,
-            "edge_type": edge_type,
-            "is_polygon": is_polygon,
-        })
+        self._pending_paths.append(
+            {
+                "nodes": nodes,
+                "edge_type": edge_type,
+                "is_polygon": is_polygon,
+            }
+        )
 
     def _process_pending_paths(
         self,
@@ -816,9 +812,7 @@ def get_edges_from_adj_list(
 
     """
     if id_to_index is None:
-        id_to_index = {
-            node_id: index for index, node_id in enumerate(adj_list.keys())
-        }
+        id_to_index = {node_id: index for index, node_id in enumerate(adj_list.keys())}
 
     # Use flat lists instead of list of tuples
     src_indices: list[int] = []
