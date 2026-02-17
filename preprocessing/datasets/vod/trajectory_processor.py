@@ -30,7 +30,7 @@ class VodProcessor(NuScenesProcessor):
         ]
 
     @override
-    def _default_config(self) -> ProcessorConfig:
+    def default_config(self) -> ProcessorConfig:
         return ProcessorConfig(5, 30, 0.1).window_parameters(5)
 
 
@@ -38,9 +38,7 @@ if __name__ == "__main__":
     import time
 
     # Update this path to your actual data location
-    data_dir = Path(
-        "/home/west/Developer/behavior-prediction/datasets/vod/v1.0-trainval/"
-    )
+    data_dir = Path("/home/west/Developer/behavior-prediction/datasets/vod/v1.0-trainval/")
 
     # Check if directory exists to avoid FileNotFound errors in example
     if data_dir.exists():

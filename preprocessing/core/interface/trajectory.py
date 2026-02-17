@@ -234,27 +234,23 @@ class Scene(Generic[T_ID]):
             schema = Scene._base_schema()
         return replace(
             self,
-            inner=self.inner.select(
-                [pl.col(name).cast(dtype) for name, dtype in schema.items()]
-            ),
+            inner=self.inner.select([pl.col(name).cast(dtype) for name, dtype in schema.items()]),
         )
 
     @staticmethod
     def _base_schema() -> pl.Schema:
-        return pl.Schema(
-            {
-                "frame": pl.Int32(),
-                "id": pl.Int32(),
-                "x": pl.Float32(),
-                "y": pl.Float32(),
-                "vx": pl.Float32(),
-                "vy": pl.Float32(),
-                "ax": pl.Float32(),
-                "ay": pl.Float32(),
-                "yaw": pl.Float32(),
-                "agent_category": pl.Int32(),
-            }
-        )
+        return pl.Schema({
+            "frame": pl.UInt32(),
+            "id": pl.Int32(),
+            "x": pl.Float32(),
+            "y": pl.Float32(),
+            "vx": pl.Float32(),
+            "vy": pl.Float32(),
+            "ax": pl.Float32(),
+            "ay": pl.Float32(),
+            "yaw": pl.Float32(),
+            "agent_category": pl.Int32(),
+        })
 
 
 IDMapping = Callable[[int, T_ID], T_ID]
@@ -271,7 +267,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
 
     def __init__(
         self,
-        processor_config: ProcessorConfig,
+        processor_config: ProcessorConfig | None = None,
         id_mapping: IDMapping[T_ID] | None = None,
         *,
         enforce_schema: bool = True,
@@ -281,7 +277,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         self._source_counter: int = 0
         self._id_mapping = id_mapping
         self._enforce_schema = enforce_schema
-        self._processor_config = processor_config
+        self._processor_config = processor_config or self.default_config()
 
     # --- Abstract Steps (The "Blanks" to fill) ---
 
@@ -309,9 +305,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
     def input_len(self) -> int:
         """Observation length in frames (resulting value in Scene)."""
         up, down = (
-            self.processor_config.resampling.factors
-            if self.processor_config.resampling
-            else (1, 1)
+            self.processor_config.resampling.factors if self.processor_config.resampling else (1, 1)
         )
         ratio = up / down
         return int((self.original_input_len - 1) * ratio + 1)
@@ -320,9 +314,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
     def output_len(self) -> int:
         """Prediction length in frames (resulting value in Scene)."""
         up, down = (
-            self.processor_config.resampling.factors
-            if self.processor_config.resampling
-            else (1, 1)
+            self.processor_config.resampling.factors if self.processor_config.resampling else (1, 1)
         )
         ratio = up / down
         total_len = int((self.sequence_length - 1) * ratio + 1)
@@ -340,6 +332,10 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         """Convert the raw DataFrame into the common schema."""
 
+    @abstractmethod
+    def default_config(self) -> ProcessorConfig:
+        """Return the default processor configuration for this dataset."""
+
     @staticmethod
     def derivative_names() -> dict[int, list[str]]:
         """Return the names of the derivatives for velocity and acceleration."""
@@ -348,11 +344,11 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
             2: ["ax", "ay"],
         }
 
-    def modify_scene(self, scene: Scene[T_ID]) -> Scene[T_ID]:
+    def modify_scene(self, scene: Scene[T_ID]) -> Scene[T_ID]:  # noqa: PLR6301
         """Modify a scene in place.
 
         Overload this method if required. This is called as the last step
-        for each scenes return by the `sce
+        for each scenes return by the `scenes_iter` method.
         """
         return scene
 

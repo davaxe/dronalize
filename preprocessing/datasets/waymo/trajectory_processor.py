@@ -80,10 +80,7 @@ class WaymoProcessor(DataProcessor[str, Path]):
                 Defaults to 1.5 meters.
 
         """
-        super().__init__(
-            processor_config=processor_config or self._default_config(),
-            enforce_schema=True,
-        )
+        super().__init__(processor_config=processor_config, enforce_schema=True)
         self._data_dir: Path = Path(data_dir) if isinstance(data_dir, str) else data_dir
         self._filter_str: FilterStr = filter_str
         self._include_map: bool = include_map
@@ -148,14 +145,15 @@ class WaymoProcessor(DataProcessor[str, Path]):
         # Change autonomous vehicle to id 0 (from id -1)
         return df_resampled.with_columns(pl.col("id") + 1)
 
+    @override
     def modify_scene(self, scene: Scene) -> Scene:
         """Add map data to the scene if map inclusion is enabled."""
         if self._include_map:
             return replace(scene, map=self._current_map)
         return scene
 
-    @staticmethod
-    def _default_config() -> ProcessorConfig:
+    @override
+    def default_config(self) -> ProcessorConfig:
         return ProcessorConfig(10, 80, 0.1)
 
 

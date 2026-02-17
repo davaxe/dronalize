@@ -34,9 +34,6 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
         split: Literal["train", "val", "test"] = "train",
     ) -> None:
         """Initialize with the given configuration."""
-        if config is None:
-            config = self._default_config()
-
         super().__init__(processor_config=config, enforce_schema=True)
         self._data_root = data_root
         self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
@@ -102,6 +99,19 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
             pl.lit(AgentCategory.PEDESTRIAN).alias("agent_category"),
         )
 
+    @override
+    def default_config(self) -> ProcessorConfig:
+        return (
+            ProcessorConfig(
+                input_len=8,
+                output_len=12,
+                sample_time=0.4,
+            )
+            .window_parameters(step_size=1)
+            .scene_filtering_parameters(require_all_valid=True)
+            .resampling_parameters(4, 1, method="spline")
+        )
+
     @staticmethod
     def _read_data_file(path: Path) -> pl.LazyFrame:
         return pl.scan_csv(
@@ -118,19 +128,6 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
         ).with_columns(
             ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
             pl.col("id").cast(pl.Int32),
-        )
-
-    @staticmethod
-    def _default_config() -> ProcessorConfig:
-        return (
-            ProcessorConfig(
-                input_len=8,
-                output_len=12,
-                sample_time=0.4,
-            )
-            .window_parameters(step_size=1)
-            .scene_filtering_parameters(require_all_valid=True)
-            .resampling_parameters(4, 1, method="spline")
         )
 
 

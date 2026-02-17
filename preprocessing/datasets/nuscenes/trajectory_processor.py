@@ -54,9 +54,7 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
             parquet_dir: directory to save the parquet cache files.
 
         """
-        super().__init__(
-            processor_config or NuScenesProcessor._default_config(), enforce_schema=True
-        )
+        super().__init__(processor_config, enforce_schema=True)
         self.data_dir = Path(data_directory)
         self._dfs: dict[str, pl.LazyFrame] = {}
         self._use_parquet = use_parquet_cache
@@ -195,8 +193,8 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df)
 
-    @staticmethod
-    def _default_config() -> ProcessorConfig:
+    @override
+    def default_config(self) -> ProcessorConfig:
         return (
             ProcessorConfig(4, 12, 0.5)
             .resampling_parameters(up=5, down=1)
