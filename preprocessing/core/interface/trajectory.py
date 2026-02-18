@@ -320,6 +320,15 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         total_len = int((self.sequence_length - 1) * ratio + 1)
         return total_len - self.input_len
 
+    @property
+    def post_sample_time(self) -> float:
+        """Time interval between frames after resampling."""
+        if self.processor_config.resampling is None:
+            return self.processor_config.sample_time
+        up, down = self.processor_config.resampling.factors
+        ratio = up / down
+        return self.processor_config.sample_time / ratio
+
     @abstractmethod
     def sources(self) -> Iterable[tuple[T_ID, T_Source]]:
         """Discover and yield identifiers for each scene to process."""

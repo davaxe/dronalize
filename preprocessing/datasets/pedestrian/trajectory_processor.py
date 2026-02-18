@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, override
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
+from typing_extensions import override
 
 from preprocessing.common.trajectory_utils import (
     filter_scene_expr,

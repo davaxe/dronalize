@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING
+
+from typing_extensions import override
 
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.interface.map import GraphBuilder, IntIDNode
@@ -35,9 +37,7 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         self._no_map_features: bool = True
 
     @classmethod
-    def from_proto(
-        cls, map_features: Sequence[lean_map_pb2.MapFeature]
-    ) -> WaymoMapGraphBuilder:
+    def from_proto(cls, map_features: Sequence[lean_map_pb2.MapFeature]) -> WaymoMapGraphBuilder:
         """Create a WaymoMapGraphBuilder from a list of MapFeature protos."""
         waymo_map = cls()
         waymo_map._process_map_features(map_features)
@@ -108,9 +108,7 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
             if feature_id in self._processed_features:
                 continue
 
-            nodes = [
-                self.new_node(x=point.x, y=point.y) for point in speed_bump.polygon
-            ]
+            nodes = [self.new_node(x=point.x, y=point.y) for point in speed_bump.polygon]
             self.add_node_edges_loop_min_dist(
                 nodes,
                 is_polygon=True,

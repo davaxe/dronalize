@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import override
+
+from typing_extensions import override
 
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.interface.map import GraphBuilder, IntIDNode
@@ -86,10 +87,7 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         boundary = lane.left_boundary
         self.add_path_lazy(
             nodes=boundary.nodes,
-            edge_type=[
-                boundary.get_edge_type_from_src(i)
-                for i in range(len(boundary.nodes) - 1)
-            ],
+            edge_type=[boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)],
         )
 
     def _traverse_lane(self, lane: parser.Lane) -> None:
@@ -98,8 +96,7 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             self.add_path_lazy(
                 nodes=boundary.nodes,
                 edge_type=[
-                    boundary.get_edge_type_from_src(i)
-                    for i in range(len(boundary.nodes) - 1)
+                    boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)
                 ],
             )
 

@@ -17,7 +17,9 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, Self, override
+from typing import TYPE_CHECKING, Any, Protocol
+
+from typing_extensions import Self, override
 
 from preprocessing.road_network.common import (
     GraphBuilder,
@@ -145,10 +147,7 @@ class LineString(Geometry):
         coords_str = geometry_str[len("LINESTRING (") : -1]
         coords = coords_str.split(", ")
         return cls(
-            [
-                IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
-                for coord in coords
-            ],
+            [IntIDNode(float(coord.split()[0]), float(coord.split()[1])) for coord in coords],
         )
 
     def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
@@ -174,8 +173,7 @@ class Polygon(Geometry):
         coords_str = geometry_str[len("POLYGON ((") : -2]
         coords = coords_str.split(", ")
         nodes = [
-            IntIDNode(float(coord.split()[0]), float(coord.split()[1]))
-            for coord in coords[:-1]
+            IntIDNode(float(coord.split()[0]), float(coord.split()[1])) for coord in coords[:-1]
         ]
         return cls(nodes)
 

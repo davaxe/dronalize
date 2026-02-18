@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from typing_extensions import override
 from zarr.creation import open_array
 
 from preprocessing.common.trajectory_utils import (

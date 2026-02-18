@@ -1,5 +1,6 @@
 from pathlib import Path
-from typing import override
+
+from typing_extensions import override
 
 from preprocessing.core.interface import ProcessorConfig
 from preprocessing.datasets.nuscenes.trajectory_processor import NuScenesProcessor

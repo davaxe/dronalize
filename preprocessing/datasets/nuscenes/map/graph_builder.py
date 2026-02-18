@@ -16,8 +16,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Self, TypedDict, override
+from typing import TYPE_CHECKING, TypedDict
 from uuid import UUID
+
+from typing_extensions import Self, override
 
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.interface.map import GraphBuilder

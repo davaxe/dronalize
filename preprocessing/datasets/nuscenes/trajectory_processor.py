@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, cast, override
+from typing import TYPE_CHECKING, cast
 
 import polars as pl
+from typing_extensions import override
 
 # Adjust imports to match your project structure
-from preprocessing.common.trajectory_utils import (
-    filter_scene_expr,
-    resample_tracks,
-    yaw_from_vel,
-)
+from preprocessing.common.trajectory_utils import filter_scene_expr, resample_tracks, yaw_from_vel
 from preprocessing.core.categories import AgentCategory
 from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
 from preprocessing.datasets.lyft.trajectory_processor import sliding_window
@@ -159,7 +156,7 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
             )
             group_by.append("window_index")
 
-        source_filtered = scenes.filter(
+        scenes_filtered = scenes.filter(
             filter_scene_expr(
                 self.processor_config,
                 group_by=group_by[-1] if len(group_by) > 0 else None,
@@ -167,10 +164,10 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
             )
         )
         group_by.append("id")
-        source_filtered = source_filtered.filter(pl.len().over(group_by) >= 2)
+        scenes_filtered = scenes_filtered.filter(pl.len().over(group_by) >= 2)
 
-        processed_source = resample_tracks(
-            source_filtered,
+        processed_scenes = resample_tracks(
+            scenes_filtered,
             resampling.up,
             resampling.down,
             group_by=group_by,
@@ -183,10 +180,10 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
         )
 
         if self.processor_config.window_params is None:
-            yield processed_source.lazy()
+            yield processed_scenes.lazy()
             return
 
-        for _, group in processed_source.collect().group_by("window_index"):
+        for _, group in processed_scenes.collect().group_by("window_index"):
             yield group.lazy().drop("window_index")
 
     @override

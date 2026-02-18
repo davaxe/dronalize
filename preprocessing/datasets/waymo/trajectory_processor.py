@@ -3,9 +3,10 @@ from __future__ import annotations
 import struct
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, override
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
+from typing_extensions import override
 
 # Assuming these exist in your project
 from preprocessing.common.trajectory_utils import (

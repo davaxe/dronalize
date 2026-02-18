@@ -36,13 +36,9 @@ from dataclasses import dataclass, field
 from enum import auto
 from functools import cached_property
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Self,
-    TypeVar,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, TypeVar
+
+from typing_extensions import Self
 
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.interface.map import BaseEnum, BaseMapObject, BaseNode
@@ -178,8 +174,7 @@ class NuScenesMap:
         # arcline definition
         data: dict[str, Any] = self.json_data["arcline_path_3"]
         data_iter = (
-            {"token": k, "knots": v[0], "ctrl": v[1], "order": v[2]}
-            for k, v in data.items()
+            {"token": k, "knots": v[0], "ctrl": v[1], "order": v[2]} for k, v in data.items()
         )
         return _many_from_dict(
             ArclinePathV1,
@@ -304,10 +299,7 @@ class Polygon(BaseMapObject[str]):
         return cls(
             id=str(data["token"]),
             exterior_nodes=[str(node) for node in data["exterior_node_tokens"]],
-            holes=[
-                [str(node) for node in hole]
-                for hole in data.get("interior_node_tokens", [])
-            ],
+            holes=[[str(node) for node in hole] for hole in data.get("interior_node_tokens", [])],
         )
 
 
@@ -442,9 +434,7 @@ class StopLine(BaseMapObject[str]):
             stop_line_type=StopLineType.from_str(
                 data.get("stop_line_type", "TURN_STOP"),
             ),
-            pedestrian_crossings=[
-                str(pc) for pc in data.get("ped_crossing_tokens", [])
-            ],
+            pedestrian_crossings=[str(pc) for pc in data.get("ped_crossing_tokens", [])],
             traffic_lights=[str(tl) for tl in data.get("traffic_light_tokens", [])],
         )
 
@@ -595,8 +585,7 @@ def _many_from_dict(
 
     if len(failed) > 0 and debug:
         tokens = "\n  ".join(
-            f'{i}: "{item.get("token", "UNKNOWN_TOKEN")}"'
-            for i, item in enumerate(failed, 1)
+            f'{i}: "{item.get("token", "UNKNOWN_TOKEN")}"' for i, item in enumerate(failed, 1)
         )
         print(
             f"[Warning] Failed to deserialize {len(failed)} instance(s) of type "

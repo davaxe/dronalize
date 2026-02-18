@@ -15,10 +15,11 @@
 from __future__ import annotations
 
 from itertools import chain, repeat
-from typing import TYPE_CHECKING, TypedDict, override
+from typing import TYPE_CHECKING, TypedDict
 
 import numpy as np
 import numpy.typing as npt
+from typing_extensions import override
 
 from preprocessing.road_network.argoverse1 import parser, utils
 from preprocessing.road_network.common import (
@@ -128,10 +129,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             right_edge_type: right border edge type.
 
         """
-        if (
-            endpoint_from not in self._lane_endpoints
-            or endpoint_to not in self._lane_endpoints
-        ):
+        if endpoint_from not in self._lane_endpoints or endpoint_to not in self._lane_endpoints:
             return
 
         from_endpoints = self._lane_endpoints[endpoint_from]
