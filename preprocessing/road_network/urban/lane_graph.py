@@ -137,6 +137,7 @@ class LaneGraphBuilder(osm.SimpleHandler):
         edge_type: EdgeType,
     ) -> None:
         """Process a regulatory relation."""
+        print(relation)
         for member in relation.members:
             if member.type == "w" and member.role == "ref_line":
                 way_nodes = self.ways.get(member.ref, {}).get("nodes", [])
@@ -245,9 +246,7 @@ def create_torch_graph(graph: nx.Graph) -> dict:
     node_types = torch.tensor(node_type_values, dtype=torch.long)
 
     # Get edge information
-    edge_index = (
-        torch.tensor(list(directed_graph.edges), dtype=torch.long).t().contiguous()
-    )
+    edge_index = torch.tensor(list(directed_graph.edges), dtype=torch.long).t().contiguous()
     edge_types = nx.get_edge_attributes(directed_graph, "type")
     edge_type_values = [et.value for et in edge_types.values()]
     edge_attr = torch.tensor(edge_type_values, dtype=torch.long)[:, None]
@@ -281,9 +280,7 @@ def plot_torch_graph(
         dpi: DPI of the output plot
         plot_nodes: Whether to plot the nodes
     """
-    assert type(graph_dict) == dict, (
-        "Make sure get_lane_graph(.) has return_torch=True."
-    )
+    assert type(graph_dict) == dict, "Make sure get_lane_graph(.) has return_torch=True."
 
     # Extract node and edge data
     map_point_data = graph_dict["map_point"]
@@ -363,9 +360,7 @@ def plot_torch_graph(
     # Plot nodes
     if plot_nodes:
         # Group nodes by type
-        nodes_by_type: dict[EdgeType, list[np.ndarray]] = {
-            edge_type: [] for edge_type in EdgeType
-        }
+        nodes_by_type: dict[EdgeType, list[np.ndarray]] = {edge_type: [] for edge_type in EdgeType}
         for idx, node_type in enumerate(node_types):
             edge_type = EdgeType(node_type)
 
@@ -446,7 +441,7 @@ def get_lane_graph(
 
 # Example usage:
 if __name__ == "__main__":
-    path = "preprocessing/road_network/test_scenario.osm"
+    path = "data/DR_CHN_Merging_ZS0.osm"
     x_utm_origin = 0
     y_utm_origin = 0
 

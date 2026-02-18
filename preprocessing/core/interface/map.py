@@ -86,9 +86,7 @@ class BaseNode(Protocol, Generic[ID]):
 
     def distance_sq_to(self, other: Self) -> float:
         """Calculate the squared Euclidean distance to another node."""
-        return (
-            (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2
-        )
+        return (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2
 
 
 @dataclass(init=False)
@@ -130,6 +128,13 @@ class IntIDNode(IntIdBaseMapObject, BaseNode[int]):
         self.x = x
         self.y = y
         self.z = z
+
+    @classmethod
+    def with_id(cls, object_id: int, x: float, y: float, z: float = 0.0) -> IntIDNode:
+        """Create an `IntIDNode` with a specified ID and coordinates."""
+        node = cls(x, y, z)
+        node.id = object_id
+        return node
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> IntIDNode:
@@ -366,11 +371,6 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
         This method converts the internal adjacency list and node positions into
         a `MapGraph` object.
-
-        Args:
-            include_extra_nodes: whether to include extra nodes added by using
-            `add_extra_node` method directly (e.g., traffic lights that are not
-            part of any edges).
 
         Returns:
             A `MapGraph` object representing the graph.
@@ -648,13 +648,11 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 is connected back to the first node to close the polygon.
 
         """
-        self._pending_paths.append(
-            {
-                "nodes": nodes,
-                "edge_type": edge_type,
-                "is_polygon": is_polygon,
-            }
-        )
+        self._pending_paths.append({
+            "nodes": nodes,
+            "edge_type": edge_type,
+            "is_polygon": is_polygon,
+        })
 
     def _process_pending_paths(
         self,
@@ -662,21 +660,13 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         interp_distance: float | None,
     ) -> None:
         for path_data in self._pending_paths:
-            if min_distance is None:
-                self.add_node_edges_loop(
-                    nodes=path_data["nodes"],
-                    interp_distance=interp_distance,
-                    edge_type=path_data["edge_type"],
-                    is_polygon=path_data["is_polygon"],
-                )
-            else:
-                self.add_node_edges_loop_min_dist(
-                    nodes=path_data["nodes"],
-                    min_distance=min_distance,
-                    interp_distance=interp_distance,
-                    edge_type=path_data["edge_type"],
-                    is_polygon=path_data["is_polygon"],
-                )
+            self.add_node_edges_loop_min_dist(
+                nodes=path_data["nodes"],
+                min_distance=min_distance,
+                interp_distance=interp_distance,
+                edge_type=path_data["edge_type"],
+                is_polygon=path_data["is_polygon"],
+            )
 
         # Clear buffer to prevent double-processing if built twice
         self._pending_paths.clear()
@@ -692,7 +682,9 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             msg = "interp_distance must be greater than 0."
             raise ValueError(msg)
         if _min_distance < 0.0 or _min_distance > _interp_distance:
-            msg = f"min_distance must be in the range [0, interp_distance] ([0, {_interp_distance}])."
+            msg = (
+                f"min_distance must be in the range [0, interp_distance] ([0, {_interp_distance}])."
+            )
             raise ValueError(msg)
 
         return min_distance, interp_distance
@@ -787,9 +779,7 @@ class Edges:
             edge_indices (2xN), edge_types (Nx1) where N is the number of edges.
 
         """
-        edge_index = torch.tensor(
-            [self.src_indices, self.dst_indices], dtype=torch.long
-        )
+        edge_index = torch.tensor([self.src_indices, self.dst_indices], dtype=torch.long)
         edge_attr = torch.tensor(self.edge_types, dtype=torch.long)
         return edge_index, edge_attr
 

@@ -22,10 +22,7 @@ import numpy.typing as npt
 from typing_extensions import override
 
 from preprocessing.road_network.argoverse1 import parser, utils
-from preprocessing.road_network.common import (
-    GraphBuilder,
-    IntIDNode,
-)
+from preprocessing.road_network.common import GraphBuilder, IntIDNode
 from preprocessing.road_network.edge_type import EdgeType
 
 if TYPE_CHECKING:
