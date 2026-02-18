@@ -21,8 +21,8 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
-from preprocessing.road_network.common import BaseEnum, BaseMapObject, IntIDNode
-from preprocessing.road_network.edge_type import EdgeType
+from preprocessing.core.categories import EdgeType
+from preprocessing.core.interface.map import BaseEnum, BaseMapObject, IntIDNode
 
 
 class Argoverse2Map:
@@ -41,10 +41,7 @@ class Argoverse2Map:
             "lane_segments",
             [],
         )
-        return {
-            segment["id"]: LaneSegment.from_dict(segment)
-            for segment in segments_data.values()
-        }
+        return {segment["id"]: LaneSegment.from_dict(segment) for segment in segments_data.values()}
 
     @cached_property
     def pedestrian_crossings(self) -> dict[int, PedestrianCrossing]:
@@ -65,9 +62,7 @@ class Argoverse2Map:
             "drivable_areas",
             [],
         )
-        return {
-            area["id"]: DrivableArea.from_dict(area) for area in areas_data.values()
-        }
+        return {area["id"]: DrivableArea.from_dict(area) for area in areas_data.values()}
 
 
 class LaneType(BaseEnum):

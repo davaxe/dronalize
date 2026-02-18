@@ -18,12 +18,9 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import override
 
-from preprocessing.road_network.argoverse2 import parser
-from preprocessing.road_network.common import (
-    GraphBuilder,
-    IntIDNode,
-)
-from preprocessing.road_network.edge_type import EdgeType
+from preprocessing.core.categories import EdgeType
+from preprocessing.core.interface.map import GraphBuilder, IntIDNode
+from preprocessing.datasets.argoverse2.map import parser
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -96,8 +93,8 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
                     edge_type=edge,
                 )
 
+    @staticmethod
     def _lane_segment_nodes(
-        self,
         segment: parser.LaneSegment,
         side: Literal["left", "right"],
     ) -> tuple[list[IntIDNode], EdgeType] | None:

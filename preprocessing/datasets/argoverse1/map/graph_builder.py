@@ -21,9 +21,9 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from preprocessing.road_network.argoverse1 import parser, utils
-from preprocessing.road_network.common import GraphBuilder, IntIDNode
-from preprocessing.road_network.edge_type import EdgeType
+from preprocessing.core.categories import EdgeType
+from preprocessing.core.interface.map import GraphBuilder, IntIDNode
+from preprocessing.datasets.argoverse1.map import parser, utils
 
 if TYPE_CHECKING:
     from pathlib import Path

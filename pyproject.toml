@@ -108,7 +108,8 @@ ignore = [
     "PLR0913",
     "PLR0917",
     "PLR0914",
-    "DOC402"
+    "DOC402",
+    "CPY001",
 ]
 
 [tool.pyrefly]

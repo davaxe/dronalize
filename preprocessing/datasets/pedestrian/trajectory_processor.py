@@ -1,3 +1,11 @@
+"""Processor for ETH/UCY pedestrian trajectory datasets.
+
+Datasets include the following subsets:
+- ETH: "eth" and "hotel"
+- UCY: "univ", "zara01", and "zara02"
+
+"""
+
 from __future__ import annotations
 
 import time

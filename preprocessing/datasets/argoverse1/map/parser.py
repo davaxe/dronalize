@@ -20,8 +20,8 @@ from enum import auto
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from preprocessing.road_network.common import BaseEnum, BaseMapObject, IntIDNode
-from preprocessing.road_network.edge_type import EdgeType
+from preprocessing.core.categories import EdgeType
+from preprocessing.core.interface.map import BaseEnum, BaseMapObject, IntIDNode
 
 if TYPE_CHECKING:
     from collections.abc import Callable

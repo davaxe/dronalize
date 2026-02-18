@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from typing_extensions import override
-
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.interface.map import GraphBuilder, IntIDNode
 from preprocessing.datasets.lyft.map import parser
+from typing_extensions import override
 
 
-class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
+class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
     """Builder for a map graph from a Lyft LVL5 map."""
 
     def __init__(self, lyft_map: parser.LyftLVL5Map) -> None:
@@ -25,7 +24,7 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         cls,
         map_path: Path | str,
         meta_json: Path | str,
-    ) -> LyftLVL5MapGraphBuilder:
+    ) -> LyftMapGraphBuilder:
         """Create a graph builder from map and metadata files.
 
         The metafile needs the `world_to_ecef` transformation matrix
@@ -87,7 +86,10 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         boundary = lane.left_boundary
         self.add_path_lazy(
             nodes=boundary.nodes,
-            edge_type=[boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)],
+            edge_type=[
+                boundary.get_edge_type_from_src(i)
+                for i in range(len(boundary.nodes) - 1)
+            ],
         )
 
     def _traverse_lane(self, lane: parser.Lane) -> None:
@@ -96,7 +98,8 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             self.add_path_lazy(
                 nodes=boundary.nodes,
                 edge_type=[
-                    boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)
+                    boundary.get_edge_type_from_src(i)
+                    for i in range(len(boundary.nodes) - 1)
                 ],
             )
 
@@ -104,11 +107,13 @@ class LyftLVL5MapGraphBuilder(GraphBuilder[int, IntIDNode]):
 if __name__ == "__main__":
     import time
 
-    base = Path("/home/west/Developer/behavior-prediction/datasets/lyft/semantic_map")
+    base = Path(
+        "/home/west/Developer/behavior-prediction/datasets/lyft/semantic_map"
+    )
     map_path = base / "semantic_map.pb"
     meta_path = base / "meta.json"
     start_time = time.perf_counter()
-    map_builder = LyftLVL5MapGraphBuilder.from_files(map_path, meta_path)
+    map_builder = LyftMapGraphBuilder.from_files(map_path, meta_path)
     map_graph = map_builder.build(interp_distance=3, min_distance=1)
 
 

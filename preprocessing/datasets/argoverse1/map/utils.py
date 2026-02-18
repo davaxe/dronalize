@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from collections.abc import Iterable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 
-from preprocessing.road_network.argoverse1.parser import LaneSegment
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from preprocessing.datasets.argoverse1.map.parser import LaneSegment
 
 # `swap_left_and_right` and `edge_borders_from_centerline` are utility functions
 # that are taken (with some modifications) from the original Argoverse 1
@@ -65,7 +70,6 @@ def edge_borders_from_centerline(
     Args:
        centerline: Numpy array of shape (N,2).
        width_scaling_factor: Multiplier that scales 3.8 meters to get the lane width.
-       visualize: Save a figure showing the the output polygon.
 
     Returns:
        polygon: Numpy array of shape (2N+1,2), with duplicate first and last
@@ -122,9 +126,7 @@ def lane_segment_successors(
     lane_segments: dict[int, LaneSegment],
 ) -> Iterable[LaneSegment]:
     """Get successors of a lane segment."""
-    return (
-        lane_segments[lane_segment_id] for lane_segment_id in lane_segment.successors
-    )
+    return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.successors)
 
 
 def lane_segment_predecessors(
@@ -132,9 +134,7 @@ def lane_segment_predecessors(
     lane_segments: dict[int, LaneSegment],
 ) -> Iterable[LaneSegment]:
     """Get predecessors of a lane segment."""
-    return (
-        lane_segments[lane_segment_id] for lane_segment_id in lane_segment.predecessors
-    )
+    return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.predecessors)
 
 
 def lane_segment_is_regulatory(
@@ -144,7 +144,6 @@ def lane_segment_is_regulatory(
 
     Args:
         lane_segment: The lane segment to check.
-        regulatory_turns: Set of turn types that are considered regulatory.
 
     Returns:
         True if the lane segment is regulatory, False otherwise.
@@ -157,6 +156,4 @@ def any_lane_segment_is_regulatory(
     lane_segments: Iterable[LaneSegment],
 ) -> bool:
     """Check if any lane segment in the iterable is regulatory."""
-    return any(
-        lane_segment_is_regulatory(lane_segment) for lane_segment in lane_segments
-    )
+    return any(lane_segment_is_regulatory(lane_segment) for lane_segment in lane_segments)

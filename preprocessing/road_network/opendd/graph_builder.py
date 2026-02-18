@@ -232,7 +232,7 @@ class MapDataRow:
         return _MARKING_TYPE_TO_EDGE_TYPE[self.marking_type]
 
     def _is_valid(self) -> bool:
-        return self.area_type not in ("COMPLETE", "NEVER", "EMERGENCY")
+        return self.area_type not in {"COMPLETE", "NEVER", "EMERGENCY"}
 
     @staticmethod
     def _parse_str_list(value: str | None) -> list[int]:
