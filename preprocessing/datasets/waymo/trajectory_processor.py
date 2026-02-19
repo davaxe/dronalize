@@ -9,11 +9,9 @@ import polars as pl
 from typing_extensions import override
 
 # Assuming these exist in your project
-from preprocessing.common.trajectory_utils import (
-    derivative,
-    filter_scene_expr,
-    resample_tracks,
-)
+from preprocessing.common.trajectory_utils.derivative import derivative
+from preprocessing.common.trajectory_utils.filter import filter_scene_expr
+from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
 from preprocessing.core.interface import (
     DataProcessor,

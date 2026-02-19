@@ -8,7 +8,7 @@ import numpy.typing as npt
 import polars as pl
 from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
-from preprocessing.common.trajectory_utils import derivative
+from preprocessing.common.trajectory_utils.derivative import derivative
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -186,7 +186,8 @@ def _resample_dataframe_spline(
     ]
 
     return (
-        data.group_by(group_cols)
+        data
+        .group_by(group_cols)
         .agg(aggregations)
         .explode(["_resampled_batch", frame_column])
         .unnest("_resampled_batch")
@@ -253,15 +254,11 @@ def _return_type(
     fields = dict.fromkeys(pos_cols, pl.Float32)
     if add_derivative:
         fields.update(
-            dict.fromkeys(
-                derivative_rename.get(1, [f"v{c}" for c in pos_cols]), pl.Float32
-            )
+            dict.fromkeys(derivative_rename.get(1, [f"v{c}" for c in pos_cols]), pl.Float32)
         )
     if add_second_derivative:
         fields.update(
-            dict.fromkeys(
-                derivative_rename.get(2, [f"a{c}" for c in pos_cols]), pl.Float32
-            )
+            dict.fromkeys(derivative_rename.get(2, [f"a{c}" for c in pos_cols]), pl.Float32)
         )
     return pl.Struct(fields)
 
@@ -272,9 +269,7 @@ def _new_frames_expr(
     frame_column: str,
 ) -> pl.Expr:
     n_new_expr = ((pl.len() - 1) * up).floordiv(down) + 1
-    start_expr = (
-        pl.when(pl.len() <= 1).then(pl.col(frame_column).first()).otherwise(pl.lit(0))
-    )
+    start_expr = pl.when(pl.len() <= 1).then(pl.col(frame_column).first()).otherwise(pl.lit(0))
     end_expr = pl.when(pl.len() <= 1).then(start_expr + 1).otherwise(n_new_expr)
     return pl.int_range(start_expr, end_expr, dtype=pl.Int32).alias(frame_column)
 
@@ -322,11 +317,7 @@ def _resample_dataframe(
     forward_fill: Sequence[str] | None = None,
 ) -> T_DataFrame:
     up, down = Fraction(up, down).as_integer_ratio()
-    data_ = (
-        data
-        if up <= 1
-        else _upsample_dataframe(data, up, frame_column, group_by, forward_fill)
-    )
+    data_ = data if up <= 1 else _upsample_dataframe(data, up, frame_column, group_by, forward_fill)
     return data_ if down <= 1 else _downsample_dataframe(data_, down, frame_column)
 
 
@@ -391,7 +382,8 @@ def _upsample_dataframe(
     lf: pl.LazyFrame = cast("pl.LazyFrame", data.lazy() if is_eager else data)
     data_scaled = lf.with_columns(pl.col(frame_column) * factor)
     upsampled = (
-        data_scaled.group_by(group_by)
+        data_scaled
+        .group_by(group_by)
         .agg(
             pl.int_range(
                 pl.col(frame_column).min(),
@@ -408,9 +400,7 @@ def _upsample_dataframe(
     exprs = [pl.all().exclude(exclude).interpolate()]
     if forward_fill:
         exprs.append(pl.col(forward_fill).forward_fill())
-    result = (
-        upsampled.join(data_scaled, on=on, how="left").sort(on).with_columns(*exprs)
-    )
+    result = upsampled.join(data_scaled, on=on, how="left").sort(on).with_columns(*exprs)
 
     if isinstance(result, pl.LazyFrame) and is_eager:
         return result.collect()

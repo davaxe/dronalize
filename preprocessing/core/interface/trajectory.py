@@ -14,7 +14,7 @@ from typing import (
 
 import polars as pl
 
-from preprocessing.common.trajectory_utils import (
+from preprocessing.common.trajectory_utils.convert import (
     convert_to_agent_data_dict,
 )
 

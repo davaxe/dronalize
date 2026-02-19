@@ -7,10 +7,10 @@ import polars as pl
 from typing_extensions import override
 
 # Adjust imports to match your project structure
-from preprocessing.common.trajectory_utils import filter_scene_expr, resample_tracks, yaw_from_vel
+from preprocessing.common.trajectory_utils.basic import yaw_from_vel
+from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
-from preprocessing.datasets.lyft.trajectory_processor import sliding_window
+from preprocessing.core.interface import DataProcessor, ProcessorConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -125,7 +125,6 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
 
     @override
     def load_raw(self, source: str) -> Iterable[pl.LazyFrame]:
-        resampling = self.processor_config.resampling or Resampling(1, 1)
         scenes = (
             self
             ._scene_cache[source]
@@ -144,47 +143,13 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
             ],
         ).drop(["status", "full_category", "full_status"])
 
-        group_by: list[str] = []
-        if self.processor_config.window_params is not None:
-            scenes = sliding_window(
-                scenes,
-                window_size=self.sequence_length,
-                step_size=self.processor_config.window_params.step_size,
-                sliding_col="frame",
-                is_sorted=True,
-                return_iterable=False,
-            )
-            group_by.append("window_index")
-
-        scenes_filtered = scenes.filter(
-            filter_scene_expr(
-                self.processor_config,
-                group_by=group_by[-1] if len(group_by) > 0 else None,
-                category_column="agent_category",
-            )
-        )
-        group_by.append("id")
-        scenes_filtered = scenes_filtered.filter(pl.len().over(group_by) >= 2)
-
-        processed_scenes = resample_tracks(
-            scenes_filtered,
-            resampling.up,
-            resampling.down,
-            group_by=group_by,
+        yield from prepare_agent_trajectories(
+            scenes,
+            config=self.processor_config,
             add_derivative=True,
             add_second_derivative=True,
-            method=resampling.method,
-            dt=self.processor_config.sample_time,
             derivative_rename=self.derivative_names(),
-            forward_fill=["agent_category"],
         )
-
-        if self.processor_config.window_params is None:
-            yield processed_scenes.lazy()
-            return
-
-        for _, group in processed_scenes.collect().group_by("window_index"):
-            yield group.lazy().drop("window_index")
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
@@ -539,7 +504,13 @@ if __name__ == "__main__":
             use_parquet_cache=True,
             parquet_dir="temp",
         )
+        count = 0
         for _scene in processor.scenes_iter():
-            break
+            count += 1
+            if count % 100 == 0:
+                elapsed = time.perf_counter() - start_time
+                print(f"Processed {count} scenes in {elapsed:.2f} seconds")
+        end_time = time.perf_counter()
+        print(f"Processed {count} scenes in {end_time - start_time:.2f} seconds.")
     else:
         print(f"Path not found: {data_dir}")

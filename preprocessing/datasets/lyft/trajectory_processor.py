@@ -10,18 +10,10 @@ import polars as pl
 from typing_extensions import override
 from zarr.creation import open_array
 
-from preprocessing.common.trajectory_utils import (
-    filter_scene_expr,
-    resample_tracks,
-    sliding_window,
-    yaw_from_vel,
-)
+from preprocessing.common.trajectory_utils.basic import yaw_from_vel
+from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import (
-    DataProcessor,
-    ProcessorConfig,
-    Resampling,
-)
+from preprocessing.core.interface import DataProcessor, ProcessorConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -80,7 +72,6 @@ class LyftProcessor(DataProcessor[int, _Source]):
         agent_start = np.min(frames_np[:]["agent_index_interval"])
         agent_end = np.max(frames_np[:]["agent_index_interval"])
         agents_np = cast("npt.NDArray", self._agents[agent_start:agent_end])
-        resampling = self.processor_config.resampling or Resampling(1, 1)
 
         for scene_data in scenes_np:
             scenes = _scene_to_polars(
@@ -91,47 +82,13 @@ class LyftProcessor(DataProcessor[int, _Source]):
                 agent_offset=agent_start,
             )[1].lazy()
 
-            group_by: list[str] = []
-            if self.processor_config.window_params is not None:
-                scenes = sliding_window(
-                    scenes,
-                    window_size=self.sequence_length,
-                    step_size=self.processor_config.window_params.step_size,
-                    sliding_col="frame",
-                    is_sorted=False,
-                    return_iterable=False,
-                )
-                group_by.append("window_index")
-
-            source_filtered = scenes.filter(
-                filter_scene_expr(
-                    self.processor_config,
-                    group_by=group_by[-1] if len(group_by) > 0 else None,
-                    category_column="agent_category",
-                )
-            )
-            group_by.append("id")
-            source_filtered = source_filtered.filter(pl.len().over(group_by) >= 2)
-
-            processed_source = resample_tracks(
-                source_filtered,
-                resampling.up,
-                resampling.down,
-                group_by=group_by,
+            yield from prepare_agent_trajectories(
+                scenes,
+                config=self.processor_config,
                 add_derivative=True,
                 add_second_derivative=True,
-                method=resampling.method,
-                dt=self.processor_config.sample_time,
                 derivative_rename=self.derivative_names(),
-                forward_fill=["agent_category"],
             )
-
-            if self.processor_config.window_params is None:
-                yield processed_source.lazy()
-                return
-
-            for _, group in processed_source.collect().group_by("window_index"):
-                yield group.lazy().drop("window_index")
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

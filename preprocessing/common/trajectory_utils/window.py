@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal, overload
 import polars as pl
 import polars.selectors as sl
 
-from preprocessing.common.trajectory_utils import collect
+from preprocessing.common.trajectory_utils.basic import collect
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

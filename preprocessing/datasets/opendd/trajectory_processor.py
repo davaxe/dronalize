@@ -5,18 +5,28 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
-from matplotlib.pyplot import table
 from typing_extensions import override
 
+from preprocessing.common.trajectory_utils.basic import yaw_from_vel
+from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
+from preprocessing.core.interface import DataProcessor, ProcessorConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
 class OpenDDProcessor(DataProcessor[str, str]):
+    """Processor for OpenDD dataset stored in SQLite format."""
+
     def __init__(self, database_path: Path, config: ProcessorConfig | None = None) -> None:
+        """Initialize the OpenDD processor.
+
+        Args:
+            database_path: Path to the OpenDD SQLite database file.
+            config: Processor configuration override. If None, the default configuration will be used.
+
+        """
         super().__init__(enforce_schema=True, processor_config=config)
         self._conn = sqlite3.connect(database_path)
         self._cursor = self._conn.cursor()
@@ -32,20 +42,19 @@ class OpenDDProcessor(DataProcessor[str, str]):
         # Possible to include: UTM_ANGLE, V, ACC, ACC_LAT, ACC_TAN
         query = f"""
         SELECT
-            ID as id,
+            OBJID as id,
             TIMESTAMP,
             UTM_X as x,
             UTM_Y as y,
-            ACC_TAN,
             CLASS
         FROM {source}
         """  # noqa: S608
-        df = (
+        scenes = (
             pl
             .read_database(query, self._conn)
             .lazy()
             .with_columns([
-                (pl.col("TIMESTAMP").round(4).rank(method="dense") - 1)
+                ((pl.col("TIMESTAMP") * 1000).round(4).rank(method="dense") - 1)
                 .cast(pl.Int64)
                 .alias("frame"),
                 pl
@@ -64,23 +73,29 @@ class OpenDDProcessor(DataProcessor[str, str]):
                 .otherwise(AgentCategory.UNKNOWN)
                 .alias("agent_category"),
             ])
-            .drop("TIMESTAMP", "CLASS")
+            .drop("CLASS", "TIMESTAMP")
         )
-
-        yield df
+        yield from prepare_agent_trajectories(
+            scenes,
+            config=self.processor_config,
+            add_derivative=True,
+            add_second_derivative=True,
+            derivative_rename=self.derivative_names(),
+        )
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        print(df.collect())
-        raise NotImplementedError
+        return yaw_from_vel(df, yaw_col="yaw")
 
     @override
     def default_config(self) -> ProcessorConfig:
-        ProcessorConfig(60, 150, 1 / 30).resampling_parameters(1, 3).window_parameters(75)
+        return ProcessorConfig(60, 150, 1 / 30).resampling_parameters(1, 3).window_parameters(75)
 
 
 if __name__ == "__main__":
-    path = Path("data/example_data/rdb1_4.sqlite")
+    path = Path("data/rdb2/trajectories_rdb2_v3.sqlite")
     processor = OpenDDProcessor(path)
+    count = 0
     for scene in processor.scenes_iter():
-        print(scene.inner)
+        count += 1
+    print(f"Processed {count} scenes.")

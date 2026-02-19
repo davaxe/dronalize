@@ -15,17 +15,12 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 from typing_extensions import override
 
-from preprocessing.common.trajectory_utils import (
-    filter_scene_expr,
-    resample_tracks,
-    sliding_window,
-    yaw_from_vel,
-)
+from preprocessing.common.trajectory_utils.basic import yaw_from_vel
+from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
 from preprocessing.core.interface import (
     DataProcessor,
     ProcessorConfig,
-    Resampling,
 )
 
 if TYPE_CHECKING:
@@ -60,47 +55,15 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
 
     @override
     def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-        # Remove single-frame pedestrians to prevent resampling errors
-        source = source.filter(pl.col("frame").n_unique().over("id") > 1)
-        resampling = self.processor_config.resampling or Resampling(1, 1)
-        group_by: list[str] = []
-        # Apply sliding window logic if parameters are present
-        if self._window_params is not None:
-            source = sliding_window(
-                source,
-                window_size=self.sequence_length,
-                step_size=self._window_params.step_size,
-                sliding_col="frame",
-                is_sorted=True,
-                return_iterable=False,
-            )
-            group_by.append("window_index")
-
-        source_filtered = source.filter(
-            filter_scene_expr(
-                self.processor_config,
-                group_by=group_by[-1] if len(group_by) > 0 else None,
-            )
-        )
-        group_by.append("id")
-
-        processed_source = resample_tracks(
-            source_filtered,
-            resampling.up,
-            resampling.down,
-            group_by=group_by,
+        yield from prepare_agent_trajectories(
+            source,
+            self.processor_config,
             add_derivative=True,
             add_second_derivative=True,
-            method=resampling.method,
-            dt=self.processor_config.sample_time,
+            sliding_col="frame",
+            agent_category_col=None,
             derivative_rename=self.derivative_names(),
         )
-        if self._window_params is None:
-            yield processed_source
-            return
-
-        for _, group in processed_source.collect().group_by("window_index"):
-            yield group.lazy()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
@@ -141,7 +104,7 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
 
 
 if __name__ == "__main__":
-    processor = EthUcyProcessor(data_root=Path("data"), dataset="hotel", split="test")
+    processor = EthUcyProcessor(data_root=Path("data"), dataset="hotel", split="train")
     start_time = time.perf_counter()
     count: int = 0
     total_time = 0.0

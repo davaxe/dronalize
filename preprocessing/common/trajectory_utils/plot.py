@@ -5,7 +5,7 @@ import numpy as np
 import polars as pl
 import seaborn as sns
 
-from preprocessing.common.trajectory_utils import resample_tracks
+from preprocessing.common.trajectory_utils.resample import resample_tracks
 
 
 def plot_comparison(

@@ -12,8 +12,6 @@ import numpy as np
 import torch
 from torch_geometric.utils import subgraph
 
-from preprocessing.common.map_utils.plot import plot_map_graph
-
 if TYPE_CHECKING:
     import numpy.typing as npt
     from matplotlib.axes import Axes
@@ -73,30 +71,6 @@ class MapGraph:
 
         self.edge_types: torch.Tensor = (
             edge_types if edge_types is not None else torch.ones(self.num_edges, dtype=torch.long)
-        )
-
-    def plot(
-        self,
-        ax: Axes | None = None,
-        figsize: tuple[int, int] = (10, 10),
-        alpha: float = 0.7,
-        *,
-        include_nodes: bool = False,
-    ) -> Axes:
-        """Plot the MapGraph using Matplotlib.
-
-        Args:
-            ax: Optional Matplotlib Axes to plot on. If None, a new figure and axes are created.
-            figsize: Size of the figure if a new one is created. Defaults to (10, 10).
-            alpha: Transparency level for the edges. Defaults to 0.7.
-            include_nodes: Whether to include node markers in the plot. Defaults to False.
-
-        Returns:
-            The Matplotlib Axes object containing the plot.
-
-        """
-        return plot_map_graph(
-            self, ax=ax, figsize=figsize, alpha=alpha, include_nodes=include_nodes
         )
 
     def to_torch_graph(self) -> dict[Any, Any]:
