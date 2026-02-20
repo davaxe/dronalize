@@ -26,7 +26,12 @@ class _Source:
 class InteractionProcessor(DataProcessor[str, _Source]):
     """Processor for the INTERACTION dataset."""
 
-    def __init__(self, data_dir: Path, config: ProcessorConfig | None = None) -> None:
+    def __init__(
+        self,
+        data_dir: Path,
+        file_batch_size: int | None = None,
+        config: ProcessorConfig | None = None,
+    ) -> None:
         """Initialize the processor.
 
         The processor will read all CSV files in the given directory, and expects them to have the
@@ -34,6 +39,9 @@ class InteractionProcessor(DataProcessor[str, _Source]):
 
         Args:
             data_dir: directory containing the INTERACTION dataset CSV files.
+            file_batch_size: number of files to read in each batch. If None, all files will be read
+                at once. Higher batch size may lead to faster processing at diminishing returns, but
+                also higher memory usage. `None` is not recommended for large amount of data.
             config: processor configuration override. If None, the default configuration will be used.
 
         Raises:
@@ -47,11 +55,15 @@ class InteractionProcessor(DataProcessor[str, _Source]):
 
         super().__init__(config, enforce_schema=True)
         self._data_dir = data_dir
+        self._file_batch_size = file_batch_size
 
     @override
     def sources(self) -> Iterable[tuple[str, _Source]]:
         csv_files = list(self._data_dir.glob("*.csv"))
-        yield str(self._data_dir), _Source(csv_files=csv_files)
+        batch_size = self._file_batch_size or len(csv_files)
+        for start in range(0, len(csv_files), batch_size):
+            batch_files = csv_files[start : start + batch_size]
+            yield f"{self._data_dir}_b{start}", _Source(csv_files=batch_files)
 
     @override
     def load_raw(self, source: _Source) -> Iterable[pl.LazyFrame]:
@@ -167,6 +179,7 @@ if __name__ == "__main__":
     count = 0
     for scene in processor.scenes_iter():
         if count % 200 == 0:
+            print(scene.identifier)
             print(f"Processed {count} scenes")
         count += 1
     print(f"Total scenes processed: {count}")

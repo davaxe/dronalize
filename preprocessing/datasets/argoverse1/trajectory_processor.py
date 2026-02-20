@@ -16,14 +16,14 @@ class Argoverse1Processor(DataProcessor[str, pl.LazyFrame]):
 
     def __init__(
         self,
-        data_path: Path,
+        data_dir: Path,
         file_batch_size: int | None = 100,
         config: ProcessorConfig | None = None,
     ) -> None:
         """Initialize the data processor.
 
         Args:
-            data_path: path to the directory of CSV files.
+            data_dir: path to the directory of CSV files.
             file_batch_size: number of files to read in each batch. If None, all files will be read
                 at once. Higher batch size may lead to faster processing at diminishing returns, but
                 also higher memory usage. `None` is not recommended for large amount of data.
@@ -31,7 +31,7 @@ class Argoverse1Processor(DataProcessor[str, pl.LazyFrame]):
 
         """
         super().__init__(processor_config=config, enforce_schema=True)
-        self._data_path = data_path
+        self._data_path = data_dir
         self._batch_size: int | None = file_batch_size
 
     @override
