@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Collection, Hashable, Iterable
+from collections.abc import Collection, Hashable, Iterable
 from dataclasses import dataclass, replace
 from fractions import Fraction
 from typing import (
     TYPE_CHECKING,
+    Any,
     Generic,
     Literal,
     Self,
@@ -191,6 +192,8 @@ class Scene(Generic[T_ID]):
     """Map graph associated with the scene. In some cases (e.g., Waymo), the map
     and trajectory are stored in the same file, and it can be useful to include
     the map graph in the scene data to avoid recomputing it for each scene."""
+    map_information: str | None = None
+    """Additional map information that can be used to determine what map corresponds to the scene."""
 
     def to_agent_data(
         self,
@@ -253,7 +256,7 @@ class Scene(Generic[T_ID]):
         })
 
 
-IDMapping = Callable[[int, T_ID], T_ID]
+# TODO: Possibly rework how map and other metadata is attached to Scene.
 
 
 class DataProcessor(ABC, Generic[T_ID, T_Source]):
@@ -268,16 +271,16 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
     def __init__(
         self,
         processor_config: ProcessorConfig | None = None,
-        id_mapping: IDMapping[T_ID] | None = None,
         *,
         enforce_schema: bool = True,
     ) -> None:
         """Initialize internal state."""
         self._count: int = 0
         self._source_counter: int = 0
-        self._id_mapping = id_mapping
         self._enforce_schema = enforce_schema
         self._processor_config = processor_config or self.default_config()
+        self._attach_scene_properties: dict[str, Any] = {}
+        self._attach_scene_expr: dict[str, pl.Expr] = {}
 
     # --- Abstract Steps (The "Blanks" to fill) ---
 
@@ -353,13 +356,16 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
             2: ["ax", "ay"],
         }
 
-    def modify_scene(self, scene: Scene[T_ID]) -> Scene[T_ID]:  # noqa: PLR6301
-        """Modify a scene in place.
-
-        Overload this method if required. This is called as the last step
-        for each scenes return by the `scenes_iter` method.
-        """
-        return scene
+    def attach_to_scene(
+        self,
+        select_expr: dict[str, pl.Expr] | None = None,
+        properties: dict[str, Any] | None = None,
+    ) -> None:
+        """Attach additional properties to the scene that can be used in `modify_scene`."""
+        if properties is not None:
+            self._attach_scene_properties.update(properties)
+        if select_expr is not None:
+            self._attach_scene_expr.update(select_expr)
 
     def process_next(self, source: T_Source) -> Iterable[pl.DataFrame]:
         """Process a single data item through the pipeline.
@@ -394,17 +400,18 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         for source_id, source in self.sources():
             self._source_counter += 1
             for scene_df in self.process_next(source):
-                yield self.modify_scene(self._create_scene(scene_df, source_id))
+                yield self._create_scene(scene_df, source_id)
 
     def _create_scene(self, df: pl.DataFrame, source_id: T_ID) -> Scene[T_ID]:
         scene = Scene[T_ID](
             inner=df,
-            identifier=source_id
-            if self._id_mapping is None
-            else self._id_mapping(self._source_counter, source_id),
+            identifier=source_id,
             scene_number=self._count,
             input_len=self.input_len,
             output_len=self.output_len,
+            **self._attach_scene_properties,
+            **{key: df.select(expr).item() for key, expr in self._attach_scene_expr.items()},
         )
+        self._attach_scene_properties.clear()
         self._count += 1
         return scene if not self._enforce_schema else scene.enforce_schema()
