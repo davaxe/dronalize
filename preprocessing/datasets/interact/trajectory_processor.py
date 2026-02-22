@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import polars as pl
 from typing_extensions import override
@@ -55,7 +55,7 @@ class InteractionProcessor(DataProcessor[str, _Source]):
 
         super().__init__(config, enforce_schema=True)
         self._data_dir = data_dir
-        self._file_batch_size = file_batch_size
+        self._file_batch_size: int | None = file_batch_size
 
     @override
     def sources(self) -> Iterable[tuple[str, _Source]]:

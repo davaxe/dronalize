@@ -14,7 +14,6 @@ from torch_geometric.utils import subgraph
 
 if TYPE_CHECKING:
     import numpy.typing as npt
-    from matplotlib.axes import Axes
 
 
 @dataclass(init=False, repr=False)

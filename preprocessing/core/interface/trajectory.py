@@ -375,9 +375,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         2. Normalize to common schema.
         """
 
-        def _step(
-            raw_df: pl.LazyFrame,
-        ) -> pl.DataFrame | None:
+        def _step(raw_df: pl.LazyFrame) -> pl.DataFrame | None:
             normalized_df = self.normalize(raw_df)
             try:
                 df = normalized_df.collect()

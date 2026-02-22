@@ -11,7 +11,7 @@ from preprocessing.core.categories import AgentCategory
 from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
 
 
-class Argoverse1Processor(DataProcessor[str, pl.LazyFrame]):
+class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
     """Processor for Argoverse 1 dataset stored in CSV format."""
 
     def __init__(
@@ -90,9 +90,9 @@ class Argoverse1Processor(DataProcessor[str, pl.LazyFrame]):
             yield yaw_from_vel(group.lazy()).drop("file_id")
 
     @override
-    def normalize(self, scene: pl.LazyFrame) -> pl.LazyFrame:
+    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         self.attach_to_scene(select_expr={"map_information": pl.col("map").first()}, properties={})
-        return yaw_from_vel(scene, yaw_col="yaw")
+        return yaw_from_vel(df, yaw_col="yaw")
 
     @override
     def default_config(self) -> ProcessorConfig:

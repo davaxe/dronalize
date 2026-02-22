@@ -27,14 +27,13 @@ from typing import (
     Generic,
     Literal,
     Protocol,
-    Self,
     TypedDict,
     TypeVar,
-    overload,
 )
 
 import numpy as np
 import torch
+from typing_extensions import Self, overload
 
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.map_graph import MapGraph
@@ -42,7 +41,6 @@ from preprocessing.core.map_graph import MapGraph
 ID = TypeVar("ID", bound=Hashable)
 
 
-@dataclass
 class BaseMapObject(Protocol, Generic[ID]):
     """Base class for all map objects in a NuScenes map."""
 
@@ -65,7 +63,6 @@ class BaseMapObject(Protocol, Generic[ID]):
             return None
 
 
-@dataclass(init=False)
 class BaseNode(Protocol, Generic[ID]):
     """Protocol for a node in a map.
 
@@ -676,14 +673,14 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         min_distance: float | None,
         interp_distance: float | None,
     ) -> tuple[float | None, float | None]:
-        _min_distance = min_distance if min_distance is not None else 0.0
-        _interp_distance = interp_distance if interp_distance is not None else np.inf
-        if _interp_distance <= 0.0:
+        min_distance = min_distance if min_distance is not None else 0.0
+        interp_distance = interp_distance if interp_distance is not None else np.inf
+        if interp_distance <= 0.0:
             msg = "interp_distance must be greater than 0."
             raise ValueError(msg)
-        if _min_distance < 0.0 or _min_distance > _interp_distance:
+        if min_distance < 0.0 or min_distance > interp_distance:
             msg = (
-                f"min_distance must be in the range [0, interp_distance] ([0, {_interp_distance}])."
+                f"min_distance must be in the range [0, interp_distance] ([0, {interp_distance}])."
             )
             raise ValueError(msg)
 

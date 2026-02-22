@@ -62,19 +62,16 @@ class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
         # `build` method is called with those parameters.
         self.apply_file(self._osm_file)
 
-    @override
     def way(self, way: Way) -> None:
+        """Handle a OSM way."""
         nodes: list[IntIDNode] = [
             self._nodes[node.ref] for node in way.nodes if node.ref in self._nodes
         ]
         edge_type = self._edge_type_mapping(way)
         self.add_path_lazy(nodes=nodes, edge_type=edge_type)
 
-    @override
-    def relation(self, relation: Relation) -> None: ...
-
-    @override
     def node(self, node: Node) -> None:
+        """Handle OSM node."""
         x, y, _zone_number, _zone_letter = utm.from_latlon(node.location.lat, node.location.lon)
         x_offset, y_offset = self._utm_position_offset
         self._nodes[node.id] = self.new_node(float(x) + x_offset, float(y) + y_offset)
