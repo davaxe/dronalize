@@ -3,7 +3,7 @@ from pathlib import Path
 
 import osmium as osm
 import utm
-from osmium.osm import Node, Relation, Way
+from osmium.osm import Node, Way
 from typing_extensions import override
 
 from preprocessing.common.map_utils.plot import plot_map_graph

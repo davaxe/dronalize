@@ -12,6 +12,10 @@ from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core.categories import AgentCategory
 from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
 
+# TODO: Currently the column "focal_agent_id" is disgarded and not used; might want to provide a way
+# to identify it downstream. Either implcitlty by assigning a specific id or explicitly by providing
+# a way to specify it.
+
 
 class Argoverse2TrajectoryProcessor(DataProcessor[int, pl.LazyFrame]):
     """Processor for Argoverse2 trajectory data stored in Parquet files."""
