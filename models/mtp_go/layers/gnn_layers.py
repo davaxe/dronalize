@@ -98,22 +98,21 @@ def create_sequential_gnn(
                 ),
             )
             ith_layer -= 1
-        else:
-            module_lst.insert(0, act)
-            module_lst.insert(
-                0,
-                (
-                    create_gnn_layer(
-                        gnn_layer,
-                        input_size,
-                        hidden_size,
-                        bias=True,
-                        att_heads=n_heads,
-                        edge_dim=edge_dim,
-                    ),
-                    "x, edge_index, edge_attr -> x",
+        module_lst.insert(0, act)
+        module_lst.insert(
+            0,
+            (
+                create_gnn_layer(
+                    gnn_layer,
+                    input_size,
+                    hidden_size,
+                    bias=True,
+                    att_heads=n_heads,
+                    edge_dim=edge_dim,
                 ),
-            )
+                "x, edge_index, edge_attr -> x",
+            ),
+        )
     return ptg.nn.Sequential("x, edge_index, edge_attr", module_lst)
 
 
@@ -174,8 +173,7 @@ def create_gnn_layer(
 
     if edge_dim is not None:
         return GaussianWeightWrapper(gc_layer)
-    else:
-        return gc_layer
+    return gc_layer
 
 
 # Linear mapping of node itself, attention over neighbors (and center node)

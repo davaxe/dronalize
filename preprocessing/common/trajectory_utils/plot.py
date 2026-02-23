@@ -1,267 +1,168 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+import altair as alt
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
-import seaborn as sns
 
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from pathlib import Path
 
-def plot_comparison(
-    first_df: pl.DataFrame,
-    second_df: pl.DataFrame,
-    group_by: str = "track_id",
+
+def plot_trajectories(
+    data: pl.DataFrame,
+    x_col: str = "x",
+    y_col: str = "y",
+    group_by: str | None = None,
     n_groups: int | None = None,
+    frame_col: str = "frame",
     *,
-    show_counts: bool = False,
-) -> None:
-    # 1. Filter logic
-    if n_groups is not None:
-        selected_ids = first_df.select(group_by).unique().head(n_groups)
-        first_df = first_df.join(selected_ids, on=group_by, how="semi")
-        second_df = second_df.join(selected_ids, on=group_by, how="semi")
+    x_label: str | None = None,
+    y_label: str | None = None,
+    save_path: Path | str | None = None,
+    title: str | None = None,
+    group_sample_seed: int | None = None,
+    highlight_frame: int | Sequence[int] | None = None,
+    **kwargs: Any,  # noqa: ANN401
+) -> alt.LayerChart:
+    """Plot a set of trajectories from a Polars dataframe using Altair.
 
-    # 2. Create a consistent color mapping
-    unique_ids = first_df.select(group_by).unique().to_series().to_list()
-    palette_name = "tab10" if len(unique_ids) <= 10 else "husl"
-    colors = sns.color_palette(palette_name, n_colors=len(unique_ids))
-    color_map = dict(zip(unique_ids, colors, strict=True))
+    Args:
+        data: underlying dataframe containing trajectory data.
+        x_col: column name for x-axis values. Defaults to "x".
+        y_col: column name for y-axis values. Defaults to "y".
+        group_by: column name to group trajectories by (e.g., "track_id").
+        n_groups: number of unique groups to plot. If None, plots all groups.
+        frame_col: column name representing the frame index.
+        x_label: label for x-axis. If None, uses x_col.
+        y_label: label for y-axis. If None, uses y_col.
+        save_path: Optional path to save the plot (json, html, png, etc.).
+        title: Optional title for the plot.
+        group_sample_seed: Optional random seed for sampling groups.
+        highlight_frame: specify frames to be highlighted.
+        kwargs: Additional keyword arguments passed to the top-level `chart.properties()`
 
-    fig, axes = plt.subplots(1, 2, figsize=(16, 7), sharex=True, sharey=True)
-    dataframes = [first_df.to_pandas(), second_df.to_pandas()]
-    titles = ["First", "Second"]
+    Returns:
+        An Altair LayerChart containing the trajectories and start/end markers.
 
-    for i, (df, ax) in enumerate(zip(dataframes, axes, strict=True)):
-        sns.lineplot(
-            data=df,
-            x="x",
-            y="y",
-            hue=group_by,
-            ax=ax,
-            palette=color_map,
-            alpha=0.8,
-            linewidth=2,
-            marker="o",
-            markersize=4,
-            markeredgecolor="white",
-            markeredgewidth=0.5,
-            sort=False,
-            legend=False,
+    """
+    alt.renderers.enable("browser")
+    if n_groups is not None and group_by is not None:
+        unique_groups = data.select(group_by).unique()
+        if unique_groups.height > n_groups:
+            selected_ids = unique_groups.sample(n_groups, seed=group_sample_seed)
+            data = data.join(selected_ids, on=group_by, how="semi")
+
+    if group_by:
+        # maintain_order=True is needed to identify the correct first/last rows per group
+        start_df = data.group_by(group_by, maintain_order=True).head(1)
+        end_df = data.group_by(group_by, maintain_order=True).tail(1)
+    else:
+        start_df = data.head(1)
+        end_df = data.tail(1)
+
+    base = alt.Chart(data).encode(
+        x=alt.X(x_col, title=x_label or x_col),
+        y=alt.Y(y_col, title=y_label or y_col),
+        color=alt.Color(
+            group_by or alt.Undefined, scale=alt.Scale(scheme="category20"), legend=None
+        ),
+    )
+
+    tooltips: list[alt.Tooltip] = [
+        alt.Tooltip(x_col, format=".2f"),
+        alt.Tooltip(y_col, format=".2f"),
+        alt.Tooltip(frame_col),
+    ]
+    if group_by:
+        tooltips.append(alt.Tooltip(group_by))
+
+    lines = base.mark_line(
+        point=alt.OverlayMarkDef(filled=True, size=15),
+        strokeWidth=2,
+        opacity=0.8,
+    ).encode(order=alt.Order(field=frame_col), tooltip=tooltips)
+
+    start_markers = (
+        alt
+        .Chart(start_df)
+        .mark_point(shape="circle", size=75, filled=True, fill="#2ecc71", stroke="black")
+        .encode(x=x_col, y=y_col, tooltip=tooltips)
+    )
+
+    end_markers = (
+        alt
+        .Chart(end_df)
+        .mark_point(shape="cross", size=75, filled=True, color="#e74c3c", stroke="black")
+        .encode(x=x_col, y=y_col, tooltip=tooltips)
+    )
+
+    layers = lines + start_markers + end_markers
+    if highlight_frame is not None:
+        # Normalize input to a list
+        frames_to_highlight = (
+            [highlight_frame] if isinstance(highlight_frame, int) else list(highlight_frame)
         )
 
-        unique_groups = df[group_by].unique()
-        for tid in unique_groups:
-            subset = df[df[group_by] == tid]
-            if len(subset) == 0:
-                continue
-
-            # Start/End markers
-            ax.plot(
-                subset["x"].iloc[0],
-                subset["y"].iloc[0],
-                marker="o",
-                color="#2ecc71",
-                markersize=8,
-                markeredgecolor="black",
-                zorder=10,
-            )
-            ax.plot(
-                subset["x"].iloc[-1],
-                subset["y"].iloc[-1],
-                marker="X",
-                color="#e74c3c",
-                markersize=8,
-                markeredgecolor="black",
-                zorder=10,
-            )
-
-            # Optional: Sample Count Labels
-            if show_counts:
-                # count nan/null values
-                invalid_count = subset.isnull().sum().sum()
-                valid_count = len(subset) - invalid_count
-                count = len(subset)
-                ax.text(
-                    subset["x"].iloc[-1],
-                    subset["y"].iloc[-1],
-                    f"{tid}: {valid_count}/{count}",
-                    fontsize=7,
-                    verticalalignment="bottom",
-                    fontweight="bold",
-                    zorder=11,
+        highlight_df = data.filter(pl.col(frame_col).is_in(frames_to_highlight))
+        if not highlight_df.is_empty():
+            highlight_layer = (
+                alt
+                .Chart(highlight_df)
+                .mark_point(
+                    shape="diamond",
+                    size=175,
+                    filled=True,
+                    fill="#FFD700",
+                    stroke="black",
+                    strokeWidth=1,
                 )
-
-        ax.set_title(titles[i], fontsize=12, pad=15, fontweight="bold")
-        ax.grid(visible=True, linestyle="--", alpha=0.3)
-        ax.set_xlabel("X Position")
-
-    axes[0].set_ylabel("Y Position")
-
-    if n_groups is not None and n_groups > 0:
-        # Added handles for legend manually if needed, or stick to basic markers
-        from matplotlib.lines import Line2D
-
-        legend_elements = [
-            Line2D(
-                [0],
-                [0],
-                marker="o",
-                color="w",
-                label="Start",
-                markerfacecolor="#2ecc71",
-                markersize=10,
-            ),
-            Line2D(
-                [0],
-                [0],
-                marker="X",
-                color="w",
-                label="End",
-                markerfacecolor="#e74c3c",
-                markersize=10,
-            ),
-        ]
-        fig.legend(
-            handles=legend_elements,
-            loc="upper right",
-            bbox_to_anchor=(0.98, 0.98),
-            frameon=True,
-        )
-
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_overlaid_comparison(
-    *dfs: pl.DataFrame,
-    labels: list[str] | None = None,
-    group_by: str = "id",
-    n_groups: int | None = None,
-) -> None:
-    if labels is not None and len(dfs) != len(labels):
-        msg = f"Length of labels ({len(labels)}) must match number of DataFrames ({len(dfs)})."
-        raise ValueError(msg)
-
-    plt.figure(figsize=(12, 10))
-    ax = plt.gca()
-
-    # 1. Define distinct line styles for each dataframe type
-    # This helps distinguish 'Original' from 'Resampled' even if they are the same color
-    line_styles = ["-", "--", ":", "-."]
-
-    # 2. Get unique track IDs for consistent coloring
-    all_ids = []
-    for df in dfs:
-        all_ids.extend(df.select(group_by).unique().to_series().to_list())
-    unique_ids = sorted(set(all_ids))
-
-    if n_groups is not None:
-        unique_ids = unique_ids[:n_groups]
-
-    # Map colors to Track IDs
-    palette = sns.color_palette("husl", n_colors=len(unique_ids))
-    color_map = dict(zip(unique_ids, palette, strict=True))
-
-    # 3. Plotting Loop
-    for df_idx, (df_pl, label) in enumerate(zip(dfs, labels or [None] * len(dfs), strict=True)):
-        df = df_pl.filter(pl.col(group_by).is_in(unique_ids)).to_pandas()
-        style = line_styles[df_idx % len(line_styles)]
-
-        for tid in unique_ids:
-            subset = df[df[group_by] == tid]
-            if subset.empty:
-                continue
-
-            # Plot the line
-            # We only add the label for the first track of each DF to avoid legend bloat
-            plot_label = label if tid == unique_ids[0] else ""
-
-            ax.plot(
-                subset["x"],
-                subset["y"],
-                linestyle=style,
-                color=color_map[tid],
-                label=plot_label,
-                linewidth=2 if df_idx == 0 else 1.5,
-                alpha=0.7,
-                marker="o" if df_idx == 0 else None,  # Markers only for the first DF
-                markersize=4,
+                .encode(x=x_col, y=y_col, tooltip=tooltips)
             )
+            layers += highlight_layer
 
-            # Special markers for the 'Master' or first dataframe
-            if df_idx == 0:
-                # Start
-                ax.scatter(
-                    subset["x"].iloc[0],
-                    subset["y"].iloc[0],
-                    c="#2ecc71",
-                    edgecolors="black",
-                    s=60,
-                    zorder=5,
-                    alpha=0.9,
-                )
-                # End
-                ax.scatter(
-                    subset["x"].iloc[-1],
-                    subset["y"].iloc[-1],
-                    marker="X",
-                    c="#e74c3c",
-                    edgecolors="black",
-                    s=60,
-                    zorder=5,
-                    alpha=0.9,
-                )
+    chart = (
+        layers
+        .properties(title=title or "", **kwargs)
+        .interactive()
+        .configure_axis(grid=True, gridColor="grey", gridOpacity=0.2, gridDash=[2, 2])
+    )
 
-    ax.set_title("Overlaid Trajectory Comparison", fontsize=14, fontweight="bold")
-    ax.set_xlabel("X Position")
-    ax.set_ylabel("Y Position")
-    ax.grid(visible=True, linestyle="--", alpha=0.3)
+    if save_path:
+        chart.save(save_path)
 
-    # Legend handling: Show method labels
-    ax.legend(title="Interpolation Method", loc="best", frameon=True)
-
-    plt.tight_layout()
-    plt.show()
+    return chart
 
 
-def _generate_test_vel() -> pl.DataFrame:
+def _generate_test() -> pl.DataFrame:
     t = np.linspace(0, 2 * np.pi, 50)
-    dt = t[1] - t[0]  # The 'real' time step
-
-    x = np.sin(2 * t)
-    y = np.cos(3 * t)
-
-    # Scale derivatives by dt so they represent change PER FRAME
-    dx = 2 * np.cos(2 * t) * dt
-    dy = -3 * np.sin(3 * t) * dt
-
-    return pl.DataFrame({
-        "frame": np.arange(len(t)),
-        "x": x,
-        "y": y,
-        "vx": dx,
-        "vy": dy,
-        "track_id": 1,
-        "category": 14,
-    }).cast({
-        "x": pl.Float64,
-        "y": pl.Float64,
-        "vx": pl.Float64,
-        "vy": pl.Float64,
-        "frame": pl.Int64,
-        "track_id": pl.Int64,
-        "category": pl.Int64,
-    })
-
-
-def _generate_simple() -> pl.DataFrame:
-    return pl.DataFrame({
-        "frame": np.arange(2),
-        "x": [0.0, 1.0],
-        "y": [0.0, 1.0],
-        "track_id": 1,
-    }).cast({
+    frames = np.arange(len(t))
+    # Track 1
+    return pl.concat([
+        pl.DataFrame({
+            "frame": frames,
+            "x": np.sin(2 * t),
+            "y": np.cos(3 * t),
+            "track_id": 1,
+        }),
+        pl.DataFrame({
+            "frame": frames,
+            "x": np.sin(3 * t),
+            "y": np.cos(4 * t),
+            "track_id": 2,
+        }),
+        pl.DataFrame({
+            "frame": frames,
+            "x": np.cos(1 * t),
+            "y": np.sin(1 * t),
+            "track_id": 3,
+        }),
+    ]).cast({
         "x": pl.Float64,
         "y": pl.Float64,
         "frame": pl.Int64,
@@ -271,13 +172,14 @@ def _generate_simple() -> pl.DataFrame:
 
 if __name__ == "__main__":
     # 1. Generate the complex data
-    df_complex = _generate_test_vel()
+    df_complex = _generate_test()
     print("Original DataFrame:")
     print(df_complex)
 
-    dt_org = 1
-    print("Ratio: ", dt_org)
     df_resampled = resample_tracks(df_complex, up=3, down=1, group_by="track_id", method="spline")
+
     print(df_resampled.filter(pl.col("track_id") == 1))
 
-    plot_comparison(df_complex, df_resampled)
+    plot_trajectories(df_complex, group_by="track_id", n_groups=1)
+    plot_trajectories(df_resampled, group_by="track_id", n_groups=1)
+    plt.show()

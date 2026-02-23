@@ -1,5 +1,6 @@
 ### Folders ###
 .vscode
+.zed
 old
 data/
 lightning_logs/

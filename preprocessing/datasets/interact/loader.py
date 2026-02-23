@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -12,25 +11,21 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
+from preprocessing.core import map_context as mc
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-@dataclass
-class _Source:
-    csv_files: list[Path]
-
-
-class InteractionProcessor(DataProcessor[str, _Source]):
+class InteractionLoader(BaseSceneLoader[str, list[Path]]):
     """Processor for the INTERACTION dataset."""
 
     def __init__(
         self,
         data_dir: Path,
         file_batch_size: int | None = None,
-        config: ProcessorConfig | None = None,
+        config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the processor.
 
@@ -58,23 +53,27 @@ class InteractionProcessor(DataProcessor[str, _Source]):
         self._file_batch_size: int | None = file_batch_size
 
     @override
-    def sources(self) -> Iterable[tuple[str, _Source]]:
+    def sources(self) -> Iterable[tuple[str, list[Path]]]:
         csv_files = list(self._data_dir.glob("*.csv"))
         batch_size = self._file_batch_size or len(csv_files)
         for start in range(0, len(csv_files), batch_size):
             batch_files = csv_files[start : start + batch_size]
-            yield f"{self._data_dir}_b{start}", _Source(csv_files=batch_files)
+            yield f"{self._data_dir}_b{start}", batch_files
 
     @override
-    def load_raw(self, source: _Source) -> Iterable[pl.LazyFrame]:
+    def num_sources(self) -> int | None:
+        if self._file_batch_size is None:
+            return 1
+
+        num_files = len(list(self._data_dir.glob("*.csv")))
+        return (num_files + self._file_batch_size - 1) // self._file_batch_size
+
+    @override
+    def load_raw(self, source: list[Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.processor_config.resampling or Resampling(1, 1)
         data = (
             pl
-            .scan_csv(
-                *[source.csv_files],
-                include_file_paths="file_id",
-                schema=_SCHEMA,
-            )
+            .scan_csv(source, include_file_paths="file_id", schema=_SCHEMA)
             .drop("track_to_predict", "interesting_agent", "width", "length", "timestamp_ms")
             .rename({
                 "agent_type": "agent_category",
@@ -104,7 +103,7 @@ class InteractionProcessor(DataProcessor[str, _Source]):
             data_filtered,
             resampling.up,
             resampling.down,
-            group_by=["file_id", "case_id"],
+            group_by=["file_id", "case_id", "id"],
             add_derivative=False,
             add_second_derivative=False,
             method=resampling.method,
@@ -114,7 +113,7 @@ class InteractionProcessor(DataProcessor[str, _Source]):
         )
 
         for _, group in data_processed.collect().group_by(["file_id", "case_id"]):
-            yield group.lazy().drop("file_id", "case_id")
+            yield group.lazy().drop("file_id", "case_id"), mc.Implicit()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
@@ -132,8 +131,8 @@ class InteractionProcessor(DataProcessor[str, _Source]):
         )
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(10, 30, 0.1)
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(10, 30, 0.1)
 
     @staticmethod
     def _map_agent_category() -> pl.Expr:
@@ -175,11 +174,10 @@ _SCHEMA = pl.Schema({
 if __name__ == "__main__":
     data_dir = Path("/home/west/Developer/behavior-prediction/datasets/interact/train")
 
-    processor = InteractionProcessor(data_dir=data_dir)
+    processor = InteractionLoader(data_dir=data_dir)
     count = 0
-    for scene in processor.scenes_iter():
+    for _scene in processor.scenes():
         if count % 200 == 0:
-            print(scene.identifier)
             print(f"Processed {count} scenes")
         count += 1
     print(f"Total scenes processed: {count}")

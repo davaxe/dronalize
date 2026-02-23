@@ -92,8 +92,6 @@ class LaneBoundaryType(BaseEnum):
     SOLID_DASH_YELLOW = auto()
     SOLID_BLUE = auto()
 
-    # TODO: There might exist more types in other parts of the dataset.
-
 
 @dataclass
 class LaneBoundary:

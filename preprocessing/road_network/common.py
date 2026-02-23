@@ -668,13 +668,11 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
                 is connected back to the first node to close the polygon.
 
         """
-        self._pending_paths.append(
-            {
-                "nodes": nodes,
-                "edge_type": edge_type,
-                "is_polygon": is_polygon,
-            }
-        )
+        self._pending_paths.append({
+            "nodes": nodes,
+            "edge_type": edge_type,
+            "is_polygon": is_polygon,
+        })
 
     def _process_pending_paths(
         self,
@@ -712,7 +710,9 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             msg = "interp_distance must be greater than 0."
             raise ValueError(msg)
         if _min_distance < 0.0 or _min_distance > _interp_distance:
-            msg = f"min_distance must be in the range [0, interp_distance] ([0, {_interp_distance}])."
+            msg = (
+                f"min_distance must be in the range [0, interp_distance] ([0, {_interp_distance}])."
+            )
             raise ValueError(msg)
 
         return min_distance, interp_distance
@@ -900,9 +900,7 @@ class MapGraph:
         )
 
         self.edge_types: torch.Tensor = (
-            edge_types
-            if edge_types is not None
-            else torch.ones(self.num_edges, dtype=torch.long)
+            edge_types if edge_types is not None else torch.ones(self.num_edges, dtype=torch.long)
         )
 
     def to_torch_graph(self) -> dict[Any, Any]:
@@ -930,9 +928,7 @@ class MapGraph:
 
         # Dictionary to group line segments by their EdgeType
         # Key: EdgeType, Value: list of segments [(x1, y1), (x2, y2)]
-        lines_by_type: defaultdict[EdgeType, list[list[tuple[float, float]]]] = (
-            defaultdict(list)
-        )
+        lines_by_type: defaultdict[EdgeType, list[list[tuple[float, float]]]] = defaultdict(list)
 
         # 1. Group segments by type
         for i in range(self.edge_indices.shape[1]):
@@ -1126,10 +1122,7 @@ class MapGraph:
         y_coords = self.node_positions[:, 1]
 
         within_bbox_mask = (
-            (x_coords >= min_x)
-            & (x_coords <= max_x)
-            & (y_coords >= min_y)
-            & (y_coords <= max_y)
+            (x_coords >= min_x) & (x_coords <= max_x) & (y_coords >= min_y) & (y_coords <= max_y)
         )
 
         # Use PyG's subgraph function to extract subgraph

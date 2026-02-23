@@ -11,19 +11,20 @@ from preprocessing.common.trajectory_utils.window import sliding_window
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-from preprocessing.core.interface.trajectory import ProcessorConfig, Resampling
+from preprocessing.core.interface.trajectory import LoaderConfig, Resampling
 
 
 def prepare_agent_trajectories(
     scenes: pl.LazyFrame,
-    config: ProcessorConfig,
+    config: LoaderConfig,
     *,
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     sliding_col: str = "frame",
-    agent_category_col: str = "agent_category",
-    derivative_rename: dict[str, str] | None = None,
+    agent_category_col: str | None = "agent_category",
+    derivative_rename: dict[int, list[str]] | None = None,
     offset_sliding_col: bool = True,
+    forward_fill: list[str] | None = None,
 ) -> Iterable[pl.LazyFrame]:
     """Prepare agent trajectories for processing.
 
@@ -48,6 +49,7 @@ def prepare_agent_trajectories(
     """
     resampling = config.resampling or Resampling(1, 1)
     group_by: list[str] = []
+    forward_fill = forward_fill or []
 
     if config.window_params is not None:
         scenes = sliding_window(
@@ -63,6 +65,7 @@ def prepare_agent_trajectories(
     scenes_filtered = scenes.filter(
         filter_scene_expr(
             config,
+            agent_id="id",
             group_by=group_by[-1] if len(group_by) > 0 else None,
             category_column=agent_category_col,
         )
@@ -79,7 +82,9 @@ def prepare_agent_trajectories(
         method=resampling.method,
         dt=config.sample_time,
         derivative_rename=derivative_rename,
-        forward_fill=[agent_category_col],
+        forward_fill=[agent_category_col, *forward_fill]
+        if agent_category_col
+        else (forward_fill or None),
     )
 
     if config.window_params is None:

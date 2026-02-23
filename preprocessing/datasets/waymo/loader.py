@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import struct
-from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -13,17 +12,10 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import (
-    DataProcessor,
-    ProcessorConfig,
-    Resampling,
-)
+from preprocessing.core import map_context as mc
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 from preprocessing.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
-from preprocessing.datasets.waymo.protos import (
-    lean_map_pb2,
-    lean_scenario_pb2,
-    scenario_pb2,
-)
+from preprocessing.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -39,14 +31,14 @@ FilterStr = Literal[
 ]
 
 
-class WaymoProcessor(DataProcessor[str, Path]):
+class WaymoLoader(BaseSceneLoader[str, Path]):
     """Processor for Waymo Open Dataset scenarios stored in TFRecord format."""
 
     def __init__(
         self,
         data_dir: Path | str,
         filter_str: FilterStr,
-        processor_config: ProcessorConfig | None = None,
+        processor_config: LoaderConfig | None = None,
         *,
         include_map: bool = True,
         interp_distance: float | None = None,
@@ -90,21 +82,25 @@ class WaymoProcessor(DataProcessor[str, Path]):
             yield (tfrecord_path.stem, tfrecord_path)
 
     @override
-    def load_raw(self, source: Path) -> Iterable[pl.LazyFrame]:
-        for raw_data in _read_tfrecord(source):
+    def num_sources(self) -> int | None:
+        return sum(1 for _ in self._data_dir.glob(self._filter_str))
+
+    @override
+    def load_raw(self, source: Path) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        for i, raw_data in enumerate(_read_tfrecord(source)):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
             # Map processing remains per-scenario (if needed)
+            map_context: mc.MapContext = mc.Explicit(str(source), record_index=i)
             if self._include_map:
                 map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
                 current_map = WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
                     min_distance=self._min_distance,
                     interp_distance=self._interp_distance,
                 )
-                # This attaches the map to the field `map` of the returned Scene object
-                self.attach_to_scene(properties={"map": current_map})
+                map_context = mc.Loaded(current_map)
 
-            yield _scenario_to_polars(scenario).lazy()
+            yield _scenario_to_polars(scenario).lazy(), map_context
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
@@ -141,8 +137,8 @@ class WaymoProcessor(DataProcessor[str, Path]):
         return df_resampled.with_columns(pl.col("id") + 1)
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(10, 80, 0.1)
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(10, 80, 0.1)
 
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:
@@ -247,16 +243,16 @@ if __name__ == "__main__":
     # because Protobuf parsing + Python loops are CPU bound and single-threaded.
     directory = Path("/home/west/Developer/behavior-prediction/datasets/waymo/validation")
 
-    processor = WaymoProcessor(directory, "*validation.tfrecord*", include_map=True)
+    processor = WaymoLoader(directory, "*validation.tfrecord*", include_map=True)
     start_time = time.perf_counter()
     print("Starting processing...")
     count = 0
     # This loop will now yield one large  per file instead of per scene
-    for _scene in processor.scenes_iter():
+    for _scene in processor.scenes():
         if count % 500 == 0:
             print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f}s")
         count += 1
-        print(_scene.map)
+        print(_scene.map_context)
         break
 
     print(f"Finished processing {count} scenes in {time.perf_counter() - start_time:.2f}s")

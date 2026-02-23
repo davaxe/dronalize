@@ -3,7 +3,7 @@ from pathlib import Path
 
 import osmium as osm
 import utm
-from osmium.osm import Node, Relation, Way
+from osmium.osm import Node, Way
 from typing_extensions import override
 
 from preprocessing.common.map_utils.plot import plot_map_graph
@@ -35,6 +35,10 @@ class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
             edge_type_mapping: _How to map the OSM way tags to EdgeType categories.
 
         """
+        if not osm_file.exists():
+            msg = f"OSM file not found at {osm_file}. Please provide a valid path to the OSM data file."
+            raise FileNotFoundError(msg)
+
         super().__init__()
         self._edge_type_mapping = edge_type_mapping or self._default_edge_type_mapping
         self._utm_position_offset = utm_position_offset

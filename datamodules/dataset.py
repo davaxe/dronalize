@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import os
+import pathlib
 import pickle
 from typing import TYPE_CHECKING
 
@@ -107,7 +108,7 @@ class TrajDataset(Dataset):
 
     def get(self, idx: int) -> HeteroData:
         """Get a sample from the dataset by index."""
-        with open(os.path.join(self.path, self.files[idx]), "rb") as f:
+        with pathlib.Path(os.path.join(self.path, self.files[idx])).open("rb") as f:
             return HeteroData(pickle.load(f))
 
 

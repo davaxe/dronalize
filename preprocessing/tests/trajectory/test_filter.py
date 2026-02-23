@@ -3,13 +3,13 @@ from polars.testing import assert_frame_equal
 
 from preprocessing.common.trajectory_utils.filter import filter_scene
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import ProcessorConfig, SceneFiltering
+from preprocessing.core.interface import FilteringConfig, LoaderConfig
 
 
 def test_no_scene_filtering() -> None:
     """Test that setting scene_filtering to None returns the original DataFrame."""
     df = pl.DataFrame({"id": [1, 1], "frame": [0, 1], "scene": [1, 1]})
-    config = ProcessorConfig(input_len=1, output_len=1, sample_time=0.1, scene_filtering=None)
+    config = LoaderConfig(input_len=1, output_len=1, sample_time=0.1, scene_filtering=None)
 
     result = filter_scene(df, config, group_by="scene")
     assert len(result) == 2
@@ -30,11 +30,11 @@ def test_filter_agent_category() -> None:
         ],
     })
 
-    config = ProcessorConfig(
+    config = LoaderConfig(
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=SceneFiltering(
+        scene_filtering=FilteringConfig(
             min_agents=0,
             require_prediction_frame=False,
             filter_agent_category=[AgentCategory.UNIMPORTANT],
@@ -55,11 +55,11 @@ def test_min_agents_threshold() -> None:
         "frame": [0, 0, 0],
     })
 
-    config = ProcessorConfig(
+    config = LoaderConfig(
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=SceneFiltering(min_agents=2, require_prediction_frame=False),
+        scene_filtering=FilteringConfig(min_agents=2, require_prediction_frame=False),
     )
 
     result = filter_scene(df, config, group_by="scene")
@@ -81,11 +81,11 @@ def test_require_all_valid() -> None:
 
     # Case A: require 2 valid agents. Since agent 2 is invalid, scene 1 only
     # has 1 valid agent. The entire scene should drop.
-    config_strict = ProcessorConfig(
+    config_strict = LoaderConfig(
         input_len=2,
         output_len=2,
         sample_time=0.1,
-        scene_filtering=SceneFiltering(
+        scene_filtering=FilteringConfig(
             min_agents=2, require_all_valid=True, require_prediction_frame=False
         ),
     )
@@ -94,11 +94,11 @@ def test_require_all_valid() -> None:
 
     # Case B: require 1 valid agent. Agent 1 is valid, so the scene survives,
     # but the invalid agent 2 should be filtered out.
-    config_lenient = ProcessorConfig(
+    config_lenient = LoaderConfig(
         input_len=2,
         output_len=2,
         sample_time=0.1,
-        scene_filtering=SceneFiltering(
+        scene_filtering=FilteringConfig(
             min_agents=1, require_all_valid=True, require_prediction_frame=False
         ),
     )
@@ -117,11 +117,11 @@ def test_require_frames() -> None:
         # Scene 2 relative frames: 0, 2
     })
 
-    config = ProcessorConfig(
+    config = LoaderConfig(
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=SceneFiltering(
+        scene_filtering=FilteringConfig(
             min_agents=0,
             require_prediction_frame=False,
             require_frames=[0, 4],  # We require relative frames 0 and 4
@@ -144,11 +144,11 @@ def test_require_prediction_frame() -> None:
         "frame": [0, 1, 2, 10, 11],
     })
 
-    config = ProcessorConfig(
+    config = LoaderConfig(
         input_len=3,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=SceneFiltering(min_agents=0, require_prediction_frame=True),
+        scene_filtering=FilteringConfig(min_agents=0, require_prediction_frame=True),
     )
 
     result = filter_scene(df, config, group_by="scene")
@@ -172,11 +172,11 @@ def test_complex_interaction() -> None:
 
     # We have 4 agents total, but 2 are UNIMPORTANT.
     # If we require min_agents=3, the 2 valid ones won't meet the threshold.
-    config = ProcessorConfig(
+    config = LoaderConfig(
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=SceneFiltering(
+        scene_filtering=FilteringConfig(
             min_agents=3,
             require_prediction_frame=False,
             filter_agent_category=[AgentCategory.UNIMPORTANT],
@@ -192,11 +192,11 @@ def test_no_groupby() -> None:
     """Test functionality when no group_by column is provided (entire df is one scene)."""
     df = pl.DataFrame({"id": [1, 2], "frame": [0, 0]})
 
-    config = ProcessorConfig(
+    config = LoaderConfig(
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=SceneFiltering(min_agents=2, require_prediction_frame=False),
+        scene_filtering=FilteringConfig(min_agents=2, require_prediction_frame=False),
     )
 
     # Because group_by is None, it groups over pl.lit(1)

@@ -59,9 +59,7 @@ def derivative(
     current_exprs = [pl.col(col_name) for col_name in x]
 
     for i in range(1, n + 1):
-        rename_list = derivative_rename.get(
-            i, [f"d{i}_{original_root}" for original_root in x]
-        )
+        rename_list = derivative_rename.get(i, [f"d{i}_{original_root}" for original_root in x])
 
         next_order_exprs = []
         for j, expr in enumerate(current_exprs):

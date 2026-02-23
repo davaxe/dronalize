@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from typing_extensions import override
+
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.interface.map import GraphBuilder, IntIDNode
 from preprocessing.datasets.lyft.map import parser
-from typing_extensions import override
 
 
 class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
@@ -86,10 +87,7 @@ class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         boundary = lane.left_boundary
         self.add_path_lazy(
             nodes=boundary.nodes,
-            edge_type=[
-                boundary.get_edge_type_from_src(i)
-                for i in range(len(boundary.nodes) - 1)
-            ],
+            edge_type=[boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)],
         )
 
     def _traverse_lane(self, lane: parser.Lane) -> None:
@@ -98,8 +96,7 @@ class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
             self.add_path_lazy(
                 nodes=boundary.nodes,
                 edge_type=[
-                    boundary.get_edge_type_from_src(i)
-                    for i in range(len(boundary.nodes) - 1)
+                    boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)
                 ],
             )
 
@@ -107,9 +104,7 @@ class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 if __name__ == "__main__":
     import time
 
-    base = Path(
-        "/home/west/Developer/behavior-prediction/datasets/lyft/semantic_map"
-    )
+    base = Path("/home/west/Developer/behavior-prediction/datasets/lyft/semantic_map")
     map_path = base / "semantic_map.pb"
     meta_path = base / "meta.json"
     start_time = time.perf_counter()

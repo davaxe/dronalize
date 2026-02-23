@@ -142,7 +142,6 @@ class TrajDataModule(LightningDataModule):
 
 if __name__ == "__main__":
     from lightning.pytorch import seed_everything
-
     from visualization import visualize_batch
 
     seed_everything(42)

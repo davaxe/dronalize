@@ -37,6 +37,8 @@ dependencies = [
     "zarr<3",
     "numcodecs<=0.13.1",
     "mosaicml-streaming>=0.10.0",
+    "altair>=6.0.0",
+    "ipython>=8.38.0",
 ]
 
 [project.optional-dependencies]

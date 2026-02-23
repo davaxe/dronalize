@@ -279,12 +279,13 @@ def plot_torch_graph(
         node_size: Base size multiplier for nodes in the plot
         dpi: DPI of the output plot
         plot_nodes: Whether to plot the nodes
+
     """
     assert type(graph_dict) == dict, "Make sure get_lane_graph(.) has return_torch=True."
 
     # Extract node and edge data
     map_point_data = graph_dict["map_point"]
-    edge_data = graph_dict[("map_point", "to", "map_point")]
+    edge_data = graph_dict["map_point", "to", "map_point"]
 
     positions = map_point_data["position"].numpy()
     node_types = map_point_data["type"].numpy()
@@ -381,7 +382,6 @@ def plot_torch_graph(
                     c=node_style["color"],
                     s=node_style["s"] * node_size,
                     zorder=20,
-                    # edgecolor='black',
                     linewidth=0.5,
                 )
 
@@ -428,27 +428,12 @@ def get_lane_graph(
     if isinstance(lanelet_file, bytes):
         try:
             lanelet_file = lanelet_file.decode("utf-8")
-        except UnicodeDecodeError:
+        except UnicodeDecodeError as e:
             msg = "lanelet_file is in bytes format but cannot be decoded to a valid string."
-            raise ValueError(msg)
+            raise ValueError(msg) from e
 
     position = MapPosition(utm_x0, utm_y0, map_x0, map_y0)
     graph_builder = LaneGraphBuilder(position)
     graph_builder.apply_file(str(lanelet_file))
 
     return create_torch_graph(graph_builder.graph) if return_torch else graph_builder
-
-
-# Example usage:
-if __name__ == "__main__":
-    path = "data/DR_CHN_Merging_ZS0.osm"
-    x_utm_origin = 0
-    y_utm_origin = 0
-
-    # Create and plot the graph
-    graph_builder = get_lane_graph(path, x_utm_origin, y_utm_origin, return_torch=False)
-    graph_builder.plot(plot_virtual=True)
-
-    # Create torch graph
-    # torch_graph = get_lane_graph(path, x_utm_origin, y_utm_origin, return_torch=True)
-    # plot_torch_graph(torch_graph, plot_virtual=True)

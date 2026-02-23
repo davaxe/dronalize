@@ -18,23 +18,21 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import (
-    DataProcessor,
-    ProcessorConfig,
-)
+from preprocessing.core import map_context as mc
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
 
-class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
+class EthUcyLoader(BaseSceneLoader[str, Path]):
     """Processor for ETH/UCY pedestrian trajectory datasets."""
 
     def __init__(
         self,
         data_root: Path,
         dataset: str | Sequence[str],
-        config: ProcessorConfig | None = None,
+        config: LoaderConfig | None = None,
         split: Literal["train", "val", "test"] = "train",
     ) -> None:
         """Initialize with the given configuration."""
@@ -46,24 +44,35 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
         self._filtering_params = self.processor_config.scene_filtering
 
     @override
-    def sources(self) -> Iterable[tuple[str, pl.LazyFrame]]:
+    def sources(self) -> Iterable[tuple[str, Path]]:
         for dataset in self._dataset:
             data_dir = self._data_root / dataset / self._split
             # Sort to ensure consistent order across runs and systems.
             for data_file in sorted(data_dir.iterdir()):
-                yield (data_file.name, EthUcyProcessor._read_data_file(data_file))
+                yield data_file.name, data_file
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-        yield from prepare_agent_trajectories(
-            source,
+    def num_sources(self) -> int | None:
+        num_sources: int = 0
+        for dataset in self._dataset:
+            data_dir = self._data_root / dataset / self._split
+            num_sources += sum(1 for _ in data_dir.iterdir())
+
+        return num_sources
+
+    @override
+    def load_raw(self, source: Path) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        source_data = EthUcyLoader._read_data_file(source)
+        for df in prepare_agent_trajectories(
+            source_data,
             self.processor_config,
             add_derivative=True,
             add_second_derivative=True,
             sliding_col="frame",
             agent_category_col=None,
             derivative_rename=self.derivative_names(),
-        )
+        ):
+            yield df, None
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
@@ -72,9 +81,9 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
         )
 
     @override
-    def default_config(self) -> ProcessorConfig:
+    def default_config(self) -> LoaderConfig:
         return (
-            ProcessorConfig(
+            LoaderConfig(
                 input_len=8,
                 output_len=12,
                 sample_time=0.4,
@@ -104,11 +113,11 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
 
 
 if __name__ == "__main__":
-    processor = EthUcyProcessor(data_root=Path("data"), dataset="hotel", split="train")
+    processor = EthUcyLoader(data_root=Path("data"), dataset="hotel", split="train")
     start_time = time.perf_counter()
     count: int = 0
     total_time = 0.0
-    for _scene in processor.scenes_iter():
+    for _scene in processor.scenes():
         count += 1
 
     end_time = time.perf_counter()

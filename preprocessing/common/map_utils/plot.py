@@ -25,7 +25,7 @@ def plot_map_graph(
         include_nodes: Whether to include node markers in the plot. Defaults to False.
 
     Returns:
-        The Matplotlib Axes object containing the plot.
+        The Matplotlib Axes object containing the figure.
 
     """
     if ax is None:
@@ -86,10 +86,11 @@ def plot_map_graph(
             color, lw, ls = style_map.get(et, default_style)
         except ValueError:
             color, lw, ls = default_style
+            et = EdgeType.VIRTUAL
 
         # Boolean mask for current edge type
         mask = edge_types_np == et_int
-        current_segments = segments[mask]
+        current_segments = segments[mask].tolist()
 
         lc = LineCollection(
             current_segments,

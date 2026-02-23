@@ -2,11 +2,11 @@ from pathlib import Path
 
 from typing_extensions import override
 
-from preprocessing.core.interface import ProcessorConfig
-from preprocessing.datasets.nuscenes.trajectory_processor import NuScenesProcessor
+from preprocessing.core.interface import LoaderConfig
+from preprocessing.datasets.nuscenes.trajectory_processor import NuScenesLoader
 
 
-class VodProcessor(NuScenesProcessor):
+class VodLoader(NuScenesLoader):
     """View-of-Delft dataset processor.
 
     This shares the same base processing logic as NuScenesProcessor but with
@@ -16,7 +16,7 @@ class VodProcessor(NuScenesProcessor):
     def __init__(
         self,
         data_directory: Path | str,
-        processor_config: ProcessorConfig | None = None,
+        processor_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the processor.
 
@@ -31,8 +31,8 @@ class VodProcessor(NuScenesProcessor):
         ]
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(5, 30, 0.1).window_parameters(5)
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(5, 30, 0.1).window_parameters(5)
 
 
 if __name__ == "__main__":
@@ -44,8 +44,8 @@ if __name__ == "__main__":
     # Check if directory exists to avoid FileNotFound errors in example
     if data_dir.exists():
         start_time = time.perf_counter()
-        processor = VodProcessor(data_directory=data_dir)
-        for _scene in processor.scenes_iter():
+        processor = VodLoader(data_directory=data_dir)
+        for _scene in processor.scenes():
             if _scene.scene_number % 200 == 0:
                 print(f"Processing scene number: {_scene.scene_number}")
     else:

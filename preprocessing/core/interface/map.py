@@ -22,23 +22,68 @@ from collections.abc import Hashable, Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from math import ceil
-from typing import (
-    Any,
-    Generic,
-    Literal,
-    Protocol,
-    TypedDict,
-    TypeVar,
-)
+from typing import Any, Generic, Literal, Protocol, TypedDict, TypeVar, overload
 
 import numpy as np
 import torch
-from typing_extensions import Self, overload
+from typing_extensions import Self
 
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.map_graph import MapGraph
 
 ID = TypeVar("ID", bound=Hashable)
+
+
+@dataclass(slots=True, frozen=True)
+class Implicit:
+    """Indicates an implicit map context; map information is known without any additional info.
+
+    Commonly this is the case when there is only one possible map.
+    """
+
+    tag: Literal["Implicit"] = "Implicit"
+
+
+@dataclass(slots=True, frozen=True)
+class Explicit:
+    """Indicates an explicit map context; map information is provided explicitly for the scene."""
+
+    identifier: str
+    """Identifier for the map context, e.g., map name or token."""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    """Additional metadata required to determine the map."""
+    tag: Literal["ImplicitWithInfo"] = "ImplicitWithInfo"
+
+
+@dataclass(slots=True, frozen=True)
+class Loaded:
+    """Indicates a loaded map context; the map graph is directly provided."""
+
+    map: MapGraph
+    """The map graph directly provided for the scene."""
+    tag: Literal["Loaded"] = "Loaded"
+
+
+MapContext = Implicit | Explicit | Loaded | None
+
+
+def implicit_map_context() -> Implicit:
+    """Signify an implicit map context."""
+    return Implicit()
+
+
+def explicit_map_context(identifier: str, **metadata: Any) -> Explicit:  # noqa: ANN401
+    """Create an explicit map context with the given identifier and metadata."""
+    return Explicit(identifier=identifier, metadata=metadata or {})
+
+
+def loaded_map_context(map_graph: MapGraph) -> Loaded:
+    """Create a loaded map context with the given map graph."""
+    return Loaded(map=map_graph)
+
+
+def no_map_context() -> None:
+    """Signify no map context."""
 
 
 class BaseMapObject(Protocol, Generic[ID]):
@@ -327,6 +372,21 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
         """
         return self.add_node(node)
+
+    def with_edge_map(self, edge_map: dict[EdgeType, EdgeType]) -> Self:
+        """Set the edge mapping for remapping edge types during graph building.
+
+        Args:
+            edge_map: a dictionary mapping original `EdgeType` values to new
+                `EdgeType` values. This allows for flexible remapping of edge
+                types without modifying the underlying graph construction logic.
+
+        Returns:
+            The `GraphBuilder` instance with the updated edge mapping.
+
+        """
+        self.edge_map = edge_map
+        return self
 
     def build(
         self,
@@ -668,8 +728,8 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         # Clear buffer to prevent double-processing if built twice
         self._pending_paths.clear()
 
+    @staticmethod
     def _resolve_distance(
-        self,
         min_distance: float | None,
         interp_distance: float | None,
     ) -> tuple[float | None, float | None]:

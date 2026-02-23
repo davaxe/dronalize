@@ -7,18 +7,19 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
+from preprocessing.core import map_context as mc
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 
 
-class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
+class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
     """Processor for Argoverse 1 dataset stored in CSV format."""
 
     def __init__(
         self,
         data_dir: Path,
         file_batch_size: int | None = 100,
-        config: ProcessorConfig | None = None,
+        config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the data processor.
 
@@ -40,10 +41,6 @@ class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
         batch_size: int = self._batch_size or len(files)
         for start in range(0, len(files), batch_size):
             batch_files = files[start : start + batch_size]
-            extra: list[pl.Expr] = []
-            if len(batch_files) > 1:
-                extra.append(pl.col("file_id").cast(pl.Categorical).to_physical())
-
             yield (
                 start,
                 pl
@@ -56,14 +53,21 @@ class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
                     .alias("agent_category"),
                     pl.col("TRACK_ID").rank(method="dense").sub(1).cast(pl.Int64).alias("id"),
                     pl.col("TIMESTAMP").rank(method="dense").sub(1).cast(pl.Int64).alias("frame"),
-                    *extra,
+                    pl.col("file_id").cast(pl.Categorical).to_physical(),
                 )
                 .drop("OBJECT_TYPE", "TRACK_ID", "TIMESTAMP")
                 .rename({"X": "x", "Y": "y", "CITY_NAME": "map"}),
             )
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
+    def num_sources(self) -> int | None:
+        num_files = sum(1 for _ in self._data_path.glob("*.csv"))
+        batch_size = self._batch_size or num_files
+        batches, extra = divmod(num_files, batch_size)
+        return batches + int(extra > 0)
+
+    @override
+    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.processor_config.resampling or Resampling(1, 1)
 
         source_filtered = source.filter(
@@ -87,16 +91,18 @@ class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
             forward_fill=["agent_category"],
         )
         for _, group in source_resampled.collect().group_by(["file_id"]):
-            yield yaw_from_vel(group.lazy()).drop("file_id")
+            yield (
+                yaw_from_vel(group.lazy()).drop("file_id"),
+                mc.Explicit(str(group["map"].first())),
+            )
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        self.attach_to_scene(select_expr={"map_information": pl.col("map").first()}, properties={})
         return yaw_from_vel(df, yaw_col="yaw")
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(20, 30, 0.1)
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(20, 30, 0.1)
 
 
 _SCHEMA: pl.Schema = pl.Schema({
@@ -114,10 +120,10 @@ if __name__ == "__main__":
     data_path = Path(
         "/home/west/Developer/behavior-prediction/datasets/argoverse/forecasting_train_v1.1/train/data"
     )
-    processor = Argoverse1Processor(data_path, file_batch_size=1000)
+    processor = Argoverse1Loader(data_path, file_batch_size=1000)
     count = 0
     time_start = time.perf_counter()
-    for scene in processor.scenes_iter():
+    for _scene in processor.scenes():
         count += 1
         if count % 500 == 0:
             print(f"Processed {count} scenes in {time.perf_counter() - time_start:.2f} seconds")

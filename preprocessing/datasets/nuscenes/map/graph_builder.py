@@ -41,7 +41,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         super().__init__()
         self.map: parser.NuScenesMap = nuscenes_map
         self.map_nodes = self.map.nodes
-        self.lane_polygon_edge: None | EdgeType = None
+        self.lane_polygon_edge: EdgeType | None = None
         self.edge_type_methods = {
             "road_divider": self._add_road_divider_edges,
             "lane_divider": self._add_lane_divider_edges,
