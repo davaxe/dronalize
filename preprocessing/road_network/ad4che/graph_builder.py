@@ -39,13 +39,9 @@ def get_black_border_pixels(gray_image):
     black_mask = (gray_image == 0).astype(np.uint8)
 
     white_mask = (gray_image > 0).astype(np.uint8)
-    dilated_white = cv2.dilate(
-        white_mask, kernel=np.ones((3, 3), np.uint8), iterations=1
-    )
+    dilated_white = cv2.dilate(white_mask, kernel=np.ones((3, 3), np.uint8), iterations=1)
 
-    border_mask = (
-        np.logical_and(black_mask == 1, dilated_white == 1).astype(np.uint8) * 255
-    )
+    border_mask = np.logical_and(black_mask == 1, dilated_white == 1).astype(np.uint8) * 255
     return border_mask
 
 
@@ -77,9 +73,7 @@ def extract_lane_polylines(border_mask, pixel_to_meter=PIXEL_TO_METER, spatial_d
             "Please install it with `pip install opencv-python`."
         )
         raise ImportError(msg)
-    contours, _ = cv2.findContours(
-        border_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-    )
+    contours, _ = cv2.findContours(border_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
     polylines = []
     for cnt in contours:
@@ -117,9 +111,7 @@ def poly_to_map_data(polylines: list[np.ndarray], x_max: float = 0.0) -> dict:
 
         # Create bidirectional edges
         edges = (
-            np.array(
-                [[i, i + 1] for i in range(n - 1)] + [[i + 1, i] for i in range(n - 1)]
-            )
+            np.array([[i, i + 1] for i in range(n - 1)] + [[i + 1, i] for i in range(n - 1)])
             + node_counter
         )
         edge_index.append(edges.T)

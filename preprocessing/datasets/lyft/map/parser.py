@@ -285,13 +285,10 @@ class Junction:
         """Create a `Junction` instance from a protobuf version."""
         return cls(
             is_non_trivial=junction.is_non_trivial_intersection,
-            road_network_nodes=[
-                _global_id_to_str(node) for node in junction.road_network_nodes
-            ],
+            road_network_nodes=[_global_id_to_str(node) for node in junction.road_network_nodes],
             extra_lanes=[_global_id_to_str(lane) for lane in junction.lanes],
             traffic_control_elements=[
-                _global_id_to_str(element)
-                for element in junction.traffic_control_elements
+                _global_id_to_str(element) for element in junction.traffic_control_elements
             ],
         )
 
@@ -431,12 +428,9 @@ class LaneBoundary:
         """Create a `LaneBoundary` instance from a `Lane` protobuf message."""
         cm_to_m: float = 0.01
         lane_types = [
-            LaneBoundaryType.from_int(boundary_type)
-            for boundary_type in boundary.divider_type
+            LaneBoundaryType.from_int(boundary_type) for boundary_type in boundary.divider_type
         ]
-        type_change_distances = [
-            x * cm_to_m for x in iter(boundary.type_change_point_cm)
-        ]
+        type_change_distances = [x * cm_to_m for x in iter(boundary.type_change_point_cm)]
 
         dx = [x * cm_to_m for x in boundary.vertex_deltas_x_cm]
         dy = [y * cm_to_m for y in boundary.vertex_deltas_y_cm]
@@ -575,9 +569,7 @@ class Lane:
             travel_direction=TravelDirection.from_int(
                 lane.orientation_in_parent_segment,
             ),
-            lane_successors=[
-                _global_id_to_str(successor) for successor in lane.lanes_ahead
-            ],
+            lane_successors=[_global_id_to_str(successor) for successor in lane.lanes_ahead],
             can_have_parked_cars=lane.can_have_parked_cars,
             turn_type=TurnType.from_int(lane.turn_type_in_parent_junction),
         )
@@ -720,9 +712,7 @@ def transform(
         return (x, y, z)
 
     transformation = np.transpose(transformation)
-    xyz = (
-        np.array([x, y, z]) @ transformation[:3, :3] + transformation[-1:, :3]
-    ).flatten()
+    xyz = (np.array([x, y, z]) @ transformation[:3, :3] + transformation[-1:, :3]).flatten()
     return (xyz[0], xyz[1], xyz[2])
 
 

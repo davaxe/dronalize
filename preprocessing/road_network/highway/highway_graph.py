@@ -90,12 +90,8 @@ def section_graph(
     edge_indices = np.concatenate(edge_index, axis=1)
     edge_attributes = np.concatenate(edge_attr, axis=0)
 
-    map_data["map_point", "to", "map_point"]["edge_index"] = torch.from_numpy(
-        edge_indices
-    ).long()
-    map_data["map_point", "to", "map_point"]["type"] = torch.from_numpy(
-        edge_attributes
-    ).float()
+    map_data["map_point", "to", "map_point"]["edge_index"] = torch.from_numpy(edge_indices).long()
+    map_data["map_point", "to", "map_point"]["type"] = torch.from_numpy(edge_attributes).float()
 
     return map_data
 
@@ -143,9 +139,7 @@ if __name__ == "__main__":
     recording_meta = pd.read_csv(f"{ROOT}/{rec_idx}_recordingMeta.csv")
     tracks_csv = pd.read_csv(f"{ROOT}/{rec_idx}_tracks.csv")
 
-    data_upper, data_lower, *_ = get_highway_graph(
-        recording_meta, tracks_csv, spacing=10
-    )
+    data_upper, data_lower, *_ = get_highway_graph(recording_meta, tracks_csv, spacing=10)
 
     plot_data = data_upper
 
@@ -159,8 +153,7 @@ if __name__ == "__main__":
         target_pos = plot_data["map_point"]["position"][target]
         COLOR = (
             "k"
-            if plot_data["map_point", "to", "map_point"]["type"][i]
-            == EdgeType.ROAD_BORDER.value
+            if plot_data["map_point", "to", "map_point"]["type"][i] == EdgeType.ROAD_BORDER.value
             else "grey"
         )
         plt.plot(
@@ -172,11 +165,7 @@ if __name__ == "__main__":
 
     # plot all points
     for i in range(plot_data["map_point"]["position"].shape[0]):
-        COLOR = (
-            "r"
-            if plot_data["map_point"]["type"][i] == EdgeType.ROAD_BORDER.value
-            else "b"
-        )
+        COLOR = "r" if plot_data["map_point"]["type"][i] == EdgeType.ROAD_BORDER.value else "b"
         plt.scatter(
             plot_data["map_point"]["position"][i, 0],
             plot_data["map_point"]["position"][i, 1],
