@@ -22,18 +22,11 @@ from collections.abc import Hashable, Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from math import ceil
-from typing import (
-    Any,
-    Generic,
-    Literal,
-    Protocol,
-    TypedDict,
-    TypeVar,
-)
+from typing import Any, Generic, Literal, Protocol, TypedDict, TypeVar, overload
 
 import numpy as np
 import torch
-from typing_extensions import Self, overload
+from typing_extensions import Self
 
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.map_graph import MapGraph

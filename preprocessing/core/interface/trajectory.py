@@ -87,6 +87,11 @@ class Resampling:
         """(up, down) resampling factors."""
         return (self.up, self.down)
 
+    @property
+    def no_resampling(self) -> bool:
+        """Whether no resampling is applied."""
+        return self.up == 1 and self.down == 1
+
 
 @dataclass(slots=True)
 class ProcessorConfig:

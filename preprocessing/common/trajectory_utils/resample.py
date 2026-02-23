@@ -85,6 +85,7 @@ def resample_tracks(
                 *pos_columns,
                 n=2,
                 dt=dt,
+                group_by=group_by,
                 include_intermediate=add_derivative,
                 derivative_rename=derivative_rename,
             )
@@ -94,6 +95,7 @@ def resample_tracks(
                 *pos_columns,
                 n=1,
                 dt=dt,
+                group_by=group_by,
                 include_intermediate=add_derivative,
                 derivative_rename=derivative_rename,
             )
@@ -352,13 +354,33 @@ def _downsample_dataframe(
     )
 
 
+@overload
+def _upsample_dataframe(
+    data: pl.DataFrame,
+    factor: int,
+    frame_column: str = "frame",
+    group_by: Sequence[str] | None = None,
+    forward_fill: Sequence[str] | None = None,
+) -> pl.DataFrame: ...
+
+
+@overload
+def _upsample_dataframe(
+    data: pl.LazyFrame,
+    factor: int,
+    frame_column: str = "frame",
+    group_by: Sequence[str] | None = None,
+    forward_fill: Sequence[str] | None = None,
+) -> pl.LazyFrame: ...
+
+
 def _upsample_dataframe(
     data: T_DataFrame,
     factor: int,
     frame_column: str = "frame",
     group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> T_DataFrame:
+) -> pl.DataFrame | pl.LazyFrame:
     """Upsample by an integer factor using linear interpolation.
 
     Args:

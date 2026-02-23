@@ -40,10 +40,6 @@ class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
         batch_size: int = self._batch_size or len(files)
         for start in range(0, len(files), batch_size):
             batch_files = files[start : start + batch_size]
-            extra: list[pl.Expr] = []
-            if len(batch_files) > 1:
-                extra.append(pl.col("file_id").cast(pl.Categorical).to_physical())
-
             yield (
                 start,
                 pl
@@ -56,7 +52,7 @@ class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
                     .alias("agent_category"),
                     pl.col("TRACK_ID").rank(method="dense").sub(1).cast(pl.Int64).alias("id"),
                     pl.col("TIMESTAMP").rank(method="dense").sub(1).cast(pl.Int64).alias("frame"),
-                    *extra,
+                    pl.col("file_id").cast(pl.Categorical).to_physical(),
                 )
                 .drop("OBJECT_TYPE", "TRACK_ID", "TIMESTAMP")
                 .rename({"X": "x", "Y": "y", "CITY_NAME": "map"}),
