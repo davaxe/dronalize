@@ -403,9 +403,9 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         for source_id, source in self.sources():
             self._source_counter += 1
             for scene_df in self.process_next(source):
-                yield self._create_scene(scene_df, source_id)
+                yield self.create_scene(scene_df, source_id)
 
-    def _create_scene(self, df: pl.DataFrame, source_id: T_ID) -> Scene[T_ID]:
+    def create_scene(self, df: pl.DataFrame, source_id: T_ID) -> Scene[T_ID]:
         scene = Scene[T_ID](
             inner=df,
             identifier=source_id,

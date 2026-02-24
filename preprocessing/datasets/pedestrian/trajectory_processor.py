@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
 
-class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
+class EthUcyProcessor(DataProcessor[str, Path]):
     """Processor for ETH/UCY pedestrian trajectory datasets."""
 
     def __init__(
@@ -46,17 +46,18 @@ class EthUcyProcessor(DataProcessor[str, pl.LazyFrame]):
         self._filtering_params = self.processor_config.scene_filtering
 
     @override
-    def sources(self) -> Iterable[tuple[str, pl.LazyFrame]]:
+    def sources(self) -> Iterable[tuple[str, Path]]:
         for dataset in self._dataset:
             data_dir = self._data_root / dataset / self._split
             # Sort to ensure consistent order across runs and systems.
             for data_file in sorted(data_dir.iterdir()):
-                yield (data_file.name, EthUcyProcessor._read_data_file(data_file))
+                yield data_file.name, data_file
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: Path) -> Iterable[pl.LazyFrame]:
+        source_data = EthUcyProcessor._read_data_file(source)
         yield from prepare_agent_trajectories(
-            source,
+            source_data,
             self.processor_config,
             add_derivative=True,
             add_second_derivative=True,
