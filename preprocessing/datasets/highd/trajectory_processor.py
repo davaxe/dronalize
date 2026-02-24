@@ -26,12 +26,12 @@ class HighDProcessor(DataProcessor[int, pl.LazyFrame]):
         self,
         data_dir: Path,
         config: ProcessorConfig | None = None,
-        highway_rebalance_ratio: float | None = 1.0,
+        lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the highD data processor.
 
         It is possible to rebalance the dataset by adjusting the number of lane changing agents
-        compared to non-lane changing agents. This can be done by setting the `highway_rebalance_ratio`
+        compared to non-lane changing agents. This can be done by setting the `lane_change_ratio`
         parameter. For example, a ratio of 0.5 would result in half as many lane changing agents as
         non-lane changing agents. Typically highway datasets are heavily imbalanced towards non-lane
         changing agents, which means that a high ratio con result in way less total data.
@@ -39,14 +39,14 @@ class HighDProcessor(DataProcessor[int, pl.LazyFrame]):
         Args:
             data_dir: Path to the directory containing the highD dataset files.
             config: Optional processor configuration. If None, default configuration will be used.
-            highway_rebalance_ratio: Optional ratio for rebalancing highway agents. If None, no
+            lane_change_ratio: Optional ratio for rebalancing highway agents. If None, no
                 rebalancing will be applied. Default is 1.0, i.e. same number of lane changes as
                 non-lane changes.
 
         """
         super().__init__(config, enforce_schema=False)
         self._data_dir = data_dir
-        self._rebalance_ratio = highway_rebalance_ratio
+        self._rebalance_ratio = lane_change_ratio
 
     @override
     def sources(self) -> Iterable[tuple[int, pl.LazyFrame]]:
