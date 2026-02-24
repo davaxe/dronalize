@@ -34,7 +34,7 @@ class SceneFiltering:
 
     require_all_valid: bool = False
     """If True, requires all agents in a scene to have valid positions for all
-    time-steps."""
+    time-steps (input and output)."""
 
     require_prediction_frame: bool = True
     """If True, requires all agents to have valid positions at the first prediction

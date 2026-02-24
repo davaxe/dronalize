@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+import altair as alt
 import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
-import seaborn as sns
 
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
-
-    from matplotlib.axes import Axes
 
 
 def plot_trajectories(
@@ -21,109 +20,123 @@ def plot_trajectories(
     y_col: str = "y",
     group_by: str | None = None,
     n_groups: int | None = None,
+    frame_col: str = "frame",
     *,
     x_label: str | None = None,
     y_label: str | None = None,
-    ax: Axes | None = None,
-    save_path: Path | None = None,
+    save_path: Path | str | None = None,
     title: str | None = None,
     group_sample_seed: int | None = None,
-) -> Axes:
-    """Plot a set of trajectories from a Polars dataframe.
+    highlight_frame: int | Sequence[int] | None = None,
+    **kwargs: Any,  # noqa: ANN401
+) -> alt.LayerChart:
+    """Plot a set of trajectories from a Polars dataframe using Altair.
 
     Args:
         data: underlying dataframe containing trajectory data.
         x_col: column name for x-axis values. Defaults to "x".
         y_col: column name for y-axis values. Defaults to "y".
         group_by: column name to group trajectories by (e.g., "track_id").
-        n_groups: number of unique groups to plot. If None, plots all groups. Defaults to None.
-        x_label: label for x-axis. If None, uses x_col. Defaults to None
-        y_label: label for y-axis. If None, uses y_col. Defaults to None.
-        ax: Optional Matplotlib Axes to plot on. If None, a new figure and axes are created.
-        save_path: Optional path to save the plot image. If None, the plot is not saved.
-        title: Optional title for the plot. Defaults to None.
-        group_sample_seed: Optional random seed for sampling groups when n_groups is specified.
+        n_groups: number of unique groups to plot. If None, plots all groups.
+        frame_col: column name representing the frame index.
+        x_label: label for x-axis. If None, uses x_col.
+        y_label: label for y-axis. If None, uses y_col.
+        save_path: Optional path to save the plot (json, html, png, etc.).
+        title: Optional title for the plot.
+        group_sample_seed: Optional random seed for sampling groups.
+        highlight_frame: specify frames to be highlighted.
+        kwargs: Additional keyword arguments passed to the top-level `chart.properties()`
 
     Returns:
-        The Matplotlib Axes object containing the figure.
+        An Altair LayerChart containing the trajectories and start/end markers.
 
     """
-    # 1. Filter logic
-    if n_groups is not None:
-        selected_ids = data.select(group_by).unique().sample(n_groups, seed=group_sample_seed)
-        data = data.join(selected_ids, on=group_by, how="semi")
+    alt.renderers.enable("browser")
+    if n_groups is not None and group_by is not None:
+        unique_groups = data.select(group_by).unique()
+        if unique_groups.height > n_groups:
+            selected_ids = unique_groups.sample(n_groups, seed=group_sample_seed)
+            data = data.join(selected_ids, on=group_by, how="semi")
 
-    # 2. Create a consistent color mapping
-    unique_ids = data.select(group_by).unique().to_series().to_list()
-    palette_name = "tab10" if len(unique_ids) <= 10 else "husl"
-    colors = sns.color_palette(palette_name, n_colors=len(unique_ids))
-    color_map = dict(zip(unique_ids, colors, strict=True))
+    if group_by:
+        # maintain_order=True is needed to identify the correct first/last rows per group
+        start_df = data.group_by(group_by, maintain_order=True).head(1)
+        end_df = data.group_by(group_by, maintain_order=True).tail(1)
+    else:
+        start_df = data.head(1)
+        end_df = data.tail(1)
 
-    if ax is None:
-        _fig, ax = plt.subplots(figsize=(10, 8))
-
-    df_pd = data.to_pandas()
-
-    # 3. Plot the main trajectory lines
-    sns.lineplot(
-        data=df_pd,
-        x=x_col,
-        y=y_col,
-        hue=group_by,
-        ax=ax,
-        palette=color_map,
-        alpha=0.8,
-        linewidth=2,
-        marker="o",
-        markersize=4,
-        markeredgecolor="white",
-        markeredgewidth=0.5,
-        sort=False,
-        legend=False,
-        estimator=None,
+    base = alt.Chart(data).encode(
+        x=alt.X(x_col, title=x_label or x_col),
+        y=alt.Y(y_col, title=y_label or y_col),
+        color=alt.Color(
+            group_by or alt.Undefined, scale=alt.Scale(scheme="category20"), legend=None
+        ),
     )
 
-    # 4. Add markers and annotations
-    unique_groups = df_pd[group_by].unique()
-    for tid in unique_groups:
-        subset = df_pd[df_pd[group_by] == tid]
-        if len(subset) == 0:
-            continue
+    tooltips: list[alt.Tooltip] = [
+        alt.Tooltip(x_col, format=".2f"),
+        alt.Tooltip(y_col, format=".2f"),
+        alt.Tooltip(frame_col),
+    ]
+    if group_by:
+        tooltips.append(alt.Tooltip(group_by))
 
-        x, y = list(subset[x_col]), list(subset[y_col])
+    lines = base.mark_line(
+        point=alt.OverlayMarkDef(filled=True, size=15),
+        strokeWidth=2,
+        opacity=0.8,
+    ).encode(order=alt.Order(field=x_col), tooltip=tooltips)
 
-        # Start marker (Green Circle)
-        ax.plot(
-            x[0],
-            y[0],
-            marker="o",
-            color="#2ecc71",
-            markersize=8,
-            markeredgecolor="black",
-            zorder=10,
+    start_markers = (
+        alt
+        .Chart(start_df)
+        .mark_point(shape="circle", size=75, filled=True, fill="#2ecc71", stroke="black")
+        .encode(x=x_col, y=y_col, tooltip=tooltips)
+    )
+
+    end_markers = (
+        alt
+        .Chart(end_df)
+        .mark_point(shape="cross", size=75, filled=True, color="#e74c3c", stroke="black")
+        .encode(x=x_col, y=y_col, tooltip=tooltips)
+    )
+
+    layers = lines + start_markers + end_markers
+    if highlight_frame is not None:
+        # Normalize input to a list
+        frames_to_highlight = (
+            [highlight_frame] if isinstance(highlight_frame, int) else list(highlight_frame)
         )
 
-        ax.plot(
-            x[-1],
-            y[-1],
-            marker="X",
-            color="#e74c3c",
-            markersize=8,
-            markeredgecolor="black",
-            zorder=10,
-        )
+        highlight_df = data.filter(pl.col(frame_col).is_in(frames_to_highlight))
+        if not highlight_df.is_empty():
+            highlight_layer = (
+                alt
+                .Chart(highlight_df)
+                .mark_point(
+                    shape="diamond",
+                    size=175,
+                    filled=True,
+                    fill="#FFD700",
+                    stroke="black",
+                    strokeWidth=1,
+                )
+                .encode(x=x_col, y=y_col, tooltip=tooltips)
+            )
+            layers += highlight_layer
 
-    if title is not None:
-        ax.set_title(title, fontsize=14, pad=15, fontweight="bold")
-    ax.set_xlabel(x_label or x_col)
-    ax.set_ylabel(y_label or y_col)
-    ax.grid(visible=True, linestyle="--", alpha=0.3)
+    chart = (
+        layers
+        .properties(title=title or "", **kwargs)
+        .interactive()
+        .configure_axis(grid=True, gridColor="grey", gridOpacity=0.2, gridDash=[2, 2])
+    )
 
-    plt.tight_layout()
-    if save_path is not None:
-        plt.savefig(save_path)
+    if save_path:
+        chart.save(save_path)
 
-    return ax
+    return chart
 
 
 def _generate_test() -> pl.DataFrame:

@@ -68,10 +68,9 @@ def resample_tracks(
         requested derivatives.
 
     """
-    group_by = [group_by] if isinstance(group_by, str) else list(group_by or [])
+    group_by = [group_by] if isinstance(group_by, str) else group_by
     if method == "fast":
-        # Just upsampling needed.
-        upsampled = _resample_dataframe(
+        resampled = _resample_dataframe(
             data=data,
             up=up,
             down=down,
@@ -80,8 +79,8 @@ def resample_tracks(
             forward_fill=forward_fill,
         )
         if add_second_derivative:
-            upsampled = derivative(
-                upsampled,
+            resampled = derivative(
+                resampled,
                 *pos_columns,
                 n=2,
                 dt=dt,
@@ -90,8 +89,8 @@ def resample_tracks(
                 derivative_rename=derivative_rename,
             )
         elif add_derivative:
-            upsampled = derivative(
-                upsampled,
+            resampled = derivative(
+                resampled,
                 *pos_columns,
                 n=1,
                 dt=dt,
@@ -99,7 +98,7 @@ def resample_tracks(
                 include_intermediate=add_derivative,
                 derivative_rename=derivative_rename,
             )
-        return upsampled
+        return resampled
 
     return _resample_dataframe_spline(
         data,
@@ -399,7 +398,6 @@ def _upsample_dataframe(
     if factor < 0:
         msg = "upsampling factor must be positive"
         raise ValueError(msg)
-
     is_eager = isinstance(data, pl.DataFrame)
     lf: pl.LazyFrame = cast("pl.LazyFrame", data.lazy() if is_eager else data)
     data_scaled = lf.with_columns(pl.col(frame_column) * factor)
@@ -417,16 +415,15 @@ def _upsample_dataframe(
         .explode(frame_column)
     )
 
-    on = [*group_by, frame_column] if group_by else [frame_column]
+    on: list[str] = [*group_by, frame_column] if group_by else [frame_column]
     exclude: list[str] = [*on, *(forward_fill or [])]
-    exprs = [pl.all().exclude(exclude).interpolate()]
+    exprs: list[pl.Expr] = [pl.all().exclude(exclude).interpolate()]
     if forward_fill:
         exprs.append(pl.col(forward_fill).forward_fill())
     result = upsampled.join(data_scaled, on=on, how="left").sort(on).with_columns(*exprs)
 
     if isinstance(result, pl.LazyFrame) and is_eager:
         return result.collect()
-
     return result
 
 

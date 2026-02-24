@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from typing_extensions import override
+
 from preprocessing.core.categories import EdgeType
 from preprocessing.core.interface.map import GraphBuilder, IntIDNode
 from preprocessing.datasets.lyft.map import parser
-from typing_extensions import override
 
 
 class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
