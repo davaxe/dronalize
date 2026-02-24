@@ -353,20 +353,35 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
     def default_config(self) -> ProcessorConfig:
         """Return the default processor configuration for this dataset."""
 
-    @staticmethod
-    def derivative_names() -> dict[int, list[str]]:
-        """Return the names of the derivatives for velocity and acceleration."""
-        return {
-            1: ["vx", "vy"],
-            2: ["ax", "ay"],
-        }
-
     def attach_to_scene(
         self,
         select_expr: dict[str, pl.Expr] | None = None,
         properties: dict[str, Any] | None = None,
     ) -> None:
-        """Attach additional properties to the scene that can be used in `modify_scene`."""
+        """Attach additional properties to the created scene.
+
+        Note that this is advanced and convoluted way to attach additional properties that will
+        likely be rewored in the future.
+
+        By default, the properties and expressions are attached to the created scene by conceptually
+        followng the code below. `scene_properties` are directly attached as attributes to the scene,
+        while `select_expr` are evaluated on the scene dataframe and attached as attributes to the
+        scene.
+
+        >>> scene = Scene[T_ID](
+            ..., # All other required fields
+            **scene_properties,
+            **{key: df.select(expr).item() for key, expr in select_expr.items()},
+        )
+
+        Args:
+            select_expr: A dictionary of {property_name: polars expression} to be evaluated on the
+                scene dataframe and attached as attributes to the scene. Will cause runtime error
+                if expression is not valid.
+            properties: A dictionary of {property_name: value} to be directly attached as attributes
+                to the scene. Will cause runtime error if property name is not valid.
+
+        """
         if properties is not None:
             self._attach_scene_properties.update(properties)
         if select_expr is not None:
@@ -406,6 +421,17 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
                 yield self.create_scene(scene_df, source_id)
 
     def create_scene(self, df: pl.DataFrame, source_id: T_ID) -> Scene[T_ID]:
+        """Create a Scene object from the processed DataFrame and source identifier.
+
+        This method also calls `Scene.enforce_schema()` if `self._enforce_schema` is True to ensure
+        the scene follows the expected schema. If overriding this method, make sure to follow
+        the expected behavior regarding schema enforcement.
+
+        Args:
+            df: Processed DataFrame for the scene, expected to follow the common schema.
+            source_id: Identifier for the scene source (e.g., file name, index).
+
+        """
         scene = Scene[T_ID](
             inner=df,
             identifier=source_id,
@@ -418,3 +444,11 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         self._attach_scene_properties.clear()
         self._count += 1
         return scene if not self._enforce_schema else scene.enforce_schema()
+
+    @staticmethod
+    def derivative_names() -> dict[int, list[str]]:
+        """Return the names of the derivatives for velocity and acceleration."""
+        return {
+            1: ["vx", "vy"],
+            2: ["ax", "ay"],
+        }
