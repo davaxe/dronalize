@@ -1,4 +1,3 @@
-import glob
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -10,21 +9,21 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
+from preprocessing.core.interface import LoaderConfig, Resampling, SceneLoader
 
 # TODO: Currently the column "focal_agent_id" is disgarded and not used; might want to provide a way
 # to identify it downstream. Either implcitlty by assigning a specific id or explicitly by providing
 # a way to specify it.
 
 
-class Argoverse2TrajectoryProcessor(DataProcessor[int, pl.LazyFrame]):
+class Argoverse2Loader(SceneLoader[int, pl.LazyFrame]):
     """Processor for Argoverse2 trajectory data stored in Parquet files."""
 
     def __init__(
         self,
         data_dir: Path,
         file_batch_size: int | None = 100,
-        processor_config: ProcessorConfig | None = None,
+        processor_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the Argoverse2TrajectoryProcessor.
 
@@ -128,8 +127,8 @@ class Argoverse2TrajectoryProcessor(DataProcessor[int, pl.LazyFrame]):
         return df
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(50, 60, 0.1).scene_filtering_parameters(
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(50, 60, 0.1).scene_filtering_parameters(
             filter_agent_category=[
                 AgentCategory.STATIC_OBJECT,
                 AgentCategory.UNKNOWN,
@@ -159,7 +158,7 @@ class Argoverse2TrajectoryProcessor(DataProcessor[int, pl.LazyFrame]):
 if __name__ == "__main__":
     data_dir = Path("/home/west/Developer/behavior-prediction/datasets/av2/train")
     file_batch_size = 100
-    processor = Argoverse2TrajectoryProcessor(data_dir, file_batch_size)
+    processor = Argoverse2Loader(data_dir, file_batch_size)
     count: int = 0
     import time
 

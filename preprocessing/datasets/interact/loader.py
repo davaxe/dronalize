@@ -8,23 +8,23 @@ from typing_extensions import override
 
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel_expr
 from preprocessing.common.trajectory_utils.derivative import derivative
-from preprocessing.common.trajectory_utils.filter import filter_scene_expr, rebalance_highway_agents
+from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
+from preprocessing.core.interface import LoaderConfig, Resampling, SceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class InteractionProcessor(DataProcessor[str, list[Path]]):
+class InteractionLoader(SceneLoader[str, list[Path]]):
     """Processor for the INTERACTION dataset."""
 
     def __init__(
         self,
         data_dir: Path,
         file_batch_size: int | None = None,
-        config: ProcessorConfig | None = None,
+        config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the processor.
 
@@ -122,8 +122,8 @@ class InteractionProcessor(DataProcessor[str, list[Path]]):
         )
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(10, 30, 0.1)
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(10, 30, 0.1)
 
     @staticmethod
     def _map_agent_category() -> pl.Expr:
@@ -165,7 +165,7 @@ _SCHEMA = pl.Schema({
 if __name__ == "__main__":
     data_dir = Path("/home/west/Developer/behavior-prediction/datasets/interact/train")
 
-    processor = InteractionProcessor(data_dir=data_dir)
+    processor = InteractionLoader(data_dir=data_dir)
     count = 0
     for scene in processor.scenes_iter():
         if count % 200 == 0:

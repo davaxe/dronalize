@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import struct
-from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -13,11 +12,7 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import (
-    DataProcessor,
-    ProcessorConfig,
-    Resampling,
-)
+from preprocessing.core.interface import LoaderConfig, Resampling, SceneLoader
 from preprocessing.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from preprocessing.datasets.waymo.protos import (
     lean_map_pb2,
@@ -39,14 +34,14 @@ FilterStr = Literal[
 ]
 
 
-class WaymoProcessor(DataProcessor[str, Path]):
+class WaymoLoader(SceneLoader[str, Path]):
     """Processor for Waymo Open Dataset scenarios stored in TFRecord format."""
 
     def __init__(
         self,
         data_dir: Path | str,
         filter_str: FilterStr,
-        processor_config: ProcessorConfig | None = None,
+        processor_config: LoaderConfig | None = None,
         *,
         include_map: bool = True,
         interp_distance: float | None = None,
@@ -141,8 +136,8 @@ class WaymoProcessor(DataProcessor[str, Path]):
         return df_resampled.with_columns(pl.col("id") + 1)
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(10, 80, 0.1)
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(10, 80, 0.1)
 
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:
@@ -247,7 +242,7 @@ if __name__ == "__main__":
     # because Protobuf parsing + Python loops are CPU bound and single-threaded.
     directory = Path("/home/west/Developer/behavior-prediction/datasets/waymo/validation")
 
-    processor = WaymoProcessor(directory, "*validation.tfrecord*", include_map=True)
+    processor = WaymoLoader(directory, "*validation.tfrecord*", include_map=True)
     start_time = time.perf_counter()
     print("Starting processing...")
     count = 0

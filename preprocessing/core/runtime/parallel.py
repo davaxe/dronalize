@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import multiprocessing as mp
 import time
-from collections.abc import Hashable, Iterable
+from collections import deque
+from collections.abc import Callable, Hashable, Iterable
 from dataclasses import replace
 from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 from typing_extensions import Self, override
 
-from preprocessing.core.interface.trajectory import DataProcessor, ProcessorConfig, Scene
+from preprocessing.core.interface import LoaderConfig, Scene, SceneLoader
 
 if TYPE_CHECKING:
     from multiprocessing.sharedctypes import Synchronized
@@ -19,8 +20,8 @@ T_Source = TypeVar("T_Source")
 T_ID = TypeVar("T_ID", bound=(Hashable))
 
 
-class ParallelDataProcessor(DataProcessor[T_ID, T_Source]):
-    """A generic parallel data processor that wraps another Dataprocessor.
+class ParallelLoader(SceneLoader[T_ID, T_Source]):
+    """A generic parallel data processor that wraps another DataProcessor.
 
     It uses Python's multiprocessing module to parallelize the processing of sources across multiple
     CPU cores. The number of processes and chunksize can be configured depending on workload.
@@ -30,11 +31,14 @@ class ParallelDataProcessor(DataProcessor[T_ID, T_Source]):
     deterministic order is required, the `maintain_order` flag can be set to True, which will use `imap`
     instead of `imap_unordered`.
 
+    This class also implements the `SceneLoader` interface, which means it can be used as a drop in
+    replacement for any other `SceneLoader` implementation.
+
     """
 
     def __init__(
         self,
-        processor: DataProcessor[T_ID, T_Source],
+        processor: SceneLoader[T_ID, T_Source],
         chunksize: int = 1,
         processes: int | None = None,
         *,
@@ -54,7 +58,8 @@ class ParallelDataProcessor(DataProcessor[T_ID, T_Source]):
 
         """
         self._processor = processor
-        self._global_counter: Synchronized[int] = mp.Value("i", 0)
+        self._mp_scene_counter: Synchronized[int] = mp.Value("i", 0)
+        self._mp_source_counter: Synchronized[int] = mp.Value("i", 0)
         self._chunksize: int = chunksize
         self._processes: int | None = processes
         self._maintain_order: bool = maintain_order
@@ -86,7 +91,7 @@ class ParallelDataProcessor(DataProcessor[T_ID, T_Source]):
         return self._processor.normalize(df)
 
     @override
-    def default_config(self) -> ProcessorConfig:
+    def default_config(self) -> LoaderConfig:
         return self._processor.default_config()
 
     @override
@@ -97,15 +102,51 @@ class ParallelDataProcessor(DataProcessor[T_ID, T_Source]):
             return
 
         with mp.Pool(
-            self._processes, initializer=_init_worker, initargs=(self._global_counter,)
+            self._processes,
+            initializer=_init_worker,
+            initargs=(self._mp_scene_counter, self._mp_source_counter),
         ) as pool:
             map_fn = pool.imap if self._maintain_order else pool.imap_unordered
             for scene in map_fn(
-                ParallelDataProcessor._process_fn,
-                (_ProcessArgs(s, self._processor) for s in self._processor.sources()),
+                ParallelLoader._process_fn,
+                (_ProcessArgs(s, self._processor) for s in self.sources()),
                 self._chunksize,
             ):
                 yield from scene
+
+    def process_scenes(
+        self, callback: Callable[[SceneLoader[T_ID, T_Source], Scene[T_ID]], None]
+    ) -> None:
+        """Process scenes using a callback function instead of yielding them.
+
+        This method allows you to provide a callback function that will be called for each processed
+        scene. This can be more efficient than yielding scenes if you want to perform side effects
+        (e.g., saving to disk) without needing to store all scenes in memory at once.
+
+        Args:
+            callback: A callable that takes a DataProcessor and a Scene as arguments and returns None.
+                This function will be called for each processed scene.
+
+        """
+        if self._processes == 1:
+            # Faster to avoid multiprocessing overhead if only using one process.
+            for scene in super().scenes_iter():
+                callback(self, scene)
+            return
+
+        with mp.Pool(
+            self._processes,
+            initializer=_init_worker,
+            initargs=(self._mp_scene_counter, self._mp_source_counter),
+        ) as pool:
+            map_fn = pool.imap if self._maintain_order else pool.imap_unordered
+            work_iter = map_fn(
+                ParallelLoader._process_fn_callable,
+                (_ProcessArgs(s, self._processor, fn=callback) for s in self._processor.sources()),
+                self._chunksize,
+            )
+            # Exaust the iterator
+            deque(work_iter, maxlen=0)
 
     @staticmethod
     def _process_fn(args: _ProcessArgs[T_ID, T_Source]) -> list[Scene[T_ID]]:
@@ -113,47 +154,76 @@ class ParallelDataProcessor(DataProcessor[T_ID, T_Source]):
         scenes: list[Scene[T_ID]] = []
         scene_number: int = -1
         for scene_data in processor.process_next(args.source[1]):
-            with _worker_counter.get_lock():
-                _worker_counter.value += 1
-                scene_number = _worker_counter.value
+            with _scene_counter.get_lock():
+                _scene_counter.value += 1
+                scene_number = _scene_counter.value
 
             scene = processor.create_scene(scene_data, args.source[0])
+            # Add a unique global scene number, since each worker will have its own local counter.
             scenes.append(replace(scene, scene_number=scene_number))
 
+        with _source_counter.get_lock():
+            _source_counter.value += 1
         return scenes
+
+    @staticmethod
+    def _process_fn_callable(args: _ProcessArgs[T_ID, T_Source]) -> None:
+        if args.fn is None:
+            msg = "no callable function provided in _ProcessArgs for _process_fn_callable."
+            raise ValueError(msg)
+        processor = args.processor
+        scene_number: int = -1
+        for scene_data in processor.process_next(args.source[1]):
+            with _scene_counter.get_lock():
+                _scene_counter.value += 1
+                scene_number = _scene_counter.value
+
+            scene = processor.create_scene(scene_data, args.source[0])
+            scene = replace(scene, scene_number=scene_number)
+            args.fn(processor, scene)
+
+        with _source_counter.get_lock():
+            _source_counter.value += 1
 
 
 class _ProcessArgs(NamedTuple, Generic[T_ID, T_Source]):
     """Arguments for processing a single source in a worker process."""
 
     source: tuple[T_ID, T_Source]
-    processor: DataProcessor[T_ID, T_Source]
+    processor: SceneLoader[T_ID, T_Source]
+    fn: Callable[[SceneLoader[T_ID, T_Source], Scene[T_ID]], None] | None = None
 
 
 # Worker initialization function to set up the global counter in each worker process.
-_worker_counter: Synchronized[int]
+_scene_counter: Synchronized[int]
+_source_counter: Synchronized[int]
 
 
-def _init_worker(counter: Synchronized[int]) -> None:
-    # This is the standard and most efficent way to share a counter across processes in Python's
+def _init_worker(scene_counter: Synchronized[int], source_counter: Synchronized[int]) -> None:
+    # This is the standard and most efficient way to share a counter across processes in Python's
     # multiprocessing module.
-    global _worker_counter  # noqa: PLW0603
-    _worker_counter = counter
+    global _scene_counter  # noqa: PLW0603
+    _scene_counter = scene_counter
+    global _source_counter  # noqa: PLW0603
+    _source_counter = source_counter
 
 
 if __name__ == "__main__":
     from pathlib import Path
 
-    from preprocessing.datasets.pedestrian.trajectory_processor import EthUcyProcessor
+    from preprocessing.datasets.lyft.trajectory_processor import LyftProcessor
 
-    processor_single = EthUcyProcessor(data_root=Path("data"), dataset="hotel", split="train")
-    processor = ParallelDataProcessor(processor_single, maintain_order=False)
+    directory = Path(
+        "/home/west/Developer/behavior-prediction/datasets/lyft/validate/validate.zarr"
+    )
+    directory = Path("data/sample/sample.zarr")
+    processor_single = LyftProcessor(directory, 15)
+    processor = ParallelLoader(processor_single, maintain_order=False, chunksize=1)
     start_time = time.perf_counter()
-    for _scene in processor.scenes_iter():
-        continue
+    deque(processor.scenes_iter(), maxlen=0)  # Exhaust the generator to process all scenes.
     multi_time = time.perf_counter() - start_time
     print(
-        f"Processed all scenes ({processor._global_counter.value}) in {multi_time:.2f} seconds with multiprocessing.",
+        f"Processed all scenes ({processor._mp_scene_counter.value}) in {multi_time:.2f} seconds with multiprocessing.",
     )
 
     start_time = time.perf_counter()

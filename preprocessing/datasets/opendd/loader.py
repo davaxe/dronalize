@@ -10,16 +10,16 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig
+from preprocessing.core.interface.trajectory import LoaderConfig, SceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class OpenDDProcessor(DataProcessor[str, str]):
+class OpenDDLoader(SceneLoader[str, str]):
     """Processor for OpenDD dataset stored in SQLite format."""
 
-    def __init__(self, database_path: Path, config: ProcessorConfig | None = None) -> None:
+    def __init__(self, database_path: Path, config: LoaderConfig | None = None) -> None:
         """Initialize the OpenDD processor.
 
         Args:
@@ -88,13 +88,13 @@ class OpenDDProcessor(DataProcessor[str, str]):
         return yaw_from_vel(df, yaw_col="yaw")
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(60, 150, 1 / 30).resampling_parameters(1, 3).window_parameters(75)
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(60, 150, 1 / 30).resampling_parameters(1, 3).window_parameters(75)
 
 
 if __name__ == "__main__":
     path = Path("data/rdb2/trajectories_rdb2_v3.sqlite")
-    processor = OpenDDProcessor(path)
+    processor = OpenDDLoader(path)
     count = 0
     for scene in processor.scenes_iter():
         count += 1

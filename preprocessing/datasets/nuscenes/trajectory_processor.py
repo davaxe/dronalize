@@ -10,13 +10,13 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig
+from preprocessing.core.interface import LoaderConfig, SceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
+class NuScenesLoader(SceneLoader[tuple[str, str], str]):
     """Nuscenes trajectory processor.
 
     Strategy:
@@ -28,7 +28,7 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
     def __init__(
         self,
         data_directory: Path | str,
-        processor_config: ProcessorConfig | None = None,
+        processor_config: LoaderConfig | None = None,
         *,
         use_parquet_cache: bool = True,
         parquet_dir: Path | str | None = None,
@@ -156,9 +156,9 @@ class NuScenesProcessor(DataProcessor[tuple[str, str], str]):
         return yaw_from_vel(df)
 
     @override
-    def default_config(self) -> ProcessorConfig:
+    def default_config(self) -> LoaderConfig:
         return (
-            ProcessorConfig(4, 12, 0.5)
+            LoaderConfig(4, 12, 0.5)
             .resampling_parameters(up=5, down=1)
             .window_parameters(step_size=1)
         )
@@ -499,7 +499,7 @@ if __name__ == "__main__":
     # Check if directory exists to avoid FileNotFound errors in example
     if data_dir.exists():
         start_time = time.perf_counter()
-        processor = NuScenesProcessor(
+        processor = NuScenesLoader(
             data_directory=data_dir,
             use_parquet_cache=True,
             parquet_dir="temp",

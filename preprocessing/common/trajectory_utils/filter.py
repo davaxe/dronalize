@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from preprocessing.common.trajectory_utils import T_DataFrame
-    from preprocessing.core.interface import ProcessorConfig
+    from preprocessing.core.interface import LoaderConfig
 
 
 # TODO: Possibly add filter option based on minimum required valid frames in
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def filter_scene(
     data: T_DataFrame,
-    config: ProcessorConfig,
+    config: LoaderConfig,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
@@ -48,7 +48,7 @@ def filter_scene(
 
 
 def filter_scene_expr(
-    config: ProcessorConfig,
+    config: LoaderConfig,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",

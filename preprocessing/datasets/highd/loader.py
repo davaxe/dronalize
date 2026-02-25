@@ -13,19 +13,19 @@ from preprocessing.common.trajectory_utils.filter import rebalance_highway_agent
 from preprocessing.common.trajectory_utils.plot import plot_trajectories
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig
+from preprocessing.core.interface import LoaderConfig, SceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class HighDProcessor(DataProcessor[int, pl.LazyFrame]):
+class HighDLoader(SceneLoader[int, pl.LazyFrame]):
     """Processor for the highD dataset."""
 
     def __init__(
         self,
         data_dir: Path,
-        config: ProcessorConfig | None = None,
+        config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the highD data processor.
@@ -100,9 +100,9 @@ class HighDProcessor(DataProcessor[int, pl.LazyFrame]):
         return yaw_from_vel(df)
 
     @override
-    def default_config(self) -> ProcessorConfig:
+    def default_config(self) -> LoaderConfig:
         return (
-            ProcessorConfig(50, 125, 0.04)
+            LoaderConfig(50, 125, 0.04)
             .resampling_parameters(2, 5)
             .window_parameters(25)
             .scene_filtering_parameters()
@@ -130,7 +130,7 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
 if __name__ == "__main__":
     data_dir = Path("/home/west/Developer/behavior-prediction/datasets/highD/data")
 
-    processor = HighDProcessor(data_dir=data_dir)
+    processor = HighDLoader(data_dir=data_dir)
     count = 0
     for scene in processor.scenes_iter():
         if count % 200 == 0:

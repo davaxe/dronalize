@@ -8,17 +8,17 @@ from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import DataProcessor, ProcessorConfig, Resampling
+from preprocessing.core.interface import LoaderConfig, Resampling, SceneLoader
 
 
-class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
+class Argoverse1Loader(SceneLoader[int, pl.LazyFrame]):
     """Processor for Argoverse 1 dataset stored in CSV format."""
 
     def __init__(
         self,
         data_dir: Path,
         file_batch_size: int | None = 100,
-        config: ProcessorConfig | None = None,
+        config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the data processor.
 
@@ -91,8 +91,8 @@ class Argoverse1Processor(DataProcessor[int, pl.LazyFrame]):
         return yaw_from_vel(df, yaw_col="yaw")
 
     @override
-    def default_config(self) -> ProcessorConfig:
-        return ProcessorConfig(20, 30, 0.1)
+    def default_config(self) -> LoaderConfig:
+        return LoaderConfig(20, 30, 0.1)
 
 
 _SCHEMA: pl.Schema = pl.Schema({
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     data_path = Path(
         "/home/west/Developer/behavior-prediction/datasets/argoverse/forecasting_train_v1.1/train/data"
     )
-    processor = Argoverse1Processor(data_path, file_batch_size=1000)
+    processor = Argoverse1Loader(data_path, file_batch_size=1000)
     count = 0
     time_start = time.perf_counter()
     for scene in processor.scenes_iter():

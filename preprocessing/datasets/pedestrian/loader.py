@@ -18,23 +18,20 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import (
-    DataProcessor,
-    ProcessorConfig,
-)
+from preprocessing.core.interface import LoaderConfig, SceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
 
-class EthUcyProcessor(DataProcessor[str, Path]):
+class EthUcyLoader(SceneLoader[str, Path]):
     """Processor for ETH/UCY pedestrian trajectory datasets."""
 
     def __init__(
         self,
         data_root: Path,
         dataset: str | Sequence[str],
-        config: ProcessorConfig | None = None,
+        config: LoaderConfig | None = None,
         split: Literal["train", "val", "test"] = "train",
     ) -> None:
         """Initialize with the given configuration."""
@@ -55,7 +52,7 @@ class EthUcyProcessor(DataProcessor[str, Path]):
 
     @override
     def load_raw(self, source: Path) -> Iterable[pl.LazyFrame]:
-        source_data = EthUcyProcessor._read_data_file(source)
+        source_data = EthUcyLoader._read_data_file(source)
         yield from prepare_agent_trajectories(
             source_data,
             self.processor_config,
@@ -73,9 +70,9 @@ class EthUcyProcessor(DataProcessor[str, Path]):
         )
 
     @override
-    def default_config(self) -> ProcessorConfig:
+    def default_config(self) -> LoaderConfig:
         return (
-            ProcessorConfig(
+            LoaderConfig(
                 input_len=8,
                 output_len=12,
                 sample_time=0.4,
@@ -105,7 +102,7 @@ class EthUcyProcessor(DataProcessor[str, Path]):
 
 
 if __name__ == "__main__":
-    processor = EthUcyProcessor(data_root=Path("data"), dataset="hotel", split="train")
+    processor = EthUcyLoader(data_root=Path("data"), dataset="hotel", split="train")
     start_time = time.perf_counter()
     count: int = 0
     total_time = 0.0

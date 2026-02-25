@@ -1,15 +1,15 @@
 from preprocessing.core.interface.trajectory import (
-    DataProcessor,
-    ProcessorConfig,
+    FilteringConfig,
+    LoaderConfig,
     Resampling,
     Scene,
-    SceneFiltering,
+    SceneLoader,
 )
 
 __all__ = [
-    "DataProcessor",
-    "ProcessorConfig",
+    "FilteringConfig",
+    "LoaderConfig",
     "Resampling",
     "Scene",
-    "SceneFiltering",
+    "SceneLoader",
 ]

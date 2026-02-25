@@ -11,12 +11,12 @@ from preprocessing.common.trajectory_utils.window import sliding_window
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-from preprocessing.core.interface.trajectory import ProcessorConfig, Resampling
+from preprocessing.core.interface.trajectory import LoaderConfig, Resampling
 
 
 def prepare_agent_trajectories(
     scenes: pl.LazyFrame,
-    config: ProcessorConfig,
+    config: LoaderConfig,
     *,
     add_derivative: bool = False,
     add_second_derivative: bool = False,

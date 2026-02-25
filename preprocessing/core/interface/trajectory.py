@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(slots=True)
-class SceneFiltering:
+class FilteringConfig:
     """Configuration for filtering scenes based on pedestrian presence and validity."""
 
     min_agents: int = 2
@@ -94,7 +94,7 @@ class Resampling:
 
 
 @dataclass(slots=True)
-class ProcessorConfig:
+class LoaderConfig:
     """Base configuration dataclass for trajectory data processing.
 
     This can be extended by specific dataset processors to include additional
@@ -118,7 +118,7 @@ class ProcessorConfig:
     scene by using a sliding window approach. If None, it is assumed that each
     scene corresponds to exactly one sample."""
 
-    scene_filtering: SceneFiltering | None = None
+    scene_filtering: FilteringConfig | None = None
     """Configuration for filtering scenes based on pedestrian presence and validity."""
 
     def window_parameters(self, step_size: int, window_size: int | None = None) -> Self:
@@ -152,7 +152,7 @@ class ProcessorConfig:
                 for frame in require_frames
             }
 
-        self.scene_filtering = SceneFiltering(
+        self.scene_filtering = FilteringConfig(
             min_agents=min_agents,
             require_all_valid=require_all_valid,
             require_prediction_frame=require_prediction_frame,
@@ -264,7 +264,7 @@ class Scene(Generic[T_ID]):
 # TODO: Possibly rework how map and other metadata is attached to Scene.
 
 
-class DataProcessor(ABC, Generic[T_ID, T_Source]):
+class SceneLoader(ABC, Generic[T_ID, T_Source]):
     """Interface for processing raw data sources into a standardized format.
 
     Generic over the data scene source type and identifier type. Source type can
@@ -275,7 +275,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
 
     def __init__(
         self,
-        processor_config: ProcessorConfig | None = None,
+        processor_config: LoaderConfig | None = None,
         *,
         enforce_schema: bool = True,
     ) -> None:
@@ -290,7 +290,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
     # --- Abstract Steps (The "Blanks" to fill) ---
 
     @property
-    def processor_config(self) -> ProcessorConfig:
+    def processor_config(self) -> LoaderConfig:
         """Return the processor configuration."""
         return self._processor_config
 
@@ -350,7 +350,7 @@ class DataProcessor(ABC, Generic[T_ID, T_Source]):
         """Convert the raw DataFrame into the common schema."""
 
     @abstractmethod
-    def default_config(self) -> ProcessorConfig:
+    def default_config(self) -> LoaderConfig:
         """Return the default processor configuration for this dataset."""
 
     def attach_to_scene(
