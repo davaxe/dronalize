@@ -82,6 +82,15 @@ class EthUcyLoader(SceneLoader[str, Path]):
             .resampling_parameters(4, 1, method="spline")
         )
 
+    @override
+    def num_sources(self) -> int | None:
+        num_sources: int = 0
+        for dataset in self._dataset:
+            data_dir = self._data_root / dataset / self._split
+            num_sources += sum(1 for _ in data_dir.iterdir())
+
+        return num_sources
+
     @staticmethod
     def _read_data_file(path: Path) -> pl.LazyFrame:
         return pl.scan_csv(

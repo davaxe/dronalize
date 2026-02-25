@@ -353,6 +353,28 @@ class SceneLoader(ABC, Generic[T_ID, T_Source]):
     def default_config(self) -> LoaderConfig:
         """Return the default processor configuration for this dataset."""
 
+    def num_scenes(self) -> int | None:
+        """Get the total number of scenes that will be processed.
+
+        In some cases this can be expensive to compute or not known in advanced, in that case `None`
+        is returned.
+        """
+        _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
+        return None
+
+    def num_sources(self) -> int | None:
+        """Get the total number of sources that will be processed.
+
+        This is different from `number_of_scenes()` since each source can potentially generate
+        multiple scenes (e.g., by using sliding window sampling). In some cases this can be
+        expensive to compute or not known in advanced, in that case `None` is returned.
+
+        This could trivially be implemented as `len(list(self.sources()))`, but that would require
+        loading all sources into memory which can be expensive for large datasets.
+        """
+        _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
+        return None
+
     def attach_to_scene(
         self,
         select_expr: dict[str, pl.Expr] | None = None,
