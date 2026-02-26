@@ -13,7 +13,7 @@ from zarr.creation import open_array
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import LoaderConfig, SceneLoader
+from preprocessing.core.interface import LoaderConfig, BaseSceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -30,7 +30,7 @@ class _Source:
     interval: tuple[int, int]
 
 
-class LyftLoader(SceneLoader[int, _Source]):
+class LyftLoader(BaseSceneLoader[int, _Source]):
     """Processor for Lyft Level 5 dataset stored in Zarr format."""
 
     def __init__(

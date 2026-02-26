@@ -10,13 +10,13 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface.trajectory import LoaderConfig, SceneLoader
+from preprocessing.core.interface.trajectory import LoaderConfig, BaseSceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class OpenDDLoader(SceneLoader[str, str]):
+class OpenDDLoader(BaseSceneLoader[str, str]):
     """Processor for OpenDD dataset stored in SQLite format."""
 
     def __init__(self, database_path: Path, config: LoaderConfig | None = None) -> None:

@@ -11,15 +11,12 @@ from typing import TYPE_CHECKING, Any, Generic, NamedTuple, TypeVar
 import tqdm
 from typing_extensions import Self, override
 
-from preprocessing.core.interface import LoaderConfig, Scene, SceneLoader
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Scene
 
 if TYPE_CHECKING:
     from multiprocessing.sharedctypes import Synchronized
 
     import polars as pl
-
-T_Source = TypeVar("T_Source")
-T_ID = TypeVar("T_ID", bound=(Hashable))
 
 
 class ProgressBar(IntEnum):
@@ -41,7 +38,11 @@ class ProgressBar(IntEnum):
         return ""
 
 
-class ParallelLoader(SceneLoader[T_ID, T_Source]):
+T_Source = TypeVar("T_Source")
+T_ID = TypeVar("T_ID", bound=(Hashable))
+
+
+class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
     """A generic parallel data processor that wraps another DataProcessor.
 
     It uses Python's multiprocessing module to parallelize the processing of sources across multiple
@@ -55,11 +56,33 @@ class ParallelLoader(SceneLoader[T_ID, T_Source]):
     This class also implements the `SceneLoader` interface, which means it can be used as a drop in
     replacement for any other `SceneLoader` implementation.
 
+    Practical Considerations:
+        Using multprocessing can significantly speed up the processing of large datasets, however
+        there are som important considerations to keep in mind:
+
+            1. If the underlying sources are small and quick to process, the overhead of multiprocessing
+               may outweigh the benefits. One option is to increase the `chunksize` to reduce overhead
+               in this case.
+
+            2. If sources are instead large, for example `WaymoLoader` and its tfrecord files,
+               then other issues may arise such as increased memory usage and possibly issues
+               with inter-process comumication. In these cases it is a good idea to avoid `scenes_iter`
+               method, and instead use the `process_scenes` method with a callback function that
+               performs side effects (e.g., saving to file). If an error related to "Too many opened
+               files" is encountered when using `scenes_iter`, this is a strong indication that the
+               underlying sources are too large for `scenes_iter` and `process_scenes` should be
+               used.
+
+            3. Since `DataLoaders` utilizes Polars, which also uses multiple cores for processing,
+               there may be some contention for CPU resources between the multiprocessing in `ParallelLoader`
+               and the multithreading in Polars. Setting the environment variable `POLARS_MAX_THREADS=X`,
+               where X is a number that balances the workload between `ParallelLoader` and Polars.
+               An alternative option is to lower the `processes` parameter in this class.
     """
 
     def __init__(
         self,
-        processor: SceneLoader[T_ID, T_Source],
+        processor: BaseSceneLoader[T_ID, T_Source],
         chunksize: int = 1,
         processes: int | None = None,
         *,
@@ -128,7 +151,16 @@ class ParallelLoader(SceneLoader[T_ID, T_Source]):
         return self._processor.default_config()
 
     @override
-    def scenes_iter(self) -> Iterable[Scene[T_ID]]:
+    def scenes(self) -> Iterable[Scene[T_ID]]:
+        """Process scenes in parallel and yield them one by one.
+
+        This uses `multiprocessing` to process data in parallel. It works by creating a pool of
+        worker processes that process batches (chunks, determined by `chunksize`) of sources.
+        The results are collected and yielded as scenes.
+
+        Note that each source might yield multiple scenes (for example if windowing is used),
+        and the each worker will process all scenes before returning to the main processes.
+        """
         with (
             tqdm.tqdm(**self._tqdm_args()) as progress_bar,
             mp.Pool(
@@ -150,9 +182,7 @@ class ParallelLoader(SceneLoader[T_ID, T_Source]):
 
                 yield from scenes
 
-    def process_scenes(
-        self, callback: Callable[[SceneLoader[T_ID, T_Source], Scene[T_ID]], None]
-    ) -> None:
+    def scenes_callback(self, callback: Callable[[Scene[T_ID]], None]) -> None:
         """Process scenes using a callback function instead of yielding them.
 
         This method allows you to provide a callback function that will be called for each processed
@@ -160,8 +190,8 @@ class ParallelLoader(SceneLoader[T_ID, T_Source]):
         (e.g., saving to disk) without needing to store all scenes in memory at once.
 
         Args:
-            callback: A callable that takes a DataProcessor and a Scene as arguments and returns None.
-                This function will be called for each processed scene.
+            callback: A callable that takes a Scene as input and performs side effects (e.g., saving
+            to disk). This function will be called for each processed scene.
 
         """
         with (
@@ -230,7 +260,7 @@ class ParallelLoader(SceneLoader[T_ID, T_Source]):
 
             scene = processor.create_scene(scene_data, args.source[0])
             scene = replace(scene, scene_number=scene_number)
-            args.fn(processor, scene)
+            args.fn(scene)
             processed_scenes += 1
 
         with _source_counter.get_lock():
@@ -260,8 +290,8 @@ class _ProcessArgs(NamedTuple, Generic[T_ID, T_Source]):
     """Arguments for processing a single source in a worker process."""
 
     source: tuple[T_ID, T_Source]
-    processor: SceneLoader[T_ID, T_Source]
-    fn: Callable[[SceneLoader[T_ID, T_Source], Scene[T_ID]], None] | None = None
+    processor: BaseSceneLoader[T_ID, T_Source]
+    fn: Callable[[Scene[T_ID]], None] | None = None
 
 
 # Worker initialization function to set up the global counter in each worker process.
@@ -281,21 +311,37 @@ def _init_worker(scene_counter: Synchronized[int], source_counter: Synchronized[
 if __name__ == "__main__":
     from pathlib import Path
 
-    from preprocessing.datasets.pedestrian.loader import EthUcyLoader
+    from preprocessing.datasets.waymo.loader import WaymoLoader
 
-    processor_single = EthUcyLoader(data_root=Path("data"), dataset="hotel", split="train")
+    directory = Path("/home/west/Developer/behavior-prediction/datasets/waymo/validation")
+
+    processor_single = WaymoLoader(
+        directory,
+        "*validation.tfrecord*",
+        include_map=True,
+        min_distance=2,
+    )
     processor = ParallelLoader(
-        processor_single, maintain_order=False, chunksize=1, progress_bar=ProgressBar.SOURCES
+        processor_single,
+        maintain_order=False,
+        chunksize=1,
+        progress_bar=ProgressBar.SCENES,
     )
     start_time = time.perf_counter()
-    deque(processor.scenes_iter(), maxlen=0)  # Exhaust the generator to process all scenes.
+    deque(processor.scenes(), maxlen=0)  # Exhaust the generator to process all scenes.
     multi_time = time.perf_counter() - start_time
     print(
         f"Processed all scenes ({processor._mp_scene_counter.value}) in {multi_time:.2f} seconds with multiprocessing.",
     )
 
     start_time = time.perf_counter()
-    for _scene in processor_single.scenes_iter():
+    for _scene in tqdm.tqdm(
+        processor_single.scenes(),
+        total=processor._mp_scene_counter.value,
+        desc="Processing scenes without multiprocessing",
+        colour="red",
+        unit=" scenes",
+    ):
         continue
 
     single_time = time.perf_counter() - start_time

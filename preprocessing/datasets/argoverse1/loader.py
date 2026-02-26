@@ -8,10 +8,10 @@ from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import LoaderConfig, Resampling, SceneLoader
+from preprocessing.core.interface import LoaderConfig, Resampling, BaseSceneLoader
 
 
-class Argoverse1Loader(SceneLoader[int, pl.LazyFrame]):
+class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
     """Processor for Argoverse 1 dataset stored in CSV format."""
 
     def __init__(

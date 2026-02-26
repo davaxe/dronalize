@@ -11,13 +11,13 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import LoaderConfig, Resampling, SceneLoader
+from preprocessing.core.interface import LoaderConfig, Resampling, BaseSceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class InteractionLoader(SceneLoader[str, list[Path]]):
+class InteractionLoader(BaseSceneLoader[str, list[Path]]):
     """Processor for the INTERACTION dataset."""
 
     def __init__(

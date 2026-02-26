@@ -189,7 +189,7 @@ class MapGraph:
 
     def extract_bbox(
         self,
-        center: torch.Tensor | tuple[float, float] | npt.NDArray[np.floating],
+        center: torch.Tensor | tuple[float, float] | npt.NDArray[np.floating] | None,
         width: float,
         height: float,
         *,
@@ -198,7 +198,8 @@ class MapGraph:
         """Extract a subgraph within a bounding box.
 
         Args:
-            center: center of the bounding box as a tensor or tuple of (x, y).
+            center: center of the bounding box as a tensor or tuple of (x, y). If `None` the
+                average position of all nodes is used as the center.
             width: width of the bounding box. If None, it is calculated as
                 10% of the total width of the nodes. Defaults to None.
             height: height of the bounding box. If None, it is calculated as
@@ -217,17 +218,6 @@ class MapGraph:
         elif isinstance(center, tuple):
             # Convert tuple to tensor
             center = torch.tensor(center, dtype=torch.float32)
-
-        if width is None:
-            total_width = torch.max(self.node_positions[:, 0]) - torch.min(
-                self.node_positions[:, 0],
-            )
-            width = total_width.item() * 0.1
-        if height is None:
-            total_height = torch.max(self.node_positions[:, 1]) - torch.min(
-                self.node_positions[:, 1],
-            )
-            height = total_height.item() * 0.1
 
         # Calculate bounding box boundaries
         half_width = width / 2.0
@@ -278,4 +268,15 @@ class MapGraph:
             f"num_edges={self.num_edges}, "
             f"node_positions_shape={self.node_positions.shape}, "
             f"edge_indices_shape={self.edge_indices.shape})"
+        )
+
+    def __repr__(self) -> str:
+        """Return a detailed string representation of the MapGraph."""
+        return (
+            f"MapGraph(num_nodes={self.num_nodes}, "
+            f"num_edges={self.num_edges}, "
+            f"node_positions={self.node_positions}, "
+            f"edge_indices={self.edge_indices}, "
+            f"node_types={self.node_types}, "
+            f"edge_types={self.edge_types})"
         )

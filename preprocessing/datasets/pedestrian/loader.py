@@ -18,13 +18,13 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import LoaderConfig, SceneLoader
+from preprocessing.core.interface import LoaderConfig, BaseSceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
 
-class EthUcyLoader(SceneLoader[str, Path]):
+class EthUcyLoader(BaseSceneLoader[str, Path]):
     """Processor for ETH/UCY pedestrian trajectory datasets."""
 
     def __init__(

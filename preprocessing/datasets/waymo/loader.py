@@ -12,7 +12,7 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import LoaderConfig, Resampling, SceneLoader
+from preprocessing.core.interface import LoaderConfig, Resampling, BaseSceneLoader
 from preprocessing.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from preprocessing.datasets.waymo.protos import (
     lean_map_pb2,
@@ -34,7 +34,7 @@ FilterStr = Literal[
 ]
 
 
-class WaymoLoader(SceneLoader[str, Path]):
+class WaymoLoader(BaseSceneLoader[str, Path]):
     """Processor for Waymo Open Dataset scenarios stored in TFRecord format."""
 
     def __init__(
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     print("Starting processing...")
     count = 0
     # This loop will now yield one large  per file instead of per scene
-    for _scene in processor.scenes_iter():
+    for _scene in processor.scenes():
         if count % 500 == 0:
             print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f}s")
         count += 1

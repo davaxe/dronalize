@@ -10,13 +10,13 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import LoaderConfig, SceneLoader
+from preprocessing.core.interface import LoaderConfig, BaseSceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class NuScenesLoader(SceneLoader[tuple[str, str], str]):
+class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
     """Nuscenes trajectory processor.
 
     Strategy:

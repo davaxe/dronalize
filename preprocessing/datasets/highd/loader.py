@@ -13,13 +13,13 @@ from preprocessing.common.trajectory_utils.filter import rebalance_highway_agent
 from preprocessing.common.trajectory_utils.plot import plot_trajectories
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import LoaderConfig, SceneLoader
+from preprocessing.core.interface import LoaderConfig, BaseSceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class HighDLoader(SceneLoader[int, pl.LazyFrame]):
+class HighDLoader(BaseSceneLoader[int, pl.LazyFrame]):
     """Processor for the highD dataset."""
 
     def __init__(

@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Hashable, Iterable
+from collections.abc import Callable, Collection, Hashable, Iterable
 from dataclasses import dataclass, replace
 from fractions import Fraction
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Literal,
-    Self,
-    TypeVar,
-)
+from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, Self, TypeVar
 
 import polars as pl
 
@@ -173,6 +166,7 @@ class LoaderConfig:
 
 
 T_Source = TypeVar("T_Source")
+T_Source_co = TypeVar("T_Source_co", covariant=True)
 T_ID = TypeVar("T_ID", bound=(Hashable))
 
 
@@ -264,8 +258,27 @@ class Scene(Generic[T_ID]):
 # TODO: Possibly rework how map and other metadata is attached to Scene.
 
 
-class SceneLoader(ABC, Generic[T_ID, T_Source]):
-    """Interface for processing raw data sources into a standardized format.
+class SceneLoader(Protocol, Generic[T_ID, T_Source_co]):
+    """Minimal protocol for scene loading, used for type hinting."""
+
+    def scenes(self) -> Iterable[Scene[T_ID]]:
+        """Yield processed scenes one at a time."""
+        ...
+
+    def scenes_callback(self, callback: Callable[[Scene[T_ID]], None]) -> None:
+        """Process scenes and call the provided callback on each scene.
+
+        This is an alternative to `scenes()` that allows for more flexible
+        processing of scenes without needing to yield them. The callback will be
+        called with each processed scene, allowing for custom handling (e.g.,
+        saving to disk, feeding into a model) without needing to store all scenes
+        in memory at once.
+        """
+        ...
+
+
+class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source]):
+    """ABC interface for processing raw data sources into a standardized format.
 
     Generic over the data scene source type and identifier type. Source type can
     be anything (e.g., file path, URL, database connection, raw data).
@@ -353,6 +366,11 @@ class SceneLoader(ABC, Generic[T_ID, T_Source]):
     def default_config(self) -> LoaderConfig:
         """Return the default processor configuration for this dataset."""
 
+    def scenes_callback(self, callback: Callable[[Scene[T_ID]], None]) -> None:
+        """Process scenes and call the provided callback on each scene."""
+        for scene in self.scenes():
+            callback(scene)
+
     def num_scenes(self) -> int | None:
         """Get the total number of scenes that will be processed.
 
@@ -432,7 +450,7 @@ class SceneLoader(ABC, Generic[T_ID, T_Source]):
             if df is not None:
                 yield df
 
-    def scenes_iter(self) -> Iterable[Scene[T_ID]]:
+    def scenes(self) -> Iterable[Scene[T_ID]]:
         """Iterate over all sources and process them into scenes.
 
         This will lazy-load and process each source one at a time.
@@ -454,7 +472,7 @@ class SceneLoader(ABC, Generic[T_ID, T_Source]):
             source_id: Identifier for the scene source (e.g., file name, index).
 
         """
-        scene = Scene[T_ID](
+        scene = Scene(
             inner=df,
             identifier=source_id,
             scene_number=self._count,

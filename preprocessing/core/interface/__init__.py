@@ -4,6 +4,7 @@ from preprocessing.core.interface.trajectory import (
     Resampling,
     Scene,
     SceneLoader,
+    BaseSceneLoader,
 )
 
 __all__ = [
@@ -11,5 +12,6 @@ __all__ = [
     "LoaderConfig",
     "Resampling",
     "Scene",
+    "BaseSceneLoader",
     "SceneLoader",
 ]
