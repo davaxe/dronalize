@@ -81,6 +81,10 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             yield (tfrecord_path.stem, tfrecord_path)
 
     @override
+    def num_sources(self) -> int | None:
+        return sum(1 for _ in self._data_dir.glob(self._filter_str))
+
+    @override
     def load_raw(self, source: Path) -> Iterable[pl.LazyFrame]:
         for raw_data in _read_tfrecord(source):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)

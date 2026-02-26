@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-import time
 from collections import deque
 from collections.abc import Callable, Hashable, Iterable
 from dataclasses import replace
@@ -24,10 +23,10 @@ class ProgressBar(IntEnum):
 
     NONE = 0
     """No progress bars."""
-    SCENES = 1
-    """Show progress bar for scenes."""
-    SOURCES = 2
+    SOURCES = 1
     """Show progress bar for sources."""
+    SCENES = 2
+    """Show progress bar for scenes."""
 
     def unit(self) -> str:
         """Return the unit string to use for tqdm progress bars based on the selected ProgressBar."""
@@ -105,6 +104,10 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
                 - `ProgressBar.NONE` (default): No progress bar.
                 - `ProgressBar.SOURCES`: Show progress bar for sources.
                 - `ProgressBar.SCENES`: Show progress bar for scenes.
+                The number of scenes is often not known beforehand, so using `ProgressBar.SCENES`
+                may not result in a progress bar, instead it will only how many scenes have been
+                processed. In contrast to `ProgressBar.SOURCES`, which will often show an actual
+                progress bar.
 
         """
         if processes is not None and processes <= 1:
@@ -178,8 +181,14 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
                 self._chunksize,
             ):
                 if self._progress_bar == ProgressBar.SOURCES:
+                    progress_bar.set_postfix(
+                        {"scenes": self._mp_scene_counter.value}, refresh=False
+                    )
                     progress_bar.update(1)
                 elif self._progress_bar == ProgressBar.SCENES:
+                    progress_bar.set_postfix(
+                        {"sources": self._mp_source_counter.value}, refresh=False
+                    )
                     progress_bar.update(len(scenes))
 
                 yield from scenes
@@ -217,8 +226,14 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
 
             for processed_scenes in work_iter:
                 if self._progress_bar == ProgressBar.SOURCES:
+                    progress_bar.set_postfix(
+                        {"scenes": self._mp_scene_counter.value}, refresh=False
+                    )
                     progress_bar.update(1)
                 elif self._progress_bar == ProgressBar.SCENES:
+                    progress_bar.set_postfix(
+                        {"sources": self._mp_source_counter.value}, refresh=False
+                    )
                     progress_bar.update(processed_scenes)
 
     @staticmethod
@@ -310,7 +325,7 @@ def _init_worker(scene_counter: Synchronized[int], source_counter: Synchronized[
     _source_counter = source_counter
 
 
-def dummy_fn(a) -> None:
+def _dummy_fn(a) -> None:
     return None
 
 
@@ -324,7 +339,7 @@ if __name__ == "__main__":
     processor_single = WaymoLoader(
         directory,
         "*validation.tfrecord*",
-        include_map=True,
+        include_map=False,
         min_distance=2,
     )
     processor = ParallelLoader(
@@ -333,27 +348,4 @@ if __name__ == "__main__":
         chunksize=5,
         progress_bar=ProgressBar.SCENES,
     )
-    start_time = time.perf_counter()
-    # deque(processor.scenes(), maxlen=0)  # Exhaust the generator to process all scenes.
-    processor.scenes_callback(dummy_fn)
-    multi_time = time.perf_counter() - start_time
-    print(
-        f"Processed all scenes ({processor._mp_scene_counter.value}) in {multi_time:.2f} seconds with multiprocessing.",
-    )
-
-    start_time = time.perf_counter()
-    for _scene in tqdm.tqdm(
-        processor_single.scenes(),
-        total=processor._mp_scene_counter.value,
-        desc="Processing scenes without multiprocessing",
-        colour="red",
-        unit=" scenes",
-    ):
-        continue
-
-    single_time = time.perf_counter() - start_time
-    print(
-        f"Processed all scenes ({processor_single._count}) in {single_time:.2f} seconds without multiprocessing.",
-    )
-
-    print(f"Multiprocessing speedup: {single_time / multi_time:.2f}x")
+    processor.scenes_callback(_dummy_fn)
