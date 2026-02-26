@@ -13,7 +13,7 @@ from preprocessing.common.trajectory_utils.filter import rebalance_highway_agent
 from preprocessing.common.trajectory_utils.plot import plot_trajectories
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import LoaderConfig, BaseSceneLoader
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -26,7 +26,7 @@ class HighDLoader(BaseSceneLoader[int, pl.LazyFrame]):
         self,
         data_dir: Path,
         config: LoaderConfig | None = None,
-        lane_change_ratio: float | None = 1.0,
+        lane_change_ratio: float | None = 10.0,
     ) -> None:
         """Initialize the highD data processor.
 
@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     processor = HighDLoader(data_dir=data_dir)
     count = 0
-    for scene in processor.scenes_iter():
+    for scene in processor.scenes():
         if count % 200 == 0:
             print(scene.inner)
             print(f"Processed {count} scenes")

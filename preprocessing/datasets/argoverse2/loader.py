@@ -9,7 +9,7 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import LoaderConfig, Resampling, BaseSceneLoader
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 
 # TODO: Currently the column "focal_agent_id" is disgarded and not used; might want to provide a way
 # to identify it downstream. Either implcitlty by assigning a specific id or explicitly by providing
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     import time
 
     start_time = time.perf_counter()
-    for scene in processor.scenes_iter():
+    for scene in processor.scenes():
         count += 1
         if count % 200 == 0:
             print(scene.map_information)

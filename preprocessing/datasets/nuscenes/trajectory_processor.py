@@ -10,7 +10,7 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import LoaderConfig, BaseSceneLoader
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -505,7 +505,7 @@ if __name__ == "__main__":
             parquet_dir="temp",
         )
         count = 0
-        for _scene in processor.scenes_iter():
+        for _scene in processor.scenes():
             count += 1
             if count % 100 == 0:
                 elapsed = time.perf_counter() - start_time

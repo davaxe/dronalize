@@ -10,7 +10,7 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface.trajectory import LoaderConfig, BaseSceneLoader
+from preprocessing.core.interface.trajectory import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -96,6 +96,6 @@ if __name__ == "__main__":
     path = Path("data/rdb2/trajectories_rdb2_v3.sqlite")
     processor = OpenDDLoader(path)
     count = 0
-    for scene in processor.scenes_iter():
+    for scene in processor.scenes():
         count += 1
     print(f"Processed {count} scenes.")

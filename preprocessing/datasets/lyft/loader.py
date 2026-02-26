@@ -13,7 +13,7 @@ from zarr.creation import open_array
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import LoaderConfig, BaseSceneLoader
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -251,7 +251,7 @@ if __name__ == "__main__":
     processor = LyftLoader(directory, 100)
     _total_scenes = 194608
     count = 0
-    for _scene in processor.scenes_iter():
+    for _scene in processor.scenes():
         if count % 1000 == 0:
             print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds.")
         count += 1

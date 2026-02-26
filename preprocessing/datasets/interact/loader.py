@@ -11,7 +11,7 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
-from preprocessing.core.interface import LoaderConfig, Resampling, BaseSceneLoader
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
     processor = InteractionLoader(data_dir=data_dir)
     count = 0
-    for scene in processor.scenes_iter():
+    for scene in processor.scenes():
         if count % 200 == 0:
             print(f"Processed {count} scenes")
         count += 1

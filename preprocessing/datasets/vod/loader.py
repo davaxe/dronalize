@@ -3,10 +3,10 @@ from pathlib import Path
 from typing_extensions import override
 
 from preprocessing.core.interface import LoaderConfig
-from preprocessing.datasets.nuscenes.trajectory_processor import NuScenesProcessor
+from preprocessing.datasets.nuscenes.trajectory_processor import NuScenesLoader
 
 
-class VodLoader(NuScenesProcessor):
+class VodLoader(NuScenesLoader):
     """View-of-Delft dataset processor.
 
     This shares the same base processing logic as NuScenesProcessor but with
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     if data_dir.exists():
         start_time = time.perf_counter()
         processor = VodLoader(data_directory=data_dir)
-        for _scene in processor.scenes_iter():
+        for _scene in processor.scenes():
             if _scene.scene_number % 200 == 0:
                 print(f"Processing scene number: {_scene.scene_number}")
     else:

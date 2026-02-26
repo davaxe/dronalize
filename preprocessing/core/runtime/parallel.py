@@ -53,8 +53,8 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
     deterministic order is required, the `maintain_order` flag can be set to True, which will use `imap`
     instead of `imap_unordered`.
 
-    This class also implements the `SceneLoader` interface, which means it can be used as a drop in
-    replacement for any other `SceneLoader` implementation.
+    This class also implements the `SceneLoader` (and `BaseSceneLoader) interface, which means it
+    can be used as a drop in replacement for any other `SceneLoader` implementation.
 
     Practical Considerations:
         Using multprocessing can significantly speed up the processing of large datasets, however
@@ -78,6 +78,7 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
                and the multithreading in Polars. Setting the environment variable `POLARS_MAX_THREADS=X`,
                where X is a number that balances the workload between `ParallelLoader` and Polars.
                An alternative option is to lower the `processes` parameter in this class.
+
     """
 
     def __init__(
@@ -160,6 +161,7 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
 
         Note that each source might yield multiple scenes (for example if windowing is used),
         and the each worker will process all scenes before returning to the main processes.
+
         """
         with (
             tqdm.tqdm(**self._tqdm_args()) as progress_bar,
@@ -308,6 +310,10 @@ def _init_worker(scene_counter: Synchronized[int], source_counter: Synchronized[
     _source_counter = source_counter
 
 
+def dummy_fn(a) -> None:
+    return None
+
+
 if __name__ == "__main__":
     from pathlib import Path
 
@@ -324,11 +330,12 @@ if __name__ == "__main__":
     processor = ParallelLoader(
         processor_single,
         maintain_order=False,
-        chunksize=1,
+        chunksize=5,
         progress_bar=ProgressBar.SCENES,
     )
     start_time = time.perf_counter()
-    deque(processor.scenes(), maxlen=0)  # Exhaust the generator to process all scenes.
+    # deque(processor.scenes(), maxlen=0)  # Exhaust the generator to process all scenes.
+    processor.scenes_callback(dummy_fn)
     multi_time = time.perf_counter() - start_time
     print(
         f"Processed all scenes ({processor._mp_scene_counter.value}) in {multi_time:.2f} seconds with multiprocessing.",

@@ -321,6 +321,21 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         """
         return self.add_node(node)
 
+    def with_edge_map(self, edge_map: dict[EdgeType, EdgeType]) -> Self:
+        """Set the edge mapping for remapping edge types during graph building.
+
+        Args:
+            edge_map: a dictionary mapping original `EdgeType` values to new
+                `EdgeType` values. This allows for flexible remapping of edge
+                types without modifying the underlying graph construction logic.
+
+        Returns:
+            The `GraphBuilder` instance with the updated edge mapping.
+
+        """
+        self.edge_map = edge_map
+        return self
+
     def build(
         self,
         min_distance: float | None = None,
@@ -661,8 +676,8 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         # Clear buffer to prevent double-processing if built twice
         self._pending_paths.clear()
 
+    @staticmethod
     def _resolve_distance(
-        self,
         min_distance: float | None,
         interp_distance: float | None,
     ) -> tuple[float | None, float | None]:

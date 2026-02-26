@@ -8,7 +8,7 @@ from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import LoaderConfig, Resampling, BaseSceneLoader
+from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 
 
 class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
@@ -113,7 +113,7 @@ if __name__ == "__main__":
     processor = Argoverse1Loader(data_path, file_batch_size=1000)
     count = 0
     time_start = time.perf_counter()
-    for scene in processor.scenes_iter():
+    for scene in processor.scenes():
         count += 1
         if count % 500 == 0:
             print(f"Processed {count} scenes in {time.perf_counter() - time_start:.2f} seconds")

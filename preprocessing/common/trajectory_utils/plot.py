@@ -86,7 +86,7 @@ def plot_trajectories(
         point=alt.OverlayMarkDef(filled=True, size=15),
         strokeWidth=2,
         opacity=0.8,
-    ).encode(order=alt.Order(field=x_col), tooltip=tooltips)
+    ).encode(order=alt.Order(field=frame_col), tooltip=tooltips)
 
     start_markers = (
         alt
