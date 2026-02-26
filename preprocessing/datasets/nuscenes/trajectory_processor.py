@@ -64,6 +64,58 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
         self._load_tables()
         self._precompute_global_data()
 
+    @override
+    def sources(self) -> Iterable[tuple[tuple[str, str], str]]:
+        for token, df in self._scene_cache.items():
+            # More efficient: peek at the first row's scene_name directly
+            scene_name = df.item(0, "scene_name")
+            map_name = df.item(0, "map")
+            yield (scene_name, map_name), token
+
+    @override
+    def num_sources(self) -> int | None:
+        return len(self._scene_cache)
+
+    @override
+    def load_raw(self, source: str) -> Iterable[pl.LazyFrame]:
+        scenes = (
+            self
+            ._scene_cache[source]
+            .drop([
+                "scene_token",
+                "scene_name",
+                "map",
+            ])
+            .lazy()
+        )
+        scenes = scenes.filter(
+            ~pl.col("status").is_in(self._status_to_filter),
+            *[
+                ~pl.col("full_category").str.contains(category)
+                for category in self._full_category_contains
+            ],
+        ).drop(["status", "full_category", "full_status"])
+
+        yield from prepare_agent_trajectories(
+            scenes,
+            config=self.processor_config,
+            add_derivative=True,
+            add_second_derivative=True,
+            derivative_rename=self.derivative_names(),
+        )
+
+    @override
+    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
+        return yaw_from_vel(df)
+
+    @override
+    def default_config(self) -> LoaderConfig:
+        return (
+            LoaderConfig(4, 12, 0.5)
+            .resampling_parameters(up=5, down=1)
+            .window_parameters(step_size=1)
+        )
+
     def _load_tables(self) -> None:
         """Load all required tables using the generic loader."""
         for name, schema in self._schemas.items():
@@ -114,54 +166,6 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
 
         self._status_to_filter: list[str] = ["parked", "undefined"]
         self._full_category_contains: list[str] = ["object"]
-
-    @override
-    def sources(self) -> Iterable[tuple[tuple[str, str], str]]:
-        for token, df in self._scene_cache.items():
-            # More efficient: peek at the first row's scene_name directly
-            scene_name = df.item(0, "scene_name")
-            map_name = df.item(0, "map")
-            yield (scene_name, map_name), token
-
-    @override
-    def load_raw(self, source: str) -> Iterable[pl.LazyFrame]:
-        scenes = (
-            self
-            ._scene_cache[source]
-            .drop([
-                "scene_token",
-                "scene_name",
-                "map",
-            ])
-            .lazy()
-        )
-        scenes = scenes.filter(
-            ~pl.col("status").is_in(self._status_to_filter),
-            *[
-                ~pl.col("full_category").str.contains(category)
-                for category in self._full_category_contains
-            ],
-        ).drop(["status", "full_category", "full_status"])
-
-        yield from prepare_agent_trajectories(
-            scenes,
-            config=self.processor_config,
-            add_derivative=True,
-            add_second_derivative=True,
-            derivative_rename=self.derivative_names(),
-        )
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df)
-
-    @override
-    def default_config(self) -> LoaderConfig:
-        return (
-            LoaderConfig(4, 12, 0.5)
-            .resampling_parameters(up=5, down=1)
-            .window_parameters(step_size=1)
-        )
 
 
 def load_cached_table(

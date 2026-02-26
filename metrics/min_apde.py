@@ -88,7 +88,6 @@ class MinAPDE(Metric):
         self.count += apde.size(0)
 
     def compute(self) -> torch.Tensor:
-        """
-        Compute the final metric.
+        """Compute the final metric.
         """
         return self.sum / self.count  # type: ignore

@@ -60,6 +60,14 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
             yield f"{self._data_dir}_b{start}", batch_files
 
     @override
+    def num_sources(self) -> int | None:
+        if self._file_batch_size is None:
+            return 1
+
+        num_files = len(list(self._data_dir.glob("*.csv")))
+        return (num_files + self._file_batch_size - 1) // self._file_batch_size
+
+    @override
     def load_raw(self, source: list[Path]) -> Iterable[pl.LazyFrame]:
         resampling = self.processor_config.resampling or Resampling(1, 1)
         data = (
@@ -167,7 +175,7 @@ if __name__ == "__main__":
 
     processor = InteractionLoader(data_dir=data_dir)
     count = 0
-    for scene in processor.scenes():
+    for _scene in processor.scenes():
         if count % 200 == 0:
             print(f"Processed {count} scenes")
         count += 1

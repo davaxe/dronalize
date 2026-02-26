@@ -3,7 +3,7 @@ from polars.testing import assert_frame_equal
 
 from preprocessing.common.trajectory_utils.filter import filter_scene
 from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import LoaderConfig, SceFilteringConfig
+from preprocessing.core.interface import FilteringConfig, LoaderConfig
 
 
 def test_no_scene_filtering() -> None:

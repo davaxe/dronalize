@@ -41,7 +41,7 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
         self.ignore_edge_types = ignore_edge_types if ignore_edge_types is not None else set()
 
         super().__init__(nuscenes_map)
-        self.lane_polygon_edge: None | EdgeType = EdgeType.LINE_THIN
+        self.lane_polygon_edge: EdgeType | None = EdgeType.LINE_THIN
         self.edge_type_methods = {
             "road_divider": self._add_road_divider_edges,
             "walkway": self._add_walkway_edges,
@@ -50,7 +50,6 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
             "stop_line": self._add_stop_line_edges,
             "lane": self._add_lane_edges,
             "carpark": self._add_carpark_edges,
-            # "centerline": self._add_centerline_edges,
         }
 
     @classmethod

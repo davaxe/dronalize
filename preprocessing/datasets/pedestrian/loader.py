@@ -51,6 +51,15 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
                 yield data_file.name, data_file
 
     @override
+    def num_sources(self) -> int | None:
+        num_sources: int = 0
+        for dataset in self._dataset:
+            data_dir = self._data_root / dataset / self._split
+            num_sources += sum(1 for _ in data_dir.iterdir())
+
+        return num_sources
+
+    @override
     def load_raw(self, source: Path) -> Iterable[pl.LazyFrame]:
         source_data = EthUcyLoader._read_data_file(source)
         yield from prepare_agent_trajectories(
@@ -81,15 +90,6 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             .scene_filtering_parameters(require_all_valid=True)
             .resampling_parameters(4, 1, method="spline")
         )
-
-    @override
-    def num_sources(self) -> int | None:
-        num_sources: int = 0
-        for dataset in self._dataset:
-            data_dir = self._data_root / dataset / self._split
-            num_sources += sum(1 for _ in data_dir.iterdir())
-
-        return num_sources
 
     @staticmethod
     def _read_data_file(path: Path) -> pl.LazyFrame:

@@ -1,16 +1,11 @@
-from typing import Union
-
 import polars as pl
-import pytest
 
-# Import your function here.
-# Assuming it is in a module named 'processing', otherwise paste the function above this test code.
 from preprocessing.common.trajectory_utils.filter import rebalance_highway_agents
 
 
 def create_dummy_data(n_lc_agents: int, n_lk_agents: int) -> pl.DataFrame:
-    """
-    Creates a dummy trajectory dataset.
+    """Create a dummy trajectory dataset.
+
     Each agent has 10 rows of data.
     """
     # Create Lane Changing (LC) Agents (IDs starting at 0)
@@ -35,105 +30,81 @@ def create_dummy_data(n_lc_agents: int, n_lk_agents: int) -> pl.DataFrame:
     return pl.concat([df_lc, df_lk])
 
 
-class TestRebalanceAgents:
-    def test_ratio_enforcement(self):
-        """
-        Scenario: We have 10 LC agents and 20 LK agents.
-        Target: Ratio of 2.0 (2 LC : 1 LK).
-        Expected: We keep all 10 LC agents, and downsample LK to 5 agents.
-        Total Agents = 15.
-        """
-        df = create_dummy_data(n_lc_agents=10, n_lk_agents=20)
+def test_ratio_enforcement() -> None:
+    """Scenario: 10 LC agents and 20 LK agents.
 
-        result = rebalance_highway_agents(
-            df, ratio=2.0, req_lane_changes=1, agent_id="id", n_lanechange_col="lane_changes"
-        )
+    Target: Ratio of 2.0 (2 LC : 1 LK).
+    Expected: Keep all 10 LC agents, and downsample LK to 5 agents.
+    Total Agents = 15.
+    """
+    df = create_dummy_data(n_lc_agents=10, n_lk_agents=20)
 
-        # Verify result is a DataFrame (since input was DataFrame)
-        assert isinstance(result, pl.DataFrame)
+    result = rebalance_highway_agents(
+        df, ratio=2.0, req_lane_changes=1, agent_id="id", n_lanechange_col="lane_changes"
+    )
 
-        # unique agents remaining
-        unique_agents = result["id"].unique()
-        n_unique = len(unique_agents)
+    # Verify result is a DataFrame (since input was DataFrame)
+    assert isinstance(result, pl.DataFrame)
 
-        # 10 LC + (10 / 2) LK = 15 expected agents
-        assert n_unique == 15
+    # unique agents remaining
+    unique_agents = result["id"].unique()
+    n_unique = len(unique_agents)
 
-        # Verify we didn't lose any LC agents
-        # IDs 0-9 were LC. They should all be present.
-        assert result.filter(pl.col("id") < 10)["id"].n_unique() == 10
+    # 10 LC + (10 / 2) LK = 15 expected agents
+    assert n_unique == 15
 
-    def test_lazy_frame_support(self):
-        """
-        Scenario: Pass a LazyFrame input.
-        Expected: Return a LazyFrame output and correct filtering when collected.
-        """
-        df = create_dummy_data(n_lc_agents=10, n_lk_agents=10)
-        lazy_df = df.lazy()
-
-        # Ratio 1.0 -> 10 LC : 10 LK. Should keep everyone.
-        result_lazy = rebalance_highway_agents(lazy_df, ratio=1.0)
-
-        assert isinstance(result_lazy, pl.LazyFrame)
-
-        result = result_lazy.collect()
-        assert result["id"].n_unique() == 20
-
-    def test_insufficient_lk_data(self):
-        """
-        Scenario: Ratio requires MORE LK agents than exist.
-        Setup: 10 LC, 2 LK.
-        Target Ratio: 1.0 (requires 10 LK).
-        Expected: Function should return all available LK agents (2) without crashing.
-        Total agents = 12.
-        """
-        df = create_dummy_data(n_lc_agents=10, n_lk_agents=2)
-
-        result = rebalance_highway_agents(df, ratio=1.0)
-
-        # Should have all 10 LC and all 2 LK
-        assert result["id"].n_unique() == 12
-
-    def test_custom_lane_change_threshold(self):
-        """
-        Scenario: Increase required lane changes to 10.
-        Setup: Our 'LC' dummy agents only have 5 changes.
-        Expected: Everyone is classified as LK.
-        Result should be empty or handle 0 LC agents gracefully depending on logic.
-        (Current logic: 0 LC -> 0 target LK -> result is empty).
-        """
-        df = create_dummy_data(n_lc_agents=5, n_lk_agents=5)
-
-        # Set req to 10. The agents with 5 changes are now considered LK.
-        # Total LK = 10. Total LC = 0.
-        result = rebalance_highway_agents(df, req_lane_changes=10)
-
-        # 0 LC agents / Ratio 2 = 0 LK agents required.
-        # Result should be empty.
-        assert len(result) == 0
+    # Verify no LC agents were lost
+    # IDs 0-9 were LC. They should all be present.
+    assert result.filter(pl.col("id") < 10)["id"].n_unique() == 10
 
 
-# ==========================================
-# Standalone Execution for quick verification
-# ==========================================
-if __name__ == "__main__":
-    # Manually run the test function if not using pytest CLI
-    tester = TestRebalanceAgents()
+def test_lazy_frame_support() -> None:
+    """Scenario: Pass a LazyFrame input.
 
-    print("Running Test 1: Ratio Enforcement...")
-    tester.test_ratio_enforcement()
-    print("Pass.")
+    Expected: Return a LazyFrame output and correct filtering when collected.
+    """
+    df = create_dummy_data(n_lc_agents=10, n_lk_agents=10)
+    lazy_df = df.lazy()
 
-    print("Running Test 2: LazyFrame Support...")
-    tester.test_lazy_frame_support()
-    print("Pass.")
+    # Ratio 1.0 -> 10 LC : 10 LK. Should keep everyone.
+    result_lazy = rebalance_highway_agents(lazy_df, ratio=1.0)
 
-    print("Running Test 3: Insufficient Data...")
-    tester.test_insufficient_lk_data()
-    print("Pass.")
+    assert isinstance(result_lazy, pl.LazyFrame)
 
-    print("Running Test 4: Thresholds...")
-    tester.test_custom_lane_change_threshold()
-    print("Pass.")
+    result = result_lazy.collect()
+    assert result["id"].n_unique() == 20
 
-    print("\nAll tests passed successfully.")
+
+def test_insufficient_lk_data() -> None:
+    """Scenario: Ratio requires MORE LK agents than exist.
+
+    Setup: 10 LC, 2 LK.
+    Target Ratio: 1.0 (requires 10 LK).
+    Expected: Function should return all available LK agents (2) without crashing.
+    Total agents = 12.
+    """
+    df = create_dummy_data(n_lc_agents=10, n_lk_agents=2)
+
+    result = rebalance_highway_agents(df, ratio=1.0)
+
+    # Should have all 10 LC and all 2 LK
+    assert result["id"].n_unique() == 12
+
+
+def test_custom_lane_change_threshold() -> None:
+    """Scenario: Increase required lane changes to 10.
+
+    Setup: The 'LC' dummy agents only have 5 changes.
+    Expected: Everyone is classified as LK.
+    Result should be empty or handle 0 LC agents gracefully depending on logic.
+    (Current logic: 0 LC -> 0 target LK -> result is empty).
+    """
+    df = create_dummy_data(n_lc_agents=5, n_lk_agents=5)
+
+    # Set req to 10. The agents with 5 changes are now considered LK.
+    # Total LK = 10. Total LC = 0.
+    result = rebalance_highway_agents(df, req_lane_changes=10)
+
+    # 0 LC agents / Ratio 2 = 0 LK agents required.
+    # Result should be empty.
+    assert len(result) == 0

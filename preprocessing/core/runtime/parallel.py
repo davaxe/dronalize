@@ -24,9 +24,9 @@ class ProgressBar(IntEnum):
     NONE = 0
     """No progress bars."""
     SOURCES = 1
-    """Show progress bar for sources."""
+    """Show progress bar for sources (# processed scenes are shown i postfix)."""
     SCENES = 2
-    """Show progress bar for scenes."""
+    """Show progress bar for scenes (# processed sources are shown in postfix)."""
 
     def unit(self) -> str:
         """Return the unit string to use for tqdm progress bars based on the selected ProgressBar."""
@@ -47,10 +47,10 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
     It uses Python's multiprocessing module to parallelize the processing of sources across multiple
     CPU cores. The number of processes and chunksize can be configured depending on workload.
 
-    By default the order resulting scenes when using `scenes_iter` method will not be deterministic
+    By default the order resulting scenes when using `scenes` method will not be deterministic
     across runs or systems due to the use of `imap_unordered` for better performance. If a
-    deterministic order is required, the `maintain_order` flag can be set to True, which will use `imap`
-    instead of `imap_unordered`.
+    deterministic order is required, the `maintain_order` flag can be set to True, which will use
+    `imap` instead of `imap_unordered`.
 
     This class also implements the `SceneLoader` (and `BaseSceneLoader) interface, which means it
     can be used as a drop in replacement for any other `SceneLoader` implementation.
@@ -65,14 +65,19 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
 
             2. If sources are instead large, for example `WaymoLoader` and its tfrecord files,
                then other issues may arise such as increased memory usage and possibly issues
-               with inter-process comumication. In these cases it is a good idea to avoid `scenes_iter`
-               method, and instead use the `process_scenes` method with a callback function that
+               with inter-process comumication. In these cases it is a good idea to avoid `scenes`
+               method, and instead use the `scenes_callback` method with a callback function that
                performs side effects (e.g., saving to file). If an error related to "Too many opened
-               files" is encountered when using `scenes_iter`, this is a strong indication that the
-               underlying sources are too large for `scenes_iter` and `process_scenes` should be
+               files" is encountered when using `scenes`, this is a strong indication that the
+               underlying sources are too large for `scenes` and `scenes_callback` should be
                used.
 
-            3. Since `DataLoaders` utilizes Polars, which also uses multiple cores for processing,
+            3. If the Scenes include a lot of data (e.g. large DataFrames or maps) sending them
+               between processees can be costly, and `scenes_callback` should be preffered when
+               possible. In extreme cases using multiprocessing can slow down processing due to the
+               overhead.
+
+            4. Since `DataLoaders` utilizes Polars, which also uses multiple cores for processing,
                there may be some contention for CPU resources between the multiprocessing in `ParallelLoader`
                and the multithreading in Polars. Setting the environment variable `POLARS_MAX_THREADS=X`,
                where X is a number that balances the workload between `ParallelLoader` and Polars.
@@ -83,7 +88,7 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
     def __init__(
         self,
         processor: BaseSceneLoader[T_ID, T_Source],
-        chunksize: int = 1,
+        chunksize: int | None = None,
         processes: int | None = None,
         *,
         maintain_order: bool = False,
@@ -91,23 +96,30 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
     ) -> None:
         """Initialize with the given processor and multiprocessing configuration.
 
+        Progress Bar Behavior:
+            - If `progress_bar` is set to `ProgressBar.SOURCES`, a progress bar
+            will be shown that tracks the number of sources processed.
+            - If `progress_bar` is set to `ProgressBar.SCENES`, a progress bar will be shown that
+            tracks the number of scenes processed.
+
+        No matter what option is chosen, the other quantity (sources or scenes) will be tracked in
+        he progress bar's postfix for visibility. Using `ProgressBar.SOURCES` is generally
+        recomended since the total number of sources is often known beforehand, while number of
+        scenes is usually not known beforehand (this result in only showng the number of processed
+        scenes without a total, which can be less useful).
+
         Args:
             processor: The underlying DataProcessor to use for processing each source.
             chunksize: The number of sources to process in each batch when using multiprocessing.
                 Larger chunksizes can reduce overhead but may lead to less even load distribution
-                across processes.
+                across processes. If `None` tries to automatically determine an optimal chunksize
+                based on the number of sources and processes (when possible),
             processes: The number of processes to use for multiprocessing. If None, uses the
                 number of CPU cores.
-            maintain_order: If True, the order of resulting scenes from `scenes_iter` will be
+            maintain_order: If True, the order of resulting scenes from `scenes` will be
                 computed using `imap` to maintain the order of sources.
-            progress_bar: Whether to show a progress bar using tqdm. Can be set to:
-                - `ProgressBar.NONE` (default): No progress bar.
-                - `ProgressBar.SOURCES`: Show progress bar for sources.
-                - `ProgressBar.SCENES`: Show progress bar for scenes.
-                The number of scenes is often not known beforehand, so using `ProgressBar.SCENES`
-                may not result in a progress bar, instead it will only how many scenes have been
-                processed. In contrast to `ProgressBar.SOURCES`, which will often show an actual
-                progress bar.
+            progress_bar: Whether to show a progress bar using tqdm. `True` is equivalent to
+                `ProgressBar.SOURCES`. Se behaviour description above.
 
         """
         if processes is not None and processes <= 1:
@@ -117,12 +129,24 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
         self._processor = processor
         self._mp_scene_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_source_counter: Synchronized[int] = mp.Value("i", 0)
-        self._chunksize: int = chunksize
+        self._chunksize: int = chunksize or self._optimal_chunksize(
+            processor.num_sources(), processes
+        )
         self._processes: int | None = processes
         self._maintain_order: bool = maintain_order
         self._progress_bar: ProgressBar = (
             ProgressBar(int(progress_bar)) if isinstance(progress_bar, bool) else progress_bar
         )
+
+    @staticmethod
+    def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:
+        if num_sources is None:
+            return 1
+
+        num_processes = num_processes or mp.cpu_count()
+        chunksize, extra = divmod(num_sources, num_processes * 4)
+        chunksize += int(extra > 0)
+        return max(chunksize, 1)
 
     def processes(self, processes: int | None) -> Self:
         """Set the number of processes to use for multiprocessing. If None, uses the number of CPU cores."""

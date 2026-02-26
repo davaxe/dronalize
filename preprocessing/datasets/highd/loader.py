@@ -77,6 +77,11 @@ class HighDLoader(BaseSceneLoader[int, pl.LazyFrame]):
             yield i, combined
 
     @override
+    def num_scenes(self) -> int | None:
+        num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
+        return num_files // 4 - 1
+
+    @override
     def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
         yield from prepare_agent_trajectories(
             rebalance_highway_agents(source, ratio=self._rebalance_ratio).drop("lane_changes")

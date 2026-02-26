@@ -40,6 +40,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def sources(self) -> Iterable[tuple[int, pl.LazyFrame]]:
+        # Sort to match files correctly
         parquet_files = sorted(str(f) for f in self._data_dir.glob("*/*.parquet"))
         json_files = sorted(str(f) for f in self._data_dir.glob("*/*.json"))
         map_lookup = pl.DataFrame({"file_id": parquet_files, "map_path": json_files}).lazy()
@@ -57,27 +58,25 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
                     self._map_object_type_expr("object_type").alias("agent_category"),
                     pl.col("track_id").str.replace("AV", "0").cast(pl.Int32),
                 )
-                .drop(
-                    "end_timestamp",
-                    "start_timestamp",
-                    "scenario_id",
-                    "object_category",
-                    "object_type",
-                    "observed",
-                    "focal_track_id",
-                    "num_timestamps",
-                    "city",
-                )
-                .rename({
-                    "track_id": "id",
-                    "timestep": "frame",
-                    "position_x": "x",
-                    "position_y": "y",
-                    "velocity_x": "vx",
-                    "velocity_y": "vy",
-                    "heading": "yaw",
-                }),
+                .select(
+                    pl.col("file_id").cast(pl.Categorical).to_physical(),
+                    self._map_object_type_expr("object_type").alias("agent_category"),
+                    pl.col("track_id").str.replace("AV", "0").cast(pl.Int32).alias("id"),
+                    pl.col("timestep").alias("frame"),
+                    pl.col("position_x").alias("x"),
+                    pl.col("position_y").alias("y"),
+                    pl.col("velocity_x").alias("vx"),
+                    pl.col("velocity_y").alias("vy"),
+                    pl.col("heading").alias("yaw"),
+                ),
             )
+
+    @override
+    def num_sources(self) -> int | None:
+        num_files = sum(1 for _ in self._data_dir.glob("*/*.parquet"))
+        batch_size = self._file_batch_size or num_files
+        batches, extra = divmod(num_files, batch_size)
+        return batches + int(extra > 0)
 
     @override
     def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:

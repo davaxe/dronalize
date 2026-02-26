@@ -102,15 +102,13 @@ def get_highway_graph(
     spacing: float = 3.0,
     buffer: float = 10.0,
 ) -> tuple[dict, dict, float, float]:
-    """
-    Get the graph representation of the highway from the lane markings.
+    """Get the graph representation of the highway from the lane markings.
     :param rec_meta: meta dataframe of the recording (used to get the lane markings)
     :param tracks: trajectory dataframe of the recording (used to get the range of x values)
     :param spacing: spacing between the lane graph nodes
     :param buffer: buffer to add to the range of x values
     :return:
     """
-
     ulm = [float(l) for l in list(rec_meta["upperLaneMarkings"])[0].split(";")]
     llm = [float(l) for l in list(rec_meta["lowerLaneMarkings"])[0].split(";")]
 
@@ -133,7 +131,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     i = 4
-    rec_idx = f"0{str(i)}" if i < 10 else str(i)
+    rec_idx = f"0{i!s}" if i < 10 else str(i)
     ROOT = "../../../datasets/highD/data"
 
     recording_meta = pd.read_csv(f"{ROOT}/{rec_idx}_recordingMeta.csv")

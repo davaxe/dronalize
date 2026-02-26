@@ -46,7 +46,7 @@ def load_config(config: str) -> dict:
 
     config = next(str(f) for f in files if config in f.name)
 
-    with open(config, "r", encoding="utf-8") as openfile:
+    with Path(config).open("r", encoding="utf-8") as openfile:
         return yaml.safe_load(openfile)
 
 

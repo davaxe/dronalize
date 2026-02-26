@@ -38,6 +38,11 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
             yield row[0], row[0]
 
     @override
+    def num_sources(self) -> int | None:
+        self._cursor.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table';")
+        return self._cursor.fetchone()[0]
+
+    @override
     def load_raw(self, source: str) -> Iterable[pl.LazyFrame]:
         # Possible to include: UTM_ANGLE, V, ACC, ACC_LAT, ACC_TAN
         query = f"""
@@ -96,6 +101,6 @@ if __name__ == "__main__":
     path = Path("data/rdb2/trajectories_rdb2_v3.sqlite")
     processor = OpenDDLoader(path)
     count = 0
-    for scene in processor.scenes():
+    for _scene in processor.scenes():
         count += 1
     print(f"Processed {count} scenes.")

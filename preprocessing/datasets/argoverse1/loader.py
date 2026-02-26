@@ -59,6 +59,13 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
             )
 
     @override
+    def num_sources(self) -> int | None:
+        num_files = sum(1 for _ in self._data_path.glob("*.csv"))
+        batch_size = self._batch_size or num_files
+        batches, extra = divmod(num_files, batch_size)
+        return batches + int(extra > 0)
+
+    @override
     def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
         resampling = self.processor_config.resampling or Resampling(1, 1)
 
@@ -113,7 +120,7 @@ if __name__ == "__main__":
     processor = Argoverse1Loader(data_path, file_batch_size=1000)
     count = 0
     time_start = time.perf_counter()
-    for scene in processor.scenes():
+    for _scene in processor.scenes():
         count += 1
         if count % 500 == 0:
             print(f"Processed {count} scenes in {time.perf_counter() - time_start:.2f} seconds")

@@ -70,6 +70,10 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
             current += self._batch_size
 
     @override
+    def num_sources(self) -> int | None:
+        return (self._total_scenes + self._batch_size - 1) // self._batch_size
+
+    @override
     def load_raw(self, source: _Source) -> Iterable[pl.LazyFrame]:
         scene_interval = source.interval
         if scene_interval is not None:

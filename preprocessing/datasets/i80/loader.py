@@ -70,6 +70,10 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
                 ),
             )
 
+    @override
+    def num_sources(self) -> int | None:
+        return sum(1 for _ in self._data_dir.rglob("trajectories*.csv"))
+
     @staticmethod
     def _lane_changes_expr(lane_id_col: str = "Lane_ID", id_col: str = "Vehicle_ID") -> pl.Expr:
         return (

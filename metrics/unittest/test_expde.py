@@ -84,7 +84,7 @@ def test_exp_de_invalid_criterion() -> None:
 
     metric = ExpDE()
     with pytest.raises(
-        ValueError, match=f"eval_criterion must be 'FDE' or 'ADE', got INVALID"
+        ValueError, match="eval_criterion must be 'FDE' or 'ADE', got INVALID"
     ):
         metric.update(pred, trg, prob=None, eval_criterion="INVALID")
 

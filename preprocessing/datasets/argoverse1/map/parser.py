@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: S405
 from dataclasses import dataclass, field
 from enum import auto
 from pathlib import Path
