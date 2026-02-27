@@ -1,11 +1,17 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.10,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "dronalize"
+module-root = ""
+# Exclude
+exclude = ["tests*", "examples*"]
 
 [project]
 name = "dronalize"
 version = "1.3.0"
-description = "Trajectory prediction and preprocessing toolbox"
+description = "Trajectory data processing toolkit for autonomous driving datasets"
 authors = [
     { name = "Theodor Westny", email = "theodor.westny@liu.se" },
     { name = "David Axelsson", email = "david.axelsson@liu.se" },
@@ -15,127 +21,74 @@ license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
 
 dependencies = [
-    "torch==2.6.0",
-    "torch_geometric==2.6.1",
-    "lightning==2.5.2",
-    "wandb==0.21.0",
-    "scikit-learn",
-    "matplotlib",
-    "tqdm",
-    "utm==0.8.1",
-    "osmium==4.0.2",
-    "pyproj==3.7.1",
-    "lark",
-    "pandas>=2.3.3",
-    "polars>=1.38.1",
-    "numpy>=2.2.3",
-    "scipy>=1.15.2",
-    "scipy-stubs>=1.15.3.0",
-    "networkx>=3.4.2",
-    "polars-splines>=0.1.2",
-    "pyarrow>=23.0.0",
-    "zarr<3",
-    "numcodecs<=0.13.1",
-    "mosaicml-streaming>=0.10.0",
-    "altair>=6.0.0",
-    "ipython>=8.38.0",
+    "numpy>=1.24.0",
+    "polars>=1.0.0",
+    "pyarrow>=14.0.0",
+    "scipy>=1.10.0",
+    "tqdm>=4.65.0",
+    "utm>=0.7.0",
+    "typing-extensions>=4.15.0",
 ]
 
 [project.optional-dependencies]
-# PyG add-on; install with a wheel source (see commands below)
-pyg = ["torch-cluster"]
+# Plotting (map graphs, trajectories)
+plot = ["altair>=5.0.0"]
 
 # Dataset-specific extras
-lyft = ["zarr<3"]
+lyft = ["zarr<3", "numcodecs<=0.13.1"]
 ad4che = ["opencv-python"]
 
-# Container-specific (headless versions for Docker/servers)
-container = ["opencv-python-headless"]
+# Minimal PyTorch dependency for the dataloader implementation
+loader = ["torch>=2.0.0"]
 
-# Development tools
-dev = [
-    "pytest",
-    "ruff",
-    "pre-commit", # For git hooks
-    "mypy",       # Type checking
+# Full ML stack for running the example training pipeline
+example = [
+    "dronalize[loader]",
+    "torchmetrics>=0.11.0",
+    "torch_geometric>=2.3.0",
+    "torch-cluster",
+    "lightning>=2.0.0",
+    "wandb>=0.15.0",
 ]
 
-# Convenience combinations
-all-datasets = ["opencv-python"]
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "scipy-stubs",
+    "ipython",
+    "dronalize[plot,lyft,ad4che]",
+]
 
-dev-cuda = ["torch-cluster", "pytest", "ruff", "pre-commit", "mypy"]
-all = ["torch-cluster", "opencv-python", "pytest", "ruff", "pre-commit", "mypy"]
-
-[tool.uv]
-find-links = ["https://data.pyg.org/whl/torch-2.6.0+cu124.html"]
+all = [
+    { include-group = "dev"}
+]
 
 [tool.uv.extra-build-dependencies]
 torch-cluster = ["torch"]
 
-# Don't install local packages - just manage dependencies
-[tool.setuptools]
-packages = []
-
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "preprocessing/common", "preprocessing/core"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["--strict-markers", "--disable-warnings", "-ra"]
+addopts = ["--doctest-modules", "-ra"]
 
 [tool.ruff]
 # Exclude proto compiled files from linting and formatting
-extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*", "old"]
+extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*"]
 line-length = 100
 preview = true
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "D203",
-    "D213",
-    "COM812",
-    "PLR2004",
-    "DOC201",
-    "DOC501",
-    "T201",
-    "S101",
-    "TRY003",
-    "D100",
-    "E501",
-    "B008",
-    "TD002",
-    "TD003",
-    "COM812",
-    "PLR0913",
-    "PLR0917",
-    "PLR0914",
-    "DOC402",
-    "CPY001",
+    "D203", "D213", "COM812", "PLR2004", "DOC201", "DOC501",
+    "T201", "S101", "TRY003", "D100", "E501", "B008",
+    "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
+    "DOC402", "CPY001", "D104", "TD005","S405", "S314",
 ]
+pydocstyle = { convention = "numpy" }
 
-[tool.pyrefly]
-project-includes = ["**/*.py*", "**/*.ipynb"]
 
-# ---------------------------------------------------------------------------
-# Installation instructions:
-#
-# Prerequisite: Install uv (https://docs.astral.sh/uv/getting-started/installation/)
-#
-# 1. Create a virtual environment and verify lockfile:
-#    uv lock
-#
-# 2. Install dependencies (creates .venv automatically):
-#    uv sync
-#
-# 3. Install with optional features (e.g. PyG support, dev tools):
-#    uv sync --extra dev-cuda
-#    # Or for specific extras:
-#    uv sync --extra lyft --extra ad4che
-#
-# 4. Running commands:
-#    uv run python train.py ...
-#    uv run pytest
-# ---------------------------------------------------------------------------
-#
-# ---------------------------------------------------------------------------
+[tool.ruff.format]
+quote-style = "double"
