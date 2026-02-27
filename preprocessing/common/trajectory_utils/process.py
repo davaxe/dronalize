@@ -24,6 +24,7 @@ def prepare_agent_trajectories(
     agent_category_col: str | None = "agent_category",
     derivative_rename: dict[int, list[str]] | None = None,
     offset_sliding_col: bool = True,
+    forward_fill: list[str] | None = None,
 ) -> Iterable[pl.LazyFrame]:
     """Prepare agent trajectories for processing.
 
@@ -48,6 +49,7 @@ def prepare_agent_trajectories(
     """
     resampling = config.resampling or Resampling(1, 1)
     group_by: list[str] = []
+    forward_fill = forward_fill or []
 
     if config.window_params is not None:
         scenes = sliding_window(
@@ -80,7 +82,9 @@ def prepare_agent_trajectories(
         method=resampling.method,
         dt=config.sample_time,
         derivative_rename=derivative_rename,
-        forward_fill=[agent_category_col] if agent_category_col else None,
+        forward_fill=[agent_category_col, *forward_fill]
+        if agent_category_col
+        else (forward_fill or None),
     )
 
     if config.window_params is None:
