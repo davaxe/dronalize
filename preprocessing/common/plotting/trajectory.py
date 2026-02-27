@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import altair as alt
-import matplotlib.pyplot as plt
 import numpy as np
 import polars as pl
 
 from preprocessing.common.trajectory.resample import resample_tracks
+from preprocessing.core._compat import require_optional
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
+
+    import altair as alt
 
 
 def plot_trajectories(
@@ -51,6 +52,7 @@ def plot_trajectories(
         An Altair LayerChart containing the trajectories and start/end markers.
 
     """
+    alt = require_optional("altair", extra="plot")
     alt.renderers.enable("browser")
     if n_groups is not None and group_by is not None:
         unique_groups = data.select(group_by).unique()
@@ -171,6 +173,8 @@ def _generate_test() -> pl.DataFrame:
 
 
 if __name__ == "__main__":
+    plt = require_optional("matplotlib.pyplot", extra="plot")
+
     # 1. Generate the complex data
     df_complex = _generate_test()
     print("Original DataFrame:")

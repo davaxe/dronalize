@@ -1,10 +1,16 @@
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.axes import Axes
-from matplotlib.collections import LineCollection
+from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import numpy as np
+
+from preprocessing.core._compat import require_optional
 from preprocessing.core.datatypes.categories import EdgeType
-from preprocessing.core.datatypes.map_graph import MapGraph
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+
+    from preprocessing.core.datatypes.map_graph import MapGraph
 
 
 def plot_map_graph(
@@ -28,8 +34,12 @@ def plot_map_graph(
         The Matplotlib Axes object containing the figure.
 
     """
+    mpl_plt = require_optional("matplotlib.pyplot", extra="plot")
+    mpl_collections = require_optional("matplotlib.collections", extra="plot")
+
     if ax is None:
-        _fig, ax = plt.subplots(figsize=figsize)
+        _fig, ax = mpl_plt.subplots(figsize=figsize)
+        assert ax is not None
 
     if graph.num_edges == 0:
         return ax
@@ -90,7 +100,7 @@ def plot_map_graph(
         mask = edge_types_np == et_int
         current_segments = segments[mask].tolist()
 
-        lc = LineCollection(
+        lc = mpl_collections.LineCollection(
             current_segments,
             colors=color,
             linewidths=lw,
@@ -122,6 +132,6 @@ def plot_map_graph(
 
     ax.set_aspect("equal")
     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.0)
-    plt.tight_layout()
+    mpl_plt.tight_layout()
 
     return ax

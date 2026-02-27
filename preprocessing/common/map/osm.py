@@ -6,10 +6,9 @@ import utm
 from osmium.osm import Node, Way
 from typing_extensions import override
 
-from preprocessing.common.map.plot import plot_map_graph
+from preprocessing.core.datatypes.categories import EdgeType
 from preprocessing.core.graph.builder import GraphBuilder
 from preprocessing.core.graph.nodes import IntIDNode
-from preprocessing.core.datatypes.categories import EdgeType
 
 
 class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
@@ -80,12 +79,3 @@ class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
         x, y, _zone_number, _zone_letter = utm.from_latlon(node.location.lat, node.location.lon)
         x_offset, y_offset = self._utm_position_offset
         self._nodes[node.id] = self.new_node(float(x) + x_offset, float(y) + y_offset)
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-
-    builder = OSMMapGraphBuilder(Path("data/DR_CHN_Merging_ZS0.osm"))
-    graph = builder.build(interp_distance=3, min_distance=1.5)
-    plot_map_graph(graph, include_nodes=False)
-    plt.show()
