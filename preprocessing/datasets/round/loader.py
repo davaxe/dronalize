@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from preprocessing.common.trajectory_utils.levelx import XLevelDataLoader
+from preprocessing.common.loaders.xlevel import XLevelDataLoader
 
 
 class RounDLoader(XLevelDataLoader):

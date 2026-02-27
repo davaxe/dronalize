@@ -21,8 +21,9 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import BaseEnum, BaseMapObject, IntIDNode
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.graph.nodes import IntIDNode
+from preprocessing.core.protocols.map_object import BaseEnum, BaseMapObject
 
 
 class Argoverse2Map:

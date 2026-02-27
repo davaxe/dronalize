@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from preprocessing.common.map_utils.lane import HighWayLaneGraphBuilder, LaneDescription
+from preprocessing.common.map.lane import HighWayLaneGraphBuilder, LaneDescription
 
 if TYPE_CHECKING:
     from pathlib import Path

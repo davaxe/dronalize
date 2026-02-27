@@ -4,12 +4,12 @@ from pathlib import Path
 import polars as pl
 from typing_extensions import override
 
-from preprocessing.common.trajectory_utils.basic import yaw_from_vel
-from preprocessing.common.trajectory_utils.filter import filter_scene_expr
-from preprocessing.common.trajectory_utils.resample import resample_tracks
-from preprocessing.core import map_context as mc
-from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
+from preprocessing.common.trajectory.basic import yaw_from_vel
+from preprocessing.common.trajectory.filter import filter_scene_expr
+from preprocessing.common.trajectory.resample import resample_tracks
+from preprocessing.core.datatypes import map_context as mc
+from preprocessing.core.datatypes.categories import AgentCategory
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Resampling
 
 
 class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):

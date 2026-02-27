@@ -21,8 +21,8 @@ from uuid import UUID
 
 from typing_extensions import Self, override
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import GraphBuilder
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.graph.builder import GraphBuilder
 from preprocessing.datasets.nuscenes.map import parser
 
 if TYPE_CHECKING:

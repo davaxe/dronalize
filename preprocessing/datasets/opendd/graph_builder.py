@@ -21,11 +21,11 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from typing_extensions import Self, override
 
-from preprocessing.road_network.common import (
+from preprocessing.core import (
+    EdgeType,
     GraphBuilder,
     IntIDNode,
 )
-from preprocessing.road_network.edge_type import EdgeType
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

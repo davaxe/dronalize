@@ -1,4 +1,4 @@
-from preprocessing.common.map_utils.osm import OSMMapGraphBuilder
+from preprocessing.common.map.osm import OSMMapGraphBuilder
 
 
 class RounDGraphBuilder(OSMMapGraphBuilder):

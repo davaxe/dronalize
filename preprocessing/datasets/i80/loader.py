@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from preprocessing.common.trajectory_utils.basic import yaw_from_vel
-from preprocessing.common.trajectory_utils.filter import rebalance_highway_agents
-from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
-from preprocessing.core import AgentCategory
-from preprocessing.core import map_context as mc
-from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
+from preprocessing.common.trajectory.basic import yaw_from_vel
+from preprocessing.common.trajectory.filter import rebalance_highway_agents
+from preprocessing.common.trajectory.process import prepare_agent_trajectories
+from preprocessing.core import AgentCategory, BaseSceneLoader, LoaderConfig
+from preprocessing.core.datatypes import map_context as mc
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

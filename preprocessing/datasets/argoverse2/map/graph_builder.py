@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import override
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import GraphBuilder, IntIDNode
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.graph import GraphBuilder, IntIDNode
 from preprocessing.datasets.argoverse2.map import parser
 
 if TYPE_CHECKING:

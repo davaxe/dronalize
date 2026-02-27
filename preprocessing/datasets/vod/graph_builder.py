@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Self
 import numpy as np
 from scipy.interpolate import BSpline
 
-from preprocessing.core.categories import EdgeType
+from preprocessing.core import EdgeType
 from preprocessing.datasets.nuscenes.map.graph_builder import NuScenesMapGraphBuilder
 from preprocessing.datasets.nuscenes.map.parser import NuScenesMap
 

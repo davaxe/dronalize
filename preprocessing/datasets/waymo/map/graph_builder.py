@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import GraphBuilder, IntIDNode
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.graph import GraphBuilder, IntIDNode
 from preprocessing.datasets.waymo.protos import lean_map_pb2
 
 if TYPE_CHECKING:

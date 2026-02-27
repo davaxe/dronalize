@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from preprocessing.common.trajectory_utils.levelx import XLevelDataLoader
+from preprocessing.common.loaders.xlevel import XLevelDataLoader
 from preprocessing.core import AgentCategory
 
 if TYPE_CHECKING:
-    from preprocessing.core.interface import LoaderConfig
+    from preprocessing.core import LoaderConfig
 
 
 class HighDLoader(XLevelDataLoader):

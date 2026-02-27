@@ -7,7 +7,7 @@ from preprocessing.datasets.i80.loader import I80Loader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from preprocessing.core.interface import LoaderConfig
+    from preprocessing.core import LoaderConfig
 
 
 class US101Loader(I80Loader):

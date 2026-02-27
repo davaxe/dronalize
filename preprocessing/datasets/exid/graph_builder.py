@@ -1,5 +1,4 @@
-from preprocessing.common.map_utils.osm import OSMMapGraphBuilder
-from preprocessing.common.map_utils.plot import plot_map_graph
+from preprocessing.common.map.osm import OSMMapGraphBuilder
 
 
 class ExiDGraphBuilder(OSMMapGraphBuilder):
@@ -14,17 +13,3 @@ class ExiDGraphBuilder(OSMMapGraphBuilder):
     dataset, inheriting all OSM parsing and graph construction logic from
     `OSMMapGraphBuilder`.
     """
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    import matplotlib.pyplot as plt
-
-    path = Path(
-        "/home/west/Developer/behavior-prediction/datasets/exiD/maps/lanelets/0_cologne_butzweiler/location0.osm"
-    )
-    graph_builder = ExiDGraphBuilder(path)
-    map_graph = graph_builder.build()
-    plot_map_graph(map_graph)
-    plt.show()

@@ -10,11 +10,11 @@ import polars as pl
 from typing_extensions import override
 from zarr.creation import open_array
 
-from preprocessing.common.trajectory_utils.basic import yaw_from_vel
-from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
-from preprocessing.core import map_context as mc
-from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
+from preprocessing.common.trajectory.basic import yaw_from_vel
+from preprocessing.common.trajectory.process import prepare_agent_trajectories
+from preprocessing.core.datatypes import map_context as mc
+from preprocessing.core.datatypes.categories import AgentCategory
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

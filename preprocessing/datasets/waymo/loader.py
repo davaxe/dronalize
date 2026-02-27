@@ -8,12 +8,11 @@ import polars as pl
 from typing_extensions import override
 
 # Assuming these exist in your project
-from preprocessing.common.trajectory_utils.derivative import derivative
-from preprocessing.common.trajectory_utils.filter import filter_scene_expr
-from preprocessing.common.trajectory_utils.resample import resample_tracks
-from preprocessing.core import AgentCategory
-from preprocessing.core import map_context as mc
-from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
+from preprocessing.common.trajectory.derivative import derivative
+from preprocessing.common.trajectory.filter import filter_scene_expr
+from preprocessing.common.trajectory.resample import resample_tracks
+from preprocessing.core import AgentCategory, BaseSceneLoader, LoaderConfig, Resampling
+from preprocessing.core.datatypes import map_context as mc
 from preprocessing.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from preprocessing.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
 

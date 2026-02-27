@@ -25,8 +25,9 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import BaseEnum, IntIDNode
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.graph.nodes import IntIDNode
+from preprocessing.core.protocols.map_object import BaseEnum
 from preprocessing.datasets.lyft.protos import road_network_pb2 as proto
 
 if TYPE_CHECKING:

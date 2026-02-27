@@ -40,8 +40,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from typing_extensions import Self
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import BaseEnum, BaseMapObject, BaseNode
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.protocols.map_object import BaseEnum, BaseMapObject, BaseNode
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import GraphBuilder, IntIDNode
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.graph import GraphBuilder, IntIDNode
 
 if TYPE_CHECKING:
     from pathlib import Path

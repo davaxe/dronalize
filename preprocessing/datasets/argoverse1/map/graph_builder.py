@@ -21,8 +21,8 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import GraphBuilder, IntIDNode
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.graph import GraphBuilder, IntIDNode
 from preprocessing.datasets.argoverse1.map import parser, utils
 
 if TYPE_CHECKING:
@@ -110,6 +110,22 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
                 already_connected[segment.id].add(suc_id)
                 already_connected.setdefault(suc_id, set()).add(segment.id)
 
+    def _node_distance(self, id_a: int, id_b: int) -> float:
+        """Calculate the Euclidean distance between two nodes by their IDs."""
+        idx_a = self._id_to_index[id_a]
+        idx_b = self._id_to_index[id_b]
+        dx = self._x[idx_a] - self._x[idx_b]
+        dy = self._y[idx_a] - self._y[idx_b]
+        return (dx * dx + dy * dy) ** 0.5
+
+    def _edge_exists(self, from_id: int, to_id: int, edge_type: EdgeType) -> bool:
+        """Check whether an edge already exists in the graph."""
+        if from_id not in self._id_to_index or to_id not in self._id_to_index:
+            return True  # treat as "exists" so we skip adding
+        u = self._id_to_index[from_id]
+        v = self._id_to_index[to_id]
+        return (u, v, int(edge_type)) in self._seen_edges
+
     def _connect_endpoints(
         self,
         endpoint_from: int,
@@ -139,27 +155,21 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
         if (
             # No need to connect if already connected
-            right_to not in self.id_adj_list.get(right_from, [])
+            not self._edge_exists(right_from, right_to, right_edge_type)
             # Check if the distance is within the allowed range
-            and self.nodes[right_to].distance_to(self.nodes[right_from])
-            < self.max_distance_between_connections
+            and self._node_distance(right_from, right_to) < self.max_distance_between_connections
         ):
             # Connect right endpoints
-            self.id_adj_list.setdefault(right_from, []).append(
-                (right_to, right_edge_type),
-            )
+            self.add_edge(right_from, right_to, right_edge_type)
 
         if (
             # No need to connect if already connected
-            left_to not in self.id_adj_list.get(left_from, [])
+            not self._edge_exists(left_from, left_to, left_edge_type)
             # Check if the distance is within the allowed range
-            and self.nodes[right_to].distance_to(self.nodes[right_from])
-            < self.max_distance_between_connections
+            and self._node_distance(left_from, left_to) < self.max_distance_between_connections
         ):
             # Connect left endpoints
-            self.id_adj_list.setdefault(left_from, []).append(
-                (left_to, left_edge_type),
-            )
+            self.add_edge(left_from, left_to, left_edge_type)
 
     def _build_segment_edges(
         self,
@@ -278,15 +288,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             dst_node = self.new_node(x=dst_vec[0], y=dst_vec[1])
             current_edge_type = edge_type_list[min(edge_idx, len(edge_type_list) - 1)]
 
-            for s, d, e in self.interpolate_edge(
-                prev_node,  # REUSE the existing node object
-                dst_node,
-                interp_distance=interp_distance,
-                edge_type=current_edge_type,
-            ):
-                self.add_edge(s, d, e)
-
-            interp_prev_id = prev_id
+            last_id = prev_id
             for s_id, d_id, e_type in self.interpolate_edge(
                 prev_node,
                 dst_node,
@@ -295,10 +297,10 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             ):
                 self.add_edge(s_id, d_id, e_type)
                 added_nodes.append(d_id)
-                interp_prev_id = d_id
+                last_id = d_id
 
             prev_node = dst_node
-            prev_id = interp_prev_id  # The last ID added is our new anchor
+            prev_id = last_id  # The last ID added is our new anchor
 
             # Advance indices
             i = j

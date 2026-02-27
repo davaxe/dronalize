@@ -4,8 +4,9 @@ from pathlib import Path
 
 from typing_extensions import override
 
-from preprocessing.core.categories import EdgeType
-from preprocessing.core.interface.map import GraphBuilder, IntIDNode
+from preprocessing.core.datatypes.categories import EdgeType
+from preprocessing.core.graph.builder import GraphBuilder
+from preprocessing.core.graph.nodes import IntIDNode
 from preprocessing.datasets.lyft.map import parser
 
 
