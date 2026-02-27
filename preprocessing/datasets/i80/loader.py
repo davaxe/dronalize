@@ -6,12 +6,11 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from preprocessing.common.trajectory_utils.basic import (
-    yaw_from_vel,
-)
+from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.filter import rebalance_highway_agents
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
+from preprocessing.core import map_context as mc
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
@@ -87,8 +86,8 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
         )
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-        yield from prepare_agent_trajectories(
+    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        for df in prepare_agent_trajectories(
             rebalance_highway_agents(source, ratio=self._rebalance_ratio).drop("lane_changes")
             if self._rebalance_ratio
             else source.drop("lane_changes"),
@@ -96,7 +95,8 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
             add_derivative=True,
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
-        )
+        ):
+            yield df, mc.Implicit()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

@@ -9,6 +9,7 @@ from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.filter import rebalance_highway_agents
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
+from preprocessing.core import map_context as mc
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
@@ -96,20 +97,25 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             columns = recording_meta_data.columns
+            meta_df = (
+                pl
+                .scan_csv(meta, schema_overrides=self.meta_schema())
+                .select(*self.meta_data_select())
+                .with_columns(pl.lit(location_id).alias("location_id"))
+            )
+
             if "xUtmOrigin" in columns and "yUtmOrigin" in columns:
                 x_utm_origin = recording_meta_data.select(pl.col("xUtmOrigin")).item()
                 y_utm_origin = recording_meta_data.select(pl.col("yUtmOrigin")).item()
-                location_id = f"{location_id}_{x_utm_origin}_{y_utm_origin}"
+                meta_df = meta_df.with_columns(
+                    pl.lit(x_utm_origin).alias("x_utm_origin"),
+                    pl.lit(y_utm_origin).alias("y_utm_origin"),
+                )
 
-            meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-                *self.meta_data_select()
-            )
             tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
                 *self.track_data_select()
             )
-            combined = tracks_df.join(meta_df, left_on="id", right_on="id").with_columns(
-                pl.lit(location_id).alias("location_id")
-            )
+            combined = tracks_df.join(meta_df, left_on="id", right_on="id")
             yield i, combined
 
     @override
@@ -118,18 +124,24 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
         return num_files // 4 - 1
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         if self._rebalance_ratio is not None:
             source = rebalance_highway_agents(source, ratio=self._rebalance_ratio).drop(
                 "lane_changes"
             )
-        yield from prepare_agent_trajectories(
-            source, self.processor_config, forward_fill=["location_id"]
-        )
+
+        source_c = source.collect()
+        location_id = source_c.select(pl.col("location_id")).item()
+        utm_x0 = source_c.select(pl.col("x_utm_origin")).item()
+        utm_y0 = source_c.select(pl.col("y_utm_origin")).item()
+
+        for df in prepare_agent_trajectories(
+            source_c.lazy(), self.processor_config, forward_fill=["location_id"]
+        ):
+            yield df, mc.Explicit(str(location_id), utm_x0=utm_x0, utm_y0=utm_y0)
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        self.attach_to_scene({"map_information": pl.col("location_id").first()})
         return yaw_from_vel(df)
 
     @override

@@ -18,6 +18,7 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory
+from preprocessing.core import map_context as mc
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
@@ -60,9 +61,9 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
         return num_sources
 
     @override
-    def load_raw(self, source: Path) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: Path) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         source_data = EthUcyLoader._read_data_file(source)
-        yield from prepare_agent_trajectories(
+        for df in prepare_agent_trajectories(
             source_data,
             self.processor_config,
             add_derivative=True,
@@ -70,7 +71,8 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             sliding_col="frame",
             agent_category_col=None,
             derivative_rename=self.derivative_names(),
-        )
+        ):
+            yield df, None
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

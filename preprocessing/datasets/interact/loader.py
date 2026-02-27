@@ -11,6 +11,7 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
+from preprocessing.core import map_context as mc
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 
 if TYPE_CHECKING:
@@ -68,7 +69,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
         return (num_files + self._file_batch_size - 1) // self._file_batch_size
 
     @override
-    def load_raw(self, source: list[Path]) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: list[Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.processor_config.resampling or Resampling(1, 1)
         data = (
             pl
@@ -112,7 +113,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
         )
 
         for _, group in data_processed.collect().group_by(["file_id", "case_id"]):
-            yield group.lazy().drop("file_id", "case_id")
+            yield group.lazy().drop("file_id", "case_id"), mc.Implicit()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

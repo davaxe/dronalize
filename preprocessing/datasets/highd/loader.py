@@ -104,7 +104,7 @@ if __name__ == "__main__":
     count = 0
     for scene in processor.scenes():
         if count % 200 == 0:
-            print(scene.map_information)
+            print(scene.map_context)
             print(f"Processed {count} scenes")
         count += 1
     print(f"Total scenes processed: {count}")

@@ -7,6 +7,7 @@ from typing_extensions import override
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
+from preprocessing.core import map_context as mc
 from preprocessing.core.categories import AgentCategory
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 
@@ -66,7 +67,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         return batches + int(extra > 0)
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.processor_config.resampling or Resampling(1, 1)
 
         source_filtered = source.filter(
@@ -90,11 +91,13 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
             forward_fill=["agent_category"],
         )
         for _, group in source_resampled.collect().group_by(["file_id"]):
-            yield yaw_from_vel(group.lazy()).drop("file_id")
+            yield (
+                yaw_from_vel(group.lazy()).drop("file_id"),
+                mc.Explicit(str(group["map"].first())),
+            )
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        self.attach_to_scene(select_expr={"map_information": pl.col("map").first()}, properties={})
         return yaw_from_vel(df, yaw_col="yaw")
 
     @override

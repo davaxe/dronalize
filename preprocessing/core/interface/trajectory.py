@@ -2,20 +2,17 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Hashable, Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, Self, TypeVar
 
-import polars as pl
-
-from preprocessing.common.trajectory_utils.convert import (
-    convert_to_agent_data_dict,
-)
+from preprocessing.core.scene import Scene
 
 if TYPE_CHECKING:
-    from preprocessing.common.agent_data import AgentData
+    import polars as pl
+
     from preprocessing.core.categories import AgentCategory
-    from preprocessing.core.map_graph import MapGraph
+    from preprocessing.core.map_context import MapContext
 
 
 @dataclass(slots=True)
@@ -167,95 +164,7 @@ class LoaderConfig:
 
 T_Source = TypeVar("T_Source")
 T_Source_co = TypeVar("T_Source_co", covariant=True)
-T_ID = TypeVar("T_ID", bound=(Hashable))
-
-
-@dataclass(slots=True, frozen=True)
-class Scene(Generic[T_ID]):
-    """Scene data class wrapping a DataFrame and its identifier.
-
-    The dataframe is expected to atleast contain all columns defined in FrameDict.
-    """
-
-    inner: pl.DataFrame
-    """Inner DataFrame containing the scene data."""
-    identifier: T_ID
-    """Identifier for the scene (e.g., file name, index, scene name/token)."""
-    scene_number: int
-    """Unique scene number assigned during processing."""
-    input_len: int
-    """Number of observed frames."""
-    output_len: int
-    """Number of predicted frames."""
-    map: MapGraph | None = None
-    """Map graph associated with the scene. In some cases (e.g., Waymo), the map
-    and trajectory are stored in the same file, and it can be useful to include
-    the map graph in the scene data to avoid recomputing it for each scene."""
-    map_information: str | None = None
-    """Additional map information that can be used to determine what map corresponds to the scene."""
-
-    def to_agent_data(
-        self,
-        target_id: int | None = None,
-    ) -> AgentData:
-        """Convert `Scene` into a agent dictionary.
-
-        The dictionary is in format that is later compatible with pytorch
-        geometric HeteroData.
-
-        Args:
-            target_id: Optional track ID to use as the target node. If None, the
-                first valid track will be used as the target.
-
-        Returns:
-            Dictionary containing the agent data according to the
-            AgentData TypedDict.
-
-        """
-        return convert_to_agent_data_dict(
-            self.inner,
-            input_len=self.input_len,
-            output_len=self.output_len,
-            target_agent=target_id,
-        )
-
-    def enforce_schema(self, schema: pl.Schema | None = None) -> Self:
-        """Enforce the scene dataframe to follow a specified schema.
-
-        This will select relevant columns and try to cast if needed/possible.
-        If it is not possible to enforce schema, an error will be raised.
-
-        Args:
-            schema: schema to follow.
-
-        Returns:
-            Scene with enforced schema.
-
-        """
-        if schema is None:
-            schema = Scene._base_schema()
-        return replace(
-            self,
-            inner=self.inner.select([pl.col(name).cast(dtype) for name, dtype in schema.items()]),
-        )
-
-    @staticmethod
-    def _base_schema() -> pl.Schema:
-        return pl.Schema({
-            "frame": pl.UInt32(),
-            "id": pl.Int32(),
-            "x": pl.Float32(),
-            "y": pl.Float32(),
-            "vx": pl.Float32(),
-            "vy": pl.Float32(),
-            "ax": pl.Float32(),
-            "ay": pl.Float32(),
-            "yaw": pl.Float32(),
-            "agent_category": pl.Int32(),
-        })
-
-
-# TODO: Possibly rework how map and other metadata is attached to Scene.
+T_ID = TypeVar("T_ID", bound=Hashable)
 
 
 class SceneLoader(Protocol, Generic[T_ID, T_Source_co]):
@@ -355,7 +264,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source])
         """Discover and yield identifiers for each scene to process."""
 
     @abstractmethod
-    def load_raw(self, source: T_Source) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: T_Source) -> Iterable[tuple[pl.LazyFrame, MapContext]]:
         """Read the raw data source into one or more DataFrame(s) (any schema)."""
 
     @abstractmethod
@@ -393,41 +302,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source])
         _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
         return None
 
-    def attach_to_scene(
-        self,
-        select_expr: dict[str, pl.Expr] | None = None,
-        properties: dict[str, Any] | None = None,
-    ) -> None:
-        """Attach additional properties to the created scene.
-
-        Note that this is advanced and convoluted way to attach additional properties that will
-        likely be rewored in the future.
-
-        By default, the properties and expressions are attached to the created scene by conceptually
-        followng the code below. `scene_properties` are directly attached as attributes to the scene,
-        while `select_expr` are evaluated on the scene dataframe and attached as attributes to the
-        scene.
-
-        >>> scene = Scene[T_ID](
-            ..., # All other required fields
-            **scene_properties,
-            **{key: df.select(expr).item() for key, expr in select_expr.items()},
-        )
-
-        Args:
-            select_expr: A dictionary of {property_name: polars expression} to be evaluated on the
-                scene dataframe and attached as attributes to the scene. Will cause runtime error
-                if expression is not valid.
-            properties: A dictionary of {property_name: value} to be directly attached as attributes
-                to the scene. Will cause runtime error if property name is not valid.
-
-        """
-        if properties is not None:
-            self._attach_scene_properties.update(properties)
-        if select_expr is not None:
-            self._attach_scene_expr.update(select_expr)
-
-    def process_next(self, source: T_Source) -> Iterable[pl.DataFrame]:
+    def process_next(self, source: T_Source) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process a single data item through the pipeline.
 
         Steps:
@@ -445,10 +320,10 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source])
                 return None
             return df if not df.is_empty() else None
 
-        for raw_df in self.load_raw(source):
+        for raw_df, map_context in self.load_raw(source):
             df = _step(raw_df)
             if df is not None:
-                yield df
+                yield df, map_context
 
     def scenes(self) -> Iterable[Scene[T_ID]]:
         """Iterate over all sources and process them into scenes.
@@ -457,10 +332,12 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source])
         """
         for source_id, source in self.sources():
             self._source_counter += 1
-            for scene_df in self.process_next(source):
-                yield self.create_scene(scene_df, source_id)
+            for scene_df, map_context in self.process_next(source):
+                yield self.create_scene(scene_df, source_id, map_context)
 
-    def create_scene(self, df: pl.DataFrame, source_id: T_ID) -> Scene[T_ID]:
+    def create_scene(
+        self, df: pl.DataFrame, source_id: T_ID, map_context: MapContext
+    ) -> Scene[T_ID]:
         """Create a Scene object from the processed DataFrame and source identifier.
 
         This method also calls `Scene.enforce_schema()` if `self._enforce_schema` is True to ensure
@@ -470,6 +347,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source])
         Args:
             df: Processed DataFrame for the scene, expected to follow the common schema.
             source_id: Identifier for the scene source (e.g., file name, index).
+            map_context: Map context associated with the scene.
 
         """
         scene = Scene(
@@ -478,8 +356,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source])
             scene_number=self._count,
             input_len=self.input_len,
             output_len=self.output_len,
-            **self._attach_scene_properties,
-            **{key: df.select(expr).item() for key, expr in self._attach_scene_expr.items()},
+            map_context=map_context,
         )
         self._attach_scene_properties.clear()
         self._count += 1

@@ -9,6 +9,7 @@ from typing_extensions import override
 # Adjust imports to match your project structure
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
+from preprocessing.core import map_context as mc
 from preprocessing.core.categories import AgentCategory
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
@@ -77,7 +78,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
         return len(self._scene_cache)
 
     @override
-    def load_raw(self, source: str) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: str) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         scenes = (
             self
             ._scene_cache[source]
@@ -96,13 +97,14 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
             ],
         ).drop(["status", "full_category", "full_status"])
 
-        yield from prepare_agent_trajectories(
+        for df in prepare_agent_trajectories(
             scenes,
             config=self.processor_config,
             add_derivative=True,
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
-        )
+        ):
+            yield df, mc.Implicit()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

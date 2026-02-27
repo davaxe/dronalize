@@ -34,6 +34,58 @@ from preprocessing.core.map_graph import MapGraph
 ID = TypeVar("ID", bound=Hashable)
 
 
+@dataclass(slots=True, frozen=True)
+class Implicit:
+    """Indicates an implicit map context; map information is known without any additional info.
+
+    Commonly this is the case when there is only one possible map.
+    """
+
+    tag: Literal["Implicit"] = "Implicit"
+
+
+@dataclass(slots=True, frozen=True)
+class Explicit:
+    """Indicates an explicit map context; map information is provided explicitly for the scene."""
+
+    identifier: str
+    """Identifier for the map context, e.g., map name or token."""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    """Additional metadata required to determine the map."""
+    tag: Literal["ImplicitWithInfo"] = "ImplicitWithInfo"
+
+
+@dataclass(slots=True, frozen=True)
+class Loaded:
+    """Indicates a loaded map context; the map graph is directly provided."""
+
+    map: MapGraph
+    """The map graph directly provided for the scene."""
+    tag: Literal["Loaded"] = "Loaded"
+
+
+MapContext = Implicit | Explicit | Loaded | None
+
+
+def implicit_map_context() -> Implicit:
+    """Signify an implicit map context."""
+    return Implicit()
+
+
+def explicit_map_context(identifier: str, **metadata: Any) -> Explicit:  # noqa: ANN401
+    """Create an explicit map context with the given identifier and metadata."""
+    return Explicit(identifier=identifier, metadata=metadata or {})
+
+
+def loaded_map_context(map_graph: MapGraph) -> Loaded:
+    """Create a loaded map context with the given map graph."""
+    return Loaded(map=map_graph)
+
+
+def no_map_context() -> None:
+    """Signify no map context."""
+
+
 class BaseMapObject(Protocol, Generic[ID]):
     """Base class for all map objects in a NuScenes map."""
 

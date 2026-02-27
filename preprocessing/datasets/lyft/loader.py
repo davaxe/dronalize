@@ -12,6 +12,7 @@ from zarr.creation import open_array
 
 from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.process import prepare_agent_trajectories
+from preprocessing.core import map_context as mc
 from preprocessing.core.categories import AgentCategory
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig
 
@@ -74,7 +75,7 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
         return (self._total_scenes + self._batch_size - 1) // self._batch_size
 
     @override
-    def load_raw(self, source: _Source) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: _Source) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         scene_interval = source.interval
         if scene_interval is not None:
             start, end = scene_interval
@@ -98,13 +99,14 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
                 agent_offset=agent_start,
             )[1].lazy()
 
-            yield from prepare_agent_trajectories(
+            for df in prepare_agent_trajectories(
                 scenes,
                 config=self.processor_config,
                 add_derivative=True,
                 add_second_derivative=True,
                 derivative_rename=self.derivative_names(),
-            )
+            ):
+                yield df, mc.Implicit()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

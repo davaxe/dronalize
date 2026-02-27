@@ -12,6 +12,7 @@ from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
 from preprocessing.core import AgentCategory
+from preprocessing.core import map_context as mc
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 from preprocessing.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from preprocessing.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
@@ -85,21 +86,21 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         return sum(1 for _ in self._data_dir.glob(self._filter_str))
 
     @override
-    def load_raw(self, source: Path) -> Iterable[pl.LazyFrame]:
-        for raw_data in _read_tfrecord(source):
+    def load_raw(self, source: Path) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        for i, raw_data in enumerate(_read_tfrecord(source)):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
             # Map processing remains per-scenario (if needed)
+            map_context: mc.MapContext = mc.Explicit(str(source), record_index=i)
             if self._include_map:
                 map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
                 current_map = WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
                     min_distance=self._min_distance,
                     interp_distance=self._interp_distance,
                 )
-                # This attaches the map to the field `map` of the returned Scene object
-                self.attach_to_scene(properties={"map": current_map})
+                map_context = mc.Loaded(current_map)
 
-            yield _scenario_to_polars(scenario).lazy()
+            yield _scenario_to_polars(scenario).lazy(), map_context
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
@@ -251,7 +252,7 @@ if __name__ == "__main__":
         if count % 500 == 0:
             print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f}s")
         count += 1
-        print(_scene.map)
+        print(_scene.map_context)
         break
 
     print(f"Finished processing {count} scenes in {time.perf_counter() - start_time:.2f}s")

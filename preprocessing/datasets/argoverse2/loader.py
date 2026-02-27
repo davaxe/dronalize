@@ -8,6 +8,7 @@ from preprocessing.common.trajectory_utils.basic import yaw_from_vel
 from preprocessing.common.trajectory_utils.derivative import derivative
 from preprocessing.common.trajectory_utils.filter import filter_scene_expr
 from preprocessing.common.trajectory_utils.resample import resample_tracks
+from preprocessing.core import map_context as mc
 from preprocessing.core.categories import AgentCategory
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Resampling
 
@@ -79,7 +80,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         return batches + int(extra > 0)
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
+    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.processor_config.resampling or Resampling(1, 1)
         source_filtered = source.filter(
             filter_scene_expr(
@@ -115,14 +116,10 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             )
 
         for _, group in source_resampled.collect().group_by(["file_id"]):
-            yield group.lazy()
+            yield group.lazy(), mc.Explicit(str(group["map_path"].first()))
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        # Attach map information to the scene to easily access it later
-        self.attach_to_scene(
-            select_expr={"map_information": pl.col("map_path").first()}, properties={}
-        )
         return df
 
     @override
@@ -165,7 +162,7 @@ if __name__ == "__main__":
     for scene in processor.scenes():
         count += 1
         if count % 200 == 0:
-            print(scene.map_information)
+            print(scene.map_context)
             print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f} seconds")
 
     print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f} seconds")
