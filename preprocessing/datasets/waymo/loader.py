@@ -38,7 +38,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         self,
         data_dir: Path | str,
         filter_str: FilterStr,
-        processor_config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
         *,
         include_map: bool = True,
         interp_distance: float | None = None,
@@ -60,7 +60,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             data_dir: directory containing the TFRecord files.
             filter_str: string pattern to filter TFRecord files
                 (e.g., "*validation.tfrecord*").
-            processor_config: Configuration if not default.
+            loader_config: Configuration if not default.
             include_map: Whether to include map data in the scene. Defaults to True.
             interp_distance: Distance threshold for interpolating map points.
                 Defaults to None (no interpolation).
@@ -68,7 +68,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
                 Defaults to 1.5 meters.
 
         """
-        super().__init__(processor_config=processor_config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
         self._data_dir: Path = Path(data_dir) if isinstance(data_dir, str) else data_dir
         self._filter_str: FilterStr = filter_str
         self._include_map: bool = include_map
@@ -104,10 +104,10 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        resampling = self.processor_config.resampling or Resampling(1, 1)
+        resampling = self.loader_config.resampling or Resampling(1, 1)
         df_filtered = df.filter(
             filter_scene_expr(
-                self.processor_config,
+                self.loader_config,
                 category_column="agent_category",
             )
         )
@@ -119,7 +119,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             add_derivative=resampling.method == "spline",
             add_second_derivative=resampling.method == "spline",
             method=resampling.method,
-            dt=self.processor_config.sample_time,
+            dt=self.loader_config.sample_time,
             derivative_rename=self.derivative_names(),
             forward_fill=["agent_category"],
         )
@@ -129,7 +129,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
                 df_resampled,
                 "vx",
                 "vy",
-                dt=self.processor_config.sample_time,
+                dt=self.loader_config.sample_time,
                 derivative_rename={1: ["ax", "ay"]},
             )
 

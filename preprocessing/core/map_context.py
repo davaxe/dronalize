@@ -28,11 +28,11 @@ class Explicit:
     """Identifier for the map context, e.g., map name or token."""
     metadata: dict[str, Any] = field(default_factory=dict)
     """Additional metadata required to determine the map."""
-    tag: Literal["ImplicitWithInfo"] = "ImplicitWithInfo"
+    tag: Literal["Explicit"] = "Explicit"
 
-    def __init__(self, identifer: str, **metadata: Any) -> None:  # noqa: ANN401
+    def __init__(self, identifier: str, **metadata: Any) -> None:  # noqa: ANN401
         """Initialize with the given identifier and metadata."""
-        object.__setattr__(self, "identifier", identifer)
+        object.__setattr__(self, "identifier", identifier)
         object.__setattr__(self, "metadata", metadata)
 
 

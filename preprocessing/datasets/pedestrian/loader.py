@@ -36,12 +36,12 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
         split: Literal["train", "val", "test"] = "train",
     ) -> None:
         """Initialize with the given configuration."""
-        super().__init__(processor_config=config, enforce_schema=True)
+        super().__init__(loader_config=config, enforce_schema=True)
         self._data_root = data_root
         self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
         self._split = split
-        self._window_params = self.processor_config.window_params
-        self._filtering_params = self.processor_config.scene_filtering
+        self._window_params = self.loader_config.window_params
+        self._filtering_params = self.loader_config.scene_filtering
 
     @override
     def sources(self) -> Iterable[tuple[str, Path]]:
@@ -65,7 +65,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
         source_data = EthUcyLoader._read_data_file(source)
         for df in prepare_agent_trajectories(
             source_data,
-            self.processor_config,
+            self.loader_config,
             add_derivative=True,
             add_second_derivative=True,
             sliding_col="frame",

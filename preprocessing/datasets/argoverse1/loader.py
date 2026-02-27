@@ -31,7 +31,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
             config: processor configuration override. If None, the default configuration will be used.
 
         """
-        super().__init__(processor_config=config, enforce_schema=True)
+        super().__init__(loader_config=config, enforce_schema=True)
         self._data_path = data_dir
         self._batch_size: int | None = file_batch_size
 
@@ -68,11 +68,11 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        resampling = self.processor_config.resampling or Resampling(1, 1)
+        resampling = self.loader_config.resampling or Resampling(1, 1)
 
         source_filtered = source.filter(
             filter_scene_expr(
-                self.processor_config,
+                self.loader_config,
                 group_by=["file_id"],
                 category_column="agent_category",
             )
@@ -86,7 +86,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
             add_derivative=True,
             add_second_derivative=True,
             method=resampling.method,
-            dt=self.processor_config.sample_time,
+            dt=self.loader_config.sample_time,
             derivative_rename=self.derivative_names(),
             forward_fill=["agent_category"],
         )

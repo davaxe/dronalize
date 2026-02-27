@@ -42,7 +42,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
                 non-lane changes.
 
         """
-        super().__init__(config, enforce_schema=False)
+        super().__init__(loader_config=config, enforce_schema=False)
         self._data_dir = data_dir
         self._rebalance_ratio = lane_change_ratio
 
@@ -91,7 +91,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
             rebalance_highway_agents(source, ratio=self._rebalance_ratio).drop("lane_changes")
             if self._rebalance_ratio
             else source.drop("lane_changes"),
-            self.processor_config,
+            self.loader_config,
             add_derivative=True,
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),

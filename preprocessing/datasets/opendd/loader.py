@@ -28,7 +28,7 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
             config: Processor configuration override. If None, the default configuration will be used.
 
         """
-        super().__init__(enforce_schema=True, processor_config=config)
+        super().__init__(enforce_schema=True, loader_config=config)
         self._conn = sqlite3.connect(database_path)
         self._cursor = self._conn.cursor()
 
@@ -84,7 +84,7 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
         )
         for df in prepare_agent_trajectories(
             scenes,
-            config=self.processor_config,
+            config=self.loader_config,
             add_derivative=True,
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),

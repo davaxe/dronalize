@@ -24,17 +24,17 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         self,
         data_dir: Path,
         file_batch_size: int | None = 100,
-        processor_config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the Argoverse2TrajectoryProcessor.
 
         Args:
             data_dir: Path to the directory containing the Parquet files.
             file_batch_size: Number of files to process in each batch.
-            processor_config: Configuration for the processor.
+            loader_config: Configuration for the loader.
 
         """
-        super().__init__(processor_config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
         self._data_dir = data_dir
         self._file_batch_size = file_batch_size
         self._unique_types: set[str] = set()
@@ -81,10 +81,10 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        resampling = self.processor_config.resampling or Resampling(1, 1)
+        resampling = self.loader_config.resampling or Resampling(1, 1)
         source_filtered = source.filter(
             filter_scene_expr(
-                self.processor_config,
+                self.loader_config,
                 group_by=["file_id"],
                 category_column="agent_category",
             )
@@ -95,7 +95,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
                 source_filtered,
                 "vx",
                 "vy",
-                dt=self.processor_config.sample_time,
+                dt=self.loader_config.sample_time,
                 group_by=["file_id"],
                 derivative_rename={1: ["ax", "ay"]},
             )
@@ -109,7 +109,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
                     add_derivative=True,
                     add_second_derivative=True,
                     method=resampling.method,
-                    dt=self.processor_config.sample_time,
+                    dt=self.loader_config.sample_time,
                     derivative_rename=self.derivative_names(),
                     forward_fill=["agent_category"],
                 )

@@ -50,7 +50,7 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
             config: processor configuration override. If None, the default configuration will be used.
 
         """
-        super().__init__(processor_config=config, enforce_schema=True)
+        super().__init__(loader_config=config, enforce_schema=True)
         self._zarr_path = Path(zarr_path)
         self._scenes: Array = open_array(self._zarr_path / "scenes", mode="r")
         self._frames: Array = open_array(self._zarr_path / "frames", mode="r")
@@ -101,7 +101,7 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
 
             for df in prepare_agent_trajectories(
                 scenes,
-                config=self.processor_config,
+                config=self.loader_config,
                 add_derivative=True,
                 add_second_derivative=True,
                 derivative_rename=self.derivative_names(),

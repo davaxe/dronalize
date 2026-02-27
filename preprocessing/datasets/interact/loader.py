@@ -48,7 +48,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
             msg = f"InteractionProcessor does not support window_params, but got {config.window_params}"
             raise ValueError(msg)
 
-        super().__init__(config, enforce_schema=True)
+        super().__init__(loader_config=config, enforce_schema=True)
         self._data_dir = data_dir
         self._file_batch_size: int | None = file_batch_size
 
@@ -70,7 +70,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
     @override
     def load_raw(self, source: list[Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        resampling = self.processor_config.resampling or Resampling(1, 1)
+        resampling = self.loader_config.resampling or Resampling(1, 1)
         data = (
             pl
             .scan_csv(source, include_file_paths="file_id", schema=_SCHEMA)
@@ -89,7 +89,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
         data_filtered = data.filter(
             filter_scene_expr(
-                self.processor_config,
+                self.loader_config,
                 group_by=["file_id", "case_id"],
                 category_column="agent_category",
             )
@@ -107,7 +107,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
             add_derivative=False,
             add_second_derivative=False,
             method=resampling.method,
-            dt=self.processor_config.sample_time,
+            dt=self.loader_config.sample_time,
             derivative_rename=self.derivative_names(),
             forward_fill=["agent_category"],
         )

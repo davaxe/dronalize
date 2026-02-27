@@ -38,7 +38,7 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
             config: Optional processor configuration. If None, default configuration will be used.
 
         """
-        super().__init__(config, enforce_schema=False)
+        super().__init__(loader_config=config, enforce_schema=False)
         self._data_dir = data_dir
         self._rebalance_ratio = None
 
@@ -136,7 +136,7 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
         utm_y0 = source_c.select(pl.col("y_utm_origin")).item()
 
         for df in prepare_agent_trajectories(
-            source_c.lazy(), self.processor_config, forward_fill=["location_id"]
+            source_c.lazy(), self.loader_config, forward_fill=["location_id"]
         ):
             yield df, mc.Explicit(str(location_id), utm_x0=utm_x0, utm_y0=utm_y0)
 

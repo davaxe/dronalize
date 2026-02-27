@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Generic, NamedTuple, TypeVar
 import tqdm
 from typing_extensions import Self, override
 
+from preprocessing.core import map_context as mc
 from preprocessing.core.interface import BaseSceneLoader, LoaderConfig, Scene
 
 if TYPE_CHECKING:
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
 
 class ProgressBar(IntEnum):
-    """Enum to specify which progress bars to show when using ParallelLoader."""
+    """Enum to specify which progress bars to show when using ParallelSceneLoader."""
 
     NONE = 0
     """No progress bars."""
@@ -41,8 +42,8 @@ T_Source = TypeVar("T_Source")
 T_ID = TypeVar("T_ID", bound=(Hashable))
 
 
-class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
-    """A generic parallel data processor that wraps another DataProcessor.
+class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
+    """A generic parallel data loader that wraps another BaseSceneLoader.
 
     It uses Python's multiprocessing module to parallelize the processing of sources across multiple
     CPU cores. The number of processes and chunksize can be configured depending on workload.
@@ -78,23 +79,24 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
                overhead.
 
             4. Since `DataLoaders` utilizes Polars, which also uses multiple cores for processing,
-               there may be some contention for CPU resources between the multiprocessing in `ParallelLoader`
-               and the multithreading in Polars. Setting the environment variable `POLARS_MAX_THREADS=X`,
-               where X is a number that balances the workload between `ParallelLoader` and Polars.
-               An alternative option is to lower the `processes` parameter in this class.
+               there may be some contention for CPU resources between the multiprocessing in
+               `ParallelSceneLoader` and the multithreading in Polars. Setting the environment
+               variable `POLARS_MAX_THREADS=X`, where X is a number that balances the workload
+               between `ParallelSceneLoader` and Polars. An alternative option is to lower the
+               `processes` parameter in this class.
 
     """
 
     def __init__(
         self,
-        processor: BaseSceneLoader[T_ID, T_Source],
+        inner: BaseSceneLoader[T_ID, T_Source],
         chunksize: int | None = None,
         processes: int | None = None,
         *,
         maintain_order: bool = False,
         progress_bar: ProgressBar | bool = ProgressBar.NONE,
     ) -> None:
-        """Initialize with the given processor and multiprocessing configuration.
+        """Initialize with the given loader and multiprocessing configuration.
 
         Progress Bar Behavior:
             - If `progress_bar` is set to `ProgressBar.SOURCES`, a progress bar
@@ -109,7 +111,7 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
         scenes without a total, which can be less useful).
 
         Args:
-            processor: The underlying DataProcessor to use for processing each source.
+            inner: The underlying BaseSceneLoader to use for processing each source.
             chunksize: The number of sources to process in each batch when using multiprocessing.
                 Larger chunksizes can reduce overhead but may lead to less even load distribution
                 across processes. If `None` tries to automatically determine an optimal chunksize
@@ -123,15 +125,13 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
 
         """
         if processes is not None and processes <= 1:
-            msg = "number of processes must be greater than 1 for ParallelLoader."
+            msg = "number of processes must be greater than 1 for ParallelSceneLoader."
             raise ValueError(msg)
 
-        self._processor = processor
+        self._inner = inner
         self._mp_scene_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_source_counter: Synchronized[int] = mp.Value("i", 0)
-        self._chunksize: int = chunksize or self._optimal_chunksize(
-            processor.num_sources(), processes
-        )
+        self._chunksize: int = chunksize or self._optimal_chunksize(inner.num_sources(), processes)
         self._processes: int | None = processes
         self._maintain_order: bool = maintain_order
         self._progress_bar: ProgressBar = (
@@ -164,19 +164,19 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
 
     @override
     def sources(self) -> Iterable[tuple[T_ID, T_Source]]:
-        return self._processor.sources()
+        return self._inner.sources()
 
     @override
-    def load_raw(self, source: T_Source) -> Iterable[pl.LazyFrame]:
-        return self._processor.load_raw(source)
+    def load_raw(self, source: T_Source) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        return self._inner.load_raw(source)
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return self._processor.normalize(df)
+        return self._inner.normalize(df)
 
     @override
     def default_config(self) -> LoaderConfig:
-        return self._processor.default_config()
+        return self._inner.default_config()
 
     @override
     def scenes(self) -> Iterable[Scene[T_ID]]:
@@ -200,8 +200,8 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
         ):
             map_fn = pool.imap if self._maintain_order else pool.imap_unordered
             for scenes in map_fn(
-                ParallelLoader._process_fn,
-                (_ProcessArgs(s, self._processor) for s in self.sources()),
+                ParallelSceneLoader._process_fn,
+                (_ProcessArgs(s, self._inner) for s in self.sources()),
                 self._chunksize,
             ):
                 if self._progress_bar == ProgressBar.SOURCES:
@@ -239,8 +239,8 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
         ):
             map_fn = pool.imap if self._maintain_order else pool.imap_unordered
             work_iter = map_fn(
-                ParallelLoader._process_fn_callable,
-                (_ProcessArgs(s, self._processor, fn=callback) for s in self._processor.sources()),
+                ParallelSceneLoader._process_fn_callable,
+                (_ProcessArgs(s, self._inner, fn=callback) for s in self._inner.sources()),
                 self._chunksize,
             )
             if self._progress_bar == ProgressBar.NONE:
@@ -263,15 +263,15 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
     @staticmethod
     def _process_fn(args: _ProcessArgs[T_ID, T_Source]) -> list[Scene[T_ID]]:
         """Worker process function that processes a single source and returns a list of Scenes."""
-        processor = args.processor
+        loader = args.loader
         scenes: list[Scene[T_ID]] = []
         scene_number: int = -1
-        for scene_data in processor.process_next(args.source[1]):
+        for scene_data, map_context in loader.process_next(args.source[1]):
             with _scene_counter.get_lock():
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
 
-            scene = processor.create_scene(scene_data, args.source[0])
+            scene = loader.create_scene(scene_data, args.source[0], map_context)
             # Add a unique global scene number, since each worker will have its own local counter.
             scenes.append(replace(scene, scene_number=scene_number))
 
@@ -292,14 +292,14 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
             raise ValueError(msg)
 
         processed_scenes = 0
-        processor = args.processor
+        loader = args.loader
         scene_number: int = -1
-        for scene_data in processor.process_next(args.source[1]):
+        for scene_data, map_context in loader.process_next(args.source[1]):
             with _scene_counter.get_lock():
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
 
-            scene = processor.create_scene(scene_data, args.source[0])
+            scene = loader.create_scene(scene_data, args.source[0], map_context)
             scene = replace(scene, scene_number=scene_number)
             args.fn(scene)
             processed_scenes += 1
@@ -311,9 +311,9 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
 
     def _total(self) -> int | None:
         if self._progress_bar == ProgressBar.SOURCES:
-            return self._processor.num_sources()
+            return self._inner.num_sources()
         if self._progress_bar == ProgressBar.SCENES:
-            return self._processor.num_scenes()
+            return self._inner.num_scenes()
         return None
 
     def _tqdm_args(self) -> dict[str, Any]:
@@ -327,11 +327,15 @@ class ParallelLoader(BaseSceneLoader[T_ID, T_Source]):
         }
 
 
+# Backward compatibility alias
+ParallelLoader = ParallelSceneLoader
+
+
 class _ProcessArgs(NamedTuple, Generic[T_ID, T_Source]):
     """Arguments for processing a single source in a worker process."""
 
     source: tuple[T_ID, T_Source]
-    processor: BaseSceneLoader[T_ID, T_Source]
+    loader: BaseSceneLoader[T_ID, T_Source]
     fn: Callable[[Scene[T_ID]], None] | None = None
 
 
@@ -360,16 +364,16 @@ if __name__ == "__main__":
 
     directory = Path("/home/west/Developer/behavior-prediction/datasets/waymo/validation")
 
-    processor_single = WaymoLoader(
+    loader_single = WaymoLoader(
         directory,
         "*validation.tfrecord*",
         include_map=False,
         min_distance=2,
     )
-    processor = ParallelLoader(
-        processor_single,
+    loader = ParallelSceneLoader(
+        loader_single,
         maintain_order=False,
         chunksize=5,
         progress_bar=ProgressBar.SCENES,
     )
-    processor.scenes_callback(_dummy_fn)
+    loader.scenes_callback(_dummy_fn)

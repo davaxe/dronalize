@@ -29,7 +29,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
     def __init__(
         self,
         data_directory: Path | str,
-        processor_config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
         *,
         use_parquet_cache: bool = True,
         parquet_dir: Path | str | None = None,
@@ -46,13 +46,13 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
                 - ego_pose.json
                 - scene.json
                 - log.json
-            processor_config: configuration for the processor.
+            loader_config: configuration for the loader.
             use_parquet_cache: Wether to use parquet cache. This will make
                 subsequent processing faster.
             parquet_dir: directory to save the parquet cache files.
 
         """
-        super().__init__(processor_config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
         self.data_dir = Path(data_directory)
         self._dfs: dict[str, pl.LazyFrame] = {}
         self._use_parquet = use_parquet_cache
@@ -99,7 +99,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
 
         for df in prepare_agent_trajectories(
             scenes,
-            config=self.processor_config,
+            config=self.loader_config,
             add_derivative=True,
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),

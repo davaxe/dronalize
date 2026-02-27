@@ -16,16 +16,16 @@ class VodLoader(NuScenesLoader):
     def __init__(
         self,
         data_directory: Path | str,
-        processor_config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the processor.
 
         Args:
             data_directory: directory of tha trajectory data JSON files.
-            processor_config: custom configuration or default if None.
+            loader_config: custom configuration or default if None.
 
         """
-        super().__init__(data_directory, processor_config=processor_config)
+        super().__init__(data_directory, loader_config=loader_config)
         self._full_category_contains = [
             "vehicle.ego",
         ]
