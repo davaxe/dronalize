@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-import torch
+import numpy as np
 from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection
 
@@ -44,11 +44,10 @@ def plot_map_graph(
     end_pos = graph.node_positions[end_indices]
 
     # Stack to get (M, 2, 2) array where each row is [[x1, y1], [x2, y2]]
-    segments = torch.stack((start_pos, end_pos), dim=1).cpu().numpy()
+    segments = np.stack((start_pos, end_pos), axis=1)
 
     # 2. Define Styles based on EdgeType
     # Map EdgeType to (color, linewidth, linestyle)
-    # Colors: using hex or standard names
     style_map = {
         EdgeType.NONE: ("gray", 0.5, "solid"),
         EdgeType.ROAD_BORDER: ("black", 2.0, "solid"),
@@ -74,15 +73,14 @@ def plot_map_graph(
     # Doing one LineCollection per style group is often cleaner than passing lists
     # of styles to a single collection, though both work. Grouping allows valid legends.
 
-    # Move edge_types to CPU/numpy for iteration
-    edge_types_np = graph.edge_types.cpu().numpy()
+    edge_types_np = graph.edge_types
 
     # We iterate over unique edge types present in the graph to batch operations
-    present_types = torch.unique(graph.edge_types).cpu().numpy()
+    present_types = np.unique(edge_types_np)
 
     for et_int in present_types:
         try:
-            et = EdgeType(et_int)
+            et = EdgeType(int(et_int))
             color, lw, ls = style_map.get(et, default_style)
         except ValueError:
             color, lw, ls = default_style
@@ -105,8 +103,8 @@ def plot_map_graph(
     if include_nodes and graph.num_nodes > 0:
         # Plot nodes with a simple style (could be enhanced to differentiate types)
         ax.scatter(
-            graph.node_positions[:, 0].cpu(),
-            graph.node_positions[:, 1].cpu(),
+            graph.node_positions[:, 0],
+            graph.node_positions[:, 1],
             color="black",
             s=10,
             zorder=3,
@@ -119,8 +117,8 @@ def plot_map_graph(
     all_y = graph.node_positions[:, 1]
 
     if len(all_x) > 0:
-        ax.set_xlim(all_x.min().item() - 5, all_x.max().item() + 5)
-        ax.set_ylim(all_y.min().item() - 5, all_y.max().item() + 5)
+        ax.set_xlim(float(all_x.min()) - 5, float(all_x.max()) + 5)
+        ax.set_ylim(float(all_y.min()) - 5, float(all_y.max()) + 5)
 
     ax.set_aspect("equal")
     ax.legend(bbox_to_anchor=(1.05, 1), loc="upper left", borderaxespad=0.0)

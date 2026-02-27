@@ -9,7 +9,7 @@ from math import ceil
 from typing import Generic, Literal, TypedDict, TypeVar, overload
 
 import numpy as np
-import torch
+import numpy.typing as npt
 from typing_extensions import Self
 
 from preprocessing.core.datatypes.categories import EdgeType
@@ -209,13 +209,14 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
             A `MapGraph` object representing the graph.
 
         """
-        x_tensor = torch.tensor(self._x, dtype=torch.float32)
-        y_tensor = torch.tensor(self._y, dtype=torch.float32)
-        node_positions = torch.stack([x_tensor, y_tensor], dim=1)
+        node_positions = np.column_stack([
+            np.array(self._x, dtype=np.float32),
+            np.array(self._y, dtype=np.float32),
+        ])
 
-        # 2. Convert Edges to Tensor
-        edge_indices = torch.tensor([self._edge_src, self._edge_dst], dtype=torch.int64)
-        edge_types = torch.tensor(self._edge_types, dtype=torch.int64)
+        # 2. Convert edges to arrays
+        edge_indices = np.array([self._edge_src, self._edge_dst], dtype=np.int64)
+        edge_types = np.array(self._edge_types, dtype=np.int64)
 
         return MapGraph(
             edge_indices=edge_indices,
@@ -602,15 +603,15 @@ class Edges:
     dst_indices: list[int]
     edge_types: list[EdgeType]
 
-    def to_torch(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """Convert the edges to PyTorch tensors.
+    def to_numpy(self) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
+        """Convert the edges to NumPy arrays.
 
         Returns:
-            edge_indices (2xN), edge_types (Nx1) where N is the number of edges.
+            edge_indices ``(2, N)` and edge_types `(N,)`.
 
         """
-        edge_index = torch.tensor([self.src_indices, self.dst_indices], dtype=torch.long)
-        edge_attr = torch.tensor(self.edge_types, dtype=torch.long)
+        edge_index = np.array([self.src_indices, self.dst_indices], dtype=np.int64)
+        edge_attr = np.array(self.edge_types, dtype=np.int64)
         return edge_index, edge_attr
 
 

@@ -4,13 +4,11 @@ from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     Any,
-    Literal,
-    overload,
 )
 
 import numpy as np
-import torch
-from torch_geometric.utils import subgraph
+
+from preprocessing.core._compat import require_optional
 
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -18,39 +16,60 @@ if TYPE_CHECKING:
 
 @dataclass(init=False, repr=False)
 class MapGraph:
-    """Represents a graph structure for a map, including nodes and edges."""
+    """Represents a graph structure for a map, including nodes and edges.
+
+    All internal arrays use NumPy so that the core library does not depend on
+    PyTorch.  Conversion to `torch.Tensor` is available via
+    `to_torch_graph` (zero-copy when possible through
+    `torch.from_numpy`).
+    """
+
+    node_positions: npt.NDArray[np.float32]
+    """Node positions, shape `(N, 2)`."""
+
+    edge_indices: npt.NDArray[np.int64]
+    """Edge COO indices, shape `(2, M)`."""
+
+    node_types: npt.NDArray[np.int64]
+    """Per-node type labels, shape `(N,)`."""
+
+    edge_types: npt.NDArray[np.int64]
+    """Per-edge type labels, shape `(M,)`."""
+
+    num_nodes: int
+    """Number of nodes in the graph."""
+
+    num_edges: int
+    """Number of edges in the graph."""
 
     def __init__(
         self,
-        node_positions: torch.Tensor,
-        edge_indices: torch.Tensor,
-        node_types: torch.Tensor | None = None,
-        edge_types: torch.Tensor | None = None,
+        node_positions: npt.NDArray[np.float32],
+        edge_indices: npt.NDArray[np.int64],
+        node_types: npt.NDArray[np.int64] | None = None,
+        edge_types: npt.NDArray[np.int64] | None = None,
         *,
         return_if_empty: bool = True,
     ) -> None:
         """Initialize a `MapGraph` instance.
 
         Args:
-            node_positions: Tensor of shape (N, 2) representing the positions.
-            edge_indices: Tensor of shape (2, M) representing the edges,
-                where M is the number of edges.
-            node_types: Tensor of shape (N,) representing the node types.
-                Defaults to None, which means all nodes are of type 1.
-            edge_types: Tensor of shape (M,) representing the edge types.
-                Defaults to None, which means all edges are of type 1.
-            return_if_empty: if True, allows empty graphs and returns empty
-                tensors for node positions and edge indices. If False, raises
-                a ValueError if the input tensors are empty.
+            node_positions: array of shape `(N, 2)` with node positions.
+            edge_indices: array of shape `(2, M)` with edge endpoint indices.
+            node_types: array of shape `(N,)` with node type labels. Defaults to `None`, which means
+                all nodes are of type 1.
+            edge_types: array of shape `(M,)` with edge type labels. Defaults to `None`, which means
+                all edges are of type 1.
+            return_if_empty: if `True`, allows empty graphs and returns empty arrays.  If `False`,
+                raises `ValueError` when both `node_positions` and `edge_indices` are empty.
 
         """
-        # Check if the input tensors are empty
-        if node_positions.numel() == 0 and edge_indices.numel() == 0:
+        if node_positions.size == 0 and edge_indices.size == 0:
             if return_if_empty:
-                node_positions = torch.zeros((0, 2), dtype=torch.float)
-                edge_indices = torch.zeros((2, 0), dtype=torch.long)
-                node_types = torch.zeros((0,), dtype=torch.long)
-                edge_types = torch.zeros((0,), dtype=torch.long)
+                node_positions = np.zeros((0, 2), dtype=np.float32)
+                edge_indices = np.zeros((2, 0), dtype=np.int64)
+                node_types = np.zeros((0,), dtype=np.int64)
+                edge_types = np.zeros((0,), dtype=np.int64)
             else:
                 msg = (
                     "Node positions and edge indices cannot be empty."
@@ -58,208 +77,131 @@ class MapGraph:
                 )
                 raise ValueError(msg)
 
-        self.node_positions: torch.Tensor = node_positions
-        self.edge_indices: torch.Tensor = edge_indices
-        self.num_nodes: int = node_positions.shape[0]
-        self.num_edges: int = edge_indices.shape[1] if edge_indices.numel() > 0 else 0
-        self.node_types: torch.Tensor = (
-            node_types
+        self.node_positions = np.ascontiguousarray(node_positions, dtype=np.float32)
+        self.edge_indices = np.ascontiguousarray(edge_indices, dtype=np.int64)
+        self.num_nodes = int(node_positions.shape[0])
+        self.num_edges = int(edge_indices.shape[1]) if edge_indices.size > 0 else 0
+
+        self.node_types = (
+            np.ascontiguousarray(node_types, dtype=np.int64)
             if node_types is not None
-            else torch.ones(node_positions.shape[0], dtype=torch.long)
+            else np.ones(self.num_nodes, dtype=np.int64)
         )
 
-        self.edge_types: torch.Tensor = (
-            edge_types if edge_types is not None else torch.ones(self.num_edges, dtype=torch.long)
+        self.edge_types = (
+            np.ascontiguousarray(edge_types, dtype=np.int64)
+            if edge_types is not None
+            else np.ones(self.num_edges, dtype=np.int64)
         )
+
+    # ------------------------------------------------------------------
+    # Torch conversion (lazy import - zero-copy when possible)
+    # ------------------------------------------------------------------
 
     def to_torch_graph(self) -> dict[Any, Any]:
-        """Convert the MapGraph to a compatible format for PyTorch Geometric.
+        """Convert the `MapGraph` to a format compatible with PyTorch Geometric.
+
+        Uses `torch.from_numpy` for zero-copy conversion (the returned tensors share the same
+        underlying memory as the NumPy arrays).
 
         Returns:
-            dictionary with relevant data for PyTorch Geometric.
+            Dictionary with node and edge data suitable for PyTorch Geometric.
 
         """
+        torch = require_optional("torch", extra="torch")
+
         return {
             "map_point": {
                 "num_nodes": self.num_nodes,
-                "type": self.node_types,
-                "position": self.node_positions,
+                "type": torch.from_numpy(self.node_types),
+                "position": torch.from_numpy(self.node_positions),
             },
             ("map_point", "to", "map_point"): {
-                "edge_index": self.edge_indices,
-                "type": self.edge_types,
+                "edge_index": torch.from_numpy(self.edge_indices),
+                "type": torch.from_numpy(self.edge_types),
             },
         }
 
-    @overload
-    def extract_radius(
-        self,
-        center: torch.Tensor | tuple[float, float] | npt.NDArray[np.floating],
-        radius: float,
-        *,
-        return_as_dict: Literal[False] = False,
-    ) -> MapGraph: ...
-
-    @overload
-    def extract_radius(
-        self,
-        center: torch.Tensor | tuple[float, float] | npt.NDArray[np.floating],
-        radius: float,
-        *,
-        return_as_dict: Literal[True],
-    ) -> dict[Any, Any]: ...
+    # ------------------------------------------------------------------
+    # Subgraph extraction
+    # ------------------------------------------------------------------
 
     def extract_radius(
         self,
-        center: torch.Tensor | tuple[float, float] | npt.NDArray[np.floating],
+        center: tuple[float, float] | npt.NDArray[np.floating],
         radius: float,
-        *,
-        return_as_dict: bool = False,
-    ) -> MapGraph | dict[Any, Any]:
+    ) -> MapGraph:
         """Extract a subgraph within a specified radius from a center point.
 
         Args:
-            center: center of the radius as a tensor or tuple of (x, y).
+            center: center of the radius as a tuple `(x, y)` or array.
             radius: radius within which to extract nodes and edges.
-            return_as_dict: if True, returns the graph in a format compatible with
-                PyTorch Geometric. Otherwise, returns a `MapGraph` object.
 
         Returns:
-            A `MapGraph` object or a dictionary with relevant data for PyTorch
-            Geometric, depending on the value of `return_as_dict`.
+            A new `MapGraph` containing only the nodes and edges within the
+            given radius.
 
         """
-        if isinstance(center, tuple):
-            # Convert tuple to tensor
-            center = torch.tensor(center, dtype=torch.float32)
+        center_arr = np.asarray(center, dtype=np.float32)
 
-        elif isinstance(center, np.ndarray):
-            # Convert numpy array to tensor
-            center = torch.tensor(center, dtype=torch.float32)
+        # Squared-distance avoids the sqrt
+        diff = self.node_positions - center_arr
+        dist_sq = np.sum(diff * diff, axis=1)
+        within_mask: npt.NDArray[np.bool_] = dist_sq <= radius * radius
 
-        # Calculate distances from center to all nodes
-        distances: torch.Tensor = torch.norm(self.node_positions - center, dim=-1)
-
-        # Find nodes within radius
-        within_radius_mask = distances <= radius
-
-        # Use PyG's subgraph function to extract subgraph
-        new_edge_indices, _, edge_mask = subgraph(
-            subset=within_radius_mask,
-            edge_index=self.edge_indices,
-            relabel_nodes=True,
-            return_edge_mask=True,
-        )
-
-        # Extract filtered data
-        new_node_positions = self.node_positions[within_radius_mask]
-        new_node_types = self.node_types[within_radius_mask]
-        new_edge_types = self.edge_types[edge_mask]
-        map_graph = MapGraph(
-            node_positions=new_node_positions,
-            edge_indices=new_edge_indices,
-            node_types=new_node_types,
-            edge_types=new_edge_types,
-        )
-
-        if return_as_dict:
-            return map_graph.to_torch_graph()
-
-        return map_graph
-
-    @overload
-    def extract_bbox(
-        self,
-        center: torch.Tensor | tuple[float, float] | npt.NDArray[np.floating],
-        width: float,
-        height: float,
-        *,
-        return_as_dict: Literal[False] = False,
-    ) -> MapGraph: ...
-
-    @overload
-    def extract_bbox(
-        self,
-        center: torch.Tensor | tuple[float, float] | npt.NDArray[np.floating],
-        width: float,
-        height: float,
-        *,
-        return_as_dict: Literal[True],
-    ) -> dict[Any, Any]: ...
+        return self._subgraph_from_mask(within_mask)
 
     def extract_bbox(
         self,
-        center: torch.Tensor | tuple[float, float] | npt.NDArray[np.floating] | None,
+        center: tuple[float, float] | npt.NDArray[np.floating] | None,
         width: float,
         height: float,
-        *,
-        return_as_dict: bool = False,
-    ) -> MapGraph | dict[Any, Any]:
+    ) -> MapGraph:
         """Extract a subgraph within a bounding box.
 
         Args:
-            center: center of the bounding box as a tensor or tuple of (x, y). If `None` the
-                average position of all nodes is used as the center.
-            width: width of the bounding box. If None, it is calculated as
-                10% of the total width of the nodes. Defaults to None.
-            height: height of the bounding box. If None, it is calculated as
-                10% of the total height of the nodes. Defaults to None.
-            return_as_dict: if True, returns the graph in a format compatible with
-                PyTorch Geometric. Otherwise, returns a `MapGraph` object.
+            center: center of the bounding box as a tuple `(x, y)` or array. If `None`, the mean
+                position of all nodes is used.
+            width: full width of the bounding box.
+            height: full height of the bounding box.
 
         Returns:
-            A `MapGraph` object or a dictionary with relevant data for PyTorch
-            Geometric, depending on the value of `return_as_dict`.
+            A new `MapGraph` with only the nodes and edges inside the box.
 
         """
         if center is None:
-            # Mean position
-            center = torch.mean(self.node_positions, dim=0)
-        elif isinstance(center, tuple):
-            # Convert tuple to tensor
-            center = torch.tensor(center, dtype=torch.float32)
+            center_arr = np.mean(self.node_positions, axis=0)
+        else:
+            center_arr = np.asarray(center, dtype=np.float32)
 
-        # Calculate bounding box boundaries
-        half_width = width / 2.0
-        half_height = height / 2.0
+        half_w = width / 2.0
+        half_h = height / 2.0
 
-        min_x = center[0] - half_width
-        max_x = center[0] + half_width
-        min_y = center[1] - half_height
-        max_y = center[1] + half_height
+        x = self.node_positions[:, 0]
+        y = self.node_positions[:, 1]
 
-        # Find nodes within bounding box
-        x_coords = self.node_positions[:, 0]
-        y_coords = self.node_positions[:, 1]
-
-        within_bbox_mask = (
-            (x_coords >= min_x) & (x_coords <= max_x) & (y_coords >= min_y) & (y_coords <= max_y)
+        within_mask: npt.NDArray[np.bool_] = (
+            (x >= center_arr[0] - half_w)
+            & (x <= center_arr[0] + half_w)
+            & (y >= center_arr[1] - half_h)
+            & (y <= center_arr[1] + half_h)
         )
 
-        # Use PyG's subgraph function to extract subgraph
-        new_edge_indices, _, edge_mask = subgraph(
-            subset=within_bbox_mask,
-            edge_index=self.edge_indices,
-            relabel_nodes=True,
-            return_edge_mask=True,
-        )
+        return self._subgraph_from_mask(within_mask)
 
-        # Extract filtered data
-        new_node_positions = self.node_positions[within_bbox_mask]
-        new_node_types = self.node_types[within_bbox_mask]
-        new_edge_types = self.edge_types[edge_mask]
+    def _subgraph_from_mask(
+        self,
+        node_mask: npt.NDArray[np.bool_],
+    ) -> MapGraph:
+        """Build a new `MapGraph` from a boolean node mask."""
+        new_edge_indices, edge_mask = _extract_subgraph(node_mask, self.edge_indices)
 
-        map_graph = MapGraph(
-            node_positions=new_node_positions,
+        return MapGraph(
+            node_positions=self.node_positions[node_mask],
             edge_indices=new_edge_indices,
-            node_types=new_node_types,
-            edge_types=new_edge_types,
+            node_types=self.node_types[node_mask],
+            edge_types=self.edge_types[edge_mask],
         )
-
-        if return_as_dict:
-            return map_graph.to_torch_graph()
-
-        return map_graph
 
     def __str__(self) -> str:
         """Return a string representation of the MapGraph."""
@@ -275,8 +217,48 @@ class MapGraph:
         return (
             f"MapGraph(num_nodes={self.num_nodes}, "
             f"num_edges={self.num_edges}, "
-            f"node_positions={self.node_positions}, "
-            f"edge_indices={self.edge_indices}, "
-            f"node_types={self.node_types}, "
-            f"edge_types={self.edge_types})"
+            f"node_positions={self.node_positions!r}, "
+            f"edge_indices={self.edge_indices!r}, "
+            f"node_types={self.node_types!r}, "
+            f"edge_types={self.edge_types!r})"
         )
+
+
+def _extract_subgraph(
+    node_mask: npt.NDArray[np.bool_],
+    edge_indices: npt.NDArray[np.int64],
+) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
+    """Extract a subgraph given a boolean node mask.
+
+    This is a pure-NumPy replacement for `torch_geometric.utils.subgraph`. It filters edges so that
+    both endpoints belong to the selected node subset and relabels node indices to be contiguous (0
+    … K-1).
+
+    Args:
+        node_mask: boolean array of shape `(N,)` indicating which nodes to keep.
+        edge_indices: integer array of shape `(2, M)` with source/destination
+            indices for every edge.
+
+    Returns:
+        A tuple of:
+        - `new_edge_indices`: relabelled edge index array of shape `(2, M')`.
+        - `edge_mask`: boolean array of shape `(M,)` indicating which edges
+          were kept.
+
+    """
+    src = edge_indices[0]
+    dst = edge_indices[1]
+
+    # Keep only edges where *both* endpoints are in the subset
+    edge_mask: npt.NDArray[np.bool_] = node_mask[src] & node_mask[dst]
+
+    # Build a mapping from old node index → new contiguous index.
+    # Positions where node_mask is False get -1 (unused).
+    remap = np.full(node_mask.shape[0], -1, dtype=np.int64)
+    remap[node_mask] = np.arange(node_mask.sum(), dtype=np.int64)
+
+    kept_src = remap[src[edge_mask]]
+    kept_dst = remap[dst[edge_mask]]
+
+    new_edge_indices = np.stack([kept_src, kept_dst], axis=0)
+    return new_edge_indices, edge_mask
