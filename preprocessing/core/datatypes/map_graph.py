@@ -1,20 +1,93 @@
 from __future__ import annotations
 
+import multiprocessing.shared_memory as shm
 from dataclasses import dataclass
-from typing import (
-    TYPE_CHECKING,
-    Any,
-)
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from typing_extensions import Self
 
 from preprocessing.core._compat import require_optional
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     import numpy.typing as npt
 
 
-@dataclass(init=False, repr=False)
+class SharedMapGraph:
+    """Context manager for accessing a `MapGraph` stored in shared memory."""
+
+    def __init__(self, shared_name: str) -> None:
+        """Initialize the context manager with the name of the shared memory block."""
+        self._shared_name = shared_name
+        self._shared: shm.SharedMemory | None = None
+        self._map_graph: MapGraph | None = None
+
+    def open(self) -> MapGraph:
+        """Open the shared memory and return a `MapGraph` instance.
+
+        Raises:
+            RuntimeError: if the shared memory is already open or if there is an issue accessing it
+                (e.g., it doesn't exist or has been released).
+
+        """
+        if self._shared is not None:
+            msg = f"Shared memory with name '{self._shared_name}' is already open."
+            raise RuntimeError(msg)
+
+        self._shared = shm.SharedMemory(name=self._shared_name)
+
+        if self._shared.buf is None:
+            msg = f"Failed to access shared memory buffer with name '{self._shared_name}'"
+            raise RuntimeError(msg)
+
+        # Store the instance so we can release its pointers later
+        self._map_graph = MapGraph.from_buffer(self._shared.buf, read_only=True)
+        return self._map_graph
+
+    def close(self) -> None:
+        """Close the shared memory and release resources.
+
+        Raises:
+            RuntimeError: if the shared memory is not currently open.
+
+        """
+        if self._shared is None:
+            msg = f"Shared memory with name '{self._shared_name}' is not open."
+            raise RuntimeError(msg)
+
+        # Release the MapGraph's references to the shared memory arrays to allow cleanup.
+        if self._map_graph is not None:
+            self._map_graph.release()
+            self._map_graph = None
+
+        self._shared.close()
+
+    def __enter__(self) -> MapGraph:
+        """Access the `MapGraph` from shared memory, returning a `MapGraph`."""
+        return self.open()
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_t: TracebackType | None,
+    ) -> None:
+        """Release resources when exiting the context."""
+        self.close()
+
+    def __del__(self) -> None:
+        """Ensure shared memory is closed when the context manager is garbage collected."""
+        # Ensure shared memory is closed if the context manager was not used properly.
+        if self._shared is not None:
+            self._shared.close()
+
+        if self._map_graph is not None:
+            self._map_graph.release()
+
+
+@dataclass(init=False, repr=False, slots=True)
 class MapGraph:
     """Represents a graph structure for a map, including nodes and edges.
 
@@ -35,12 +108,6 @@ class MapGraph:
 
     edge_types: npt.NDArray[np.int64]
     """Per-edge type labels, shape `(M,)`."""
-
-    num_nodes: int
-    """Number of nodes in the graph."""
-
-    num_edges: int
-    """Number of edges in the graph."""
 
     def __init__(
         self,
@@ -79,8 +146,6 @@ class MapGraph:
 
         self.node_positions = np.ascontiguousarray(node_positions, dtype=np.float32)
         self.edge_indices = np.ascontiguousarray(edge_indices, dtype=np.int64)
-        self.num_nodes = int(node_positions.shape[0])
-        self.num_edges = int(edge_indices.shape[1]) if edge_indices.size > 0 else 0
 
         self.node_types = (
             np.ascontiguousarray(node_types, dtype=np.int64)
@@ -94,9 +159,102 @@ class MapGraph:
             else np.ones(self.num_edges, dtype=np.int64)
         )
 
-    # ------------------------------------------------------------------
-    # Torch conversion (lazy import - zero-copy when possible)
-    # ------------------------------------------------------------------
+    @property
+    def num_nodes(self) -> int:
+        """Return the number of nodes in the graph."""
+        return int(self.node_positions.shape[0])
+
+    @property
+    def num_edges(self) -> int:
+        """Return the number of edges in the graph."""
+        return int(self.edge_indices.shape[1])
+
+    def to_shared(self) -> shm.SharedMemory:
+        """Serialize the `MapGraph` to a shared memory block, including dimensions.
+
+        Returns:
+            `SharedMemory` object containing the serialized graph data.
+
+        """
+        # Pack the dimensions into an int64 array to serve as the header
+        header = np.array([self.num_nodes, self.num_edges], dtype=np.int64)
+
+        arrays_to_serialize = (
+            header,
+            self.node_positions,
+            self.edge_indices,
+            self.node_types,
+            self.edge_types,
+        )
+
+        total_bytes = sum(arr.nbytes for arr in arrays_to_serialize)
+        shared = shm.SharedMemory(create=True, size=total_bytes)
+
+        offset = 0
+        for arr in arrays_to_serialize:
+            target_arr = np.ndarray(arr.shape, dtype=arr.dtype, buffer=shared.buf, offset=offset)
+            np.copyto(target_arr, arr)
+            offset += arr.nbytes
+
+        return shared
+
+    @classmethod
+    def from_shared(cls, shared_name: str) -> SharedMapGraph:
+        """Create a `SharedMapGraph` context manager for accessing a graph in shared memory.
+
+        Example:
+            shared_name: str = ... # name for the shared memory
+            >>> with MapGraph.from_shared(shared_name, num_nodes, num_edges) as graph:
+                    ...   # graph is a MapGraph instance backed by shared memory
+        Args:
+            shared_name: name of the shared memory block containing the graph data.
+            num_nodes: number of nodes in the graph (metadata).
+            num_edges: number of edges in the graph (metadata).
+
+        """
+        return SharedMapGraph(shared_name)
+
+    @classmethod
+    def from_buffer(cls, buf: memoryview, *, read_only: bool = True) -> Self:
+        """Deserialize a `MapGraph` from a bytes buffer with embedded metadata."""
+        offset = 0
+
+        # Read the first two int64 values to get the dimensions
+        header = np.frombuffer(buf, dtype=np.int64, count=2, offset=offset)
+        n, m = int(header[0]), int(header[1])
+        offset += header.nbytes
+
+        positions = np.frombuffer(buf, dtype=np.float32, count=n * 2, offset=offset).reshape((n, 2))
+        offset += positions.nbytes
+
+        indices = np.frombuffer(buf, dtype=np.int64, count=m * 2, offset=offset).reshape((2, m))
+        offset += indices.nbytes
+
+        node_types = np.frombuffer(buf, dtype=np.int64, count=n, offset=offset)
+        offset += node_types.nbytes
+
+        edge_types = np.frombuffer(buf, dtype=np.int64, count=m, offset=offset)
+
+        if read_only:
+            for arr in (positions, indices, node_types, edge_types):
+                arr.flags.writeable = False
+
+        return cls(
+            node_positions=positions,
+            edge_indices=indices,
+            node_types=node_types,
+            edge_types=edge_types,
+        )
+
+    def release(self) -> None:
+        """Release references to the internal arrays to allow shared memory cleanup.
+
+        This will clear the internal arrays and is not intended for general use.
+        """
+        self.node_positions = np.array([], dtype=np.float32).reshape(0, 2)
+        self.edge_indices = np.array([], dtype=np.int64).reshape(2, 0)
+        self.node_types = np.array([], dtype=np.int64)
+        self.edge_types = np.array([], dtype=np.int64)
 
     def to_torch_graph(self) -> dict[Any, Any]:
         """Convert the `MapGraph` to a format compatible with PyTorch Geometric.
@@ -121,10 +279,6 @@ class MapGraph:
                 "type": torch.from_numpy(self.edge_types),
             },
         }
-
-    # ------------------------------------------------------------------
-    # Subgraph extraction
-    # ------------------------------------------------------------------
 
     def extract_radius(
         self,
