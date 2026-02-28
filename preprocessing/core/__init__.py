@@ -2,16 +2,6 @@
 
 # Domain models
 # Graph building
-from preprocessing.core.graph import (
-    Edges,
-    GraphBuilder,
-    InterpolationStage,
-    IntIDBaseMapObject,
-    IntIdBaseMapObject,
-    IntIDNode,
-    get_edges_from_adj_list,
-    interpolate_position,
-)
 from preprocessing.core.datatypes import (
     AgentCategory,
     EdgeType,
@@ -21,6 +11,16 @@ from preprocessing.core.datatypes import (
     MapContext,
     MapGraph,
     Scene,
+)
+from preprocessing.core.graph import (
+    Edges,
+    GraphBuilder,
+    InterpolationStage,
+    IntIDBaseMapObject,
+    IntIdBaseMapObject,
+    IntIDNode,
+    get_edges_from_adj_list,
+    interpolate_position,
 )
 
 # Parallel execution
@@ -44,36 +44,32 @@ from preprocessing.core.protocols import (
 )
 
 __all__ = [
-    # Models
     "AgentCategory",
-    "EdgeType",
-    "Explicit",
-    "Implicit",
-    "Loaded",
-    "MapContext",
-    "MapGraph",
-    "Scene",
-    # Protocols & loader ABCs
     "BaseEnum",
     "BaseMapObject",
     "BaseNode",
     "BaseSceneLoader",
-    "FilteringConfig",
-    "LoaderConfig",
-    "Resampling",
-    "SceneLoader",
-    "WindowParams",
-    # Graph
+    "EdgeType",
     "Edges",
+    "Explicit",
+    "FilteringConfig",
     "GraphBuilder",
+    "Implicit",
     "IntIDBaseMapObject",
     "IntIDNode",
     "IntIdBaseMapObject",
     "InterpolationStage",
-    "get_edges_from_adj_list",
-    "interpolate_position",
-    # Parallel
+    "Loaded",
+    "LoaderConfig",
+    "MapContext",
+    "MapGraph",
     "ParallelLoader",
     "ParallelSceneLoader",
     "ProgressBar",
+    "Resampling",
+    "Scene",
+    "SceneLoader",
+    "WindowParams",
+    "get_edges_from_adj_list",
+    "interpolate_position",
 ]

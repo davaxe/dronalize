@@ -3,9 +3,10 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-from preprocessing.common.agent_data import AgentData
 
 from preprocessing.core.datatypes.categories import AgentCategory
+
+# TODO: Update this when ready
 
 
 def convert_to_agent_data_dict(
@@ -15,7 +16,7 @@ def convert_to_agent_data_dict(
     target_agent: int | None = None,
     *,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> AgentData:
+) -> dict:
     """Convert `Scene` into a agent dictionary.
 
     The dictionary is in format that is later compatible with pytorch
@@ -83,24 +84,24 @@ def convert_to_agent_data_dict(
     else:
         type_array = raw_categories.astype(np.int32)
 
-    return AgentData(
-        num_nodes=num_agents,
-        ta_index=0,  # Target agent is forced to index 0
-        type=type_array,
-        inp_pos=pos[:, :input_len],
-        inp_vel=vel[:, :input_len],
-        inp_acc=acc[:, :input_len],
-        inp_yaw=yaw[:, :input_len],
-        trg_pos=pos[:, input_len:],
-        trg_vel=vel[:, input_len:],
-        trg_acc=acc[:, input_len:],
-        trg_yaw=yaw[:, input_len:],
-        input_mask=mask[:, :input_len],
-        valid_mask=mask[:, input_len:],
+    return {
+        "num_nodes": num_agents,
+        "ta_index": 0,  # Target agent is forced to index 0
+        "type": type_array,
+        "inp_pos": pos[:, :input_len],
+        "inp_vel": vel[:, :input_len],
+        "inp_acc": acc[:, :input_len],
+        "inp_yaw": yaw[:, :input_len],
+        "trg_pos": pos[:, input_len:],
+        "trg_vel": vel[:, input_len:],
+        "trg_acc": acc[:, input_len:],
+        "trg_yaw": yaw[:, input_len:],
+        "input_mask": mask[:, :input_len],
+        "valid_mask": mask[:, input_len:],
         # TODO: Correctly implement these masks
-        ma_mask=np.empty(1, dtype=bool),
-        sa_mask=np.empty(1, dtype=bool),
-    )
+        "ma_mask": np.empty(1, dtype=bool),
+        "sa_mask": np.empty(1, dtype=bool),
+    }
 
 
 def _extract_target_agent(

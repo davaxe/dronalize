@@ -7,9 +7,9 @@ import polars as pl
 from scipy.interpolate import UnivariateSpline
 from typing_extensions import Self, override
 
+from preprocessing.core.datatypes.categories import EdgeType
 from preprocessing.core.graph.builder import GraphBuilder
 from preprocessing.core.graph.nodes import IntIDNode
-from preprocessing.core.datatypes.categories import EdgeType
 
 
 @dataclass(slots=True, frozen=True)

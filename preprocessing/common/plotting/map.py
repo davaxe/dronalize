@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, Final
+
+import polars as pl
 
 from preprocessing.core._compat import require_optional
 from preprocessing.core.datatypes.categories import EdgeType
@@ -13,30 +16,36 @@ if TYPE_CHECKING:
 
 def plot_map_graph(
     graph: MapGraph,
-    width: int = 800,
-    height: int = 800,
+    width: int = 700,
+    height: int = 700,
     alpha: float = 0.7,
     *,
     include_nodes: bool = False,
+    disable_max_rows: bool = True,
+    **kwargs: Any,  # noqa: ANN401
 ) -> alt.Chart:
     """Plot a MapGraph using Altair.
 
     Args:
         graph: The MapGraph to plot.
-        width: Width of the chart in pixels. Defaults to 800.
-        height: Height of the chart in pixels. Defaults to 800.
+        width: Width of the chart in pixels. Defaults to 1000.
+        height: Height of the chart in pixels. Defaults to 1000.
         alpha: Transparency level for the edges. Defaults to 0.7.
         include_nodes: Whether to include node markers in the plot. Defaults to False.
+        disable_max_rows: Automatically bypass Altair's 5000 row limit. Defaults to True.
+        **kwargs: Additional keyword arguments to pass to `alt.Chart.properties()`.
 
     Returns:
         An Altair Chart object.
 
     """
     alt = require_optional("altair", extra="plot")
-    pd = require_optional("pandas", extra="plot")
+
+    if disable_max_rows:
+        alt.data_transformers.disable_max_rows()
 
     if graph.num_edges == 0:
-        return alt.Chart(pd.DataFrame()).mark_text().encode(text=alt.value("Empty Graph"))
+        return alt.Chart(pl.DataFrame()).mark_text(size=16).encode(text=alt.value("Empty Graph"))
 
     # 1. Prepare segments into a DataFrame
     start_indices = graph.edge_indices[0]
@@ -45,153 +54,161 @@ def plot_map_graph(
     start_pos = graph.node_positions[start_indices]
     end_pos = graph.node_positions[end_indices]
 
-    df_edges = pd.DataFrame({
-        "x1": start_pos[:, 0],
-        "y1": start_pos[:, 1],
-        "x2": end_pos[:, 0],
-        "y2": end_pos[:, 1],
-        "edge_type_int": graph.edge_types,
-    })
-
-    # Map integer types to human-readable names
-    df_edges["edge_type"] = df_edges["edge_type_int"].apply(
-        lambda x: (
-            EdgeType(x).name.replace("_", " ").title()
-            if x in {item.value for item in EdgeType}
-            else EdgeType.VIRTUAL.name.title()
+    df_edges = (
+        pl
+        .DataFrame({
+            "x1": start_pos[:, 0],
+            "y1": start_pos[:, 1],
+            "x2": end_pos[:, 0],
+            "y2": end_pos[:, 1],
+            "edge_type_int": graph.edge_types,
+        })
+        .with_columns(
+            pl
+            .col("edge_type_int")
+            .replace(_ALL_EDGE_TYPES, default=EdgeType.VIRTUAL.name.title())
+            .alias("edge_type"),
+            ((pl.col("x1") - pl.col("x2")) ** 2 + (pl.col("y1") - pl.col("y2")) ** 2)
+            .sqrt()
+            .alias("length"),
         )
+        .drop("edge_type_int")
     )
 
-    # Extract unique types present in the data to build scales
-    present_types = df_edges["edge_type"].unique().tolist()
+    # 2. Dynamically build domains and ranges for *only* the data present
+    color_dict, width_dict, dash_dict = _get_altair_style_dicts()
 
-    domain = []
-    range_color = []
-    range_width = []
-    range_dash = []
+    present_types = df_edges["edge_type"].unique().to_list()
+    present_types.sort()
 
-    for pt in present_types:
-        style = _STYLE_MAP.get(pt, {"color": "gray", "width": 1.0, "dash": [1, 0]})
-        domain.append(pt)
-        range_color.append(style["color"])
-        range_width.append(style["width"])
-        range_dash.append(style["dash"])
+    plot_domain = present_types
+    plot_color = [color_dict.get(pt, "gray") for pt in present_types]
+    plot_width = [width_dict.get(pt, 1.0) for pt in present_types]
+    plot_dash = [dash_dict.get(pt, [1, 0]) for pt in present_types]
 
-    # Disable zero-baseline to mimic Matplotlib's auto-scaling logic for spatial coordinates
     axis_scale = alt.Scale(zero=False)
 
-    # 3. Create the lines chart
+    # 3. Setup Legend Selection
+    edge_selection = alt.selection_point(fields=["edge_type"], bind="legend")
+
+    # 4. Create the lines chart
     lines = (
         alt
         .Chart(df_edges)
-        .mark_rule(opacity=alpha)
+        .mark_rule()
         .encode(
-            x=alt.X("x1", scale=axis_scale, title="X"),
-            y=alt.Y("y1", scale=axis_scale, title="Y"),
+            x=alt.X("x1", scale=axis_scale, title="X", axis=alt.Axis(grid=False)),
+            y=alt.Y("y1", scale=axis_scale, title="Y", axis=alt.Axis(grid=False)),
             x2="x2",
             y2="y2",
             color=alt.Color(
                 "edge_type:N",
-                scale=alt.Scale(domain=domain, range=range_color),
-                title="Edge Type",
+                scale=alt.Scale(domain=plot_domain, range=plot_color),
+                legend=alt.Legend(
+                    title="Edge Type",
+                    symbolType="stroke",
+                    symbolStrokeWidth=3,
+                    orient="right",
+                ),
             ),
             size=alt.Size(
-                "edge_type:N", scale=alt.Scale(domain=domain, range=range_width), legend=None
+                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_width), legend=None
             ),
             strokeDash=alt.StrokeDash(
-                "edge_type:N", scale=alt.Scale(domain=domain, range=range_dash), legend=None
+                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_dash), legend=None
             ),
+            opacity=alt.when(edge_selection).then(alt.value(alpha)).otherwise(alt.value(0.05)),
             tooltip=[
                 alt.Tooltip("edge_type:N", title="Type"),
                 alt.Tooltip("x1:Q", title="Start X", format=".2f"),
                 alt.Tooltip("y1:Q", title="Start Y", format=".2f"),
                 alt.Tooltip("x2:Q", title="End X", format=".2f"),
                 alt.Tooltip("y2:Q", title="End Y", format=".2f"),
+                alt.Tooltip("length:Q", title="Length", format=".2f"),
             ],
         )
     )
 
-    chart = lines
+    layers = [lines]
 
-    # 4. Create the nodes chart if requested
-    if include_nodes and graph.num_nodes > 0:
-        df_nodes = pd.DataFrame({
-            "x": graph.node_positions[:, 0],
-            "y": graph.node_positions[:, 1],
-        })
-        nodes = (
+    # 5. Create the nodes charts mapped directly to the edge properties
+    if include_nodes and graph.num_edges > 0:
+        # Start nodes of the edges
+        nodes_start = (
             alt
-            .Chart(df_nodes)
+            .Chart(df_edges)
             .mark_circle(color="black", size=15)
             .encode(
-                x=alt.X("x", scale=axis_scale),
-                y=alt.Y("y", scale=axis_scale),
+                x=alt.X("x1", scale=axis_scale),
+                y=alt.Y("y1", scale=axis_scale),
+                opacity=alt.when(edge_selection).then(alt.value(1.0)).otherwise(alt.value(0.05)),
                 tooltip=[
-                    alt.Tooltip("x:Q", title="Node X", format=".2f"),
-                    alt.Tooltip("y:Q", title="Node Y", format=".2f"),
+                    alt.Tooltip("x1:Q", title="Node X", format=".2f"),
+                    alt.Tooltip("y1:Q", title="Node Y", format=".2f"),
                 ],
             )
         )
-        chart = lines + nodes
+        # End nodes of the edges
+        nodes_end = (
+            alt
+            .Chart(df_edges)
+            .mark_circle(color="black", size=15)
+            .encode(
+                x=alt.X("x2", scale=axis_scale),
+                y=alt.Y("y2", scale=axis_scale),
+                opacity=alt.when(edge_selection).then(alt.value(1.0)).otherwise(alt.value(0.05)),
+                tooltip=[
+                    alt.Tooltip("x2:Q", title="Node X", format=".2f"),
+                    alt.Tooltip("y2:Q", title="Node Y", format=".2f"),
+                ],
+            )
+        )
+        layers.extend([nodes_start, nodes_end])
 
-    # 5. Apply chart properties and interactivity
-    return chart.properties(width=width, height=height).interactive()
+    # 6. Apply chart properties, global text configurations, and bind the selection at the root layer
+    return (
+        alt
+        .layer(*layers)
+        .add_params(edge_selection)
+        .properties(width=width, height=height, title="Map Graph Visualization", **kwargs)
+        .configure_view(stroke=None)
+        .configure_title(fontSize=22)
+        .configure_axis(labelFontSize=14, titleFontSize=16)
+        .configure_legend(labelFontSize=14, titleFontSize=16)
+        .interactive()
+    )
 
 
-_STYLE_MAP: Final[dict] = {
-    EdgeType.NONE.name.title(): {"color": "gray", "width": 0.5, "dash": [1, 0]},
-    EdgeType.ROAD_BORDER.name.replace("_", " ").title(): {
-        "color": "black",
-        "width": 2.0,
-        "dash": [1, 0],
-    },
-    EdgeType.CURB.name.title(): {"color": "black", "width": 2.5, "dash": [1, 0]},
-    EdgeType.REGULATORY.name.title(): {"color": "red", "width": 1.0, "dash": [1, 0]},
-    EdgeType.VIRTUAL.name.title(): {"color": "blue", "width": 0.5, "dash": [2, 2]},
-    EdgeType.LINE_THIN.name.replace("_", " ").title(): {
-        "color": "gray",
-        "width": 1.0,
-        "dash": [1, 0],
-    },
-    EdgeType.LINE_THIN_DASHED.name.replace("_", " ").title(): {
-        "color": "gray",
-        "width": 1.0,
-        "dash": [5, 5],
-    },
-    EdgeType.LINE_THICK.name.replace("_", " ").title(): {
-        "color": "gray",
-        "width": 2.0,
-        "dash": [1, 0],
-    },
-    EdgeType.LINE_THICK_DASHED.name.replace("_", " ").title(): {
-        "color": "gray",
-        "width": 2.0,
-        "dash": [5, 5],
-    },
-    EdgeType.PEDESTRIAN_MARKING.name.replace("_", " ").title(): {
-        "color": "orange",
-        "width": 1.5,
-        "dash": [5, 5],
-    },
-    EdgeType.BIKE_MARKING.name.replace("_", " ").title(): {
-        "color": "green",
-        "width": 1.5,
-        "dash": [5, 5],
-    },
-    EdgeType.GUARD_RAIL.name.replace("_", " ").title(): {
-        "color": "purple",
-        "width": 2.0,
-        "dash": [1, 0],
-    },
-    EdgeType.STOP.name.title(): {"color": "red", "width": 3.0, "dash": [1, 0]},
-    EdgeType.LINE_THIN_DOUBLE.name.replace("_", " ").title(): {
-        "color": "#D4AF37",
-        "width": 2.0,
-        "dash": [1, 0],
-    },  # Gold/Yellow
-    EdgeType.LINE_THIN_DOUBLE_DASHED.name.replace("_", " ").title(): {
-        "color": "#D4AF37",
-        "width": 2.0,
-        "dash": [5, 5],
-    },
+_STYLE_MAP: Final[dict[int, dict]] = {
+    EdgeType.NONE.value: {"color": "gray", "width": 0.5, "dash": [1, 0]},
+    EdgeType.ROAD_BORDER.value: {"color": "black", "width": 2.0, "dash": [1, 0]},
+    EdgeType.CURB.value: {"color": "black", "width": 2.5, "dash": [1, 0]},
+    EdgeType.REGULATORY.value: {"color": "red", "width": 1.0, "dash": [1, 0]},
+    EdgeType.VIRTUAL.value: {"color": "blue", "width": 0.5, "dash": [2, 2]},
+    EdgeType.LINE_THIN.value: {"color": "gray", "width": 1.0, "dash": [1, 0]},
+    EdgeType.LINE_THIN_DASHED.value: {"color": "gray", "width": 1.0, "dash": [5, 5]},
+    EdgeType.LINE_THICK.value: {"color": "gray", "width": 2.0, "dash": [1, 0]},
+    EdgeType.LINE_THICK_DASHED.value: {"color": "gray", "width": 2.0, "dash": [5, 5]},
+    EdgeType.PEDESTRIAN_MARKING.value: {"color": "orange", "width": 1.5, "dash": [5, 5]},
+    EdgeType.BIKE_MARKING.value: {"color": "green", "width": 1.5, "dash": [5, 5]},
+    EdgeType.GUARD_RAIL.value: {"color": "purple", "width": 2.0, "dash": [1, 0]},
+    EdgeType.STOP.value: {"color": "red", "width": 3.0, "dash": [1, 0]},
+    EdgeType.LINE_THIN_DOUBLE.value: {"color": "#D4AF37", "width": 2.0, "dash": [1, 0]},
+    EdgeType.LINE_THIN_DOUBLE_DASHED.value: {"color": "#D4AF37", "width": 2.0, "dash": [5, 5]},
 }
+
+_ALL_EDGE_TYPES: Final[dict[int, str]] = {
+    item.value: item.name.replace("_", " ").title() for item in EdgeType
+}
+
+
+@lru_cache(maxsize=1)
+def _get_altair_style_dicts() -> tuple[dict[str, str], dict[str, float], dict[str, list[int]]]:
+    """Cache the styling mappings as dictionaries keyed by the string name."""
+    colors, widths, dashes = {}, {}, {}
+    for val, name in _ALL_EDGE_TYPES.items():
+        style = _STYLE_MAP.get(val, {"color": "gray", "width": 1.0, "dash": [1, 0]})
+        colors[name] = style["color"]
+        widths[name] = style["width"]
+        dashes[name] = style["dash"]
+    return colors, widths, dashes

@@ -1,9 +1,8 @@
 from collections.abc import Callable
 from pathlib import Path
 
-import osmium as osm
 import utm
-from osmium.osm import Node, Way
+from osmium import SimpleHandler, osm
 from typing_extensions import override
 
 from preprocessing.core.datatypes.categories import EdgeType
@@ -11,7 +10,7 @@ from preprocessing.core.graph.builder import GraphBuilder
 from preprocessing.core.graph.nodes import IntIDNode
 
 
-class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
+class OSMMapGraphBuilder(SimpleHandler, GraphBuilder[int, IntIDNode]):
     """GraphBuilder implementation that constructs a MapGraph from OpenStreetMap (OSM) data.
 
     This is for instance useful for:
@@ -24,7 +23,9 @@ class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
         self,
         osm_file: Path,
         utm_position_offset: tuple[float, float] = (0.0, 0.0),
-        edge_type_mapping: Callable[[Way], EdgeType] | None = None,
+        edge_type_mapping: Callable[[osm.Way], EdgeType] | None = None,
+        *,
+        include_edge_type_none: bool = False,
     ) -> None:
         """Initialize the OSMMapGraphBuilder.
 
@@ -33,6 +34,9 @@ class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
             utm_position_offset: _(x, y) offset to apply to all node positions after converting
                 from lat/lon to UTM coordinates. Defaults to (0.0, 0.0).
             edge_type_mapping: _How to map the OSM way tags to EdgeType categories.
+            include_edge_type_none: Whether to include edges that are categorized as EdgeType.NONE
+                based on the edge_type_mapping. Defaults to False (i.e., skip edges that are
+                categorized as NONE).
 
         """
         if not osm_file.exists():
@@ -44,9 +48,10 @@ class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
         self._utm_position_offset = utm_position_offset
         self._osm_file = osm_file
         self._nodes: dict[int, IntIDNode] = {}
+        self._include_edge_type_none = include_edge_type_none
 
     @staticmethod
-    def _default_edge_type_mapping(way: Way) -> EdgeType:
+    def _default_edge_type_mapping(way: osm.Way) -> EdgeType:
         return EdgeType.from_str(way.tags.get("type"), way.tags.get("subtype"))
 
     @override
@@ -66,15 +71,18 @@ class OSMMapGraphBuilder(osm.SimpleHandler, GraphBuilder[int, IntIDNode]):
         # `build` method is called with those parameters.
         self.apply_file(self._osm_file)
 
-    def way(self, way: Way) -> None:
+    def way(self, way: osm.Way) -> None:
         """Handle a OSM way."""
         nodes: list[IntIDNode] = [
             self._nodes[node.ref] for node in way.nodes if node.ref in self._nodes
         ]
         edge_type = self._edge_type_mapping(way)
+        if edge_type == EdgeType.NONE and not self._include_edge_type_none:
+            return
+
         self.add_path_lazy(nodes=nodes, edge_type=edge_type)
 
-    def node(self, node: Node) -> None:
+    def node(self, node: osm.Node) -> None:
         """Handle OSM node."""
         x, y, _zone_number, _zone_letter = utm.from_latlon(node.location.lat, node.location.lon)
         x_offset, y_offset = self._utm_position_offset

@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, Generic, NamedTuple, TypeVar
 import tqdm
 from typing_extensions import Self, override
 
-from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig
 
 if TYPE_CHECKING:
@@ -18,6 +17,7 @@ if TYPE_CHECKING:
 
     import polars as pl
 
+    from preprocessing.core.datatypes import map_context as mc
     from preprocessing.core.datatypes.scene import Scene
 
 

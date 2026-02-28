@@ -42,6 +42,7 @@ def prepare_agent_trajectories(
         agent_category_col: The column name containing agent categories.
         derivative_rename: A dictionary mapping old derivative column names to new names.
         offset_sliding_col: Whether to offset the sliding column to start from zero in each window.
+        forward_fill: List of columns to forward-fill after resampling.
 
     Yields:
         Processed scenes as LazyFrames, ready for further processing or saving.
