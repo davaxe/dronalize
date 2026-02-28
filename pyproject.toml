@@ -23,7 +23,6 @@ dependencies = [
     "utm>=0.7.0",
     "osmium>=4.0.0",
     "pyproj>=3.0.0",
-    "lark>=1.1.0",
     "pandas>=2.0.0",
 ]
 
@@ -81,7 +80,7 @@ addopts = ["--strict-markers", "--disable-warnings", "-ra"]
 
 [tool.ruff]
 # Exclude proto compiled files from linting and formatting
-extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*", "old"]
+extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*"]
 line-length = 100
 preview = true
 
