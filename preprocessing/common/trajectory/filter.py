@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from preprocessing.common.trajectory import T_DataFrame
-    from preprocessing.core.protocols.loader import LoaderConfig
+    from preprocessing.core.protocols.loader import FilteringConfig, LoaderConfig
 
 
 # TODO: Possibly add filter option based on minimum required valid frames in
@@ -53,6 +53,8 @@ def filter_scene_expr(
     agent_id: str = "id",
     frame_column: str = "frame",
     category_column: str | None = None,
+    x_column: str = "x",
+    y_column: str = "y",
 ) -> pl.Expr:
     """Express scene filtering logic as a Polars expression.
 
@@ -62,6 +64,8 @@ def filter_scene_expr(
         agent_id: Column name representing the agent ID.
         frame_column: Column name representing the frame index.
         category_column: Column name representing the agent category.
+        x_column: Column name representing the agent's X position.
+        y_column: Column name representing the agent's Y position.
 
     Returns:
         Expression for filtering scenes based on the configuration.
@@ -70,75 +74,54 @@ def filter_scene_expr(
     if config.scene_filtering is None:
         return pl.lit(value=True)
 
-    filtering = config.scene_filtering
-    group_by = [group_by] if isinstance(group_by, str) else list(group_by or [])
+    filtering: FilteringConfig = config.scene_filtering
+    group_by_list = [group_by] if isinstance(group_by, str) else list(group_by or [])
 
     # Define Windows
-    scene_window = group_by or pl.lit(1)
-    agent_window = [*group_by, agent_id] if group_by else [agent_id]
+    scene_window = group_by_list or pl.lit(1)
+    agent_window = [*group_by_list, agent_id] if group_by_list else [agent_id]
 
     conditions: list[pl.Expr] = []
 
     # --- 1. Global Scene Validations ---
-
-    # Calculate Scene Start (Reference for relative calculations)
     scene_start_frame = pl.col(frame_column).min().over(scene_window)
 
-    # Base Frame Filtering (Does the scene contain the required relative timestamps?)
     if filtering.require_frames is not None:
-        required_set = set(filtering.require_frames)
-        n_required = len(required_set)
-
-        # Calculate offsets relative to scene start
-        relative_frame = pl.col(frame_column) - scene_start_frame
-
-        has_all_frames = (
-            relative_frame.filter(relative_frame.is_in(required_set)).n_unique().over(scene_window)
-            == n_required
+        conditions.append(
+            _check_required_frames(
+                set(filtering.require_frames), frame_column, scene_start_frame, scene_window
+            )
         )
-        conditions.append(has_all_frames)
 
-    # --- 2. Build Agent Validity Mask ---
-    # We combine ALL reasons an agent might be invalid into one mask.
-
-    # A. Agent Type Filtering
     agent_validity = pl.lit(value=True)
     if filtering.filter_agent_category is not None and category_column is not None:
-        agent_validity &= ~pl.col(category_column).is_in(filtering.filter_agent_category)
+        agent_validity &= _check_agent_category(
+            set(filtering.filter_agent_category), category_column
+        )
 
-    # B. Input Frame Overlap (Condition 5)
-    # Agents must appear at or before the last input frame
-    last_input_frame = scene_start_frame + config.input_len - 1
-    agent_start_frame = pl.col(frame_column).min().over(agent_window)
-    has_input_overlap = agent_start_frame <= last_input_frame
+    agent_validity &= _check_input_overlap(
+        scene_start_frame, config.input_len, frame_column, agent_window
+    )
 
-    agent_validity &= has_input_overlap
-
-    # C. Prediction Frame Existence
     if filtering.require_prediction_frame:
-        # Target frame is calculated globally (Scene Start + Input Offset)
-        target_frame = scene_start_frame + config.input_len - 1
+        agent_validity &= _check_prediction_frame(
+            scene_start_frame, config.input_len, frame_column, agent_window
+        )
 
-        # Check locally: Does THIS agent have a row at that frame?
-        has_pred_frame = (pl.col(frame_column) == target_frame).any().over(agent_window)
-
-        agent_validity &= has_pred_frame
-
-    # D. Full Length Validity
     if filtering.require_all_valid:
         total_len = config.input_len + config.output_len
-        track_len_valid = pl.len().over(agent_window) == total_len
+        agent_validity &= _check_full_length(total_len, agent_window)
 
-        agent_validity &= track_len_valid
+    if filtering.filter_slow_agents is not None:
+        agent_validity &= _check_slow_agents(
+            filtering.filter_slow_agents, config.sample_time, x_column, y_column, agent_window
+        )
 
-    # Apply the combined mask to filter out bad agent rows
     conditions.append(agent_validity)
-
-    # --- 3. Scene-Level: Minimum Valid Agents ---
-    # Now we count only the agents that survived the "agent_validity" checks above.
     if filtering.min_agents > 0:
-        valid_agent_count = pl.col(agent_id).filter(agent_validity).n_unique().over(scene_window)
-        conditions.append(valid_agent_count >= filtering.min_agents)
+        conditions.append(
+            _check_min_agents(filtering.min_agents, agent_id, agent_validity, scene_window)
+        )
 
     if not conditions:
         return pl.lit(value=True)
@@ -146,72 +129,66 @@ def filter_scene_expr(
     return pl.all_horizontal(conditions)
 
 
-def rebalance_highway_agents(
-    data: T_DataFrame,
-    ratio: float = 2.0,
-    req_lane_changes: int = 1,
-    agent_id: str = "id",
-    n_lanechange_col: str = "lane_changes",
-) -> T_DataFrame:
-    """Rebalances data to enforce a specific ratio of Lane Changing (LC) agents to Lane Keeping (LK) agents.
+def _check_required_frames(
+    require_frames: set[int],
+    frame_column: str,
+    scene_start_frame: pl.Expr,
+    scene_window: pl.Expr | list[str],
+) -> pl.Expr:
+    """Check if the scene contains all the required relative frame offsets."""
+    relative_frame = pl.col(frame_column) - scene_start_frame
+    return relative_frame.filter(relative_frame.is_in(require_frames)).n_unique().over(
+        scene_window
+    ) == len(require_frames)
 
-    Ratio formula: N_LC / N_LK = ratio
-    Therefore: Target N_LK = N_LC / ratio
 
-    Args:
-        data: Input DataFrame or LazyFrame.
-        ratio: Target ratio of LC agents to LK agents (e.g., 2.0 means 2 LC for every 1 LK).
-        req_lane_changes: Minimum lane changes to be considered an LC agent.
-        agent_id: Column name for agent identifiers.
-        n_lanechange_col: Column containing lane change counts (assumed pre-calculated per agent).
+def _check_agent_category(filter_categories: set[int], category_column: str) -> pl.Expr:
+    """Filter out specific agent categories."""
+    return ~pl.col(category_column).is_in(filter_categories)
 
-    """
-    # 1. Normalize input to LazyFrame to unify logic
-    lazy_data = data.lazy() if isinstance(data, pl.DataFrame) else data
 
-    # 2. Extract unique agents and classify them
-    # We group by ID and take the max of lane_changes to see if they EVER met the criteria
-    # (assuming n_lanechange_col might be cumulative or instantaneous)
-    agent_stats = (
-        lazy_data
-        .group_by(agent_id)
-        .agg(pl.col(n_lanechange_col).max().alias("max_lc"))
-        .with_columns((pl.col("max_lc") >= req_lane_changes).alias("is_lc_agent"))
-    )
+def _check_input_overlap(
+    scene_start_frame: pl.Expr, input_len: int, frame_column: str, agent_window: list[str]
+) -> pl.Expr:
+    """Ensure the agent appears at or before the last input frame."""
+    last_input_frame = scene_start_frame + input_len - 1
+    agent_start_frame = pl.col(frame_column).min().over(agent_window)
+    return agent_start_frame <= last_input_frame
 
-    # 3. Collect only the ID map to perform the split/sampling in memory.
-    # This is efficient because we are only materializing IDs, not the full dataset.
-    agent_map = agent_stats.collect()
 
-    lc_agents = agent_map.filter(pl.col("is_lc_agent"))
-    lk_agents = agent_map.filter(~pl.col("is_lc_agent"))
+def _check_prediction_frame(
+    scene_start_frame: pl.Expr, input_len: int, frame_column: str, agent_window: list[str]
+) -> pl.Expr:
+    """Ensure the agent exists at the exact first prediction frame."""
+    target_frame = scene_start_frame + input_len - 1
+    return (pl.col(frame_column) == target_frame).any().over(agent_window)
 
-    n_lc = len(lc_agents)
 
-    # Calculate target number of LK agents
-    # If ratio is 2 (2 LC : 1 LK), then n_lk = n_lc / 2
-    if ratio <= 0:
-        msg = "Ratio must be positive."
-        raise ValueError(msg)
+def _check_full_length(total_len: int, agent_window: list[str]) -> pl.Expr:
+    """Ensure the agent's track length matches the total required length."""
+    return pl.len().over(agent_window) == total_len
 
-    n_lk_target = int(n_lc / ratio)
 
-    # Handle edge case where we don't have enough LK agents to downsample
-    if n_lk_target > len(lk_agents):
-        # Depending on preference, one might warn here.
-        # For now, we keep all available LK agents (undersampling not possible).
-        sampled_lk = lk_agents
-    else:
-        sampled_lk = lk_agents.sample(n=n_lk_target, shuffle=True)
+def _check_slow_agents(
+    min_speed: float, sample_time: float, x_column: str, y_column: str, agent_window: list[str]
+) -> pl.Expr:
+    """Filter out agents moving slower than the minimum speed threshold."""
+    dx = pl.col(x_column).diff().over(agent_window)
+    dy = pl.col(y_column).diff().over(agent_window)
+    step_distance = (dx.pow(2) + dy.pow(2)).sqrt().fill_null(0.0)
 
-    # 4. Combine allowed IDs
-    valid_ids = pl.concat([lc_agents.select(agent_id), sampled_lk.select(agent_id)])
+    total_distance = step_distance.sum().over(agent_window)
 
-    # 5. Filter the original data
-    # semi_join is equivalent to SQL "WHERE id IN (...)" but more optimized for frames
-    result = lazy_data.join(valid_ids.lazy(), on=agent_id, how="semi")
+    agent_frame_count = pl.len().over(agent_window)
+    total_time = (agent_frame_count - 1) * sample_time
 
-    # Return valid type matching input
-    if isinstance(data, pl.DataFrame):
-        return result.collect()
-    return result
+    avg_speed = pl.when(total_time > 0).then(total_distance / total_time).otherwise(0.0)
+    return avg_speed >= min_speed
+
+
+def _check_min_agents(
+    min_agents: int, agent_id: str, agent_validity: pl.Expr, scene_window: pl.Expr | list[str]
+) -> pl.Expr:
+    """Ensure the scene meets the minimum count of valid agents."""
+    valid_agent_count = pl.col(agent_id).filter(agent_validity).n_unique().over(scene_window)
+    return valid_agent_count >= min_agents

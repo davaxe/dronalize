@@ -1,9 +1,8 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from preprocessing.common.trajectory_utils.filter import filter_scene
-from preprocessing.core.categories import AgentCategory
-from preprocessing.core.interface import FilteringConfig, LoaderConfig
+from preprocessing.common.trajectory.filter import filter_scene
+from preprocessing.core import AgentCategory, FilteringConfig, LoaderConfig
 
 
 def test_no_scene_filtering() -> None:
@@ -203,3 +202,34 @@ def test_no_groupby() -> None:
     result = filter_scene(df, config, group_by=None)
 
     assert len(result) == 2
+
+
+def test_filter_slow_agents() -> None:
+    """Test that agents with an average speed below the threshold are filtered out."""
+    # Agent 1: Moves 4.0 meters over 0.2 seconds (avg speed = 20 m/s)
+    # Agent 2: Moves 0.2 meters over 0.2 seconds (avg speed = 1 m/s)
+    # Agent 3: Stationary (avg speed = 0 m/s)
+    df = pl.DataFrame({
+        "scene": [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "id": [1, 1, 1, 2, 2, 2, 3, 3, 3],
+        "frame": [0, 1, 2, 0, 1, 2, 0, 1, 2],
+        "x": [0.0, 2.0, 4.0, 0.0, 0.1, 0.2, 0.0, 0.0, 0.0],
+        "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    })
+
+    config = LoaderConfig(
+        input_len=1,
+        output_len=1,
+        sample_time=0.1,
+        scene_filtering=FilteringConfig(
+            min_agents=0,
+            require_prediction_frame=False,
+            filter_slow_agents=2.0,  # Require at least 2.0 m/s
+        ),
+    )
+
+    result = filter_scene(df, config, group_by="scene")
+
+    # Only Agent 1 meets the speed requirement
+    assert len(result) == 3
+    assert result["id"].unique().to_list() == [1]

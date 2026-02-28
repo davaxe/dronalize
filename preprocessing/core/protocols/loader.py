@@ -36,6 +36,9 @@ class FilteringConfig:
     filter_agent_category: Collection[AgentCategory] | None = None
     """Set of agent categories to filter out from scenes."""
 
+    filter_slow_agents: float | None = None
+    """Filter out agents with an average speed below this threshold."""
+
     def __post_init__(self) -> None:
         """Convert to set(s) to avoid duplicates."""
         if self.filter_agent_category is not None and not isinstance(
@@ -129,6 +132,7 @@ class LoaderConfig:
         require_prediction_frame: bool = True,
         require_frames: Collection[int] | None = None,
         filter_agent_category: Collection[AgentCategory] | None = None,
+        filter_slow_agents: float | None = None,
     ) -> Self:
         """Set the scene filtering parameters.
 
@@ -148,6 +152,7 @@ class LoaderConfig:
             require_prediction_frame=require_prediction_frame,
             require_frames=require_frames,
             filter_agent_category=filter_agent_category,
+            filter_slow_agents=filter_slow_agents,
         )
         return self
 

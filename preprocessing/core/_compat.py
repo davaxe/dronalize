@@ -31,6 +31,6 @@ def require_optional(module_name: str, *, extra: str | None = None) -> ModuleTyp
         install_target = f"dronalize[{extra}]" if extra else module_name
         msg = (
             f"{module_name!r} is required for this functionality. "
-            f"Install it with: pip install {install_target}"
+            f"Install {install_target} to use it."
         )
         raise ImportError(msg) from exc
