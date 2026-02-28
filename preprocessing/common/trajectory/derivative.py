@@ -29,6 +29,7 @@ def derivative(
         Raises an exception if the dataset contains fewer than two datapoints
         per group, as `np.gradient` requires sufficient padding.
 
+
     Args:
         data: Input DataFrame or LazyFrame.
         *x: Names of columns to differentiate.
@@ -41,6 +42,27 @@ def derivative(
 
     Returns:
         The original data structure with new derivative columns appended.
+
+    Examples:
+    >>> df = pl.DataFrame(
+    ...     {
+    ...         "time": [0, 1, 2, 3, 4],
+    ...         "position": [0, 1, 4, 9, 16],
+    ...     }
+    ... )
+    >>> derivative(df, "position", dt=1.0, n=2, include_intermediate=True)
+    shape: (5, 4)
+    ┌──────┬──────────┬─────────────┬─────────────┐
+    │ time ┆ position ┆ d1_position ┆ d2_position │
+    │ ---  ┆ ---      ┆ ---         ┆ ---         │
+    │ i64  ┆ i64      ┆ f64         ┆ f64         │
+    ╞══════╪══════════╪═════════════╪═════════════╡
+    │ 0    ┆ 0        ┆ 1.0         ┆ 1.0         │
+    │ 1    ┆ 1        ┆ 2.0         ┆ 1.5         │
+    │ 2    ┆ 4        ┆ 4.0         ┆ 2.0         │
+    │ 3    ┆ 9        ┆ 6.0         ┆ 1.5         │
+    │ 4    ┆ 16       ┆ 7.0         ┆ 1.0         │
+    └──────┴──────────┴─────────────┴─────────────┘
 
     """
     derivative_rename = {} if derivative_rename is None else derivative_rename

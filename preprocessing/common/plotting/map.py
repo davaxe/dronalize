@@ -66,7 +66,7 @@ def plot_map_graph(
         .with_columns(
             pl
             .col("edge_type_int")
-            .replace(_ALL_EDGE_TYPES, default=EdgeType.VIRTUAL.name.title())
+            .replace_strict(_ALL_EDGE_TYPES, default=EdgeType.VIRTUAL.name.title())
             .alias("edge_type"),
             ((pl.col("x1") - pl.col("x2")) ** 2 + (pl.col("y1") - pl.col("y2")) ** 2)
             .sqrt()

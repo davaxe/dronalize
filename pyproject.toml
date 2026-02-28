@@ -1,6 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.10,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "preprocessing"
+module-root = ""
 
 [project]
 name = "dronalize"
@@ -22,8 +26,6 @@ dependencies = [
     "tqdm>=4.65.0",
     "utm>=0.7.0",
     "osmium>=4.0.0",
-    "pyproj>=3.0.0",
-    "pandas>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -52,7 +54,6 @@ container = ["opencv-python-headless"]
 
 dev = [
     "pytest>=7.0",
-    "ruff>=0.3.0",
     "scipy-stubs",
     "ipython",
 ]
@@ -67,16 +68,12 @@ all = ["dronalize[train,plot,ad4che,lyft,dev]"]
 [tool.uv.extra-build-dependencies]
 torch-cluster = ["torch"]
 
-# Don't install local packages - just manage dependencies
-[tool.setuptools]
-packages = []
-
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "preprocessing/common", "preprocessing/core"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["--strict-markers", "--disable-warnings", "-ra"]
+addopts = ["--doctest-modules", "-ra"]
 
 [tool.ruff]
 # Exclude proto compiled files from linting and formatting
@@ -92,26 +89,3 @@ ignore = [
     "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
     "DOC402", "CPY001", "D104", "TD005"
 ]
-
-# ---------------------------------------------------------------------------
-# Installation instructions:
-#
-# Prerequisite: Install uv (https://docs.astral.sh/uv/getting-started/installation/)
-#
-# 1. Create a virtual environment and verify lockfile:
-#    uv lock
-#
-# 2. Install dependencies (creates .venv automatically):
-#    uv sync
-#
-# 3. Install with optional features (e.g. PyG support, dev tools):
-#    uv sync --extra dev-cuda
-#    # Or for specific extras:
-#    uv sync --extra lyft --extra ad4che
-#
-# 4. Running commands:
-#    uv run python train.py ...
-#    uv run pytest
-# ---------------------------------------------------------------------------
-#
-# ---------------------------------------------------------------------------

@@ -202,14 +202,8 @@ class MapGraph:
     def from_shared(cls, shared_name: str) -> SharedMapGraph:
         """Create a `SharedMapGraph` context manager for accessing a graph in shared memory.
 
-        Example:
-            shared_name: str = ... # name for the shared memory
-            >>> with MapGraph.from_shared(shared_name, num_nodes, num_edges) as graph:
-                    ...   # graph is a MapGraph instance backed by shared memory
         Args:
             shared_name: name of the shared memory block containing the graph data.
-            num_nodes: number of nodes in the graph (metadata).
-            num_edges: number of edges in the graph (metadata).
 
         """
         return SharedMapGraph(shared_name)

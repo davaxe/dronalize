@@ -52,7 +52,7 @@ def convert_to_agent_data_dict(
     # We add 'row_idx' (agent) and 'col_idx' (time) columns to the dataframe
     # Casting to proper types ensures numpy compatibility
     df_indexed = data.with_columns([
-        pl.col("id").replace(id_to_idx_map, default=None).cast(pl.Int32).alias("row_idx"),
+        pl.col("id").replace_strict(id_to_idx_map, default=None).cast(pl.Int32).alias("row_idx"),
         (pl.col("frame") - start_frame).cast(pl.Int32).alias("col_idx"),
     ])
 

@@ -6,8 +6,8 @@ import polars as pl
 from typing_extensions import override
 
 from preprocessing.common.trajectory.basic import yaw_from_vel
-from preprocessing.common.trajectory.filter import rebalance_highway_agents
 from preprocessing.common.trajectory.process import prepare_agent_trajectories
+from preprocessing.common.trajectory.rebalance import rebalance_highway_agents
 from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.datatypes.categories import AgentCategory
 from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig

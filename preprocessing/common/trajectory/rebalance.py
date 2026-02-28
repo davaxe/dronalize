@@ -14,6 +14,7 @@ def rebalance_highway_agents(
     req_lane_changes: int = 1,
     agent_id: str = "id",
     n_lanechange_col: str = "lane_changes",
+    seed: int | None = None,
 ) -> T_DataFrame:
     """Rebalances data to enforce a specific ratio of Lane Changing (LC) agents to Lane Keeping (LK) agents.
 
@@ -26,6 +27,31 @@ def rebalance_highway_agents(
         req_lane_changes: Minimum lane changes to be considered an LC agent.
         agent_id: Column name for agent identifiers.
         n_lanechange_col: Column containing lane change counts (assumed pre-calculated per agent).
+        seed: Optional random seed for reproducibility of sampling. This will also perform a sort
+            operation to ensure determisitc sampling across runs.
+
+    Examples:
+    For a simple dataset with 6 agents, where agents 0-3 are LK (0 lane changes) and agents 4-5 are
+    LC (2 lane changes) it is expected that with a ratio of 2.0, we keep all 2 LC agents and only 1
+    LK agent (since ratio is 2 LC : 1 LK). The resulting dataset should contain 3 agents total.
+
+    >>> df = pl.DataFrame(
+    ...     {
+    ...         "id": [0, 1, 2, 3, 4, 5],
+    ...         "lane_changes": [0, 0, 0, 0, 2, 2],
+    ...     }
+    ... )
+    >>> rebalance_highway_agents(df, ratio=2.0, req_lane_changes=1, agent_id="id", seed=42)
+    shape: (3, 2)
+    ┌─────┬──────────────┐
+    │ id  ┆ lane_changes │
+    │ --- ┆ ---          │
+    │ i64 ┆ i64          │
+    ╞═════╪══════════════╡
+    │ 3   ┆ 0            │
+    │ 4   ┆ 2            │
+    │ 5   ┆ 2            │
+    └─────┴──────────────┘
 
     """
     # 1. Normalize input to LazyFrame to unify logic
@@ -40,6 +66,11 @@ def rebalance_highway_agents(
         .agg(pl.col(n_lanechange_col).max().alias("max_lc"))
         .with_columns((pl.col("max_lc") >= req_lane_changes).alias("is_lc_agent"))
     )
+
+    if seed is not None:
+        # If seed is set, detmerinistic sampling is desired. Sorting by agent_id ensures the same
+        # order across runs.
+        agent_stats = agent_stats.sort(agent_id)
 
     # 3. Collect only the ID map to perform the split/sampling in memory.
     # This is efficient because we are only materializing IDs, not the full dataset.
@@ -64,7 +95,7 @@ def rebalance_highway_agents(
         # For now, we keep all available LK agents (undersampling not possible).
         sampled_lk = lk_agents
     else:
-        sampled_lk = lk_agents.sample(n=n_lk_target, shuffle=True)
+        sampled_lk = lk_agents.sample(n=n_lk_target, shuffle=True, seed=seed)
 
     # 4. Combine allowed IDs
     valid_ids = pl.concat([lc_agents.select(agent_id), sampled_lk.select(agent_id)])
