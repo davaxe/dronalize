@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
 from preprocessing.common.trajectory.basic import yaw_from_vel
-from preprocessing.common.trajectory.filter import rebalance_highway_agents
 from preprocessing.common.trajectory.process import prepare_agent_trajectories
+from preprocessing.common.trajectory.rebalance import rebalance_highway_agents
 from preprocessing.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from preprocessing.core.datatypes import map_context as mc
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
 
 class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
@@ -104,9 +104,3 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
     @override
     def default_config(self) -> LoaderConfig:
         return LoaderConfig(20, 50, 0.1).window_parameters(25).scene_filtering_parameters()
-
-
-if __name__ == "__main__":
-    loader = I80Loader(Path("/home/west/Developer/behavior-prediction/datasets/i80/"))
-    for scene in loader.scenes():
-        print(scene)
