@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from preprocessing.datasets.nuscenes.trajectory_processor import NuScenesLoader
 from typing_extensions import override
 
 from preprocessing.core import LoaderConfig
+from preprocessing.datasets.nuscenes.loader import NuScenesLoader
 
 
 class VodLoader(NuScenesLoader):

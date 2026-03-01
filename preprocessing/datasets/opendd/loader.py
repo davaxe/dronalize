@@ -11,6 +11,7 @@ from preprocessing.common.trajectory.basic import yaw_from_vel
 from preprocessing.common.trajectory.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from preprocessing.core.datatypes import map_context as mc
+from preprocessing.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -32,10 +33,10 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
         self._cursor = self._conn.cursor()
 
     @override
-    def sources(self) -> Iterable[tuple[str, str]]:
+    def sources(self) -> Iterable[Source[str, str]]:
         self._cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         for row in self._cursor.fetchall():
-            yield row[0], row[0]
+            yield Source(identifier=row[0], inner=row[0])
 
     @override
     def num_sources(self) -> int | None:
@@ -43,7 +44,8 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
         return self._cursor.fetchone()[0]
 
     @override
-    def load_raw(self, source: str) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(self, source: Source[str, str]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        table_name = source.inner
         # Possible to include: UTM_ANGLE, V, ACC, ACC_LAT, ACC_TAN
         query = f"""
         SELECT
@@ -52,7 +54,7 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
             UTM_X as x,
             UTM_Y as y,
             CLASS
-        FROM {source}
+        FROM {table_name}
         """  # noqa: S608
         scenes = (
             pl

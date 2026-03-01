@@ -9,7 +9,7 @@ from preprocessing.common.trajectory.filter import filter_scene_expr
 from preprocessing.common.trajectory.resample import resample_tracks
 from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.datatypes.categories import AgentCategory
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Resampling
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Resampling, Source
 
 
 class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
@@ -36,14 +36,14 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         self._batch_size: int | None = file_batch_size
 
     @override
-    def sources(self) -> Iterable[tuple[int, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
         files: list[Path] = sorted(self._data_path.glob("*.csv"))
         batch_size: int = self._batch_size or len(files)
         for start in range(0, len(files), batch_size):
             batch_files = files[start : start + batch_size]
-            yield (
-                start,
-                pl
+            yield Source(
+                identifier=start,
+                inner=pl
                 .scan_csv(batch_files, include_file_paths="file_id", schema=_SCHEMA)
                 .with_columns(
                     pl
@@ -67,10 +67,12 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         return batches + int(extra > 0)
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(
+        self, source: Source[int, pl.LazyFrame]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
 
-        source_filtered = source.filter(
+        source_filtered = source.inner.filter(
             filter_scene_expr(
                 self.loader_config,
                 group_by=["file_id"],
@@ -93,7 +95,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         for _, group in source_resampled.collect().group_by(["file_id"]):
             yield (
                 yaw_from_vel(group.lazy()).drop("file_id"),
-                mc.Explicit(str(group["map"].first())),
+                mc.Explicit(map=str(group["map"].first())),
             )
 
     @override

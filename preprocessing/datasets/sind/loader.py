@@ -9,7 +9,7 @@ from preprocessing.common.trajectory.basic import yaw_from_vel_expr
 from preprocessing.common.trajectory.process import prepare_agent_trajectories
 from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.datatypes.categories import AgentCategory
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -44,7 +44,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
             self.loader_config.scene_filtering.filter_slow_agents = 0.1
 
     @override
-    def sources(self) -> Iterable[tuple[str, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[str, pl.LazyFrame]]:
         for subdir in self._data_dir.iterdir():
             pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
             vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
@@ -83,11 +83,11 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
                 *("x", "y", "vx", "vy", "ax", "ay"),
             )
 
-            yield (
-                subdir.name,
-                pl.concat([vehicle_df, pedestrian_df]).with_columns(
-                    pl.lit(self._resolve_map(subdir.name)).alias("map_location")
-                ),
+            map_location = self._resolve_map(subdir.name)
+            yield Source(
+                identifier=subdir.name,
+                inner=pl.concat([vehicle_df, pedestrian_df]),
+                map_context=mc.Explicit(map=str(map_location)),
             )
 
     @override
@@ -95,10 +95,11 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
         return sum(1 for _ in self._data_dir.iterdir())
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        map_location = source.select(pl.col("map_location").first()).collect().item()
-        for df in prepare_agent_trajectories(source, self.loader_config):
-            yield df, mc.Explicit(str(map_location))
+    def load_raw(
+        self, source: Source[str, pl.LazyFrame]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        for df in prepare_agent_trajectories(source.inner, self.loader_config):
+            yield df, source.map_context or mc.NoMap()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

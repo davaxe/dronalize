@@ -13,6 +13,7 @@ from preprocessing.common.trajectory.filter import filter_scene_expr
 from preprocessing.common.trajectory.resample import resample_tracks
 from preprocessing.core import AgentCategory, BaseSceneLoader, LoaderConfig, Resampling
 from preprocessing.core.datatypes import map_context as mc
+from preprocessing.core.protocols.loader import Source
 from preprocessing.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from preprocessing.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
 
@@ -75,22 +76,22 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         self._min_distance: float | None = min_distance
 
     @override
-    def sources(self) -> Iterable[tuple[str, Path]]:
+    def sources(self) -> Iterable[Source[str, Path]]:
         # Sorting ensures deterministic processing order
         for tfrecord_path in sorted(self._data_dir.glob(self._filter_str)):
-            yield (tfrecord_path.stem, tfrecord_path)
+            yield Source(identifier=tfrecord_path.stem, inner=tfrecord_path)
 
     @override
     def num_sources(self) -> int | None:
         return sum(1 for _ in self._data_dir.glob(self._filter_str))
 
     @override
-    def load_raw(self, source: Path) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        for i, raw_data in enumerate(_read_tfrecord(source)):
+    def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        for i, raw_data in enumerate(_read_tfrecord(source.inner)):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
             # Map processing remains per-scenario (if needed)
-            map_context: mc.MapContext = mc.Explicit(str(source), record_index=i)
+            map_context: mc.MapContext = mc.Explicit(tfrecord=str(source.inner), index=i)
             if self._include_map:
                 map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
                 current_map = WaymoMapGraphBuilder.from_proto(map_data.map_features).build(

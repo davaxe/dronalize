@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Generic, NamedTuple, TypeVar
 import tqdm
 from typing_extensions import Self, override
 
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
 if TYPE_CHECKING:
     from multiprocessing.sharedctypes import Synchronized
@@ -163,11 +163,13 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
         return self
 
     @override
-    def sources(self) -> Iterable[tuple[T_ID, T_Source]]:
+    def sources(self) -> Iterable[Source[T_ID, T_Source]]:
         return self._inner.sources()
 
     @override
-    def load_raw(self, source: T_Source) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(
+        self, source: Source[T_ID, T_Source]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         return self._inner.load_raw(source)
 
     @override
@@ -264,14 +266,15 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
     def _process_fn(args: _ProcessArgs[T_ID, T_Source]) -> list[Scene[T_ID]]:
         """Worker process function that processes a single source and returns a list of Scenes."""
         loader = args.loader
+        source = args.source
         scenes: list[Scene[T_ID]] = []
         scene_number: int = -1
-        for scene_data, map_context in loader.process_next(args.source[1]):
+        for scene_data, map_context in loader.process_next(source):
             with _scene_counter.get_lock():
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
 
-            scene = loader.create_scene(scene_data, args.source[0], map_context)
+            scene = loader.create_scene(scene_data, source.identifier, map_context)
             # Add a unique global scene number, since each worker will have its own local counter.
             scenes.append(replace(scene, scene_number=scene_number))
 
@@ -293,13 +296,14 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
 
         processed_scenes = 0
         loader = args.loader
+        source = args.source
         scene_number: int = -1
-        for scene_data, map_context in loader.process_next(args.source[1]):
+        for scene_data, map_context in loader.process_next(source):
             with _scene_counter.get_lock():
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
 
-            scene = loader.create_scene(scene_data, args.source[0], map_context)
+            scene = loader.create_scene(scene_data, source.identifier, map_context)
             scene = replace(scene, scene_number=scene_number)
             args.fn(scene)
             processed_scenes += 1
@@ -334,7 +338,7 @@ ParallelLoader = ParallelSceneLoader
 class _ProcessArgs(NamedTuple, Generic[T_ID, T_Source]):
     """Arguments for processing a single source in a worker process."""
 
-    source: tuple[T_ID, T_Source]
+    source: Source[T_ID, T_Source]
     loader: BaseSceneLoader[T_ID, T_Source]
     fn: Callable[[Scene[T_ID]], None] | None = None
 
@@ -351,29 +355,3 @@ def _init_worker(scene_counter: Synchronized[int], source_counter: Synchronized[
     _scene_counter = scene_counter
     global _source_counter  # noqa: PLW0603
     _source_counter = source_counter
-
-
-def _dummy_fn(a) -> None:
-    return None
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    from preprocessing.datasets.waymo.loader import WaymoLoader
-
-    directory = Path("/home/west/Developer/behavior-prediction/datasets/waymo/validation")
-
-    loader_single = WaymoLoader(
-        directory,
-        "*validation.tfrecord*",
-        include_map=False,
-        min_distance=2,
-    )
-    loader = ParallelSceneLoader(
-        loader_single,
-        maintain_order=False,
-        chunksize=5,
-        progress_bar=ProgressBar.SCENES,
-    )
-    loader.scenes_callback(_dummy_fn)

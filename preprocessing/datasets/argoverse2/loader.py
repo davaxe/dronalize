@@ -10,7 +10,7 @@ from preprocessing.common.trajectory.filter import filter_scene_expr
 from preprocessing.common.trajectory.resample import resample_tracks
 from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.datatypes.categories import AgentCategory
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Resampling
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Resampling, Source
 
 # TODO: Currently the column "focal_agent_id" is disgarded and not used; might want to provide a way
 # to identify it downstream. Either implcitlty by assigning a specific id or explicitly by providing
@@ -40,7 +40,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         self._unique_types: set[str] = set()
 
     @override
-    def sources(self) -> Iterable[tuple[int, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
         # Sort to match files correctly
         parquet_files = sorted(str(f) for f in self._data_dir.glob("*/*.parquet"))
         json_files = sorted(str(f) for f in self._data_dir.glob("*/*.json"))
@@ -49,9 +49,9 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         batch_size: int = self._file_batch_size or len(parquet_files)
         for i in range(0, len(parquet_files), batch_size):
             batch_files: list[str] = list(parquet_files[i : i + batch_size])
-            yield (
-                i,
-                pl
+            yield Source(
+                identifier=i,
+                inner=pl
                 .scan_parquet(batch_files, include_file_paths="file_id")
                 .join(map_lookup, on="file_id", how="left")
                 .with_columns(
@@ -80,9 +80,11 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         return batches + int(extra > 0)
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(
+        self, source: Source[int, pl.LazyFrame]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
-        source_filtered = source.filter(
+        source_filtered = source.inner.filter(
             filter_scene_expr(
                 self.loader_config,
                 group_by=["file_id"],
@@ -116,7 +118,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             )
 
         for _, group in source_resampled.collect().group_by(["file_id"]):
-            yield group.lazy(), mc.Explicit(str(group["map_path"].first()))
+            yield group.lazy(), mc.Explicit(map_path=str(group["map_path"].first()))
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

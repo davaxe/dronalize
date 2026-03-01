@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET  # noqa: S405
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import utm
 
 from preprocessing.common.map.osm import OSMMapGraphBuilder
-from preprocessing.common.plotting import plot_map_graph
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from osmium import osm
 
 

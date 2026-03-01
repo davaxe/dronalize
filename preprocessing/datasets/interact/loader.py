@@ -12,6 +12,7 @@ from preprocessing.common.trajectory.filter import filter_scene_expr
 from preprocessing.common.trajectory.resample import resample_tracks
 from preprocessing.core import AgentCategory, BaseSceneLoader, LoaderConfig, Resampling
 from preprocessing.core.datatypes import map_context as mc
+from preprocessing.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -52,12 +53,12 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
         self._file_batch_size: int | None = file_batch_size
 
     @override
-    def sources(self) -> Iterable[tuple[str, list[Path]]]:
+    def sources(self) -> Iterable[Source[str, list[Path]]]:
         csv_files = list(self._data_dir.glob("*.csv"))
         batch_size = self._file_batch_size or len(csv_files)
         for start in range(0, len(csv_files), batch_size):
             batch_files = csv_files[start : start + batch_size]
-            yield f"{self._data_dir}_b{start}", batch_files
+            yield Source(f"{self._data_dir}_b{start}", batch_files)
 
     @override
     def num_sources(self) -> int | None:
@@ -68,11 +69,13 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
         return (num_files + self._file_batch_size - 1) // self._file_batch_size
 
     @override
-    def load_raw(self, source: list[Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(
+        self, source: Source[str, list[Path]]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         data = (
             pl
-            .scan_csv(source, include_file_paths="file_id", schema=_SCHEMA)
+            .scan_csv(source.inner, include_file_paths="file_id", schema=_SCHEMA)
             .drop("track_to_predict", "interesting_agent", "width", "length", "timestamp_ms")
             .rename({
                 "agent_type": "agent_category",

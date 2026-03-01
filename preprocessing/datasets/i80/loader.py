@@ -10,6 +10,7 @@ from preprocessing.common.trajectory.process import prepare_agent_trajectories
 from preprocessing.common.trajectory.rebalance import rebalance_highway_agents
 from preprocessing.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from preprocessing.core.datatypes import map_context as mc
+from preprocessing.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -46,11 +47,11 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
         self._rebalance_ratio = lane_change_ratio
 
     @override
-    def sources(self) -> Iterable[tuple[int, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
         for i, csv_file in enumerate(self._data_dir.rglob("trajectories*.csv")):
-            yield (
-                i,
-                pl.scan_csv(csv_file).select(
+            yield Source(
+                identifier=i,
+                inner=pl.scan_csv(csv_file).select(
                     pl.col("Vehicle_ID").alias("id"),
                     pl.col("Frame_ID").alias("frame"),
                     pl.col("Local_X").alias("x"),
@@ -85,11 +86,14 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
         )
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(
+        self, source: Source[int, pl.LazyFrame]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        data = source.inner
         for df in prepare_agent_trajectories(
-            rebalance_highway_agents(source, ratio=self._rebalance_ratio).drop("lane_changes")
+            rebalance_highway_agents(data, ratio=self._rebalance_ratio).drop("lane_changes")
             if self._rebalance_ratio
-            else source.drop("lane_changes"),
+            else data.drop("lane_changes"),
             self.loader_config,
             add_derivative=True,
             add_second_derivative=True,

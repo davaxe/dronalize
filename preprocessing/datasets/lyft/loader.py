@@ -14,7 +14,7 @@ from preprocessing.common.trajectory.basic import yaw_from_vel
 from preprocessing.common.trajectory.process import prepare_agent_trajectories
 from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.datatypes.categories import AgentCategory
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -62,12 +62,15 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
         )
 
     @override
-    def sources(self) -> Iterable[tuple[int, _Source]]:
+    def sources(self) -> Iterable[Source[int, _Source]]:
         current: int = 0
         while current < self._total_scenes:
             end = min(current + self._batch_size, self._total_scenes)
             scene_interval = (current, end)
-            yield current, _Source(interval=scene_interval)
+            yield Source(
+                identifier=current,
+                inner=_Source(interval=scene_interval),
+            )
             current += self._batch_size
 
     @override
@@ -75,8 +78,10 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
         return (self._total_scenes + self._batch_size - 1) // self._batch_size
 
     @override
-    def load_raw(self, source: _Source) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        scene_interval = source.interval
+    def load_raw(
+        self, source: Source[int, _Source]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        scene_interval = source.inner.interval
         if scene_interval is not None:
             start, end = scene_interval
             scenes_np = cast("npt.NDArray", self._scenes[start:end])

@@ -6,14 +6,13 @@ import polars as pl
 from typing_extensions import override
 
 from preprocessing.common.trajectory.process import prepare_agent_trajectories
+from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.datatypes.categories import AgentCategory
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
-
-    from preprocessing.core.datatypes import map_context as mc
 
 
 class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
@@ -44,11 +43,11 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
         self._data_dir = data_dir
 
     @override
-    def sources(self) -> Iterable[tuple[str, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[str, pl.LazyFrame]]:
         for data_file in self._data_dir.glob("*.txt"):
-            yield (
-                data_file.stem,
-                pl.scan_csv(
+            yield Source(
+                identifier=data_file.stem,
+                inner=pl.scan_csv(
                     data_file,
                     has_header=False,
                     schema=_DATA_SCHEMA,
@@ -70,15 +69,17 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
         return sum(1 for _ in self._data_dir.glob("*.txt"))
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(
+        self, source: Source[str, pl.LazyFrame]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         for df in prepare_agent_trajectories(
-            source,
+            source.inner,
             self.loader_config,
             add_derivative=True,
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
         ):
-            yield df, None
+            yield df, mc.NoMap()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

@@ -24,15 +24,12 @@ class Implicit:
 class Explicit:
     """Indicates an explicit map context; map information is provided explicitly for the scene."""
 
-    identifier: str
-    """Identifier for the map context, e.g., map name or token."""
     metadata: dict[str, Any] = field(default_factory=dict)
-    """Additional metadata required to determine the map."""
+    """Metadata required to determine the map."""
     tag: Literal["Explicit"] = "Explicit"
 
-    def __init__(self, identifier: str, **metadata: Any) -> None:  # noqa: ANN401
+    def __init__(self, **metadata: Any) -> None:  # noqa: ANN401
         """Initialize with the given identifier and metadata."""
-        object.__setattr__(self, "identifier", identifier)
         object.__setattr__(self, "metadata", metadata)
 
 
@@ -45,4 +42,11 @@ class Loaded:
     tag: Literal["Loaded"] = "Loaded"
 
 
-MapContext = Implicit | Explicit | Loaded | None
+@dataclass(slots=True, frozen=True)
+class NoMap:
+    """Indicates no map is available for the scene; map information is not known or not applicable."""
+
+    tag: Literal["NoMap"] = "NoMap"
+
+
+MapContext = Implicit | Explicit | Loaded | NoMap

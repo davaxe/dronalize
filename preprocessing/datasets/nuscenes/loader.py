@@ -11,7 +11,7 @@ from preprocessing.common.trajectory.basic import yaw_from_vel
 from preprocessing.common.trajectory.process import prepare_agent_trajectories
 from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.datatypes.categories import AgentCategory
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -66,22 +66,25 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
         self._precompute_global_data()
 
     @override
-    def sources(self) -> Iterable[tuple[tuple[str, str], str]]:
+    def sources(self) -> Iterable[Source[tuple[str, str], str]]:
         for token, df in self._scene_cache.items():
             # More efficient: peek at the first row's scene_name directly
             scene_name = df.item(0, "scene_name")
             map_name = df.item(0, "map")
-            yield (scene_name, map_name), token
+            yield Source(identifier=(scene_name, map_name), inner=token, map_context=mc.Implicit())
 
     @override
     def num_sources(self) -> int | None:
         return len(self._scene_cache)
 
     @override
-    def load_raw(self, source: str) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(
+        self, source: Source[tuple[str, str], str]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        map_context = source.map_context or mc.Implicit()
         scenes = (
             self
-            ._scene_cache[source]
+            ._scene_cache[source.inner]
             .drop([
                 "scene_token",
                 "scene_name",
@@ -104,7 +107,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
         ):
-            yield df, mc.Implicit()
+            yield df, map_context
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

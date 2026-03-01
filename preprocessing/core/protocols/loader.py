@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Hashable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, Self, TypeVar
 
@@ -172,7 +172,24 @@ T_Source_co = TypeVar("T_Source_co", covariant=True)
 T_ID = TypeVar("T_ID", bound=Hashable)
 
 
-class SceneLoader(Protocol, Generic[T_ID, T_Source_co]):
+@dataclass(slots=True, frozen=True)
+class Source(Generic[T_ID, T_Source]):
+    """Represents a raw data source for a scene, identified by a unique identifier."""
+
+    identifier: T_ID
+    """Generic identifier for the source, e.g., file name, URL, database key."""
+    inner: T_Source
+    """The actual source data, which can be of any type (e.g., file path, raw data)."""
+    map_context: MapContext | None = None
+    """Optional map context associated with the source.
+
+    This can be useful if all scenes generated from this source share the same map context.
+    """
+    metadata: dict[str, Any] = field(default_factory=dict)
+    """Additional metadata associated with the source."""
+
+
+class SceneLoader(Protocol, Generic[T_ID]):
     """Minimal protocol for scene loading, used for type hinting."""
 
     def scenes(self) -> Iterable[Scene[T_ID]]:
@@ -191,7 +208,7 @@ class SceneLoader(Protocol, Generic[T_ID, T_Source_co]):
         ...
 
 
-class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source]):
+class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     """ABC interface for processing raw data sources into a standardized format.
 
     Generic over the data scene source type and identifier type. Source type can
@@ -215,6 +232,119 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source])
         self._attach_scene_expr: dict[str, pl.Expr] = {}
 
     # --- Abstract Steps (The "Blanks" to fill) ---
+
+    @abstractmethod
+    def sources(self) -> Iterable[Source[T_ID, T_Source]]:
+        """Discover and yield identifiers for each scene to process."""
+
+    @abstractmethod
+    def load_raw(self, source: Source[T_ID, T_Source]) -> Iterable[tuple[pl.LazyFrame, MapContext]]:
+        """Read the raw data source into one or more DataFrame(s) (any schema)."""
+
+    @abstractmethod
+    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
+        """Convert the raw DataFrame into the common schema."""
+
+    @abstractmethod
+    def default_config(self) -> LoaderConfig:
+        """Return the default processor configuration for this dataset."""
+
+    def scenes_callback(self, callback: Callable[[Scene[T_ID]], None]) -> None:
+        """Process scenes and call the provided callback on each scene."""
+        for scene in self.scenes():
+            callback(scene)
+
+    def num_scenes(self) -> int | None:
+        """Get the total number of scenes that will be processed.
+
+        In some cases this can be expensive to compute or not known in advanced, in that case `None`
+        is returned.
+        """
+        _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
+        return None
+
+    def num_sources(self) -> int | None:
+        """Get the total number of sources that will be processed.
+
+        This is different from `number_of_scenes()` since each source can potentially generate
+        multiple scenes (e.g., by using sliding window sampling). In some cases this can be
+        expensive to compute or not known in advanced, in that case `None` is returned.
+
+        This could trivially be implemented as `len(list(self.sources()))`, but that would require
+        loading all sources into memory which can be expensive for large datasets.
+        """
+        _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
+        return None
+
+    def process_next(
+        self, source: Source[T_ID, T_Source]
+    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
+        """Process a single data item through the pipeline.
+
+        Steps:
+        1. Load raw data for all sources.
+        2. Normalize to common schema.
+        """
+
+        def _step(raw_df: pl.LazyFrame) -> pl.DataFrame | None:
+            normalized_df = self.normalize(raw_df)
+            try:
+                df = normalized_df.collect()
+            except ValueError:
+                # Error cases can be caused by:
+                # 1. Empty scenes (due to filtering or missing data)
+                return None
+            return df if not df.is_empty() else None
+
+        for raw_df, map_context in self.load_raw(source):
+            df = _step(raw_df)
+            if df is not None:
+                yield df, map_context
+
+    def scenes(self) -> Iterable[Scene[T_ID]]:
+        """Iterate over all sources and process them into scenes.
+
+        This will lazy-load and process each source one at a time.
+        """
+        for source in self.sources():
+            self._source_counter += 1
+            for scene_df, map_context in self.process_next(source):
+                yield self.create_scene(scene_df, source.identifier, map_context)
+
+    def create_scene(
+        self, df: pl.DataFrame, source_id: T_ID, map_context: MapContext
+    ) -> Scene[T_ID]:
+        """Create a Scene object from the processed DataFrame and source identifier.
+
+        This method also calls `Scene.enforce_schema()` if `self._enforce_schema` is True to ensure
+        the scene follows the expected schema. If overriding this method, make sure to follow
+        the expected behavior regarding schema enforcement.
+
+        Args:
+            df: Processed DataFrame for the scene, expected to follow the common schema.
+            source_id: Identifier for the scene source (e.g., file name, index).
+            map_context: Map context associated with the scene.
+
+        """
+        scene = Scene(
+            inner=df,
+            identifier=source_id,
+            scene_number=self._count,
+            input_len=self.input_len,
+            output_len=self.output_len,
+            map_context=map_context,
+        )
+        self._attach_scene_properties.clear()
+        self._count += 1
+        return scene if not self._enforce_schema else scene.enforce_schema()
+
+    @staticmethod
+    def derivative_names() -> dict[int, list[str]]:
+        """Return the names of the derivatives for velocity and acceleration."""
+        return {
+            1: ["vx", "vy"],
+            2: ["ax", "ay"],
+        }
 
     @property
     def loader_config(self) -> LoaderConfig:
@@ -263,114 +393,3 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID, T_Source], Generic[T_ID, T_Source])
         up, down = self.loader_config.resampling.factors
         ratio = up / down
         return self.loader_config.sample_time / ratio
-
-    @abstractmethod
-    def sources(self) -> Iterable[tuple[T_ID, T_Source]]:
-        """Discover and yield identifiers for each scene to process."""
-
-    @abstractmethod
-    def load_raw(self, source: T_Source) -> Iterable[tuple[pl.LazyFrame, MapContext]]:
-        """Read the raw data source into one or more DataFrame(s) (any schema)."""
-
-    @abstractmethod
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        """Convert the raw DataFrame into the common schema."""
-
-    @abstractmethod
-    def default_config(self) -> LoaderConfig:
-        """Return the default processor configuration for this dataset."""
-
-    def scenes_callback(self, callback: Callable[[Scene[T_ID]], None]) -> None:
-        """Process scenes and call the provided callback on each scene."""
-        for scene in self.scenes():
-            callback(scene)
-
-    def num_scenes(self) -> int | None:
-        """Get the total number of scenes that will be processed.
-
-        In some cases this can be expensive to compute or not known in advanced, in that case `None`
-        is returned.
-        """
-        _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
-        return None
-
-    def num_sources(self) -> int | None:
-        """Get the total number of sources that will be processed.
-
-        This is different from `number_of_scenes()` since each source can potentially generate
-        multiple scenes (e.g., by using sliding window sampling). In some cases this can be
-        expensive to compute or not known in advanced, in that case `None` is returned.
-
-        This could trivially be implemented as `len(list(self.sources()))`, but that would require
-        loading all sources into memory which can be expensive for large datasets.
-        """
-        _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
-        return None
-
-    def process_next(self, source: T_Source) -> Iterable[tuple[pl.DataFrame, MapContext]]:
-        """Process a single data item through the pipeline.
-
-        Steps:
-        1. Load raw data for all sources.
-        2. Normalize to common schema.
-        """
-
-        def _step(raw_df: pl.LazyFrame) -> pl.DataFrame | None:
-            normalized_df = self.normalize(raw_df)
-            try:
-                df = normalized_df.collect()
-            except ValueError:
-                # Error cases can be caused by:
-                # 1. Empty scenes (due to filtering or missing data)
-                return None
-            return df if not df.is_empty() else None
-
-        for raw_df, map_context in self.load_raw(source):
-            df = _step(raw_df)
-            if df is not None:
-                yield df, map_context
-
-    def scenes(self) -> Iterable[Scene[T_ID]]:
-        """Iterate over all sources and process them into scenes.
-
-        This will lazy-load and process each source one at a time.
-        """
-        for source_id, source in self.sources():
-            self._source_counter += 1
-            for scene_df, map_context in self.process_next(source):
-                yield self.create_scene(scene_df, source_id, map_context)
-
-    def create_scene(
-        self, df: pl.DataFrame, source_id: T_ID, map_context: MapContext
-    ) -> Scene[T_ID]:
-        """Create a Scene object from the processed DataFrame and source identifier.
-
-        This method also calls `Scene.enforce_schema()` if `self._enforce_schema` is True to ensure
-        the scene follows the expected schema. If overriding this method, make sure to follow
-        the expected behavior regarding schema enforcement.
-
-        Args:
-            df: Processed DataFrame for the scene, expected to follow the common schema.
-            source_id: Identifier for the scene source (e.g., file name, index).
-            map_context: Map context associated with the scene.
-
-        """
-        scene = Scene(
-            inner=df,
-            identifier=source_id,
-            scene_number=self._count,
-            input_len=self.input_len,
-            output_len=self.output_len,
-            map_context=map_context,
-        )
-        self._attach_scene_properties.clear()
-        self._count += 1
-        return scene if not self._enforce_schema else scene.enforce_schema()
-
-    @staticmethod
-    def derivative_names() -> dict[int, list[str]]:
-        """Return the names of the derivatives for velocity and acceleration."""
-        return {
-            1: ["vx", "vy"],
-            2: ["ax", "ay"],
-        }

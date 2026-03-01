@@ -10,7 +10,7 @@ from preprocessing.common.trajectory.process import prepare_agent_trajectories
 from preprocessing.common.trajectory.rebalance import rebalance_highway_agents
 from preprocessing.core.datatypes import map_context as mc
 from preprocessing.core.datatypes.categories import AgentCategory
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig
+from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -88,7 +88,7 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
         return _TRACK_SCHEMA
 
     @override
-    def sources(self) -> Iterable[tuple[int, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
         num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
         for i in range(1, num_files // 4):
             recording_meta = self._data_dir / f"{i:0>2}_recordingMeta.csv"
@@ -97,26 +97,25 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             columns = recording_meta_data.columns
-            meta_df = (
-                pl
-                .scan_csv(meta, schema_overrides=self.meta_schema())
-                .select(*self.meta_data_select())
-                .with_columns(pl.lit(location_id).alias("location_id"))
+            meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
+                *self.meta_data_select()
             )
 
+            utm_x0: float | None = None
+            utm_y0: float | None = None
             if "xUtmOrigin" in columns and "yUtmOrigin" in columns:
-                x_utm_origin = recording_meta_data.select(pl.col("xUtmOrigin")).item()
-                y_utm_origin = recording_meta_data.select(pl.col("yUtmOrigin")).item()
-                meta_df = meta_df.with_columns(
-                    pl.lit(x_utm_origin).alias("x_utm_origin"),
-                    pl.lit(y_utm_origin).alias("y_utm_origin"),
-                )
+                utm_x0 = recording_meta_data.select(pl.col("xUtmOrigin")).item()
+                utm_y0 = recording_meta_data.select(pl.col("yUtmOrigin")).item()
 
             tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
                 *self.track_data_select()
             )
             combined = tracks_df.join(meta_df, left_on="id", right_on="id")
-            yield i, combined
+            yield Source(
+                identifier=i,
+                inner=combined,
+                map_context=mc.Explicit(id=str(location_id), utm_x0=utm_x0, utm_y0=utm_y0),
+            )
 
     @override
     def num_sources(self) -> int | None:
@@ -124,21 +123,15 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
         return num_files // 4 - 1
 
     @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def load_raw(
+        self, source: Source[int, pl.LazyFrame]
+    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        data = source.inner
         if self._rebalance_ratio is not None:
-            source = rebalance_highway_agents(source, ratio=self._rebalance_ratio).drop(
-                "lane_changes"
-            )
+            data = rebalance_highway_agents(data, ratio=self._rebalance_ratio).drop("lane_changes")
 
-        source_c = source.collect()
-        location_id = source_c.select(pl.col("location_id")).item()
-        utm_x0 = source_c.select(pl.col("x_utm_origin")).item()
-        utm_y0 = source_c.select(pl.col("y_utm_origin")).item()
-
-        for df in prepare_agent_trajectories(
-            source_c.lazy(), self.loader_config, forward_fill=["location_id"]
-        ):
-            yield df, mc.Explicit(str(location_id), utm_x0=utm_x0, utm_y0=utm_y0)
+        for df in prepare_agent_trajectories(data, self.loader_config):
+            yield df, source.map_context or mc.NoMap()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

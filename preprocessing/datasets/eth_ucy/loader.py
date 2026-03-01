@@ -10,11 +10,11 @@ from typing_extensions import override
 from preprocessing.common.trajectory.basic import yaw_from_vel
 from preprocessing.common.trajectory.process import prepare_agent_trajectories
 from preprocessing.core import AgentCategory, BaseSceneLoader, LoaderConfig
+from preprocessing.core.datatypes import map_context as mc
+from preprocessing.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
-
-    from preprocessing.core.datatypes import map_context as mc
 
 
 class EthUcyLoader(BaseSceneLoader[str, Path]):
@@ -36,12 +36,12 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
         self._filtering_params = self.loader_config.scene_filtering
 
     @override
-    def sources(self) -> Iterable[tuple[str, Path]]:
+    def sources(self) -> Iterable[Source[str, Path]]:
         for dataset in self._dataset:
             data_dir = self._data_root / dataset / self._split
             # Sort to ensure consistent order across runs and systems.
             for data_file in sorted(data_dir.iterdir()):
-                yield data_file.name, data_file
+                yield Source(identifier=data_file.name, inner=data_file)
 
     @override
     def num_sources(self) -> int | None:
@@ -53,8 +53,8 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
         return num_sources
 
     @override
-    def load_raw(self, source: Path) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        source_data = EthUcyLoader._read_data_file(source)
+    def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        source_data = EthUcyLoader._read_data_file(source.inner)
         for df in prepare_agent_trajectories(
             source_data,
             self.loader_config,
@@ -64,7 +64,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             agent_category_col=None,
             derivative_rename=self.derivative_names(),
         ):
-            yield df, None
+            yield df, mc.NoMap()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

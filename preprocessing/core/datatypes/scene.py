@@ -31,7 +31,7 @@ class Scene(Generic[T_ID]):
     output_len: int
     """Number of predicted frames."""
     map_context: MapContext
-    """Map context for the scene, which can be implicit, explicit, loaded, or None."""
+    """Map context for the scene, which can be implicit, explicit, loaded, or no map."""
 
     def enforce_schema(self, schema: pl.Schema | None = None) -> Self:
         """Enforce the scene dataframe to follow a specified schema.
