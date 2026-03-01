@@ -89,7 +89,7 @@ def prepare_agent_trajectories(
     )
 
     if config.window_params is None:
-        yield scenes_resampled.lazy()
+        yield scenes_resampled
     else:
         for _, group in scenes_resampled.collect().group_by("window_index"):
             if offset_sliding_col:

@@ -417,9 +417,16 @@ def _upsample_dataframe(
 
     on: list[str] = [*group_by, frame_column] if group_by else [frame_column]
     exclude: list[str] = [*on, *(forward_fill or [])]
-    exprs: list[pl.Expr] = [pl.all().exclude(exclude).interpolate()]
+    interp_expr: pl.Expr = pl.all().exclude(exclude).interpolate()
+    if group_by:
+        interp_expr = interp_expr.over(group_by)
+
+    exprs: list[pl.Expr] = [interp_expr]
     if forward_fill:
-        exprs.append(pl.col(forward_fill).forward_fill())
+        forward_fill_exp = pl.col(forward_fill)
+        if group_by:
+            forward_fill_exp = forward_fill_exp.over(group_by)
+        exprs.append(forward_fill_exp.forward_fill())
     result = upsampled.join(data_scaled, on=on, how="left").sort(on).with_columns(*exprs)
 
     if isinstance(result, pl.LazyFrame) and is_eager:
