@@ -5,19 +5,16 @@ from collections import deque
 from collections.abc import Callable, Hashable, Iterable
 from dataclasses import replace
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Any, Concatenate, Generic, NamedTuple, ParamSpec, TypeVar
 
 import tqdm
 from typing_extensions import Self, override
 
-from preprocessing.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
+from preprocessing.core.protocols.loader import BaseSceneLoader, SceneLoader, Source
 
 if TYPE_CHECKING:
     from multiprocessing.sharedctypes import Synchronized
 
-    import polars as pl
-
-    from preprocessing.core.datatypes import map_context as mc
     from preprocessing.core.datatypes.scene import Scene
 
 
@@ -42,9 +39,10 @@ class ProgressBar(IntEnum):
 
 T_Source = TypeVar("T_Source")
 T_ID = TypeVar("T_ID", bound=(Hashable))
+P = ParamSpec("P")
 
 
-class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
+class ParallelSceneLoader(SceneLoader[T_ID]):
     """A generic parallel data loader that wraps another BaseSceneLoader.
 
     It uses Python's multiprocessing module to parallelize the processing of sources across multiple
@@ -54,9 +52,6 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
     across runs or systems due to the use of `imap_unordered` for better performance. If a
     deterministic order is required, the `maintain_order` flag can be set to True, which will use
     `imap` instead of `imap_unordered`.
-
-    This class also implements the `SceneLoader` (and `BaseSceneLoader) interface, which means it
-    can be used as a drop in replacement for any other `SceneLoader` implementation.
 
     Practical Considerations:
         Using multprocessing can significantly speed up the processing of large datasets, however
@@ -84,6 +79,10 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
         `POLARS_MAX_THREADS=X`, where X is a number that balances the workload between
         `ParallelSceneLoader` and Polars. An alternative option is to lower the `processes`
         parameter in this class.
+
+        5. The input dataloader will be sent to each worker process. This means that it should be
+        as lightweight as possible, and possibly avoid eager loading of data in its constructor.
+        It also needs to be picklable, in order to be sent to worker processes.
 
     """
 
@@ -138,16 +137,6 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
             ProgressBar(int(progress_bar)) if isinstance(progress_bar, bool) else progress_bar
         )
 
-    @staticmethod
-    def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:
-        if num_sources is None:
-            return 1
-
-        num_processes = num_processes or mp.cpu_count()
-        chunksize, extra = divmod(num_sources, num_processes * 4)
-        chunksize += int(extra > 0)
-        return max(chunksize, 1)
-
     def processes(self, processes: int | None) -> Self:
         """Set the number of processes to use for multiprocessing. If None, uses the number of CPU cores."""
         self._processes = processes
@@ -161,24 +150,6 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
         """
         self._chunksize = chunksize
         return self
-
-    @override
-    def sources(self) -> Iterable[Source[T_ID, T_Source]]:
-        return self._inner.sources()
-
-    @override
-    def load_raw(
-        self, source: Source[T_ID, T_Source]
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        return self._inner.load_raw(source)
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return self._inner.normalize(df)
-
-    @override
-    def default_config(self) -> LoaderConfig:
-        return self._inner.default_config()
 
     @override
     def scenes(self) -> Iterable[Scene[T_ID]]:
@@ -203,7 +174,7 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
             map_fn = pool.imap if self._maintain_order else pool.imap_unordered
             for scenes in map_fn(
                 ParallelSceneLoader._process_fn,
-                (_ProcessArgs(s, self._inner) for s in self.sources()),
+                (_ProcessArgs(s, self._inner) for s in self._inner.sources()),
                 self._chunksize,
             ):
                 if self._progress_bar == ProgressBar.SOURCES:
@@ -219,7 +190,13 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
 
                 yield from scenes
 
-    def scenes_callback(self, callback: Callable[[Scene[T_ID]], None]) -> None:
+    @override
+    def scenes_callback(
+        self,
+        callback: Callable[Concatenate[Scene[T_ID], P], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
         """Process scenes using a callback function instead of yielding them.
 
         This method allows you to provide a callback function that will be called for each processed
@@ -228,9 +205,21 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
 
         Args:
             callback: A callable that takes a Scene as input and performs side effects (e.g., saving
-            to disk). This function will be called for each processed scene.
+                to disk). This function will be called for each processed scene.
+            *args: Additional positional arguments to pass to the callback function.
+            **kwargs: Additional keyword arguments to pass to the callback function.
+
+
+        Considerations:
+            All additional arguments will be passed to the worker processes and should be chosen
+            carefully to avoid sending large amounts of data.
+
+            Moreover, due to the nature of multiprocessing, the callback function and its arguments
+            must be picklable. If you encounter issues with pickling, consider using simpler data
+            structures or functions defined at the top level of a module.
 
         """
+        loader = self._inner
         with (
             tqdm.tqdm(**self._tqdm_args()) as progress_bar,
             mp.Pool(
@@ -241,8 +230,8 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
         ):
             map_fn = pool.imap if self._maintain_order else pool.imap_unordered
             work_iter = map_fn(
-                ParallelSceneLoader._process_fn_callable,
-                (_ProcessArgs(s, self._inner, fn=callback) for s in self._inner.sources()),
+                ParallelSceneLoader._process_fn_callback,
+                (_ProcessArgs(s, loader, callback, args, kwargs) for s in loader.sources()),
                 self._chunksize,
             )
             if self._progress_bar == ProgressBar.NONE:
@@ -263,28 +252,41 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
                     progress_bar.update(processed_scenes)
 
     @staticmethod
+    def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:
+        if num_sources is None:
+            return 1
+
+        num_processes = num_processes or mp.cpu_count()
+        chunksize, extra = divmod(num_sources, num_processes * 4)
+        chunksize += int(extra > 0)
+        return max(chunksize, 1)
+
+    @staticmethod
     def _process_fn(args: _ProcessArgs[T_ID, T_Source]) -> list[Scene[T_ID]]:
         """Worker process function that processes a single source and returns a list of Scenes."""
-        loader = args.loader
-        source = args.source
+        loader, source = args.loader, args.source
         scenes: list[Scene[T_ID]] = []
-        scene_number: int = -1
-        for scene_data, map_context in loader.process_next(source):
-            with _scene_counter.get_lock():
-                _scene_counter.value += 1
-                scene_number = _scene_counter.value
 
+        for scene_data, map_context in loader.process_next(source):
             scene = loader.create_scene(scene_data, source.identifier, map_context)
-            # Add a unique global scene number, since each worker will have its own local counter.
-            scenes.append(replace(scene, scene_number=scene_number))
+            scenes.append(scene)
+
+        if num_scenes := len(scenes):
+            with _scene_counter.get_lock():
+                start_index = _scene_counter.value + 1
+                _scene_counter.value += num_scenes
+
+            for i in range(num_scenes):
+                scenes[i] = replace(scenes[i], scene_number=start_index + i)
 
         with _source_counter.get_lock():
             _source_counter.value += 1
+
         return scenes
 
     @staticmethod
-    def _process_fn_callable(args: _ProcessArgs[T_ID, T_Source]) -> int:
-        """Worker process function that applies a callable to each Scene.
+    def _process_fn_callback(args: _ProcessArgs[T_ID, T_Source]) -> int:
+        """Worker process function that applies a callback to each Scene.
 
         This function returns the number of processed scenes (used for keeping track of progress),
         otherwise it behaves similarly to `_process_fn` but instead of returning the scenes, it
@@ -295,17 +297,20 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
             raise ValueError(msg)
 
         processed_scenes = 0
-        loader = args.loader
-        source = args.source
+        loader, source = args.loader, args.source
         scene_number: int = -1
+        cb_args, cb_kwargs = args.cb_args or (), args.cb_kwargs or {}
         for scene_data, map_context in loader.process_next(source):
+            # Should be fine to aquire lock in loop, since `process_next` is expected to be
+            # relatively slow. Not as easy to move outside the loop here since we want to avoid
+            # loading all scenes into memory at once, which would happen if we used `_process_fn`.
             with _scene_counter.get_lock():
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
 
             scene = loader.create_scene(scene_data, source.identifier, map_context)
             scene = replace(scene, scene_number=scene_number)
-            args.fn(scene)
+            args.fn(scene, *cb_args, **cb_kwargs)
             processed_scenes += 1
 
         with _source_counter.get_lock():
@@ -331,16 +336,14 @@ class ParallelSceneLoader(BaseSceneLoader[T_ID, T_Source]):
         }
 
 
-# Backward compatibility alias
-ParallelLoader = ParallelSceneLoader
-
-
 class _ProcessArgs(NamedTuple, Generic[T_ID, T_Source]):
     """Arguments for processing a single source in a worker process."""
 
     source: Source[T_ID, T_Source]
     loader: BaseSceneLoader[T_ID, T_Source]
-    fn: Callable[[Scene[T_ID]], None] | None = None
+    fn: Callable[..., None] | None = None
+    cb_args: tuple | None = None
+    cb_kwargs: dict[str, Any] | None = None
 
 
 # Worker initialization function to set up the global counter in each worker process.

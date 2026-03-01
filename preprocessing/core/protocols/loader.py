@@ -4,7 +4,19 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Hashable, Iterable
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, Self, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Concatenate,
+    Generic,
+    Literal,
+    ParamSpec,
+    Protocol,
+    Self,
+    TypeVar,
+)
+
+from typing_extensions import override
 
 from preprocessing.core.datatypes.scene import Scene
 
@@ -170,6 +182,7 @@ class LoaderConfig:
 T_Source = TypeVar("T_Source")
 T_Source_co = TypeVar("T_Source_co", covariant=True)
 T_ID = TypeVar("T_ID", bound=Hashable)
+P = ParamSpec("P")
 
 
 @dataclass(slots=True, frozen=True)
@@ -196,7 +209,12 @@ class SceneLoader(Protocol, Generic[T_ID]):
         """Yield processed scenes one at a time."""
         ...
 
-    def scenes_callback(self, callback: Callable[[Scene[T_ID]], None]) -> None:
+    def scenes_callback(
+        self,
+        callback: Callable[Concatenate[Scene[T_ID], P], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
         """Process scenes and call the provided callback on each scene.
 
         This is an alternative to `scenes()` that allows for more flexible
@@ -204,6 +222,13 @@ class SceneLoader(Protocol, Generic[T_ID]):
         called with each processed scene, allowing for custom handling (e.g.,
         saving to disk, feeding into a model) without needing to store all scenes
         in memory at once.
+
+        Args:
+            callback: A function that takes a Scene and additional arguments, and
+                processes it (e.g., saves to disk, feeds into a model).
+            *args: Additional positional arguments to pass to the callback.
+            **kwargs: Additional keyword arguments to pass to the callback.
+
         """
         ...
 
@@ -249,10 +274,15 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     def default_config(self) -> LoaderConfig:
         """Return the default processor configuration for this dataset."""
 
-    def scenes_callback(self, callback: Callable[[Scene[T_ID]], None]) -> None:
-        """Process scenes and call the provided callback on each scene."""
+    @override
+    def scenes_callback(
+        self,
+        callback: Callable[Concatenate[Scene[T_ID], P], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
         for scene in self.scenes():
-            callback(scene)
+            callback(scene, *args, **kwargs)
 
     def num_scenes(self) -> int | None:
         """Get the total number of scenes that will be processed.

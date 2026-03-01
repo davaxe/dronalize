@@ -25,7 +25,6 @@ from preprocessing.core.graph import (
 
 # Parallel execution
 from preprocessing.core.parallel import (
-    ParallelLoader,
     ParallelSceneLoader,
     ProgressBar,
 )
@@ -63,7 +62,6 @@ __all__ = [
     "LoaderConfig",
     "MapContext",
     "MapGraph",
-    "ParallelLoader",
     "ParallelSceneLoader",
     "ProgressBar",
     "Resampling",
