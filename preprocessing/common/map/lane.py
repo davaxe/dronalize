@@ -74,8 +74,6 @@ class HighWayLaneGraphBuilder(GraphBuilder[int, IntIDNode]):
         elif orientation == "horizontal":
             self._long_col = self._x_col
             self._lat_col = self._y_col
-        else:
-            raise ValueError("Orientation must be 'vertical' or 'horizontal'.")
 
     def lane_description(self, lane_description: LaneDescription) -> Self:
         """Provide lane description to enable more accurate edge type classification."""
