@@ -16,9 +16,10 @@ if TYPE_CHECKING:
 class SindGraphBuilder(OSMMapGraphBuilder):
     """Map graph builder for the SIND dataset.
 
-    This builder constructs a map graph from the OSM lanelet map files provided with the SIND
-    dataset. It dynamically finds the local origin in the OSM file and uses UTM projection
-    offsets to build a local metric coordinate system.
+    This builder constructs a map graph from the OSM lanelet map files provided
+    with the SIND dataset. It dynamically finds the local origin in the OSM file
+    and uses UTM projection offsets to build a local metric coordinate system.
+
     """
 
     def __init__(

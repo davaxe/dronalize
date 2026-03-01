@@ -27,7 +27,7 @@ class BaseMapObject(Protocol, Generic[ID]):
         cls: type[Self],
         data: dict[str, Any],
     ) -> Self | None:
-        """Try to create an instance from a dictionary, returning None on failure."""
+        """Try to create an instance from a dictionary."""
         try:
             return cls.from_dict(data)
         except (ValueError, TypeError):
@@ -124,7 +124,7 @@ class BaseEnum(IntEnum):
 
     @classmethod
     def try_from_str(cls: type[Self], value: str | None) -> Self | None:
-        """Try to convert a string to an enum member, returning `None` otherwise.
+        """Try to convert a string to an enum member.
 
         Parameters
         ----------
@@ -175,7 +175,7 @@ class BaseEnum(IntEnum):
 
     @classmethod
     def try_from_int(cls: type[Self], value: int | None) -> Self | None:
-        """Try to convert a value to an enum member, returning `None` otherwise.
+        """Try to convert a value to an enum member.
 
         Parameters
         ----------

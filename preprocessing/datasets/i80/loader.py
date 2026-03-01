@@ -28,11 +28,13 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
     ) -> None:
         """Initialize the I80 dataset loader.
 
-        It is possible to rebalance the dataset by adjusting the number of lane changing agents
-        compared to non-lane changing agents. This can be done by setting the `lane_change_ratio`
-        parameter. For example, a ratio of 0.5 would result in half as many lane changing agents as
-        non-lane changing agents. Typically highway datasets are heavily imbalanced towards non-lane
-        changing agents, which means that a high ratio con result in way less total data.
+        It is possible to rebalance the dataset by adjusting the number of lane
+        changing agents compared to non-lane changing agents. This can be done
+        by setting the `lane_change_ratio` parameter. For example, a ratio of
+        0.5 would result in half as many lane changing agents as non-lane
+        changing agents. Typically highway datasets are heavily imbalanced
+        towards non-lane changing agents, which means that a high ratio con
+        result in way less total data.
 
         Parameters
         ----------

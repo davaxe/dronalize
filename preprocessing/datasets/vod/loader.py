@@ -11,6 +11,7 @@ class VodLoader(NuScenesLoader):
 
     This shares the same base processing logic as NuScenesProcessor but with
     specific category filtering. For further details se the nuScenes processor.
+
     """
 
     def __init__(

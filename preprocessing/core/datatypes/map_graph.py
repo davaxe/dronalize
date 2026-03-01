@@ -19,7 +19,7 @@ class SharedMapGraph:
     """Context manager for accessing a `MapGraph` stored in shared memory."""
 
     def __init__(self, shared_name: str) -> None:
-        """Initialize the context manager with the name of the shared memory block."""
+        """Initialize the shared memory context manager."""
         self._shared_name = shared_name
         self._shared: shm.SharedMemory | None = None
         self._map_graph: MapGraph | None = None
@@ -105,7 +105,7 @@ class SharedMapGraph:
         self.close()
 
     def __del__(self) -> None:
-        """Ensure shared memory is closed when the context manager is garbage collected."""
+        """Ensure shared memory is closed."""
         # Ensure shared memory is closed if the context manager was not used properly.
         if self._shared is not None:
             self._shared.close()
@@ -234,7 +234,7 @@ class MapGraph:
 
     @classmethod
     def from_shared(cls, shared_name: str) -> SharedMapGraph:
-        """Create a `SharedMapGraph` context manager for accessing a graph in shared memory.
+        """Create a context manager for accessing a graph in shared memory.
 
         Parameters
         ----------
@@ -289,8 +289,8 @@ class MapGraph:
     def to_torch_graph(self) -> dict[Any, Any]:
         """Convert the `MapGraph` to a format compatible with PyTorch Geometric.
 
-        Uses `torch.from_numpy` for zero-copy conversion (the returned tensors share the same
-        underlying memory as the NumPy arrays).
+        Uses `torch.from_numpy` for zero-copy conversion (the returned tensors
+        share the same underlying memory as the NumPy arrays).
 
         Returns
         -------
@@ -427,9 +427,9 @@ def _extract_subgraph(
 ) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
     """Extract a subgraph given a boolean node mask.
 
-    This is a pure-NumPy replacement for `torch_geometric.utils.subgraph`. It filters edges so that
-    both endpoints belong to the selected node subset and relabels node indices to be contiguous (0
-    … K-1).
+    This is a pure-NumPy replacement for `torch_geometric.utils.subgraph`. It
+    filters edges so that both endpoints belong to the selected node subset and
+    relabels node indices to be contiguous (0 … K-1).
 
     Parameters
     ----------

@@ -252,7 +252,8 @@ class Source(Generic[T_ID, T_Source]):
     map_context: MapContext | None = None
     """Optional map context associated with the source.
 
-    This can be useful if all scenes generated from this source share the same map context.
+    This can be useful if all scenes generated from this source share the same
+    map context.
     """
     metadata: dict[str, Any] = field(default_factory=dict)
     """Additional metadata associated with the source."""
@@ -411,13 +412,13 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         """Get the total number of sources that will be processed.
 
         This is different from `num_scenes()` since each source can potentially
-        generate multiple scenes (e.g., by using sliding window sampling). In some
-        cases this can be expensive to compute or not known in advance, in that
-        case `None` is returned.
+        generate multiple scenes (e.g., by using sliding window sampling). In
+        some cases this can be expensive to compute or not known in advance, in
+        that case `None` is returned.
 
         This could trivially be implemented as `len(list(self.sources()))`, but
-        that would require loading all sources into memory which can be expensive
-        for large datasets.
+        that would require loading all sources into memory which can be
+        expensive for large datasets.
 
         Returns
         -------
@@ -486,9 +487,10 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     ) -> Scene[T_ID]:
         """Create a Scene object from the processed DataFrame and source identifier.
 
-        This method also calls `Scene.enforce_schema()` if `self._enforce_schema`
-        is True to ensure the scene follows the expected schema. If overriding this
-        method, make sure to follow the expected behavior regarding schema enforcement.
+        This method also calls `Scene.enforce_schema()` if
+        `self._enforce_schema` is True to ensure the scene follows the expected
+        schema. If overriding this method, make sure to follow the expected
+        behavior regarding schema enforcement.
 
         Parameters
         ----------

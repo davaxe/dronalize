@@ -13,7 +13,9 @@ if TYPE_CHECKING:
 class US101Loader(I80Loader):
     """Scene loader for the US-101 dataset.
 
-    For more details see `I80Loader`, as the US-101 dataset has the same format and structure.
+    For more details see `I80Loader`, as the US-101 dataset has the same format
+    and structure.
+
     """
 
     def __init__(
@@ -24,11 +26,13 @@ class US101Loader(I80Loader):
     ) -> None:
         """Initialize the US101 dataset loader.
 
-        It is possible to rebalance the dataset by adjusting the number of lane changing agents
-        compared to non-lane changing agents. This can be done by setting the `lane_change_ratio`
-        parameter. For example, a ratio of 0.5 would result in half as many lane changing agents as
-        non-lane changing agents. Typically highway datasets are heavily imbalanced towards non-lane
-        changing agents, which means that a high ratio con result in way less total data.
+        It is possible to rebalance the dataset by adjusting the number of lane
+        changing agents compared to non-lane changing agents. This can be done
+        by setting the `lane_change_ratio` parameter. For example, a ratio of
+        0.5 would result in half as many lane changing agents as non-lane
+        changing agents. Typically highway datasets are heavily imbalanced
+        towards non-lane changing agents, which means that a high ratio con
+        result in way less total data.
 
         Parameters
         ----------

@@ -12,7 +12,7 @@ ID = TypeVar("ID", bound=Hashable)
 
 @dataclass(slots=True, frozen=True)
 class Implicit:
-    """Indicates an implicit map context; map information is known without any additional info.
+    """Indicates an implicit map context.
 
     Commonly this is the case when there is only one possible map.
     """
@@ -22,7 +22,7 @@ class Implicit:
 
 @dataclass(slots=True, frozen=True)
 class Explicit:
-    """Indicates an explicit map context; map information is provided explicitly for the scene."""
+    """Indicates an explicit map contex."""
 
     metadata: dict[str, Any] = field(default_factory=dict)
     """Metadata required to determine the map."""
@@ -44,7 +44,7 @@ class Loaded:
 
 @dataclass(slots=True, frozen=True)
 class NoMap:
-    """Indicates no map is available for the scene; map information is not known or not applicable."""
+    """Indicates no map is available for the scene."""
 
     tag: Literal["NoMap"] = "NoMap"
 

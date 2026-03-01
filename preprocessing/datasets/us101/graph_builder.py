@@ -13,9 +13,11 @@ if TYPE_CHECKING:
 class US101GraphBuilder(HighWayLaneGraphBuilder):
     """Graph builder for the US101 dataset.
 
-    This dataset do not have acutal map data, but the map can be reconstructed (infered/estimated)
-    from the trajectories of the vehicles. The graph builder uses a simple heuristic to infer the
-    lane structure, see `HighWayLaneGraphBuilder` for details.
+    This dataset do not have acutal map data, but the map can be reconstructed
+    (infered/estimated) from the trajectories of the vehicles. The graph builder
+    uses a simple heuristic to infer the lane structure, see
+    `HighWayLaneGraphBuilder` for details.
+
     """
 
     def __init__(self, data_dir: Path) -> None:

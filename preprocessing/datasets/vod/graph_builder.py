@@ -14,9 +14,6 @@ from preprocessing.datasets.nuscenes.map.parser import NuScenesMap
 if TYPE_CHECKING:
     from pathlib import Path
 
-# TODO:
-# - Add centerlines correctly by using `arcline_path_3` available in the VOD map
-
 
 class VODMapGraphBuilder(NuScenesMapGraphBuilder):
     """A builder for creating a MapGraph from a VOD map."""

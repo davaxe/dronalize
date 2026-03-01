@@ -13,11 +13,13 @@ if TYPE_CHECKING:
 
 
 class HighDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
-    """Graph builder for the HighD dataset. It builds a graph from the lane markings in the dataset.
+    """Graph builder for the HighD dataset.
 
-    The data only contains the y coordinates of the lane markings, so we craete the nodes at specified
-    start and end x coordinates. The lane markings are represented as edges between the nodes. The outermost
-    lanes are classifed as road boarders.
+    The data only contains the y coordinates of the lane markings, so we craete
+    the nodes at specified start and end x coordinates. The lane markings are
+    represented as edges between the nodes. The outermost lanes are classifed as
+    road boarders.
+
     """
 
     def __init__(self, meta_file: Path, start_x: float, end_x: float) -> None:

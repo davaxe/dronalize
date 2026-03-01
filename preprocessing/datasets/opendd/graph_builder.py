@@ -39,6 +39,7 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
     More information about OpenDD can be found at:
     https://l3pilot.eu/data/opendd.html
+
     """
 
     def __init__(self, sqlite_map_path: Path) -> None:
@@ -59,6 +60,7 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
         The file is by default located at: `rdbX/map_rdbX/map_rdbX.sqlite`, in
         the downloaded `OpenDD` data
+
         """
         if isinstance(sqlite_file, str):
             sqlite_file = Path(sqlite_file)

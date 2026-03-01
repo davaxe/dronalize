@@ -21,8 +21,8 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
     def __init__(self, data_dir: Path, loader_config: LoaderConfig | None = None) -> None:
         """Initialize the loader with the given data directory and loader configuration.
 
-        The `data_dir` directory should contain the actual .txt datafiles stored in CSV-like
-        format, with the following columns (in order):
+        The `data_dir` directory should contain the actual .txt datafiles stored
+        in CSV-like format, with the following columns (in order):
         - frame: The frame number of the trajectory point.
         - id: The unique identifier for the agent.
         - agent_category: The category of the agent, encoded as an integer.

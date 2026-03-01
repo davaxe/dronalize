@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def require_optional(module_name: str, *, extra: str | None = None) -> ModuleType:
-    """Import and return an optional dependency, raising a clear error if missing.
+    """Import and return an optional dependency.
 
     Parameters
     ----------

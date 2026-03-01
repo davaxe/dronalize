@@ -258,7 +258,8 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         """Interpolate an edge between two nodes.
 
         This method generates intermediate edges between two nodes, ensuring
-        that the distance between consecutive points is at most `interp_distance`.
+        that the distance between consecutive points is at most
+        `interp_distance`.
 
         Parameters
         ----------

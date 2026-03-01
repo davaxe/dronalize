@@ -79,7 +79,6 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             id=str(UUID(int=hash((x, y, z)) & ((1 << 128) - 1))),
             x=x,
             y=y,
-            z=z,
         )
 
     @override

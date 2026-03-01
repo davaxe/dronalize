@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 class ProgressBar(IntEnum):
-    """Enum to specify which progress bars to show when using ParallelSceneLoader."""
+    """Enum to specify which progress bars to show."""
 
     NONE = 0
     """No progress bars."""
@@ -29,7 +29,7 @@ class ProgressBar(IntEnum):
     """Show progress bar for scenes (# processed sources are shown in postfix)."""
 
     def unit(self) -> str:
-        """Return the unit string to use for tqdm progress bars based on the selected ProgressBar.
+        """Return unit depending on the type of progress bar.
 
         Returns
         -------
@@ -52,44 +52,51 @@ P = ParamSpec("P")
 class ParallelSceneLoader(SceneLoader[T_ID]):
     """A generic parallel data loader that wraps another BaseSceneLoader.
 
-    It uses Python's multiprocessing module to parallelize the processing of sources across multiple
-    CPU cores. The number of processes and chunksize can be configured depending on workload.
+    It uses Python's multiprocessing module to parallelize the processing of
+    sources across multiple CPU cores. The number of processes and chunksize can
+    be configured depending on workload.
 
-    By default the order of resulting scenes when using the `scenes` method will not be
-    deterministic across runs or systems due to the use of `imap_unordered` for better
-    performance. If a deterministic order is required, the `maintain_order` flag can be set to
-    True, which will use `imap` instead of `imap_unordered`.
+    By default the order of resulting scenes when using the `scenes` method will
+    not be deterministic across runs or systems due to the use of
+    `imap_unordered` for better performance. If a deterministic order is
+    required, the `maintain_order` flag can be set to True, which will use
+    `imap` instead of `imap_unordered`.
 
-    Practical Considerations:
-        Using multiprocessing can significantly speed up the processing of large datasets, however
-        there are some important considerations to keep in mind:
+    Practical Considerations
+    ------------------------
+    Using multiprocessing can significantly speed up the processing of large
+    datasets, however there are some important considerations to keep in mind:
 
-        1. If the underlying sources are small and quick to process, the overhead of multiprocessing
-        may outweigh the benefits. One option is to increase the `chunksize` to reduce overhead in
-        this case.
+    1. If the underlying sources are small and quick to process, the overhead of
+    multiprocessing may outweigh the benefits. One option is to increase the
+    `chunksize` to reduce overhead in this case.
 
-        2. If sources are instead large, for example `WaymoLoader` and its tfrecord files, then
-        other issues may arise such as increased memory usage and possibly issues with inter-process
-        communication. In these cases it is a good idea to avoid the `scenes` method, and instead
-        use the `scenes_callback` method with a callback function that performs side effects (e.g.,
-        saving to file). If an error related to "Too many opened files" is encountered when using
-        `scenes`, this is a strong indication that the underlying sources are too large for
-        `scenes` and `scenes_callback` should be used.
+    2. If sources are instead large, for example `WaymoLoader` and its tfrecord
+    files, then other issues may arise such as increased memory usage and
+    possibly issues with inter-process communication. In these cases it is a
+    good idea to avoid the `scenes` method, and instead use the
+    `scenes_callback` method with a callback function that performs side effects
+    (e.g., saving to file). If an error related to "Too many opened files" is
+    encountered when using `scenes`, this is a strong indication that the
+    underlying sources are too large for `scenes` and `scenes_callback` should
+    be used.
 
-        3. If the scenes include a lot of data (e.g. large DataFrames or maps) sending them between
-        processes can be costly, and `scenes_callback` should be preferred when possible. In
-        extreme cases using multiprocessing can slow down processing due to the overhead.
+    3. If the scenes include a lot of data (e.g. large DataFrames or maps)
+    sending them between processes can be costly, and `scenes_callback` should
+    be preferred when possible. In extreme cases using multiprocessing can slow
+    down processing due to the overhead.
 
-        4. Since `DataLoaders` utilizes Polars, which also uses multiple cores for processing,
-        there may be some contention for CPU resources between the multiprocessing in
-        `ParallelSceneLoader` and the multithreading in Polars. Setting the environment variable
-        `POLARS_MAX_THREADS=X`, where X is a number that balances the workload between
-        `ParallelSceneLoader` and Polars. An alternative option is to lower the `processes`
-        parameter in this class.
+    4. Since `DataLoaders` utilizes Polars, which also uses multiple cores for
+    processing, there may be some contention for CPU resources between the
+    multiprocessing in `ParallelSceneLoader` and the multithreading in Polars.
+    Setting the environment variable `POLARS_MAX_THREADS=X`, where X is a number
+    that balances the workload between `ParallelSceneLoader` and Polars. An
+    alternative option is to lower the `processes` parameter in this class.
 
-        5. The input dataloader will be sent to each worker process. This means that it should be
-        as lightweight as possible, and possibly avoid eager loading of data in its constructor.
-        It also needs to be picklable, in order to be sent to worker processes.
+    5. The input dataloader will be sent to each worker process. This means that
+    it should be as lightweight as possible, and possibly avoid eager loading of
+    data in its constructor. It also needs to be picklable, in order to be sent
+    to worker processes.
 
     """
 
