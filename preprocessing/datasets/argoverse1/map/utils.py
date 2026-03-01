@@ -37,16 +37,23 @@ def swap_left_and_right(
 ) -> Iterable[np.ndarray]:
     """Swap points in left and right centerline according to condition.
 
-    Args:
-       condition: Numpy array of shape (N,) of type boolean. Where true, swap
-            the values in the left and right centerlines.
-       left_centerline: The left centerline, whose points should be swapped with
-            the right centerline.
-       right_centerline: The right centerline.
+    Parameters
+    ----------
+    condition : np.ndarray
+        Boolean array of shape (N,). Where True, swap the values in the left
+        and right centerlines.
+    left_centerline : np.ndarray
+        The left centerline, whose points should be swapped with the right
+        centerline.
+    right_centerline : np.ndarray
+        The right centerline.
 
-    Returns:
-       left_centerline
-       right_centerline
+    Returns
+    -------
+    left_centerline : np.ndarray
+        The (possibly swapped) left centerline.
+    right_centerline : np.ndarray
+        The (possibly swapped) right centerline.
 
     """
     right_swap_indices = right_centerline[condition]
@@ -67,13 +74,19 @@ def edge_borders_from_centerline(
     side. We use this as the length of the hypotenuse of a right triangle, and
     compute the other two legs to find the scaled x and y displacement.
 
-    Args:
-       centerline: Numpy array of shape (N,2).
-       width_scaling_factor: Multiplier that scales 3.8 meters to get the lane width.
+    Parameters
+    ----------
+    centerline : np.ndarray, shape (N, 2)
+        The lane centerline polyline.
+    width_scaling_factor : float, optional
+        Multiplier that scales 3.8 meters to get the lane width.
 
-    Returns:
-       polygon: Numpy array of shape (2N+1,2), with duplicate first and last
-        vertices.
+    Returns
+    -------
+    right_centerline : np.ndarray
+        Right border of the lane.
+    left_centerline : np.ndarray
+        Left border of the lane.
 
     """
     # eliminate duplicates
@@ -142,10 +155,14 @@ def lane_segment_is_regulatory(
 ) -> bool:
     """Check if a lane segment is regulatory.
 
-    Args:
-        lane_segment: The lane segment to check.
+    Parameters
+    ----------
+    lane_segment : LaneSegment
+        The lane segment to check.
 
-    Returns:
+    Returns
+    -------
+    bool
         True if the lane segment is regulatory, False otherwise.
 
     """

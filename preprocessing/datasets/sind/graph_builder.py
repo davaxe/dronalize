@@ -30,11 +30,15 @@ class SindGraphBuilder(OSMMapGraphBuilder):
     ) -> None:
         """Initialize the graph builder.
 
-        Args:
-            osm_file: Path to the OSM lanelet map file for the SIND dataset.
-            position_offset: Optional (x, y) offset to apply to all node positions after
-                converting to local coordinates.
-            include_edge_type_none: Whether to include edges with type 'none' in the graph.
+        Parameters
+        ----------
+        osm_file : Path
+            Path to the OSM lanelet map file for the SIND dataset.
+        position_offset : tuple[float, float], optional
+            (x, y) offset to apply to all node positions after converting to
+            local coordinates.
+        include_edge_type_none : bool, optional
+            Whether to include edges with type 'none' in the graph.
 
         """
         self._origin_lat, self._origin_lon = self._extract_origin(osm_file)

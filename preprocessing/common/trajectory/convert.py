@@ -17,24 +17,32 @@ def convert_to_agent_data_dict(
     *,
     category_mapping: dict[AgentCategory, int] | None = None,
 ) -> dict:
-    """Convert `Scene` into a agent dictionary.
+    """Convert `Scene` into an agent dictionary.
 
-    The dictionary is in format that is later compatible with pytorch
-    geometric HeteroData.
+    The dictionary is in a format that is later compatible with PyTorch
+    Geometric HeteroData.
 
-    Args:
-        data: DataFrame containing the scene data.
-        input_len: Number of observed frames.
-        output_len: Number of frames to predict.
-        target_agent: Optional track ID to use as the target node. If None, the
-            first valid track will be used as the target.
-        category_mapping: Optional mapping from Category enum to integer type for
-            customized type encoding. If None, the integer value from the Enum will
-            be used directly.
+    Parameters
+    ----------
+    data : pl.DataFrame
+        DataFrame containing the scene data.
+    input_len : int
+        Number of observed frames.
+    output_len : int
+        Number of frames to predict.
+    target_agent : int, optional
+        Track ID to use as the target node. If None, the first valid track
+        will be used as the target.
+    category_mapping : dict[AgentCategory, int], optional
+        Mapping from Category enum to integer type for customized type
+        encoding. If None, the integer value from the Enum will be used
+        directly.
 
-    Returns:
-        Dictionary containing the agent data according to the
-        AgentData TypedDict.
+    Returns
+    -------
+    dict
+        Dictionary containing the agent data according to the AgentData
+        TypedDict.
 
     """
     target_agent_id = _extract_target_agent(data, input_len, output_len, target_agent)

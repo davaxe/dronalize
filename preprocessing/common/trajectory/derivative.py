@@ -25,25 +25,35 @@ def derivative(
     orders are requested via `include_intermediate`, all steps from $1$ to $n$
     are returned.
 
-    Note:
-        Raises an exception if the dataset contains fewer than two datapoints
-        per group, as `np.gradient` requires sufficient padding.
+    .. note::
+        Groups with only one datapoint will produce null values for the
+        derivative columns, as finite differences require at least two points.
 
+    Parameters
+    ----------
+    data : T_DataFrame
+        Input DataFrame or LazyFrame.
+    *x : str
+        Names of columns to differentiate.
+    dt : float, optional
+        Constant time step between samples. Defaults to 1.0.
+    n : int, optional
+        The maximum order of the derivative. Defaults to 1.
+    include_intermediate : bool, optional
+        If True, retains all derivatives from 1 to n-1.
+    group_by : str or Sequence[str], optional
+        Column(s) used to partition data before calculation.
+    derivative_rename : dict[int, list[str]], optional
+        Mapping of order to a list of new column names.
+        Format: `{order: [name_x1, name_x2, ...]}`.
 
-    Args:
-        data: Input DataFrame or LazyFrame.
-        *x: Names of columns to differentiate.
-        dt: Constant time step between samples. Defaults to 1.0.
-        n: The maximum order of the derivative. Defaults to 1.
-        include_intermediate: If True, retains all derivatives from 1 to n-1.
-        group_by: Column(s) used to partition data before calculation.
-        derivative_rename: Mapping of order to a list of new column names.
-            Format: `{order: [name_x1, name_x2, ...]}`.
-
-    Returns:
+    Returns
+    -------
+    T_DataFrame
         The original data structure with new derivative columns appended.
 
-    Examples:
+    Examples
+    --------
     >>> df = pl.DataFrame(
     ...     {
     ...         "time": [0, 1, 2, 3, 4],

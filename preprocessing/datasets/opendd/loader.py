@@ -23,9 +23,12 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
     def __init__(self, database_path: Path, config: LoaderConfig | None = None) -> None:
         """Initialize the OpenDD processor.
 
-        Args:
-            database_path: Path to the OpenDD SQLite database file.
-            config: Processor configuration override. If None, the default configuration will be used.
+        Parameters
+        ----------
+        database_path : Path
+            Path to the OpenDD SQLite database file.
+        config : LoaderConfig, optional
+            Processor configuration override. If None, the default configuration will be used.
 
         """
         super().__init__(enforce_schema=True, loader_config=config)

@@ -34,9 +34,12 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
         - height: The height of the agent.
         - yaw: The yaw angle of the agent in radians.
 
-        Args:
-            data_dir: The directory containing the ApolloScape data files.
-            loader_config: Optional configuration override.
+        Parameters
+        ----------
+        data_dir : Path
+            The directory containing the ApolloScape data files.
+        loader_config : LoaderConfig, optional
+            Configuration override.
 
         """
         super().__init__(loader_config, enforce_schema=True)

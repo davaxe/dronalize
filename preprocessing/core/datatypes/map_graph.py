@@ -27,9 +27,16 @@ class SharedMapGraph:
     def open(self) -> MapGraph:
         """Open the shared memory and return a `MapGraph` instance.
 
-        Raises:
-            RuntimeError: if the shared memory is already open or if there is an issue accessing it
-                (e.g., it doesn't exist or has been released).
+        Returns
+        -------
+        MapGraph
+            The `MapGraph` instance loaded from shared memory.
+
+        Raises
+        ------
+        RuntimeError
+            If the shared memory is already open or if there is an issue
+            accessing it (e.g., it doesn't exist or has been released).
 
         """
         if self._shared is not None:
@@ -49,8 +56,10 @@ class SharedMapGraph:
     def close(self) -> None:
         """Close the shared memory and release resources.
 
-        Raises:
-            RuntimeError: if the shared memory is not currently open.
+        Raises
+        ------
+        RuntimeError
+            If the shared memory is not currently open.
 
         """
         if self._shared is None:
@@ -65,7 +74,14 @@ class SharedMapGraph:
         self._shared.close()
 
     def __enter__(self) -> MapGraph:
-        """Access the `MapGraph` from shared memory, returning a `MapGraph`."""
+        """Access the `MapGraph` from shared memory.
+
+        Returns
+        -------
+        MapGraph
+            The `MapGraph` instance loaded from shared memory.
+
+        """
         return self.open()
 
     def __exit__(
@@ -74,7 +90,18 @@ class SharedMapGraph:
         exc_val: BaseException | None,
         exc_t: TracebackType | None,
     ) -> None:
-        """Release resources when exiting the context."""
+        """Release resources when exiting the context.
+
+        Parameters
+        ----------
+        exc_type : type[BaseException] or None
+            The exception type, if any.
+        exc_val : BaseException or None
+            The exception value, if any.
+        exc_t : TracebackType or None
+            The traceback, if any.
+
+        """
         self.close()
 
     def __del__(self) -> None:
@@ -120,15 +147,20 @@ class MapGraph:
     ) -> None:
         """Initialize a `MapGraph` instance.
 
-        Args:
-            node_positions: array of shape `(N, 2)` with node positions.
-            edge_indices: array of shape `(2, M)` with edge endpoint indices.
-            node_types: array of shape `(N,)` with node type labels. Defaults to `None`, which means
-                all nodes are of type 1.
-            edge_types: array of shape `(M,)` with edge type labels. Defaults to `None`, which means
-                all edges are of type 1.
-            return_if_empty: if `True`, allows empty graphs and returns empty arrays.  If `False`,
-                raises `ValueError` when both `node_positions` and `edge_indices` are empty.
+        Parameters
+        ----------
+        node_positions : ndarray of float32, shape (N, 2)
+            Array of node positions.
+        edge_indices : ndarray of int64, shape (2, M)
+            Array of edge endpoint indices.
+        node_types : ndarray of int64, shape (N,), optional
+            Per-node type labels. If None, all nodes are assigned type 1.
+        edge_types : ndarray of int64, shape (M,), optional
+            Per-edge type labels. If None, all edges are assigned type 1.
+        return_if_empty : bool, optional
+            If True, allows empty graphs and returns empty arrays. If False,
+            raises `ValueError` when both `node_positions` and
+            `edge_indices` are empty.
 
         """
         if node_positions.size == 0 and edge_indices.size == 0:
@@ -172,7 +204,9 @@ class MapGraph:
     def to_shared(self) -> shm.SharedMemory:
         """Serialize the `MapGraph` to a shared memory block, including dimensions.
 
-        Returns:
+        Returns
+        -------
+        SharedMemory
             `SharedMemory` object containing the serialized graph data.
 
         """
@@ -202,8 +236,10 @@ class MapGraph:
     def from_shared(cls, shared_name: str) -> SharedMapGraph:
         """Create a `SharedMapGraph` context manager for accessing a graph in shared memory.
 
-        Args:
-            shared_name: name of the shared memory block containing the graph data.
+        Parameters
+        ----------
+        shared_name : str
+            Name of the shared memory block containing the graph data.
 
         """
         return SharedMapGraph(shared_name)
@@ -256,7 +292,9 @@ class MapGraph:
         Uses `torch.from_numpy` for zero-copy conversion (the returned tensors share the same
         underlying memory as the NumPy arrays).
 
-        Returns:
+        Returns
+        -------
+        dict
             Dictionary with node and edge data suitable for PyTorch Geometric.
 
         """
@@ -281,11 +319,16 @@ class MapGraph:
     ) -> MapGraph:
         """Extract a subgraph within a specified radius from a center point.
 
-        Args:
-            center: center of the radius as a tuple `(x, y)` or array.
-            radius: radius within which to extract nodes and edges.
+        Parameters
+        ----------
+        center : tuple[float, float] or ndarray
+            Center of the radius as a tuple `(x, y)` or array.
+        radius : float
+            Radius within which to extract nodes and edges.
 
-        Returns:
+        Returns
+        -------
+        MapGraph
             A new `MapGraph` containing only the nodes and edges within the
             given radius.
 
@@ -307,13 +350,19 @@ class MapGraph:
     ) -> MapGraph:
         """Extract a subgraph within a bounding box.
 
-        Args:
-            center: center of the bounding box as a tuple `(x, y)` or array. If `None`, the mean
-                position of all nodes is used.
-            width: full width of the bounding box.
-            height: full height of the bounding box.
+        Parameters
+        ----------
+        center : tuple[float, float] or ndarray or None
+            Center of the bounding box as a tuple `(x, y)` or array. If
+            `None`, the mean position of all nodes is used.
+        width : float
+            Full width of the bounding box.
+        height : float
+            Full height of the bounding box.
 
-        Returns:
+        Returns
+        -------
+        MapGraph
             A new `MapGraph` with only the nodes and edges inside the box.
 
         """
@@ -382,16 +431,19 @@ def _extract_subgraph(
     both endpoints belong to the selected node subset and relabels node indices to be contiguous (0
     … K-1).
 
-    Args:
-        node_mask: boolean array of shape `(N,)` indicating which nodes to keep.
-        edge_indices: integer array of shape `(2, M)` with source/destination
-            indices for every edge.
+    Parameters
+    ----------
+    node_mask : ndarray of bool, shape (N,)
+        Boolean array indicating which nodes to keep.
+    edge_indices : ndarray of int64, shape (2, M)
+        Source/destination indices for every edge.
 
-    Returns:
-        A tuple of:
-        - `new_edge_indices`: relabelled edge index array of shape `(2, M')`.
-        - `edge_mask`: boolean array of shape `(M,)` indicating which edges
-          were kept.
+    Returns
+    -------
+    new_edge_indices : ndarray of int64, shape (2, M')
+        Relabelled edge index array for the kept edges.
+    edge_mask : ndarray of bool, shape (M,)
+        Boolean array indicating which edges were kept.
 
     """
     src = edge_indices[0]

@@ -183,8 +183,12 @@ class LaneSegment:
     def get_border_edge_types(self) -> tuple[EdgeType, EdgeType]:
         """Determine the border edge types based on the lane segment's neighbors.
 
-        Returns:
-            (left_edge_type, right_edge_type): A tuple containing the edge types
+        Returns
+        -------
+        left_edge_type : EdgeType
+            Edge type for the left border.
+        right_edge_type : EdgeType
+            Edge type for the right border.
 
         """
         ln, rn = (

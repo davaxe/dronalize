@@ -31,12 +31,17 @@ class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
         The metafile needs the `world_to_ecef` transformation matrix
 
-        Args:
-            map_path: path to the proto file containing the map data.
-            meta_json: path to the JSON file containing metadata.
+        Parameters
+        ----------
+        map_path : Path or str
+            Path to the proto file containing the map data.
+        meta_json : Path or str
+            Path to the JSON file containing metadata.
 
-        Returns:
-            A `LyftLVL5MapGraphBuilder` instance initialized with the map.
+        Returns
+        -------
+        LyftMapGraphBuilder
+            A `LyftMapGraphBuilder` instance initialized with the map.
 
         """
         if isinstance(map_path, str):

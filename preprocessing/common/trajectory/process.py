@@ -29,22 +29,35 @@ def prepare_agent_trajectories(
     """Prepare agent trajectories for processing.
 
     This function performs several common preprocessing steps on the input scenes:
+
     1. Optionally applies a sliding window to the scenes if `window_params` is set in the config.
     2. Filters the scenes based on the criteria specified in the config.
     3. Resamples the agent trajectories to a common time step, and optionally adds derivatives.
 
-    Args:
-        scenes: A LazyFrame containing the raw scenes to be processed.
-        config: The configuration for processing the scenes.
-        add_derivative: Whether to compute and add the first derivative of the trajectories.
-        add_second_derivative: Whether to compute and add the second derivative of the trajectories.
-        sliding_col: The column name to use for sliding window operations.
-        agent_category_col: The column name containing agent categories.
-        derivative_rename: A dictionary mapping old derivative column names to new names.
-        offset_sliding_col: Whether to offset the sliding column to start from zero in each window.
-        forward_fill: List of columns to forward-fill after resampling.
+    Parameters
+    ----------
+    scenes : pl.LazyFrame
+        A LazyFrame containing the raw scenes to be processed.
+    config : LoaderConfig
+        The configuration for processing the scenes.
+    add_derivative : bool, optional
+        Whether to compute and add the first derivative of the trajectories.
+    add_second_derivative : bool, optional
+        Whether to compute and add the second derivative of the trajectories.
+    sliding_col : str, optional
+        The column name to use for sliding window operations.
+    agent_category_col : str, optional
+        The column name containing agent categories.
+    derivative_rename : dict[int, list[str]], optional
+        A dictionary mapping derivative order to a list of new column names.
+    offset_sliding_col : bool, optional
+        Whether to offset the sliding column to start from zero in each window.
+    forward_fill : list[str], optional
+        List of columns to forward-fill after resampling.
 
-    Yields:
+    Yields
+    ------
+    pl.LazyFrame
         Processed scenes as LazyFrames, ready for further processing or saving.
 
     """

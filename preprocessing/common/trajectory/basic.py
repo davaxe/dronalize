@@ -30,13 +30,20 @@ def yaw_from_vel(
 ) -> T_DataFrame:
     """Estimate yaw from velocity vector.
 
-    Args:
-        data: Input data frame or lazy frame.
-        vx_col: Name of the column containing x velocity. Defaults to "vx".
-        vy_col: Name of the column containing y velocity. Defaults to "vy".
-        yaw_col: Name of the column to store the estimated yaw. Defaults to "yaw".
+    Parameters
+    ----------
+    data : T_DataFrame
+        Input data frame or lazy frame.
+    vx_col : str, optional
+        Name of the column containing x velocity. Defaults to "vx".
+    vy_col : str, optional
+        Name of the column containing y velocity. Defaults to "vy".
+    yaw_col : str, optional
+        Name of the column to store the estimated yaw. Defaults to "yaw".
 
-    Returns:
+    Returns
+    -------
+    T_DataFrame
         Data frame or lazy frame with the estimated yaw column added.
 
     """
@@ -50,12 +57,18 @@ def yaw_from_vel_expr(
 ) -> pl.Expr:
     """Expression to estimate yaw from velocity vector.
 
-    Args:
-        vx_col: Name of the column containing x velocity. Defaults to "vx".
-        vy_col: Name of the column containing y velocity. Defaults to "vy".
-        yaw_col: Name of the column to store the estimated yaw. Defaults to "yaw".
+    Parameters
+    ----------
+    vx_col : str, optional
+        Name of the column containing x velocity. Defaults to "vx".
+    vy_col : str, optional
+        Name of the column containing y velocity. Defaults to "vy".
+    yaw_col : str, optional
+        Name of the column to store the estimated yaw. Defaults to "yaw".
 
-    Returns:
+    Returns
+    -------
+    pl.Expr
         Polars expression to compute the estimated yaw.
 
     """
@@ -70,13 +83,20 @@ def yaw_from_pos(
 ) -> T_DataFrame:
     """Estimate yaw from position differences.
 
-    Args:
-        data: Input data frame or lazy frame.
-        x_col: Name of the column containing x position. Defaults to "x".
-        y_col: Name of the column containing y position. Defaults to "y".
-        yaw_col: Name of the column to store the estimated yaw. Defaults to "yaw".
+    Parameters
+    ----------
+    data : T_DataFrame
+        Input data frame or lazy frame.
+    x_col : str, optional
+        Name of the column containing x position. Defaults to "x".
+    y_col : str, optional
+        Name of the column containing y position. Defaults to "y".
+    yaw_col : str, optional
+        Name of the column to store the estimated yaw. Defaults to "yaw".
 
-    Returns:
+    Returns
+    -------
+    T_DataFrame
         Data frame or lazy frame with the estimated yaw column added.
 
     """
@@ -90,12 +110,18 @@ def yaw_from_pos_expr(
 ) -> pl.Expr:
     """Expression to estimate yaw from position differences.
 
-    Args:
-        x_col: Name of the column containing x position. Defaults to "x".
-        y_col: Name of the column containing y position. Defaults to "y".
-        yaw_col: Name of the column to store the estimated yaw. Defaults to "yaw".
+    Parameters
+    ----------
+    x_col : str, optional
+        Name of the column containing x position. Defaults to "x".
+    y_col : str, optional
+        Name of the column containing y position. Defaults to "y".
+    yaw_col : str, optional
+        Name of the column to store the estimated yaw. Defaults to "yaw".
 
-    Returns:
+    Returns
+    -------
+    pl.Expr
         Polars expression to compute the estimated yaw.
 
     """

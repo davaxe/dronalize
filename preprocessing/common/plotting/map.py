@@ -26,16 +26,26 @@ def plot_map_graph(
 ) -> alt.Chart:
     """Plot a MapGraph using Altair.
 
-    Args:
-        graph: The MapGraph to plot.
-        width: Width of the chart in pixels. Defaults to 1000.
-        height: Height of the chart in pixels. Defaults to 1000.
-        alpha: Transparency level for the edges. Defaults to 0.7.
-        include_nodes: Whether to include node markers in the plot. Defaults to False.
-        disable_max_rows: Automatically bypass Altair's 5000 row limit. Defaults to True.
-        **kwargs: Additional keyword arguments to pass to `alt.Chart.properties()`.
+    Parameters
+    ----------
+    graph : MapGraph
+        The MapGraph to plot.
+    width : int, optional
+        Width of the chart in pixels. Defaults to 700.
+    height : int, optional
+        Height of the chart in pixels. Defaults to 700.
+    alpha : float, optional
+        Transparency level for the edges. Defaults to 0.7.
+    include_nodes : bool, optional
+        Whether to include node markers in the plot. Defaults to False.
+    disable_max_rows : bool, optional
+        Automatically bypass Altair's 5000 row limit. Defaults to True.
+    **kwargs : Any
+        Additional keyword arguments to pass to `alt.Chart.properties()`.
 
-    Returns:
+    Returns
+    -------
+    alt.Chart
         An Altair Chart object.
 
     """

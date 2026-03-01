@@ -32,16 +32,24 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
         The processor will read all CSV files in the given directory, and expects them to have the
         same schema as the INTERACTION dataset.
 
-        Args:
-            data_dir: directory containing the INTERACTION dataset CSV files.
-            file_batch_size: number of files to read in each batch. If None, all files will be read
-                at once. Higher batch size may lead to faster processing at diminishing returns, but
-                also higher memory usage. `None` is not recommended for large amount of data.
-            config: processor configuration override. If None, the default configuration will be used.
+        Parameters
+        ----------
+        data_dir : Path
+            Directory containing the INTERACTION dataset CSV files.
+        file_batch_size : int, optional
+            Number of files to read in each batch. If None, all files will be
+            read at once. Higher batch size may lead to faster processing at
+            diminishing returns, but also higher memory usage. `None` is not
+            recommended for large amounts of data.
+        config : LoaderConfig, optional
+            Processor configuration override. If None, the default
+            configuration will be used.
 
-        Raises:
-            ValueError: if window_params is set in the config, since InteractionProcessor does not
-                support windowing.
+        Raises
+        ------
+        ValueError
+            If `window_params` is set in the config, since
+            `InteractionLoader` does not support windowing.
 
         """
         if config is not None and config.window_params is not None:

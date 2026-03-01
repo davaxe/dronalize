@@ -29,7 +29,7 @@ class Explicit:
     tag: Literal["Explicit"] = "Explicit"
 
     def __init__(self, **metadata: Any) -> None:  # noqa: ANN401
-        """Initialize with the given identifier and metadata."""
+        """Initialize with keyword arguments stored as metadata."""
         object.__setattr__(self, "metadata", metadata)
 
 

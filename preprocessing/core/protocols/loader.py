@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True)
 class FilteringConfig:
-    """Configuration for filtering scenes based on pedestrian presence and validity."""
+    """Configuration for filtering scenes based on agent validity and scene composition."""
 
     min_agents: int = 2
     """Minimum number of agents required in a scene to be valid."""
@@ -124,10 +124,25 @@ class LoaderConfig:
     scene corresponds to exactly one sample."""
 
     scene_filtering: FilteringConfig | None = None
-    """Configuration for filtering scenes based on pedestrian presence and validity."""
+    """Configuration for filtering scenes based on agent validity and scene composition."""
 
     def window_parameters(self, step_size: int, window_size: int | None = None) -> Self:
-        """Set the window parameters for sliding window sampling."""
+        """Set the window parameters for sliding window sampling.
+
+        Parameters
+        ----------
+        step_size : int
+            Number of frames to advance between consecutive windows.
+        window_size : int, optional
+            Total number of frames in each window. If None, defaults to
+            `input_len + output_len`.
+
+        Returns
+        -------
+        Self
+            The config instance with window parameters set.
+
+        """
         self.window_params = WindowParams(
             window_size=window_size
             if window_size is not None
@@ -148,9 +163,34 @@ class LoaderConfig:
     ) -> Self:
         """Set the scene filtering parameters.
 
-        The inputs are passed int `SceneFiltering` dataclass. Note that using
-        this function support negative indices in `require_frames` where
-        negative -1 indicate last frame etc.
+        The inputs are passed into the `FilteringConfig` dataclass. Negative
+        indices are supported in `require_frames`, where -1 refers to the
+        last frame of the sequence, -2 to the second-to-last, etc.
+
+        Parameters
+        ----------
+        min_agents : int, optional
+            Minimum number of valid agents required in a scene. Defaults to 2.
+        require_all_valid : bool, optional
+            If True, all agents must have valid positions for every time step
+            (input and output). Defaults to False.
+        require_prediction_frame : bool, optional
+            If True, all agents must have a valid position at the first
+            prediction frame. Defaults to True.
+        require_frames : Collection[int], optional
+            Specific frame offsets (relative to scene start) that must be
+            present. Supports negative indices. Defaults to None.
+        filter_agent_category : Collection[AgentCategory], optional
+            Agent categories to exclude from scenes. Defaults to None.
+        filter_slow_agents : float, optional
+            Remove agents whose average speed (m/s) is below this threshold.
+            Defaults to None (no filtering).
+
+        Returns
+        -------
+        Self
+            The config instance with scene filtering parameters set.
+
         """
         if require_frames is not None:
             require_frames = {
@@ -174,7 +214,23 @@ class LoaderConfig:
         down: int,
         method: Literal["fast", "spline"] = "fast",
     ) -> Self:
-        """Set the resampling parameters."""
+        """Set the resampling parameters.
+
+        Parameters
+        ----------
+        up : int
+            Upsampling factor.
+        down : int
+            Downsampling factor.
+        method : {"fast", "spline"}, optional
+            Resampling method to use. Defaults to "fast".
+
+        Returns
+        -------
+        Self
+            The config instance with resampling parameters set.
+
+        """
         self.resampling = Resampling(up=up, down=down, method=method)
         return self
 
@@ -223,11 +279,15 @@ class SceneLoader(Protocol, Generic[T_ID]):
         saving to disk, feeding into a model) without needing to store all scenes
         in memory at once.
 
-        Args:
-            callback: A function that takes a Scene and additional arguments, and
-                processes it (e.g., saves to disk, feeds into a model).
-            *args: Additional positional arguments to pass to the callback.
-            **kwargs: Additional keyword arguments to pass to the callback.
+        Parameters
+        ----------
+        callback : Callable
+            A function that takes a Scene and additional arguments, and
+            processes it (e.g., saves to disk, feeds into a model).
+        *args : Any
+            Additional positional arguments to pass to the callback.
+        **kwargs : Any
+            Additional keyword arguments to pass to the callback.
 
         """
         ...
@@ -248,7 +308,17 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         *,
         enforce_schema: bool = True,
     ) -> None:
-        """Initialize internal state."""
+        """Initialize internal state.
+
+        Parameters
+        ----------
+        loader_config : LoaderConfig, optional
+            Configuration for the loader. If None, `default_config()` is used.
+        enforce_schema : bool, optional
+            Whether to enforce the scene schema on each created scene.
+            Defaults to True.
+
+        """
         self._count: int = 0
         self._source_counter: int = 0
         self._enforce_schema = enforce_schema
@@ -260,19 +330,57 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
 
     @abstractmethod
     def sources(self) -> Iterable[Source[T_ID, T_Source]]:
-        """Discover and yield identifiers for each scene to process."""
+        """Discover and yield identifiers for each scene to process.
+
+        Yields
+        ------
+        Source[T_ID, T_Source]
+            Each raw data source to be processed.
+
+        """
 
     @abstractmethod
     def load_raw(self, source: Source[T_ID, T_Source]) -> Iterable[tuple[pl.LazyFrame, MapContext]]:
-        """Read the raw data source into one or more DataFrame(s) (any schema)."""
+        """Read the raw data source into one or more DataFrame(s) (any schema).
+
+        Parameters
+        ----------
+        source : Source[T_ID, T_Source]
+            The raw data source to load.
+
+        Yields
+        ------
+        tuple[pl.LazyFrame, MapContext]
+            Raw data frame and its associated map context.
+
+        """
 
     @abstractmethod
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        """Convert the raw DataFrame into the common schema."""
+        """Convert the raw DataFrame into the common schema.
+
+        Parameters
+        ----------
+        df : pl.LazyFrame
+            Raw data frame to normalize.
+
+        Returns
+        -------
+        pl.LazyFrame
+            Normalized data frame following the common schema.
+
+        """
 
     @abstractmethod
     def default_config(self) -> LoaderConfig:
-        """Return the default processor configuration for this dataset."""
+        """Return the default processor configuration for this dataset.
+
+        Returns
+        -------
+        LoaderConfig
+            Default configuration for this loader.
+
+        """
 
     @override
     def scenes_callback(
@@ -287,8 +395,14 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     def num_scenes(self) -> int | None:
         """Get the total number of scenes that will be processed.
 
-        In some cases this can be expensive to compute or not known in advanced, in that case `None`
-        is returned.
+        In some cases this can be expensive to compute or not known in advance,
+        in that case `None` is returned.
+
+        Returns
+        -------
+        int or None
+            Total number of scenes, or `None` if not known in advance.
+
         """
         _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
         return None
@@ -296,12 +410,20 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     def num_sources(self) -> int | None:
         """Get the total number of sources that will be processed.
 
-        This is different from `number_of_scenes()` since each source can potentially generate
-        multiple scenes (e.g., by using sliding window sampling). In some cases this can be
-        expensive to compute or not known in advanced, in that case `None` is returned.
+        This is different from `num_scenes()` since each source can potentially
+        generate multiple scenes (e.g., by using sliding window sampling). In some
+        cases this can be expensive to compute or not known in advance, in that
+        case `None` is returned.
 
-        This could trivially be implemented as `len(list(self.sources()))`, but that would require
-        loading all sources into memory which can be expensive for large datasets.
+        This could trivially be implemented as `len(list(self.sources()))`, but
+        that would require loading all sources into memory which can be expensive
+        for large datasets.
+
+        Returns
+        -------
+        int or None
+            Total number of sources, or `None` if not known in advance.
+
         """
         _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
         return None
@@ -312,8 +434,20 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         """Process a single data item through the pipeline.
 
         Steps:
-        1. Load raw data for all sources.
+
+        1. Load raw data for the source.
         2. Normalize to common schema.
+
+        Parameters
+        ----------
+        source : Source[T_ID, T_Source]
+            The source to process.
+
+        Yields
+        ------
+        tuple[pl.DataFrame, MapContext]
+            Processed data frame and its associated map context.
+
         """
 
         def _step(raw_df: pl.LazyFrame) -> pl.DataFrame | None:
@@ -335,6 +469,12 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         """Iterate over all sources and process them into scenes.
 
         This will lazy-load and process each source one at a time.
+
+        Yields
+        ------
+        Scene[T_ID]
+            Processed scenes one at a time.
+
         """
         for source in self.sources():
             self._source_counter += 1
@@ -346,14 +486,23 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     ) -> Scene[T_ID]:
         """Create a Scene object from the processed DataFrame and source identifier.
 
-        This method also calls `Scene.enforce_schema()` if `self._enforce_schema` is True to ensure
-        the scene follows the expected schema. If overriding this method, make sure to follow
-        the expected behavior regarding schema enforcement.
+        This method also calls `Scene.enforce_schema()` if `self._enforce_schema`
+        is True to ensure the scene follows the expected schema. If overriding this
+        method, make sure to follow the expected behavior regarding schema enforcement.
 
-        Args:
-            df: Processed DataFrame for the scene, expected to follow the common schema.
-            source_id: Identifier for the scene source (e.g., file name, index).
-            map_context: Map context associated with the scene.
+        Parameters
+        ----------
+        df : pl.DataFrame
+            Processed DataFrame for the scene, expected to follow the common schema.
+        source_id : T_ID
+            Identifier for the scene source (e.g., file name, index).
+        map_context : MapContext
+            Map context associated with the scene.
+
+        Returns
+        -------
+        Scene[T_ID]
+            The created scene object.
 
         """
         scene = Scene(
@@ -370,7 +519,14 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
 
     @staticmethod
     def derivative_names() -> dict[int, list[str]]:
-        """Return the names of the derivatives for velocity and acceleration."""
+        """Return the names of the derivatives for velocity and acceleration.
+
+        Returns
+        -------
+        dict[int, list[str]]
+            Mapping of derivative order to column names.
+
+        """
         return {
             1: ["vx", "vy"],
             2: ["ax", "ay"],

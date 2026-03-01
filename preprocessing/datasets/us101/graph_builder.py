@@ -21,8 +21,10 @@ class US101GraphBuilder(HighWayLaneGraphBuilder):
     def __init__(self, data_dir: Path) -> None:
         """Initialize the graph builder.
 
-        Args:
-            data_dir: The root directory of the US101 dataset.
+        Parameters
+        ----------
+        data_dir : Path
+            The root directory of the US101 dataset.
 
         """
         data = pl.scan_csv(list(data_dir.rglob("trajectories*.csv"))).select(

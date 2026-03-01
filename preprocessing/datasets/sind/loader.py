@@ -28,13 +28,18 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
     ) -> None:
         """Initialize the SindLoader.
 
-        Args:
-            data_dir: The directory containing the SIND dataset, (i.e. the data directory).
-            loader_config: Overrides for the default loader configuration.
-            filter_parked_vehicles: Whether to filter out parked vehicles based on their speed.
-                If True, all agents with an average speed less than 0.1 will be removed. This will
-                override any existing setting for the `filter_slow_agents` parameter in the
-                `scene_filtering` configuration
+        Parameters
+        ----------
+        data_dir : Path
+            The directory containing the SIND dataset (i.e. the data directory).
+        loader_config : LoaderConfig, optional
+            Overrides for the default loader configuration.
+        filter_parked_vehicles : bool, optional
+            Whether to filter out parked vehicles based on their speed.
+            If True, all agents with an average speed less than 0.1 will be
+            removed. This will override any existing setting for the
+            `filter_slow_agents` parameter in the `scene_filtering`
+            configuration.
 
         """
         super().__init__(loader_config, enforce_schema=True)

@@ -56,16 +56,23 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         map points after processing, and do not do anything if map inclusion is
         disabled.
 
-        Args:
-            data_dir: directory containing the TFRecord files.
-            filter_str: string pattern to filter TFRecord files
-                (e.g., "*validation.tfrecord*").
-            loader_config: Configuration if not default.
-            include_map: Whether to include map data in the scene. Defaults to True.
-            interp_distance: Distance threshold for interpolating map points.
-                Defaults to None (no interpolation).
-            min_distance: Minimum distance between map points after processing.
-                Defaults to 1.5 meters.
+        Parameters
+        ----------
+        data_dir : Path or str
+            Directory containing the TFRecord files.
+        filter_str : str
+            String pattern to filter TFRecord files
+            (e.g., "*validation.tfrecord*").
+        loader_config : LoaderConfig, optional
+            Configuration override. If None, the default configuration will be used.
+        include_map : bool, optional
+            Whether to include map data in the scene. Defaults to True.
+        interp_distance : float, optional
+            Distance threshold for interpolating map points.
+            Defaults to None (no interpolation).
+        min_distance : float, optional
+            Minimum distance between map points after processing.
+            Defaults to 1.5 meters.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)

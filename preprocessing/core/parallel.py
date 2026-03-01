@@ -24,12 +24,19 @@ class ProgressBar(IntEnum):
     NONE = 0
     """No progress bars."""
     SOURCES = 1
-    """Show progress bar for sources (# processed scenes are shown i postfix)."""
+    """Show progress bar for sources (# processed scenes are shown in postfix)."""
     SCENES = 2
     """Show progress bar for scenes (# processed sources are shown in postfix)."""
 
     def unit(self) -> str:
-        """Return the unit string to use for tqdm progress bars based on the selected ProgressBar."""
+        """Return the unit string to use for tqdm progress bars based on the selected ProgressBar.
+
+        Returns
+        -------
+        str
+            Unit string for the tqdm progress bar.
+
+        """
         if self == ProgressBar.SOURCES:
             return " sources"
         if self == ProgressBar.SCENES:
@@ -48,14 +55,14 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
     It uses Python's multiprocessing module to parallelize the processing of sources across multiple
     CPU cores. The number of processes and chunksize can be configured depending on workload.
 
-    By default the order resulting scenes when using `scenes` method will not be deterministic
-    across runs or systems due to the use of `imap_unordered` for better performance. If a
-    deterministic order is required, the `maintain_order` flag can be set to True, which will use
-    `imap` instead of `imap_unordered`.
+    By default the order of resulting scenes when using the `scenes` method will not be
+    deterministic across runs or systems due to the use of `imap_unordered` for better
+    performance. If a deterministic order is required, the `maintain_order` flag can be set to
+    True, which will use `imap` instead of `imap_unordered`.
 
     Practical Considerations:
-        Using multprocessing can significantly speed up the processing of large datasets, however
-        there are som important considerations to keep in mind:
+        Using multiprocessing can significantly speed up the processing of large datasets, however
+        there are some important considerations to keep in mind:
 
         1. If the underlying sources are small and quick to process, the overhead of multiprocessing
         may outweigh the benefits. One option is to increase the `chunksize` to reduce overhead in
@@ -63,18 +70,18 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
         2. If sources are instead large, for example `WaymoLoader` and its tfrecord files, then
         other issues may arise such as increased memory usage and possibly issues with inter-process
-        comumication. In these cases it is a good idea to avoid `scenes` method, and instead use the
-        `scenes_callback` method with a callback function that performs side effects (e.g., saving
-        to file). If an error related to "Too many opened files" is encountered when using `scenes`,
-        this is a strong indication that the underlying sources are too large for `scenes` and
-        `scenes_callback` should be used.
+        communication. In these cases it is a good idea to avoid the `scenes` method, and instead
+        use the `scenes_callback` method with a callback function that performs side effects (e.g.,
+        saving to file). If an error related to "Too many opened files" is encountered when using
+        `scenes`, this is a strong indication that the underlying sources are too large for
+        `scenes` and `scenes_callback` should be used.
 
-        3. If the Scenes include a lot of data (e.g. large DataFrames or maps) sending them between
-        processees can be costly, and `scenes_callback` should be preffered when possible. In
+        3. If the scenes include a lot of data (e.g. large DataFrames or maps) sending them between
+        processes can be costly, and `scenes_callback` should be preferred when possible. In
         extreme cases using multiprocessing can slow down processing due to the overhead.
 
-        4. Since `DataLoaders` utilizes Polars, which also uses multiple cores for processing, there
-        may be some contention for CPU resources between the multiprocessing in
+        4. Since `DataLoaders` utilizes Polars, which also uses multiple cores for processing,
+        there may be some contention for CPU resources between the multiprocessing in
         `ParallelSceneLoader` and the multithreading in Polars. Setting the environment variable
         `POLARS_MAX_THREADS=X`, where X is a number that balances the workload between
         `ParallelSceneLoader` and Polars. An alternative option is to lower the `processes`
@@ -97,30 +104,39 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
     ) -> None:
         """Initialize with the given loader and multiprocessing configuration.
 
-        Progress Bar Behavior:
-            - If `progress_bar` is set to `ProgressBar.SOURCES`, a progress bar
-            will be shown that tracks the number of sources processed.
-            - If `progress_bar` is set to `ProgressBar.SCENES`, a progress bar will be shown that
-            tracks the number of scenes processed.
+        Progress bar behaviour:
 
-        No matter what option is chosen, the other quantity (sources or scenes) will be tracked in
-        he progress bar's postfix for visibility. Using `ProgressBar.SOURCES` is generally
-        recomended since the total number of sources is often known beforehand, while number of
-        scenes is usually not known beforehand (this result in only showng the number of processed
-        scenes without a total, which can be less useful).
+        - If `progress_bar` is set to `ProgressBar.SOURCES`, a progress bar
+          will be shown that tracks the number of sources processed.
+        - If `progress_bar` is set to `ProgressBar.SCENES`, a progress bar
+          will be shown that tracks the number of scenes processed.
 
-        Args:
-            inner: The underlying BaseSceneLoader to use for processing each source.
-            chunksize: The number of sources to process in each batch when using multiprocessing.
-                Larger chunksizes can reduce overhead but may lead to less even load distribution
-                across processes. If `None` tries to automatically determine an optimal chunksize
-                based on the number of sources and processes (when possible),
-            processes: The number of processes to use for multiprocessing. If None, uses the
-                number of CPU cores.
-            maintain_order: If True, the order of resulting scenes from `scenes` will be
-                computed using `imap` to maintain the order of sources.
-            progress_bar: Whether to show a progress bar using tqdm. `True` is equivalent to
-                `ProgressBar.SOURCES`. Se behaviour description above.
+        No matter what option is chosen, the other quantity (sources or scenes)
+        will be tracked in the progress bar's postfix for visibility. Using
+        `ProgressBar.SOURCES` is generally recommended since the total number
+        of sources is often known beforehand, while the number of scenes is
+        usually not known beforehand (this results in only showing the number of
+        processed scenes without a total, which can be less useful).
+
+        Parameters
+        ----------
+        inner : BaseSceneLoader[T_ID, T_Source]
+            The underlying BaseSceneLoader to use for processing each source.
+        chunksize : int, optional
+            The number of sources to process in each batch when using
+            multiprocessing. Larger chunksizes can reduce overhead but may lead
+            to less even load distribution across processes. If `None`, tries
+            to automatically determine an optimal chunksize based on the number
+            of sources and processes (when possible).
+        processes : int, optional
+            The number of processes to use for multiprocessing. If None, uses
+            the number of CPU cores.
+        maintain_order : bool, optional
+            If True, the order of resulting scenes from `scenes` will be
+            maintained using `imap` instead of `imap_unordered`.
+        progress_bar : ProgressBar or bool, optional
+            Whether to show a progress bar using tqdm. `True` is equivalent to
+            `ProgressBar.SOURCES`. See behaviour description above.
 
         """
         if processes is not None and processes <= 1:
@@ -138,15 +154,38 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         )
 
     def processes(self, processes: int | None) -> Self:
-        """Set the number of processes to use for multiprocessing. If None, uses the number of CPU cores."""
+        """Set the number of processes to use for multiprocessing.
+
+        Parameters
+        ----------
+        processes : int or None
+            Number of worker processes. If None, uses the number of CPU cores.
+
+        Returns
+        -------
+        Self
+            The loader instance with the updated process count.
+
+        """
         self._processes = processes
         return self
 
     def chunksize(self, chunksize: int) -> Self:
         """Set chunksize used when creating the `multiprocessing.Pool`.
 
-        Larger chunksizes can reduce overhead but may lead to less even load distribution across
-        processes.
+        Larger chunksizes can reduce overhead but may lead to less even load
+        distribution across processes.
+
+        Parameters
+        ----------
+        chunksize : int
+            Number of sources per batch sent to each worker process.
+
+        Returns
+        -------
+        Self
+            The loader instance with the updated chunksize.
+
         """
         self._chunksize = chunksize
         return self
@@ -155,12 +194,19 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
     def scenes(self) -> Iterable[Scene[T_ID]]:
         """Process scenes in parallel and yield them one by one.
 
-        This uses `multiprocessing` to process data in parallel. It works by creating a pool of
-        worker processes that process batches (chunks, determined by `chunksize`) of sources.
-        The results are collected and yielded as scenes.
+        This uses `multiprocessing` to process data in parallel. It works by
+        creating a pool of worker processes that process batches (chunks,
+        determined by `chunksize`) of sources. The results are collected and
+        yielded as scenes.
 
-        Note that each source might yield multiple scenes (for example if windowing is used),
-        and the each worker will process all scenes before returning to the main processes.
+        Note that each source might yield multiple scenes (for example if
+        windowing is used), and each worker will process all scenes before
+        returning to the main process.
+
+        Yields
+        ------
+        Scene[T_ID]
+            Processed scenes one at a time.
 
         """
         with (
@@ -199,24 +245,30 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
     ) -> None:
         """Process scenes using a callback function instead of yielding them.
 
-        This method allows you to provide a callback function that will be called for each processed
-        scene. This can be more efficient than yielding scenes if you want to perform side effects
-        (e.g., saving to disk) without needing to store all scenes in memory at once.
+        This method allows you to provide a callback function that will be
+        called for each processed scene. This can be more efficient than
+        yielding scenes if you want to perform side effects (e.g., saving to
+        disk) without needing to store all scenes in memory at once.
 
-        Args:
-            callback: A callable that takes a Scene as input and performs side effects (e.g., saving
-                to disk). This function will be called for each processed scene.
-            *args: Additional positional arguments to pass to the callback function.
-            **kwargs: Additional keyword arguments to pass to the callback function.
+        Parameters
+        ----------
+        callback : Callable
+            A callable that takes a Scene as input and performs side effects
+            (e.g., saving to disk). This function will be called for each
+            processed scene.
+        *args : Any
+            Additional positional arguments to pass to the callback function.
+        **kwargs : Any
+            Additional keyword arguments to pass to the callback function.
 
+        .. note::
+            All additional arguments will be passed to the worker processes and
+            should be chosen carefully to avoid sending large amounts of data.
 
-        Considerations:
-            All additional arguments will be passed to the worker processes and should be chosen
-            carefully to avoid sending large amounts of data.
-
-            Moreover, due to the nature of multiprocessing, the callback function and its arguments
-            must be picklable. If you encounter issues with pickling, consider using simpler data
-            structures or functions defined at the top level of a module.
+            Due to the nature of multiprocessing, the callback function and its
+            arguments must be picklable. If you encounter issues with pickling,
+            consider using simpler data structures or functions defined at the
+            top level of a module.
 
         """
         loader = self._inner
@@ -263,7 +315,19 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
     @staticmethod
     def _process_fn(args: _ProcessArgs[T_ID, T_Source]) -> list[Scene[T_ID]]:
-        """Worker process function that processes a single source and returns a list of Scenes."""
+        """Worker process function that processes a single source and returns a list of Scenes.
+
+        Parameters
+        ----------
+        args : _ProcessArgs[T_ID, T_Source]
+            Arguments containing the source and loader to process.
+
+        Returns
+        -------
+        list[Scene[T_ID]]
+            List of processed scenes from the given source.
+
+        """
         loader, source = args.loader, args.source
         scenes: list[Scene[T_ID]] = []
 
@@ -288,9 +352,21 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
     def _process_fn_callback(args: _ProcessArgs[T_ID, T_Source]) -> int:
         """Worker process function that applies a callback to each Scene.
 
-        This function returns the number of processed scenes (used for keeping track of progress),
-        otherwise it behaves similarly to `_process_fn` but instead of returning the scenes, it
-        applies the provided callable to each scene for side effects (e.g., saving to disk).
+        This function returns the number of processed scenes (used for keeping
+        track of progress). It behaves similarly to `_process_fn` but instead
+        of returning the scenes, it applies the provided callable to each scene
+        for side effects (e.g., saving to disk).
+
+        Parameters
+        ----------
+        args : _ProcessArgs[T_ID, T_Source]
+            Arguments containing the source, loader, and callback to apply.
+
+        Returns
+        -------
+        int
+            Number of scenes processed from the given source.
+
         """
         if args.fn is None:
             msg = "no callable function provided in _ProcessArgs for _process_fn_callable."

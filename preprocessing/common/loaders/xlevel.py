@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
     """Common trajectory data loader for X-level datasets.
 
-    This class is meant as a base class for the datasets, since some of the processing is slighlty
+    This class is meant as a base class for the datasets, since some of the processing is slightly
     different for highway datasets (e.g., highD) compared to urban datasets (e.g., rounD, inD).
 
-    With no changes this support: rounD, inD, exiD, and uniD.
+    With no changes this supports: rounD, inD, exiD, uniD, and sinD.
     """
 
     def __init__(
@@ -33,9 +33,12 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
     ) -> None:
         """Initialize the trajectory data loader for a X-level dataset (e.g., rounD, inD).
 
-        Args:
-            data_dir: Path to the directory containing the .csv data files.
-            config: Optional processor configuration. If None, default configuration will be used.
+        Parameters
+        ----------
+        data_dir : Path
+            Path to the directory containing the .csv data files.
+        config : LoaderConfig, optional
+            Processor configuration. If None, default configuration will be used.
 
         """
         super().__init__(loader_config=config, enforce_schema=False)

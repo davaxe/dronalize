@@ -30,11 +30,14 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
     ) -> None:
         """Initialize the VODMapGraphBuilder.
 
-        Args:
-            path: Path to the VOD map JSON file.
-            debug_parsing: If True, enables debug prints for parsing issues.
-            ignore_edge_types: A set of edge type names to ignore during graph
-                construction.
+        Parameters
+        ----------
+        path : Path
+            Path to the VOD map JSON file.
+        debug_parsing : bool, optional
+            If True, enables debug prints for parsing issues.
+        ignore_edge_types : set[str], optional
+            A set of edge type names to ignore during graph construction.
 
         """
         nuscenes_map = NuScenesMap(path, enable_debug_prints=debug_parsing)

@@ -23,12 +23,18 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
     ) -> None:
         """Initialize the data processor.
 
-        Args:
-            data_dir: path to the directory of CSV files.
-            file_batch_size: number of files to read in each batch. If None, all files will be read
-                at once. Higher batch size may lead to faster processing at diminishing returns, but
-                also higher memory usage. `None` is not recommended for large amount of data.
-            config: processor configuration override. If None, the default configuration will be used.
+        Parameters
+        ----------
+        data_dir : Path
+            Path to the directory of CSV files.
+        file_batch_size : int, optional
+            Number of files to read in each batch. If None, all files will be
+            read at once. Higher batch size may lead to faster processing at
+            diminishing returns, but also higher memory usage. `None` is not
+            recommended for large amounts of data.
+        config : LoaderConfig, optional
+            Processor configuration override. If None, the default
+            configuration will be used.
 
         """
         super().__init__(loader_config=config, enforce_schema=True)

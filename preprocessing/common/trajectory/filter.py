@@ -25,15 +25,24 @@ def filter_scene(
 ) -> T_DataFrame:
     """Filter scenes based on configuration.
 
-    Args:
-        data: Input DataFrame containing trajectory data.
-        config: ProcessorConfig object with filtering criteria.
-        group_by: Optional column name to group by. Each group will be consider an independent scene.
-        agent_id: Column name representing the agent ID.
-        frame_column: Column name representing the frame index.
-        category_column: Column name representing the agent category.
+    Parameters
+    ----------
+    data : T_DataFrame
+        Input DataFrame containing trajectory data.
+    config : LoaderConfig
+        LoaderConfig object with filtering criteria.
+    group_by : str or Sequence[str], optional
+        Column name to group by. Each group will be considered an independent scene.
+    agent_id : str, optional
+        Column name representing the agent ID.
+    frame_column : str, optional
+        Column name representing the frame index.
+    category_column : str, optional
+        Column name representing the agent category.
 
-    Returns:
+    Returns
+    -------
+    T_DataFrame
         Filtered DataFrame based on the configuration.
 
     """
@@ -58,16 +67,26 @@ def filter_scene_expr(
 ) -> pl.Expr:
     """Express scene filtering logic as a Polars expression.
 
-    Args:
-        config: ProcessorConfig object with filtering criteria.
-        group_by: Optional column name to group by.
-        agent_id: Column name representing the agent ID.
-        frame_column: Column name representing the frame index.
-        category_column: Column name representing the agent category.
-        x_column: Column name representing the agent's X position.
-        y_column: Column name representing the agent's Y position.
+    Parameters
+    ----------
+    config : LoaderConfig
+        LoaderConfig object with filtering criteria.
+    group_by : str or Sequence[str], optional
+        Column name to group by.
+    agent_id : str, optional
+        Column name representing the agent ID.
+    frame_column : str, optional
+        Column name representing the frame index.
+    category_column : str, optional
+        Column name representing the agent category.
+    x_column : str, optional
+        Column name representing the agent's X position.
+    y_column : str, optional
+        Column name representing the agent's Y position.
 
-    Returns:
+    Returns
+    -------
+    pl.Expr
         Expression for filtering scenes based on the configuration.
 
     """

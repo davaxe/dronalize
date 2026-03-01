@@ -16,24 +16,32 @@ def rebalance_highway_agents(
     n_lanechange_col: str = "lane_changes",
     seed: int | None = None,
 ) -> T_DataFrame:
-    """Rebalances data to enforce a specific ratio of Lane Changing (LC) agents to Lane Keeping (LK) agents.
+    """Rebalance data to enforce a specific ratio of Lane Changing (LC) to Lane Keeping (LK) agents.
 
     Ratio formula: N_LC / N_LK = ratio
     Therefore: Target N_LK = N_LC / ratio
 
-    Args:
-        data: Input DataFrame or LazyFrame.
-        ratio: Target ratio of LC agents to LK agents (e.g., 2.0 means 2 LC for every 1 LK).
-        req_lane_changes: Minimum lane changes to be considered an LC agent.
-        agent_id: Column name for agent identifiers.
-        n_lanechange_col: Column containing lane change counts (assumed pre-calculated per agent).
-        seed: Optional random seed for reproducibility of sampling. This will also perform a sort
-            operation to ensure determisitc sampling across runs.
+    Parameters
+    ----------
+    data : T_DataFrame
+        Input DataFrame or LazyFrame.
+    ratio : float, optional
+        Target ratio of LC agents to LK agents (e.g., 2.0 means 2 LC for every 1 LK).
+    req_lane_changes : int, optional
+        Minimum lane changes to be considered an LC agent.
+    agent_id : str, optional
+        Column name for agent identifiers.
+    n_lanechange_col : str, optional
+        Column containing lane change counts (assumed pre-calculated per agent).
+    seed : int, optional
+        Random seed for reproducibility of sampling. This will also perform a sort
+        operation to ensure deterministic sampling across runs.
 
-    Examples:
-    For a simple dataset with 6 agents, where agents 0-3 are LK (0 lane changes) and agents 4-5 are
-    LC (2 lane changes) it is expected that with a ratio of 2.0, we keep all 2 LC agents and only 1
-    LK agent (since ratio is 2 LC : 1 LK). The resulting dataset should contain 3 agents total.
+    Examples
+    --------
+    For a simple dataset with 6 agents, where agents 0-3 are LK (0 lane changes) and agents 4-5
+    are LC (2 lane changes), with a ratio of 2.0 we keep all 2 LC agents and only 1 LK agent
+    (since ratio is 2 LC : 1 LK). The resulting dataset should contain 3 agents total.
 
     >>> df = pl.DataFrame(
     ...     {

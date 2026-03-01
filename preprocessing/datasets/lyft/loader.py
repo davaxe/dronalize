@@ -42,12 +42,17 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
     ) -> None:
         """Initialize the processor.
 
-        Args:
-            zarr_path: Path to the Zarr dataset directory.
-            scene_batch_size: Number of scenes to load in each batch. Higher batch size may lead
-                to faster processing at diminishing returns, but also higher memory usage. `None` is
-                not recommended for large amount of data.
-            config: processor configuration override. If None, the default configuration will be used.
+        Parameters
+        ----------
+        zarr_path : Path or str
+            Path to the Zarr dataset directory.
+        scene_batch_size : int, optional
+            Number of scenes to load in each batch. Higher batch size may lead
+            to faster processing at diminishing returns, but also higher memory
+            usage. `None` is not recommended for large amounts of data.
+        config : LoaderConfig, optional
+            Processor configuration override. If None, the default
+            configuration will be used.
 
         """
         super().__init__(loader_config=config, enforce_schema=True)

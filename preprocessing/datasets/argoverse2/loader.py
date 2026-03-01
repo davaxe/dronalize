@@ -28,10 +28,14 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
     ) -> None:
         """Initialize the Argoverse2TrajectoryProcessor.
 
-        Args:
-            data_dir: Path to the directory containing the Parquet files.
-            file_batch_size: Number of files to process in each batch.
-            loader_config: Configuration for the loader.
+        Parameters
+        ----------
+        data_dir : Path
+            Path to the directory containing the Parquet files.
+        file_batch_size : int, optional
+            Number of files to process in each batch.
+        loader_config : LoaderConfig, optional
+            Configuration for the loader.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)

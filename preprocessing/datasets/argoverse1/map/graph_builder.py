@@ -135,11 +135,16 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
     ) -> None:
         """Connect two lane segment endpoints in the graph.
 
-        Args:
-            endpoint_from: lane segment ID from which to connect.
-            endpoint_to: lane segment ID to which to connect.
-            left_edge_type: left border edge type.
-            right_edge_type: right border edge type.
+        Parameters
+        ----------
+        endpoint_from : int
+            Lane segment ID from which to connect.
+        endpoint_to : int
+            Lane segment ID to which to connect.
+        left_edge_type : EdgeType, optional
+            Left border edge type.
+        right_edge_type : EdgeType, optional
+            Right border edge type.
 
         """
         if endpoint_from not in self._lane_endpoints or endpoint_to not in self._lane_endpoints:

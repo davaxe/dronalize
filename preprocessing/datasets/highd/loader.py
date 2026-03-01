@@ -29,10 +29,14 @@ class HighDLoader(XLevelDataLoader):
         non-lane changing agents. Typically highway datasets are heavily imbalanced towards non-lane
         changing agents, which means that a high ratio con result in way less total data.
 
-        Args:
-            data_dir: Path to the directory containing the .csv data files.
-            config: Optional processor configuration. If None, default configuration will be used.
-            lane_change_ratio: Optional ratio to rebalance lane changing vs non-lane changing agents.
+        Parameters
+        ----------
+        data_dir : Path
+            Path to the directory containing the .csv data files.
+        config : LoaderConfig, optional
+            Processor configuration. If None, default configuration will be used.
+        lane_change_ratio : float, optional
+            Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
         super().__init__(data_dir, config)

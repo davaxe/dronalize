@@ -17,7 +17,9 @@ T_ID = TypeVar("T_ID", bound=(Hashable))
 class Scene(Generic[T_ID]):
     """Scene data class wrapping a DataFrame and its identifier.
 
-    The dataframe is expected to atleast contain all columns defined in FrameDict.
+    The dataframe is expected to at least contain all columns defined in
+    `Scene._base_schema()`: `frame`, `id`, `x`, `y`, `vx`, `vy`,
+    `ax`, `ay`, `yaw`, and `agent_category`.
     """
 
     inner: pl.DataFrame
@@ -37,13 +39,17 @@ class Scene(Generic[T_ID]):
         """Enforce the scene dataframe to follow a specified schema.
 
         This will select relevant columns and try to cast if needed/possible.
-        If it is not possible to enforce schema, an error will be raised.
+        If it is not possible to enforce the schema, an error will be raised.
 
-        Args:
-            schema: schema to follow.
+        Parameters
+        ----------
+        schema : pl.Schema, optional
+            Schema to follow. If None, the base schema is used.
 
-        Returns:
-            Scene with enforced schema.
+        Returns
+        -------
+        Self
+            Scene with the enforced schema.
 
         """
         if schema is None:

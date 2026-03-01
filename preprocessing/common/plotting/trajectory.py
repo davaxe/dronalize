@@ -33,22 +33,38 @@ def plot_trajectories(
 ) -> alt.LayerChart:
     """Plot a set of trajectories from a Polars dataframe using Altair.
 
-    Args:
-        data: underlying dataframe containing trajectory data.
-        x_col: column name for x-axis values. Defaults to "x".
-        y_col: column name for y-axis values. Defaults to "y".
-        group_by: column name to group trajectories by (e.g., "track_id").
-        n_groups: number of unique groups to plot. If None, plots all groups.
-        frame_col: column name representing the frame index.
-        x_label: label for x-axis. If None, uses x_col.
-        y_label: label for y-axis. If None, uses y_col.
-        save_path: Optional path to save the plot (json, html, png, etc.).
-        title: Optional title for the plot.
-        group_sample_seed: Optional random seed for sampling groups.
-        highlight_frame: specify frames to be highlighted.
-        kwargs: Additional keyword arguments passed to the top-level `chart.properties()`
+    Parameters
+    ----------
+    data : pl.DataFrame
+        Underlying dataframe containing trajectory data.
+    x_col : str, optional
+        Column name for x-axis values. Defaults to "x".
+    y_col : str, optional
+        Column name for y-axis values. Defaults to "y".
+    group_by : str, optional
+        Column name to group trajectories by (e.g., "track_id").
+    n_groups : int, optional
+        Number of unique groups to plot. If None, plots all groups.
+    frame_col : str, optional
+        Column name representing the frame index.
+    x_label : str, optional
+        Label for the x-axis. If None, uses `x_col`.
+    y_label : str, optional
+        Label for the y-axis. If None, uses `y_col`.
+    save_path : Path or str, optional
+        Path to save the plot (json, html, png, etc.).
+    title : str, optional
+        Title for the plot.
+    group_sample_seed : int, optional
+        Random seed for sampling groups.
+    highlight_frame : int or Sequence[int], optional
+        Frame index or indices to highlight.
+    **kwargs : Any
+        Additional keyword arguments passed to `chart.properties()`.
 
-    Returns:
+    Returns
+    -------
+    alt.LayerChart
         An Altair LayerChart containing the trajectories and start/end markers.
 
     """

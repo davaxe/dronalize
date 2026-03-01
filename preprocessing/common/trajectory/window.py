@@ -58,25 +58,37 @@ def sliding_window(
     window. This means that if the input was a `pl.LazyFrame` it will be
     collected.
 
-    Args:
-        data: Input DataFrame to generate windows from.
-        window_size: Number of rows in each window.
-        step_size: Number of rows to move the window at each step.
-        sliding_col: Column name to use for determining the window boundaries.
-            Defaults to "frame".
-        is_sorted: Whether the input DataFrame is already sorted by the sliding_col.
-            If False, the function will sort the DataFrame by sliding_col before
-            generating windows. Defaults to False.
-        include_boundaries: Passed to `group_by_dynamic` to include window
-            boundaries in the output. Defaults to False.
-        return_iterable: Whether to return an iterable of DataFrames or a single
-            DataFrame containing all windows. Defaults to True.
-        group_by: Optional column name(s) to group by before applying the sliding window.
-            This allows for generating windows within each group separately.
+    Parameters
+    ----------
+    data : T_DataFrame
+        Input DataFrame to generate windows from.
+    window_size : int
+        Number of rows in each window.
+    step_size : int
+        Number of rows to move the window at each step.
+    sliding_col : str, optional
+        Column name to use for determining the window boundaries.
+        Defaults to "frame".
+    group_by : str, optional
+        Column name(s) to group by before applying the sliding window.
+        This allows for generating windows within each group separately.
+    is_sorted : bool, optional
+        Whether the input DataFrame is already sorted by `sliding_col`.
+        If False, the DataFrame will be sorted before generating windows.
+        Defaults to False.
+    include_boundaries : bool, optional
+        Passed to `group_by_dynamic` to include window boundaries in the
+        output. Defaults to False.
+    return_iterable : bool, optional
+        Whether to return an iterable of DataFrames or a single DataFrame
+        containing all windows. Defaults to True.
 
-    Returns:
-        DataFrames corresponding to each sliding window. Either as an iterable of DataFrames or a
-        single DataFrame with all windows, depending on the `return_iterable` flag.
+    Returns
+    -------
+    Iterable[pl.DataFrame] or T_DataFrame
+        DataFrames corresponding to each sliding window. Either as an
+        iterable of DataFrames or a single DataFrame with all windows,
+        depending on the `return_iterable` flag.
 
     """
     if not is_sorted:

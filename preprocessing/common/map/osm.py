@@ -29,14 +29,19 @@ class OSMMapGraphBuilder(SimpleHandler, GraphBuilder[int, IntIDNode]):
     ) -> None:
         """Initialize the OSMMapGraphBuilder.
 
-        Args:
-            osm_file: file path to the OSM data file (e.g., .osm or .pbf format).
-            utm_position_offset: _(x, y) offset to apply to all node positions after converting
-                from lat/lon to UTM coordinates. Defaults to (0.0, 0.0).
-            edge_type_mapping: _How to map the OSM way tags to EdgeType categories.
-            include_edge_type_none: Whether to include edges that are categorized as EdgeType.NONE
-                based on the edge_type_mapping. Defaults to False (i.e., skip edges that are
-                categorized as NONE).
+        Parameters
+        ----------
+        osm_file : Path
+            File path to the OSM data file (e.g., .osm or .pbf format).
+        utm_position_offset : tuple[float, float], optional
+            (x, y) offset to apply to all node positions after converting
+            from lat/lon to UTM coordinates. Defaults to (0.0, 0.0).
+        edge_type_mapping : Callable[[osm.Way], EdgeType], optional
+            How to map the OSM way tags to EdgeType categories.
+        include_edge_type_none : bool, optional
+            Whether to include edges categorized as EdgeType.NONE based on
+            the edge_type_mapping. Defaults to False (i.e., skip edges
+            categorized as NONE).
 
         """
         if not osm_file.exists():
@@ -72,7 +77,7 @@ class OSMMapGraphBuilder(SimpleHandler, GraphBuilder[int, IntIDNode]):
         self.apply_file(self._osm_file)
 
     def way(self, way: osm.Way) -> None:
-        """Handle a OSM way."""
+        """Handle an OSM way."""
         nodes: list[IntIDNode] = [
             self._nodes[node.ref] for node in way.nodes if node.ref in self._nodes
         ]
@@ -83,7 +88,7 @@ class OSMMapGraphBuilder(SimpleHandler, GraphBuilder[int, IntIDNode]):
         self.add_path_lazy(nodes=nodes, edge_type=edge_type)
 
     def node(self, node: osm.Node) -> None:
-        """Handle OSM node."""
+        """Handle an OSM node."""
         x, y, _zone_number, _zone_letter = utm.from_latlon(node.location.lat, node.location.lon)
         x_offset, y_offset = self._utm_position_offset
         self._nodes[node.id] = self.new_node(float(x) + x_offset, float(y) + y_offset)

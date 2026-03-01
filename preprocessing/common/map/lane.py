@@ -44,16 +44,26 @@ class HighWayLaneGraphBuilder(GraphBuilder[int, IntIDNode]):
     ) -> None:
         """Initialize the graph builder.
 
-        Args:
-            data: A Polars LazyFrame containing vehicle trajectory data.
-            id_col: Name of the column containing unique identifiers for each vehicle.
-            x_col: Name of the column containing X coordinates.
-            y_col: Name of the column containing Y coordinates.
-            lane_id_col: Name of the column containing lane identifiers.
-            orientation: The dominant axis of the highway ("vertical" for Y-axis, "horizontal" for X-axis).
-            bin_size: The size of the longitudinal bins used to group vehicle positions.
-            include_outer_borders: Whether to include outer lane borders in the graph.
-            smoothing: Optional smoothing factor for lane center estimation (spline parameter).
+        Parameters
+        ----------
+        data : pl.LazyFrame
+            A Polars LazyFrame containing vehicle trajectory data.
+        id_col : str, optional
+            Name of the column containing unique identifiers for each vehicle.
+        x_col : str, optional
+            Name of the column containing X coordinates.
+        y_col : str, optional
+            Name of the column containing Y coordinates.
+        lane_id_col : str, optional
+            Name of the column containing lane identifiers.
+        orientation : {"vertical", "horizontal"}, optional
+            The dominant axis of the highway ("vertical" for Y-axis, "horizontal" for X-axis).
+        bin_size : float, optional
+            The size of the longitudinal bins used to group vehicle positions.
+        include_outer_borders : bool, optional
+            Whether to include outer lane borders in the graph.
+        smoothing : float, optional
+            Smoothing factor for lane center estimation (spline parameter).
 
         """
         super().__init__()
@@ -76,7 +86,19 @@ class HighWayLaneGraphBuilder(GraphBuilder[int, IntIDNode]):
             self._lat_col = self._y_col
 
     def lane_description(self, lane_description: LaneDescription) -> Self:
-        """Provide lane description to enable more accurate edge type classification."""
+        """Provide lane description to enable more accurate edge type classification.
+
+        Parameters
+        ----------
+        lane_description : LaneDescription
+            Lane description containing lane IDs and directions.
+
+        Returns
+        -------
+        Self
+            The builder instance with the lane description set.
+
+        """
         self._lane_description = lane_description
         return self
 

@@ -38,32 +38,44 @@ def resample_tracks(
     interpolation ("spline"), with the ability to append velocity and acceleration
     vectors directly to the resulting DataFrame.
 
-    Args:
-        data: Input trajectory data in a Polars-compatible DataFrame format.
-        up: Upsampling factor (integer). Increases the number of samples.
-        down: Downsampling factor (integer). Decreases the number of samples.
-            Defaults to 1.
-        frame_column: Name of the column representing time or frame index.
-            Defaults to "frame".
-        pos_columns: List of column names representing spatial coordinates
-            (e.g., x, y, z). Defaults to ("x", "y").
-        group_by: Column names used to partition data into individual tracks
-            (e.g., "track_id"). If None, data is treated as a single track.
-            Defaults to None.
-        add_derivative: Whether to calculate and append the first derivative
-            (velocity) of the position columns. Defaults to False.
-        add_second_derivative: Whether to calculate and append the second
-            derivative (acceleration). Defaults to False.
-        dt: Time step between original frames, used to scale derivatives
-            appropriately. Defaults to 1.0.
-        method: Resampling algorithm to use. "fast" performs standard
-            interpolation; "spline" uses cubic splines for smoother paths
-            and more accurate derivatives. Defaults to "fast".
-        derivative_rename: Mapping to define custom names for the resulting
-            derivative columns. Defaults to None.
-        forward_fill: Columns to forward fill instead of interpolate.
+    Parameters
+    ----------
+    data : T_DataFrame
+        Input trajectory data in a Polars-compatible DataFrame format.
+    up : int
+        Upsampling factor. Increases the number of samples.
+    down : int, optional
+        Downsampling factor. Decreases the number of samples. Defaults to 1.
+    frame_column : str, optional
+        Name of the column representing time or frame index. Defaults to "frame".
+    pos_columns : Sequence[str], optional
+        Column names representing spatial coordinates (e.g., x, y, z).
+        Defaults to ("x", "y").
+    group_by : str or Sequence[str], optional
+        Column names used to partition data into individual tracks (e.g.,
+        "track_id"). If None, data is treated as a single track.
+    add_derivative : bool, optional
+        Whether to calculate and append the first derivative (velocity) of
+        the position columns. Defaults to False.
+    add_second_derivative : bool, optional
+        Whether to calculate and append the second derivative (acceleration).
+        Defaults to False.
+    dt : float, optional
+        Time step between original frames, used to scale derivatives
+        appropriately. Defaults to 1.0.
+    method : {"fast", "spline"}, optional
+        Resampling algorithm to use. "fast" performs standard interpolation;
+        "spline" uses cubic splines for smoother paths and more accurate
+        derivatives. Defaults to "fast".
+    derivative_rename : dict[int, list[str]], optional
+        Mapping to define custom names for the resulting derivative columns.
+        Defaults to None.
+    forward_fill : Sequence[str], optional
+        Columns to forward fill instead of interpolate.
 
-    Returns:
+    Returns
+    -------
+    T_DataFrame
         A Polars DataFrame containing the resampled coordinates and any
         requested derivatives.
 
@@ -128,27 +140,34 @@ def _resample_dataframe_spline(
     """Resample the track trajectories by an integer fraction.
 
     The required columns are:
+
     1. Column for frame index, specified by `frame_column`.
     2. Columns for positions to be interpolated, specified by `pos_columns`.
 
-    To add estimated velocities calculated from the spline interpolation, set
-    `add_velocity=True`. This will not do anything if velocity columns are
-    already provided.
+    Parameters
+    ----------
+    data : T_DataFrame
+        Trajectory data.
+    up : int
+        Upsampling factor.
+    down : int, optional
+        Downsampling factor. Defaults to 1.
+    frame_column : str, optional
+        Column for frame index. Defaults to "frame".
+    pos_columns : Sequence[str], optional
+        Columns for position. Defaults to ("x", "y").
+    group_by : Sequence[str], optional
+        Columns to group by. Defaults to None.
+    add_derivative : bool, optional
+        Whether to add first derivative columns. Defaults to False.
+    add_second_derivative : bool, optional
+        Whether to add second derivative columns. Defaults to False.
+    derivative_rename : dict[int, list[str]], optional
+        Optional dictionary to rename derivative columns.
 
-    Args:
-        data: trajectory data.
-        up: upsampling factor.
-        down: downsampling factor. Defaults to 1.
-        frame_column: column for frame index. Defaults to "frame".
-        pos_columns: columns for position. Defaults to ("x", "y").
-        group_by: columns to group by. Defaults to None.
-        add_derivative: whether to add derivative columns if not provided.
-            Defaults to False.
-        add_second_derivative: whether to add second derivative columns if not provided.
-            Defaults to False.
-        derivative_rename: optional dictionary to rename derivative columns.
-
-    Returns:
+    Returns
+    -------
+    T_DataFrame
         Resampled trajectory data.
 
     """
@@ -329,12 +348,18 @@ def _downsample_dataframe(
 ) -> T_DataFrame:
     """Downsample by an integer factor using decimation.
 
-    Args:
-        data: DataFrame containing the tracks to be downsampled.
-        factor: integer downsampling factor.
-        frame_column: column name for frame index. Defaults to "frame".
+    Parameters
+    ----------
+    data : T_DataFrame
+        DataFrame containing the tracks to be downsampled.
+    factor : int
+        Integer downsampling factor.
+    frame_column : str, optional
+        Column name for frame index. Defaults to "frame".
 
-    Returns:
+    Returns
+    -------
+    T_DataFrame
         Downsampled DataFrame.
 
     """
@@ -382,14 +407,22 @@ def _upsample_dataframe(
 ) -> pl.DataFrame | pl.LazyFrame:
     """Upsample by an integer factor using linear interpolation.
 
-    Args:
-        data: DataFrame containing the tracks to be upsampled.
-        factor: integer upsampling factor.
-        frame_column: column name for frame index. Defaults to "frame".
-        group_by: columns to group by. Defaults to None.
-        forward_fill: columns to forward fill instead of linear interpolation.
+    Parameters
+    ----------
+    data : T_DataFrame
+        DataFrame containing the tracks to be upsampled.
+    factor : int
+        Integer upsampling factor.
+    frame_column : str, optional
+        Column name for frame index. Defaults to "frame".
+    group_by : Sequence[str], optional
+        Columns to group by. Defaults to None.
+    forward_fill : Sequence[str], optional
+        Columns to forward fill instead of linear interpolation.
 
-    Returns:
+    Returns
+    -------
+    pl.DataFrame or pl.LazyFrame
         Upsampled DataFrame.
 
     """
@@ -520,22 +553,28 @@ def cubic_spline_interpolation(
     and acceleration) along with the interpolated positions by setting
     `include_first_derivative` and `include_second_derivative` to True.
 
+    Parameters
+    ----------
+    t : ndarray of float32, shape (n_samples,)
+        Original time points corresponding to `pos`.
+    t_new : ndarray of float32, shape (n_new_samples,)
+        New time points at which to interpolate.
+    pos : ndarray of float32, shape (n_samples, n_dims)
+        Original positions to interpolate.
+    vel : ndarray of float32, shape (n_samples, n_dims), optional
+        Original velocities corresponding to `pos`. Needed if `hermite=True`.
+    hermite : bool, optional
+        Whether to use Hermite spline interpolation.
+    include_first_derivative : bool, optional
+        Whether to include the first derivative in the output.
+    include_second_derivative : bool, optional
+        Whether to include the second derivative in the output.
 
-    Args:
-        pos: original positions to interpolate, shape (n_samples, n_dims).
-        t: original time points corresponding to `pos`, shape (n_samples,).
-        t_new: new time points at which to interpolate, shape (n_new_samples,).
-        vel: original velocities corresponding to `pos`, shape (n_samples, n_dims).
-            Needed if `hermite=True`.
-        hermite: whether to use Hermite spline interpolation.
-        include_first_derivative: whether to include the first derivative in the
-            output.
-        include_second_derivative: whether to include the second derivative in
-            the output.
-
-    Returns:
-        (interpolated positions, [optional] interpolated velocities, [optional]
-        interpolated accelerations)
+    Returns
+    -------
+    ndarray or tuple of ndarray
+        Interpolated positions, and optionally interpolated velocities and/or
+        accelerations as a tuple.
 
     """
     if hermite and vel is not None:

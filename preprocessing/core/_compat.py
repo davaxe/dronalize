@@ -12,17 +12,24 @@ if TYPE_CHECKING:
 def require_optional(module_name: str, *, extra: str | None = None) -> ModuleType:
     """Import and return an optional dependency, raising a clear error if missing.
 
-    Args:
-        module_name: fully-qualified module name (e.g. `"torch"`).
-        extra: pip extras name to suggest in the error message.
-            If `None`, the suggestion defaults to
-            `pip install <module_name>`.
+    Parameters
+    ----------
+    module_name : str
+        Fully-qualified module name (e.g. `"torch"`).
+    extra : str, optional
+        pip extras name to suggest in the error message.
+        If `None`, the suggestion defaults to
+        `pip install <module_name>`.
 
-    Returns:
+    Returns
+    -------
+    ModuleType
         The imported module.
 
-    Raises:
-        ImportError: if the module is not installed.
+    Raises
+    ------
+    ImportError
+        If the module is not installed.
 
     """
     try:

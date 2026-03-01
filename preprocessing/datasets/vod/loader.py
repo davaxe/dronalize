@@ -20,9 +20,12 @@ class VodLoader(NuScenesLoader):
     ) -> None:
         """Initialize the processor.
 
-        Args:
-            data_directory: directory of tha trajectory data JSON files.
-            loader_config: custom configuration or default if None.
+        Parameters
+        ----------
+        data_directory : Path or str
+            Directory of the trajectory data JSON files.
+        loader_config : LoaderConfig, optional
+            Custom configuration, or default if None.
 
         """
         super().__init__(data_directory, loader_config=loader_config)

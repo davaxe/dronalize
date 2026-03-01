@@ -58,10 +58,12 @@ class NuScenesMap:
     ) -> None:
         """Initialize the `NuscenesMap` with data from a JSON file.
 
-        Args:
-            json_file: Path to the JSON file containing the map data.
-            enable_debug_prints: If `True`, enables limited debug prints for
-                deserialization issues.
+        Parameters
+        ----------
+        json_file : Path
+            Path to the JSON file containing the map data.
+        enable_debug_prints : bool, optional
+            If True, enables limited debug prints for deserialization issues.
 
         """
         self.json_file: Path = json_file
@@ -561,15 +563,21 @@ def _many_from_dict(
 ) -> dict[str, T]:
     """Deserialize a sequence of dictionaries into a dictionary of objects.
 
-    If an item cannot be deserialized, it is skipped. If `debug` is `True`, a
+    If an item cannot be deserialized, it is skipped. If `debug` is True, a
     warning is printed for each item that fails to deserialize.
 
-    Args:
-        cls: class to deserialize the items into.
-        data: an iterable of dictionaries representing the items to deserialize.
-        debug: if `True`, enables debug prints for deserialization issues.
+    Parameters
+    ----------
+    cls : type[T]
+        Class to deserialize the items into.
+    data : Iterable[dict]
+        An iterable of dictionaries representing the items to deserialize.
+    debug : bool, optional
+        If True, enables debug prints for deserialization issues.
 
-    Returns:
+    Returns
+    -------
+    dict[str, T]
         A dictionary mapping UUIDs to deserialized objects of type `cls`.
 
     """

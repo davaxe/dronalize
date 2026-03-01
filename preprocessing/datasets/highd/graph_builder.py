@@ -23,10 +23,14 @@ class HighDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
     def __init__(self, meta_file: Path, start_x: float, end_x: float) -> None:
         """Initialize the graph builder.
 
-        Args:
-            meta_file: Path to the meta file containing the lane markings.
-            start_x: The x coordinate of the start of the road section.
-            end_x: The x coordinate of the end of the road section.
+        Parameters
+        ----------
+        meta_file : Path
+            Path to the meta file containing the lane markings.
+        start_x : float
+            The x coordinate of the start of the road section.
+        end_x : float
+            The x coordinate of the end of the road section.
 
         """
         self._start_x: float = start_x

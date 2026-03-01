@@ -36,20 +36,27 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
     ) -> None:
         """Initialize the data processor.
 
-        Args:
-            data_directory: data directory containing the raw nuScenes trajectories.
-                This is the directory that for example include:
-                - category.json
-                - instance.json
-                - sample_annotation.json
-                - sample_data.json
-                - ego_pose.json
-                - scene.json
-                - log.json
-            loader_config: configuration for the loader.
-            use_parquet_cache: Wether to use parquet cache. This will make
-                subsequent processing faster.
-            parquet_dir: directory to save the parquet cache files.
+        Parameters
+        ----------
+        data_directory : Path or str
+            Data directory containing the raw nuScenes trajectories.
+            This is the directory that for example includes:
+
+            - category.json
+            - instance.json
+            - sample_annotation.json
+            - sample_data.json
+            - ego_pose.json
+            - scene.json
+            - log.json
+
+        loader_config : LoaderConfig, optional
+            Configuration for the loader.
+        use_parquet_cache : bool, optional
+            Whether to use parquet cache. This will make subsequent processing
+            faster.
+        parquet_dir : Path or str, optional
+            Directory to save the parquet cache files.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)
@@ -183,15 +190,24 @@ def load_cached_table(
 ) -> pl.LazyFrame:
     """Load a table from Parquet if available/enabled, otherwise falls back to JSON.
 
-    Args:
-        name: name of the JSON-file to read without extension (e.g., "scene")
-        base_dir: base directory where the JSON file is located
-        schema: schema to use for reading the JSON file. Defaults to None.
-        use_parquet: whether to use parquet files if available. Defaults to True.
-        parquet_dir: directory where parquet files are stored. If None, defaults to base_dir.
+    Parameters
+    ----------
+    name : str
+        Name of the JSON file to read without extension (e.g., "scene").
+    base_dir : Path
+        Base directory where the JSON file is located.
+    schema : pl.Schema, optional
+        Schema to use for reading the JSON file.
+    use_parquet : bool, optional
+        Whether to use parquet files if available. Defaults to True.
+    parquet_dir : Path, optional
+        Directory where parquet files are stored. If None, defaults to
+        `base_dir`.
 
-    Returns:
-        LazyFrame of the loaded table
+    Returns
+    -------
+    pl.LazyFrame
+        LazyFrame of the loaded table.
 
     """
     p_dir = parquet_dir if parquet_dir is not None else base_dir
@@ -222,13 +238,19 @@ def build_scene_timeline(
 ) -> pl.LazyFrame:
     """Build scene timeline.
 
-    Args:
-        sample_lf: sample data dataframe.
-        scene_lf: scene dataframe.
-        log_lf: log dataframe.
+    Parameters
+    ----------
+    sample_lf : pl.LazyFrame
+        Sample data LazyFrame.
+    scene_lf : pl.LazyFrame
+        Scene LazyFrame.
+    log_lf : pl.LazyFrame
+        Log LazyFrame.
 
-    Returns:
-        Timeline dataframe for a scene.
+    Returns
+    -------
+    pl.LazyFrame
+        Timeline LazyFrame for a scene.
 
     """
     return (
@@ -263,15 +285,23 @@ def extract_ego_tracks(
 ) -> pl.LazyFrame:
     """Extract ego track from relevant dataframes.
 
-    Args:
-        timeline_lf: timeline dataframe for a scene returned by `build_scene_timeline`
-        sample_data_lf: sample data dataframe.
-        ego_pose_lf: ego pose dataframe.
-        ego_id: ego id. Defaults to 0.
-        ego_category: ego category. Defaults to AgentCategory.CAR.
+    Parameters
+    ----------
+    timeline_lf : pl.LazyFrame
+        Timeline LazyFrame for a scene, as returned by `build_scene_timeline`.
+    sample_data_lf : pl.LazyFrame
+        Sample data LazyFrame.
+    ego_pose_lf : pl.LazyFrame
+        Ego pose LazyFrame.
+    ego_id : int, optional
+        Ego agent ID. Defaults to 0.
+    ego_category : int, optional
+        Ego agent category. Defaults to `AgentCategory.CAR`.
 
-    Returns:
-        Track of the ego vehicle.
+    Returns
+    -------
+    pl.LazyFrame
+        LazyFrame containing the track of the ego vehicle.
 
     """
     return (
@@ -309,21 +339,32 @@ def extract_agent_tracks(
 ) -> pl.LazyFrame:
     """Extract agent tracks from relevant tables.
 
-    Args:
-        timeline_lf: return from `build_scene_timeline`
-        annotation_lf: sample annotation dataframe.
-        instance_lf: instance dataframe.
-        category_lf: category dataframe.
-        attribute_lf: attribute dataframe.
-        category_mapping: mapping from category names to integer categories.
-        status_mapping: mapping from status names to string statuses.
-        default_agent_category: default integer category for unmapped categories.
-            Defaults to AgentCategory.UNKNOWN.
-        default_status: default string status for unmapped statuses. Defaults
-            to "unknown".
+    Parameters
+    ----------
+    timeline_lf : pl.LazyFrame
+        Timeline LazyFrame, as returned by `build_scene_timeline`.
+    annotation_lf : pl.LazyFrame
+        Sample annotation LazyFrame.
+    instance_lf : pl.LazyFrame
+        Instance LazyFrame.
+    category_lf : pl.LazyFrame
+        Category LazyFrame.
+    attribute_lf : pl.LazyFrame
+        Attribute LazyFrame.
+    category_mapping : dict[str, int]
+        Mapping from category names to integer categories.
+    status_mapping : dict[str, str]
+        Mapping from status names to string statuses.
+    default_agent_category : int, optional
+        Default integer category for unmapped categories.
+        Defaults to `AgentCategory.UNKNOWN`.
+    default_status : str, optional
+        Default string status for unmapped statuses. Defaults to "unknown".
 
-    Returns:
-        A LazyFrame containing agent tracks.
+    Returns
+    -------
+    pl.LazyFrame
+        LazyFrame containing agent tracks.
 
     """
     # 1. Prepare small lookup tables

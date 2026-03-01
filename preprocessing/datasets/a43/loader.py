@@ -26,9 +26,12 @@ class A43Loader(BaseSceneLoader[int, pl.LazyFrame]):
     ) -> None:
         """Initialize the A43 dataset loader.
 
-        Args:
-            data_dir: Path to root of the A43 dataset, data files.
-            config: Optional processor configuration. If None, default configuration will be used.
+        Parameters
+        ----------
+        data_dir : Path
+            Path to root of the A43 dataset, data files.
+        config : LoaderConfig, optional
+            Processor configuration. If None, default configuration will be used.
 
         """
         super().__init__(loader_config=config, enforce_schema=False)

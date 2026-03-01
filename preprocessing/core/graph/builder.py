@@ -74,19 +74,23 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         """Prepare internal structure for building the map graph.
 
         This means that the method should populate the internal data structures:
-            - `self.nodes`
-            - `self.id_adj_list`
-            - `self.extra_nodes` (optional)
-            - `self._pending_paths` (optional, if lazy evaluation is used)
+
+        - `self.nodes`
+        - `self.id_adj_list`
+        - `self.extra_nodes` (optional)
+        - `self._pending_paths` (optional, if lazy evaluation is used)
 
         The function will be called automatically by the `build` method (if it
         is not overridden).
 
-        Args:
-            min_distance: minimum distance between nodes when adding edges.
-                If None, no minimum distance is enforced.
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
+        Parameters
+        ----------
+        min_distance : float, optional
+            Minimum distance between nodes when adding edges.
+            If None, no minimum distance is enforced.
+        interp_distance : float, optional
+            The target distance for interpolation. If None, no interpolation
+            is performed.
 
         """
 
@@ -111,12 +115,17 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
         If the node already exists, it is not added again.
 
-        Args:
-            node: node to add to the graph.
-            none_if_exists: if True, return None if the node already exists.
+        Parameters
+        ----------
+        node : NODE
+            Node to add to the graph.
+        none_if_exists : bool, optional
+            If True, return None if the node already exists.
 
-        Returns:
-            The ID of the added node or `None` if the node already exists
+        Returns
+        -------
+        ID or None
+            The ID of the added node, or `None` if the node already exists
             and `none_if_exists` is True.
 
         """
@@ -140,10 +149,14 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     def add_extra_node(self, node: NODE) -> ID:
         """Add an extra node to the graph.
 
-        Args:
-            node: node to add to the graph.
+        Parameters
+        ----------
+        node : NODE
+            Node to add to the graph.
 
-        Returns:
+        Returns
+        -------
+        ID
             The ID of the added node.
 
         """
@@ -152,12 +165,16 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     def with_edge_map(self, edge_map: dict[EdgeType, EdgeType]) -> Self:
         """Set the edge mapping for remapping edge types during graph building.
 
-        Args:
-            edge_map: a dictionary mapping original `EdgeType` values to new
-                `EdgeType` values. This allows for flexible remapping of edge
-                types without modifying the underlying graph construction logic.
+        Parameters
+        ----------
+        edge_map : dict[EdgeType, EdgeType]
+            A dictionary mapping original `EdgeType` values to new
+            `EdgeType` values. This allows for flexible remapping of edge
+            types without modifying the underlying graph construction logic.
 
-        Returns:
+        Returns
+        -------
+        Self
             The `GraphBuilder` instance with the updated edge mapping.
 
         """
@@ -171,13 +188,18 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     ) -> MapGraph:
         """Build a graph representation of the map.
 
-        Args:
-            min_distance: the minimum distance between nodes when adding edges.
-                If None, no minimum distance is enforced.
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
+        Parameters
+        ----------
+        min_distance : float, optional
+            The minimum distance between nodes when adding edges.
+            If None, no minimum distance is enforced.
+        interp_distance : float, optional
+            The target distance for interpolation. If None, no interpolation
+            is performed.
 
-        Returns:
+        Returns
+        -------
+        MapGraph
             A `MapGraph` object representing the graph.
 
         """
@@ -205,7 +227,9 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         This method converts the internal adjacency list and node positions into
         a `MapGraph` object.
 
-        Returns:
+        Returns
+        -------
+        MapGraph
             A `MapGraph` object representing the graph.
 
         """
@@ -236,14 +260,21 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         This method generates intermediate edges between two nodes, ensuring
         that the distance between consecutive points is at most `interp_distance`.
 
-        Args:
-            src: source node.
-            dst: destination node.
-            interp_distance: the target distance for interpolation. If None,
-                no interpolation is performed.
-            edge_type: type of the edge to be created.
+        Parameters
+        ----------
+        src : NODE
+            Source node.
+        dst : NODE
+            Destination node.
+        interp_distance : float or None
+            The target distance for interpolation. If None, no interpolation
+            is performed.
+        edge_type : EdgeType
+            Type of the edge to be created.
 
-        Yields:
+        Yields
+        ------
+        tuple[ID, ID, EdgeType]
             Tuples of (from_id, to_id, edge_type) for each interpolated edge.
 
         """
@@ -273,13 +304,18 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     ) -> None:
         """Add edges between consecutive nodes in a given list.
 
-        Args:
-            nodes: a sequence of nodes to connect with edges.
-            interp_distance: If None, no interpolation is performed.
-            edge_type: type of the edge to be created. Either a single EdgeType or
-                a sequence of EdgeTypes matching the number of edges to be created.
-            is_polygon: whether the nodes form a polygon. If True, the last node
-                is connected back to the first node to close the polygon.
+        Parameters
+        ----------
+        nodes : Sequence[NODE]
+            A sequence of nodes to connect with edges.
+        interp_distance : float or None
+            If None, no interpolation is performed.
+        edge_type : EdgeType or Sequence[EdgeType]
+            Type of the edge to be created. Either a single EdgeType or a
+            sequence of EdgeTypes matching the number of edges to be created.
+        is_polygon : bool, optional
+            Whether the nodes form a polygon. If True, the last node is
+            connected back to the first node to close the polygon.
 
         """
         if isinstance(edge_type, EdgeType):
@@ -329,22 +365,27 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
         """Add edges between consecutive nodes in a given list.
 
         The edges are only added if the distance between nodes is greater than
-        the specified `min_distance` (greater than) threshold. This is useful
-        for filtering out very short segments that may not be relevant for the
-        graph representation.
+        the specified `min_distance` threshold. This is useful for filtering
+        out very short segments that may not be relevant for the graph
+        representation.
 
-        By using `min_distance` and `interp_distance` together, you can control
-        both the minimum distance for adding edges and the maximum distance
-        between interpolated points along those edges.
+        By using `min_distance` and `interp_distance` together, you can
+        control both the minimum distance for adding edges and the maximum
+        distance between interpolated points along those edges.
 
-        Args:
-            nodes: a sequence of nodes to connect with edges.
-            min_distance: minimum distance threshold for adding edges.
-            interp_distance: If None, no interpolation is performed.
-            edge_type: type of the edge to be created. Either a single EdgeType
-                or a sequence of EdgeTypes matching the number of edges to be
-                created.
-            is_polygon: whether the nodes form a polygon. Defaults to False.
+        Parameters
+        ----------
+        nodes : Sequence[NODE]
+            A sequence of nodes to connect with edges.
+        min_distance : float or None
+            Minimum distance threshold for adding edges.
+        interp_distance : float or None
+            If None, no interpolation is performed.
+        edge_type : EdgeType or Sequence[EdgeType]
+            Type of the edge to be created. Either a single EdgeType or a
+            sequence of EdgeTypes matching the number of edges to be created.
+        is_polygon : bool, optional
+            Whether the nodes form a polygon. Defaults to False.
 
         """
         if min_distance is None:
@@ -419,9 +460,11 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     ) -> None:
         """Add edges to the graph from an iterable of edges.
 
-        Args:
-            edges: an iterable of tuples, where each tuple contains
-                (from_id, to_id, edge_type).
+        Parameters
+        ----------
+        edges : Iterable[tuple[ID, ID, EdgeType]]
+            An iterable of tuples, where each tuple contains
+            `(from_id, to_id, edge_type)`.
 
         """
         for from_id, to_id, edge_type in edges:
@@ -437,10 +480,14 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
 
         If the edge already exists, it is not added again.
 
-        Args:
-            from_id: ID of the source node.
-            to_id: ID of the destination node.
-            edge_type: type of the edge.
+        Parameters
+        ----------
+        from_id : ID
+            ID of the source node.
+        to_id : ID
+            ID of the destination node.
+        edge_type : EdgeType
+            Type of the edge.
 
         """
         if from_id not in self._id_to_index or to_id not in self._id_to_index:
@@ -475,11 +522,15 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     ) -> None:
         """Add a sequence (path) of nodes to be processed later.
 
-        Args:
-            nodes: nodes
-            edge_type: edges between the nodes.
-            is_polygon: _whether the nodes form a polygon. If True, the last node
-                is connected back to the first node to close the polygon.
+        Parameters
+        ----------
+        nodes : Sequence[NODE]
+            Nodes forming the path.
+        edge_type : EdgeType or Sequence[EdgeType]
+            Edge type(s) between the nodes.
+        is_polygon : bool, optional
+            Whether the nodes form a polygon. If True, the last node is
+            connected back to the first node to close the polygon.
 
         """
         self._pending_paths.append({
@@ -549,15 +600,20 @@ def interpolate_position(
     destination coordinates, ensuring that the distance between consecutive
     points is at most `target_distance`.
 
-    Args:
-        src: source coordinates as a tuple of (x, y).
-        dst: destination coordinates as a tuple of (x, y).
-        target_distance: the maximum distance between consecutive points.
-            Default is 1.0.
+    Parameters
+    ----------
+    src : tuple[float, float]
+        Source coordinates as a tuple of (x, y).
+    dst : tuple[float, float]
+        Destination coordinates as a tuple of (x, y).
+    target_distance : float or None, optional
+        The maximum distance between consecutive points. Defaults to 1.0.
 
-    Yields:
-        A tuple (`InterpolationStage`, `src`, `dst`) for each segment of the
-            interpolated path.
+    Yields
+    ------
+    tuple[InterpolationStage, tuple[float, float], tuple[float, float]]
+        A tuple of (`InterpolationStage`, src, dst) for each segment of the
+        interpolated path.
 
     """
     if target_distance is None or target_distance <= 0:
@@ -606,8 +662,12 @@ class Edges:
     def to_numpy(self) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.int64]]:
         """Convert the edges to NumPy arrays.
 
-        Returns:
-            edge_indices ``(2, N)` and edge_types `(N,)`.
+        Returns
+        -------
+        edge_indices : ndarray of int64, shape (2, N)
+            Source and destination index pairs for each edge.
+        edge_types : ndarray of int64, shape (N,)
+            Type label for each edge.
 
         """
         edge_index = np.array([self.src_indices, self.dst_indices], dtype=np.int64)
@@ -622,13 +682,19 @@ def get_edges_from_adj_list(
 ) -> Edges:
     """Get edges from an adjacency list.
 
-    Args:
-        adj_list: adjacency list where keys are node IDs and values are lists of
-            tuples containing destination node IDs and edge types.
-        id_to_index: a mapping from node IDs to their indices in the graph.
-        edge_map: a optional mapping from edge type if needed to remap edge types.
+    Parameters
+    ----------
+    adj_list : dict[ID, list[tuple[ID, EdgeType]]]
+        Adjacency list where keys are node IDs and values are lists of
+        tuples containing destination node IDs and edge types.
+    id_to_index : dict[ID, int], optional
+        A mapping from node IDs to their indices in the graph.
+    edge_map : dict[EdgeType, EdgeType], optional
+        An optional mapping to remap edge types.
 
-    Returns:
+    Returns
+    -------
+    Edges
         An `Edges` object containing the edge indices and types.
 
     """

@@ -34,12 +34,16 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
         non-lane changing agents. Typically highway datasets are heavily imbalanced towards non-lane
         changing agents, which means that a high ratio con result in way less total data.
 
-        Args:
-            data_dir: Path to root of the I80 dataset, containing subdirectores of data files.
-            config: Optional processor configuration. If None, default configuration will be used.
-            lane_change_ratio: Optional ratio for rebalancing highway agents. If None, no
-                rebalancing will be applied. Default is 1.0, i.e. same number of lane changes as
-                non-lane changes.
+        Parameters
+        ----------
+        data_dir : Path
+            Path to root of the I80 dataset, containing subdirectories of data files.
+        config : LoaderConfig, optional
+            Processor configuration. If None, default configuration will be used.
+        lane_change_ratio : float, optional
+            Ratio for rebalancing highway agents. If None, no rebalancing will
+            be applied. Default is 1.0, i.e. same number of lane changes as
+            non-lane changes.
 
         """
         super().__init__(loader_config=config, enforce_schema=False)

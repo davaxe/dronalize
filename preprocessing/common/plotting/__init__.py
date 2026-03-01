@@ -1,7 +1,7 @@
 """Plotting utilities for map graphs and trajectories.
 
-This subpackage is optional and requires ``matplotlib`` (and optionally
-``altair`` for trajectory plots).  Install with::
+This subpackage is optional and requires `matplotlib` (and optionally
+`altair` for trajectory plots).  Install with::
 
     pip install dronalize[plot]
 """
