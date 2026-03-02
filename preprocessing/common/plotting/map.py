@@ -24,12 +24,12 @@ def plot_map_graph(
     disable_max_rows: bool = True,
     **kwargs: Any,  # noqa: ANN401
 ) -> alt.Chart:
-    """Plot a MapGraph using Altair.
+    """Plot a map graph using Altair.
 
     Parameters
     ----------
     graph : MapGraph
-        The MapGraph to plot.
+        The map graph to plot.
     width : int, optional
         Width of the chart in pixels. Defaults to 700.
     height : int, optional
@@ -46,7 +46,7 @@ def plot_map_graph(
     Returns
     -------
     alt.Chart
-        An Altair Chart object.
+        An Altair `alt.Chart` object.
 
     """
     alt = require_optional("altair", extra="plot")
