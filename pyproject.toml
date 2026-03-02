@@ -25,42 +25,42 @@ dependencies = [
     "scipy>=1.10.0",
     "tqdm>=4.65.0",
     "utm>=0.7.0",
-    "osmium>=4.0.0",
+    "typing-extensions>=4.15.0",
 ]
 
 [project.optional-dependencies]
 # Plotting (map graphs, trajectories)
-plot = ["matplotlib>=3.5.0", "altair>=5.0.0"]
-
-# PyTorch integration (zero-copy conversion, datasets, etc.)
-torch = ["torch>=2.0.0"]
-pyg = ["torch>=2.0.0", "torch_geometric>=2.3.0", "torch-cluster"]
-
-# Training stack (only needed for model training, not preprocessing)
-train = [
-    "dronalize[pyg]",
-    "lightning>=2.0.0",
-    "wandb>=0.15.0",
-    "scikit-learn>=1.0.0",
-    "mosaicml-streaming>=0.7.0",
-]
+plot = ["altair>=5.0.0"]
 
 # Dataset-specific extras
 lyft = ["zarr<3", "numcodecs<=0.13.1"]
 ad4che = ["opencv-python"]
 
-# Container-specific (headless versions for Docker/servers)
-container = ["opencv-python-headless"]
+# Minimal PyTorch dependency for the dataloader implementation
+loader = ["torch>=2.0.0"]
+
+# Full ML stack for running the example training pipeline
+example = [
+    "dronalize[loader]",
+    "torchmetrics>=0.11.0",
+    "torch_geometric>=2.3.0",
+    "torch-cluster",
+    "lightning>=2.0.0",
+    "wandb>=0.15.0",
+]
 
 dev = [
     "pytest>=7.0",
     "scipy-stubs",
     "ipython",
+    "dronalize[plot,lyft,ad4che]",
 ]
+dev-example = ["dronalize[example,dev]"]
 
-all-datasets = ["dronalize[lyft,ad4che]"]
-dev-cuda = ["dronalize[train,dev]"]
-all = ["dronalize[train,plot,ad4che,lyft,dev]"]
+# All runtime extras (no dev/test tooling)
+all = ["dronalize[loader,plot,lyft,ad4che]"]
+# All runtime + dev/test tooling
+all-dev = ["dronalize[all,dev]"]
 
 # [tool.uv]
 # find-links = ["https://data.pyg.org/whl/torch-2.6.0+cu124.html"]
@@ -87,5 +87,5 @@ ignore = [
     "D203", "D213", "COM812", "PLR2004", "DOC201", "DOC501",
     "T201", "S101", "TRY003", "D100", "E501", "B008",
     "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
-    "DOC402", "CPY001", "D104", "TD005"
+    "DOC402", "CPY001", "D104", "TD005","S405", "S314",
 ]

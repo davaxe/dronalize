@@ -189,8 +189,6 @@ def _generate_test() -> pl.DataFrame:
 
 
 if __name__ == "__main__":
-    plt = require_optional("matplotlib.pyplot", extra="plot")
-
     # 1. Generate the complex data
     df_complex = _generate_test()
     print("Original DataFrame:")
@@ -202,4 +200,3 @@ if __name__ == "__main__":
 
     plot_trajectories(df_complex, group_by="track_id", n_groups=1)
     plot_trajectories(df_resampled, group_by="track_id", n_groups=1)
-    plt.show()

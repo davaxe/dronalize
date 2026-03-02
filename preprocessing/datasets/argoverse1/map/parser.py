@@ -14,7 +14,7 @@
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET  # noqa: S405
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from enum import auto
 from pathlib import Path
@@ -52,7 +52,7 @@ class Argoverse1Map:
         if self._parsed:
             return
 
-        tree = ET.parse(self.path)  # noqa: S314
+        tree = ET.parse(self.path)
         root = tree.getroot()
 
         all_graph_nodes: dict[int, IntIDNode] = {}

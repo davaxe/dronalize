@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET  # noqa: S405
+import xml.etree.ElementTree as ET
 from typing import TYPE_CHECKING
 
 import utm
+from typing_extensions import override
 
 from preprocessing.common.map.osm import OSMMapGraphBuilder
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from osmium import osm
 
 
 class SindGraphBuilder(OSMMapGraphBuilder):
@@ -48,24 +47,10 @@ class SindGraphBuilder(OSMMapGraphBuilder):
         )
         super().__init__(osm_file, position_offset, include_edge_type_none=include_edge_type_none)
 
-    def node(self, node: osm.Node) -> None:
-        """Handle OSM node by converting to UTM and offsetting against the map origin."""
-        # Convert to UTM, forcing the origin's zone to prevent boundary issues
-        x_utm, y_utm, _, _ = utm.from_latlon(
-            node.location.lat,
-            node.location.lon,
-            force_zone_number=self._zone_number,
-            force_zone_letter=self._zone_letter,
-        )
-        local_x = x_utm - self._origin_utm_x
-        local_y = y_utm - self._origin_utm_y
-        x_offset, y_offset = self._utm_position_offset
-        self._nodes[node.id] = self.new_node(float(local_x) + x_offset, float(local_y) + y_offset)
-
     @staticmethod
     def _extract_origin(osm_file: Path) -> tuple[float, float]:
         """Parse the XML sequentially to find the node tagged as 'origin'."""
-        context = ET.iterparse(osm_file, events=("start", "end"))  # noqa: S314
+        context = ET.iterparse(osm_file, events=("start", "end"))
         current_node_element = None
 
         for event, elem in context:
@@ -82,3 +67,43 @@ class SindGraphBuilder(OSMMapGraphBuilder):
 
         # Default fallback if the origin tag is missing
         return 0.0, 0.0
+
+    @override
+    def _process_node(
+        self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element
+    ) -> None:
+        """Process an OSM node element by converting to UTM and offsetting against the map origin."""
+        node_id = int(elem.attrib["id"])
+        lat = float(elem.attrib["lat"])
+        lon = float(elem.attrib["lon"])
+
+        # Apply SIND-specific UTM projection
+        x_utm, y_utm, _, _ = utm.from_latlon(
+            lat,
+            lon,
+            force_zone_number=self._zone_number,
+            force_zone_letter=self._zone_letter,
+        )
+        local_x = x_utm - self._origin_utm_x
+        local_y = y_utm - self._origin_utm_y
+
+        self._nodes[node_id] = self.new_node(float(local_x) + x_offset, float(local_y) + y_offset)
+
+        # Clear element from memory once processed
+        elem.clear()
+        root.clear()
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    import altair as alt
+
+    alt.renderers.enable("browser")
+    from preprocessing.common.plotting import plot_map_graph
+
+    graph_builder = SindGraphBuilder(
+        Path("/home/west/Developer/behavior-prediction/datasets/SIND/maps/Changchun_Pudong.osm")
+    )
+    graph = graph_builder.build()
+    plot_map_graph(graph).show()
