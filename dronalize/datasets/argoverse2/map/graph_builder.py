@@ -34,7 +34,7 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         super().__init__()
         self.map = map_data
 
-        self.edge_map: dict[EdgeType, EdgeType] = {EdgeType.NONE: EdgeType.VIRTUAL}
+        self.edge_map = {EdgeType.NONE: EdgeType.VIRTUAL}
 
     @classmethod
     def from_json_file(cls, json_file: Path) -> Argoverse2GraphBuilder:
