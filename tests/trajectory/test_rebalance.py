@@ -1,6 +1,6 @@
 import polars as pl
 
-from preprocessing.common.trajectory.rebalance import rebalance_highway_agents
+from dronalize.common.trajectory.rebalance import rebalance_highway_agents
 
 
 def create_dummy_data(n_lc_agents: int, n_lk_agents: int) -> pl.DataFrame:

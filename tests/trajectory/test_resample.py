@@ -1,7 +1,7 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from preprocessing.common.trajectory.resample import resample_tracks
+from dronalize.common.trajectory.resample import resample_tracks
 
 
 def test_no_resampling() -> None:

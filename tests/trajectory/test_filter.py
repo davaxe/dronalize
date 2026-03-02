@@ -1,8 +1,8 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from preprocessing.common.trajectory.filter import filter_scene
-from preprocessing.core import AgentCategory, FilteringConfig, LoaderConfig
+from dronalize.common.trajectory.filter import filter_scene
+from dronalize.core import AgentCategory, FilteringConfig, LoaderConfig
 
 
 def test_no_scene_filtering() -> None:

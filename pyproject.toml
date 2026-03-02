@@ -3,8 +3,10 @@ requires = ["uv_build>=0.10,<0.11.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-module-name = "preprocessing"
+module-name = "dronalize"
 module-root = ""
+# Exclude
+exclude = ["tests*", "examples*"]
 
 [project]
 name = "dronalize"
@@ -49,21 +51,17 @@ example = [
     "wandb>=0.15.0",
 ]
 
+[dependency-groups]
 dev = [
     "pytest>=7.0",
     "scipy-stubs",
     "ipython",
     "dronalize[plot,lyft,ad4che]",
 ]
-dev-example = ["dronalize[example,dev]"]
 
-# All runtime extras (no dev/test tooling)
-all = ["dronalize[loader,plot,lyft,ad4che]"]
-# All runtime + dev/test tooling
-all-dev = ["dronalize[all,dev]"]
-
-# [tool.uv]
-# find-links = ["https://data.pyg.org/whl/torch-2.6.0+cu124.html"]
+all = [
+    { include-group = "dev"}
+]
 
 [tool.uv.extra-build-dependencies]
 torch-cluster = ["torch"]
@@ -89,3 +87,8 @@ ignore = [
     "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
     "DOC402", "CPY001", "D104", "TD005","S405", "S314",
 ]
+pydocstyle = { convention = "numpy" }
+
+
+[tool.ruff.format]
+quote-style = "double"
