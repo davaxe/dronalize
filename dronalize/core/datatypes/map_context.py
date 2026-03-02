@@ -31,6 +31,7 @@ class Explicit:
     def __init__(self, **metadata: Any) -> None:  # noqa: ANN401
         """Initialize with keyword arguments stored as metadata."""
         object.__setattr__(self, "metadata", metadata)
+        object.__setattr__(self, "tag", "Explicit")
 
 
 @dataclass(slots=True, frozen=True)
