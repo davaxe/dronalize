@@ -2,12 +2,14 @@
 
 # Domain models
 # Graph building
+# Pipeline
 from dronalize.core.datatypes import (
     AgentCategory,
     EdgeType,
     Explicit,
     Implicit,
     Loaded,
+    LoaderConfig,
     MapContext,
     MapGraph,
     Scene,
@@ -26,17 +28,19 @@ from dronalize.core.parallel import (
     ParallelSceneLoader,
     ProgressBar,
 )
+from dronalize.core.pipeline import (
+    FlatMapTransform,
+    Pipeline,
+    Transform,
+    pipeline_from_config,
+    transforms,
+)
 
 # Protocols & loader ABCs
 from dronalize.core.protocols import (
     BaseEnum,
     BaseMapObject,
     BaseSceneLoader,
-    FilteringConfig,
-    LoaderConfig,
-    Resampling,
-    SceneLoader,
-    WindowParams,
 )
 
 __all__ = [
@@ -47,7 +51,7 @@ __all__ = [
     "EdgeType",
     "Edges",
     "Explicit",
-    "FilteringConfig",
+    "FlatMapTransform",
     "GraphBuilder",
     "Implicit",
     "InterpolationStage",
@@ -56,12 +60,13 @@ __all__ = [
     "MapContext",
     "MapGraph",
     "ParallelSceneLoader",
+    "Pipeline",
     "Point",
     "ProgressBar",
-    "Resampling",
     "Scene",
-    "SceneLoader",
-    "WindowParams",
+    "Transform",
     "get_edges_from_adj_list",
     "interpolate_position",
+    "pipeline_from_config",
+    "transforms",
 ]

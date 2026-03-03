@@ -78,7 +78,7 @@ def prepare_agent_trajectories(
 
     scenes_filtered = scenes.filter(
         filter_scene_expr(
-            config,
+            *config.filter_args(),
             agent_id="id",
             group_by=group_by[-1] if len(group_by) > 0 else None,
             category_column=agent_category_col,

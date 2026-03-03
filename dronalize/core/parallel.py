@@ -44,12 +44,12 @@ class ProgressBar(IntEnum):
         return ""
 
 
-T_Source = TypeVar("T_Source")
-T_ID = TypeVar("T_ID", bound=(Hashable))
+SourceT = TypeVar("SourceT")
+IdT = TypeVar("IdT", bound=Hashable)
 P = ParamSpec("P")
 
 
-class ParallelSceneLoader(SceneLoader[T_ID]):
+class ParallelSceneLoader(SceneLoader[IdT]):
     """A generic parallel data loader that wraps another BaseSceneLoader.
 
     It uses Python's multiprocessing module to parallelize the processing of
@@ -102,7 +102,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
     def __init__(
         self,
-        inner: BaseSceneLoader[T_ID, T_Source],
+        inner: BaseSceneLoader[IdT, SourceT],
         chunksize: int | None = None,
         processes: int | None = None,
         *,
@@ -127,7 +127,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
         Parameters
         ----------
-        inner : BaseSceneLoader[T_ID, T_Source]
+        inner : BaseSceneLoader[IdT, SourceT]
             The underlying BaseSceneLoader to use for processing each source.
         chunksize : int, optional
             The number of sources to process in each batch when using
@@ -198,7 +198,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         return self
 
     @override
-    def scenes(self) -> Iterable[Scene[T_ID]]:
+    def scenes(self) -> Iterable[Scene[IdT]]:
         """Process scenes in parallel and yield them one by one.
 
         This uses `multiprocessing` to process data in parallel. It works by
@@ -212,7 +212,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
         Yields
         ------
-        Scene[T_ID]
+        Scene[IdT]
             Processed scenes one at a time.
 
         """
@@ -248,7 +248,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
     @override
     def scenes_callback(
         self,
-        callback: Callable[Concatenate[Scene[T_ID], P], None],
+        callback: Callable[Concatenate[Scene[IdT], P], None],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
@@ -325,22 +325,22 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         return max(chunksize, 1)
 
     @staticmethod
-    def _process_fn(args: _ProcessArgs[T_ID, T_Source]) -> list[Scene[T_ID]]:
+    def _process_fn(args: _ProcessArgs[IdT, SourceT]) -> list[Scene[IdT]]:
         """Worker process function that processes a single source and returns a list of Scenes.
 
         Parameters
         ----------
-        args : _ProcessArgs[T_ID, T_Source]
+        args : _ProcessArgs[IdT, SourceT]
             Arguments containing the source and loader to process.
 
         Returns
         -------
-        list[Scene[T_ID]]
+        list[Scene[IdT]]
             List of processed scenes from the given source.
 
         """
         loader, source = args.loader, args.source
-        scenes: list[Scene[T_ID]] = []
+        scenes: list[Scene[IdT]] = []
 
         for scene_data, map_context in loader.process_next(source):
             scene = loader.create_scene(scene_data, source.identifier, map_context)
@@ -360,7 +360,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         return scenes
 
     @staticmethod
-    def _process_fn_callback(args: _ProcessArgs[T_ID, T_Source]) -> int:
+    def _process_fn_callback(args: _ProcessArgs[IdT, SourceT]) -> int:
         """Worker process function that applies a callback to each Scene.
 
         This function returns the number of processed scenes (used for keeping
@@ -370,7 +370,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
         Parameters
         ----------
-        args : _ProcessArgs[T_ID, T_Source]
+        args : _ProcessArgs[IdT, SourceT]
             Arguments containing the source, loader, and callback to apply.
 
         Returns
@@ -423,11 +423,11 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         }
 
 
-class _ProcessArgs(NamedTuple, Generic[T_ID, T_Source]):
+class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):
     """Arguments for processing a single source in a worker process."""
 
-    source: Source[T_ID, T_Source]
-    loader: BaseSceneLoader[T_ID, T_Source]
+    source: Source[IdT, SourceT]
+    loader: BaseSceneLoader[IdT, SourceT]
     fn: Callable[..., None] | None = None
     cb_args: tuple | None = None
     cb_kwargs: dict[str, Any] | None = None

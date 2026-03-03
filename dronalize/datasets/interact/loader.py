@@ -9,8 +9,8 @@ from typing_extensions import override
 from dronalize.common.trajectory.basic import yaw_from_vel_expr
 from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import resample_tracks
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig, Resampling
+from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.protocols.loader import Source
 
@@ -99,7 +99,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
         data_filtered = data.filter(
             filter_scene_expr(
-                self.loader_config,
+                *self.loader_config.filter_args(),
                 group_by=["file_id", "case_id"],
                 category_column="agent_category",
             )
@@ -111,12 +111,10 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
         data_processed = resample_tracks(
             data_filtered,
-            resampling.up,
-            resampling.down,
+            resampling,
             group_by=["file_id", "case_id", "id"],
             add_derivative=False,
             add_second_derivative=False,
-            method=resampling.method,
             dt=self.loader_config.sample_time,
             derivative_rename=self.derivative_names(),
             forward_fill=["agent_category"],

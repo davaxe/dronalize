@@ -1,285 +1,47 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Collection, Hashable, Iterable
-from dataclasses import dataclass, field, replace
-from fractions import Fraction
+from collections.abc import (  # pyright: ignore[reportUnusedImport]
+    Callable,
+    Hashable,
+    Iterable,
+)
+from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
     Concatenate,
     Generic,
-    Literal,
     ParamSpec,
     Protocol,
-    Self,
     TypeVar,
 )
 
 from typing_extensions import override
 
-from dronalize.common.trajectory.resample import ResamplingMethod
 from dronalize.core.datatypes.scene import Scene
+from dronalize.core.pipeline import Pipeline
 
 if TYPE_CHECKING:
     import polars as pl
 
-    from dronalize.core.datatypes.categories import AgentCategory
+    from dronalize.core.datatypes import LoaderConfig
     from dronalize.core.datatypes.map_context import MapContext
 
 
-@dataclass(slots=True, frozen=True)
-class FilteringConfig:
-    """Configuration for filtering scenes based on agent validity and scene composition."""
-
-    min_agents: int = 2
-    """Minimum number of agents required in a scene to be valid."""
-
-    require_all_valid: bool = False
-    """If True, requires all agents in a scene to have valid positions for all
-    time-steps (input and output)."""
-
-    require_prediction_frame: bool = True
-    """If True, requires all agents to have valid positions at the first prediction
-    frame."""
-
-    require_frames: frozenset[int] | None = None
-    """Specific frames offset required for the scene to be considered valid."""
-
-    filter_agent_category: frozenset[AgentCategory] | None = None
-    """Set of agent categories to filter out from scenes."""
-
-    filter_slow_agents: float | None = None
-    """Filter out agents with an average speed below this threshold."""
-
-    def __init__(
-        self,
-        min_agents: int = 2,
-        *,
-        require_all_valid: bool = False,
-        require_prediction_frame: bool = True,
-        require_frames: Collection[int] | None = None,
-        filter_agent_category: Collection[AgentCategory] | None = None,
-        filter_slow_agents: float | None = None,
-    ) -> None:
-        """Initialize and normalise collections to frozensets."""
-        object.__setattr__(self, "min_agents", min_agents)
-        object.__setattr__(self, "require_all_valid", require_all_valid)
-        object.__setattr__(self, "require_prediction_frame", require_prediction_frame)
-        object.__setattr__(
-            self,
-            "require_frames",
-            frozenset(require_frames) if require_frames is not None else None,
-        )
-        object.__setattr__(
-            self,
-            "filter_agent_category",
-            frozenset(filter_agent_category) if filter_agent_category is not None else None,
-        )
-        object.__setattr__(self, "filter_slow_agents", filter_slow_agents)
-
-
-@dataclass(slots=True, frozen=True)
-class WindowParams:
-    """Configuration for sliding window sampling of scenes."""
-
-    window_size: int
-    """Number of frames in each window."""
-
-    step_size: int
-    """Number of frames to skip between windows."""
-
-
-@dataclass(slots=True, frozen=True)
-class Resampling:
-    """Configuration for resampling trajectories."""
-
-    up: int
-    """Upsampling factor."""
-    down: int
-    """Downsampling factor."""
-    method: ResamplingMethod = ResamplingMethod.FAST
-    """Method used for resampling."""
-
-    def __init__(
-        self,
-        up: int,
-        down: int,
-        method: Literal["fast", "spline"] = "fast",
-    ) -> None:
-        """Simplify the resampling ratio to its smallest integer ratio form."""
-        simplified_up, simplified_down = Fraction(up, down).as_integer_ratio()
-        object.__setattr__(self, "up", simplified_up)
-        object.__setattr__(self, "down", simplified_down)
-        object.__setattr__(self, "method", method)
-
-    @property
-    def factors(self) -> tuple[int, int]:
-        """(up, down) resampling factors."""
-        return (self.up, self.down)
-
-    @property
-    def no_resampling(self) -> bool:
-        """Whether no resampling is applied."""
-        return self.up == 1 and self.down == 1
-
-
-@dataclass(slots=True, frozen=True)
-class LoaderConfig:
-    """Base configuration dataclass for trajectory data processing.
-
-    All builder-style methods (`with_*`) return **new** instances, leaving the
-    original unchanged.  This makes configs safe to share, compare, serialise
-    and merge.
-    """
-
-    input_len: int
-    """Observation length in frames."""
-
-    output_len: int
-    """Prediction length in frames."""
-
-    sample_time: float
-    """Time interval between frames in seconds."""
-
-    resampling: Resampling | None = None
-    """Resampling config if applicable."""
-
-    window_params: WindowParams | None = None
-    """Used for datasets where multiple samples can be generated from a single
-    scene by using a sliding window approach. If None, it is assumed that each
-    scene corresponds to exactly one sample."""
-
-    scene_filtering: FilteringConfig | None = None
-    """Configuration for filtering scenes based on agent validity and scene composition."""
-
-    # -- builder helpers (return new frozen instances) -----------------------
-
-    def with_window(self, step_size: int, window_size: int | None = None) -> Self:
-        """Return a copy with the given window parameters.
-
-        Parameters
-        ----------
-        step_size : int
-            Number of frames to advance between consecutive windows.
-        window_size : int, optional
-            Total number of frames in each window. If None, defaults to
-            `input_len + output_len`.
-
-        Returns
-        -------
-        Self
-            A **new** config instance with window parameters set.
-
-        """
-        return replace(
-            self,
-            window_params=WindowParams(
-                window_size=window_size
-                if window_size is not None
-                else self.input_len + self.output_len,
-                step_size=step_size,
-            ),
-        )
-
-    def with_filtering(
-        self,
-        min_agents: int = 2,
-        *,
-        require_all_valid: bool = False,
-        require_prediction_frame: bool = True,
-        require_frames: Collection[int] | None = None,
-        filter_agent_category: Collection[AgentCategory] | None = None,
-        filter_slow_agents: float | None = None,
-    ) -> Self:
-        """Return a copy with the given scene-filtering parameters.
-
-        The inputs are passed into the `FilteringConfig` dataclass. Negative
-        indices are supported in *require_frames*, where `-1` refers to the
-        last frame of the sequence, `-2` to the second-to-last, etc.
-
-        Parameters
-        ----------
-        min_agents : int, optional
-            Minimum number of valid agents required in a scene. Defaults to 2.
-        require_all_valid : bool, optional
-            If True, all agents must have valid positions for every time step
-            (input and output). Defaults to False.
-        require_prediction_frame : bool, optional
-            If True, all agents must have a valid position at the first
-            prediction frame. Defaults to True.
-        require_frames : Collection[int], optional
-            Specific frame offsets (relative to scene start) that must be
-            present. Supports negative indices. Defaults to None.
-        filter_agent_category : Collection[AgentCategory], optional
-            Agent categories to exclude from scenes. Defaults to None.
-        filter_slow_agents : float, optional
-            Remove agents whose average speed (m/s) is below this threshold.
-            Defaults to None (no filtering).
-
-        Returns
-        -------
-        Self
-            A **new** config instance with scene-filtering parameters set.
-
-        """
-        if require_frames is not None:
-            require_frames = {
-                frame if frame > 0 else (self.input_len + self.output_len + frame)
-                for frame in require_frames
-            }
-
-        return replace(
-            self,
-            scene_filtering=FilteringConfig(
-                min_agents=min_agents,
-                require_all_valid=require_all_valid,
-                require_prediction_frame=require_prediction_frame,
-                require_frames=require_frames,
-                filter_agent_category=filter_agent_category,
-                filter_slow_agents=filter_slow_agents,
-            ),
-        )
-
-    def with_resampling(
-        self,
-        up: int,
-        down: int,
-        method: Literal["fast", "spline"] = "fast",
-    ) -> Self:
-        """Return a copy with the given resampling parameters.
-
-        Parameters
-        ----------
-        up : int
-            Upsampling factor.
-        down : int
-            Downsampling factor.
-        method : {"fast", "spline"}, optional
-            Resampling method to use. Defaults to `"fast"`.
-
-        Returns
-        -------
-        Self
-            A **new** config instance with resampling parameters set.
-
-        """
-        return replace(self, resampling=Resampling(up=up, down=down, method=method))
-
-
-T_Source = TypeVar("T_Source")
-T_Source_co = TypeVar("T_Source_co", covariant=True)
-T_ID = TypeVar("T_ID", bound=Hashable)
+SourceT = TypeVar("SourceT")
+SourceT_co = TypeVar("SourceT_co", covariant=True)
+IdT = TypeVar("IdT", bound=Hashable)
 P = ParamSpec("P")
 
 
 @dataclass(slots=True, frozen=True)
-class Source(Generic[T_ID, T_Source]):
+class Source(Generic[IdT, SourceT]):
     """Represents a raw data source for a scene, identified by a unique identifier."""
 
-    identifier: T_ID
+    identifier: IdT
     """Generic identifier for the source, e.g., file name, URL, database key."""
-    inner: T_Source
+    inner: SourceT
     """The actual source data, which can be of any type (e.g., file path, raw data)."""
     map_context: MapContext | None = None
     """Optional map context associated with the source.
@@ -291,16 +53,16 @@ class Source(Generic[T_ID, T_Source]):
     """Additional metadata associated with the source."""
 
 
-class SceneLoader(Protocol, Generic[T_ID]):
+class SceneLoader(Protocol, Generic[IdT]):
     """Minimal protocol for scene loading, used for type hinting."""
 
-    def scenes(self) -> Iterable[Scene[T_ID]]:
+    def scenes(self) -> Iterable[Scene[IdT]]:
         """Yield processed scenes one at a time."""
         ...
 
     def scenes_callback(
         self,
-        callback: Callable[Concatenate[Scene[T_ID], P], None],
+        callback: Callable[Concatenate[Scene[IdT], P], None],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
@@ -326,13 +88,39 @@ class SceneLoader(Protocol, Generic[T_ID]):
         ...
 
 
-class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
+class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     """ABC interface for processing raw data sources into a standardized format.
 
     Generic over the data scene source type and identifier type. Source type can
     be anything (e.g., file path, URL, database connection, raw data).
     Identifier type is used to unique identify each scene source (e.g., str,
     int).
+
+    Processing model
+    ----------------
+    Each source is processed through these stages:
+
+    1. **sources()** — discover raw data items.
+    2. **load_raw()** — ingest each source into `(LazyFrame, MapContext)`
+       pairs.
+    3. **pipeline()** — a composable :class:`~dronalize.core.pipeline.Pipeline`
+       of `LazyFrame → LazyFrame` transforms (filtering, resampling,
+       derivatives, windowing, …).
+    4. **create_scene()** — wrap the final DataFrame into a :class:`Scene`.
+
+    Subclasses **must** implement :meth:`sources`, :meth:`load_raw`, and
+    :meth:`default_config`.
+
+    For the processing step, subclasses can *either*:
+
+    * Override :meth:`pipeline` to return a composable
+      :class:`~dronalize.core.pipeline.Pipeline` (preferred), **or**
+    * Override :meth:`normalize` for simple 1:1 transforms (legacy).
+
+    If :meth:`pipeline` returns a non-empty pipeline, it is used and
+    :meth:`normalize` is ignored.  If :meth:`pipeline` returns an empty
+    pipeline, :meth:`normalize` is called as a fallback for backward
+    compatibility.
     """
 
     def __init__(
@@ -360,23 +148,23 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     # --- Abstract Steps (The "Blanks" to fill) ---
 
     @abstractmethod
-    def sources(self) -> Iterable[Source[T_ID, T_Source]]:
+    def sources(self) -> Iterable[Source[IdT, SourceT]]:
         """Discover and yield identifiers for each scene to process.
 
         Yields
         ------
-        Source[T_ID, T_Source]
+        Source[IdT, SourceT]
             Each raw data source to be processed.
 
         """
 
     @abstractmethod
-    def load_raw(self, source: Source[T_ID, T_Source]) -> Iterable[tuple[pl.LazyFrame, MapContext]]:
+    def load_raw(self, source: Source[IdT, SourceT]) -> Iterable[tuple[pl.LazyFrame, MapContext]]:
         """Read the raw data source into one or more DataFrame(s) (any schema).
 
         Parameters
         ----------
-        source : Source[T_ID, T_Source]
+        source : Source[IdT, SourceT]
             The raw data source to load.
 
         Yields
@@ -386,9 +174,14 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
 
         """
 
-    @abstractmethod
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         """Convert the raw DataFrame into the common schema.
+
+        .. deprecated::
+            Override :meth:`pipeline` instead.  This method is only called
+            as a fallback when :meth:`pipeline` returns an empty pipeline.
+
+        The default implementation is the identity (returns *df* unchanged).
 
         Parameters
         ----------
@@ -401,6 +194,47 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
             Normalized data frame following the common schema.
 
         """
+        return df
+
+    def pipeline(self) -> Pipeline:
+        """Return the composable processing pipeline for this loader.
+
+        The pipeline is a chain of :class:`~dronalize.core.pipeline.Transform`
+        (1:1) and :class:`~dronalize.core.pipeline.FanOut` (1:N) steps that
+        are applied to every LazyFrame produced by :meth:`load_raw`.
+
+        The default implementation returns an **empty** pipeline, which
+        causes :meth:`process_next` to fall back to :meth:`normalize`.
+        Override this method to define a composable pipeline.
+
+        Returns
+        -------
+        Pipeline
+            The processing pipeline.  An empty pipeline triggers the
+            legacy :meth:`normalize` fallback.
+
+        Example
+        -------
+        ::
+
+            from dronalize.core.pipeline import Pipeline, transforms as T
+
+            def pipeline(self) -> Pipeline:
+                return (
+                    Pipeline()
+                    .then(T.filter(self.loader_config))
+                    .then_flat_map(T.window(self.loader_config))
+                    .then(T.resample(
+                        self.loader_config,
+                        add_derivative=True,
+                        add_second_derivative=True,
+                        derivative_rename=self.derivative_names(),
+                    ))
+                    .then(T.yaw_from_vel())
+                )
+
+        """
+        return Pipeline()
 
     @classmethod
     @abstractmethod
@@ -420,7 +254,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     @override
     def scenes_callback(
         self,
-        callback: Callable[Concatenate[Scene[T_ID], P], None],
+        callback: Callable[Concatenate[Scene[IdT], P], None],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
@@ -464,18 +298,18 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         return None
 
     def process_next(
-        self, source: Source[T_ID, T_Source]
+        self, source: Source[IdT, SourceT]
     ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process a single data item through the pipeline.
 
-        Steps:
-
-        1. Load raw data for the source.
-        2. Normalize to common schema.
+        If :meth:`pipeline` returns a non-empty pipeline, each raw
+        LazyFrame is run through that pipeline (which may fan out into
+        multiple frames).  Otherwise, :meth:`normalize` is called as a
+        1:1 fallback.
 
         Parameters
         ----------
-        source : Source[T_ID, T_Source]
+        source : Source[IdT, SourceT]
             The source to process.
 
         Yields
@@ -484,23 +318,29 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
             Processed data frame and its associated map context.
 
         """
+        pipe = self.pipeline()
+        use_pipeline = bool(pipe)
 
-        def _step(raw_df: pl.LazyFrame) -> pl.DataFrame | None:
-            normalized_df = self.normalize(raw_df)
+        def _collect(lf: pl.LazyFrame) -> pl.DataFrame | None:
             try:
-                df = normalized_df.collect()
+                df = lf.collect()
             except ValueError:
-                # Error cases can be caused by:
-                # 1. Empty scenes (due to filtering or missing data)
                 return None
             return df if not df.is_empty() else None
 
         for raw_df, map_context in self.load_raw(source):
-            df = _step(raw_df)
-            if df is not None:
-                yield df, map_context
+            if use_pipeline:
+                for result_lf in pipe.run(raw_df):
+                    df = _collect(result_lf)
+                    if df is not None:
+                        yield df, map_context
+            else:
+                # Legacy path: single 1:1 normalize call
+                df = _collect(self.normalize(raw_df))
+                if df is not None:
+                    yield df, map_context
 
-    def scenes(self) -> Iterable[Scene[T_ID]]:
+    def scenes(self) -> Iterable[Scene[IdT]]:
         """Iterate over all sources and process them into scenes.
 
         This will lazy-load and process each source one at a time.
@@ -509,7 +349,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
 
         Yields
         ------
-        Scene[T_ID]
+        Scene[IdT]
             Processed scenes one at a time.
 
         """
@@ -520,9 +360,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
             for scene_df, map_context in self.process_next(source):
                 yield self.create_scene(scene_df, source.identifier, map_context)
 
-    def create_scene(
-        self, df: pl.DataFrame, source_id: T_ID, map_context: MapContext
-    ) -> Scene[T_ID]:
+    def create_scene(self, df: pl.DataFrame, source_id: IdT, map_context: MapContext) -> Scene[IdT]:
         """Create a Scene object from the processed DataFrame and source identifier.
 
         This method also calls `Scene.enforce_schema()` if
@@ -534,14 +372,14 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         ----------
         df : pl.DataFrame
             Processed DataFrame for the scene, expected to follow the common schema.
-        source_id : T_ID
+        source_id : IdT
             Identifier for the scene source (e.g., file name, index).
         map_context : MapContext
             Map context associated with the scene.
 
         Returns
         -------
-        Scene[T_ID]
+        Scene[IdT]
             The created scene object.
 
         """

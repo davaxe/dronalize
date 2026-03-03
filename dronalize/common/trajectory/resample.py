@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 from fractions import Fraction
 from typing import TYPE_CHECKING, Literal, cast, overload
@@ -25,10 +26,47 @@ class ResamplingMethod(StrEnum):
     SPLINE = "spline"
 
 
+@dataclass(slots=True, frozen=True)
+class Resampling:
+    """Configuration for resampling trajectories."""
+
+    up: int
+    """Upsampling factor."""
+    down: int
+    """Downsampling factor."""
+    method: ResamplingMethod = ResamplingMethod.FAST
+    """Method used for resampling."""
+
+    def __init__(
+        self,
+        up: int,
+        down: int,
+        method: Literal["fast", "spline"] | ResamplingMethod = ResamplingMethod.FAST,
+    ) -> None:
+        """Simplify the resampling ratio to its smallest integer ratio form."""
+        simplified_up, simplified_down = Fraction(up, down).as_integer_ratio()
+        if method == "fast":
+            method = ResamplingMethod.FAST
+        elif method == "spline":
+            method = ResamplingMethod.SPLINE
+        object.__setattr__(self, "up", simplified_up)
+        object.__setattr__(self, "down", simplified_down)
+        object.__setattr__(self, "method", method)
+
+    @property
+    def factors(self) -> tuple[int, int]:
+        """(up, down) resampling factors."""
+        return (self.up, self.down)
+
+    @property
+    def no_resampling(self) -> bool:
+        """Whether no resampling is applied."""
+        return self.up == 1 and self.down == 1
+
+
 def resample_tracks(
     data: T_DataFrame,
-    up: int,
-    down: int = 1,
+    resampling: Resampling,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
     group_by: str | Sequence[str] | None = None,
@@ -36,7 +74,6 @@ def resample_tracks(
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     dt: float = 1.0,
-    method: ResamplingMethod | Literal["fast", "spline"] = ResamplingMethod.FAST,
     derivative_rename: dict[int, list[str]] | None = None,
     forward_fill: Sequence[str] | None = None,
 ) -> T_DataFrame:
@@ -51,10 +88,8 @@ def resample_tracks(
     ----------
     data : T_DataFrame
         Input trajectory data in a Polars-compatible DataFrame format.
-    up : int
-        Upsampling factor. Increases the number of samples.
-    down : int, optional
-        Downsampling factor. Decreases the number of samples. Defaults to 1.
+    resampling : Resampling
+        Configuration specifying upsampling/downsampling factors and method.
     frame_column : str, optional
         Name of the column representing time or frame index. Defaults to "frame".
     pos_columns : Sequence[str], optional
@@ -72,10 +107,6 @@ def resample_tracks(
     dt : float, optional
         Time step between original frames, used to scale derivatives
         appropriately. Defaults to 1.0.
-    method : {"fast", "spline"}, optional
-        Resampling algorithm to use. "fast" performs standard interpolation;
-        "spline" uses cubic splines for smoother paths and more accurate
-        derivatives. Defaults to "fast".
     derivative_rename : dict[int, list[str]], optional
         Mapping to define custom names for the resulting derivative columns.
         Defaults to None.
@@ -89,6 +120,8 @@ def resample_tracks(
         requested derivatives.
 
     """
+    method = resampling.method
+    up, down = resampling.factors
     group_by = [group_by] if isinstance(group_by, str) else group_by
     if method in {"fast", ResamplingMethod.FAST}:
         resampled = _resample_dataframe(

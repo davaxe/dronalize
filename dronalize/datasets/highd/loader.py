@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -9,6 +8,8 @@ from dronalize.common.loaders.xlevel import XLevelDataLoader
 from dronalize.core import AgentCategory
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dronalize.core import LoaderConfig
 
 

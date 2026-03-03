@@ -7,10 +7,10 @@ from typing_extensions import override
 from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import resample_tracks
+from dronalize.common.trajectory.resample import Resampling, resample_tracks
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Resampling, Source
+from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
 # TODO: Currently the column "focal_agent_id" is disgarded and not used; might want to provide a way
 # to identify it downstream. Either implcitlty by assigning a specific id or explicitly by providing
@@ -90,7 +90,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         resampling = self.loader_config.resampling or Resampling(1, 1)
         source_filtered = source.inner.filter(
             filter_scene_expr(
-                self.loader_config,
+                *self.loader_config.filter_args(),
                 group_by=["file_id"],
                 category_column="agent_category",
             )
@@ -109,12 +109,10 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             source_resampled = yaw_from_vel(
                 resample_tracks(
                     source_filtered,
-                    resampling.up,
-                    resampling.down,
+                    resampling,
                     group_by=["file_id"],
                     add_derivative=True,
                     add_second_derivative=True,
-                    method=resampling.method,
                     dt=self.loader_config.sample_time,
                     derivative_rename=self.derivative_names(),
                     forward_fill=["agent_category"],

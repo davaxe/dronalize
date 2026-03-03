@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -13,6 +12,7 @@ from dronalize.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
 
 class AD4CHELoader(XLevelDataLoader):

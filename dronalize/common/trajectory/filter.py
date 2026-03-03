@@ -1,23 +1,78 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import polars as pl
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Collection, Sequence
 
     from dronalize.common.trajectory import T_DataFrame
-    from dronalize.core.protocols.loader import FilteringConfig, LoaderConfig
+    from dronalize.core.datatypes.categories import AgentCategory
 
 
 # TODO: Possibly add filter option based on minimum required valid frames in
 # input and output, respectively.
 
 
+@dataclass(slots=True, frozen=True)
+class FilteringConfig:
+    """Configuration for filtering scenes based on agent validity and scene composition."""
+
+    min_agents: int = 2
+    """Minimum number of agents required in a scene to be valid."""
+
+    require_all_valid: bool = False
+    """If True, requires all agents in a scene to have valid positions for all
+    time-steps (input and output)."""
+
+    require_prediction_frame: bool = True
+    """If True, requires all agents to have valid positions at the first prediction
+    frame."""
+
+    require_frames: frozenset[int] | None = None
+    """Specific frames offset required for the scene to be considered valid."""
+
+    filter_agent_category: frozenset[AgentCategory] | None = None
+    """Set of agent categories to filter out from scenes."""
+
+    filter_slow_agents: float | None = None
+    """Filter out agents with an average speed below this threshold."""
+
+    def __init__(
+        self,
+        min_agents: int = 2,
+        *,
+        require_all_valid: bool = False,
+        require_prediction_frame: bool = True,
+        require_frames: Collection[int] | None = None,
+        filter_agent_category: Collection[AgentCategory] | None = None,
+        filter_slow_agents: float | None = None,
+    ) -> None:
+        """Initialize and normalise collections to frozensets."""
+        object.__setattr__(self, "min_agents", min_agents)
+        object.__setattr__(self, "require_all_valid", require_all_valid)
+        object.__setattr__(self, "require_prediction_frame", require_prediction_frame)
+        object.__setattr__(
+            self,
+            "require_frames",
+            frozenset(require_frames) if require_frames is not None else None,
+        )
+        object.__setattr__(
+            self,
+            "filter_agent_category",
+            frozenset(filter_agent_category) if filter_agent_category is not None else None,
+        )
+        object.__setattr__(self, "filter_slow_agents", filter_slow_agents)
+
+
 def filter_scene(
     data: T_DataFrame,
-    config: LoaderConfig,
+    config: FilteringConfig | None,
+    input_len: int,
+    output_len: int,
+    sample_time: float = 1.0,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
@@ -29,8 +84,8 @@ def filter_scene(
     ----------
     data : T_DataFrame
         Input DataFrame containing trajectory data.
-    config : LoaderConfig
-        LoaderConfig object with filtering criteria.
+    config : FilteringConfig
+        FilteringConfig object with criteria for scene filtering.
     group_by : str or Sequence[str], optional
         Column name to group by. Each group will be considered an independent scene.
     agent_id : str, optional
@@ -48,6 +103,9 @@ def filter_scene(
     """
     filter_expr = filter_scene_expr(
         config=config,
+        input_len=input_len,
+        output_len=output_len,
+        sample_time=sample_time,
         group_by=group_by,
         agent_id=agent_id,
         frame_column=frame_column,
@@ -57,7 +115,10 @@ def filter_scene(
 
 
 def filter_scene_expr(
-    config: LoaderConfig,
+    config: FilteringConfig | None,
+    input_len: int,
+    output_len: int,
+    sample_time: float = 1.0,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
@@ -90,10 +151,10 @@ def filter_scene_expr(
         Expression for filtering scenes based on the configuration.
 
     """
-    if config.scene_filtering is None:
+    if config is None:
         return pl.lit(value=True)
 
-    filtering: FilteringConfig = config.scene_filtering
+    filtering: FilteringConfig = config
     group_by_list = [group_by] if isinstance(group_by, str) else list(group_by or [])
 
     # Define Windows
@@ -118,22 +179,20 @@ def filter_scene_expr(
             set(filtering.filter_agent_category), category_column
         )
 
-    agent_validity &= _check_input_overlap(
-        scene_start_frame, config.input_len, frame_column, agent_window
-    )
+    agent_validity &= _check_input_overlap(scene_start_frame, input_len, frame_column, agent_window)
 
     if filtering.require_prediction_frame:
         agent_validity &= _check_prediction_frame(
-            scene_start_frame, config.input_len, frame_column, agent_window
+            scene_start_frame, input_len, frame_column, agent_window
         )
 
     if filtering.require_all_valid:
-        total_len = config.input_len + config.output_len
+        total_len = input_len + output_len
         agent_validity &= _check_full_length(total_len, agent_window)
 
     if filtering.filter_slow_agents is not None:
         agent_validity &= _check_slow_agents(
-            filtering.filter_slow_agents, config.sample_time, x_column, y_column, agent_window
+            filtering.filter_slow_agents, sample_time, x_column, y_column, agent_window
         )
 
     conditions.append(agent_validity)
