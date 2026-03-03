@@ -59,10 +59,12 @@ class Argoverse1Map:
         # Mapping from original ID in the XML to new ID in the graph. This makes
         # it easier to add additional nodes without worrying about ID conflicts.
         id_map: dict[int, int] = {}
+        next_id = 0
         for child in root:
             if child.tag == "node":
                 base_node = Node.from_xml_element(child)
-                node = IntIDNode(base_node.x, base_node.y)
+                node = IntIDNode(next_id, base_node.x, base_node.y)
+                next_id += 1
                 id_map[base_node.id] = node.id
                 all_graph_nodes[node.id] = node
             elif child.tag == "way":
@@ -217,12 +219,3 @@ class LaneSegment:
             successors=[],
             predecessors=[],
         )
-
-
-if __name__ == "__main__":
-    # Example usage
-    xml_file_path = Path(
-        "data/pruned_argoverse_MIA_10316_vector_map.xml",
-    )
-    argo_map = Argoverse1Map(xml_file_path)
-    argo_map.parse()

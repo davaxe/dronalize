@@ -31,7 +31,7 @@ from dronalize.core.protocols.map_object import BaseEnum
 from dronalize.datasets.lyft.protos import road_network_pb2 as proto
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
 
 class LyftLVL5Map:
@@ -48,6 +48,8 @@ class LyftLVL5Map:
 
     def __init__(self, protobuf_map_path: Path, meta_json: Path) -> None:
         """Initialize the LyftLVL5Map with the given protobuf map and meta JSON."""
+        self._node_counter: int = 0
+
         with Path.open(protobuf_map_path, "rb") as file:
             map_fragment = proto.MapFragment()
             map_fragment.ParseFromString(file.read())
@@ -60,6 +62,12 @@ class LyftLVL5Map:
         )
         self.elements = map_fragment.elements
 
+    def next_node_id(self) -> int:
+        """Return the next unique node ID and advance the counter."""
+        node_id = self._node_counter
+        self._node_counter += 1
+        return node_id
+
     @cached_property
     def lanes(self) -> dict[str, Lane]:
         """Get all lanes in the map."""
@@ -70,6 +78,7 @@ class LyftLVL5Map:
                 lane_id,
                 el.element.lane,
                 transformation=self.ecef_to_world,
+                id_factory=self.next_node_id,
             )
             lanes[_global_id_to_str(el.id)] = lane
 
@@ -97,6 +106,7 @@ class LyftLVL5Map:
                 element = TrafficControlElement.from_proto_traffic_control_element(
                     el.element.traffic_control_element,
                     transformation=self.ecef_to_world,
+                    id_factory=self.next_node_id,
                 )
                 elements[_global_id_to_str(el.id)] = element
 
@@ -424,6 +434,8 @@ class LaneBoundary:
         boundary: proto.Lane.Boundary,
         frame: proto.GeoFrame,
         transformation: npt.NDArray[np.float32] | None = None,
+        *,
+        id_factory: Callable[[], int],
     ) -> LaneBoundary:
         """Create a `LaneBoundary` instance from a `Lane` protobuf message."""
         cm_to_m: float = 0.01
@@ -438,7 +450,7 @@ class LaneBoundary:
 
         return cls(
             lane_types=lane_types,
-            nodes=_parse_nodes(dx, dy, dz, frame, transformation),
+            nodes=_parse_nodes(dx, dy, dz, frame, transformation, id_factory=id_factory),
             type_change_distances=type_change_distances or None,
         )
 
@@ -549,6 +561,8 @@ class Lane:
         lane_id: str,
         lane: proto.Lane,
         transformation: npt.NDArray[np.float32] | None = None,
+        *,
+        id_factory: Callable[[], int],
     ) -> Lane:
         """Create a `Lane` instance from a protobuf message."""
         return cls(
@@ -560,11 +574,13 @@ class Lane:
                 lane.left_boundary,
                 lane.geo_frame,
                 transformation,
+                id_factory=id_factory,
             ),
             right_boundary=LaneBoundary.from_proto_lane_boundary(
                 lane.right_boundary,
                 lane.geo_frame,
                 transformation,
+                id_factory=id_factory,
             ),
             travel_direction=TravelDirection.from_int(
                 lane.orientation_in_parent_segment,
@@ -627,6 +643,8 @@ class TrafficControlElement:
         cls,
         element: proto.TrafficControlElement,
         transformation: npt.NDArray[np.float32] | None = None,
+        *,
+        id_factory: Callable[[], int],
     ) -> TrafficControlElement:
         """Create a `TrafficControlElement` instance from a protobuf message."""
         cm_to_m = 0.01
@@ -637,7 +655,9 @@ class TrafficControlElement:
         if not dx or not dy or not dz:
             nodes = None
         else:
-            nodes = _parse_nodes(dx, dy, dz, element.geo_frame, transformation)
+            nodes = _parse_nodes(
+                dx, dy, dz, element.geo_frame, transformation, id_factory=id_factory
+            )
 
         return cls(
             control_element_type=cls._solve_type(element),
@@ -680,6 +700,8 @@ def _parse_nodes(
     dz: Sequence[float],
     frame: proto.GeoFrame,
     transformation: npt.NDArray[np.float32] | None = None,
+    *,
+    id_factory: Callable[[], int],
 ) -> list[IntIDNode]:
     if not dx or not dy or not dz:
         return []
@@ -692,6 +714,7 @@ def _parse_nodes(
 
     return [
         IntIDNode(
+            id_factory(),
             *transform(xi, yi, zi, lat, lon, transformation),
         )
         for xi, yi, zi in zip(x, y, z, strict=True)
@@ -772,15 +795,3 @@ def _enu_to_uvw(
     u = cos_lon * t - sin_lon * east
     v = sin_lon * t + cos_lon * east
     return u, v, w
-
-
-if __name__ == "__main__":
-    root = Path(__file__).parent.parent.parent.parent.parent
-    map_path = root / "datasets" / "lyftlvl5" / "semantic_map" / "semantic_map.pb"
-    meta_path = root / "datasets" / "lyftlvl5" / "semantic_map" / "meta.json"
-    lyft_map = LyftLVL5Map(map_path, meta_path)
-    print(f"Loaded {len(lyft_map.lanes)} lanes")
-    print(f"Loaded {len(lyft_map.road_network_segments)} road network segments")
-    print(f"Loaded {len(lyft_map.traffic_control_elements)} traffic control elements")
-    print(f"Loaded {len(lyft_map.road_network_nodes)} road network nodes")
-    print(f"Loaded {len(lyft_map.junctions)} junctions")

@@ -53,7 +53,7 @@ class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
     @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
+        return IntIDNode(self.next_node_id(), x, y, z)
 
     @override
     def build_impl(
@@ -105,17 +105,3 @@ class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
                     boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)
                 ],
             )
-
-
-if __name__ == "__main__":
-    import time
-
-    base = Path("/home/west/Developer/behavior-prediction/datasets/lyft/semantic_map")
-    map_path = base / "semantic_map.pb"
-    meta_path = base / "meta.json"
-    start_time = time.perf_counter()
-    map_builder = LyftMapGraphBuilder.from_files(map_path, meta_path)
-    map_graph = map_builder.build(interp_distance=3, min_distance=1)
-
-
-# previous results:MapGraph(num_nodes=228860, num_edges=216920, node_positions_shape=torch.Size([228860, 2]), edge_indices_shape=torch.Size([2, 216920]))

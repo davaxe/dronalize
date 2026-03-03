@@ -128,9 +128,10 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return df
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(50, 60, 0.1).scene_filtering_parameters(
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(50, 60, 0.1).with_filtering(
             filter_agent_category=[
                 AgentCategory.STATIC_OBJECT,
                 AgentCategory.UNKNOWN,
@@ -155,20 +156,3 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         return pl.col(col).replace_strict(
             mapping, default=AgentCategory.UNKNOWN, return_dtype=pl.Int32
         )
-
-
-if __name__ == "__main__":
-    data_dir = Path("/home/west/Developer/behavior-prediction/datasets/av2/train")
-    file_batch_size = 100
-    processor = Argoverse2Loader(data_dir, file_batch_size)
-    count: int = 0
-    import time
-
-    start_time = time.perf_counter()
-    for scene in processor.scenes():
-        count += 1
-        if count % 200 == 0:
-            print(scene.map_context)
-            print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f} seconds")
-
-    print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f} seconds")

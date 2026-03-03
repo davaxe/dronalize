@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from fractions import Fraction
 from typing import TYPE_CHECKING, Literal, cast, overload
 
@@ -16,6 +17,14 @@ if TYPE_CHECKING:
     from dronalize.common.trajectory import T_DataFrame
 
 
+class ResamplingMethod(StrEnum):
+    """Enumeration of resampling methods for trajectory data."""
+
+    FAST = "fast"
+
+    SPLINE = "spline"
+
+
 def resample_tracks(
     data: T_DataFrame,
     up: int,
@@ -27,7 +36,7 @@ def resample_tracks(
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     dt: float = 1.0,
-    method: Literal["fast", "spline"] = "fast",
+    method: ResamplingMethod | Literal["fast", "spline"] = ResamplingMethod.FAST,
     derivative_rename: dict[int, list[str]] | None = None,
     forward_fill: Sequence[str] | None = None,
 ) -> T_DataFrame:
@@ -81,7 +90,7 @@ def resample_tracks(
 
     """
     group_by = [group_by] if isinstance(group_by, str) else group_by
-    if method == "fast":
+    if method in {"fast", ResamplingMethod.FAST}:
         resampled = _resample_dataframe(
             data=data,
             up=up,

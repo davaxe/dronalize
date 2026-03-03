@@ -59,6 +59,18 @@ class Scene(Generic[T_ID]):
             inner=self.inner.select([pl.col(name).cast(dtype) for name, dtype in schema.items()]),
         )
 
+    def __repr__(self) -> str:
+        """Return a compact representation with metadata and DataFrame shape."""
+        rows, cols = self.inner.shape
+        return (
+            f"Scene(identifier={self.identifier!r}, "
+            f"scene_number={self.scene_number}, "
+            f"input_len={self.input_len}, "
+            f"output_len={self.output_len}, "
+            f"map_context={self.map_context!r}, "
+            f"inner=DataFrame({rows} rows x {cols} cols))"
+        )
+
     @staticmethod
     def _base_schema() -> pl.Schema:
         return pl.Schema({

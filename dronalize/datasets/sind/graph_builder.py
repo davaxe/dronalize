@@ -92,18 +92,3 @@ class SindGraphBuilder(OSMMapGraphBuilder):
         # Clear element from memory once processed
         elem.clear()
         root.clear()
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    import altair as alt
-
-    alt.renderers.enable("browser")
-    from dronalize.common.plotting import plot_map_graph
-
-    graph_builder = SindGraphBuilder(
-        Path("/home/west/Developer/behavior-prediction/datasets/SIND/maps/Changchun_Pudong.osm")
-    )
-    graph = graph_builder.build()
-    plot_map_graph(graph).show()

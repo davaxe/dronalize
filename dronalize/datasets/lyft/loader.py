@@ -36,27 +36,27 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
 
     def __init__(
         self,
-        zarr_path: Path | str,
+        data_dir: Path | str,
         scene_batch_size: int | None = 1000,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the processor.
 
         Parameters
         ----------
-        zarr_path : Path or str
+        data_dir : Path or str
             Path to the Zarr dataset directory.
         scene_batch_size : int, optional
             Number of scenes to load in each batch. Higher batch size may lead
             to faster processing at diminishing returns, but also higher memory
             usage. `None` is not recommended for large amounts of data.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration override. If None, the default
             configuration will be used.
 
         """
-        super().__init__(loader_config=config, enforce_schema=True)
-        self._zarr_path = Path(zarr_path)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
+        self._zarr_path = Path(data_dir)
         self._scenes: Array = open_array(self._zarr_path / "scenes", mode="r")
         self._frames: Array = open_array(self._zarr_path / "frames", mode="r")
         self._agents: Array = open_array(self._zarr_path / "agents", mode="r")
@@ -122,16 +122,17 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df, yaw_col="yaw")
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
+    def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(
                 input_len=20,
                 output_len=50,
                 sample_time=0.1,
             )
-            .window_parameters(step_size=20)
-            .scene_filtering_parameters(
+            .with_window(step_size=20)
+            .with_filtering(
                 min_agents=1,
                 require_prediction_frame=True,
                 filter_agent_category={AgentCategory.UNIMPORTANT},
@@ -254,21 +255,3 @@ def _scene_to_polars(
         "agent_category": agent_categories,
     })
     return scene.scene_name, pl.concat([ego_df, agent_df])
-
-
-if __name__ == "__main__":
-    import time
-
-    start_time = time.time()
-    directory = Path(
-        "/home/west/Developer/behavior-prediction/datasets/lyft/validate/validate.zarr"
-    )
-    directory = Path("data/sample/sample.zarr")
-    processor = LyftLoader(directory, 100)
-    _total_scenes = 194608
-    count = 0
-    for _scene in processor.scenes():
-        if count % 1000 == 0:
-            print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds.")
-        count += 1
-    print(f"Processed {count} scenes in {time.time() - start_time:.2f} seconds.")

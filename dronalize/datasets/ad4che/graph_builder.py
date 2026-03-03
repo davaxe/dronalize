@@ -50,7 +50,7 @@ class AD4CHEGraphBuilder(GraphBuilder[int, IntIDNode]):
 
     @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
+        return IntIDNode(self.next_node_id(), x, y, z)
 
     @override
     def build_impl(
@@ -78,7 +78,7 @@ class AD4CHEGraphBuilder(GraphBuilder[int, IntIDNode]):
                 nodes = [self.new_node(float(pt[0]), -float(pt[1])) for pt in coords]
 
                 self.add_path_lazy(
-                    nodes=nodes, edge_type=EdgeType.LINE_THIN_DASHED, is_polygon=False
+                    nodes=nodes, edge_type=EdgeType.LINE_THICK_DASHED, is_polygon=False
                 )
 
 
@@ -101,16 +101,3 @@ def _spatial_downsample_polyline(
             filtered.append(pt)
 
     return np.array(filtered)
-
-
-if __name__ == "__main__":
-    import altair as alt
-
-    from dronalize.common.plotting.map import plot_map_graph
-
-    alt.renderers.enable("browser")
-    # Example usage
-    graph_builder = AD4CHEGraphBuilder(Path("data/ad4che/DJI_0001/01_laneWidthColorAndID.png"))
-    graph = graph_builder.build()
-    print(graph)
-    plot_map_graph(graph, width=1200, height=800, include_nodes=True).show()

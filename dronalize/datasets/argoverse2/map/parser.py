@@ -19,11 +19,14 @@ from dataclasses import dataclass, field
 from enum import auto
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dronalize.core.datatypes.categories import EdgeType
 from dronalize.core.graph.nodes import IntIDNode
-from dronalize.core.protocols.map_object import BaseEnum, BaseMapObject
+from dronalize.core.protocols.map_object import BaseEnum
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class Argoverse2Map:
@@ -32,8 +35,15 @@ class Argoverse2Map:
     def __init__(self, json_file: Path) -> None:
         """Initialize the Argoverse2Map with a JSON file."""
         self.json_file: Path = json_file
+        self._node_counter: int = 0
         with Path.open(json_file, "r") as file:
             self.json_data: dict[str, Any] = json.load(file)
+
+    def next_node_id(self) -> int:
+        """Return the next unique node ID and advance the counter."""
+        node_id = self._node_counter
+        self._node_counter += 1
+        return node_id
 
     @cached_property
     def segments(self) -> dict[int, LaneSegment]:
@@ -42,7 +52,10 @@ class Argoverse2Map:
             "lane_segments",
             [],
         )
-        return {segment["id"]: LaneSegment.from_dict(segment) for segment in segments_data.values()}
+        return {
+            segment["id"]: LaneSegment.from_dict(segment, id_factory=self.next_node_id)
+            for segment in segments_data.values()
+        }
 
     @cached_property
     def pedestrian_crossings(self) -> dict[int, PedestrianCrossing]:
@@ -52,7 +65,7 @@ class Argoverse2Map:
             [],
         )
         return {
-            crossing["id"]: PedestrianCrossing.from_dict(crossing)
+            crossing["id"]: PedestrianCrossing.from_dict(crossing, id_factory=self.next_node_id)
             for crossing in crossings_data.values()
         }
 
@@ -63,7 +76,10 @@ class Argoverse2Map:
             "drivable_areas",
             [],
         )
-        return {area["id"]: DrivableArea.from_dict(area) for area in areas_data.values()}
+        return {
+            area["id"]: DrivableArea.from_dict(area, id_factory=self.next_node_id)
+            for area in areas_data.values()
+        }
 
 
 class LaneType(BaseEnum):
@@ -102,12 +118,18 @@ class LaneBoundary:
     nodes: list[IntIDNode]
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], *, left: bool) -> LaneBoundary:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        left: bool,
+        id_factory: Callable[[], int],
+    ) -> LaneBoundary:
         """Create a `LaneBoundary` instance from a dictionary."""
         boundary_key = "left_lane_boundary" if left else "right_lane_boundary"
         type_key = "left_lane_mark_type" if left else "right_lane_mark_type"
 
-        nodes = [IntIDNode(**node) for node in data[boundary_key]]
+        nodes = [IntIDNode(id_factory(), **node) for node in data[boundary_key]]
         return cls(
             lane_type=LaneBoundaryType.from_str(data[type_key]),
             nodes=nodes,
@@ -139,7 +161,7 @@ _BOUNDARY_TO_EDGE_TYPE = {
 
 
 @dataclass
-class LaneSegment(BaseMapObject[int]):
+class LaneSegment:
     """Represents a lane segment in the Argoverse2 map."""
 
     id: int
@@ -152,7 +174,7 @@ class LaneSegment(BaseMapObject[int]):
     left_neighbor_id: int | None = None
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> LaneSegment:
+    def from_dict(cls, data: dict[str, Any], *, id_factory: Callable[[], int]) -> LaneSegment:
         """Create a `LaneSegment` instance from a dictionary."""
         segment = cls(
             id=data["id"],
@@ -162,9 +184,9 @@ class LaneSegment(BaseMapObject[int]):
         )
 
         if "left_lane_boundary" in data:
-            segment.left_boundary = LaneBoundary.from_dict(data, left=True)
+            segment.left_boundary = LaneBoundary.from_dict(data, left=True, id_factory=id_factory)
         if "right_lane_boundary" in data:
-            segment.right_boundary = LaneBoundary.from_dict(data, left=False)
+            segment.right_boundary = LaneBoundary.from_dict(data, left=False, id_factory=id_factory)
 
         segment.successors = data.get("successors", [])
         segment.predecessors = data.get("predecessors", [])
@@ -173,7 +195,7 @@ class LaneSegment(BaseMapObject[int]):
 
 
 @dataclass
-class PedestrianCrossing(BaseMapObject[int]):
+class PedestrianCrossing:
     """Represents a pedestrian crossing in the Argoverse2 map."""
 
     id: int
@@ -181,26 +203,28 @@ class PedestrianCrossing(BaseMapObject[int]):
     second_edge: list[IntIDNode]
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PedestrianCrossing:
+    def from_dict(
+        cls, data: dict[str, Any], *, id_factory: Callable[[], int]
+    ) -> PedestrianCrossing:
         """Create a `PedestrianCrossing` instance from a dictionary."""
         return cls(
             id=data["id"],
-            first_edge=[IntIDNode(**node) for node in data["edge1"]],
-            second_edge=[IntIDNode(**node) for node in data["edge2"]],
+            first_edge=[IntIDNode(id_factory(), **node) for node in data["edge1"]],
+            second_edge=[IntIDNode(id_factory(), **node) for node in data["edge2"]],
         )
 
 
 @dataclass
-class DrivableArea(BaseMapObject[int]):
+class DrivableArea:
     """Represents a drivable area in the Argoverse2 map."""
 
     id: int
     boundary: list[IntIDNode] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DrivableArea:
+    def from_dict(cls, data: dict[str, Any], *, id_factory: Callable[[], int]) -> DrivableArea:
         """Create a `DrivableArea` instance from a dictionary."""
         return cls(
             id=data["id"],
-            boundary=[IntIDNode(**node) for node in data["area_boundary"]],
+            boundary=[IntIDNode(id_factory(), **node) for node in data["area_boundary"]],
         )

@@ -44,7 +44,7 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
 
     @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
+        return IntIDNode(self.next_node_id(), x, y, z)
 
     @override
     def build_impl(

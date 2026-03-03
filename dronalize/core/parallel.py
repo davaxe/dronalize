@@ -216,6 +216,8 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
             Processed scenes one at a time.
 
         """
+        self._mp_scene_counter.value = 0
+        self._mp_source_counter.value = 0
         with (
             tqdm.tqdm(**self._tqdm_args()) as progress_bar,
             mp.Pool(
@@ -278,6 +280,8 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
             top level of a module.
 
         """
+        self._mp_scene_counter.value = 0
+        self._mp_source_counter.value = 0
         loader = self._inner
         with (
             tqdm.tqdm(**self._tqdm_args()) as progress_bar,

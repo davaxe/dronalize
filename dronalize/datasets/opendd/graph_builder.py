@@ -28,7 +28,7 @@ from dronalize.core import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
 
 class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
@@ -69,7 +69,7 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
     @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
+        return IntIDNode(self.next_node_id(), x, y, z)
 
     @override
     def build_impl(
@@ -91,7 +91,7 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         self.cursor.execute(f"SELECT * FROM {map_table}")  # noqa: S608
         rows = self.cursor.fetchall()
         for row in rows:
-            map_data_row = MapDataRow.try_from_row(row)
+            map_data_row = MapDataRow.try_from_row(row, id_factory=self.next_node_id)
             if map_data_row is None:
                 continue
 
@@ -119,7 +119,7 @@ class Geometry(Protocol):
     _coordinates: list[IntIDNode]
 
     @classmethod
-    def from_str(cls, geometry_str: str) -> Self:
+    def from_str(cls, geometry_str: str, *, id_factory: Callable[[], int]) -> Self:
         """Create a Geometry object from a string representation."""
         ...
 
@@ -139,7 +139,7 @@ class LineString(Geometry):
     _coordinates: list[IntIDNode]
 
     @classmethod
-    def from_str(cls, geometry_str: str) -> LineString:
+    def from_str(cls, geometry_str: str, *, id_factory: Callable[[], int]) -> LineString:
         """Create a LineString object from a string representation."""
         # Format: LINESTRING (x1 y1, x2 y2, ..., xn yn )
         if not geometry_str.startswith("LINESTRING"):
@@ -149,7 +149,10 @@ class LineString(Geometry):
         coords_str = geometry_str[len("LINESTRING (") : -1]
         coords = coords_str.split(", ")
         return cls(
-            [IntIDNode(float(coord.split()[0]), float(coord.split()[1])) for coord in coords],
+            [
+                IntIDNode(id_factory(), float(coord.split()[0]), float(coord.split()[1]))
+                for coord in coords
+            ],
         )
 
     def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
@@ -165,7 +168,7 @@ class Polygon(Geometry):
     _coordinates: list[IntIDNode]
 
     @classmethod
-    def from_str(cls, geometry_str: str) -> Polygon:
+    def from_str(cls, geometry_str: str, *, id_factory: Callable[[], int]) -> Polygon:
         """Create a Polygon object from a string representation."""
         # Format: POLYGON ((x1 y1, x2 y2, ..., xn yn))
         if not geometry_str.startswith("POLYGON"):
@@ -175,7 +178,8 @@ class Polygon(Geometry):
         coords_str = geometry_str[len("POLYGON ((") : -2]
         coords = coords_str.split(", ")
         nodes = [
-            IntIDNode(float(coord.split()[0]), float(coord.split()[1])) for coord in coords[:-1]
+            IntIDNode(id_factory(), float(coord.split()[0]), float(coord.split()[1]))
+            for coord in coords[:-1]
         ]
         return cls(nodes)
 
@@ -203,7 +207,9 @@ class MapDataRow:
     area_type: str | None
 
     @classmethod
-    def try_from_row(cls, row: tuple[Any, ...]) -> MapDataRow | None:
+    def try_from_row(
+        cls, row: tuple[Any, ...], *, id_factory: Callable[[], int]
+    ) -> MapDataRow | None:
         """Try to create a MapDataRow from a database row.
 
         Returns None if the row is invalid or missing required fields.
@@ -213,7 +219,7 @@ class MapDataRow:
                 row[0],
                 row[1],
                 row[2],
-                MapDataRow._parse_geometry(row[3]),
+                MapDataRow._parse_geometry(row[3], id_factory=id_factory),
                 MapDataRow._parse_str_list(row[4]),
                 MapDataRow._parse_str_list(row[5]),
                 row[6],
@@ -245,13 +251,13 @@ class MapDataRow:
         return [int(float(x.strip())) for x in value.split(",")]
 
     @staticmethod
-    def _parse_geometry(geometry_str: str) -> Geometry:
+    def _parse_geometry(geometry_str: str, *, id_factory: Callable[[], int]) -> Geometry:
         """Parse a geometry string into a Geometry object."""
         if geometry_str.startswith("LINESTRING"):
-            return LineString.from_str(geometry_str)
+            return LineString.from_str(geometry_str, id_factory=id_factory)
 
         if geometry_str.startswith("POLYGON"):
-            return Polygon.from_str(geometry_str)
+            return Polygon.from_str(geometry_str, id_factory=id_factory)
         # Add more geometry types as needed
         msg = f"Unsupported geometry type: {geometry_str}"
         raise ValueError(msg)

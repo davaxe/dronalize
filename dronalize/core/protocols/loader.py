@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Hashable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from typing import (
     TYPE_CHECKING,
@@ -18,6 +18,7 @@ from typing import (
 
 from typing_extensions import override
 
+from dronalize.common.trajectory.resample import ResamplingMethod
 from dronalize.core.datatypes.scene import Scene
 
 if TYPE_CHECKING:
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from dronalize.core.datatypes.map_context import MapContext
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FilteringConfig:
     """Configuration for filtering scenes based on agent validity and scene composition."""
 
@@ -42,26 +43,43 @@ class FilteringConfig:
     """If True, requires all agents to have valid positions at the first prediction
     frame."""
 
-    require_frames: Collection[int] | None = None
+    require_frames: frozenset[int] | None = None
     """Specific frames offset required for the scene to be considered valid."""
 
-    filter_agent_category: Collection[AgentCategory] | None = None
+    filter_agent_category: frozenset[AgentCategory] | None = None
     """Set of agent categories to filter out from scenes."""
 
     filter_slow_agents: float | None = None
     """Filter out agents with an average speed below this threshold."""
 
-    def __post_init__(self) -> None:
-        """Convert to set(s) to avoid duplicates."""
-        if self.filter_agent_category is not None and not isinstance(
-            self.filter_agent_category, set
-        ):
-            self.filter_agent_category = set(self.filter_agent_category)
-        if self.require_frames is not None and not isinstance(self.require_frames, set):
-            self.require_frames = set(self.require_frames)
+    def __init__(
+        self,
+        min_agents: int = 2,
+        *,
+        require_all_valid: bool = False,
+        require_prediction_frame: bool = True,
+        require_frames: Collection[int] | None = None,
+        filter_agent_category: Collection[AgentCategory] | None = None,
+        filter_slow_agents: float | None = None,
+    ) -> None:
+        """Initialize and normalise collections to frozensets."""
+        object.__setattr__(self, "min_agents", min_agents)
+        object.__setattr__(self, "require_all_valid", require_all_valid)
+        object.__setattr__(self, "require_prediction_frame", require_prediction_frame)
+        object.__setattr__(
+            self,
+            "require_frames",
+            frozenset(require_frames) if require_frames is not None else None,
+        )
+        object.__setattr__(
+            self,
+            "filter_agent_category",
+            frozenset(filter_agent_category) if filter_agent_category is not None else None,
+        )
+        object.__setattr__(self, "filter_slow_agents", filter_slow_agents)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class WindowParams:
     """Configuration for sliding window sampling of scenes."""
 
@@ -72,7 +90,7 @@ class WindowParams:
     """Number of frames to skip between windows."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Resampling:
     """Configuration for resampling trajectories."""
 
@@ -80,12 +98,20 @@ class Resampling:
     """Upsampling factor."""
     down: int
     """Downsampling factor."""
-    method: Literal["fast", "spline"] = "fast"
+    method: ResamplingMethod = ResamplingMethod.FAST
     """Method used for resampling."""
 
-    def __post_init__(self) -> None:
+    def __init__(
+        self,
+        up: int,
+        down: int,
+        method: Literal["fast", "spline"] = "fast",
+    ) -> None:
         """Simplify the resampling ratio to its smallest integer ratio form."""
-        self.up, self.down = Fraction(self.up, self.down).as_integer_ratio()
+        simplified_up, simplified_down = Fraction(up, down).as_integer_ratio()
+        object.__setattr__(self, "up", simplified_up)
+        object.__setattr__(self, "down", simplified_down)
+        object.__setattr__(self, "method", method)
 
     @property
     def factors(self) -> tuple[int, int]:
@@ -98,12 +124,13 @@ class Resampling:
         return self.up == 1 and self.down == 1
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class LoaderConfig:
     """Base configuration dataclass for trajectory data processing.
 
-    This can be extended by specific dataset processors to include additional
-    parameters.
+    All builder-style methods (``with_*``) return **new** instances, leaving the
+    original unchanged.  This makes configs safe to share, compare, serialise
+    and merge.
     """
 
     input_len: int
@@ -126,8 +153,10 @@ class LoaderConfig:
     scene_filtering: FilteringConfig | None = None
     """Configuration for filtering scenes based on agent validity and scene composition."""
 
-    def window_parameters(self, step_size: int, window_size: int | None = None) -> Self:
-        """Set the window parameters for sliding window sampling.
+    # -- builder helpers (return new frozen instances) -----------------------
+
+    def with_window(self, step_size: int, window_size: int | None = None) -> Self:
+        """Return a copy with the given window parameters.
 
         Parameters
         ----------
@@ -135,23 +164,25 @@ class LoaderConfig:
             Number of frames to advance between consecutive windows.
         window_size : int, optional
             Total number of frames in each window. If None, defaults to
-            `input_len + output_len`.
+            ``input_len + output_len``.
 
         Returns
         -------
         Self
-            The config instance with window parameters set.
+            A **new** config instance with window parameters set.
 
         """
-        self.window_params = WindowParams(
-            window_size=window_size
-            if window_size is not None
-            else self.input_len + self.output_len,
-            step_size=step_size,
+        return replace(
+            self,
+            window_params=WindowParams(
+                window_size=window_size
+                if window_size is not None
+                else self.input_len + self.output_len,
+                step_size=step_size,
+            ),
         )
-        return self
 
-    def scene_filtering_parameters(
+    def with_filtering(
         self,
         min_agents: int = 2,
         *,
@@ -161,11 +192,11 @@ class LoaderConfig:
         filter_agent_category: Collection[AgentCategory] | None = None,
         filter_slow_agents: float | None = None,
     ) -> Self:
-        """Set the scene filtering parameters.
+        """Return a copy with the given scene-filtering parameters.
 
-        The inputs are passed into the `FilteringConfig` dataclass. Negative
-        indices are supported in `require_frames`, where -1 refers to the
-        last frame of the sequence, -2 to the second-to-last, etc.
+        The inputs are passed into the ``FilteringConfig`` dataclass. Negative
+        indices are supported in *require_frames*, where ``-1`` refers to the
+        last frame of the sequence, ``-2`` to the second-to-last, etc.
 
         Parameters
         ----------
@@ -189,7 +220,7 @@ class LoaderConfig:
         Returns
         -------
         Self
-            The config instance with scene filtering parameters set.
+            A **new** config instance with scene-filtering parameters set.
 
         """
         if require_frames is not None:
@@ -198,23 +229,25 @@ class LoaderConfig:
                 for frame in require_frames
             }
 
-        self.scene_filtering = FilteringConfig(
-            min_agents=min_agents,
-            require_all_valid=require_all_valid,
-            require_prediction_frame=require_prediction_frame,
-            require_frames=require_frames,
-            filter_agent_category=filter_agent_category,
-            filter_slow_agents=filter_slow_agents,
+        return replace(
+            self,
+            scene_filtering=FilteringConfig(
+                min_agents=min_agents,
+                require_all_valid=require_all_valid,
+                require_prediction_frame=require_prediction_frame,
+                require_frames=require_frames,
+                filter_agent_category=filter_agent_category,
+                filter_slow_agents=filter_slow_agents,
+            ),
         )
-        return self
 
-    def resampling_parameters(
+    def with_resampling(
         self,
         up: int,
         down: int,
         method: Literal["fast", "spline"] = "fast",
     ) -> Self:
-        """Set the resampling parameters.
+        """Return a copy with the given resampling parameters.
 
         Parameters
         ----------
@@ -223,16 +256,15 @@ class LoaderConfig:
         down : int
             Downsampling factor.
         method : {"fast", "spline"}, optional
-            Resampling method to use. Defaults to "fast".
+            Resampling method to use. Defaults to ``"fast"``.
 
         Returns
         -------
         Self
-            The config instance with resampling parameters set.
+            A **new** config instance with resampling parameters set.
 
         """
-        self.resampling = Resampling(up=up, down=down, method=method)
-        return self
+        return replace(self, resampling=Resampling(up=up, down=down, method=method))
 
 
 T_Source = TypeVar("T_Source")
@@ -274,7 +306,7 @@ class SceneLoader(Protocol, Generic[T_ID]):
     ) -> None:
         """Process scenes and call the provided callback on each scene.
 
-        This is an alternative to `scenes()` that allows for more flexible
+        This is an alternative to ``scenes()`` that allows for more flexible
         processing of scenes without needing to yield them. The callback will be
         called with each processed scene, allowing for custom handling (e.g.,
         saving to disk, feeding into a model) without needing to store all scenes
@@ -314,7 +346,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         Parameters
         ----------
         loader_config : LoaderConfig, optional
-            Configuration for the loader. If None, `default_config()` is used.
+            Configuration for the loader. If None, ``default_config()`` is used.
         enforce_schema : bool, optional
             Whether to enforce the scene schema on each created scene.
             Defaults to True.
@@ -323,9 +355,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         self._count: int = 0
         self._source_counter: int = 0
         self._enforce_schema = enforce_schema
-        self._loader_config = loader_config or self.default_config()
-        self._attach_scene_properties: dict[str, Any] = {}
-        self._attach_scene_expr: dict[str, pl.Expr] = {}
+        self._loader_config = loader_config or type(self).default_config()
 
     # --- Abstract Steps (The "Blanks" to fill) ---
 
@@ -372,9 +402,13 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
 
         """
 
+    @classmethod
     @abstractmethod
-    def default_config(self) -> LoaderConfig:
+    def default_config(cls) -> LoaderConfig:
         """Return the default processor configuration for this dataset.
+
+        This is a classmethod so that the default configuration can be
+        inspected without constructing a loader instance.
 
         Returns
         -------
@@ -397,12 +431,12 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         """Get the total number of scenes that will be processed.
 
         In some cases this can be expensive to compute or not known in advance,
-        in that case `None` is returned.
+        in that case ``None`` is returned.
 
         Returns
         -------
         int or None
-            Total number of scenes, or `None` if not known in advance.
+            Total number of scenes, or ``None`` if not known in advance.
 
         """
         _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
@@ -411,19 +445,19 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     def num_sources(self) -> int | None:
         """Get the total number of sources that will be processed.
 
-        This is different from `num_scenes()` since each source can potentially
+        This is different from ``num_scenes()`` since each source can potentially
         generate multiple scenes (e.g., by using sliding window sampling). In
         some cases this can be expensive to compute or not known in advance, in
-        that case `None` is returned.
+        that case ``None`` is returned.
 
-        This could trivially be implemented as `len(list(self.sources()))`, but
+        This could trivially be implemented as ``len(list(self.sources()))``, but
         that would require loading all sources into memory which can be
         expensive for large datasets.
 
         Returns
         -------
         int or None
-            Total number of sources, or `None` if not known in advance.
+            Total number of sources, or ``None`` if not known in advance.
 
         """
         _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
@@ -470,6 +504,8 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         """Iterate over all sources and process them into scenes.
 
         This will lazy-load and process each source one at a time.
+        Counters are reset at the start of each call so a loader instance
+        can be iterated more than once.
 
         Yields
         ------
@@ -477,6 +513,8 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
             Processed scenes one at a time.
 
         """
+        self._count = 0
+        self._source_counter = 0
         for source in self.sources():
             self._source_counter += 1
             for scene_df, map_context in self.process_next(source):
@@ -487,8 +525,8 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     ) -> Scene[T_ID]:
         """Create a Scene object from the processed DataFrame and source identifier.
 
-        This method also calls `Scene.enforce_schema()` if
-        `self._enforce_schema` is True to ensure the scene follows the expected
+        This method also calls ``Scene.enforce_schema()`` if
+        ``self._enforce_schema`` is True to ensure the scene follows the expected
         schema. If overriding this method, make sure to follow the expected
         behavior regarding schema enforcement.
 
@@ -515,7 +553,6 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
             output_len=self.output_len,
             map_context=map_context,
         )
-        self._attach_scene_properties.clear()
         self._count += 1
         return scene if not self._enforce_schema else scene.enforce_schema()
 

@@ -63,7 +63,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
     @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x=x, y=y, z=z)
+        return IntIDNode(self.next_node_id(), x=x, y=y, z=z)
 
     @override
     def build_impl(

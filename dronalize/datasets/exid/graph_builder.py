@@ -14,23 +14,3 @@ class ExiDGraphBuilder(OSMMapGraphBuilder):
     logic from `OSMMapGraphBuilder`.
 
     """
-
-
-if __name__ == "__main__":
-    import time
-    from pathlib import Path
-
-    import altair as alt
-
-    from dronalize.common.plotting import plot_map_graph
-
-    alt.renderers.enable("browser")
-    graph_builder = ExiDGraphBuilder(
-        Path(
-            "/home/west/Developer/behavior-prediction/datasets/exiD/maps/lanelets/0_cologne_butzweiler/location0.osm"
-        )
-    )
-    start = time.perf_counter()
-    graph = graph_builder.build()
-    print(f"Graph built in {time.perf_counter() - start:.2f} seconds")
-    plot_map_graph(graph).show()

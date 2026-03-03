@@ -62,7 +62,7 @@ class OSMMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
     @override
     def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
+        return IntIDNode(self.next_node_id(), x, y, z)
 
     def _process_node(
         self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element

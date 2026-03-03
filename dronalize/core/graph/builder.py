@@ -38,6 +38,10 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     edge_map: dict[EdgeType, EdgeType] = field(default_factory=dict, init=False)
     """Optionally remap edge types during graph building by adding entries"""
 
+    _node_id_counter: int = field(default=0, init=False, repr=False)
+    """Auto-incrementing counter used by :meth:`next_node_id` to assign unique
+    integer IDs to nodes created via :meth:`new_node`."""
+
     _x: list[float] = field(default_factory=list, init=False)
     _y: list[float] = field(default_factory=list, init=False)
     _id_to_index: dict[ID, int] = field(default_factory=dict, init=False)
@@ -54,6 +58,22 @@ class GraphBuilder(ABC, Generic[ID, NODE]):
     )
     """List of pending paths to be added after all nodes are parsed. Used for
     lazy evaluation."""
+
+    def next_node_id(self) -> int:
+        """Return the next unique integer node ID and advance the counter.
+
+        This is the canonical way for subclasses to obtain IDs when creating
+        nodes inside :meth:`new_node`.
+
+        Returns
+        -------
+        int
+            A unique, monotonically increasing node ID.
+
+        """
+        node_id = self._node_id_counter
+        self._node_id_counter += 1
+        return node_id
 
     @abstractmethod
     def new_node(

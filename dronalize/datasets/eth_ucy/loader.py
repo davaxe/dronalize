@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -22,14 +21,27 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
 
     def __init__(
         self,
-        data_root: Path,
+        data_dir: Path,
         dataset: str | Sequence[str],
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
         split: Literal["train", "val", "test"] = "train",
     ) -> None:
-        """Initialize with the given configuration."""
-        super().__init__(loader_config=config, enforce_schema=True)
-        self._data_root = data_root
+        """Initialize with the given configuration.
+
+        Parameters
+        ----------
+        data_dir : Path
+            Path to the root directory containing the ETH/UCY data.
+        dataset : str or Sequence[str]
+            Name(s) of the dataset(s) to load (e.g., "hotel", "eth").
+        loader_config : LoaderConfig, optional
+            Configuration override. If None, default configuration will be used.
+        split : {"train", "val", "test"}, optional
+            Data split to load. Defaults to "train".
+
+        """
+        super().__init__(loader_config=loader_config, enforce_schema=True)
+        self._data_root = data_dir
         self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
         self._split = split
         self._window_params = self.loader_config.window_params
@@ -72,17 +84,18 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             pl.lit(AgentCategory.PEDESTRIAN).alias("agent_category"),
         )
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
+    def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(
                 input_len=8,
                 output_len=12,
                 sample_time=0.4,
             )
-            .window_parameters(step_size=1)
-            .scene_filtering_parameters(require_all_valid=True)
-            .resampling_parameters(4, 1, method="spline")
+            .with_window(step_size=1)
+            .with_filtering(require_all_valid=True)
+            .with_resampling(4, 1, method="spline")
         )
 
     @staticmethod
@@ -102,15 +115,3 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
             pl.col("id").cast(pl.Int32),
         )
-
-
-if __name__ == "__main__":
-    processor = EthUcyLoader(data_root=Path("data"), dataset="hotel", split="train")
-    start_time = time.perf_counter()
-    count: int = 0
-    total_time = 0.0
-    for _scene in processor.scenes():
-        count += 1
-
-    end_time = time.perf_counter()
-    print(f"Processed {count} scenes in {end_time - start_time:.2f} seconds.")

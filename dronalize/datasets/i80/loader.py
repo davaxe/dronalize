@@ -23,7 +23,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
     def __init__(
         self,
         data_dir: Path,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the I80 dataset loader.
@@ -40,7 +40,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
         ----------
         data_dir : Path
             Path to root of the I80 dataset, containing subdirectories of data files.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
         lane_change_ratio : float, optional
             Ratio for rebalancing highway agents. If None, no rebalancing will
@@ -48,7 +48,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
             non-lane changes.
 
         """
-        super().__init__(loader_config=config, enforce_schema=False)
+        super().__init__(loader_config=loader_config, enforce_schema=False)
         self._data_dir = data_dir
         self._rebalance_ratio = lane_change_ratio
 
@@ -111,6 +111,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df)
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(20, 50, 0.1).window_parameters(25).scene_filtering_parameters()
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(20, 50, 0.1).with_window(25).with_filtering()
