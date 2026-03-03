@@ -26,12 +26,13 @@ import numpy as np
 import numpy.typing as npt
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.nodes import IntIDNode
 from dronalize.core.protocols.map_object import BaseEnum
 from dronalize.datasets.lyft.protos import road_network_pb2 as proto
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
+
+    from dronalize.core.graph.builder import Point
 
 
 class LyftLVL5Map:
@@ -410,8 +411,8 @@ class LaneBoundary:
     lane_types: list[LaneBoundaryType]
     """One or more boundary types for te lane boundary."""
 
-    nodes: list[IntIDNode]
-    """List of nodes defining the lane boundary."""
+    points: list[Point]
+    """List of points defining the lane boundary."""
 
     type_change_distances: list[float] | None = None
     """Distances in meters at which the lane boundary type changes. Expected to
@@ -438,7 +439,7 @@ class LaneBoundary:
 
         return cls(
             lane_types=lane_types,
-            nodes=_parse_nodes(dx, dy, dz, frame, transformation),
+            points=_parse_points(dx, dy, dz, frame, transformation),
             type_change_distances=type_change_distances or None,
         )
 
@@ -453,7 +454,7 @@ class LaneBoundary:
         is in the range of the number of nodes.
         """
         if src_idx < 0:
-            src_idx = len(self.nodes) + src_idx
+            src_idx = len(self.points) + src_idx
 
         if not self.lane_types:
             return EdgeType.NONE
@@ -465,9 +466,9 @@ class LaneBoundary:
         acc_distance: float = 0.0
         change_count: int = 0
         edge_type: EdgeType = self.lane_types[0].to_edge_type()
-        for i in range(len(self.nodes) - 1):
+        for i in range(len(self.points) - 1):
             edge_types.append(edge_type)
-            dist = self.nodes[i].distance_to(self.nodes[i + 1])
+            dist = _point_distance(self.points[i], self.points[i + 1])
             acc_distance += dist
 
             if (
@@ -499,9 +500,9 @@ class LaneBoundary:
         acc_distance: float = 0.0
         change_count: int = 0
         edge_type: EdgeType = self.lane_types[0].to_edge_type()
-        for i in range(len(self.nodes) - 1):
+        for i in range(len(self.points) - 1):
             edge_types.append(edge_type)
-            dist = self.nodes[i].distance_to(self.nodes[i + 1])
+            dist = _point_distance(self.points[i], self.points[i + 1])
             acc_distance += dist
 
             if (
@@ -611,8 +612,8 @@ class TrafficControlElement:
     geometry_type: GeometryType
     """Type of geometry for the traffic control element"""
 
-    nodes: list[IntIDNode] | None = None
-    """Represents a traffic control element in the map."""
+    points: list[Point] | None = None
+    """Points defining the geometry of this traffic control element."""
 
     controlled_lane_sequence: list[str] = field(default_factory=list)
     """Ids of the lanes controlled by this traffic control element.
@@ -635,14 +636,14 @@ class TrafficControlElement:
         dz = [z * cm_to_m for z in element.points_z_deltas_cm]
 
         if not dx or not dy or not dz:
-            nodes = None
+            points = None
         else:
-            nodes = _parse_nodes(dx, dy, dz, element.geo_frame, transformation)
+            points = _parse_points(dx, dy, dz, element.geo_frame, transformation)
 
         return cls(
             control_element_type=cls._solve_type(element),
             geometry_type=GeometryType.from_int(int(element.geometry_type)),
-            nodes=nodes,
+            points=points,
         )
 
     @staticmethod
@@ -674,13 +675,13 @@ def _global_id_to_str(global_id: proto.GlobalId) -> str:
     return global_id.id.decode("utf-8") if global_id.id else ""
 
 
-def _parse_nodes(
+def _parse_points(
     dx: Sequence[float],
     dy: Sequence[float],
     dz: Sequence[float],
     frame: proto.GeoFrame,
     transformation: npt.NDArray[np.float32] | None = None,
-) -> list[IntIDNode]:
+) -> list[Point]:
     if not dx or not dy or not dz:
         return []
 
@@ -690,12 +691,16 @@ def _parse_nodes(
     y = np.cumsum(dy)
     z = np.cumsum(dz)
 
-    return [
-        IntIDNode(
-            *transform(xi, yi, zi, lat, lon, transformation),
-        )
-        for xi, yi, zi in zip(x, y, z, strict=True)
-    ]
+    result: list[Point] = []
+    for xi, yi, zi in zip(x, y, z, strict=True):
+        tx, ty, _tz = transform(xi, yi, zi, lat, lon, transformation)
+        result.append((tx, ty))
+    return result
+
+
+def _point_distance(a: Point, b: Point) -> float:
+    """Euclidean distance between two points."""
+    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
 
 
 def transform(
@@ -772,15 +777,3 @@ def _enu_to_uvw(
     u = cos_lon * t - sin_lon * east
     v = sin_lon * t + cos_lon * east
     return u, v, w
-
-
-if __name__ == "__main__":
-    root = Path(__file__).parent.parent.parent.parent.parent
-    map_path = root / "datasets" / "lyftlvl5" / "semantic_map" / "semantic_map.pb"
-    meta_path = root / "datasets" / "lyftlvl5" / "semantic_map" / "meta.json"
-    lyft_map = LyftLVL5Map(map_path, meta_path)
-    print(f"Loaded {len(lyft_map.lanes)} lanes")
-    print(f"Loaded {len(lyft_map.road_network_segments)} road network segments")
-    print(f"Loaded {len(lyft_map.traffic_control_elements)} traffic control elements")
-    print(f"Loaded {len(lyft_map.road_network_nodes)} road network nodes")
-    print(f"Loaded {len(lyft_map.junctions)} junctions")

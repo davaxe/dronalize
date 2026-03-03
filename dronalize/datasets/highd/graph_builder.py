@@ -6,13 +6,13 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph import GraphBuilder, IntIDNode
+from dronalize.core.graph import GraphBuilder
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class HighDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
+class HighDMapGraphBuilder(GraphBuilder):
     """Graph builder for the HighD dataset.
 
     The data only contains the y coordinates of the lane markings, so we craete
@@ -41,10 +41,6 @@ class HighDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         super().__init__()
 
     @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
-
-    @override
     def build_impl(
         self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
@@ -58,7 +54,7 @@ class HighDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         n_lane_markings = len(data["upperLaneMarkings"][0])
         for i, y in enumerate(data["upperLaneMarkings"][0]):
             self.add_path_lazy(
-                [self.new_node(x, y) for x in (self._start_x, self._end_x)],
+                [(self._start_x, y), (self._end_x, y)],
                 EdgeType.ROAD_BORDER
                 if i == 0 or i == n_lane_markings - 1
                 else EdgeType.LINE_THIN_DASHED,
@@ -67,7 +63,7 @@ class HighDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         n_lane_markings = len(data["lowerLaneMarkings"][0])
         for i, y in enumerate(data["lowerLaneMarkings"][0]):
             self.add_path_lazy(
-                [self.new_node(x, y) for x in (self._start_x, self._end_x)],
+                [(self._start_x, y), (self._end_x, y)],
                 EdgeType.ROAD_BORDER
                 if i == 0 or i == n_lane_markings - 1
                 else EdgeType.LINE_THIN_DASHED,

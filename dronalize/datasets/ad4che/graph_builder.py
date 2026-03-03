@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import cv2
 import numpy as np
@@ -9,12 +8,15 @@ import numpy.typing as npt
 from typing_extensions import override
 
 from dronalize.core import EdgeType
-from dronalize.core.graph import GraphBuilder, IntIDNode
+from dronalize.core.graph import GraphBuilder
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 PIXEL_TO_METER: Final[float] = 0.0375
 
 
-class AD4CHEGraphBuilder(GraphBuilder[int, IntIDNode]):
+class AD4CHEGraphBuilder(GraphBuilder):
     """Graph builder for the AD4CHE dataset.
 
     This dataset do not contain explicit lane graph or similar data. Therefore
@@ -49,10 +51,6 @@ class AD4CHEGraphBuilder(GraphBuilder[int, IntIDNode]):
         self.spatial_ds = spatial_ds
 
     @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
-
-    @override
     def build_impl(
         self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
@@ -75,10 +73,10 @@ class AD4CHEGraphBuilder(GraphBuilder[int, IntIDNode]):
 
                 if len(coords) < 2:
                     continue
-                nodes = [self.new_node(float(pt[0]), -float(pt[1])) for pt in coords]
+                points = [(float(pt[0]), -float(pt[1])) for pt in coords]
 
                 self.add_path_lazy(
-                    nodes=nodes, edge_type=EdgeType.LINE_THIN_DASHED, is_polygon=False
+                    points=points, edge_type=EdgeType.LINE_THICK_DASHED, is_polygon=False
                 )
 
 
@@ -101,16 +99,3 @@ def _spatial_downsample_polyline(
             filtered.append(pt)
 
     return np.array(filtered)
-
-
-if __name__ == "__main__":
-    import altair as alt
-
-    from dronalize.common.plotting.map import plot_map_graph
-
-    alt.renderers.enable("browser")
-    # Example usage
-    graph_builder = AD4CHEGraphBuilder(Path("data/ad4che/DJI_0001/01_laneWidthColorAndID.png"))
-    graph = graph_builder.build()
-    print(graph)
-    plot_map_graph(graph, width=1200, height=800, include_nodes=True).show()

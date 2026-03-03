@@ -143,8 +143,9 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         # Change autonomous vehicle to id 0 (from id -1)
         return df_resampled.with_columns(pl.col("id") + 1)
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
+    def default_config(cls) -> LoaderConfig:
         return LoaderConfig(10, 80, 0.1)
 
 
@@ -241,25 +242,3 @@ _OBJECT_TYPE_TO_CATEGORY: dict[int, AgentCategory] = {
     scenario_pb2.Track.TYPE_CYCLIST: AgentCategory.BICYCLE,
     scenario_pb2.Track.TYPE_OTHER: AgentCategory.UNKNOWN,
 }
-
-
-if __name__ == "__main__":
-    import time
-
-    # Recommendation: Use ProcessPoolExecutor here for actual parallel processing
-    # because Protobuf parsing + Python loops are CPU bound and single-threaded.
-    directory = Path("/home/west/Developer/behavior-prediction/datasets/waymo/validation")
-
-    processor = WaymoLoader(directory, "*validation.tfrecord*", include_map=True)
-    start_time = time.perf_counter()
-    print("Starting processing...")
-    count = 0
-    # This loop will now yield one large  per file instead of per scene
-    for _scene in processor.scenes():
-        if count % 500 == 0:
-            print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f}s")
-        count += 1
-        print(_scene.map_context)
-        break
-
-    print(f"Finished processing {count} scenes in {time.perf_counter() - start_time:.2f}s")

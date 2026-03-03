@@ -24,14 +24,14 @@ from typing_extensions import Self, override
 from dronalize.core import (
     EdgeType,
     GraphBuilder,
-    IntIDNode,
+    Point,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
+class OpenDDMapGraphBuilder(GraphBuilder):
     """A builder for creating a graph representation of an OpenDD map.
 
     Maps are stored in a SQLite database, typically located at:
@@ -66,10 +66,6 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
             sqlite_file = Path(sqlite_file)
 
         return cls(sqlite_file)
-
-    @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
 
     @override
     def build_impl(
@@ -116,18 +112,18 @@ class OpenDDMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 class Geometry(Protocol):
     """Protocol for geometry types."""
 
-    _coordinates: list[IntIDNode]
+    _coordinates: list[Point]
 
     @classmethod
     def from_str(cls, geometry_str: str) -> Self:
         """Create a Geometry object from a string representation."""
         ...
 
-    def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
+    def connections(self) -> Iterable[tuple[Point, Point]]:
         """Iterate over edge connections in the geometry."""
         ...
 
-    def coordinates(self) -> list[IntIDNode]:
+    def coordinates(self) -> list[Point]:
         """Get the coordinates of the geometry."""
         return self._coordinates
 
@@ -136,7 +132,7 @@ class Geometry(Protocol):
 class LineString(Geometry):
     """A LineString geometry type."""
 
-    _coordinates: list[IntIDNode]
+    _coordinates: list[Point]
 
     @classmethod
     def from_str(cls, geometry_str: str) -> LineString:
@@ -149,10 +145,10 @@ class LineString(Geometry):
         coords_str = geometry_str[len("LINESTRING (") : -1]
         coords = coords_str.split(", ")
         return cls(
-            [IntIDNode(float(coord.split()[0]), float(coord.split()[1])) for coord in coords],
+            [(float(coord.split()[0]), float(coord.split()[1])) for coord in coords],
         )
 
-    def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
+    def connections(self) -> Iterable[tuple[Point, Point]]:
         """Iterate over edge connections in the linestring."""
         for i in range(len(self._coordinates) - 1):
             yield (self._coordinates[i], self._coordinates[i + 1])
@@ -162,7 +158,7 @@ class LineString(Geometry):
 class Polygon(Geometry):
     """A Polygon geometry type."""
 
-    _coordinates: list[IntIDNode]
+    _coordinates: list[Point]
 
     @classmethod
     def from_str(cls, geometry_str: str) -> Polygon:
@@ -174,12 +170,12 @@ class Polygon(Geometry):
 
         coords_str = geometry_str[len("POLYGON ((") : -2]
         coords = coords_str.split(", ")
-        nodes = [
-            IntIDNode(float(coord.split()[0]), float(coord.split()[1])) for coord in coords[:-1]
+        points: list[Point] = [
+            (float(coord.split()[0]), float(coord.split()[1])) for coord in coords[:-1]
         ]
-        return cls(nodes)
+        return cls(points)
 
-    def connections(self) -> Iterable[tuple[IntIDNode, IntIDNode]]:
+    def connections(self) -> Iterable[tuple[Point, Point]]:
         """Iterate over edge connections in the polygon."""
         for i in range(len(self._coordinates)):
             yield (

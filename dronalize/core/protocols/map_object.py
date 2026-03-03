@@ -1,19 +1,17 @@
-"""Protocol and base class definitions for map objects and nodes."""
+"""Protocol and base class definitions for map objects."""
 
 from __future__ import annotations
 
-import math
-from collections.abc import Hashable
 from enum import IntEnum
 from typing import Any, Generic, Protocol, TypeVar
 
 from typing_extensions import Self
 
-ID = TypeVar("ID", bound=Hashable)
+ID = TypeVar("ID", bound=object)
 
 
 class BaseMapObject(Protocol, Generic[ID]):
-    """Base class for all map objects in a NuScenes map."""
+    """Base class for all map objects in a map."""
 
     id: ID
 
@@ -32,53 +30,6 @@ class BaseMapObject(Protocol, Generic[ID]):
             return cls.from_dict(data)
         except (ValueError, TypeError):
             return None
-
-
-class BaseNode(Protocol, Generic[ID]):
-    """Protocol for a node in a map.
-
-    This protocol defines the interface for a node in a map, which includes
-    methods for calculating distances to other nodes.
-    """
-
-    id: ID
-    x: float
-    y: float
-    z: float = 0.0
-
-    def distance_to(self, other: Self) -> float:
-        """Calculate the Euclidean distance to another node.
-
-        Parameters
-        ----------
-        other : Self
-            The other node to calculate the distance to.
-
-        Returns
-        -------
-        float
-            Euclidean distance between this node and `other`.
-
-        """
-        return math.sqrt(
-            (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2,
-        )
-
-    def distance_sq_to(self, other: Self) -> float:
-        """Calculate the squared Euclidean distance to another node.
-
-        Parameters
-        ----------
-        other : Self
-            The other node to calculate the squared distance to.
-
-        Returns
-        -------
-        float
-            Squared Euclidean distance between this node and `other`.
-
-        """
-        return (self.x - other.x) ** 2 + (self.y - other.y) ** 2 + (self.z - other.z) ** 2
 
 
 class BaseEnum(IntEnum):

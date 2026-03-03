@@ -9,13 +9,11 @@ from dronalize.core.protocols.loader import (
 from dronalize.core.protocols.map_object import (
     BaseEnum,
     BaseMapObject,
-    BaseNode,
 )
 
 __all__ = [
     "BaseEnum",
     "BaseMapObject",
-    "BaseNode",
     "BaseSceneLoader",
     "FilteringConfig",
     "LoaderConfig",

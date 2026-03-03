@@ -28,7 +28,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
 
     def __init__(
         self,
-        data_directory: Path | str,
+        data_dir: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
         use_parquet_cache: bool = True,
@@ -38,7 +38,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
 
         Parameters
         ----------
-        data_directory : Path or str
+        data_dir : Path or str
             Data directory containing the raw nuScenes trajectories.
             This is the directory that for example includes:
 
@@ -60,7 +60,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)
-        self.data_dir = Path(data_directory)
+        self.data_dir = Path(data_dir)
         self._dfs: dict[str, pl.LazyFrame] = {}
         self._use_parquet = use_parquet_cache
         self._parquet_dir = Path(parquet_dir) if parquet_dir is not None else self.data_dir
@@ -120,13 +120,10 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df)
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return (
-            LoaderConfig(4, 12, 0.5)
-            .resampling_parameters(up=5, down=1)
-            .window_parameters(step_size=1)
-        )
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(4, 12, 0.5).with_resampling(up=5, down=1).with_window(step_size=1)
 
     def _load_tables(self) -> None:
         """Load all required tables using the generic loader."""
@@ -537,30 +534,3 @@ _SCHEMAS: dict[str, pl.Schema | None] = {
         "width": pl.Int32,
     }),
 }
-
-if __name__ == "__main__":
-    import time
-
-    # Update this path to your actual data location
-    data_dir = Path(
-        "/home/west/Developer/behavior-prediction/datasets/nuscenes/v1.0-trainval_meta/v1.0-trainval/"
-    )
-
-    # Check if directory exists to avoid FileNotFound errors in example
-    if data_dir.exists():
-        start_time = time.perf_counter()
-        processor = NuScenesLoader(
-            data_directory=data_dir,
-            use_parquet_cache=True,
-            parquet_dir="temp",
-        )
-        count = 0
-        for _scene in processor.scenes():
-            count += 1
-            if count % 100 == 0:
-                elapsed = time.perf_counter() - start_time
-                print(f"Processed {count} scenes in {elapsed:.2f} seconds")
-        end_time = time.perf_counter()
-        print(f"Processed {count} scenes in {end_time - start_time:.2f} seconds.")
-    else:
-        print(f"Path not found: {data_dir}")

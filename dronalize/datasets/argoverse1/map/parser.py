@@ -17,15 +17,16 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from enum import auto
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.nodes import IntIDNode
 from dronalize.core.protocols.map_object import BaseEnum, BaseMapObject
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
+
+    from dronalize.core.graph.builder import Point
 
 
 class Argoverse1Map:
@@ -35,7 +36,7 @@ class Argoverse1Map:
         """Initialize the ArgoverseMap with the path to the XML file."""
         self.path: Path = path
         self.lane_segments: dict[int, LaneSegment] = {}
-        self.nodes: dict[int, IntIDNode] = {}
+        self.nodes: dict[int, Point] = {}
         self._parsed: bool = False
 
     @classmethod
@@ -55,16 +56,17 @@ class Argoverse1Map:
         tree = ET.parse(self.path)
         root = tree.getroot()
 
-        all_graph_nodes: dict[int, IntIDNode] = {}
-        # Mapping from original ID in the XML to new ID in the graph. This makes
-        # it easier to add additional nodes without worrying about ID conflicts.
+        all_graph_nodes: dict[int, Point] = {}
+        # Mapping from original ID in the XML to new sequential ID.
         id_map: dict[int, int] = {}
+        next_id = 0
         for child in root:
             if child.tag == "node":
                 base_node = Node.from_xml_element(child)
-                node = IntIDNode(base_node.x, base_node.y)
-                id_map[base_node.id] = node.id
-                all_graph_nodes[node.id] = node
+                point: Point = (base_node.x, base_node.y)
+                id_map[base_node.id] = next_id
+                all_graph_nodes[next_id] = point
+                next_id += 1
             elif child.tag == "way":
                 lane_segment = LaneSegment.from_xml_element(child)
                 self.lane_segments[lane_segment.id] = lane_segment
@@ -217,12 +219,3 @@ class LaneSegment:
             successors=[],
             predecessors=[],
         )
-
-
-if __name__ == "__main__":
-    # Example usage
-    xml_file_path = Path(
-        "data/pruned_argoverse_MIA_10316_vector_map.xml",
-    )
-    argo_map = Argoverse1Map(xml_file_path)
-    argo_map.parse()

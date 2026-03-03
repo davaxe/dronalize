@@ -19,7 +19,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         self,
         data_dir: Path,
         file_batch_size: int | None = 100,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the data processor.
 
@@ -32,12 +32,12 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
             read at once. Higher batch size may lead to faster processing at
             diminishing returns, but also higher memory usage. `None` is not
             recommended for large amounts of data.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration override. If None, the default
             configuration will be used.
 
         """
-        super().__init__(loader_config=config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
         self._data_path = data_dir
         self._batch_size: int | None = file_batch_size
 
@@ -108,8 +108,9 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df, yaw_col="yaw")
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
+    def default_config(cls) -> LoaderConfig:
         return LoaderConfig(20, 30, 0.1)
 
 
@@ -121,20 +122,3 @@ _SCHEMA: pl.Schema = pl.Schema({
     "Y": pl.Float32,
     "CITY_NAME": pl.String,
 })
-
-if __name__ == "__main__":
-    import time
-
-    data_path = Path(
-        "/home/west/Developer/behavior-prediction/datasets/argoverse/forecasting_train_v1.1/train/data"
-    )
-    processor = Argoverse1Loader(data_path, file_batch_size=1000)
-    count = 0
-    time_start = time.perf_counter()
-    for _scene in processor.scenes():
-        count += 1
-        if count % 500 == 0:
-            print(f"Processed {count} scenes in {time.perf_counter() - time_start:.2f} seconds")
-
-    print(f"Total scenes processed: {count}")
-    print(f"Time taken: {time.perf_counter() - time_start:.2f} seconds")
