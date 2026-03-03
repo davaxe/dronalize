@@ -50,7 +50,7 @@ class Explicit:
         key : str
             Metadata key to look up.
         default : Any, optional
-            Value to return when *key* is not present. Defaults to ``None``.
+            Value to return when *key* is not present. Defaults to `None`.
 
         Returns
         -------

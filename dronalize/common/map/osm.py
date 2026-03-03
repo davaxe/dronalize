@@ -7,8 +7,7 @@ import utm
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.builder import GraphBuilder
-from dronalize.core.graph.nodes import IntIDNode
+from dronalize.core.graph.builder import GraphBuilder, Point
 
 
 @dataclass
@@ -18,7 +17,7 @@ class OSMWay:
     tags: dict[str, str]
 
 
-class OSMMapGraphBuilder(GraphBuilder[int, IntIDNode]):
+class OSMMapGraphBuilder(GraphBuilder):
     """GraphBuilder implementation that constructs a MapGraph from OpenStreetMap (OSM) XML data."""
 
     def __init__(
@@ -53,16 +52,12 @@ class OSMMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         self._edge_type_mapping = edge_type_mapping or self._default_edge_type_mapping
         self._utm_position_offset = utm_position_offset
         self._osm_file = osm_file
-        self._nodes: dict[int, IntIDNode] = {}
+        self._nodes: dict[int, Point] = {}
         self._include_edge_type_none = include_edge_type_none
 
     @staticmethod
     def _default_edge_type_mapping(way: OSMWay) -> EdgeType:
         return EdgeType.from_str(way.tags.get("type"), way.tags.get("subtype"))
-
-    @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(self.next_node_id(), x, y, z)
 
     def _process_node(
         self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element
@@ -73,7 +68,7 @@ class OSMMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         lon = float(elem.attrib["lon"])
 
         x, y, _, _ = utm.from_latlon(lat, lon)
-        self._nodes[node_id] = self.new_node(float(x) + x_offset, float(y) + y_offset)
+        self._nodes[node_id] = (float(x) + x_offset, float(y) + y_offset)
 
         # Clear element from memory once processed
         elem.clear()
@@ -81,7 +76,7 @@ class OSMMapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
     def _process_way(self, elem: ET.Element, root: ET.Element) -> None:
         """Process an OSM way element."""
-        nodes: list[IntIDNode] = []
+        points: list[Point] = []
         tags: dict[str, str] = {}
 
         # Extract node references and tags
@@ -89,15 +84,15 @@ class OSMMapGraphBuilder(GraphBuilder[int, IntIDNode]):
             if child.tag == "nd":
                 ref = int(child.attrib["ref"])
                 if ref in self._nodes:
-                    nodes.append(self._nodes[ref])
+                    points.append(self._nodes[ref])
             elif child.tag == "tag":
                 tags[child.attrib["k"]] = child.attrib["v"]
 
         way = OSMWay(tags=tags)
         edge_type = self._edge_type_mapping(way)
 
-        if (edge_type != EdgeType.NONE or self._include_edge_type_none) and nodes:
-            self.add_path_lazy(nodes=nodes, edge_type=edge_type)
+        if (edge_type != EdgeType.NONE or self._include_edge_type_none) and points:
+            self.add_path_lazy(points=points, edge_type=edge_type)
 
         # Clear element from memory once processed
         elem.clear()

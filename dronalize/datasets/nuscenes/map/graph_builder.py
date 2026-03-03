@@ -17,19 +17,18 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
-from uuid import UUID
 
 from typing_extensions import Self, override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.builder import GraphBuilder
+from dronalize.core.graph.builder import GraphBuilder, Point
 from dronalize.datasets.nuscenes.map import parser
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
+class NuScenesMapGraphBuilder(GraphBuilder):
     """A builder for creating a MapGraph from a NuscenesMap."""
 
     def __init__(
@@ -73,15 +72,6 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         return cls(nuscenes_map, ignore_edge_types=ignore_edge_types)
 
     @override
-    def new_node(self, x: float, y: float, z: float = 0) -> parser.Node:
-        """Create a new node with the given coordinates."""
-        return parser.Node(
-            id=str(UUID(int=hash((x, y, z)) & ((1 << 128) - 1))),
-            x=x,
-            y=y,
-        )
-
-    @override
     def build_impl(
         self,
         min_distance: float | None = None,
@@ -92,13 +82,19 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             if edge_type not in self.ignore_edge_types:
                 method(interp_distance=interp_distance)
 
+    # --- Helper to convert node IDs to Points ---
+
+    def _node_points(self, node_ids: list[str]) -> list[Point]:
+        """Convert a list of NuScenes node token strings to `(x, y)` points."""
+        return [self.map_nodes[i].as_point() for i in node_ids]
+
     # --- Private methods ---
 
     def _add_road_divider_edges(self, interp_distance: float | None) -> None:
         for road_divider in self.map.road_dividers.values():
             line: parser.Line = self.map.lines[road_divider.line]
             self.add_node_edges_loop_min_dist(
-                [self.map_nodes[i] for i in line.nodes],
+                self._node_points(line.nodes),
                 min_distance=self.min_distance,
                 edge_type=EdgeType.LINE_THICK,
                 interp_distance=interp_distance,
@@ -131,7 +127,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
                 lane_polygon: parser.Polygon = self.map.polygons[lane.polygon]
                 nodes: list[str] = lane_polygon.exterior_nodes
                 self.add_node_edges_loop_min_dist(
-                    [self.map_nodes[i] for i in nodes],
+                    self._node_points(nodes),
                     min_distance=self.min_distance,
                     is_polygon=True,
                     edge_type=self.lane_polygon_edge,
@@ -143,7 +139,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             polygon: parser.Polygon = self.map.polygons[walkway.polygon]
             nodes: list[str] = polygon.exterior_nodes
             self.add_node_edges_loop(
-                [self.map_nodes[i] for i in nodes],
+                self._node_points(nodes),
                 is_polygon=True,
                 edge_type=EdgeType.CURB,
                 interp_distance=interp_distance,
@@ -154,7 +150,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             polygon: parser.Polygon = self.map.polygons[crossing.polygon]
             nodes: list[str] = polygon.exterior_nodes
             self.add_node_edges_loop(
-                [self.map_nodes[i] for i in nodes],
+                self._node_points(nodes),
                 is_polygon=True,
                 edge_type=EdgeType.PEDESTRIAN_MARKING,
                 interp_distance=interp_distance,
@@ -164,7 +160,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         for traffic_light in self.map.traffic_lights.values():
             line: parser.Line = self.map.lines[traffic_light.line]
             self.add_node_edges_loop(
-                [self.map_nodes[i] for i in line.nodes],
+                self._node_points(line.nodes),
                 edge_type=EdgeType.REGULATORY,
                 interp_distance=interp_distance,
             )
@@ -177,7 +173,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             polygon: parser.Polygon = self.map.polygons[stop_line.polygon]
             nodes: list[str] = polygon.exterior_nodes
             self.add_node_edges_loop(
-                [self.map_nodes[i] for i in nodes],
+                self._node_points(nodes),
                 is_polygon=True,
                 edge_type=EdgeType.STOP,
                 interp_distance=interp_distance,
@@ -188,7 +184,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
             polygon: parser.Polygon = self.map.polygons[carpark.polygon]
             nodes: list[str] = polygon.exterior_nodes
             self.add_node_edges_loop(
-                [self.map_nodes[i] for i in nodes],
+                self._node_points(nodes),
                 is_polygon=True,
                 edge_type=EdgeType.VIRTUAL,
                 interp_distance=interp_distance,
@@ -199,7 +195,7 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         segments: list[tuple[str, parser.SegmentDividerType]],
     ) -> NuScenesMapGraphBuilder._Edges:
         return {
-            "nodes": [self.map_nodes[n_id] for n_id, _ in segments],
+            "points": [self.map_nodes[n_id].as_point() for n_id, _ in segments],
             "edge_type": [
                 parser.SegmentDividerType.to_edge_type(s_type)
                 # The last segment type is always `NIL` as it is meaningless
@@ -208,5 +204,5 @@ class NuScenesMapGraphBuilder(GraphBuilder[str, parser.Node]):
         }
 
     class _Edges(TypedDict):
-        nodes: list[parser.Node]
+        points: list[Point]
         edge_type: list[EdgeType]

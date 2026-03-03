@@ -8,8 +8,7 @@ from scipy.interpolate import UnivariateSpline
 from typing_extensions import Self, override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.builder import GraphBuilder
-from dronalize.core.graph.nodes import IntIDNode
+from dronalize.core.graph.builder import GraphBuilder, Point
 
 
 @dataclass(slots=True, frozen=True)
@@ -20,7 +19,7 @@ class LaneDescription:
     direction: list[bool]
 
 
-class HighWayLaneGraphBuilder(GraphBuilder[int, IntIDNode]):
+class HighWayLaneGraphBuilder(GraphBuilder):
     """A graph builder that constructs a lane graph for a highway based on vehicle trajectory data.
 
     This makes three major assumptions about the structure of the highway and the data:
@@ -103,10 +102,6 @@ class HighWayLaneGraphBuilder(GraphBuilder[int, IntIDNode]):
         return self
 
     @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(self.next_node_id(), x, y, z)
-
-    @override
     def build_impl(
         self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
@@ -138,8 +133,8 @@ class HighWayLaneGraphBuilder(GraphBuilder[int, IntIDNode]):
             else:
                 x_vals, y_vals = group_data["long_bin"], group_data["border_lat"]
 
-            nodes = list(map(self.new_node, x_vals, y_vals))
-            self.add_path_lazy(nodes, self._get_border_type(left, right))
+            points: list[Point] = list(zip(x_vals.to_list(), y_vals.to_list(), strict=True))
+            self.add_path_lazy(points, self._get_border_type(left, right))
 
         if self._include_outer_borders:
             outer_borders = self._get_outer_borders(lane_centers, lane_borders)
@@ -149,8 +144,8 @@ class HighWayLaneGraphBuilder(GraphBuilder[int, IntIDNode]):
                 else:
                     x_vals, y_vals = group_data["long_bin"], group_data["border_lat"]
 
-                nodes = list(map(self.new_node, x_vals, y_vals))
-                self.add_path_lazy(nodes, EdgeType.CURB)
+                points = list(zip(x_vals.to_list(), y_vals.to_list(), strict=True))
+                self.add_path_lazy(points, EdgeType.CURB)
 
     def _get_lane_centers(self, data: pl.LazyFrame, bin_size: float = 8.0) -> pl.LazyFrame:
         return (

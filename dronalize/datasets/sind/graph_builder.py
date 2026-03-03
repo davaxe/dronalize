@@ -87,7 +87,7 @@ class SindGraphBuilder(OSMMapGraphBuilder):
         local_x = x_utm - self._origin_utm_x
         local_y = y_utm - self._origin_utm_y
 
-        self._nodes[node_id] = self.new_node(float(local_x) + x_offset, float(local_y) + y_offset)
+        self._nodes[node_id] = (float(local_x) + x_offset, float(local_y) + y_offset)
 
         # Clear element from memory once processed
         elem.clear()

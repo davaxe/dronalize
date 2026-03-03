@@ -128,7 +128,7 @@ class Resampling:
 class LoaderConfig:
     """Base configuration dataclass for trajectory data processing.
 
-    All builder-style methods (``with_*``) return **new** instances, leaving the
+    All builder-style methods (`with_*`) return **new** instances, leaving the
     original unchanged.  This makes configs safe to share, compare, serialise
     and merge.
     """
@@ -164,7 +164,7 @@ class LoaderConfig:
             Number of frames to advance between consecutive windows.
         window_size : int, optional
             Total number of frames in each window. If None, defaults to
-            ``input_len + output_len``.
+            `input_len + output_len`.
 
         Returns
         -------
@@ -194,9 +194,9 @@ class LoaderConfig:
     ) -> Self:
         """Return a copy with the given scene-filtering parameters.
 
-        The inputs are passed into the ``FilteringConfig`` dataclass. Negative
-        indices are supported in *require_frames*, where ``-1`` refers to the
-        last frame of the sequence, ``-2`` to the second-to-last, etc.
+        The inputs are passed into the `FilteringConfig` dataclass. Negative
+        indices are supported in *require_frames*, where `-1` refers to the
+        last frame of the sequence, `-2` to the second-to-last, etc.
 
         Parameters
         ----------
@@ -256,7 +256,7 @@ class LoaderConfig:
         down : int
             Downsampling factor.
         method : {"fast", "spline"}, optional
-            Resampling method to use. Defaults to ``"fast"``.
+            Resampling method to use. Defaults to `"fast"`.
 
         Returns
         -------
@@ -306,7 +306,7 @@ class SceneLoader(Protocol, Generic[T_ID]):
     ) -> None:
         """Process scenes and call the provided callback on each scene.
 
-        This is an alternative to ``scenes()`` that allows for more flexible
+        This is an alternative to `scenes()` that allows for more flexible
         processing of scenes without needing to yield them. The callback will be
         called with each processed scene, allowing for custom handling (e.g.,
         saving to disk, feeding into a model) without needing to store all scenes
@@ -346,7 +346,7 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         Parameters
         ----------
         loader_config : LoaderConfig, optional
-            Configuration for the loader. If None, ``default_config()`` is used.
+            Configuration for the loader. If None, `default_config()` is used.
         enforce_schema : bool, optional
             Whether to enforce the scene schema on each created scene.
             Defaults to True.
@@ -431,12 +431,12 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
         """Get the total number of scenes that will be processed.
 
         In some cases this can be expensive to compute or not known in advance,
-        in that case ``None`` is returned.
+        in that case `None` is returned.
 
         Returns
         -------
         int or None
-            Total number of scenes, or ``None`` if not known in advance.
+            Total number of scenes, or `None` if not known in advance.
 
         """
         _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
@@ -445,19 +445,19 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     def num_sources(self) -> int | None:
         """Get the total number of sources that will be processed.
 
-        This is different from ``num_scenes()`` since each source can potentially
+        This is different from `num_scenes()` since each source can potentially
         generate multiple scenes (e.g., by using sliding window sampling). In
         some cases this can be expensive to compute or not known in advance, in
-        that case ``None`` is returned.
+        that case `None` is returned.
 
-        This could trivially be implemented as ``len(list(self.sources()))``, but
+        This could trivially be implemented as `len(list(self.sources()))`, but
         that would require loading all sources into memory which can be
         expensive for large datasets.
 
         Returns
         -------
         int or None
-            Total number of sources, or ``None`` if not known in advance.
+            Total number of sources, or `None` if not known in advance.
 
         """
         _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
@@ -525,8 +525,8 @@ class BaseSceneLoader(ABC, SceneLoader[T_ID], Generic[T_ID, T_Source]):
     ) -> Scene[T_ID]:
         """Create a Scene object from the processed DataFrame and source identifier.
 
-        This method also calls ``Scene.enforce_schema()`` if
-        ``self._enforce_schema`` is True to ensure the scene follows the expected
+        This method also calls `Scene.enforce_schema()` if
+        `self._enforce_schema` is True to ensure the scene follows the expected
         schema. If overriding this method, make sure to follow the expected
         behavior regarding schema enforcement.
 

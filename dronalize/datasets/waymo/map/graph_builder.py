@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph import GraphBuilder, IntIDNode
+from dronalize.core.graph import GraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
+class WaymoMapGraphBuilder(GraphBuilder):
     """A Waymo map representation.
 
     As opposed to other maps (e.g, argoverse1, argoverse2 and NuScenes) this map
@@ -47,10 +47,6 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
     def empty_map(self) -> bool:
         """Check if the map is empty."""
         return self._no_map_features
-
-    @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(self.next_node_id(), x=x, y=y, z=z)
 
     @override
     def build_impl(
@@ -108,9 +104,9 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
             if feature_id in self._processed_features:
                 continue
 
-            nodes = [self.new_node(x=point.x, y=point.y) for point in speed_bump.polygon]
+            points = [(point.x, point.y) for point in speed_bump.polygon]
             self.add_node_edges_loop_min_dist(
-                nodes,
+                points,
                 is_polygon=True,
                 min_distance=min_distance,
                 interp_distance=interp_distance,
@@ -121,9 +117,7 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
     def _add_stop_sign_nodes(self) -> None:
         """Add stop sign nodes to the map graph."""
         for stop_sign in self.stop_signs.values():
-            # Create a node for the stop sign location
-            node = self.new_node(x=stop_sign.position.x, y=stop_sign.position.y)
-            self.add_node(node)
+            self.add_node(stop_sign.position.x, stop_sign.position.y)
 
     def _add_lane_edges(
         self,
@@ -135,9 +129,9 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
             if feature_id in self._processed_features:
                 continue
 
-            nodes = [self.new_node(x=point.x, y=point.y) for point in lane.polyline]
+            points = [(point.x, point.y) for point in lane.polyline]
             self.add_node_edges_loop_min_dist(
-                nodes,
+                points,
                 is_polygon=False,
                 min_distance=min_distance,
                 interp_distance=interp_distance,
@@ -154,10 +148,10 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         for feature_id, crosswalk in self.crosswalks.items():
             if feature_id in self._processed_features:
                 continue
-            nodes = [self.new_node(x=point.x, y=point.y) for point in crosswalk.polygon]
+            points = [(point.x, point.y) for point in crosswalk.polygon]
 
             self.add_node_edges_loop_min_dist(
-                nodes,
+                points,
                 is_polygon=True,
                 min_distance=min_distance,
                 interp_distance=interp_distance,
@@ -174,10 +168,10 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         for feature_id, driveway in self.driveways.items():
             if feature_id in self._processed_features:
                 continue
-            nodes = [self.new_node(x=point.x, y=point.y) for point in driveway.polygon]
+            points = [(point.x, point.y) for point in driveway.polygon]
 
             self.add_node_edges_loop_min_dist(
-                nodes,
+                points,
                 is_polygon=True,
                 min_distance=min_distance,
                 interp_distance=interp_distance,
@@ -192,10 +186,10 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
     ) -> None:
         """Process a road edge feature and update nodes and id_adj_list."""
         for feature_id, road_edge in self.road_edges.items():
-            nodes = [self.new_node(x=point.x, y=point.y) for point in road_edge.polyline]
+            points = [(point.x, point.y) for point in road_edge.polyline]
 
             self.add_node_edges_loop_min_dist(
-                nodes,
+                points,
                 is_polygon=False,
                 min_distance=min_distance,
                 interp_distance=interp_distance,
@@ -210,10 +204,10 @@ class WaymoMapGraphBuilder(GraphBuilder[int, IntIDNode]):
     ) -> None:
         """Process a road line feature and update nodes and id_adj_list."""
         for feature_id, road_line in self.road_lines.items():
-            nodes = [self.new_node(x=point.x, y=point.y) for point in road_line.polyline]
+            points = [(point.x, point.y) for point in road_line.polyline]
 
             self.add_node_edges_loop_min_dist(
-                nodes,
+                points,
                 min_distance=min_distance,
                 is_polygon=False,
                 interp_distance=interp_distance,

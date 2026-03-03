@@ -39,7 +39,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
             Whether to filter out parked vehicles based on their speed.
             If True, all agents with an average speed less than 0.1 will be
             removed. This will override any existing setting for the
-            ``filter_slow_agents`` parameter in the ``scene_filtering``
+            `filter_slow_agents` parameter in the `scene_filtering`
             configuration.
 
         """

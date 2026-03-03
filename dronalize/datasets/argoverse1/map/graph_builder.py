@@ -22,14 +22,14 @@ import numpy.typing as npt
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph import GraphBuilder, IntIDNode
+from dronalize.core.graph import GraphBuilder, Point
 from dronalize.datasets.argoverse1.map import parser, utils
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
+class Argoverse1MapGraphBuilder(GraphBuilder):
     """A builder for creating a graph representation of an Argoverse1 map."""
 
     class SegmentEndpoint(TypedDict):
@@ -51,7 +51,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
 
         super().__init__()
         self.lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
-        self.map_nodes: dict[int, IntIDNode] = argoverse_map.nodes
+        self.map_nodes: dict[int, Point] = argoverse_map.nodes
 
         self.max_distance_between_connections: float = 1.0
 
@@ -60,10 +60,6 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         """Create an `ArgoverseMapGraphBuilder` instance from an XML file."""
         argoverse_map = parser.Argoverse1Map.from_xml_file(path)
         return cls(argoverse_map)
-
-    @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(self.next_node_id(), x=x, y=y, z=z)
 
     @override
     def build_impl(
@@ -110,22 +106,6 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
                 already_connected[segment.id].add(suc_id)
                 already_connected.setdefault(suc_id, set()).add(segment.id)
 
-    def _node_distance(self, id_a: int, id_b: int) -> float:
-        """Calculate the Euclidean distance between two nodes by their IDs."""
-        idx_a = self._id_to_index[id_a]
-        idx_b = self._id_to_index[id_b]
-        dx = self._x[idx_a] - self._x[idx_b]
-        dy = self._y[idx_a] - self._y[idx_b]
-        return (dx * dx + dy * dy) ** 0.5
-
-    def _edge_exists(self, from_id: int, to_id: int, edge_type: EdgeType) -> bool:
-        """Check whether an edge already exists in the graph."""
-        if from_id not in self._id_to_index or to_id not in self._id_to_index:
-            return True  # treat as "exists" so we skip adding
-        u = self._id_to_index[from_id]
-        v = self._id_to_index[to_id]
-        return (u, v, int(edge_type)) in self._seen_edges
-
     def _connect_endpoints(
         self,
         endpoint_from: int,
@@ -159,21 +139,15 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         left_to = to_endpoints["left"]["start_id"]
 
         if (
-            # No need to connect if already connected
-            not self._edge_exists(right_from, right_to, right_edge_type)
-            # Check if the distance is within the allowed range
-            and self._node_distance(right_from, right_to) < self.max_distance_between_connections
+            not self.edge_exists(right_from, right_to, right_edge_type)
+            and self.node_distance(right_from, right_to) < self.max_distance_between_connections
         ):
-            # Connect right endpoints
             self.add_edge(right_from, right_to, right_edge_type)
 
         if (
-            # No need to connect if already connected
-            not self._edge_exists(left_from, left_to, left_edge_type)
-            # Check if the distance is within the allowed range
-            and self._node_distance(left_from, left_to) < self.max_distance_between_connections
+            not self.edge_exists(left_from, left_to, left_edge_type)
+            and self.node_distance(left_from, left_to) < self.max_distance_between_connections
         ):
-            # Connect left endpoints
             self.add_edge(left_from, left_to, left_edge_type)
 
     def _build_segment_edges(
@@ -182,7 +156,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         interp_distance: float | None = None,
         min_distance: float | None = None,
     ) -> None:
-        """Build edges trough a lane segment."""
+        """Build edges through a lane segment."""
         for segment in self.lane_segments.values():
             self._add_boundary_edges(
                 segment,
@@ -199,7 +173,7 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
     ) -> None:
         """Add edges for the left and right boundaries of a lane segment."""
         node_ids = list(segment.node_ids)
-        centerline = [(self.map_nodes[i].x, self.map_nodes[i].y) for i in node_ids]
+        centerline = [self.map_nodes[i] for i in node_ids]
         l_type, r_type = EdgeType.VIRTUAL, EdgeType.VIRTUAL
         add_as_polygon = (
             utils.lane_segment_is_regulatory(segment)
@@ -243,8 +217,6 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
             )
 
         # Store endpoints for the lane segment for later use to connect lanes
-        # Only start and end is needed to access all nodes in the segment as the
-        # ids are by design ordered from start to end
         if len(l_nodes) > 1 and len(r_nodes) > 1:
             self._lane_endpoints[segment.id] = {
                 "right": {
@@ -273,15 +245,14 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
         else:
             edge_type_list = edge_type
 
-        # 1. Create the starting node ONCE
-        prev_node = self.new_node(x=numpy_nodes[0][0], y=numpy_nodes[0][1])
-        prev_id = self.add_node(prev_node)
+        # 1. Create the starting node
+        prev_pt: Point = (float(numpy_nodes[0][0]), float(numpy_nodes[0][1]))
+        prev_id = self.add_node(*prev_pt)
 
-        added_nodes = [prev_id]
+        added_ids = [prev_id]
         min_distance = min_distance if min_distance is not None else 0.0
 
         i, j = 0, 1
-        # Track the edge index separately because 'j' might skip ahead
         edge_idx = 0
         while i < len(numpy_nodes) - 1:
             src_vec, dst_vec = numpy_nodes[i], numpy_nodes[j]
@@ -290,26 +261,29 @@ class Argoverse1MapGraphBuilder(GraphBuilder[int, IntIDNode]):
                 j += 1
                 continue
 
-            dst_node = self.new_node(x=dst_vec[0], y=dst_vec[1])
+            dst_pt: Point = (float(dst_vec[0]), float(dst_vec[1]))
+            dst_id = self.add_node(*dst_pt)
             current_edge_type = edge_type_list[min(edge_idx, len(edge_type_list) - 1)]
 
             last_id = prev_id
             for s_id, d_id, e_type in self.interpolate_edge(
-                prev_node,
-                dst_node,
+                prev_id,
+                prev_pt,
+                dst_id,
+                dst_pt,
                 interp_distance,
                 current_edge_type,
             ):
                 self.add_edge(s_id, d_id, e_type)
-                added_nodes.append(d_id)
+                added_ids.append(d_id)
                 last_id = d_id
 
-            prev_node = dst_node
-            prev_id = last_id  # The last ID added is our new anchor
+            prev_pt = dst_pt
+            prev_id = last_id
 
             # Advance indices
             i = j
             j = i + 1
             edge_idx += 1
 
-        return added_nodes
+        return added_ids
