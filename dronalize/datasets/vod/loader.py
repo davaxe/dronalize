@@ -16,41 +16,25 @@ class VodLoader(NuScenesLoader):
 
     def __init__(
         self,
-        data_directory: Path | str,
+        data_dir: Path | str,
         loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the processor.
 
         Parameters
         ----------
-        data_directory : Path or str
+        data_dir : Path or str
             Directory of the trajectory data JSON files.
         loader_config : LoaderConfig, optional
             Custom configuration, or default if None.
 
         """
-        super().__init__(data_directory, loader_config=loader_config)
+        super().__init__(data_dir, loader_config=loader_config)
         self._full_category_contains = [
             "vehicle.ego",
         ]
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(5, 30, 0.1).window_parameters(5)
-
-
-if __name__ == "__main__":
-    import time
-
-    # Update this path to your actual data location
-    data_dir = Path("/home/west/Developer/behavior-prediction/datasets/vod/v1.0-trainval/")
-
-    # Check if directory exists to avoid FileNotFound errors in example
-    if data_dir.exists():
-        start_time = time.perf_counter()
-        processor = VodLoader(data_directory=data_dir)
-        for _scene in processor.scenes():
-            if _scene.scene_number % 200 == 0:
-                print(f"Processing scene number: {_scene.scene_number}")
-    else:
-        print(f"Path not found: {data_dir}")
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(5, 30, 0.1).with_window(5).with_filtering(require_frames=[4])

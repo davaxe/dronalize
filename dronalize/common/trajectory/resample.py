@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import StrEnum
 from fractions import Fraction
 from typing import TYPE_CHECKING, Literal, cast, overload
 
@@ -13,13 +15,60 @@ from dronalize.common.trajectory.derivative import derivative
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.common.trajectory import T_DataFrame
+    from dronalize.common.trajectory import DataFrameT
+
+
+class ResamplingMethod(StrEnum):
+    """Enumeration of resampling methods for trajectory data."""
+
+    FAST = "fast"
+    """Linear interpolation-based resampling."""
+
+    SPLINE = "spline"
+    """Cubic spline-based resampling."""
+
+
+@dataclass(slots=True, frozen=True)
+class Resampling:
+    """Configuration for resampling trajectories."""
+
+    up: int
+    """Upsampling factor."""
+    down: int
+    """Downsampling factor."""
+    method: ResamplingMethod = ResamplingMethod.FAST
+    """Method used for resampling."""
+
+    def __init__(
+        self,
+        up: int,
+        down: int,
+        method: Literal["fast", "spline"] | ResamplingMethod = ResamplingMethod.FAST,
+    ) -> None:
+        """Simplify the resampling ratio to its smallest integer ratio form."""
+        simplified_up, simplified_down = Fraction(up, down).as_integer_ratio()
+        if method == "fast":
+            method = ResamplingMethod.FAST
+        elif method == "spline":
+            method = ResamplingMethod.SPLINE
+        object.__setattr__(self, "up", simplified_up)
+        object.__setattr__(self, "down", simplified_down)
+        object.__setattr__(self, "method", method)
+
+    @property
+    def factors(self) -> tuple[int, int]:
+        """(up, down) resampling factors."""
+        return (self.up, self.down)
+
+    @property
+    def no_resampling(self) -> bool:
+        """Whether no resampling is applied."""
+        return self.up == 1 and self.down == 1
 
 
 def resample_tracks(
-    data: T_DataFrame,
-    up: int,
-    down: int = 1,
+    data: DataFrameT,
+    resampling: Resampling,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
     group_by: str | Sequence[str] | None = None,
@@ -27,10 +76,9 @@ def resample_tracks(
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     dt: float = 1.0,
-    method: Literal["fast", "spline"] = "fast",
     derivative_rename: dict[int, list[str]] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     """Resample trajectory data to a new sampling rate.
 
     This function adjusts the temporal resolution of track data by upsampling and
@@ -42,10 +90,8 @@ def resample_tracks(
     ----------
     data : T_DataFrame
         Input trajectory data in a Polars-compatible DataFrame format.
-    up : int
-        Upsampling factor. Increases the number of samples.
-    down : int, optional
-        Downsampling factor. Decreases the number of samples. Defaults to 1.
+    resampling : Resampling
+        Configuration specifying upsampling/downsampling factors and method.
     frame_column : str, optional
         Name of the column representing time or frame index. Defaults to "frame".
     pos_columns : Sequence[str], optional
@@ -63,10 +109,6 @@ def resample_tracks(
     dt : float, optional
         Time step between original frames, used to scale derivatives
         appropriately. Defaults to 1.0.
-    method : {"fast", "spline"}, optional
-        Resampling algorithm to use. "fast" performs standard interpolation;
-        "spline" uses cubic splines for smoother paths and more accurate
-        derivatives. Defaults to "fast".
     derivative_rename : dict[int, list[str]], optional
         Mapping to define custom names for the resulting derivative columns.
         Defaults to None.
@@ -80,8 +122,10 @@ def resample_tracks(
         requested derivatives.
 
     """
+    method = resampling.method
+    up, down = resampling.factors
     group_by = [group_by] if isinstance(group_by, str) else group_by
-    if method == "fast":
+    if method in {"fast", ResamplingMethod.FAST}:
         resampled = _resample_dataframe(
             data=data,
             up=up,
@@ -126,7 +170,7 @@ def resample_tracks(
 
 
 def _resample_dataframe_spline(
-    data: T_DataFrame,
+    data: DataFrameT,
     up: int,
     down: int = 1,
     frame_column: str = "frame",
@@ -136,7 +180,7 @@ def _resample_dataframe_spline(
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     derivative_rename: dict[int, list[str]] | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     """Resample the track trajectories by an integer fraction.
 
     The required columns are:
@@ -274,11 +318,11 @@ def _return_type(
     fields = dict.fromkeys(pos_cols, pl.Float32)
     if add_derivative:
         fields.update(
-            dict.fromkeys(derivative_rename.get(1, [f"v{c}" for c in pos_cols]), pl.Float32)
+            dict.fromkeys(derivative_rename.get(1, [f"v{c}" for c in pos_cols]), pl.Float32),
         )
     if add_second_derivative:
         fields.update(
-            dict.fromkeys(derivative_rename.get(2, [f"a{c}" for c in pos_cols]), pl.Float32)
+            dict.fromkeys(derivative_rename.get(2, [f"a{c}" for c in pos_cols]), pl.Float32),
         )
     return pl.Struct(fields)
 
@@ -329,23 +373,23 @@ def _apply_interpolation(
 
 
 def _resample_dataframe(
-    data: T_DataFrame,
+    data: DataFrameT,
     up: int,
     down: int,
     frame_column: str = "frame",
     group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     up, down = Fraction(up, down).as_integer_ratio()
     data_ = data if up <= 1 else _upsample_dataframe(data, up, frame_column, group_by, forward_fill)
     return data_ if down <= 1 else _downsample_dataframe(data_, down, frame_column)
 
 
 def _downsample_dataframe(
-    data: T_DataFrame,
+    data: DataFrameT,
     factor: int,
     frame_column: str = "frame",
-) -> T_DataFrame:
+) -> DataFrameT:
     """Downsample by an integer factor using decimation.
 
     Parameters
@@ -378,33 +422,13 @@ def _downsample_dataframe(
     )
 
 
-@overload
 def _upsample_dataframe(
-    data: pl.DataFrame,
+    data: DataFrameT,
     factor: int,
     frame_column: str = "frame",
     group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> pl.DataFrame: ...
-
-
-@overload
-def _upsample_dataframe(
-    data: pl.LazyFrame,
-    factor: int,
-    frame_column: str = "frame",
-    group_by: Sequence[str] | None = None,
-    forward_fill: Sequence[str] | None = None,
-) -> pl.LazyFrame: ...
-
-
-def _upsample_dataframe(
-    data: T_DataFrame,
-    factor: int,
-    frame_column: str = "frame",
-    group_by: Sequence[str] | None = None,
-    forward_fill: Sequence[str] | None = None,
-) -> pl.DataFrame | pl.LazyFrame:
+) -> DataFrameT:
     """Upsample by an integer factor using linear interpolation.
 
     Parameters
@@ -443,7 +467,7 @@ def _upsample_dataframe(
                 pl.col(frame_column).max() + 1,
                 step=1,
                 dtype=pl.Int32,
-            ).alias(frame_column)
+            ).alias(frame_column),
         )
         .explode(frame_column)
     )

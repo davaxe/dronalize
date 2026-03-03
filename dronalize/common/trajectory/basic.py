@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import polars as pl
 
 if TYPE_CHECKING:
-    from dronalize.common.trajectory import T_DataFrame
+    from dronalize.common.trajectory import DataFrameT
 
 
 def lazy(data: pl.DataFrame | pl.LazyFrame) -> pl.LazyFrame:
@@ -18,16 +18,16 @@ def lazy(data: pl.DataFrame | pl.LazyFrame) -> pl.LazyFrame:
 def collect(data: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame:
     """Resolve a LazyFrame to a DataFrame if necessary."""
     if isinstance(data, pl.LazyFrame):
-        return cast("pl.DataFrame", data.collect())
+        return data.collect()
     return data
 
 
 def yaw_from_vel(
-    data: T_DataFrame,
+    data: DataFrameT,
     vx_col: str = "vx",
     vy_col: str = "vy",
     yaw_col: str = "yaw",
-) -> T_DataFrame:
+) -> DataFrameT:
     """Estimate yaw from velocity vector.
 
     Parameters
@@ -76,11 +76,11 @@ def yaw_from_vel_expr(
 
 
 def yaw_from_pos(
-    data: T_DataFrame,
+    data: DataFrameT,
     x_col: str = "x",
     y_col: str = "y",
     yaw_col: str = "yaw",
-) -> T_DataFrame:
+) -> DataFrameT:
     """Estimate yaw from position differences.
 
     Parameters

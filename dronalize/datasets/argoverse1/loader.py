@@ -6,10 +6,10 @@ from typing_extensions import override
 
 from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import resample_tracks
+from dronalize.common.trajectory.resample import Resampling, resample_tracks
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Resampling, Source
+from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
 
 class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
@@ -19,7 +19,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         self,
         data_dir: Path,
         file_batch_size: int | None = 100,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the data processor.
 
@@ -32,12 +32,12 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
             read at once. Higher batch size may lead to faster processing at
             diminishing returns, but also higher memory usage. `None` is not
             recommended for large amounts of data.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration override. If None, the default
             configuration will be used.
 
         """
-        super().__init__(loader_config=config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
         self._data_path = data_dir
         self._batch_size: int | None = file_batch_size
 
@@ -74,26 +74,24 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame]
+        self, source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
 
         source_filtered = source.inner.filter(
             filter_scene_expr(
-                self.loader_config,
+                self.loader_config.scene_filtering,
                 group_by=["file_id"],
                 category_column="agent_category",
-            )
+            ),
         )
 
         source_resampled = resample_tracks(
             source_filtered,
-            resampling.up,
-            resampling.down,
+            resampling,
             group_by=["file_id"],
             add_derivative=True,
             add_second_derivative=True,
-            method=resampling.method,
             dt=self.loader_config.sample_time,
             derivative_rename=self.derivative_names(),
             forward_fill=["agent_category"],
@@ -108,9 +106,10 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df, yaw_col="yaw")
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(20, 30, 0.1)
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(20, 30, 0.1).with_filtering(require_frames=[19])
 
 
 _SCHEMA: pl.Schema = pl.Schema({
@@ -121,20 +120,3 @@ _SCHEMA: pl.Schema = pl.Schema({
     "Y": pl.Float32,
     "CITY_NAME": pl.String,
 })
-
-if __name__ == "__main__":
-    import time
-
-    data_path = Path(
-        "/home/west/Developer/behavior-prediction/datasets/argoverse/forecasting_train_v1.1/train/data"
-    )
-    processor = Argoverse1Loader(data_path, file_batch_size=1000)
-    count = 0
-    time_start = time.perf_counter()
-    for _scene in processor.scenes():
-        count += 1
-        if count % 500 == 0:
-            print(f"Processed {count} scenes in {time.perf_counter() - time_start:.2f} seconds")
-
-    print(f"Total scenes processed: {count}")
-    print(f"Time taken: {time.perf_counter() - time_start:.2f} seconds")

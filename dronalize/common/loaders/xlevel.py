@@ -29,7 +29,7 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
     def __init__(
         self,
         data_dir: Path,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the trajectory data loader for a X-level dataset (e.g., rounD, inD).
 
@@ -37,11 +37,11 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
         ----------
         data_dir : Path
             Path to the directory containing the .csv data files.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
 
         """
-        super().__init__(loader_config=config, enforce_schema=False)
+        super().__init__(loader_config=loader_config, enforce_schema=False)
         self._data_dir = data_dir
         self._rebalance_ratio = None
 
@@ -101,7 +101,7 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             columns = recording_meta_data.columns
             meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-                *self.meta_data_select()
+                *self.meta_data_select(),
             )
 
             utm_x0: float | None = None
@@ -111,7 +111,7 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
                 utm_y0 = recording_meta_data.select(pl.col("yUtmOrigin")).item()
 
             tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
-                *self.track_data_select()
+                *self.track_data_select(),
             )
             combined = tracks_df.join(meta_df, left_on="id", right_on="id")
             yield Source(
@@ -127,7 +127,7 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame]
+        self, source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         data = source.inner
         if self._rebalance_ratio is not None:
@@ -140,13 +140,17 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df)
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
+    def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(50, 125, 0.04)
-            .resampling_parameters(2, 5)
-            .window_parameters(25)
-            .scene_filtering_parameters(filter_agent_category=[AgentCategory.TRAILER])
+            .with_resampling(2, 5)
+            .with_window(25)
+            .with_filtering(
+                require_frames=[49],
+                filter_agent_category=[AgentCategory.TRAILER],
+            )
         )
 
 

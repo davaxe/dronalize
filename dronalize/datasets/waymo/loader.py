@@ -10,8 +10,8 @@ from typing_extensions import override
 # Assuming these exist in your project
 from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import resample_tracks
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig, Resampling
+from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.protocols.loader import Source
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
@@ -114,18 +114,16 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         resampling = self.loader_config.resampling or Resampling(1, 1)
         df_filtered = df.filter(
             filter_scene_expr(
-                self.loader_config,
+                self.loader_config.scene_filtering,
                 category_column="agent_category",
-            )
+            ),
         )
         df_resampled = resample_tracks(
             df_filtered,
-            resampling.up,
-            resampling.down,
+            resampling,
             group_by=["id"],
             add_derivative=resampling.method == "spline",
             add_second_derivative=resampling.method == "spline",
-            method=resampling.method,
             dt=self.loader_config.sample_time,
             derivative_rename=self.derivative_names(),
             forward_fill=["agent_category"],
@@ -143,9 +141,10 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         # Change autonomous vehicle to id 0 (from id -1)
         return df_resampled.with_columns(pl.col("id") + 1)
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(10, 80, 0.1)
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(10, 80, 0.1).with_filtering(require_frames=[9])
 
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:
@@ -241,25 +240,3 @@ _OBJECT_TYPE_TO_CATEGORY: dict[int, AgentCategory] = {
     scenario_pb2.Track.TYPE_CYCLIST: AgentCategory.BICYCLE,
     scenario_pb2.Track.TYPE_OTHER: AgentCategory.UNKNOWN,
 }
-
-
-if __name__ == "__main__":
-    import time
-
-    # Recommendation: Use ProcessPoolExecutor here for actual parallel processing
-    # because Protobuf parsing + Python loops are CPU bound and single-threaded.
-    directory = Path("/home/west/Developer/behavior-prediction/datasets/waymo/validation")
-
-    processor = WaymoLoader(directory, "*validation.tfrecord*", include_map=True)
-    start_time = time.perf_counter()
-    print("Starting processing...")
-    count = 0
-    # This loop will now yield one large  per file instead of per scene
-    for _scene in processor.scenes():
-        if count % 500 == 0:
-            print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f}s")
-        count += 1
-        print(_scene.map_context)
-        break
-
-    print(f"Finished processing {count} scenes in {time.perf_counter() - start_time:.2f}s")

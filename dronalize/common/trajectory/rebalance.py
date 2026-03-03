@@ -4,18 +4,20 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
+from dronalize.common.trajectory.basic import lazy
+
 if TYPE_CHECKING:
-    from dronalize.common.trajectory import T_DataFrame
+    from dronalize.common.trajectory import DataFrameT
 
 
 def rebalance_highway_agents(
-    data: T_DataFrame,
+    data: DataFrameT,
     ratio: float = 2.0,
     req_lane_changes: int = 1,
     agent_id: str = "id",
-    n_lanechange_col: str = "lane_changes",
+    lane_changes_col: str = "lane_changes",
     seed: int | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     """Rebalance data to enforce a specific ratio of Lane Changing (LC) to Lane Keeping (LK) agents.
 
     Ratio formula: N_LC / N_LK = ratio
@@ -31,7 +33,7 @@ def rebalance_highway_agents(
         Minimum lane changes to be considered an LC agent.
     agent_id : str, optional
         Column name for agent identifiers.
-    n_lanechange_col : str, optional
+    lane_changes_col : str, optional
         Column containing lane change counts (assumed pre-calculated per agent).
     seed : int, optional
         Random seed for reproducibility of sampling. This will also perform a sort
@@ -63,7 +65,7 @@ def rebalance_highway_agents(
 
     """
     # 1. Normalize input to LazyFrame to unify logic
-    lazy_data = data.lazy() if isinstance(data, pl.DataFrame) else data
+    lazy_data = lazy(data)
 
     # 2. Extract unique agents and classify them
     # We group by ID and take the max of lane_changes to see if they EVER met the criteria
@@ -71,7 +73,7 @@ def rebalance_highway_agents(
     agent_stats = (
         lazy_data
         .group_by(agent_id)
-        .agg(pl.col(n_lanechange_col).max().alias("max_lc"))
+        .agg(pl.col(lane_changes_col).max().alias("max_lc"))
         .with_columns((pl.col("max_lc") >= req_lane_changes).alias("is_lc_agent"))
     )
 

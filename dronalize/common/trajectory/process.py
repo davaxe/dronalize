@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import resample_tracks
+from dronalize.common.trajectory.resample import Resampling, resample_tracks
 from dronalize.common.trajectory.window import sliding_window
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-from dronalize.core.protocols.loader import LoaderConfig, Resampling
+    from dronalize.core.protocols.loader import LoaderConfig
 
 
 def prepare_agent_trajectories(
@@ -78,22 +78,20 @@ def prepare_agent_trajectories(
 
     scenes_filtered = scenes.filter(
         filter_scene_expr(
-            config,
+            config.scene_filtering,
             agent_id="id",
             group_by=group_by[-1] if len(group_by) > 0 else None,
             category_column=agent_category_col,
-        )
+        ),
     )
     group_by.append("id")
     scenes_filtered = scenes_filtered.filter(pl.len().over(group_by) > 1)
     scenes_resampled = resample_tracks(
         scenes_filtered,
-        resampling.up,
-        resampling.down,
+        resampling,
         group_by=group_by,
         add_derivative=add_derivative,
         add_second_derivative=add_second_derivative,
-        method=resampling.method,
         dt=config.sample_time,
         derivative_rename=derivative_rename,
         forward_fill=[agent_category_col, *forward_fill]

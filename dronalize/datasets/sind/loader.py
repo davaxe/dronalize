@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace as _replace
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -42,11 +43,22 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
             configuration.
 
         """
+        if filter_parked_vehicles:
+            resolved = loader_config or type(self).default_config()
+            filtering = resolved.scene_filtering
+            if filtering is not None:
+                loader_config = _replace(
+                    resolved,
+                    scene_filtering=_replace(filtering, filter_slow_agents=0.1),
+                )
+            else:
+                loader_config = resolved.with_filtering(
+                    require_frames=[resolved.input_len - 1],
+                    filter_slow_agents=0.1 * 0.1,  # 0.1 m/s,
+                )
+
         super().__init__(loader_config, enforce_schema=True)
         self._data_dir = data_dir
-        if self.loader_config.scene_filtering is not None and filter_parked_vehicles:
-            # Will remove all agents with an average speed less than 0.1
-            self.loader_config.scene_filtering.filter_slow_agents = 0.1
 
     @override
     def sources(self) -> Iterable[Source[str, pl.LazyFrame]]:
@@ -69,7 +81,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
                 *("x", "y", "vx", "vy", "ax", "ay"),
             )
             pedestrian_df = pl.scan_csv(
-                pedestrian_data_path, schema_overrides=_PEDESTRIAN_SCHEMA
+                pedestrian_data_path, schema_overrides=_PEDESTRIAN_SCHEMA,
             ).select(
                 pl
                 .col("track_id")
@@ -101,7 +113,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[str, pl.LazyFrame]
+        self, source: Source[str, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         for df in prepare_agent_trajectories(source.inner, self.loader_config):
             yield df, source.map_context or mc.NoMap()
@@ -113,12 +125,13 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
             .when(pl.col("yaw").is_null())
             .then(yaw_from_vel_expr())
             .otherwise(pl.col("yaw"))
-            .alias("yaw")
+            .alias("yaw"),
         )
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(20, 50, 0.1).window_parameters(25).scene_filtering_parameters()
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(20, 50, 0.1).with_window(25).with_filtering(require_frames=[19])
 
     @staticmethod
     def _resolve_map(path_name: str) -> str:

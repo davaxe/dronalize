@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -15,25 +14,26 @@ from dronalize.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
 
 class OpenDDLoader(BaseSceneLoader[str, str]):
     """Processor for OpenDD dataset stored in SQLite format."""
 
-    def __init__(self, database_path: Path, config: LoaderConfig | None = None) -> None:
+    def __init__(self, data_dir: Path, loader_config: LoaderConfig | None = None) -> None:
         """Initialize the OpenDD processor.
 
         Parameters
         ----------
-        database_path : Path
+        data_dir : Path
             Path to the OpenDD SQLite database file.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration override. If None, the default configuration
             will be used.
 
         """
-        super().__init__(enforce_schema=True, loader_config=config)
-        self._conn = sqlite3.connect(database_path)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
+        self._conn = sqlite3.connect(data_dir)
         self._cursor = self._conn.cursor()
 
     @override
@@ -100,15 +100,12 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return yaw_from_vel(df, yaw_col="yaw")
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(60, 150, 1 / 30).resampling_parameters(1, 3).window_parameters(75)
-
-
-if __name__ == "__main__":
-    path = Path("data/rdb2/trajectories_rdb2_v3.sqlite")
-    processor = OpenDDLoader(path)
-    count = 0
-    for _scene in processor.scenes():
-        count += 1
-    print(f"Processed {count} scenes.")
+    def default_config(cls) -> LoaderConfig:
+        return (
+            LoaderConfig(60, 150, 1 / 30)
+            .with_resampling(1, 3)
+            .with_window(75)
+            .with_filtering(require_frames=[59])
+        )

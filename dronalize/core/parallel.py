@@ -44,12 +44,12 @@ class ProgressBar(IntEnum):
         return ""
 
 
-T_Source = TypeVar("T_Source")
-T_ID = TypeVar("T_ID", bound=(Hashable))
+SourceT = TypeVar("SourceT")
+IdT = TypeVar("IdT", bound=Hashable)
 P = ParamSpec("P")
 
 
-class ParallelSceneLoader(SceneLoader[T_ID]):
+class ParallelSceneLoader(SceneLoader[IdT]):
     """A generic parallel data loader that wraps another BaseSceneLoader.
 
     It uses Python's multiprocessing module to parallelize the processing of
@@ -102,7 +102,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
     def __init__(
         self,
-        inner: BaseSceneLoader[T_ID, T_Source],
+        inner: BaseSceneLoader[IdT, SourceT],
         chunksize: int | None = None,
         processes: int | None = None,
         *,
@@ -127,7 +127,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
         Parameters
         ----------
-        inner : BaseSceneLoader[T_ID, T_Source]
+        inner : BaseSceneLoader[IdT, SourceT]
             The underlying BaseSceneLoader to use for processing each source.
         chunksize : int, optional
             The number of sources to process in each batch when using
@@ -198,7 +198,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         return self
 
     @override
-    def scenes(self) -> Iterable[Scene[T_ID]]:
+    def scenes(self) -> Iterable[Scene[IdT]]:
         """Process scenes in parallel and yield them one by one.
 
         This uses `multiprocessing` to process data in parallel. It works by
@@ -212,10 +212,12 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
         Yields
         ------
-        Scene[T_ID]
+        Scene[IdT]
             Processed scenes one at a time.
 
         """
+        self._mp_scene_counter.value = 0
+        self._mp_source_counter.value = 0
         with (
             tqdm.tqdm(**self._tqdm_args()) as progress_bar,
             mp.Pool(
@@ -232,12 +234,14 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
             ):
                 if self._progress_bar == ProgressBar.SOURCES:
                     progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value}, refresh=False
+                        {"scenes": self._mp_scene_counter.value},
+                        refresh=False,
                     )
                     progress_bar.update(1)
                 elif self._progress_bar == ProgressBar.SCENES:
                     progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value}, refresh=False
+                        {"sources": self._mp_source_counter.value},
+                        refresh=False,
                     )
                     progress_bar.update(len(scenes))
 
@@ -246,7 +250,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
     @override
     def scenes_callback(
         self,
-        callback: Callable[Concatenate[Scene[T_ID], P], None],
+        callback: Callable[Concatenate[Scene[IdT], P], None],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
@@ -278,6 +282,8 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
             top level of a module.
 
         """
+        self._mp_scene_counter.value = 0
+        self._mp_source_counter.value = 0
         loader = self._inner
         with (
             tqdm.tqdm(**self._tqdm_args()) as progress_bar,
@@ -301,12 +307,14 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
             for processed_scenes in work_iter:
                 if self._progress_bar == ProgressBar.SOURCES:
                     progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value}, refresh=False
+                        {"scenes": self._mp_scene_counter.value},
+                        refresh=False,
                     )
                     progress_bar.update(1)
                 elif self._progress_bar == ProgressBar.SCENES:
                     progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value}, refresh=False
+                        {"sources": self._mp_source_counter.value},
+                        refresh=False,
                     )
                     progress_bar.update(processed_scenes)
 
@@ -321,22 +329,22 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         return max(chunksize, 1)
 
     @staticmethod
-    def _process_fn(args: _ProcessArgs[T_ID, T_Source]) -> list[Scene[T_ID]]:
+    def _process_fn(args: _ProcessArgs[IdT, SourceT]) -> list[Scene[IdT]]:
         """Worker process function that processes a single source and returns a list of Scenes.
 
         Parameters
         ----------
-        args : _ProcessArgs[T_ID, T_Source]
+        args : _ProcessArgs[IdT, SourceT]
             Arguments containing the source and loader to process.
 
         Returns
         -------
-        list[Scene[T_ID]]
+        list[Scene[IdT]]
             List of processed scenes from the given source.
 
         """
         loader, source = args.loader, args.source
-        scenes: list[Scene[T_ID]] = []
+        scenes: list[Scene[IdT]] = []
 
         for scene_data, map_context in loader.process_next(source):
             scene = loader.create_scene(scene_data, source.identifier, map_context)
@@ -356,7 +364,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         return scenes
 
     @staticmethod
-    def _process_fn_callback(args: _ProcessArgs[T_ID, T_Source]) -> int:
+    def _process_fn_callback(args: _ProcessArgs[IdT, SourceT]) -> int:
         """Worker process function that applies a callback to each Scene.
 
         This function returns the number of processed scenes (used for keeping
@@ -366,7 +374,7 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
 
         Parameters
         ----------
-        args : _ProcessArgs[T_ID, T_Source]
+        args : _ProcessArgs[IdT, SourceT]
             Arguments containing the source, loader, and callback to apply.
 
         Returns
@@ -384,9 +392,10 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         scene_number: int = -1
         cb_args, cb_kwargs = args.cb_args or (), args.cb_kwargs or {}
         for scene_data, map_context in loader.process_next(source):
-            # Should be fine to aquire lock in loop, since `process_next` is expected to be
-            # relatively slow. Not as easy to move outside the loop here since we want to avoid
-            # loading all scenes into memory at once, which would happen if we used `_process_fn`.
+            # Should be fine to aquire lock in loop, since `process_next` is
+            # expected to be relatively slow. Not as easy to move outside the
+            # loop here since we want to avoid loading all scenes into memory at
+            # once, which would happen if we used `_process_fn`.
             with _scene_counter.get_lock():
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
@@ -419,24 +428,25 @@ class ParallelSceneLoader(SceneLoader[T_ID]):
         }
 
 
-class _ProcessArgs(NamedTuple, Generic[T_ID, T_Source]):
+class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):
     """Arguments for processing a single source in a worker process."""
 
-    source: Source[T_ID, T_Source]
-    loader: BaseSceneLoader[T_ID, T_Source]
+    source: Source[IdT, SourceT]
+    loader: BaseSceneLoader[IdT, SourceT]
     fn: Callable[..., None] | None = None
     cb_args: tuple | None = None
     cb_kwargs: dict[str, Any] | None = None
 
 
-# Worker initialization function to set up the global counter in each worker process.
+# Worker initialization function to set up the global counter in each worker
+# process.
 _scene_counter: Synchronized[int]
 _source_counter: Synchronized[int]
 
 
 def _init_worker(scene_counter: Synchronized[int], source_counter: Synchronized[int]) -> None:
-    # This is the standard and most efficient way to share a counter across processes in Python's
-    # multiprocessing module.
+    # This is the standard and most efficient way to share a counter across
+    # processes in Python's multiprocessing module.
     global _scene_counter  # noqa: PLW0603
     _scene_counter = scene_counter
     global _source_counter  # noqa: PLW0603

@@ -6,11 +6,10 @@ from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
 from dronalize.core.graph.builder import GraphBuilder
-from dronalize.core.graph.nodes import IntIDNode
 from dronalize.datasets.lyft.map import parser
 
 
-class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
+class LyftMapGraphBuilder(GraphBuilder):
     """Builder for a map graph from a Lyft LVL5 map."""
 
     def __init__(self, lyft_map: parser.LyftLVL5Map) -> None:
@@ -52,10 +51,6 @@ class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         return cls(lyft_map)
 
     @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
-
-    @override
     def build_impl(
         self,
         min_distance: float | None = None,
@@ -92,30 +87,16 @@ class LyftMapGraphBuilder(GraphBuilder[int, IntIDNode]):
         """Traverse a junction lane and yield edges for its boundaries."""
         boundary = lane.left_boundary
         self.add_path_lazy(
-            nodes=boundary.nodes,
-            edge_type=[boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)],
+            points=boundary.points,
+            edge_type=[boundary.get_edge_type_from_src(i) for i in range(len(boundary.points) - 1)],
         )
 
     def _traverse_lane(self, lane: parser.Lane) -> None:
         """Traverse a lane and yield edges for its boundaries."""
         for boundary in (lane.left_boundary, lane.right_boundary):
             self.add_path_lazy(
-                nodes=boundary.nodes,
+                points=boundary.points,
                 edge_type=[
-                    boundary.get_edge_type_from_src(i) for i in range(len(boundary.nodes) - 1)
+                    boundary.get_edge_type_from_src(i) for i in range(len(boundary.points) - 1)
                 ],
             )
-
-
-if __name__ == "__main__":
-    import time
-
-    base = Path("/home/west/Developer/behavior-prediction/datasets/lyft/semantic_map")
-    map_path = base / "semantic_map.pb"
-    meta_path = base / "meta.json"
-    start_time = time.perf_counter()
-    map_builder = LyftMapGraphBuilder.from_files(map_path, meta_path)
-    map_graph = map_builder.build(interp_distance=3, min_distance=1)
-
-
-# previous results:MapGraph(num_nodes=228860, num_edges=216920, node_positions_shape=torch.Size([228860, 2]), edge_indices_shape=torch.Size([2, 216920]))

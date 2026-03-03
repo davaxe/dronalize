@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -13,6 +12,7 @@ from dronalize.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
 
 class AD4CHELoader(XLevelDataLoader):
@@ -21,7 +21,7 @@ class AD4CHELoader(XLevelDataLoader):
     def __init__(
         self,
         data_dir: Path,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the trajectory data loader for the AD4CHE dataset.
@@ -38,13 +38,13 @@ class AD4CHELoader(XLevelDataLoader):
         ----------
         data_dir : Path
             Path to the directory containing the .csv data files.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
         lane_change_ratio : float, optional
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
-        super().__init__(data_dir, config)
+        super().__init__(data_dir, loader_config)
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 
@@ -58,11 +58,11 @@ class AD4CHELoader(XLevelDataLoader):
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-                *self.meta_data_select()
+                *self.meta_data_select(),
             )
 
             tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
-                *self.track_data_select()
+                *self.track_data_select(),
             )
             combined = tracks_df.join(meta_df, left_on="id", right_on="id")
             yield Source(
@@ -116,13 +116,14 @@ class AD4CHELoader(XLevelDataLoader):
         """Define the schema for the track CSV."""
         return _TRACK_SCHEMA
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
+    def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(60, 150, 1 / 30)
-            .resampling_parameters(1, 3)
-            .scene_filtering_parameters()
-            .window_parameters(45)
+            .with_resampling(1, 3)
+            .with_filtering(require_frames=[59])
+            .with_window(45)
         )
 
 
@@ -143,18 +144,3 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float32,
     "yAcceleration": pl.Float32,
 })
-
-if __name__ == "__main__":
-    from dronalize.common.plotting import plot_trajectories
-
-    data_dir = Path("C:/Users/axdai/dev/python/dronalize/data/ad4che")
-
-    processor = AD4CHELoader(data_dir=data_dir)
-    count = 0
-    for scene in processor.scenes():
-        if count % 50 == 0:
-            plt = plot_trajectories(scene.inner, group_by="id", width=1200, height=800).show()
-            print(scene.map_context)
-            print(f"Processed {count} scenes")
-        count += 1
-    print(f"Total scenes processed: {count}")

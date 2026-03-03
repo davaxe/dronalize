@@ -7,18 +7,18 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.common.trajectory import T_DataFrame
+    from dronalize.common.trajectory import DataFrameT
 
 
 def derivative(
-    data: T_DataFrame,
+    data: DataFrameT,
     *x: str,
     dt: float = 1.0,
     n: int = 1,
     include_intermediate: bool = False,
     group_by: str | Sequence[str] | None = None,
     derivative_rename: dict[int, list[str]] | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     """Compute the n-th order derivative for columns using finite differences.
 
     Calculates numerical derivatives for one or multiple columns. If multiple

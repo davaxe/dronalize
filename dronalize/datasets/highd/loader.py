@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -9,6 +8,8 @@ from dronalize.common.loaders.xlevel import XLevelDataLoader
 from dronalize.core import AgentCategory
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from dronalize.core import LoaderConfig
 
 
@@ -18,7 +19,7 @@ class HighDLoader(XLevelDataLoader):
     def __init__(
         self,
         data_dir: Path,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the trajectory data loader for the highD dataset.
@@ -35,13 +36,13 @@ class HighDLoader(XLevelDataLoader):
         ----------
         data_dir : Path
             Path to the directory containing the .csv data files.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
         lane_change_ratio : float, optional
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
-        super().__init__(data_dir, config)
+        super().__init__(data_dir, loader_config)
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 
@@ -118,15 +119,3 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float32,
     "yAcceleration": pl.Float32,
 })
-
-if __name__ == "__main__":
-    data_dir = Path("/home/west/Developer/behavior-prediction/datasets/highD/data")
-
-    processor = HighDLoader(data_dir=data_dir)
-    count = 0
-    for scene in processor.scenes():
-        if count % 200 == 0:
-            print(scene.map_context)
-            print(f"Processed {count} scenes")
-        count += 1
-    print(f"Total scenes processed: {count}")

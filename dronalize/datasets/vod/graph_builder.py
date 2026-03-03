@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import itertools
-from pathlib import Path
 from typing import TYPE_CHECKING, Self
 
 import numpy as np
@@ -13,6 +11,8 @@ from dronalize.datasets.nuscenes.map.parser import NuScenesMap
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from dronalize.core.graph.builder import Point
 
 
 class VODMapGraphBuilder(NuScenesMapGraphBuilder):
@@ -81,9 +81,9 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
             u = np.linspace(0, 1, 100)
             xy = spline(u).astype(np.float64)
             x, y = xy[:, 0], xy[:, 1]
-            nodes = list(itertools.starmap(self.new_node, zip(x, y, strict=True)))
+            points: list[Point] = list(zip(x.tolist(), y.tolist(), strict=True))
             self.add_node_edges_loop_min_dist(
-                nodes,
+                points,
                 min_distance=self.min_distance,
                 interp_distance=None,
                 edge_type=EdgeType.STOP,

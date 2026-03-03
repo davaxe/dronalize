@@ -73,7 +73,7 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[str, pl.LazyFrame]
+        self, source: Source[str, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         for df in prepare_agent_trajectories(
             source.inner,
@@ -88,13 +88,14 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return df
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
+    def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(4, 6, 0.5)
-            .resampling_parameters(5, 1)
-            .scene_filtering_parameters()
-            .window_parameters(1)
+            .with_resampling(5, 1)
+            .with_filtering(require_frames=[3])
+            .with_window(1)
         )
 
 

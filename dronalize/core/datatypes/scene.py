@@ -10,11 +10,11 @@ if TYPE_CHECKING:
     from dronalize.core.datatypes.map_context import MapContext
 
 
-T_ID = TypeVar("T_ID", bound=(Hashable))
+IdT = TypeVar("IdT", bound=(Hashable))
 
 
 @dataclass(slots=True, frozen=True)
-class Scene(Generic[T_ID]):
+class Scene(Generic[IdT]):
     """Scene data class wrapping a DataFrame and its identifier.
 
     The dataframe is expected to at least contain all columns defined in
@@ -24,7 +24,7 @@ class Scene(Generic[T_ID]):
 
     inner: pl.DataFrame
     """Inner DataFrame containing the scene data."""
-    identifier: T_ID
+    identifier: IdT
     """Identifier for the scene (e.g., file name, index, scene name/token)."""
     scene_number: int
     """Unique scene number assigned during processing."""
@@ -57,6 +57,18 @@ class Scene(Generic[T_ID]):
         return replace(
             self,
             inner=self.inner.select([pl.col(name).cast(dtype) for name, dtype in schema.items()]),
+        )
+
+    def __repr__(self) -> str:
+        """Return a compact representation with metadata and DataFrame shape."""
+        rows, cols = self.inner.shape
+        return (
+            f"Scene(identifier={self.identifier!r}, "
+            f"scene_number={self.scene_number}, "
+            f"input_len={self.input_len}, "
+            f"output_len={self.output_len}, "
+            f"map_context={self.map_context!r}, "
+            f"inner=DataFrame({rows} rows x {cols} cols))"
         )
 
     @staticmethod

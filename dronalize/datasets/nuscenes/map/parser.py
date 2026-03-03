@@ -41,7 +41,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from typing_extensions import Self
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.map_object import BaseEnum, BaseMapObject, BaseNode
+from dronalize.core.protocols.map_object import BaseEnum, BaseMapObject
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -234,12 +234,16 @@ class LaneType(BaseEnum):
 
 
 @dataclass
-class Node(BaseMapObject[str], BaseNode[str]):
+class Node(BaseMapObject[str]):
     """A node in the NuScenes map, representing a point in space."""
 
     id: str
     x: float
     y: float
+
+    def as_point(self) -> tuple[float, float]:
+        """Return the node as an `(x, y)` point tuple."""
+        return (self.x, self.y)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Node:

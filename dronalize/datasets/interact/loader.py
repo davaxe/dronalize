@@ -9,8 +9,8 @@ from typing_extensions import override
 from dronalize.common.trajectory.basic import yaw_from_vel_expr
 from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import resample_tracks
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig, Resampling
+from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.protocols.loader import Source
 
@@ -25,7 +25,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
         self,
         data_dir: Path,
         file_batch_size: int | None = None,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the processor.
 
@@ -41,7 +41,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
             read at once. Higher batch size may lead to faster processing at
             diminishing returns, but also higher memory usage. `None` is not
             recommended for large amounts of data.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration override. If None, the default
             configuration will be used.
 
@@ -52,11 +52,14 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
             `InteractionLoader` does not support windowing.
 
         """
-        if config is not None and config.window_params is not None:
-            msg = f"InteractionProcessor does not support window_params, but got {config.window_params}"
+        if loader_config is not None and loader_config.window_params is not None:
+            msg = (
+                f"InteractionProcessor does not support window_params, "
+                f"but got {loader_config.window_params}"
+            )
             raise ValueError(msg)
 
-        super().__init__(loader_config=config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
         self._data_dir = data_dir
         self._file_batch_size: int | None = file_batch_size
 
@@ -78,7 +81,8 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
     @override
     def load_raw(
-        self, source: Source[str, list[Path]]
+        self,
+        source: Source[str, list[Path]],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         data = (
@@ -99,10 +103,10 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
         data_filtered = data.filter(
             filter_scene_expr(
-                self.loader_config,
+                self.loader_config.scene_filtering,
                 group_by=["file_id", "case_id"],
                 category_column="agent_category",
-            )
+            ),
         )
 
         data_filtered = data_filtered.with_columns(
@@ -111,12 +115,10 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
         data_processed = resample_tracks(
             data_filtered,
-            resampling.up,
-            resampling.down,
+            resampling,
             group_by=["file_id", "case_id", "id"],
             add_derivative=False,
             add_second_derivative=False,
-            method=resampling.method,
             dt=self.loader_config.sample_time,
             derivative_rename=self.derivative_names(),
             forward_fill=["agent_category"],
@@ -140,9 +142,10 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
             derivative_rename={1: ["ax", "ay"]},
         )
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(10, 30, 0.1)
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(10, 30, 0.1).with_filtering(require_frames=[19])
 
     @staticmethod
     def _map_agent_category() -> pl.Expr:
@@ -157,7 +160,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
                 pl
                 .when((pl.col("vx") ** 2 + pl.col("vy") ** 2).sqrt() < 2)
                 .then(AgentCategory.PEDESTRIAN.value)
-                .otherwise(AgentCategory.BICYCLE.value)
+                .otherwise(AgentCategory.BICYCLE.value),
             )
             .otherwise(pl.col("agent_category"))
         )
@@ -179,15 +182,3 @@ _SCHEMA = pl.Schema({
     "track_to_predict": pl.Float32,
     "interesting_agent": pl.Float32,
 })
-
-
-if __name__ == "__main__":
-    data_dir = Path("/home/west/Developer/behavior-prediction/datasets/interact/train")
-
-    processor = InteractionLoader(data_dir=data_dir)
-    count = 0
-    for _scene in processor.scenes():
-        if count % 200 == 0:
-            print(f"Processed {count} scenes")
-        count += 1
-    print(f"Total scenes processed: {count}")

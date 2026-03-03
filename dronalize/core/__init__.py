@@ -2,12 +2,16 @@
 
 # Domain models
 # Graph building
+# Pipeline
+# Allow `from dronalize.core import transforms` as a module reference
+from dronalize.core import transforms
 from dronalize.core.datatypes import (
     AgentCategory,
     EdgeType,
     Explicit,
     Implicit,
     Loaded,
+    LoaderConfig,
     MapContext,
     MapGraph,
     Scene,
@@ -16,9 +20,7 @@ from dronalize.core.graph import (
     Edges,
     GraphBuilder,
     InterpolationStage,
-    IntIDBaseMapObject,
-    IntIdBaseMapObject,
-    IntIDNode,
+    Point,
     get_edges_from_adj_list,
     interpolate_position,
 )
@@ -28,46 +30,46 @@ from dronalize.core.parallel import (
     ParallelSceneLoader,
     ProgressBar,
 )
+from dronalize.core.pipeline import (
+    FlatMapTransform,
+    Pipeline,
+    Transform,
+)
 
 # Protocols & loader ABCs
 from dronalize.core.protocols import (
     BaseEnum,
     BaseMapObject,
-    BaseNode,
     BaseSceneLoader,
-    FilteringConfig,
-    LoaderConfig,
-    Resampling,
-    SceneLoader,
-    WindowParams,
+)
+from dronalize.core.transforms import (
+    pipeline_from_config,
 )
 
 __all__ = [
     "AgentCategory",
     "BaseEnum",
     "BaseMapObject",
-    "BaseNode",
     "BaseSceneLoader",
     "EdgeType",
     "Edges",
     "Explicit",
-    "FilteringConfig",
+    "FlatMapTransform",
     "GraphBuilder",
     "Implicit",
-    "IntIDBaseMapObject",
-    "IntIDNode",
-    "IntIdBaseMapObject",
     "InterpolationStage",
     "Loaded",
     "LoaderConfig",
     "MapContext",
     "MapGraph",
     "ParallelSceneLoader",
+    "Pipeline",
+    "Point",
     "ProgressBar",
-    "Resampling",
     "Scene",
-    "SceneLoader",
-    "WindowParams",
+    "Transform",
     "get_edges_from_adj_list",
     "interpolate_position",
+    "pipeline_from_config",
+    "transforms",
 ]

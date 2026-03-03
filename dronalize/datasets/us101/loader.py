@@ -21,7 +21,7 @@ class US101Loader(I80Loader):
     def __init__(
         self,
         data_dir: Path,
-        config: LoaderConfig | None = None,
+        loader_config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1,
     ) -> None:
         """Initialize the US101 dataset loader.
@@ -38,7 +38,7 @@ class US101Loader(I80Loader):
         ----------
         data_dir : Path
             Path to root of the US101 dataset, containing subdirectories of data files.
-        config : LoaderConfig, optional
+        loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
         lane_change_ratio : float, optional
             Ratio for rebalancing highway agents. If None, no rebalancing will
@@ -46,4 +46,4 @@ class US101Loader(I80Loader):
             non-lane changes.
 
         """
-        super().__init__(data_dir, config, lane_change_ratio)
+        super().__init__(data_dir, loader_config, lane_change_ratio)

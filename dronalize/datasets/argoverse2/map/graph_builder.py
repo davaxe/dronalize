@@ -19,14 +19,14 @@ from typing import TYPE_CHECKING, Literal
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph import GraphBuilder, IntIDNode
+from dronalize.core.graph import GraphBuilder, Point
 from dronalize.datasets.argoverse2.map import parser
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
+class Argoverse2GraphBuilder(GraphBuilder):
     """A builder for creating a graph representation of an Argoverse2 map."""
 
     def __init__(self, map_data: parser.Argoverse2Map) -> None:
@@ -41,10 +41,6 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         """Create an `Argoverse2GraphBuilder` from a JSON file."""
         map_data = parser.Argoverse2Map(json_file)
         return cls(map_data)
-
-    @override
-    def new_node(self, x: float, y: float, z: float = 0) -> IntIDNode:
-        return IntIDNode(x, y, z)
 
     @override
     def build_impl(
@@ -63,11 +59,11 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
         """Add edges for pedestrian crossings in the map."""
         for crossing in self.map.pedestrian_crossings.values():
             self.add_path_lazy(
-                nodes=crossing.first_edge,
+                points=crossing.first_edge,
                 edge_type=EdgeType.PEDESTRIAN_MARKING,
             )
             self.add_path_lazy(
-                nodes=crossing.second_edge,
+                points=crossing.second_edge,
                 edge_type=EdgeType.PEDESTRIAN_MARKING,
             )
 
@@ -77,32 +73,32 @@ class Argoverse2GraphBuilder(GraphBuilder[int, IntIDNode]):
 
         while lane_segments:
             _, segment = lane_segments.popitem()
-            left = self._lane_segment_nodes(segment, side="left")
+            left = self._lane_segment_points(segment, side="left")
             if left is not None:
-                nodes, edge = left
+                points, edge = left
                 self.add_path_lazy(
-                    nodes=nodes,
+                    points=points,
                     edge_type=edge,
                 )
 
-            right_nodes = self._lane_segment_nodes(segment, side="right")
-            if right_nodes is not None:
-                nodes, edge = right_nodes
+            right = self._lane_segment_points(segment, side="right")
+            if right is not None:
+                points, edge = right
                 self.add_path_lazy(
-                    nodes=nodes,
+                    points=points,
                     edge_type=edge,
                 )
 
     @staticmethod
-    def _lane_segment_nodes(
+    def _lane_segment_points(
         segment: parser.LaneSegment,
         side: Literal["left", "right"],
-    ) -> tuple[list[IntIDNode], EdgeType] | None:
-        """Get all nodes for a lane segment's boundaries."""
+    ) -> tuple[list[Point], EdgeType] | None:
+        """Get all points for a lane segment's boundaries."""
         boundary = segment.left_boundary if side == "left" else segment.right_boundary
         if boundary is None:
             return None
 
-        nodes = boundary.nodes
+        points = boundary.points
         edge_type = boundary.get_edge_type()
-        return nodes, edge_type
+        return points, edge_type

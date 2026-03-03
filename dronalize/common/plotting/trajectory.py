@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
 import polars as pl
 
-from dronalize.common.trajectory.resample import resample_tracks
 from dronalize.core._compat import require_optional
 
 if TYPE_CHECKING:
@@ -88,7 +86,7 @@ def plot_trajectories(
         x=alt.X(x_col, title=x_label or x_col),
         y=alt.Y(y_col, title=y_label or y_col),
         color=alt.Color(
-            group_by or alt.Undefined, scale=alt.Scale(scheme="category20"), legend=None
+            group_by or alt.Undefined, scale=alt.Scale(scheme="category20"), legend=None,
         ),
     )
 
@@ -155,48 +153,3 @@ def plot_trajectories(
         chart.save(save_path)
 
     return chart
-
-
-def _generate_test() -> pl.DataFrame:
-    t = np.linspace(0, 2 * np.pi, 50)
-    frames = np.arange(len(t))
-    # Track 1
-    return pl.concat([
-        pl.DataFrame({
-            "frame": frames,
-            "x": np.sin(2 * t),
-            "y": np.cos(3 * t),
-            "track_id": 1,
-        }),
-        pl.DataFrame({
-            "frame": frames,
-            "x": np.sin(3 * t),
-            "y": np.cos(4 * t),
-            "track_id": 2,
-        }),
-        pl.DataFrame({
-            "frame": frames,
-            "x": np.cos(1 * t),
-            "y": np.sin(1 * t),
-            "track_id": 3,
-        }),
-    ]).cast({
-        "x": pl.Float64,
-        "y": pl.Float64,
-        "frame": pl.Int64,
-        "track_id": pl.Int64,
-    })
-
-
-if __name__ == "__main__":
-    # 1. Generate the complex data
-    df_complex = _generate_test()
-    print("Original DataFrame:")
-    print(df_complex)
-
-    df_resampled = resample_tracks(df_complex, up=3, down=1, group_by="track_id", method="spline")
-
-    print(df_resampled.filter(pl.col("track_id") == 1))
-
-    plot_trajectories(df_complex, group_by="track_id", n_groups=1)
-    plot_trajectories(df_resampled, group_by="track_id", n_groups=1)

@@ -7,14 +7,14 @@ from typing_extensions import override
 from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import resample_tracks
+from dronalize.common.trajectory.resample import Resampling, resample_tracks
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Resampling, Source
+from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
-# TODO: Currently the column "focal_agent_id" is disgarded and not used; might want to provide a way
-# to identify it downstream. Either implcitlty by assigning a specific id or explicitly by providing
-# a way to specify it.
+# TODO: Currently the column "focal_agent_id" is discarded and not used; might
+# want to provide a way to identify it downstream. Either implicitly by
+# assigning a specific id or explicitly by providing a way to specify it.
 
 
 class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
@@ -85,15 +85,16 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame]
+        self,
+        source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         source_filtered = source.inner.filter(
             filter_scene_expr(
-                self.loader_config,
+                self.loader_config.scene_filtering,
                 group_by=["file_id"],
                 category_column="agent_category",
-            )
+            ),
         )
 
         if resampling.no_resampling:
@@ -109,16 +110,14 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             source_resampled = yaw_from_vel(
                 resample_tracks(
                     source_filtered,
-                    resampling.up,
-                    resampling.down,
+                    resampling,
                     group_by=["file_id"],
                     add_derivative=True,
                     add_second_derivative=True,
-                    method=resampling.method,
                     dt=self.loader_config.sample_time,
                     derivative_rename=self.derivative_names(),
                     forward_fill=["agent_category"],
-                )
+                ),
             )
 
         for _, group in source_resampled.collect().group_by(["file_id"]):
@@ -128,14 +127,16 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
         return df
 
+    @classmethod
     @override
-    def default_config(self) -> LoaderConfig:
-        return LoaderConfig(50, 60, 0.1).scene_filtering_parameters(
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(50, 60, 0.1).with_filtering(
+            require_frames=[49],
             filter_agent_category=[
                 AgentCategory.STATIC_OBJECT,
                 AgentCategory.UNKNOWN,
                 AgentCategory.UNIMPORTANT,
-            ]
+            ],
         )
 
     @staticmethod
@@ -153,22 +154,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             "unknown": AgentCategory.UNKNOWN,
         }
         return pl.col(col).replace_strict(
-            mapping, default=AgentCategory.UNKNOWN, return_dtype=pl.Int32
+            mapping,
+            default=AgentCategory.UNKNOWN,
+            return_dtype=pl.Int32,
         )
-
-
-if __name__ == "__main__":
-    data_dir = Path("/home/west/Developer/behavior-prediction/datasets/av2/train")
-    file_batch_size = 100
-    processor = Argoverse2Loader(data_dir, file_batch_size)
-    count: int = 0
-    import time
-
-    start_time = time.perf_counter()
-    for scene in processor.scenes():
-        count += 1
-        if count % 200 == 0:
-            print(scene.map_context)
-            print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f} seconds")
-
-    print(f"Processed {count} scenes in {time.perf_counter() - start_time:.2f} seconds")

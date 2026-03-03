@@ -19,11 +19,13 @@ from dataclasses import dataclass, field
 from enum import auto
 from functools import cached_property
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.nodes import IntIDNode
-from dronalize.core.protocols.map_object import BaseEnum, BaseMapObject
+from dronalize.core.protocols.map_object import BaseEnum
+
+if TYPE_CHECKING:
+    from dronalize.core.graph.builder import Point
 
 
 class Argoverse2Map:
@@ -99,18 +101,23 @@ class LaneBoundary:
     """Represents a lane boundary in the Argoverse2 map."""
 
     lane_type: LaneBoundaryType
-    nodes: list[IntIDNode]
+    points: list[Point]
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], *, left: bool) -> LaneBoundary:
+    def from_dict(
+        cls,
+        data: dict[str, Any],
+        *,
+        left: bool,
+    ) -> LaneBoundary:
         """Create a `LaneBoundary` instance from a dictionary."""
         boundary_key = "left_lane_boundary" if left else "right_lane_boundary"
         type_key = "left_lane_mark_type" if left else "right_lane_mark_type"
 
-        nodes = [IntIDNode(**node) for node in data[boundary_key]]
+        points: list[Point] = [(node["x"], node["y"]) for node in data[boundary_key]]
         return cls(
             lane_type=LaneBoundaryType.from_str(data[type_key]),
-            nodes=nodes,
+            points=points,
         )
 
     def get_edge_type(self) -> EdgeType:
@@ -139,7 +146,7 @@ _BOUNDARY_TO_EDGE_TYPE = {
 
 
 @dataclass
-class LaneSegment(BaseMapObject[int]):
+class LaneSegment:
     """Represents a lane segment in the Argoverse2 map."""
 
     id: int
@@ -173,34 +180,34 @@ class LaneSegment(BaseMapObject[int]):
 
 
 @dataclass
-class PedestrianCrossing(BaseMapObject[int]):
+class PedestrianCrossing:
     """Represents a pedestrian crossing in the Argoverse2 map."""
 
     id: int
-    first_edge: list[IntIDNode]
-    second_edge: list[IntIDNode]
+    first_edge: list[Point]
+    second_edge: list[Point]
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PedestrianCrossing:
         """Create a `PedestrianCrossing` instance from a dictionary."""
         return cls(
             id=data["id"],
-            first_edge=[IntIDNode(**node) for node in data["edge1"]],
-            second_edge=[IntIDNode(**node) for node in data["edge2"]],
+            first_edge=[(node["x"], node["y"]) for node in data["edge1"]],
+            second_edge=[(node["x"], node["y"]) for node in data["edge2"]],
         )
 
 
 @dataclass
-class DrivableArea(BaseMapObject[int]):
+class DrivableArea:
     """Represents a drivable area in the Argoverse2 map."""
 
     id: int
-    boundary: list[IntIDNode] = field(default_factory=list)
+    boundary: list[Point] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> DrivableArea:
         """Create a `DrivableArea` instance from a dictionary."""
         return cls(
             id=data["id"],
-            boundary=[IntIDNode(**node) for node in data["area_boundary"]],
+            boundary=[(node["x"], node["y"]) for node in data["area_boundary"]],
         )
