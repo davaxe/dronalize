@@ -11,16 +11,16 @@ from polars.testing import assert_frame_equal
 from typing_extensions import override
 
 from dronalize.core import AgentCategory
+from dronalize.core import transforms as transform
 from dronalize.core.datatypes import LoaderConfig
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.pipeline import (
     FlatMapTransform,
     Pipeline,
     Transform,
-    pipeline_from_config,
 )
-from dronalize.core.pipeline import transforms as transform
 from dronalize.core.protocols.loader import BaseSceneLoader, Source
+from dronalize.core.transforms import pipeline_from_config
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -157,7 +157,7 @@ def test_pipeline_repr_empty() -> None:
 
 def test_run_empty_pipeline_is_identity(simple_lf: pl.LazyFrame) -> None:
     """Ensure running an empty pipeline acts as an identity function."""
-    results = list(Pipeline().run(simple_lf))
+    results = list(Pipeline().execute(simple_lf))
     assert len(results) == 1
     assert_frame_equal(results[0].collect(), simple_lf.collect())
 
@@ -165,7 +165,7 @@ def test_run_empty_pipeline_is_identity(simple_lf: pl.LazyFrame) -> None:
 def test_run_single_transform(simple_lf: pl.LazyFrame) -> None:
     """Verify that a single transform applies correctly to a LazyFrame."""
     pipe = Pipeline().then(_add_one_to_x)
-    result = pipe.run_single(simple_lf).collect()
+    result = pipe.execute_single(simple_lf).collect()
     expected = simple_lf.with_columns(pl.col("x") + 1).collect()
     assert_frame_equal(result, expected)
 
@@ -174,7 +174,7 @@ def test_run_chained_transforms_apply_in_order(simple_lf: pl.LazyFrame) -> None:
     """Ensure chained transforms apply in the exact order they were added."""
     # add 1 first, then multiply by 2 → (x+1)*2
     pipe = Pipeline().then(_add_one_to_x).then(_multiply_x_by_two)
-    result = pipe.run_single(simple_lf).collect()
+    result = pipe.execute_single(simple_lf).collect()
     expected = simple_lf.with_columns((pl.col("x") + 1) * 2).collect()
     assert_frame_equal(result, expected)
 
@@ -182,7 +182,7 @@ def test_run_chained_transforms_apply_in_order(simple_lf: pl.LazyFrame) -> None:
 def test_run_fan_out_produces_multiple_outputs(simple_lf: pl.LazyFrame) -> None:
     """Verify that a fan-out transform correctly produces multiple output frames."""
     pipe = Pipeline().then_flat_map(_split_by_id)
-    results = list(pipe.run(simple_lf))
+    results = list(pipe.execute(simple_lf))
     assert len(results) == 2  # two distinct IDs
     # Each should have 4 rows
     for r in results:
@@ -192,7 +192,7 @@ def test_run_fan_out_produces_multiple_outputs(simple_lf: pl.LazyFrame) -> None:
 def test_run_transform_after_fan_out_applied_to_each(simple_lf: pl.LazyFrame) -> None:
     """Ensure transforms added after a fan-out apply independently to all resulting frames."""
     pipe = Pipeline().then_flat_map(_split_by_id).then(_add_one_to_x)
-    results = [r.collect() for r in pipe.run(simple_lf)]
+    results = [r.collect() for r in pipe.execute(simple_lf)]
     assert len(results) == 2
     # All x values should have been incremented by 1
     all_x = pl.concat(results)["x"].to_list()
@@ -205,13 +205,13 @@ def test_run_single_raises_on_fan_out(simple_lf: pl.LazyFrame) -> None:
     """Verify that run_single raises a ValueError when multiple frames are produced."""
     pipe = Pipeline().then_flat_map(_split_by_id)
     with pytest.raises(ValueError, match="exactly 1 output"):
-        pipe.run_single(simple_lf)
+        pipe.execute_single(simple_lf)
 
 
 def test_run_single_succeeds_for_single_output(simple_lf: pl.LazyFrame) -> None:
     """Ensure run_single succeeds seamlessly when exactly one frame is produced."""
     pipe = Pipeline().then(_add_one_to_x)
-    result = pipe.run_single(simple_lf)
+    result = pipe.execute_single(simple_lf)
     assert isinstance(result, pl.LazyFrame)
 
 
@@ -220,7 +220,7 @@ def test_compose_then_run(simple_lf: pl.LazyFrame) -> None:
     p1 = Pipeline().then(_add_one_to_x)
     p2 = Pipeline().then(_multiply_x_by_two)
     combined = p1.compose(p2)
-    result = combined.run_single(simple_lf).collect()
+    result = combined.execute_single(simple_lf).collect()
     expected = simple_lf.with_columns((pl.col("x") + 1) * 2).collect()
     assert_frame_equal(result, expected)
 
@@ -228,7 +228,7 @@ def test_compose_then_run(simple_lf: pl.LazyFrame) -> None:
 def test_lambda_transform(simple_lf: pl.LazyFrame) -> None:
     """Ensure lambda functions correctly mutate the data within the pipeline."""
     pipe = Pipeline().then(lambda df: df.with_columns(pl.col("x") + 100))
-    result = pipe.run_single(simple_lf).collect()
+    result = pipe.execute_single(simple_lf).collect()
     assert result["x"].min() >= 100  # pyright: ignore[reportOperatorIssue]
 
 
@@ -240,7 +240,7 @@ def test_lambda_transform(simple_lf: pl.LazyFrame) -> None:
 def test_lambda_with_columns(simple_lf: pl.LazyFrame) -> None:
     """Verify a lambda transform using with_columns adds the expected columns."""
     pipe = Pipeline().then(lambda df: df.with_columns(pl.lit(42).alias("answer")))
-    result = pipe.run_single(simple_lf).collect()
+    result = pipe.execute_single(simple_lf).collect()
     assert "answer" in result.columns
     assert result["answer"].unique().to_list() == [42]
 
@@ -248,14 +248,14 @@ def test_lambda_with_columns(simple_lf: pl.LazyFrame) -> None:
 def test_lambda_select(simple_lf: pl.LazyFrame) -> None:
     """Verify a lambda transform using select keeps only the specified columns."""
     pipe = Pipeline().then(lambda df: df.select("frame", "id"))
-    result = pipe.run_single(simple_lf).collect()
+    result = pipe.execute_single(simple_lf).collect()
     assert result.columns == ["frame", "id"]
 
 
 def test_lambda_drop(simple_lf: pl.LazyFrame) -> None:
     """Verify a lambda transform using drop successfully removes specified columns."""
     pipe = Pipeline().then(lambda df: df.drop("y"))
-    result = pipe.run_single(simple_lf).collect()
+    result = pipe.execute_single(simple_lf).collect()
     assert "y" not in result.columns
     assert "x" in result.columns
 
@@ -263,7 +263,7 @@ def test_lambda_drop(simple_lf: pl.LazyFrame) -> None:
 def test_lambda_rename(simple_lf: pl.LazyFrame) -> None:
     """Verify a lambda transform using rename alters the column names correctly."""
     pipe = Pipeline().then(lambda df: df.rename({"x": "pos_x", "y": "pos_y"}))
-    result = pipe.run_single(simple_lf).collect()
+    result = pipe.execute_single(simple_lf).collect()
     assert "pos_x" in result.columns
     assert "pos_y" in result.columns
     assert "x" not in result.columns
@@ -272,7 +272,7 @@ def test_lambda_rename(simple_lf: pl.LazyFrame) -> None:
 def test_lambda_filter(simple_lf: pl.LazyFrame) -> None:
     """Verify a lambda transform using filter retains only the correct rows."""
     pipe = Pipeline().then(lambda df: df.filter(pl.col("id") == 1))
-    result = pipe.run_single(simple_lf).collect()
+    result = pipe.execute_single(simple_lf).collect()
     assert result["id"].unique().to_list() == [1]
     assert result.shape[0] == 4
 
@@ -281,7 +281,7 @@ def test_lambda_sort() -> None:
     """Verify a lambda transform using sort properly orders the rows."""
     lf = pl.DataFrame({"a": [3, 1, 2]}).lazy()
     pipe = Pipeline().then(lambda df: df.sort("a"))
-    assert pipe.run_single(lf).collect()["a"].to_list() == [1, 2, 3]
+    assert pipe.execute_single(lf).collect()["a"].to_list() == [1, 2, 3]
 
 
 def test_transform_group_by_yield_splits(simple_lf: pl.LazyFrame) -> None:
@@ -493,7 +493,7 @@ def test_pipeline_integration_filter_then_yaw() -> None:
         "vy": [0.0, 0.0, 0.0, 0.0],
     }).lazy()
     pipe = Pipeline().then(lambda df: df.filter(pl.col("id") == 1)).then(transform.yaw_from_vel())
-    result = pipe.run_single(lf).collect()
+    result = pipe.execute_single(lf).collect()
     assert result.shape[0] == 2
     assert result["yaw"][0] == pytest.approx(0.0)
 
@@ -511,7 +511,7 @@ def test_pipeline_integration_window_then_transform() -> None:
         .then_flat_map(transform.window(config))
         .then(lambda df: df.with_columns(pl.lit(99).alias("marker")))
     )
-    results = [r.collect() for r in pipe.run(lf)]
+    results = [r.collect() for r in pipe.execute(lf)]
     assert len(results) >= 2
     for r in results:
         assert "marker" in r.columns
@@ -532,7 +532,7 @@ def test_pipeline_integration_complex() -> None:
         .then_flat_map(transform.group_by_yield("id", drop_group_cols=False))
         .then(lambda df: df.rename({"x": "pos_x"}))
     )
-    results = [r.collect() for r in pipe.run(lf)]
+    results = [r.collect() for r in pipe.execute(lf)]
     assert len(results) == 2
     for r in results:
         assert "pos_x" in r.columns
@@ -558,7 +558,7 @@ def test_pipeline_from_config_basic_no_window_no_resample() -> None:
         "agent_category": [1, 1, 1, 1, 1, 1],
     }).lazy()
 
-    results = list(pipe.run(lf))
+    results = list(pipe.execute(lf))
     assert len(results) == 1
     result = results[0].collect()
     assert result.shape[0] == 6
@@ -579,7 +579,7 @@ def test_pipeline_from_config_with_window_produces_fan_out() -> None:
         "agent_category": [1] * 12,
     }).lazy()
 
-    results = list(pipe.run(lf))
+    results = list(pipe.execute(lf))
     assert len(results) >= 2
 
 
@@ -602,7 +602,7 @@ def test_pipeline_from_config_with_yaw_from_vel() -> None:
         "agent_category": [1, 1, 1, 1, 1, 1],
     }).lazy()
 
-    result = next(iter(pipe.run(lf))).collect()
+    result = next(iter(pipe.execute(lf))).collect()
     assert "yaw" in result.columns
     assert "vx" in result.columns
     assert "ax" in result.columns
@@ -620,7 +620,7 @@ def test_pipeline_from_config_no_category_column() -> None:
         "y": [0.0, 0.0, 0.0, 0.0],
     }).lazy()
 
-    results = list(pipe.run(lf))
+    results = list(pipe.execute(lf))
     assert len(results) == 1
 
 

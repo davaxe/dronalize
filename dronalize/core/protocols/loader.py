@@ -217,7 +217,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         -------
         ::
 
-            from dronalize.core.pipeline import Pipeline, transforms as T
+            from dronalize.core import transforms as T
+            from dronalize.core.pipeline import Pipeline
 
             def pipeline(self) -> Pipeline:
                 return (
@@ -330,7 +331,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
         for raw_df, map_context in self.load_raw(source):
             if use_pipeline:
-                for result_lf in pipe.run(raw_df):
+                for result_lf in pipe.execute(raw_df):
                     df = _collect(result_lf)
                     if df is not None:
                         yield df, map_context

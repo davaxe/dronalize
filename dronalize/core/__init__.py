@@ -3,6 +3,8 @@
 # Domain models
 # Graph building
 # Pipeline
+# Allow `from dronalize.core import transforms` as a module reference
+from dronalize.core import transforms
 from dronalize.core.datatypes import (
     AgentCategory,
     EdgeType,
@@ -32,8 +34,6 @@ from dronalize.core.pipeline import (
     FlatMapTransform,
     Pipeline,
     Transform,
-    pipeline_from_config,
-    transforms,
 )
 
 # Protocols & loader ABCs
@@ -41,6 +41,9 @@ from dronalize.core.protocols import (
     BaseEnum,
     BaseMapObject,
     BaseSceneLoader,
+)
+from dronalize.core.transforms import (
+    pipeline_from_config,
 )
 
 __all__ = [
