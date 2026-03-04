@@ -91,7 +91,12 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(4, 6, 0.5).with_resampling(5, 1).with_filtering().with_window(1)
+        return (
+            LoaderConfig(4, 6, 0.5)
+            .with_resampling(5, 1)
+            .with_filtering(require_frames=[3])
+            .with_window(1)
+        )
 
 
 _DATA_SCHEMA: pl.Schema = pl.Schema({

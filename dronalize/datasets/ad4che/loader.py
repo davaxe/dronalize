@@ -119,7 +119,12 @@ class AD4CHELoader(XLevelDataLoader):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(60, 150, 1 / 30).with_resampling(1, 3).with_filtering().with_window(45)
+        return (
+            LoaderConfig(60, 150, 1 / 30)
+            .with_resampling(1, 3)
+            .with_filtering(require_frames=[59])
+            .with_window(45)
+        )
 
 
 _META_SCHEMA: pl.Schema = pl.Schema({

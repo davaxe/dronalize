@@ -134,9 +134,8 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
             .with_window(step_size=20)
             .with_filtering(
                 min_agents=1,
-                require_prediction_frame=True,
                 filter_agent_category={AgentCategory.UNIMPORTANT},
-                require_frames=[-1],
+                require_frames=[19, -1],
             )
         )
 

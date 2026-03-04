@@ -114,4 +114,4 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(20, 50, 0.1).with_window(25).with_filtering()
+        return LoaderConfig(20, 50, 0.1).with_window(25).with_filtering(require_frames=[19])

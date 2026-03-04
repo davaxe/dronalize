@@ -52,7 +52,10 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
                     scene_filtering=_replace(filtering, filter_slow_agents=0.1),
                 )
             else:
-                loader_config = resolved.with_filtering(filter_slow_agents=0.1)
+                loader_config = resolved.with_filtering(
+                    require_frames=[resolved.input_len - 1],
+                    filter_slow_agents=0.1 * 0.1,  # 0.1 m/s,
+                )
 
         super().__init__(loader_config, enforce_schema=True)
         self._data_dir = data_dir
@@ -128,7 +131,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(20, 50, 0.1).with_window(25).with_filtering()
+        return LoaderConfig(20, 50, 0.1).with_window(25).with_filtering(require_frames=[19])
 
     @staticmethod
     def _resolve_map(path_name: str) -> str:

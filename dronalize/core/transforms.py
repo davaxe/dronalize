@@ -1,46 +1,28 @@
-"""Built-in transform / fan-out factory functions for pipelines.
-
-Import as::
-
-    from dronalize.core import transforms as T
-
-Then use in a pipeline::
-
-    Pipeline().then(T.filter(config)).then(T.resample(config))
-
-For generic Polars operations, use a lambda::
-
-    Pipeline().then(lambda df: df.drop("col")).then(lambda df: df.sort("frame"))
-"""
+"""Built-in transform / fan-out factory functions for pipelines."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.common.trajectory.basic import yaw_from_pos as _yaw_from_pos_impl
-from dronalize.common.trajectory.basic import yaw_from_vel as _yaw_from_vel_impl
+from dronalize.common.trajectory.basic import yaw_from_pos_expr, yaw_from_vel_expr
 from dronalize.common.trajectory.derivative import derivative as _derivative_impl
-from dronalize.common.trajectory.filter import filter_scene_expr
+from dronalize.common.trajectory.filter import FilteringConfig, filter_scene_expr
 from dronalize.common.trajectory.rebalance import rebalance_highway_agents
 from dronalize.common.trajectory.resample import Resampling, resample_tracks
 from dronalize.common.trajectory.window import sliding_window
+from dronalize.core.pipeline import Pipeline
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
     from dronalize.core.datatypes.loader_config import LoaderConfig
-    from dronalize.core.pipeline import FlatMapTransform, Pipeline, Transform
-
-# Type aliases matching pipeline.py internals.
-_TransformFn = Callable[[pl.LazyFrame], pl.LazyFrame]
-_FanOutFn = Callable[[pl.LazyFrame], Iterable[pl.LazyFrame]]
+    from dronalize.core.pipeline import FlatMapTransform, Transform
 
 __all__ = [
     "derivative",
-    "filter",
+    "filter_scene",
     "group_by_yield",
     "pipeline_from_config",
     "rebalance",
@@ -56,22 +38,22 @@ __all__ = [
 # -------------------------------------------------------------------
 
 
-def filter(
-    config: LoaderConfig,
+def filter_scene(
+    config: FilteringConfig | None = None,
     *,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
     category_column: str | None = "agent_category",
 ) -> Transform:
-    """Create a filtering transform from a :class:`LoaderConfig`.
+    """Create a filtering transform.
 
     Wraps :func:`~dronalize.common.trajectory.filter.filter_scene_expr`.
 
     Parameters
     ----------
-    config : LoaderConfig
-        Loader configuration containing the filtering criteria.
+    config : FilteringConfig, optional
+        Configuration containing the filtering criteria.
     group_by : str or Sequence[str], optional
         Column(s) that define independent scenes inside the frame.
     agent_id : str, optional
@@ -87,7 +69,7 @@ def filter(
 
     """
     expr = filter_scene_expr(
-        *config.filter_args(),
+        config=config,
         group_by=group_by,
         agent_id=agent_id,
         frame_column=frame_column,
@@ -108,7 +90,8 @@ def filter(
 
 
 def resample(
-    config: LoaderConfig,
+    resampling: Resampling | None = None,
+    sample_time: float = 1.0,
     *,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
@@ -121,14 +104,16 @@ def resample(
     """Create a resampling transform.
 
     Wraps :func:`~dronalize.common.trajectory.resample.resample_tracks`.
-    If the config specifies no resampling (ratio 1:1), the transform
+    If the resampling object specifies no resampling (ratio 1:1), the transform
     is still applied (it becomes a no-op for the resampling itself but
     may still add derivatives).
 
     Parameters
     ----------
-    config : LoaderConfig
-        Loader configuration with resampling parameters.
+    resampling : Resampling, optional
+        Resampling parameters.
+    sample_time : float, optional
+        Original sample time in seconds.
     frame_column : str, optional
         Column name for the frame index.
     pos_columns : Sequence[str], optional
@@ -149,18 +134,18 @@ def resample(
     Transform
 
     """
-    resampling = config.resampling or Resampling(1, 1)
+    resampling_obj = resampling or Resampling(1, 1)
 
     def _resample(df: pl.LazyFrame) -> pl.LazyFrame:
         return resample_tracks(
             df,
-            resampling,
+            resampling_obj,
             frame_column=frame_column,
             pos_columns=pos_columns,
             group_by=group_by,
             add_derivative=add_derivative,
             add_second_derivative=add_second_derivative,
-            dt=config.sample_time,
+            dt=sample_time,
             derivative_rename=derivative_rename,
             forward_fill=forward_fill,
         )
@@ -233,6 +218,8 @@ def yaw_from_vel(
     vx_col: str = "vx",
     vy_col: str = "vy",
     yaw_col: str = "yaw",
+    *,
+    only_null: bool = False,
 ) -> Transform:
     """Create a yaw-from-velocity transform.
 
@@ -246,15 +233,30 @@ def yaw_from_vel(
         Y-velocity column name.
     yaw_col : str, optional
         Output yaw column name.
+    only_null : bool, optional
+        Whether to only compute yaw for rows where `yaw_col` is null. Note that
+        this requires that `yaw_col` already exists in the input frame.
 
     Returns
     -------
     Transform
 
     """
+    if only_null:
 
-    def _yaw_from_vel(df: pl.LazyFrame) -> pl.LazyFrame:
-        return _yaw_from_vel_impl(df, vx_col=vx_col, vy_col=vy_col, yaw_col=yaw_col)
+        def _yaw_from_vel(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.with_columns(
+                pl
+                .when(pl.col(yaw_col).is_null())
+                .then(yaw_from_vel_expr(vx_col, vy_col, yaw_col))
+                .otherwise(pl.col(yaw_col))
+                .alias(yaw_col)
+            )
+
+    else:
+
+        def _yaw_from_vel(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.with_columns(yaw_from_vel_expr(vx_col, vy_col, yaw_col))
 
     _yaw_from_vel.__name__ = "yaw_from_vel"
     _yaw_from_vel.__qualname__ = "transforms.yaw_from_vel"
@@ -265,6 +267,8 @@ def yaw_from_pos(
     x_col: str = "x",
     y_col: str = "y",
     yaw_col: str = "yaw",
+    *,
+    only_null: bool = False,
 ) -> Transform:
     """Create a yaw-from-position transform.
 
@@ -278,15 +282,30 @@ def yaw_from_pos(
         Y-position column name.
     yaw_col : str, optional
         Output yaw column name.
+    only_null : bool, optional
+        Whether to only compute yaw for rows where `yaw_col` is null. Note that
+        this requires that `yaw_col` already exists in the input frame.
 
     Returns
     -------
     Transform
 
     """
+    if only_null:
 
-    def _yaw_from_pos(df: pl.LazyFrame) -> pl.LazyFrame:
-        return _yaw_from_pos_impl(df, x_col=x_col, y_col=y_col, yaw_col=yaw_col)
+        def _yaw_from_pos(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.with_columns(
+                pl
+                .when(pl.col(yaw_col).is_null())
+                .then(yaw_from_pos_expr(x_col, y_col, yaw_col))
+                .otherwise(pl.col(yaw_col))
+                .alias(yaw_col)
+            )
+
+    else:
+
+        def _yaw_from_pos(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.with_columns(yaw_from_pos_expr(x_col, y_col, yaw_col))
 
     _yaw_from_pos.__name__ = "yaw_from_pos"
     _yaw_from_pos.__qualname__ = "transforms.yaw_from_pos"
@@ -299,7 +318,8 @@ def yaw_from_pos(
 
 
 def window(
-    config: LoaderConfig,
+    window_size: int,
+    step_size: int,
     *,
     sliding_col: str = "frame",
     offset_sliding_col: bool = True,
@@ -313,8 +333,10 @@ def window(
 
     Parameters
     ----------
-    config : LoaderConfig
-        Loader configuration with ``window_params`` set.
+    window_size : int
+        Number of rows in each window.
+    step_size : int
+        Number of rows to move the window at each step.
     sliding_col : str, optional
         Column to slide over.
     offset_sliding_col : bool, optional
@@ -324,21 +346,7 @@ def window(
     -------
     FlatMapTransform
 
-    Raises
-    ------
-    ValueError
-        If ``config.window_params`` is ``None``.
-
     """
-    if config.window_params is None:
-        msg = (
-            "transforms.window() requires config.window_params to be set.  "
-            "Use LoaderConfig.with_window() first."
-        )
-        raise ValueError(msg)
-
-    window_size = config.window_params.window_size
-    step_size = config.window_params.step_size
 
     def _window(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
         for window_df in sliding_window(
@@ -524,8 +532,6 @@ def pipeline_from_config(
         A ready-to-use pipeline.
 
     """
-    from dronalize.core.pipeline import Pipeline
-
     pipe = Pipeline()
 
     # Determine the full group_by list.  If windowing is used, the sliding
@@ -547,8 +553,8 @@ def pipeline_from_config(
 
     # 2. Filtering
     pipe = pipe.then(
-        filter(
-            config,
+        filter_scene(
+            config.scene_filtering,
             group_by=resample_group_by[-1] if resample_group_by else None,
             agent_id=agent_id,
             frame_column=frame_column,
@@ -572,7 +578,8 @@ def pipeline_from_config(
 
     pipe = pipe.then(
         resample(
-            config,
+            config.resampling,
+            config.sample_time,
             frame_column=frame_column,
             pos_columns=pos_columns,
             group_by=resample_and_agent_groups or None,
@@ -608,7 +615,7 @@ def _inline_window(
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
-) -> _TransformFn:
+) -> Transform:
     """Apply sliding window as a 1:1 transform that keeps ``window_index``.
 
     This mirrors the ``return_iterable=False`` path of
@@ -637,7 +644,7 @@ def _split_windows(
     sliding_col: str = "frame",
     *,
     offset_sliding_col: bool = True,
-) -> _FanOutFn:
+) -> FlatMapTransform:
     """Fan-out that groups by ``window_index`` and yields each window."""
 
     def _apply(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:

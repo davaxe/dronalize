@@ -123,7 +123,12 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(4, 12, 0.5).with_resampling(up=5, down=1).with_window(step_size=1)
+        return (
+            LoaderConfig(4, 12, 0.5)
+            .with_resampling(up=5, down=1)
+            .with_window(step_size=1)
+            .with_filtering(require_frames=[3])
+        )
 
     def _load_tables(self) -> None:
         """Load all required tables using the generic loader."""

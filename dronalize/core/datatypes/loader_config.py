@@ -56,24 +56,6 @@ class LoaderConfig:
     scene_filtering: FilteringConfig | None = None
     """Configuration for filtering scenes based on agent validity and scene composition."""
 
-    def filter_args(self) -> tuple[FilteringConfig | None, int, int, float]:
-        """Return a tuple of arguments to be used for filtering scenes.
-
-        Returns
-        -------
-        tuple[FilteringConfig, int, int, float] | None
-            A tuple containing the scene filtering configuration, input length,
-            output length, and sample time. This can be used to pass all
-            necessary arguments to a filtering function in a single object.
-
-        """
-        return (
-            self.scene_filtering,
-            self.input_len,
-            self.output_len,
-            self.sample_time,
-        )
-
     # -- builder helpers (return new frozen instances) -----------------------
 
     def with_window(self, step_size: int, window_size: int | None = None) -> Self:
@@ -108,7 +90,6 @@ class LoaderConfig:
         min_agents: int = 2,
         *,
         require_all_valid: bool = False,
-        require_prediction_frame: bool = True,
         require_frames: Collection[int] | None = None,
         filter_agent_category: Collection[AgentCategory] | None = None,
         filter_slow_agents: float | None = None,
@@ -126,9 +107,6 @@ class LoaderConfig:
         require_all_valid : bool, optional
             If True, all agents must have valid positions for every time step
             (input and output). Defaults to False.
-        require_prediction_frame : bool, optional
-            If True, all agents must have a valid position at the first
-            prediction frame. Defaults to True.
         require_frames : Collection[int], optional
             Specific frame offsets (relative to scene start) that must be
             present. Supports negative indices. Defaults to None.
@@ -155,7 +133,6 @@ class LoaderConfig:
             scene_filtering=FilteringConfig(
                 min_agents=min_agents,
                 require_all_valid=require_all_valid,
-                require_prediction_frame=require_prediction_frame,
                 require_frames=require_frames,
                 filter_agent_category=filter_agent_category,
                 filter_slow_agents=filter_slow_agents,

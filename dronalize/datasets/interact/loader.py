@@ -99,7 +99,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
         data_filtered = data.filter(
             filter_scene_expr(
-                *self.loader_config.filter_args(),
+                self.loader_config.scene_filtering,
                 group_by=["file_id", "case_id"],
                 category_column="agent_category",
             )
@@ -141,7 +141,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(10, 30, 0.1)
+        return LoaderConfig(10, 30, 0.1).with_filtering(require_frames=[19])
 
     @staticmethod
     def _map_agent_category() -> pl.Expr:

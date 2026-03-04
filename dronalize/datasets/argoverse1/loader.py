@@ -80,7 +80,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
         source_filtered = source.inner.filter(
             filter_scene_expr(
-                *self.loader_config.filter_args(),
+                self.loader_config.scene_filtering,
                 group_by=["file_id"],
                 category_column="agent_category",
             )
@@ -109,7 +109,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(20, 30, 0.1)
+        return LoaderConfig(20, 30, 0.1).with_filtering(require_frames=[19])
 
 
 _SCHEMA: pl.Schema = pl.Schema({

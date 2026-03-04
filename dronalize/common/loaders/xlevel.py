@@ -147,7 +147,10 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
             LoaderConfig(50, 125, 0.04)
             .with_resampling(2, 5)
             .with_window(25)
-            .with_filtering(filter_agent_category=[AgentCategory.TRAILER])
+            .with_filtering(
+                require_frames=[49],
+                filter_agent_category=[AgentCategory.TRAILER],
+            )
         )
 
 

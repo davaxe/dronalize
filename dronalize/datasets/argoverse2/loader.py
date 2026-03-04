@@ -90,7 +90,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         resampling = self.loader_config.resampling or Resampling(1, 1)
         source_filtered = source.inner.filter(
             filter_scene_expr(
-                *self.loader_config.filter_args(),
+                self.loader_config.scene_filtering,
                 group_by=["file_id"],
                 category_column="agent_category",
             )
@@ -130,11 +130,12 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(50, 60, 0.1).with_filtering(
+            require_frames=[49],
             filter_agent_category=[
                 AgentCategory.STATIC_OBJECT,
                 AgentCategory.UNKNOWN,
                 AgentCategory.UNIMPORTANT,
-            ]
+            ],
         )
 
     @staticmethod

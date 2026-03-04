@@ -114,7 +114,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         resampling = self.loader_config.resampling or Resampling(1, 1)
         df_filtered = df.filter(
             filter_scene_expr(
-                *self.loader_config.filter_args(),
+                self.loader_config.scene_filtering,
                 category_column="agent_category",
             )
         )
@@ -144,7 +144,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(10, 80, 0.1)
+        return LoaderConfig(10, 80, 0.1).with_filtering(require_frames=[9])
 
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:

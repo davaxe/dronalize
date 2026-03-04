@@ -367,7 +367,7 @@ def test_transform_derivative_second_with_intermediate() -> None:
 def test_transform_filter_no_config_passes_all(trajectory_lf: pl.LazyFrame) -> None:
     """Ensure the filter transform passes all rows when no specific rules apply."""
     config = LoaderConfig(3, 3, 0.1)
-    fn = transform.filter(config)
+    fn = transform.filter_scene(config.scene_filtering)
     result = fn(trajectory_lf).collect()
     assert_frame_equal(result, trajectory_lf.collect())
 
@@ -377,7 +377,7 @@ def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
     # Filter out agent_category == 1 -> should remove all
 
     config = LoaderConfig(3, 3, 0.1).with_filtering(filter_agent_category=[AgentCategory.CAR])
-    fn = transform.filter(config)
+    fn = transform.filter_scene(config.scene_filtering)
     result = fn(trajectory_lf).collect()
     # All agents have category 1 (CAR), and min_agents=2 by default,
     # so after filtering CAR agents out, no valid agents remain,
@@ -388,7 +388,7 @@ def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
 def test_transform_resample_identity(simple_lf: pl.LazyFrame) -> None:
     """Ensure resampling with identical rates accurately preserves the row count."""
     config = LoaderConfig(2, 2, 1.0)
-    fn = transform.resample(config, group_by="id")
+    fn = transform.resample(config.resampling, config.sample_time, group_by="id")
     result = fn(simple_lf).collect()
     # 1:1 resampling should preserve row count
     assert result.shape[0] == simple_lf.collect().shape[0]
@@ -402,7 +402,7 @@ def test_transform_resample_downsample() -> None:
         "y": [0.0] * 10,
     }).lazy()
     config = LoaderConfig(5, 5, 0.1).with_resampling(1, 2)
-    fn = transform.resample(config)
+    fn = transform.resample(config.resampling, config.sample_time)
     result = fn(lf).collect()
     assert result.shape[0] == 5
 
@@ -440,8 +440,7 @@ def test_transform_window_produces_multiple() -> None:
         "frame": list(range(10)),
         "x": [float(i) for i in range(10)],
     }).lazy()
-    config = LoaderConfig(3, 2, 0.1).with_window(step_size=2, window_size=5)
-    fan = transform.window(config)
+    fan = transform.window(window_size=5, step_size=2)
     results = list(fan(lf))
     assert len(results) >= 2
 
@@ -452,8 +451,7 @@ def test_transform_window_offsets_frame() -> None:
         "frame": list(range(10)),
         "x": [float(i) for i in range(10)],
     }).lazy()
-    config = LoaderConfig(3, 2, 0.1).with_window(step_size=3, window_size=5)
-    fan = transform.window(config)
+    fan = transform.window(window_size=5, step_size=3)
     for result_lf in fan(lf):
         result = result_lf.collect()
         # Frame should be zero-offset
@@ -466,18 +464,10 @@ def test_transform_window_no_offset() -> None:
         "frame": list(range(6)),
         "x": [float(i) for i in range(6)],
     }).lazy()
-    config = LoaderConfig(3, 2, 0.1).with_window(step_size=3, window_size=5)
-    fan = transform.window(config, offset_sliding_col=False)
+    fan = transform.window(window_size=5, step_size=3, offset_sliding_col=False)
     results = [r.collect() for r in fan(lf)]
     # At least first window should start at frame 0
     assert results[0]["frame"].min() == 0
-
-
-def test_transform_window_requires_config() -> None:
-    """Ensure the window transform raises an error if the window parameters are missing."""
-    config = LoaderConfig(3, 2, 0.1)  # No window_params
-    with pytest.raises(ValueError, match="window_params"):
-        transform.window(config)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -505,10 +495,9 @@ def test_pipeline_integration_window_then_transform() -> None:
         "x": [float(i) for i in range(10)],
         "y": [0.0] * 10,
     }).lazy()
-    config = LoaderConfig(3, 2, 0.1).with_window(step_size=3, window_size=5)
     pipe = (
         Pipeline()
-        .then_flat_map(transform.window(config))
+        .then_flat_map(transform.window(window_size=5, step_size=3))
         .then(lambda df: df.with_columns(pl.lit(99).alias("marker")))
     )
     results = [r.collect() for r in pipe.execute(lf)]
