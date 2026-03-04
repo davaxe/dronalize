@@ -53,7 +53,10 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
         """
         if loader_config is not None and loader_config.window_params is not None:
-            msg = f"InteractionProcessor does not support window_params, but got {loader_config.window_params}"
+            msg = (
+                f"InteractionProcessor does not support window_params, "
+                f"but got {loader_config.window_params}"
+            )
             raise ValueError(msg)
 
         super().__init__(loader_config=loader_config, enforce_schema=True)
@@ -78,7 +81,8 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
     @override
     def load_raw(
-        self, source: Source[str, list[Path]],
+        self,
+        source: Source[str, list[Path]],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         data = (

@@ -8,7 +8,7 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Collection, Sequence
 
-    from dronalize.common.trajectory import T_DataFrame
+    from dronalize.common.trajectory import DataFrameT
     from dronalize.core.datatypes.categories import AgentCategory
 
 
@@ -62,13 +62,13 @@ class FilteringConfig:
 
 
 def filter_scene(
-    data: T_DataFrame,
+    data: DataFrameT,
     config: FilteringConfig | None,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
     category_column: str | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     """Filter scenes based on configuration.
 
     Parameters

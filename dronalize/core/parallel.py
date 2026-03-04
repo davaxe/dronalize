@@ -234,12 +234,14 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             ):
                 if self._progress_bar == ProgressBar.SOURCES:
                     progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value}, refresh=False,
+                        {"scenes": self._mp_scene_counter.value},
+                        refresh=False,
                     )
                     progress_bar.update(1)
                 elif self._progress_bar == ProgressBar.SCENES:
                     progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value}, refresh=False,
+                        {"sources": self._mp_source_counter.value},
+                        refresh=False,
                     )
                     progress_bar.update(len(scenes))
 
@@ -305,12 +307,14 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             for processed_scenes in work_iter:
                 if self._progress_bar == ProgressBar.SOURCES:
                     progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value}, refresh=False,
+                        {"scenes": self._mp_scene_counter.value},
+                        refresh=False,
                     )
                     progress_bar.update(1)
                 elif self._progress_bar == ProgressBar.SCENES:
                     progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value}, refresh=False,
+                        {"sources": self._mp_source_counter.value},
+                        refresh=False,
                     )
                     progress_bar.update(processed_scenes)
 
@@ -388,9 +392,10 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         scene_number: int = -1
         cb_args, cb_kwargs = args.cb_args or (), args.cb_kwargs or {}
         for scene_data, map_context in loader.process_next(source):
-            # Should be fine to aquire lock in loop, since `process_next` is expected to be
-            # relatively slow. Not as easy to move outside the loop here since we want to avoid
-            # loading all scenes into memory at once, which would happen if we used `_process_fn`.
+            # Should be fine to aquire lock in loop, since `process_next` is
+            # expected to be relatively slow. Not as easy to move outside the
+            # loop here since we want to avoid loading all scenes into memory at
+            # once, which would happen if we used `_process_fn`.
             with _scene_counter.get_lock():
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
@@ -433,14 +438,15 @@ class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):
     cb_kwargs: dict[str, Any] | None = None
 
 
-# Worker initialization function to set up the global counter in each worker process.
+# Worker initialization function to set up the global counter in each worker
+# process.
 _scene_counter: Synchronized[int]
 _source_counter: Synchronized[int]
 
 
 def _init_worker(scene_counter: Synchronized[int], source_counter: Synchronized[int]) -> None:
-    # This is the standard and most efficient way to share a counter across processes in Python's
-    # multiprocessing module.
+    # This is the standard and most efficient way to share a counter across
+    # processes in Python's multiprocessing module.
     global _scene_counter  # noqa: PLW0603
     _scene_counter = scene_counter
     global _source_counter  # noqa: PLW0603

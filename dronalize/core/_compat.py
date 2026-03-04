@@ -17,9 +17,8 @@ def require_optional(module_name: str, *, extra: str | None = None) -> ModuleTyp
     module_name : str
         Fully-qualified module name (e.g. `"torch"`).
     extra : str, optional
-        pip extras name to suggest in the error message.
-        If `None`, the suggestion defaults to
-        `pip install <module_name>`.
+        pip extras name to suggest in the error message. If `None`, the
+        suggestion defaults to `pip install <module_name>`.
 
     Returns
     -------

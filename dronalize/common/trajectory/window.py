@@ -10,12 +10,12 @@ from dronalize.common.trajectory.basic import collect
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.common.trajectory import T_DataFrame
+    from dronalize.common.trajectory import DataFrameT
 
 
 @overload
 def sliding_window(
-    data: T_DataFrame,
+    data: DataFrameT,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
@@ -29,7 +29,7 @@ def sliding_window(
 
 @overload
 def sliding_window(
-    data: T_DataFrame,
+    data: DataFrameT,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
@@ -38,11 +38,11 @@ def sliding_window(
     is_sorted: bool = False,
     include_boundaries: bool = False,
     return_iterable: Literal[False],
-) -> T_DataFrame: ...
+) -> DataFrameT: ...
 
 
 def sliding_window(
-    data: T_DataFrame,
+    data: DataFrameT,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
@@ -51,7 +51,7 @@ def sliding_window(
     is_sorted: bool = False,
     include_boundaries: bool = False,
     return_iterable: bool = True,
-) -> Iterable[pl.DataFrame] | T_DataFrame:
+) -> Iterable[pl.DataFrame] | DataFrameT:
     """Generate sliding windows from a DataFrame.
 
     When returning as an iterable, the function yields DataFrames for each
@@ -133,14 +133,14 @@ def _sliding_window_iterable(
 
 
 def _sliding_window(
-    data: T_DataFrame,
+    data: DataFrameT,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
     *,
     group_by: str | None = None,
     include_boundaries: bool = False,
-) -> T_DataFrame:
+) -> DataFrameT:
     return (
         data
         .group_by_dynamic(

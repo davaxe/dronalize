@@ -15,15 +15,17 @@ from dronalize.common.trajectory.derivative import derivative
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.common.trajectory import T_DataFrame
+    from dronalize.common.trajectory import DataFrameT
 
 
 class ResamplingMethod(StrEnum):
     """Enumeration of resampling methods for trajectory data."""
 
     FAST = "fast"
+    """Linear interpolation-based resampling."""
 
     SPLINE = "spline"
+    """Cubic spline-based resampling."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -65,7 +67,7 @@ class Resampling:
 
 
 def resample_tracks(
-    data: T_DataFrame,
+    data: DataFrameT,
     resampling: Resampling,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
@@ -76,7 +78,7 @@ def resample_tracks(
     dt: float = 1.0,
     derivative_rename: dict[int, list[str]] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     """Resample trajectory data to a new sampling rate.
 
     This function adjusts the temporal resolution of track data by upsampling and
@@ -168,7 +170,7 @@ def resample_tracks(
 
 
 def _resample_dataframe_spline(
-    data: T_DataFrame,
+    data: DataFrameT,
     up: int,
     down: int = 1,
     frame_column: str = "frame",
@@ -178,7 +180,7 @@ def _resample_dataframe_spline(
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     derivative_rename: dict[int, list[str]] | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     """Resample the track trajectories by an integer fraction.
 
     The required columns are:
@@ -371,23 +373,23 @@ def _apply_interpolation(
 
 
 def _resample_dataframe(
-    data: T_DataFrame,
+    data: DataFrameT,
     up: int,
     down: int,
     frame_column: str = "frame",
     group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> T_DataFrame:
+) -> DataFrameT:
     up, down = Fraction(up, down).as_integer_ratio()
     data_ = data if up <= 1 else _upsample_dataframe(data, up, frame_column, group_by, forward_fill)
     return data_ if down <= 1 else _downsample_dataframe(data_, down, frame_column)
 
 
 def _downsample_dataframe(
-    data: T_DataFrame,
+    data: DataFrameT,
     factor: int,
     frame_column: str = "frame",
-) -> T_DataFrame:
+) -> DataFrameT:
     """Downsample by an integer factor using decimation.
 
     Parameters
@@ -420,33 +422,13 @@ def _downsample_dataframe(
     )
 
 
-@overload
 def _upsample_dataframe(
-    data: pl.DataFrame,
+    data: DataFrameT,
     factor: int,
     frame_column: str = "frame",
     group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> pl.DataFrame: ...
-
-
-@overload
-def _upsample_dataframe(
-    data: pl.LazyFrame,
-    factor: int,
-    frame_column: str = "frame",
-    group_by: Sequence[str] | None = None,
-    forward_fill: Sequence[str] | None = None,
-) -> pl.LazyFrame: ...
-
-
-def _upsample_dataframe(
-    data: T_DataFrame,
-    factor: int,
-    frame_column: str = "frame",
-    group_by: Sequence[str] | None = None,
-    forward_fill: Sequence[str] | None = None,
-) -> pl.DataFrame | pl.LazyFrame:
+) -> DataFrameT:
     """Upsample by an integer factor using linear interpolation.
 
     Parameters

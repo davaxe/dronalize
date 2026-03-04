@@ -228,7 +228,10 @@ def test_lambda_transform(simple_lf: pl.LazyFrame) -> None:
     """Ensure lambda functions correctly mutate the data within the pipeline."""
     pipe = Pipeline().then(lambda df: df.with_columns(pl.col("x") + 100))
     result = pipe.execute_single(simple_lf).collect()
-    assert result["x"].min() >= 100  # pyright: ignore[reportOperatorIssue]
+    min_x = result["x"].min()
+    assert min_x is not None
+    assert isinstance(min_x, (int, float))
+    assert min_x >= 100
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -458,7 +461,7 @@ def test_transform_window_offsets_frame() -> None:
 
 
 def test_transform_window_no_offset() -> None:
-    """Verify the window transform retains the original frame offset when configured not to offset."""
+    """Verify the window transform retains the original frame offset."""
     lf = pl.DataFrame({
         "frame": list(range(6)),
         "x": [float(i) for i in range(6)],
@@ -524,7 +527,10 @@ def test_pipeline_integration_complex() -> None:
     assert len(results) == 2
     for r in results:
         assert "pos_x" in r.columns
-        assert r["pos_x"].min() >= 100.0  # pyright: ignore[reportOperatorIssue]
+        min_x = r["pos_x"].min()
+        assert min_x is not None
+        assert isinstance(min_x, (float, int))
+        assert min_x >= 100.0
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -572,7 +578,10 @@ def test_loader_legacy_normalize_fallback() -> None:
     scenes = list(loader.scenes())
     assert len(scenes) == 1
     # normalize should have been called
-    assert scenes[0].inner["x"].min() >= 1000  # pyright: ignore[reportOperatorIssue]
+    min_x = scenes[0].inner["x"].min()
+    assert min_x is not None
+    assert isinstance(min_x, (float, int))
+    assert min_x >= 1000
 
 
 def test_loader_pipeline_overrides_normalize() -> None:

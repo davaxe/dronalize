@@ -12,9 +12,9 @@ from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
-# TODO: Currently the column "focal_agent_id" is disgarded and not used; might want to provide a way
-# to identify it downstream. Either implcitlty by assigning a specific id or explicitly by providing
-# a way to specify it.
+# TODO: Currently the column "focal_agent_id" is discarded and not used; might
+# want to provide a way to identify it downstream. Either implicitly by
+# assigning a specific id or explicitly by providing a way to specify it.
 
 
 class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
@@ -85,7 +85,8 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame],
+        self,
+        source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         source_filtered = source.inner.filter(
@@ -153,5 +154,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             "unknown": AgentCategory.UNKNOWN,
         }
         return pl.col(col).replace_strict(
-            mapping, default=AgentCategory.UNKNOWN, return_dtype=pl.Int32,
+            mapping,
+            default=AgentCategory.UNKNOWN,
+            return_dtype=pl.Int32,
         )
