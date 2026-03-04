@@ -2,33 +2,26 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
-# Assuming these exist in your project
-from dronalize.common.trajectory.derivative import derivative
-from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import Resampling, resample_tracks
+import dronalize.pipeline.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes import map_context as mc
-from dronalize.core.protocols.loader import Source
+from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
+from dronalize.core.datatypes.split import DatasetSplit
+from dronalize.core.protocols.loader import IngestOutput, Source
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
-from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
+from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
+from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-FilterStr = Literal[
-    "*training.tfrecord*",
-    "*training_20s.tfrecord*",
-    "*validation.tfrecord*",
-    "validation_interactive.tfrecord*",
-    "*testing.tfrecord*",
-    "*testing_interactive.tfrecord*",
-    "*.tfrecord*",
-]
+    from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.datasets.waymo.protos.lean_map_pb2 import LeanMapContainer
 
 
 class WaymoLoader(BaseSceneLoader[str, Path]):
@@ -36,10 +29,10 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
 
     def __init__(
         self,
-        data_dir: Path | str,
-        filter_str: FilterStr,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
+        split: DatasetSplit = DatasetSplit.ALL,
         include_map: bool = True,
         interp_distance: float | None = None,
         min_distance: float | None = 1.5,
@@ -58,13 +51,14 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
 
         Parameters
         ----------
-        data_dir : Path or str
-            Directory containing the TFRecord files.
-        filter_str : str
-            String pattern to filter TFRecord files
-            (e.g., "*validation.tfrecord*").
+        data_root : Path or str
+            Root directory of the Waymo dataset.  This directory should
+            contain `training/`, `validation/`, and `testing/`
+            subdirectories with TFRecord files.
         loader_config : LoaderConfig, optional
             Configuration override. If None, the default configuration will be used.
+        split : DatasetSplit, optional
+            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
         include_map : bool, optional
             Whether to include map data in the scene. Defaults to True.
         interp_distance : float, optional
@@ -75,76 +69,115 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             Defaults to 1.5 meters.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._data_dir: Path = Path(data_dir) if isinstance(data_dir, str) else data_dir
-        self._filter_str: FilterStr = filter_str
+        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        self._data_root: Path = Path(data_root) if isinstance(data_root, str) else data_root
         self._include_map: bool = include_map
         self._interp_distance: float | None = interp_distance
         self._min_distance: float | None = min_distance
 
-    @override
-    def sources(self) -> Iterable[Source[str, Path]]:
-        # Sorting ensures deterministic processing order
-        for tfrecord_path in sorted(self._data_dir.glob(self._filter_str)):
+    # ------------------------------------------------------------------
+    # Split-aware source discovery
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _sources_from_dir(data_dir: Path) -> Iterable[Source[str, Path]]:
+        if not data_dir.is_dir():
+            return
+        for tfrecord_path in sorted(data_dir.glob("*.tfrecord*")):
             yield Source(identifier=tfrecord_path.stem, inner=tfrecord_path)
 
     @override
-    def num_sources(self) -> int | None:
-        return sum(1 for _ in self._data_dir.glob(self._filter_str))
+    def all_sources(self) -> Iterable[Source[str, Path]]:
+        yield from self.train_sources()
+        yield from self.validate_sources()
+        yield from self.test_sources()
 
     @override
-    def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        for i, raw_data in enumerate(_read_tfrecord(source.inner)):
+    def train_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_dir(self._data_root / "training")
+
+    @override
+    def validate_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_dir(self._data_root / "validation")
+
+    @override
+    def test_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_dir(self._data_root / "testing")
+
+    # ------------------------------------------------------------------
+    # Ingestion / pipeline
+    # ------------------------------------------------------------------
+
+    @override
+    def num_sources(self) -> int | None:
+        dirs: list[Path] = []
+        split = self._split
+        if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
+            dirs.append(self._data_root / "training")
+        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
+            dirs.append(self._data_root / "validation")
+        if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
+            dirs.append(self._data_root / "testing")
+
+        return sum(sum(1 for _ in d.glob("*.tfrecord*")) for d in dirs if d.is_dir())
+
+    @override
+    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+        for raw_data in _read_tfrecord(source.inner):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
-            # Map processing remains per-scenario (if needed)
-            map_context: mc.MapContext = mc.Explicit(tfrecord=str(source.inner), index=i)
             if self._include_map:
                 map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
-                current_map = WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
-                    min_distance=self._min_distance,
-                    interp_distance=self._interp_distance,
-                )
-                map_context = mc.Loaded(current_map)
 
-            yield _scenario_to_polars(scenario).lazy(), map_context
+                def _resolver(
+                    key: MapKey | None = None,  # noqa: ARG001
+                    _map_data: LeanMapContainer = map_data,
+                ) -> MapGraph:
+                    return WaymoMapGraphBuilder.from_proto(_map_data.map_features).build()
+
+                resolver: MapResolver = _resolver
+            else:
+                resolver = no_map()
+
+            yield _scenario_to_polars(scenario).lazy(), resolver
 
     @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        resampling = self.loader_config.resampling or Resampling(1, 1)
-        df_filtered = df.filter(
-            filter_scene_expr(
-                self.loader_config.scene_filtering,
-                category_column="agent_category",
-            ),
-        )
-        df_resampled = resample_tracks(
-            df_filtered,
-            resampling,
-            group_by=["id"],
-            add_derivative=resampling.method == "spline",
-            add_second_derivative=resampling.method == "spline",
-            dt=self.loader_config.sample_time,
-            derivative_rename=self.derivative_names(),
-            forward_fill=["agent_category"],
-        )
+    def pipeline(self) -> Pipeline:
+        resampling = self.loader_config.resampling
+        no_resampling = resampling is None or resampling.no_resampling
 
-        if resampling.method != "spline":
-            df_resampled = derivative(
-                df_resampled,
-                "vx",
-                "vy",
-                dt=self.loader_config.sample_time,
-                derivative_rename={1: ["ax", "ay"]},
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(
+                    self.loader_config,
+                    derivative_rename=self.derivative_names(),
+                    # When not using spline resampling, derivatives are computed
+                    # separately below since vx/vy already exist in the raw data
+                    # and only ax/ay need to be derived.
+                    add_derivative=not no_resampling,
+                    add_second_derivative=not no_resampling,
+                )
             )
-
-        # Change autonomous vehicle to id 0 (from id -1)
-        return df_resampled.with_columns(pl.col("id") + 1)
+            .then(
+                tr.derivative(
+                    "vx",
+                    "vy",
+                    dt=self.loader_config.sample_time,
+                    derivative_rename={1: ["ax", "ay"]},
+                ),
+                when=no_resampling,
+            )
+            # Shift autonomous vehicle id from -1 to 0
+            .then(tr.with_columns(pl.col("id") + 1))
+        )
 
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(10, 80, 0.1).with_filtering(require_frames=[9])
+        return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filtering(
+            require_frames=[9]
+        )
 
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:
@@ -233,10 +266,12 @@ def _read_tfrecord(path: Path) -> Iterable[bytes]:
         offset = data_end + 4
 
 
+# Integer values correspond to waymo.open_dataset.Track.ObjectType enum:
+# TYPE_UNSET=0, TYPE_VEHICLE=1, TYPE_PEDESTRIAN=2, TYPE_CYCLIST=3, TYPE_OTHER=4
 _OBJECT_TYPE_TO_CATEGORY: dict[int, AgentCategory] = {
-    scenario_pb2.Track.TYPE_UNSET: AgentCategory.UNKNOWN,
-    scenario_pb2.Track.TYPE_VEHICLE: AgentCategory.CAR,
-    scenario_pb2.Track.TYPE_PEDESTRIAN: AgentCategory.PEDESTRIAN,
-    scenario_pb2.Track.TYPE_CYCLIST: AgentCategory.BICYCLE,
-    scenario_pb2.Track.TYPE_OTHER: AgentCategory.UNKNOWN,
+    0: AgentCategory.UNKNOWN,  # TYPE_UNSET
+    1: AgentCategory.CAR,  # TYPE_VEHICLE
+    2: AgentCategory.PEDESTRIAN,  # TYPE_PEDESTRIAN
+    3: AgentCategory.BICYCLE,  # TYPE_CYCLIST
+    4: AgentCategory.UNKNOWN,  # TYPE_OTHER
 }

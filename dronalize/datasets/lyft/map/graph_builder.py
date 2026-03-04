@@ -5,11 +5,11 @@ from pathlib import Path
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.builder import GraphBuilder
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder
 from dronalize.datasets.lyft.map import parser
 
 
-class LyftMapGraphBuilder(GraphBuilder):
+class LyftMapGraphBuilder(BaseGraphBuilder):
     """Builder for a map graph from a Lyft LVL5 map."""
 
     def __init__(self, lyft_map: parser.LyftLVL5Map) -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import multiprocessing.shared_memory as shm
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import numpy as np
 from typing_extensions import Self
@@ -13,6 +13,17 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     import numpy.typing as npt
+
+
+class NumpyMapGraphDict(TypedDict):
+    """TypedDict for representing a MapGraph as a dictionary of NumPy arrays."""
+
+    map_num_nodes: int
+    map_num_edges: int
+    map_node_positions: npt.NDArray[np.float32]
+    map_edge_indices: npt.NDArray[np.int32]
+    map_node_types: npt.NDArray[np.int32]
+    map_edge_types: npt.NDArray[np.int32]
 
 
 class SharedMapGraph:
@@ -106,7 +117,8 @@ class SharedMapGraph:
 
     def __del__(self) -> None:
         """Ensure shared memory is closed."""
-        # Ensure shared memory is closed if the context manager was not used properly.
+        # Ensure shared memory is closed if the context manager was not used
+        # properly.
         if self._shared is not None:
             self._shared.close()
 
@@ -127,21 +139,21 @@ class MapGraph:
     node_positions: npt.NDArray[np.float32]
     """Node positions, shape `(N, 2)`."""
 
-    edge_indices: npt.NDArray[np.int64]
+    edge_indices: npt.NDArray[np.int32]
     """Edge COO indices, shape `(2, M)`."""
 
-    node_types: npt.NDArray[np.int64]
+    node_types: npt.NDArray[np.int32]
     """Per-node type labels, shape `(N,)`."""
 
-    edge_types: npt.NDArray[np.int64]
+    edge_types: npt.NDArray[np.int32]
     """Per-edge type labels, shape `(M,)`."""
 
     def __init__(
         self,
         node_positions: npt.NDArray[np.float32],
-        edge_indices: npt.NDArray[np.int64],
-        node_types: npt.NDArray[np.int64] | None = None,
-        edge_types: npt.NDArray[np.int64] | None = None,
+        edge_indices: npt.NDArray[np.int32],
+        node_types: npt.NDArray[np.int32] | None = None,
+        edge_types: npt.NDArray[np.int32] | None = None,
         *,
         return_if_empty: bool = True,
     ) -> None:
@@ -166,9 +178,9 @@ class MapGraph:
         if node_positions.size == 0 and edge_indices.size == 0:
             if return_if_empty:
                 node_positions = np.zeros((0, 2), dtype=np.float32)
-                edge_indices = np.zeros((2, 0), dtype=np.int64)
-                node_types = np.zeros((0,), dtype=np.int64)
-                edge_types = np.zeros((0,), dtype=np.int64)
+                edge_indices = np.zeros((2, 0), dtype=np.int32)
+                node_types = np.zeros((0,), dtype=np.int32)
+                edge_types = np.zeros((0,), dtype=np.int32)
             else:
                 msg = (
                     "Node positions and edge indices cannot be empty."
@@ -177,18 +189,18 @@ class MapGraph:
                 raise ValueError(msg)
 
         self.node_positions = np.ascontiguousarray(node_positions, dtype=np.float32)
-        self.edge_indices = np.ascontiguousarray(edge_indices, dtype=np.int64)
+        self.edge_indices = np.ascontiguousarray(edge_indices, dtype=np.int32)
 
         self.node_types = (
-            np.ascontiguousarray(node_types, dtype=np.int64)
+            np.ascontiguousarray(node_types, dtype=np.int32)
             if node_types is not None
-            else np.ones(self.num_nodes, dtype=np.int64)
+            else np.ones(self.num_nodes, dtype=np.int32)
         )
 
         self.edge_types = (
-            np.ascontiguousarray(edge_types, dtype=np.int64)
+            np.ascontiguousarray(edge_types, dtype=np.int32)
             if edge_types is not None
-            else np.ones(self.num_edges, dtype=np.int64)
+            else np.ones(self.num_edges, dtype=np.int32)
         )
 
     @property
@@ -257,13 +269,13 @@ class MapGraph:
         positions = np.frombuffer(buf, dtype=np.float32, count=n * 2, offset=offset).reshape((n, 2))
         offset += positions.nbytes
 
-        indices = np.frombuffer(buf, dtype=np.int64, count=m * 2, offset=offset).reshape((2, m))
+        indices = np.frombuffer(buf, dtype=np.int32, count=m * 2, offset=offset).reshape((2, m))
         offset += indices.nbytes
 
-        node_types = np.frombuffer(buf, dtype=np.int64, count=n, offset=offset)
+        node_types = np.frombuffer(buf, dtype=np.int32, count=n, offset=offset)
         offset += node_types.nbytes
 
-        edge_types = np.frombuffer(buf, dtype=np.int64, count=m, offset=offset)
+        edge_types = np.frombuffer(buf, dtype=np.int32, count=m, offset=offset)
 
         if read_only:
             for arr in (positions, indices, node_types, edge_types):
@@ -282,9 +294,9 @@ class MapGraph:
         This will clear the internal arrays and is not intended for general use.
         """
         self.node_positions = np.array([], dtype=np.float32).reshape(0, 2)
-        self.edge_indices = np.array([], dtype=np.int64).reshape(2, 0)
-        self.node_types = np.array([], dtype=np.int64)
-        self.edge_types = np.array([], dtype=np.int64)
+        self.edge_indices = np.array([], dtype=np.int32).reshape(2, 0)
+        self.node_types = np.array([], dtype=np.int32)
+        self.edge_types = np.array([], dtype=np.int32)
 
     def to_torch_graph(self) -> dict[Any, Any]:
         """Convert the `MapGraph` to a format compatible with PyTorch Geometric.
@@ -311,6 +323,47 @@ class MapGraph:
                 "type": torch.from_numpy(self.edge_types),
             },
         }
+
+    def to_numpy_dict(self) -> NumpyMapGraphDict:
+        """Convert the `MapGraph` to a dictionary of NumPy arrays.
+
+        Returns
+        -------
+        dict
+            Dictionary containing the graph data as NumPy arrays.
+
+        """
+        return {
+            "map_num_nodes": self.num_nodes,
+            "map_num_edges": self.num_edges,
+            "map_node_positions": self.node_positions,
+            "map_edge_indices": self.edge_indices,
+            "map_node_types": self.node_types,
+            "map_edge_types": self.edge_types,
+        }
+
+    @classmethod
+    def from_numpy_dict(cls, data: NumpyMapGraphDict) -> Self:
+        """Create a `MapGraph` from a dictionary of NumPy arrays.
+
+        Parameters
+        ----------
+        data : dict
+            Dictionary containing the graph data as NumPy arrays, with keys
+            matching those defined in `NumpyMapGraphDict`.
+
+        Returns
+        -------
+        MapGraph
+            A new `MapGraph` instance created from the provided data.
+
+        """
+        return cls(
+            node_positions=data["map_node_positions"],
+            edge_indices=data["map_edge_indices"],
+            node_types=data["map_node_types"],
+            edge_types=data["map_edge_types"],
+        )
 
     def extract_radius(
         self,
@@ -388,7 +441,7 @@ class MapGraph:
 
     def _subgraph_from_mask(
         self,
-        node_mask: npt.NDArray[np.bool_],
+        node_mask: npt.NDArray[np.bool],
     ) -> MapGraph:
         """Build a new `MapGraph` from a boolean node mask."""
         new_edge_indices, edge_mask = _extract_subgraph(node_mask, self.edge_indices)
@@ -422,9 +475,9 @@ class MapGraph:
 
 
 def _extract_subgraph(
-    node_mask: npt.NDArray[np.bool_],
-    edge_indices: npt.NDArray[np.int64],
-) -> tuple[npt.NDArray[np.int64], npt.NDArray[np.bool_]]:
+    node_mask: npt.NDArray[np.bool],
+    edge_indices: npt.NDArray[np.int32],
+) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.bool]]:
     """Extract a subgraph given a boolean node mask.
 
     This is a pure-NumPy replacement for `torch_geometric.utils.subgraph`. It
@@ -454,8 +507,8 @@ def _extract_subgraph(
 
     # Build a mapping from old node index → new contiguous index.
     # Positions where node_mask is False get -1 (unused).
-    remap = np.full(node_mask.shape[0], -1, dtype=np.int64)
-    remap[node_mask] = np.arange(node_mask.sum(), dtype=np.int64)
+    remap = np.full(node_mask.shape[0], -1, dtype=np.int32)
+    remap[node_mask] = np.arange(node_mask.sum(), dtype=np.int32)
 
     kept_src = remap[src[edge_mask]]
     kept_dst = remap[dst[edge_mask]]

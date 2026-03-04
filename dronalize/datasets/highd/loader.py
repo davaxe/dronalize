@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.common.loaders.xlevel import XLevelDataLoader
 from dronalize.core import AgentCategory
+from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -18,8 +18,9 @@ class HighDLoader(XLevelDataLoader):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
         loader_config: LoaderConfig | None = None,
+        *,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the trajectory data loader for the highD dataset.
@@ -34,15 +35,15 @@ class HighDLoader(XLevelDataLoader):
 
         Parameters
         ----------
-        data_dir : Path
-            Path to the directory containing the .csv data files.
+        data_root : Path
+            Path to the root directory of the highD dataset, which should contain a "data"
         loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
         lane_change_ratio : float, optional
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
-        super().__init__(data_dir, loader_config)
+        super().__init__(data_root / "data", loader_config)
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 

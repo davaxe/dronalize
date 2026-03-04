@@ -1,4 +1,4 @@
-from dronalize.common.map.osm import OSMMapGraphBuilder
+from dronalize.datasets.common.graph_builder_osm import OSMMapGraphBuilder
 
 
 class RounDGraphBuilder(OSMMapGraphBuilder):

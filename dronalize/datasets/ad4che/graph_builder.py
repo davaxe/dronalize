@@ -8,7 +8,7 @@ import numpy.typing as npt
 from typing_extensions import override
 
 from dronalize.core import EdgeType
-from dronalize.core.graph import GraphBuilder
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 PIXEL_TO_METER: Final[float] = 0.0375
 
 
-class AD4CHEGraphBuilder(GraphBuilder):
+class AD4CHEGraphBuilder(BaseGraphBuilder):
     """Graph builder for the AD4CHE dataset.
 
     This dataset do not contain explicit lane graph or similar data. Therefore
@@ -52,7 +52,9 @@ class AD4CHEGraphBuilder(GraphBuilder):
 
     @override
     def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None,
+        self,
+        min_distance: float | None = None,
+        interp_distance: float | None = None,
     ) -> None:
         # Load the image in grayscale
         gray = cv2.imread(str(self.map_image_path), cv2.IMREAD_GRAYSCALE)
@@ -76,7 +78,9 @@ class AD4CHEGraphBuilder(GraphBuilder):
                 points = [(float(pt[0]), -float(pt[1])) for pt in coords]
 
                 self.add_path_lazy(
-                    points=points, edge_type=EdgeType.LINE_THICK_DASHED, is_polygon=False,
+                    points=points,
+                    edge_type=EdgeType.LINE_THICK_DASHED,
+                    is_polygon=False,
                 )
 
 
@@ -88,7 +92,8 @@ def _get_black_border_pixels(gray_image: npt.NDArray) -> npt.NDArray[np.uint8]:
 
 
 def _spatial_downsample_polyline(
-    polyline: npt.NDArray[np.floating[Any]], d_min: float = 0.5,
+    polyline: npt.NDArray[np.floating[Any]],
+    d_min: float = 0.5,
 ) -> npt.NDArray[np.floating[Any]]:
     if len(polyline) < 2:
         return polyline

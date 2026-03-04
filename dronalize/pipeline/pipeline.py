@@ -1,0 +1,750 @@
+"""Composable pipeline for LazyFrame transformations."""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal, TypedDict, Unpack, cast
+
+import polars as pl
+from typing_extensions import overload
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dronalize.core._types import T
+
+
+Transform = Callable[[pl.LazyFrame], pl.LazyFrame]
+"""A 1:1 transformation from one LazyFrame to another."""
+
+FlatMapTransform = Callable[[pl.LazyFrame], Iterable[pl.LazyFrame]]
+"""A 1:N transformation that maps one LazyFrame to an iterable of LazyFrames."""
+
+ReduceTransform = Callable[[Iterable[pl.LazyFrame]], pl.LazyFrame]
+"""An N:1 transformation that reduces an iterable of LazyFrames to a single LazyFrame."""
+
+
+@dataclass(frozen=True, slots=True)
+class Pipeline:
+    """Immutable, composable chain of LazyFrame transformations.
+
+    Build pipelines with `then` (1:1) and `then_flat_map`
+    (1:N).  Execute with `run`.
+
+    Pipelines are **immutable** - every builder method returns a *new*
+    `Pipeline` instance, so the original can be safely shared or
+    extended independently.
+    """
+
+    _steps: tuple[_PipelineEntry, ...] = field(default_factory=tuple)
+
+    # -- builder API --------------------------------------------------------
+
+    def then(
+        self,
+        transform: Transform,
+        *,
+        when: bool = True,
+        otherwise: Transform | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Append a 1:1 transform and return a *new* pipeline.
+
+        Parameters
+        ----------
+        transform : Transform
+            A callable that maps one LazyFrame to one LazyFrame.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : Transform, optional
+            If provided and `when` is `False`, this transform will be used
+            instead of skipping the step.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the transform appended.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            transform = otherwise
+        return Pipeline((*self._steps, _MapEntry(transform, name)))
+
+    def then_lazy(
+        self,
+        transform: Callable[..., Transform],
+        *,
+        when: bool = True,
+        otherwise: Callable[..., Transform] | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Like `then` but the transform is produced by a factory at build time.
+
+        This is useful for deferring expensive setup until it's known to be needed.
+
+        Parameters
+        ----------
+        transform : Callable[..., Transform]
+            A factory that produces a Transform when called.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : Callable[..., Transform], optional
+            If provided and `when` is `False`, this factory will be used to
+            produce a transform instead of skipping the step.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the transform appended if when is True, else the
+            unchanged pipeline.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            transform_ = otherwise()
+        else:
+            transform_ = transform()
+        return self.then(transform_, name=name)
+
+    def then_if_present(
+        self,
+        transform_factory: Callable[[T], Transform],
+        arg: T | None,
+    ) -> Pipeline:
+        """Like `then` but only append the transform if *arg* is not None.
+
+        Parameters
+        ----------
+        transform_factory : Callable[[T], Transform]
+            A factory that produces a Transform when given an argument.
+        arg : T or None
+            The argument to pass to the factory. If None, this step is skipped.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the transform appended if arg is not None, else
+            the unchanged pipeline.
+        """
+        if arg is None:
+            return self
+        transform = transform_factory(arg)
+        return self.then(transform)
+
+    def then_flat_map(
+        self,
+        transform: FlatMapTransform,
+        *,
+        when: bool = True,
+        otherwise: FlatMapTransform | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Append a 1:N flat-map step and return a *new* pipeline.
+
+        Any subsequent `then` transforms will be applied to
+        **each** LazyFrame produced by this step independently.
+
+        Parameters
+        ----------
+        transform : FlatMapTransform
+            A callable that maps one LazyFrame to an iterable of
+            LazyFrames.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : FlatMapTransform, optional
+            If provided and `when` is `False`, this flat-map will be used
+            instead of skipping the step.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the flat-map step appended.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            transform = otherwise
+        return Pipeline((*self._steps, _FlatMapEntry(transform, name)))
+
+    def then_lazy_flat_map(
+        self,
+        transform: Callable[..., FlatMapTransform],
+        *,
+        when: bool = True,
+        otherwise: Callable[..., FlatMapTransform] | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Like `then_flat_map` but the flat-map is produced by a factory at build time.
+
+        This is useful for deferring expensive setup until it's known to be needed.
+
+        Parameters
+        ----------
+        transform : Callable[..., FlatMapTransform]
+            A factory that produces a FlatMapTransform when called.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : Callable[..., FlatMapTransform], optional
+            If provided and `when` is `False`, this factory will be used to
+            produce a flat-map instead of skipping the step.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the flat-map step appended if when is True, else the
+            unchanged pipeline.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            transform_ = otherwise()
+        else:
+            transform_ = transform()
+        return self.then_flat_map(transform_, name=name)
+
+    def then_if_present_flat_map(
+        self,
+        flat_map_factory: Callable[[T], FlatMapTransform],
+        arg: T | None,
+    ) -> Pipeline:
+        """Like `then_flat_map` but only append the flat-map if *arg* is not None.
+
+        Parameters
+        ----------
+        flat_map_factory : Callable[[T], FlatMapTransform]
+            A factory that produces a FlatMapTransform when given an argument.
+        arg : T or None
+            The argument to pass to the factory. If None, this step is skipped.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the flat-map step appended if arg is not None, else
+            the unchanged pipeline.
+        """
+        if arg is None:
+            return self
+        flat_map = flat_map_factory(arg)
+        return self.then_flat_map(flat_map)
+
+    def then_reduce(
+        self,
+        transform: ReduceTransform,
+        *,
+        when: bool = True,
+        otherwise: ReduceTransform | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Append an N:1 reduce step and return a *new* pipeline.
+
+        This step will consume **all** LazyFrames produced by the previous steps
+        and yield a single output LazyFrame.
+
+        Parameters
+        ----------
+        transform : ReduceTransform
+            A callable that maps an iterable of LazyFrames to a single LazyFrame.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : ReduceTransform, optional
+            If provided and `when` is `False`, this reduce will be used instead
+            of skipping the step.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the reduce step appended.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            transform = otherwise
+        return Pipeline((*self._steps, _ReduceEntry(transform, name)))
+
+    def then_lazy_reduce(
+        self,
+        transform: Callable[..., ReduceTransform],
+        *,
+        when: bool = True,
+        otherwise: Callable[..., ReduceTransform] | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Like `then_reduce` but the reduce is produced by a factory at build time.
+
+        This is useful for deferring expensive setup until it's known to be needed.
+
+        Parameters
+        ----------
+        transform : Callable[..., ReduceTransform]
+            A factory that produces a ReduceTransform when called.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : Callable[..., ReduceTransform], optional
+            If provided and `when` is `False`, this factory will be used to
+            produce a reduce instead of skipping the step.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the reduce step appended if when is True, else the
+            unchanged pipeline.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            transform_ = otherwise()
+        else:
+            transform_ = transform()
+        return self.then_reduce(transform_, name=name)
+
+    def then_if_present_reduce(
+        self,
+        reduce_factory: Callable[[T], ReduceTransform],
+        arg: T | None,
+    ) -> Pipeline:
+        """Like `then_reduce` but only append the reduce if *arg* is not None.
+
+        Parameters
+        ----------
+        reduce_factory : Callable[[T], ReduceTransform]
+            A factory that produces a ReduceTransform when given an argument.
+        arg : T or None
+            The argument to pass to the factory. If None, this step is skipped.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the reduce step appended if arg is not None, else
+            the unchanged pipeline.
+        """
+        if arg is None:
+            return self
+        reduce = reduce_factory(arg)
+        return self.then_reduce(reduce)
+
+    def compose(
+        self,
+        other: Pipeline,
+        *,
+        when: bool = True,
+        otherwise: Pipeline | None = None,
+    ) -> Pipeline:
+        """Concatenate *other* pipeline's steps after this one.
+
+        Parameters
+        ----------
+        other : Pipeline
+            Pipeline whose steps are appended.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : Pipeline, optional
+            If provided and `when` is `False`, this pipeline will be returned
+            instead of the unchanged pipeline.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline combining both step sequences.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            return otherwise
+        return Pipeline((*self._steps, *other._steps))
+
+    def checkpoint(
+        self, name: str = "checkpoint", **collect_kwargs: Unpack[_CollectKwargs]
+    ) -> Pipeline:
+        """Append a checkpoint that collects the LazyFrame(s) at this point.
+
+        Parameters
+        ----------
+        name : str, optional
+            An optional name for this checkpoint, used in the pipeline's repr.
+        **collect_kwargs : _CollectKwargs
+            Keyword arguments to pass to `pl.LazyFrame.collect()` when executing
+            this checkpoint.
+        """
+        return self.then(lambda df: df.collect(**collect_kwargs).lazy(), name=name)
+
+    # -- slicing ------------------------------------------------------------
+
+    def take(self, n: int) -> Pipeline:
+        """Take only the first n steps of the pipeline.
+
+        Parameters
+        ----------
+        n : int
+            Number of steps to take. Must be less than the total number of
+            steps.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline containing only the first n steps.
+
+        Raises
+        ------
+        ValueError
+            If n is greater than or equal to the total number of steps in the
+            pipeline.
+        """
+        if len(self._steps) <= n:
+            msg = f"Pipeline.take({n}) called on pipeline with only {len(self._steps)} steps"
+            raise ValueError(msg)
+
+        return Pipeline(self._steps[:n])
+
+    # -- execution ----------------------------------------------------------
+
+    @overload
+    def execute(
+        self,
+        df: pl.LazyFrame | pl.DataFrame,
+        *,
+        collect: Literal[False] = False,
+        filter_empty: bool = True,
+    ) -> Iterator[pl.LazyFrame]: ...
+
+    @overload
+    def execute(
+        self,
+        df: pl.LazyFrame | pl.DataFrame,
+        *,
+        collect: Literal[True],
+        filter_empty: bool = True,
+    ) -> Iterator[pl.DataFrame]: ...
+
+    def execute(
+        self,
+        df: pl.LazyFrame | pl.DataFrame,
+        *,
+        collect: bool = False,
+        filter_empty: bool = True,
+    ) -> Iterator[pl.LazyFrame | pl.DataFrame]:
+        """
+        Execute every step in order, yielding the resulting LazyFrame(s).
+
+        Parameters
+        ----------
+        df : pl.LazyFrame or pl.DataFrame
+            Input data. DataFrames will be converted to LazyFrames before
+            processing.
+        collect : bool, optional
+            If True, collect each resulting LazyFrame to a DataFrame before
+            yielding.
+        filter_empty : bool, optional
+            If True, skip any resulting DataFrames that are empty.
+            Only applies when `collect=True`.
+
+        Yields
+        ------
+        pl.LazyFrame | pl.DataFrame
+            One or more transformed frames.
+        """
+        current: Iterable[pl.LazyFrame] = (df.lazy(),)
+
+        for entry in self._steps:
+            current = entry.apply(current)
+
+        if not collect:
+            yield from current
+            return
+
+        for lf in current:
+            df_collected = lf.collect()
+
+            if filter_empty and df_collected.height == 0:
+                continue
+
+            yield df_collected
+
+    @overload
+    def execute_single(
+        self,
+        df: pl.LazyFrame | pl.DataFrame,
+        *,
+        collect: Literal[False] = False,
+        filter_empty: bool = True,
+    ) -> pl.LazyFrame: ...
+
+    @overload
+    def execute_single(
+        self,
+        df: pl.LazyFrame | pl.DataFrame,
+        *,
+        collect: Literal[True],
+        filter_empty: Literal[False] = False,
+    ) -> pl.DataFrame: ...
+
+    @overload
+    def execute_single(
+        self,
+        df: pl.LazyFrame,
+        *,
+        collect: Literal[True],
+        filter_empty: Literal[True],
+    ) -> pl.DataFrame | None: ...
+
+    def execute_single(
+        self,
+        df: pl.LazyFrame | pl.DataFrame,
+        *,
+        collect: bool = False,
+        filter_empty: bool = True,
+    ) -> pl.LazyFrame | pl.DataFrame | None:
+        """
+        Execute the pipeline expecting exactly one output.
+
+        This is a convenience wrapper for pipelines that contain no flat-map steps.
+
+        Parameters
+        ----------
+        df : pl.LazyFrame or pl.DataFrame
+            Input data. DataFrames will be converted to LazyFrames before
+            processing.
+        collect : bool, optional
+            If True, collect the resulting LazyFrame.
+        filter_empty : bool, optional
+            If True and collect=True, return None if the collected
+            DataFrame is empty.
+
+        Returns
+        -------
+        pl.LazyFrame | pl.DataFrame | None
+            The single resulting frame. May return None if
+            collect=True and filter_empty=True and the result is empty.
+
+        Raises
+        ------
+        ValueError
+            If the pipeline produces zero or more than one output.
+        """
+        results = list(self.execute(df, collect=collect, filter_empty=False))
+
+        if len(results) != 1:
+            msg = (
+                f"Pipeline.execute_single() expected exactly 1 output, "
+                f"got {len(results)}. Use execute() for flat-map pipelines."
+            )
+            raise ValueError(msg)
+
+        result = results[0]
+
+        if not collect:
+            return result
+
+        result = cast("pl.DataFrame", result)  # type checker cannot infer this
+        if filter_empty and result.height == 0:
+            return None
+
+        return result
+
+    # -- common polars patterns ---------------------------------------------
+
+    def with_columns(self, *exprs: pl.Expr, **named_expr: pl.Expr) -> Pipeline:
+        """Append a with_columns step to the pipeline.
+
+        This is a common enough pattern that it gets its own convenience method.
+        Equivalent to `then(lambda df: df.with_columns(*exprs, **named_expr))`.
+
+        Parameters
+        ----------
+        *exprs : pl.Expr
+            see `pl.LazyFrame.with_columns`.
+        **named_expr : pl.Expr
+            see `pl.LazyFrame.with_columns`.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the with_columns step appended.
+        """
+
+        def transform(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.with_columns(*exprs, **named_expr)
+
+        return self.then(transform, name="with_columns")
+
+    def select(self, *exprs: pl.Expr, **named_expr: pl.Expr) -> Pipeline:
+        """Append a select step to the pipeline.
+
+        This is a common enough pattern that it gets its own convenience method.
+        Equivalent to `then(lambda df: df.select(*exprs, **named_expr))`.
+
+        Parameters
+        ----------
+        *exprs : pl.Expr
+            see `pl.LazyFrame.select`.
+        **named_expr : pl.Expr
+            see `pl.LazyFrame.select`.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the select step appended.
+        """
+
+        def transform(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.select(*exprs, **named_expr)
+
+        return self.then(transform, name="select")
+
+    # -- introspection ------------------------------------------------------
+
+    def inspect(self, f: Callable[[pl.LazyFrame], None]) -> Pipeline:
+        """Append an inspection step that applies f to each intermediate LazyFrame.
+
+        This is useful for debugging or logging the pipeline's behavior without
+        affecting the data flow.
+
+        Parameters
+        ----------
+        f : Callable[[pl.LazyFrame], None]
+            A function that takes a LazyFrame and returns None. It will be called
+            with each intermediate LazyFrame during execution.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the inspection step appended.
+        """
+
+        def transform(df: pl.LazyFrame) -> pl.LazyFrame:
+            f(df)
+            return df
+
+        return self.then(transform, name=f"inspect({f.__name__})")
+
+    def is_empty(self) -> bool:
+        """Return True if the pipeline contains no steps."""
+        return len(self._steps) == 0
+
+    def has_flat_map(self) -> bool:
+        """Return True if the pipeline contains any flat-map steps."""
+        return any(isinstance(entry, _FlatMapEntry) for entry in self._steps)
+
+    def __len__(self) -> int:
+        """Return the number of steps in the pipeline."""
+        return len(self._steps)
+
+    def __bool__(self) -> bool:
+        """Return True when the pipeline contains at least one step."""
+        return len(self._steps) > 0
+
+    def __repr__(self) -> str:
+        """Return a human-readable representation of the pipeline."""
+        parts: list[str] = []
+        for entry in self._steps:
+            if isinstance(entry, _MapEntry):
+                parts.append(f"  .then({entry.name or _fn_name(entry.fn)})")
+            elif isinstance(entry, _FlatMapEntry):
+                parts.append(f"  .then_flat_map({entry.name or _fn_name(entry.fn)})")
+            elif isinstance(entry, _ReduceEntry):
+                parts.append(f"  .then_reduce({entry.name or _fn_name(entry.fn)})")
+        body = "\n".join(parts) if parts else "  (empty)"
+        return f"Pipeline(\n{body}\n)"
+
+    def __rshift__(self, other: Pipeline) -> Pipeline:
+        """Compose two pipelines.
+
+        This operator is a convenient shorthand for `compose`, allowing you to
+        write `p1 >> p2` instead of `p1.compose(p2)`.
+
+        """
+        return self.compose(other)
+
+
+# ---------------------------------------------------------------------------
+# Internal entry wrappers
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True, frozen=True)
+class _MapEntry:
+    """Wraps a 1:1 Transform."""
+
+    fn: Transform
+    name: str | None = None
+
+    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
+        """Apply the transform for each input."""
+        for df in inputs:
+            yield self.fn(df)
+
+
+@dataclass(slots=True, frozen=True)
+class _FlatMapEntry:
+    """Wraps a 1:N FlatMapTransform."""
+
+    fn: FlatMapTransform
+    name: str | None = None
+
+    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
+        """Apply the flat-map for each input, yielding all outputs."""
+        for df in inputs:
+            yield from self.fn(df)
+
+
+@dataclass(slots=True, frozen=True)
+class _ReduceEntry:
+    """Wraps an N:1 ReduceTransform."""
+
+    fn: ReduceTransform
+    name: str | None = None
+
+    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
+        """Consume all inputs, apply reduction, and yield the single output."""
+        # Note: This materializes the iterable in memory, but the
+        # actual data inside the Polars frames remains lazy.
+        yield self.fn(inputs)
+
+
+_PipelineEntry = _MapEntry | _FlatMapEntry | _ReduceEntry
+
+
+class _CollectKwargs(TypedDict, total=False):
+    type_coercion: bool
+    predicate_pushdown: bool
+    projection_pushdown: bool
+    simplify_expression: bool
+    slice_pushdown: bool
+    comm_subplan_elim: bool
+    comm_subexpr_elim: bool
+    cluster_with_columns: bool
+    collapse_joins: bool
+    no_optimization: bool
+    engine: Literal["auto", "in-memory", "streaming", "gpu"]
+    background: Literal[False]
+
+
+def _fn_name(fn: object) -> str:
+    """Best-effort human-readable name for a callable."""
+    name = getattr(fn, "__name__", None) or getattr(fn, "__qualname__", None)
+    if name:
+        return name
+    cls = type(fn)
+    if cls.__name__ != "function":
+        return cls.__name__
+    return repr(fn)

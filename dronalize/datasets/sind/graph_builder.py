@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import utm
 from typing_extensions import override
 
-from dronalize.common.map.osm import OSMMapGraphBuilder
+from dronalize.datasets.common.graph_builder_osm import OSMMapGraphBuilder
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -51,7 +51,7 @@ class SindGraphBuilder(OSMMapGraphBuilder):
     def _extract_origin(osm_file: Path) -> tuple[float, float]:
         """Parse the XML sequentially to find the node tagged as 'origin'."""
         context = ET.iterparse(osm_file, events=("start", "end"))
-        current_node_element = None
+        current_node_element: ET.Element | None = None
 
         for event, elem in context:
             if event == "start" and elem.tag == "node":

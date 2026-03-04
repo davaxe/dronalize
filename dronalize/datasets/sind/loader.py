@@ -1,23 +1,24 @@
 from __future__ import annotations
 
 from dataclasses import replace as _replace
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.trajectory.basic import yaw_from_vel_expr
-from dronalize.common.trajectory.process import prepare_agent_trajectories
-from dronalize.core.datatypes import map_context as mc
+import dronalize.pipeline.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
+from dronalize.core.datatypes.loader_config import LoaderConfig
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
+from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from pathlib import Path
 
 
-class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
+class SindLoader(BaseSceneLoader[str, Path]):
     """Loader for the SIND dataset."""
 
     def __init__(
@@ -45,7 +46,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
         """
         if filter_parked_vehicles:
             resolved = loader_config or type(self).default_config()
-            filtering = resolved.scene_filtering
+            filtering = resolved.filtering
             if filtering is not None:
                 loader_config = _replace(
                     resolved,
@@ -61,77 +62,80 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
         self._data_dir = data_dir
 
     @override
-    def sources(self) -> Iterable[Source[str, pl.LazyFrame]]:
+    def all_sources(self) -> Iterable[Source[str, Path]]:
         for subdir in self._data_dir.iterdir():
-            pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
-            vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
-            vehicle_df = pl.scan_csv(vehicle_data_path, schema_overrides=_VEHICLE_SCHEMA).select(
-                pl.col("track_id").alias("id"),
-                pl.col("frame_id").alias("frame"),
-                pl
-                .col("agent_type")
-                .replace_strict({
-                    "motorcycle": AgentCategory.MOTORCYCLE.value,
-                    "car": AgentCategory.CAR.value,
-                    "truck": AgentCategory.TRUCK.value,
-                    "tricycle": AgentCategory.TRICYCLE.value,
-                })
-                .alias("agent_category"),
-                pl.col("heading_rad").alias("yaw"),
-                *("x", "y", "vx", "vy", "ax", "ay"),
-            )
-            pedestrian_df = pl.scan_csv(
-                pedestrian_data_path, schema_overrides=_PEDESTRIAN_SCHEMA,
-            ).select(
-                pl
-                .col("track_id")
-                .str.slice(1)
-                .cast(pl.Int32)
-                .add(vehicle_df.select(pl.col("id").max()).collect().item() + 1)
-                .alias("id"),
-                pl.col("frame_id").alias("frame"),
-                pl
-                .col("agent_type")
-                .replace_strict({
-                    "pedestrian": AgentCategory.PEDESTRIAN.value,
-                })
-                .alias("agent_category"),
-                pl.lit(None).alias("yaw"),
-                *("x", "y", "vx", "vy", "ax", "ay"),
-            )
-
             map_location = self._resolve_map(subdir.name)
             yield Source(
                 identifier=subdir.name,
-                inner=pl.concat([vehicle_df, pedestrian_df]),
-                map_context=mc.Explicit(map=str(map_location)),
+                inner=subdir,
+                map_key=str(map_location),
             )
+
+    @override
+    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+        subdir = source.inner
+        pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
+        vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
+        vehicle_df = pl.scan_csv(vehicle_data_path, schema_overrides=_VEHICLE_SCHEMA).select(
+            pl.col("track_id").alias("id"),
+            pl.col("frame_id").alias("frame"),
+            pl
+            .col("agent_type")
+            .replace_strict({
+                "motorcycle": AgentCategory.MOTORCYCLE.value,
+                "car": AgentCategory.CAR.value,
+                "truck": AgentCategory.TRUCK.value,
+                "tricycle": AgentCategory.TRICYCLE.value,
+            })
+            .alias("agent_category"),
+            pl.col("heading_rad").alias("yaw"),
+            *("x", "y", "vx", "vy", "ax", "ay"),
+        )
+        pedestrian_df = pl.scan_csv(
+            pedestrian_data_path,
+            schema_overrides=_PEDESTRIAN_SCHEMA,
+        ).select(
+            pl
+            .col("track_id")
+            .str.slice(1)
+            .cast(pl.Int32)
+            .add(vehicle_df.select(pl.col("id").max()).collect().item() + 1)
+            .alias("id"),
+            pl.col("frame_id").alias("frame"),
+            pl
+            .col("agent_type")
+            .replace_strict({
+                "pedestrian": AgentCategory.PEDESTRIAN.value,
+            })
+            .alias("agent_category"),
+            pl.lit(None).alias("yaw"),
+            *("x", "y", "vx", "vy", "ax", "ay"),
+        )
+
+        yield pl.concat([vehicle_df, pedestrian_df]), source.map_key
 
     @override
     def num_sources(self) -> int | None:
         return sum(1 for _ in self._data_dir.iterdir())
 
     @override
-    def load_raw(
-        self, source: Source[str, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        for df in prepare_agent_trajectories(source.inner, self.loader_config):
-            yield df, source.map_context or mc.NoMap()
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return df.with_columns(
-            pl
-            .when(pl.col("yaw").is_null())
-            .then(yaw_from_vel_expr())
-            .otherwise(pl.col("yaw"))
-            .alias("yaw"),
+    def pipeline(self) -> Pipeline:
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(self.loader_config, derivative_rename=self.derivative_names())
+            )
+            .then(tr.yaw_from_vel(only_null=True))
         )
 
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(20, 50, 0.1).with_window(25).with_filtering(require_frames=[19])
+        return (
+            LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
+            .with_window(25)
+            .with_filtering(require_frames=[19])
+        )
 
     @staticmethod
     def _resolve_map(path_name: str) -> str:

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dronalize.core.graph.builder import GraphBuilder
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder
 
 
-class A43GraphBuilder(GraphBuilder):
+class A43GraphBuilder(BaseGraphBuilder):
     """Graph builder for the A43 dataset.
 
     This dataset does not have actual map data, but the map can be reconstructed

@@ -20,13 +20,13 @@ from enum import auto
 from typing import TYPE_CHECKING
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.map_object import BaseEnum, BaseMapObject
+from dronalize.core.datatypes.enum import BaseEnum
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from dronalize.core.graph.builder import Point
+    from dronalize.core.protocols.graph_builder import Point
 
 
 class Argoverse1Map:
@@ -93,7 +93,7 @@ class TurnType(BaseEnum):
 
 
 @dataclass
-class Node(BaseMapObject[int]):
+class Node:
     """Represents a node in the Argoverse map."""
 
     id: int
@@ -160,6 +160,8 @@ class LaneSegment:
                     segment.predecessors.append(int(v))
                 case ("k", "successor"), ("v", v):
                     segment.successors.append(int(v))
+                case _:
+                    ...
 
         return segment
 

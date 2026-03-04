@@ -1,75 +1,47 @@
-"""Core package — domain models, protocols, graph building, and parallelism."""
+"""Core package — domain types, protocols, and graph building infrastructure."""
 
-# Domain models
-# Graph building
-# Pipeline
-# Allow `from dronalize.core import transforms` as a module reference
-from dronalize.core import transforms
 from dronalize.core.datatypes import (
     AgentCategory,
+    DatasetSplit,
     EdgeType,
-    Explicit,
-    Implicit,
-    Loaded,
+    FilteringConfig,
     LoaderConfig,
-    MapContext,
     MapGraph,
+    MapKey,
+    MapResolver,
     Scene,
+    SplitNotSupportedError,
+    WindowParams,
+    fixed_map,
+    keyed_map,
+    no_map,
+    preloaded_map,
+    resolved_map,
 )
-from dronalize.core.graph import (
-    Edges,
-    GraphBuilder,
-    InterpolationStage,
-    Point,
-    get_edges_from_adj_list,
-    interpolate_position,
-)
-
-# Parallel execution
-from dronalize.core.parallel import (
-    ParallelSceneLoader,
-    ProgressBar,
-)
-from dronalize.core.pipeline import (
-    FlatMapTransform,
-    Pipeline,
-    Transform,
-)
-
-# Protocols & loader ABCs
 from dronalize.core.protocols import (
-    BaseEnum,
-    BaseMapObject,
+    BaseGraphBuilder,
     BaseSceneLoader,
-)
-from dronalize.core.transforms import (
-    pipeline_from_config,
+    Point,
 )
 
 __all__ = [
     "AgentCategory",
-    "BaseEnum",
-    "BaseMapObject",
+    "BaseGraphBuilder",
     "BaseSceneLoader",
+    "DatasetSplit",
     "EdgeType",
-    "Edges",
-    "Explicit",
-    "FlatMapTransform",
-    "GraphBuilder",
-    "Implicit",
-    "InterpolationStage",
-    "Loaded",
+    "FilteringConfig",
     "LoaderConfig",
-    "MapContext",
     "MapGraph",
-    "ParallelSceneLoader",
-    "Pipeline",
+    "MapKey",
+    "MapResolver",
     "Point",
-    "ProgressBar",
     "Scene",
-    "Transform",
-    "get_edges_from_adj_list",
-    "interpolate_position",
-    "pipeline_from_config",
-    "transforms",
+    "SplitNotSupportedError",
+    "WindowParams",
+    "fixed_map",
+    "keyed_map",
+    "no_map",
+    "preloaded_map",
+    "resolved_map",
 ]

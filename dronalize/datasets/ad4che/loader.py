@@ -5,10 +5,9 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.loaders.xlevel import XLevelDataLoader
 from dronalize.core import AgentCategory, LoaderConfig
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.protocols.loader import Source
+from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -20,8 +19,9 @@ class AD4CHELoader(XLevelDataLoader):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
         loader_config: LoaderConfig | None = None,
+        *,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the trajectory data loader for the AD4CHE dataset.
@@ -36,7 +36,7 @@ class AD4CHELoader(XLevelDataLoader):
 
         Parameters
         ----------
-        data_dir : Path
+        data_root : Path
             Path to the directory containing the .csv data files.
         loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
@@ -44,31 +44,20 @@ class AD4CHELoader(XLevelDataLoader):
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
-        super().__init__(data_dir, loader_config)
+        super().__init__(data_root / "AD4CHE_Data_V1.0", loader_config)
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 
     @override
-    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
-        for i, subdir in enumerate(self._data_dir.iterdir(), start=1):
+    def all_sources(self) -> Iterable[Source[int, Path]]:
+        for i, subdir in enumerate(sorted(self._data_dir.iterdir()), start=1):
             recording_meta = subdir / f"{i:0>2}_recordingMeta.csv"
-            meta = subdir / f"{i:0>2}_tracksMeta.csv"
-            tracks = subdir / f"{i:0>2}_tracks.csv"
-
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
-            meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-                *self.meta_data_select(),
-            )
-
-            tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
-                *self.track_data_select(),
-            )
-            combined = tracks_df.join(meta_df, left_on="id", right_on="id")
             yield Source(
                 identifier=i,
-                inner=combined,
-                map_context=mc.Explicit(id=str(location_id)),
+                inner=subdir,
+                map_key=str(location_id),
             )
 
     @override
@@ -120,7 +109,7 @@ class AD4CHELoader(XLevelDataLoader):
     @override
     def default_config(cls) -> LoaderConfig:
         return (
-            LoaderConfig(60, 150, 1 / 30)
+            LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
             .with_resampling(1, 3)
             .with_filtering(require_frames=[59])
             .with_window(45)
@@ -144,3 +133,16 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float32,
     "yAcceleration": pl.Float32,
 })
+
+if __name__ == "__main__":
+    import time
+    from pathlib import Path
+
+    loader = AD4CHELoader(Path("data/ad4che"))
+    cout = 0
+    start = time.perf_counter()
+    for _scene in loader.scenes():
+        cout += 1
+
+    end = time.perf_counter()
+    print(f"Processed {cout} scenes in {end - start:.2f} seconds")

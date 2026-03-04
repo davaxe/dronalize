@@ -1,7 +1,7 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.ops.trajectory.resample import Resampling, ResamplingMethod, resample
 
 
 def test_no_resampling() -> None:
@@ -11,7 +11,7 @@ def test_no_resampling() -> None:
         "x": [0.0, 1.0, 2.0, 3.0, 4.0],
         "y": [0.0, 0.0, 0.0, 0.0, 0.0],
     })
-    result = resample_tracks(df, Resampling(1, 1))
+    result = resample(df, Resampling(up=1, down=1))
     assert_frame_equal(result, df)
 
 
@@ -22,7 +22,7 @@ def test_downsample_by_two() -> None:
         "x": [0.0, 1.0, 2.0, 3.0, 4.0],
         "y": [0.0, 10.0, 20.0, 30.0, 40.0],
     })
-    result = resample_tracks(df, Resampling(1, 2))
+    result = resample(df, Resampling(up=1, down=2))
     assert result["frame"].to_list() == [0, 1, 2]
     assert result["x"].to_list() == [0.0, 2.0, 4.0]
     assert result["y"].to_list() == [0.0, 20.0, 40.0]
@@ -35,7 +35,7 @@ def test_upsample_by_two() -> None:
         "x": [0.0, 2.0, 4.0],
         "y": [0.0, 10.0, 20.0],
     })
-    result = resample_tracks(df, Resampling(2, 1))
+    result = resample(df, Resampling(up=2, down=1))
     # 3 original points -> (3-1)*2 + 1 = 5 points after upsampling
     assert len(result) == 5
     # Intermediate values should be linearly interpolated
@@ -54,7 +54,7 @@ def test_fraction_simplification() -> None:
         "x": [0.0, 1.0, 2.0, 3.0],
         "y": [0.0, 0.0, 0.0, 0.0],
     })
-    result = resample_tracks(df, Resampling(2, 2))
+    result = resample(df, Resampling(up=2, down=2))
     assert_frame_equal(result, df)
 
 
@@ -66,7 +66,7 @@ def test_group_by_isolation() -> None:
         "x": [0.0, 1.0, 2.0, 10.0, 20.0, 30.0],
         "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     })
-    result = resample_tracks(df, Resampling(1, 2), group_by="id")
+    result = resample(df, Resampling(up=1, down=2), group_by="id")
     # Each agent: 3 frames downsampled by 2 -> 2 frames each
     agent1 = result.filter(pl.col("id") == 1).sort("frame")
     agent2 = result.filter(pl.col("id") == 2).sort("frame")
@@ -83,7 +83,7 @@ def test_add_first_derivative() -> None:
         "x": [0.0, 1.0, 2.0, 3.0],
         "y": [0.0, 0.0, 0.0, 0.0],
     })
-    result = resample_tracks(df, Resampling(1, 1), add_derivative=True, dt=1.0)
+    result = resample(df, Resampling(up=1, down=1), add_derivative=True, dt=1.0)
     assert "d1_x" in result.columns
     assert "d1_y" in result.columns
     # Linear x with dt=1 -> dx/dt should be 1.0 everywhere
@@ -101,7 +101,7 @@ def test_add_second_derivative() -> None:
         "x": [0.0, 1.0, 2.0, 3.0, 4.0],
         "y": [0.0, 0.0, 0.0, 0.0, 0.0],
     })
-    result = resample_tracks(df, Resampling(1, 1), add_second_derivative=True, dt=1.0)
+    result = resample(df, Resampling(up=1, down=1), add_second_derivative=True, dt=1.0)
     assert "d2_x" in result.columns
     assert "d2_y" in result.columns
     # Linear signal -> second derivative should be ~0 at interior points
@@ -117,8 +117,8 @@ def test_derivative_rename() -> None:
         "y": [0.0, 0.0, 0.0, 0.0],
     })
     rename = {1: ["vx", "vy"]}
-    result = resample_tracks(
-        df, Resampling(1, 1), add_derivative=True, dt=1.0, derivative_rename=rename
+    result = resample(
+        df, Resampling(up=1, down=1), add_derivative=True, dt=1.0, derivative_rename=rename
     )
     assert "vx" in result.columns
     assert "vy" in result.columns
@@ -134,20 +134,20 @@ def test_forward_fill_column() -> None:
         "y": [0.0, 0.0, 0.0],
         "agent_category": [5, 5, 5],
     })
-    result = resample_tracks(df, Resampling(2, 1), group_by="id", forward_fill=["agent_category"])
+    result = resample(df, Resampling(up=2, down=1), group_by="id", forward_fill=["agent_category"])
     # All agent_category values should remain integer 5 (forward-filled, not interpolated)
     for val in result["agent_category"].to_list():
         assert val == 5
 
 
 def test_lazyframe_input() -> None:
-    """resample_tracks works on a LazyFrame and returns a LazyFrame."""
+    """Resample works on a LazyFrame and returns a LazyFrame."""
     lf = pl.DataFrame({
         "frame": [0, 1, 2],
         "x": [0.0, 1.0, 2.0],
         "y": [0.0, 0.0, 0.0],
     }).lazy()
-    result = resample_tracks(lf, Resampling(1, 1))
+    result = resample(lf, Resampling(up=1, down=1))
     assert isinstance(result, pl.LazyFrame)
     collected = result.collect()
     assert len(collected) == 3
@@ -161,7 +161,7 @@ def test_group_by_upsample_with_derivative() -> None:
         "x": [0.0, 1.0, 2.0, 0.0, 10.0, 20.0],
         "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     })
-    result = resample_tracks(df, Resampling(2, 1), group_by="id", add_derivative=True, dt=1.0)
+    result = resample(df, Resampling(up=2, down=1), group_by="id", add_derivative=True, dt=1.0)
     agent1 = result.filter(pl.col("id") == 1).sort("frame")
     agent2 = result.filter(pl.col("id") == 2).sort("frame")
     # Each agent with 3 original points produces 5 upsampled points
@@ -177,7 +177,7 @@ def test_spline_method_basic() -> None:
         "x": [0.0, 1.0, 4.0, 9.0, 16.0],
         "y": [0.0, 0.0, 0.0, 0.0, 0.0],
     })
-    result = resample_tracks(df, Resampling(2, 1, "spline"), group_by="id")
+    result = resample(df, Resampling(up=2, down=1, method=ResamplingMethod.SPLINE), group_by="id")
     # 5 original -> (5-1)*2/1 + 1 = 9 new points
     assert len(result) == 9
 
@@ -191,9 +191,9 @@ def test_spline_method_with_derivative() -> None:
         "y": [0.0, 0.0, 0.0, 0.0, 0.0],
     })
     rename = {1: ["vx", "vy"]}
-    result = resample_tracks(
+    result = resample(
         df,
-        Resampling(2, 1, "spline"),
+        Resampling(up=2, down=1, method=ResamplingMethod.SPLINE),
         group_by="id",
         add_derivative=True,
         derivative_rename=rename,
@@ -209,7 +209,7 @@ def test_downsample_preserves_frame_column_name() -> None:
         "x": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
         "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     })
-    result = resample_tracks(df, Resampling(1, 3))
+    result = resample(df, Resampling(up=1, down=3))
     assert "frame" in result.columns
     assert result["frame"].to_list() == [0, 1]
     assert result["x"].to_list() == [0.0, 3.0]

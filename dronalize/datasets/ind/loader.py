@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from dronalize.common.loaders.xlevel import XLevelDataLoader
+from typing import TYPE_CHECKING
+
+from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dronalize.core import LoaderConfig
 
 
 class InDLoader(XLevelDataLoader):
@@ -16,3 +23,20 @@ class InDLoader(XLevelDataLoader):
     across the X-level dataset family.
 
     """
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+    ) -> None:
+        """Initialize the trajectory data loader for the inD dataset.
+
+        Parameters
+        ----------
+        data_root : Path
+            Path to root of the inD dataset.
+        loader_config : LoaderConfig, optional
+            Processor configuration. If None, default configuration will be used.
+
+        """
+        super().__init__(data_root / "data", loader_config)

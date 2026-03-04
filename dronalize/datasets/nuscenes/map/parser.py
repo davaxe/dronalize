@@ -1,17 +1,3 @@
-# Copyright 2024-2025, Theodor Westny. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Parser for NuScenes map data.
 
 This module provides a structured interface for parsing and representing
@@ -36,12 +22,12 @@ from dataclasses import dataclass, field
 from enum import auto
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from typing_extensions import Self
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.map_object import BaseEnum, BaseMapObject
+from dronalize.core.datatypes.enum import BaseEnum
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -53,8 +39,6 @@ class NuScenesMap:
     def __init__(
         self,
         json_file: Path,
-        *,
-        enable_debug_prints: bool = False,
     ) -> None:
         """Initialize the `NuscenesMap` with data from a JSON file.
 
@@ -62,30 +46,26 @@ class NuScenesMap:
         ----------
         json_file : Path
             Path to the JSON file containing the map data.
-        enable_debug_prints : bool, optional
-            If True, enables limited debug prints for deserialization issues.
 
         """
         self.json_file: Path = json_file
         with Path.open(json_file) as f:
             self.json_data: dict[str, Any] = json.load(f)
 
-        self.debug: bool = enable_debug_prints
-
     @cached_property
     def nodes(self) -> dict[str, Node]:
         """A dictionary of `Node` objects keyed by their str."""
-        return _many_from_dict(Node, self.json_data["node"], debug=self.debug)
+        return _many_from_dict(Node, self.json_data["node"])
 
     @cached_property
     def lines(self) -> dict[str, Line]:
         """A dictionary of `Line` objects keyed by their str."""
-        return _many_from_dict(Line, self.json_data["line"], debug=self.debug)
+        return _many_from_dict(Line, self.json_data["line"])
 
     @cached_property
     def polygons(self) -> dict[str, Polygon]:
         """A dictionary of `Polygon` objects keyed by their str."""
-        return _many_from_dict(Polygon, self.json_data["polygon"], debug=self.debug)
+        return _many_from_dict(Polygon, self.json_data["polygon"])
 
     @cached_property
     def road_dividers(self) -> dict[str, RoadDivider]:
@@ -93,7 +73,6 @@ class NuScenesMap:
         return _many_from_dict(
             RoadDivider,
             self.json_data["road_divider"],
-            debug=self.debug,
         )
 
     @cached_property
@@ -102,7 +81,6 @@ class NuScenesMap:
         return _many_from_dict(
             RoadSegment,
             self.json_data["road_segment"],
-            debug=self.debug,
         )
 
     @cached_property
@@ -111,13 +89,12 @@ class NuScenesMap:
         return _many_from_dict(
             PedestrianCrossing,
             self.json_data["ped_crossing"],
-            debug=self.debug,
         )
 
     @cached_property
     def walkways(self) -> dict[str, Walkway]:
         """A dictionary of `Walkway` objects keyed by their str."""
-        return _many_from_dict(Walkway, self.json_data["walkway"], debug=self.debug)
+        return _many_from_dict(Walkway, self.json_data["walkway"])
 
     @cached_property
     def traffic_lights(self) -> dict[str, TrafficLight]:
@@ -125,7 +102,6 @@ class NuScenesMap:
         return _many_from_dict(
             TrafficLight,
             self.json_data["traffic_light"],
-            debug=self.debug,
         )
 
     @cached_property
@@ -134,7 +110,6 @@ class NuScenesMap:
         return _many_from_dict(
             LaneDivider,
             self.json_data["lane_divider"],
-            debug=self.debug,
         )
 
     @cached_property
@@ -143,13 +118,12 @@ class NuScenesMap:
         return _many_from_dict(
             StopLine,
             self.json_data["stop_line"],
-            debug=self.debug,
         )
 
     @cached_property
     def lanes(self) -> dict[str, Lane]:
         """A dictionary of `Lane` objects keyed by their str."""
-        return _many_from_dict(Lane, self.json_data["lane"], debug=self.debug)
+        return _many_from_dict(Lane, self.json_data["lane"])
 
     @cached_property
     def road_blocks(self) -> dict[str, RoadBlock]:
@@ -157,7 +131,6 @@ class NuScenesMap:
         return _many_from_dict(
             RoadBlock,
             self.json_data["road_block"],
-            debug=self.debug,
         )
 
     @cached_property
@@ -166,7 +139,6 @@ class NuScenesMap:
         return _many_from_dict(
             CarparkArea,
             self.json_data.get("carpark_area", []),
-            debug=self.debug,
         )
 
     @cached_property
@@ -178,11 +150,7 @@ class NuScenesMap:
         data_iter = (
             {"token": k, "knots": v[0], "ctrl": v[1], "order": v[2]} for k, v in data.items()
         )
-        return _many_from_dict(
-            ArclinePathV1,
-            data_iter,
-            debug=self.debug,
-        )
+        return _many_from_dict(ArclinePathV1, data_iter)
 
 
 class StopLineType(BaseEnum):
@@ -233,8 +201,19 @@ class LaneType(BaseEnum):
     FOUR = 4
 
 
+class _FromDict(Protocol):
+    """Protocol for classes that can be created from a dictionary."""
+
+    id: str
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Self:
+        """Create an instance of the class from a dictionary."""
+        ...
+
+
 @dataclass
-class Node(BaseMapObject[str]):
+class Node:
     """A node in the NuScenes map, representing a point in space."""
 
     id: str
@@ -256,7 +235,7 @@ class Node(BaseMapObject[str]):
 
 
 @dataclass
-class ArclinePathV1(BaseMapObject[str]):
+class ArclinePathV1:
     """A version 1 arcline path in the NuScenes map, representing a curved path."""
 
     id: str
@@ -276,7 +255,7 @@ class ArclinePathV1(BaseMapObject[str]):
 
 
 @dataclass
-class Line(BaseMapObject[str]):
+class Line:
     """A line in the NuScenes map, representing a sequence of nodes."""
 
     id: str
@@ -292,7 +271,7 @@ class Line(BaseMapObject[str]):
 
 
 @dataclass
-class Polygon(BaseMapObject[str]):
+class Polygon:
     """A closed polygon in the NuScenes map, defined by nodes."""
 
     id: str
@@ -310,7 +289,7 @@ class Polygon(BaseMapObject[str]):
 
 
 @dataclass
-class RoadDivider(BaseMapObject[str]):
+class RoadDivider:
     """A road divider in NuScenes, represented as a line.
 
     Optionally, the corresponding road segment (as a reference to a
@@ -332,7 +311,7 @@ class RoadDivider(BaseMapObject[str]):
 
 
 @dataclass
-class RoadSegment(BaseMapObject[str]):
+class RoadSegment:
     """A road segment in NuScenes, defined by a polygon and a list of nodes."""
 
     id: str
@@ -350,7 +329,7 @@ class RoadSegment(BaseMapObject[str]):
 
 
 @dataclass
-class PedestrianCrossing(BaseMapObject[str]):
+class PedestrianCrossing:
     """A pedestrian crossing in NuScenes, represented by a polygon."""
 
     id: str
@@ -368,7 +347,7 @@ class PedestrianCrossing(BaseMapObject[str]):
 
 
 @dataclass
-class Walkway(BaseMapObject[str]):
+class Walkway:
     """A walkway in NuScenes, represented by a polygon."""
 
     id: str
@@ -384,7 +363,7 @@ class Walkway(BaseMapObject[str]):
 
 
 @dataclass
-class TrafficLight(BaseMapObject[str]):
+class TrafficLight:
     """A traffic light in NuScenes, represented by a line."""
 
     id: str
@@ -400,7 +379,7 @@ class TrafficLight(BaseMapObject[str]):
 
 
 @dataclass
-class LaneDivider(BaseMapObject[str]):
+class LaneDivider:
     """A lane divider in NuScenes, represented by a line and segment types."""
 
     id: str
@@ -422,7 +401,7 @@ class LaneDivider(BaseMapObject[str]):
 
 
 @dataclass
-class StopLine(BaseMapObject[str]):
+class StopLine:
     """A stop line in NuScenes, represented by a polygon and associated objects."""
 
     id: str
@@ -464,7 +443,7 @@ class StopLine(BaseMapObject[str]):
 
 
 @dataclass
-class Lane(BaseMapObject[str]):
+class Lane:
     """A lane in NuScenes, represented by a polygon and lane dividers."""
 
     id: str
@@ -496,7 +475,7 @@ class Lane(BaseMapObject[str]):
 
 
 @dataclass
-class CarparkArea(BaseMapObject):
+class CarparkArea:
     """A carpark in NuScenes, represented by a polygon."""
 
     id: str
@@ -517,7 +496,7 @@ class CarparkArea(BaseMapObject):
 
 
 @dataclass
-class RoadBlock(BaseMapObject[str]):
+class RoadBlock:
     """A road block in NuScenes, represented by a polygon."""
 
     id: str
@@ -556,14 +535,12 @@ def _parse_segment_divider(
     ]
 
 
-T = TypeVar("T", bound=BaseMapObject[str])
+T = TypeVar("T", bound="_FromDict")
 
 
 def _many_from_dict(
     cls: type[T],
     data: Iterable[dict[str, Any]],
-    *,
-    debug: bool = True,
 ) -> dict[str, T]:
     """Deserialize a sequence of dictionaries into a dictionary of objects.
 
@@ -573,11 +550,10 @@ def _many_from_dict(
     Parameters
     ----------
     cls : type[T]
-        Class to deserialize the items into.
+        Class to deserialize the items into. Must have a `from_dict`
+        class method and an `id` attribute.
     data : Iterable[dict]
         An iterable of dictionaries representing the items to deserialize.
-    debug : bool, optional
-        If True, enables debug prints for deserialization issues.
 
     Returns
     -------
@@ -586,23 +562,11 @@ def _many_from_dict(
 
     """
     objects: dict[str, T] = {}
-    failed = []
     for item in data:
-        obj: T | None = cls.try_from_dict(item)
-        if obj is None:
-            if debug:
-                failed.append(item)
+        try:
+            obj = cls.from_dict(item)
+        except (ValueError, TypeError):
             continue
         objects[obj.id] = obj
-
-    if len(failed) > 0 and debug:
-        tokens = "\n  ".join(
-            f'{i}: "{item.get("token", "UNKNOWN_TOKEN")}"' for i, item in enumerate(failed, 1)
-        )
-        print(
-            f"[Warning] Failed to deserialize {len(failed)} instance(s) of type "
-            f"'{cls.__name__}'. Review input data for schema compliance.\n"
-            f"Tokens of failed items:\n  {tokens}",
-        )
 
     return objects

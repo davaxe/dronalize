@@ -10,18 +10,17 @@ import polars as pl
 from typing_extensions import override
 from zarr.creation import open_array
 
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.process import prepare_agent_trajectories
-from dronalize.core.datatypes import map_context as mc
+import dronalize.pipeline.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
+from dronalize.core.datatypes.loader_config import LoaderConfig
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
+from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from zarr.core import Array
-
-_ZARR_CACHE: dict[str, Array] = {}
 
 
 @dataclass
@@ -37,8 +36,9 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
     def __init__(
         self,
         data_dir: Path | str,
-        scene_batch_size: int | None = 1000,
         loader_config: LoaderConfig | None = None,
+        *,
+        scene_batch_size: int | None = 1000,
     ) -> None:
         """Initialize the processor.
 
@@ -67,14 +67,13 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
         )
 
     @override
-    def sources(self) -> Iterable[Source[int, _Source]]:
+    def all_sources(self) -> Iterable[Source[int, _Source]]:
         current: int = 0
         while current < self._total_scenes:
             end = min(current + self._batch_size, self._total_scenes)
-            scene_interval = (current, end)
             yield Source(
                 identifier=current,
-                inner=_Source(interval=scene_interval),
+                inner=_Source(interval=(current, end)),
             )
             current += self._batch_size
 
@@ -83,15 +82,9 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
         return (self._total_scenes + self._batch_size - 1) // self._batch_size
 
     @override
-    def load_raw(
-        self, source: Source[int, _Source],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        scene_interval = source.inner.interval
-        if scene_interval is not None:
-            start, end = scene_interval
-            scenes_np = cast("npt.NDArray", self._scenes[start:end])
-        else:
-            scenes_np = cast("npt.NDArray", self._scenes[:])
+    def ingest(self, source: Source[int, _Source]) -> Iterable[IngestOutput]:
+        start, end = source.inner.interval
+        scenes_np = cast("npt.NDArray", self._scenes[start:end])
 
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
         frame_end = np.max(scenes_np[:]["frame_index_interval"])
@@ -101,26 +94,24 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
         agents_np = cast("npt.NDArray", self._agents[agent_start:agent_end])
 
         for scene_data in scenes_np:
-            scenes = _scene_to_polars(
+            df = _scene_to_polars(
                 scene_data,
                 frames=frames_np,
                 agents=agents_np,
                 frame_offset=frame_start,
                 agent_offset=agent_start,
-            )[1].lazy()
-
-            for df in prepare_agent_trajectories(
-                scenes,
-                config=self.loader_config,
-                add_derivative=True,
-                add_second_derivative=True,
-                derivative_rename=self.derivative_names(),
-            ):
-                yield df, mc.Implicit()
+            )
+            yield df.lazy(), None
 
     @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df, yaw_col="yaw")
+    def pipeline(self) -> Pipeline:
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(self.loader_config, derivative_rename=self.derivative_names())
+            )
+            .then(tr.yaw_from_vel())
+        )
 
     @classmethod
     @override
@@ -185,7 +176,7 @@ def _scene_to_polars(
     agents: npt.NDArray,
     frame_offset: int = 0,
     agent_offset: int = 0,
-) -> tuple[str, pl.DataFrame]:
+) -> pl.DataFrame:
     # This function has been optimized for performance using vectorized operations.
     scene = _LyftScene(scene_data=scene_data)
     scene_start, scene_end = scene.frame_interval
@@ -214,7 +205,7 @@ def _scene_to_polars(
     total_agents = np.sum(counts)
 
     if total_agents <= 0:
-        return scene.scene_name, ego_df
+        return ego_df
 
     # Determine the global start/end indices in the 'agents' array
     # The agents for a scene are contiguous.
@@ -253,4 +244,4 @@ def _scene_to_polars(
         "y": agent_y,
         "agent_category": agent_categories,
     })
-    return scene.scene_name, pl.concat([ego_df, agent_df])
+    return pl.concat([ego_df, agent_df])

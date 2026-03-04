@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Self
 
 import numpy as np
 from scipy.interpolate import BSpline
+from typing_extensions import override
 
 from dronalize.core import EdgeType
 from dronalize.datasets.nuscenes.map.graph_builder import NuScenesMapGraphBuilder
@@ -12,7 +13,7 @@ from dronalize.datasets.nuscenes.map.parser import NuScenesMap
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core.graph.builder import Point
+    from dronalize.core.protocols.graph_builder import Point
 
 
 class VODMapGraphBuilder(NuScenesMapGraphBuilder):
@@ -22,7 +23,6 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
         self,
         path: Path,
         *,
-        debug_parsing: bool = False,
         ignore_edge_types: set[str] | None = None,
     ) -> None:
         """Initialize the VODMapGraphBuilder.
@@ -31,18 +31,16 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
         ----------
         path : Path
             Path to the VOD map JSON file.
-        debug_parsing : bool, optional
-            If True, enables debug prints for parsing issues.
         ignore_edge_types : set[str], optional
             A set of edge type names to ignore during graph construction.
 
         """
-        nuscenes_map = NuScenesMap(path, enable_debug_prints=debug_parsing)
+        nuscenes_map = NuScenesMap(path)
         self.ignore_edge_types = ignore_edge_types if ignore_edge_types is not None else set()
 
         super().__init__(nuscenes_map)
         self.lane_polygon_edge: EdgeType | None = EdgeType.LINE_THIN
-        self.edge_type_methods = {
+        self._edge_type_methods = {
             "road_divider": self._add_road_divider_edges,
             "walkway": self._add_walkway_edges,
             "pedestrian_crossing": self._add_pedestrian_crossing_edges,
@@ -52,20 +50,16 @@ class VODMapGraphBuilder(NuScenesMapGraphBuilder):
             "carpark": self._add_carpark_edges,
         }
 
+    @override
     @classmethod
     def from_json_file(
         cls,
         path: Path,
         *,
-        debug_parsing: bool = False,
         ignore_edge_types: set[str] | None = None,
     ) -> Self:
         """Create a VODMapGraphBuilder from a file path."""
-        return cls(
-            path,
-            debug_parsing=debug_parsing,
-            ignore_edge_types=ignore_edge_types,
-        )
+        return cls(path, ignore_edge_types=ignore_edge_types)
 
     def _add_centerline_edges(self, _interp_distance: float | None) -> None:
         """Add edges for arcline paths."""

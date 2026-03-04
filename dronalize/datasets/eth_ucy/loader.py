@@ -1,88 +1,137 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.process import prepare_agent_trajectories
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes import map_context as mc
-from dronalize.core.protocols.loader import Source
+import dronalize.pipeline.transforms as tr
+from dronalize.core import BaseSceneLoader, LoaderConfig
+from dronalize.core.datatypes.categories import AgentCategory
+from dronalize.core.datatypes.split import DatasetSplit
+from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
 
-class EthUcyLoader(BaseSceneLoader[str, Path]):
+class _EthUcyLoader(BaseSceneLoader[str, Path]):
     """Processor for ETH/UCY pedestrian trajectory datasets."""
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
         dataset: str | Sequence[str],
         loader_config: LoaderConfig | None = None,
-        split: Literal["train", "val", "test"] = "train",
+        *,
+        split: DatasetSplit = DatasetSplit.ALL,
     ) -> None:
         """Initialize with the given configuration.
 
         Parameters
         ----------
-        data_dir : Path
+        data_root : Path
             Path to the root directory containing the ETH/UCY data.
         dataset : str or Sequence[str]
             Name(s) of the dataset(s) to load (e.g., "hotel", "eth").
         loader_config : LoaderConfig, optional
             Configuration override. If None, default configuration will be used.
-        split : {"train", "val", "test"}, optional
-            Data split to load. Defaults to "train".
+        split : DatasetSplit, optional
+            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._data_root = data_dir
+        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        self._data_root = data_root
         self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
-        self._split = split
-        self._window_params = self.loader_config.window_params
-        self._filtering_params = self.loader_config.scene_filtering
 
-    @override
-    def sources(self) -> Iterable[Source[str, Path]]:
-        for dataset in self._dataset:
-            data_dir = self._data_root / dataset / self._split
-            # Sort to ensure consistent order across runs and systems.
+    # ------------------------------------------------------------------
+    # Split-aware source discovery
+    # ------------------------------------------------------------------
+
+    def _sources_from_split(self, split_name: str) -> Iterable[Source[str, Path]]:
+        for dataset in sorted(self._dataset):
+            data_dir = self._data_root / dataset / split_name
+            if not data_dir.is_dir():
+                continue
             for data_file in sorted(data_dir.iterdir()):
                 yield Source(identifier=data_file.name, inner=data_file)
 
     @override
+    def all_sources(self) -> Iterable[Source[str, Path]]:
+        yield from self.train_sources()
+        yield from self.validate_sources()
+        yield from self.test_sources()
+
+    @override
+    def train_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_split("train")
+
+    @override
+    def validate_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_split("val")
+
+    @override
+    def test_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_split("test")
+
+    # ------------------------------------------------------------------
+    # Ingestion / pipeline
+    # ------------------------------------------------------------------
+
+    @override
+    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+        yield (
+            pl.scan_csv(
+                source.inner,
+                has_header=False,
+                separator="\t",
+                new_columns=["frame", "id", "x", "y"],
+                schema={
+                    "frame": pl.Int32,
+                    "id": pl.Int32,
+                    "x": pl.Float64,
+                    "y": pl.Float64,
+                },
+            ).with_columns(
+                ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
+                pl.col("id").cast(pl.Int32),
+            ),
+            None,
+        )
+
+    @override
+    def pipeline(self) -> Pipeline:
+        config = self.loader_config
+        return (
+            Pipeline()
+            .compose(trajectory_pipeline(config, derivative_rename=self.derivative_names()))
+            .then(tr.yaw_from_vel())
+            .then(tr.with_columns(agent_category=pl.lit(AgentCategory.PEDESTRIAN)))
+        )
+
+    @override
     def num_sources(self) -> int | None:
         num_sources: int = 0
+        split = self._split
+
+        split_names: list[str] = []
+        if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
+            split_names.append("train")
+        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
+            split_names.append("val")
+        if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
+            split_names.append("test")
+
         for dataset in self._dataset:
-            data_dir = self._data_root / dataset / self._split
-            num_sources += sum(1 for _ in data_dir.iterdir())
+            for split_name in split_names:
+                data_dir = self._data_root / dataset / split_name
+                if data_dir.is_dir():
+                    num_sources += sum(1 for _ in data_dir.iterdir())
 
         return num_sources
-
-    @override
-    def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        source_data = EthUcyLoader._read_data_file(source.inner)
-        for df in prepare_agent_trajectories(
-            source_data,
-            self.loader_config,
-            add_derivative=True,
-            add_second_derivative=True,
-            sliding_col="frame",
-            agent_category_col=None,
-            derivative_rename=self.derivative_names(),
-        ):
-            yield df, mc.NoMap()
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df, yaw_col="yaw").with_columns(
-            pl.lit(AgentCategory.PEDESTRIAN).alias("agent_category"),
-        )
 
     @classmethod
     @override
@@ -94,24 +143,104 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
                 sample_time=0.4,
             )
             .with_window(step_size=1)
-            .with_filtering(require_all_valid=True)
-            .with_resampling(4, 1, method="spline")
+            .with_filtering(require_all_valid=True, min_samples_per_agent=2)
+            .with_resampling(4, 1, method="fast")
         )
 
-    @staticmethod
-    def _read_data_file(path: Path) -> pl.LazyFrame:
-        return pl.scan_csv(
-            path,
-            has_header=False,
-            separator="\t",
-            new_columns=["frame", "id", "x", "y"],
-            schema={
-                "frame": pl.Int32,
-                "id": pl.Int32,
-                "x": pl.Float64,
-                "y": pl.Float64,
-            },
-        ).with_columns(
-            ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
-            pl.col("id").cast(pl.Int32),
+
+class HotelLoader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY hotel dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="hotel",
+            loader_config=loader_config,
+            split=split,
         )
+
+
+class EthLoader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY eth dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="eth",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
+class UnivLoader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY univ dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="univ",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
+class Zara1Loader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY zara1 dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="zara1",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
+class Zara2Loader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY zara2 dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="zara2",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
+if __name__ == "__main__":
+    import altair as alt
+
+    path = Path("data")
+    alt.renderers.enable("browser")
+    loader = HotelLoader(path, split=DatasetSplit.TRAIN)
+    count = 0
+    for _scene in loader.scenes():
+        count += 1
+
+    print(f"Total scenes: {count}")

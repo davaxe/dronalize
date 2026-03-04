@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from typing import (
-    TYPE_CHECKING,
-    Literal,
-    Self,
-)
+from typing import TYPE_CHECKING, Literal, Self
 
-from dronalize.common.trajectory.filter import FilteringConfig
-from dronalize.common.trajectory.resample import Resampling
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from dronalize.ops.trajectory.filter import FilteringConfig
+from dronalize.ops.trajectory.resample import Resampling, ResamplingMethod
 
 if TYPE_CHECKING:
     from collections.abc import Collection
@@ -16,45 +13,59 @@ if TYPE_CHECKING:
     from dronalize.core.datatypes.categories import AgentCategory
 
 
-@dataclass(slots=True, frozen=True)
-class WindowParams:
+class WindowParams(BaseModel):
     """Configuration for sliding window sampling of scenes."""
 
-    window_size: int
-    """Number of frames in each window."""
+    model_config = ConfigDict(frozen=True)
+    window_size: int = Field(gt=0, description="Number of frames in each window.")
+    step_size: int = Field(gt=0, description="Number of frames to skip between windows.")
 
-    step_size: int
-    """Number of frames to skip between windows."""
+    def __bool__(self) -> bool:
+        """Return True if windowing is enabled (i.e., step_size > 0)."""
+        return self.step_size > 0 and self.window_size > 0
 
 
-@dataclass(slots=True, frozen=True)
-class LoaderConfig:
-    """Base configuration dataclass for trajectory data processing.
+class LoaderConfig(BaseModel):
+    """Base configuration class for trajectory data processing.
 
     All builder-style methods (`with_*`) return **new** instances, leaving the
-    original unchanged.  This makes configs safe to share, compare, serialise
+    original unchanged. This makes configs safe to share, compare, serialise
     and merge.
     """
 
-    input_len: int
-    """Observation length in frames."""
+    model_config = ConfigDict(frozen=True)
 
-    output_len: int
-    """Prediction length in frames."""
+    input_len: int = Field(gt=0, description="Observation length in frames.")
+    output_len: int = Field(gt=0, description="Prediction length in frames.")
+    sample_time: float = Field(gt=0, description="Time interval between frames in seconds.")
 
-    sample_time: float
-    """Time interval between frames in seconds."""
+    resampling: Resampling | None = Field(
+        default=None, description="Resampling config if applicable."
+    )
+    window: WindowParams | None = Field(
+        default=None,
+        description="Used for datasets where multiple samples can be generated from a single "
+        "scene by using a sliding window approach. If None, it is assumed that each "
+        "scene corresponds to exactly one sample.",
+    )
+    filtering: FilteringConfig | None = Field(
+        default=None,
+        description=(
+            "Configuration for filtering scenes based on agent validity and scene composition."
+        ),
+    )
 
-    resampling: Resampling | None = None
-    """Resampling config if applicable."""
-
-    window_params: WindowParams | None = None
-    """Used for datasets where multiple samples can be generated from a single
-    scene by using a sliding window approach. If None, it is assumed that each
-    scene corresponds to exactly one sample."""
-
-    scene_filtering: FilteringConfig | None = None
-    """Configuration for filtering scenes based on agent validity and scene composition."""
+    @model_validator(mode="after")
+    def _validate(self) -> LoaderConfig:
+        if self.window is None:
+            return self
+        if self.window.window_size != self.input_len + self.output_len:
+            msg = (
+                f"Window size ({self.window.window_size}) must equal input_len + output_len "
+                f"({self.input_len + self.output_len}) for consistent windowing."
+            )
+            raise ValueError(msg)
+        return self
 
     # -- builder helpers (return new frozen instances) -----------------------
 
@@ -73,17 +84,14 @@ class LoaderConfig:
         -------
         Self
             A **new** config instance with window parameters set.
-
         """
-        return replace(
-            self,
-            window_params=WindowParams(
-                window_size=window_size
-                if window_size is not None
-                else self.input_len + self.output_len,
-                step_size=step_size,
-            ),
+        new_window_params = WindowParams(
+            window_size=window_size
+            if window_size is not None
+            else self.input_len + self.output_len,
+            step_size=step_size,
         )
+        return self.model_copy(update={"window": new_window_params})
 
     def with_filtering(
         self,
@@ -93,6 +101,7 @@ class LoaderConfig:
         require_frames: Collection[int] | None = None,
         filter_agent_category: Collection[AgentCategory] | None = None,
         filter_slow_agents: float | None = None,
+        min_samples_per_agent: int | None = None,
     ) -> Self:
         """Return a copy with the given scene-filtering parameters.
 
@@ -115,12 +124,14 @@ class LoaderConfig:
         filter_slow_agents : float, optional
             Remove agents whose average speed (m/s) is below this threshold.
             Defaults to None (no filtering).
+        min_samples_per_agent : int, optional
+            Minimum number of data points (rows) required per agent. Agents
+            with fewer samples are removed. Defaults to None (no filtering).
 
         Returns
         -------
         Self
             A **new** config instance with scene-filtering parameters set.
-
         """
         if require_frames is not None:
             require_frames = {
@@ -128,22 +139,23 @@ class LoaderConfig:
                 for frame in require_frames
             }
 
-        return replace(
-            self,
-            scene_filtering=FilteringConfig(
-                min_agents=min_agents,
-                require_all_valid=require_all_valid,
-                require_frames=require_frames,
-                filter_agent_category=filter_agent_category,
-                filter_slow_agents=filter_slow_agents,
-            ),
+        new_filtering = FilteringConfig(
+            min_agents=min_agents,
+            require_all_valid=require_all_valid,
+            require_frames=frozenset(require_frames) if require_frames is not None else None,
+            filter_agent_category=frozenset(filter_agent_category)
+            if filter_agent_category is not None
+            else None,
+            filter_slow_agents=filter_slow_agents,
+            min_samples_per_agent=min_samples_per_agent,
         )
+        return self.model_copy(update={"filtering": new_filtering})
 
     def with_resampling(
         self,
         up: int,
         down: int,
-        method: Literal["fast", "spline"] = "fast",
+        method: Literal["fast", "spline"] | ResamplingMethod = "fast",
     ) -> Self:
         """Return a copy with the given resampling parameters.
 
@@ -160,6 +172,10 @@ class LoaderConfig:
         -------
         Self
             A **new** config instance with resampling parameters set.
-
         """
-        return replace(self, resampling=Resampling(up=up, down=down, method=method))
+        new_resampling = Resampling(
+            up=up,
+            down=down,
+            method=method if isinstance(method, ResamplingMethod) else ResamplingMethod(method),
+        )
+        return self.model_copy(update={"resampling": new_resampling})

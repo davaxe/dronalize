@@ -5,14 +5,14 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph import GraphBuilder
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-class WaymoMapGraphBuilder(GraphBuilder):
+class WaymoMapGraphBuilder(BaseGraphBuilder):
     """A Waymo map representation.
 
     As opposed to other maps (e.g, argoverse1, argoverse2 and NuScenes) this map

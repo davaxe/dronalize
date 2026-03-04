@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.common.map.lane import HighWayLaneGraphBuilder, LaneDescription
+from dronalize.datasets.common.graph_builder_highway import (
+    HighWayLaneGraphBuilder,
+    LaneDescription,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -29,7 +32,8 @@ class I80GraphBuilder(HighWayLaneGraphBuilder):
             The root directory of the I-80 dataset.
 
         """
-        data = pl.scan_csv(list(data_dir.rglob("trajectories*.csv"))).select(
+        files = list(data_dir.rglob("trajectories*.csv"))
+        data = pl.scan_csv(files).select(
             pl.col("Vehicle_ID").alias("id"),
             pl.col("Local_X").alias("x").mul(0.3048),  # Convert feet to meters
             pl.col("Local_Y").alias("y").mul(0.3048),

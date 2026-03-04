@@ -6,13 +6,13 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph import GraphBuilder
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class HighDMapGraphBuilder(GraphBuilder):
+class HighDMapGraphBuilder(BaseGraphBuilder):
     """Graph builder for the HighD dataset.
 
     The data only contains the y coordinates of the lane markings, so we craete
@@ -42,7 +42,9 @@ class HighDMapGraphBuilder(GraphBuilder):
 
     @override
     def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None,
+        self,
+        min_distance: float | None = None,
+        interp_distance: float | None = None,
     ) -> None:
         # These are used implcitly if `GraphBuilder.build` method is used.
         _min_distance, _interp_distance = min_distance, interp_distance
