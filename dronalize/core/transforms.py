@@ -12,19 +12,16 @@ from dronalize.common.trajectory.filter import FilteringConfig, filter_scene_exp
 from dronalize.common.trajectory.rebalance import rebalance_highway_agents
 from dronalize.common.trajectory.resample import Resampling, resample_tracks
 from dronalize.common.trajectory.window import sliding_window
-from dronalize.core.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.core.datatypes.loader_config import LoaderConfig
     from dronalize.core.pipeline import FlatMapTransform, Transform
 
 __all__ = [
     "derivative",
     "filter_scene",
     "group_by_yield",
-    "pipeline_from_config",
     "rebalance",
     "resample",
     "window",
@@ -250,7 +247,7 @@ def yaw_from_vel(
                 .when(pl.col(yaw_col).is_null())
                 .then(yaw_from_vel_expr(vx_col, vy_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
-                .alias(yaw_col)
+                .alias(yaw_col),
             )
 
     else:
@@ -299,7 +296,7 @@ def yaw_from_pos(
                 .when(pl.col(yaw_col).is_null())
                 .then(yaw_from_pos_expr(x_col, y_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
-                .alias(yaw_col)
+                .alias(yaw_col),
             )
 
     else:
@@ -358,7 +355,7 @@ def window(
         ):
             if offset_sliding_col:
                 window_df = window_df.with_columns(  # noqa: PLW2901
-                    pl.col(sliding_col) - pl.col(sliding_col).min()
+                    pl.col(sliding_col) - pl.col(sliding_col).min(),
                 )
             yield window_df.lazy()
 
@@ -464,198 +461,3 @@ def group_by_yield(
     _group_by_yield.__name__ = "group_by_yield"
     _group_by_yield.__qualname__ = "transforms.group_by_yield"
     return _group_by_yield
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Pipeline construction helper from LoaderConfig
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def pipeline_from_config(
-    config: LoaderConfig,
-    *,
-    group_by: str | Sequence[str] | None = None,
-    agent_id: str = "id",
-    frame_column: str = "frame",
-    category_column: str | None = "agent_category",
-    pos_columns: Sequence[str] = ("x", "y"),
-    add_derivative: bool = False,
-    add_second_derivative: bool = False,
-    derivative_rename: dict[int, list[str]] | None = None,
-    forward_fill: Sequence[str] | None = None,
-    sliding_col: str = "frame",
-    offset_sliding_col: bool = True,
-    add_yaw_from_vel: bool = False,
-) -> Pipeline:
-    """Build a standard :class:`~dronalize.core.pipeline.Pipeline` from a :class:`LoaderConfig`.
-
-    This constructs the "canonical" processing pipeline that
-    ``prepare_agent_trajectories`` used to perform monolithically:
-
-    1. (optional) sliding window → fan-out
-    2. filtering
-    3. resampling + derivatives
-    4. (optional) yaw from velocity
-
-    Parameters
-    ----------
-    config : LoaderConfig
-        Full loader configuration.
-    group_by : str or Sequence[str], optional
-        Scene-level grouping columns.
-    agent_id : str, optional
-        Agent identifier column.
-    frame_column : str, optional
-        Frame index column.
-    category_column : str, optional
-        Agent category column.
-    pos_columns : Sequence[str], optional
-        Position columns.
-    add_derivative : bool, optional
-        Add first-order derivatives.
-    add_second_derivative : bool, optional
-        Add second-order derivatives.
-    derivative_rename : dict[int, list[str]], optional
-        Custom derivative column names.
-    forward_fill : Sequence[str], optional
-        Columns to forward fill after resampling.
-    sliding_col : str, optional
-        Column for sliding window.
-    offset_sliding_col : bool, optional
-        Zero-offset the sliding column per window.
-    add_yaw_from_vel : bool, optional
-        Append a yaw-from-velocity step.
-
-    Returns
-    -------
-    Pipeline
-        A ready-to-use pipeline.
-
-    """
-    pipe = Pipeline()
-
-    # Determine the full group_by list.  If windowing is used, the sliding
-    # window adds a `window_index` column that must be included in
-    # downstream group-by operations.
-    group_by_list: list[str] = [group_by] if isinstance(group_by, str) else list(group_by or [])
-    resample_group_by: list[str] = list(group_by_list)
-
-    # 1. Sliding window (fan-out or inline)
-    if config.window_params is not None:
-        pipe = pipe.then(
-            _inline_window(
-                window_size=config.window_params.window_size,
-                step_size=config.window_params.step_size,
-                sliding_col=sliding_col,
-            )
-        )
-        resample_group_by.append("window_index")
-
-    # 2. Filtering
-    pipe = pipe.then(
-        filter_scene(
-            config.scene_filtering,
-            group_by=resample_group_by[-1] if resample_group_by else None,
-            agent_id=agent_id,
-            frame_column=frame_column,
-            category_column=category_column,
-        )
-    )
-
-    # Ensure single-point groups are dropped (same as prepare_agent_trajectories)
-    resample_and_agent_groups = [*resample_group_by, agent_id]
-
-    def _drop_singletons(df: pl.LazyFrame) -> pl.LazyFrame:
-        return df.filter(pl.len().over(resample_and_agent_groups) > 1)
-
-    _drop_singletons.__name__ = "drop_singletons"
-    pipe = pipe.then(_drop_singletons)
-
-    # 3. Resampling + derivatives
-    resolved_forward_fill = (
-        [category_column, *(forward_fill or [])] if category_column else forward_fill or None
-    )
-
-    pipe = pipe.then(
-        resample(
-            config.resampling,
-            config.sample_time,
-            frame_column=frame_column,
-            pos_columns=pos_columns,
-            group_by=resample_and_agent_groups or None,
-            add_derivative=add_derivative,
-            add_second_derivative=add_second_derivative,
-            derivative_rename=derivative_rename,
-            forward_fill=resolved_forward_fill,
-        )
-    )
-
-    # 4. If windowed, split into individual windows
-    if config.window_params is not None:
-        pipe = pipe.then_flat_map(
-            _split_windows(
-                sliding_col=sliding_col,
-                offset_sliding_col=offset_sliding_col,
-            )
-        )
-
-    # 5. Optional yaw from velocity
-    if add_yaw_from_vel:
-        pipe = pipe.then(yaw_from_vel())
-
-    return pipe
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers for pipeline_from_config
-# ---------------------------------------------------------------------------
-
-
-def _inline_window(
-    window_size: int,
-    step_size: int,
-    sliding_col: str = "frame",
-) -> Transform:
-    """Apply sliding window as a 1:1 transform that keeps ``window_index``.
-
-    This mirrors the ``return_iterable=False`` path of
-    :func:`~dronalize.common.trajectory.window.sliding_window`, keeping
-    all windows in a single frame tagged with ``window_index``.
-    The fan-out into individual frames happens later via
-    :func:`_split_windows`.
-    """
-
-    def _apply(df: pl.LazyFrame) -> pl.LazyFrame:
-        return sliding_window(
-            df,
-            window_size=window_size,
-            step_size=step_size,
-            sliding_col=sliding_col,
-            is_sorted=False,
-            return_iterable=False,
-        )
-
-    _apply.__name__ = "inline_window"
-    _apply.__qualname__ = "transforms.inline_window"
-    return _apply
-
-
-def _split_windows(
-    sliding_col: str = "frame",
-    *,
-    offset_sliding_col: bool = True,
-) -> FlatMapTransform:
-    """Fan-out that groups by ``window_index`` and yields each window."""
-
-    def _apply(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-        collected = df.collect()
-        for _, group in collected.group_by("window_index"):
-            if offset_sliding_col:
-                group = group.with_columns(  # noqa: PLW2901
-                    pl.col(sliding_col) - pl.col(sliding_col).min()
-                )
-            yield group.lazy().drop("window_index")
-
-    _apply.__name__ = "split_windows"
-    _apply.__qualname__ = "transforms.split_windows"
-    return _apply

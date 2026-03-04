@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
-import polars as pl
 from typing_extensions import overload
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
+
+    import polars as pl
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +115,11 @@ class Pipeline:
         return Pipeline((*self._steps, _MapEntry(transform, name))) if when else self
 
     def then_flat_map(
-        self, flat_map: FlatMapTransform, *, when: bool = True, name: str | None = None
+        self,
+        flat_map: FlatMapTransform,
+        *,
+        when: bool = True,
+        name: str | None = None,
     ) -> Pipeline:
         """Append a 1:N flat-map step and return a *new* pipeline.
 
@@ -322,11 +327,9 @@ class Pipeline:
         result = results[0]
 
         if not collect:
-            return result  # LazyFrame
+            return result
 
-        # Collected case
-        assert isinstance(result, pl.DataFrame)
-
+        result = cast("pl.DataFrame", result)
         if filter_empty and result.height == 0:
             return None
 

@@ -74,7 +74,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame]
+        self, source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
 
@@ -83,7 +83,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
                 self.loader_config.scene_filtering,
                 group_by=["file_id"],
                 category_column="agent_category",
-            )
+            ),
         )
 
         source_resampled = resample_tracks(

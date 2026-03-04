@@ -85,7 +85,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame]
+        self, source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         source_filtered = source.inner.filter(
@@ -93,7 +93,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
                 self.loader_config.scene_filtering,
                 group_by=["file_id"],
                 category_column="agent_category",
-            )
+            ),
         )
 
         if resampling.no_resampling:
@@ -116,7 +116,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
                     dt=self.loader_config.sample_time,
                     derivative_rename=self.derivative_names(),
                     forward_fill=["agent_category"],
-                )
+                ),
             )
 
         for _, group in source_resampled.collect().group_by(["file_id"]):
@@ -153,5 +153,5 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             "unknown": AgentCategory.UNKNOWN,
         }
         return pl.col(col).replace_strict(
-            mapping, default=AgentCategory.UNKNOWN, return_dtype=pl.Int32
+            mapping, default=AgentCategory.UNKNOWN, return_dtype=pl.Int32,
         )

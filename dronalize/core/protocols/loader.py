@@ -299,7 +299,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         return None
 
     def process_next(
-        self, source: Source[IdT, SourceT]
+        self, source: Source[IdT, SourceT],
     ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process a single data item through the pipeline.
 

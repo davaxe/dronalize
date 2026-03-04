@@ -84,7 +84,7 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
 
     @override
     def load_raw(
-        self, source: Source[int, _Source]
+        self, source: Source[int, _Source],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         scene_interval = source.inner.interval
         if scene_interval is not None:

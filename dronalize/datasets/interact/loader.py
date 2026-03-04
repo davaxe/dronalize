@@ -78,7 +78,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
     @override
     def load_raw(
-        self, source: Source[str, list[Path]]
+        self, source: Source[str, list[Path]],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         data = (
@@ -102,7 +102,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
                 self.loader_config.scene_filtering,
                 group_by=["file_id", "case_id"],
                 category_column="agent_category",
-            )
+            ),
         )
 
         data_filtered = data_filtered.with_columns(
@@ -156,7 +156,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
                 pl
                 .when((pl.col("vx") ** 2 + pl.col("vy") ** 2).sqrt() < 2)
                 .then(AgentCategory.PEDESTRIAN.value)
-                .otherwise(AgentCategory.BICYCLE.value)
+                .otherwise(AgentCategory.BICYCLE.value),
             )
             .otherwise(pl.col("agent_category"))
         )

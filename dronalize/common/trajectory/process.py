@@ -82,7 +82,7 @@ def prepare_agent_trajectories(
             agent_id="id",
             group_by=group_by[-1] if len(group_by) > 0 else None,
             category_column=agent_category_col,
-        )
+        ),
     )
     group_by.append("id")
     scenes_filtered = scenes_filtered.filter(pl.len().over(group_by) > 1)

@@ -86,7 +86,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
 
     @override
     def load_raw(
-        self, source: Source[tuple[str, str], str]
+        self, source: Source[tuple[str, str], str],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         map_context = source.map_context or mc.Implicit()
         scenes = (
@@ -144,7 +144,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
     def _precompute_global_data(self) -> None:
         # 1. Build the global timeline (Sample + Scene + Log)
         timeline_lf = build_scene_timeline(
-            self._dfs["sample"], self._dfs["scene"], self._dfs["log"]
+            self._dfs["sample"], self._dfs["scene"], self._dfs["log"],
         )
 
         # 2. Process Ego
@@ -273,7 +273,7 @@ def build_scene_timeline(
             .over("scene_token")
             .sub(1)
             .alias("frame")
-            .cast(pl.Int64)
+            .cast(pl.Int64),
         )
     )
 
@@ -393,7 +393,7 @@ def extract_agent_tracks(
             how="left",
         )
         .with_columns(
-            pl.col("instance_token").rank("dense").over("scene_token").cast(pl.Int32).alias("id")
+            pl.col("instance_token").rank("dense").over("scene_token").cast(pl.Int32).alias("id"),
         )
         .select(
             *("scene_token", "scene_name", "map", "frame", "id"),

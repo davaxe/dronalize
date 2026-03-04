@@ -116,7 +116,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             filter_scene_expr(
                 self.loader_config.scene_filtering,
                 category_column="agent_category",
-            )
+            ),
         )
         df_resampled = resample_tracks(
             df_filtered,

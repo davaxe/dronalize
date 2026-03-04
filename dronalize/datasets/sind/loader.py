@@ -81,7 +81,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
                 *("x", "y", "vx", "vy", "ax", "ay"),
             )
             pedestrian_df = pl.scan_csv(
-                pedestrian_data_path, schema_overrides=_PEDESTRIAN_SCHEMA
+                pedestrian_data_path, schema_overrides=_PEDESTRIAN_SCHEMA,
             ).select(
                 pl
                 .col("track_id")
@@ -113,7 +113,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[str, pl.LazyFrame]
+        self, source: Source[str, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         for df in prepare_agent_trajectories(source.inner, self.loader_config):
             yield df, source.map_context or mc.NoMap()
@@ -125,7 +125,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
             .when(pl.col("yaw").is_null())
             .then(yaw_from_vel_expr())
             .otherwise(pl.col("yaw"))
-            .alias("yaw")
+            .alias("yaw"),
         )
 
     @classmethod

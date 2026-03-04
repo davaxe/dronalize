@@ -58,11 +58,11 @@ class AD4CHELoader(XLevelDataLoader):
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-                *self.meta_data_select()
+                *self.meta_data_select(),
             )
 
             tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
-                *self.track_data_select()
+                *self.track_data_select(),
             )
             combined = tracks_df.join(meta_df, left_on="id", right_on="id")
             yield Source(

@@ -42,7 +42,7 @@ class HighDMapGraphBuilder(GraphBuilder):
 
     @override
     def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None
+        self, min_distance: float | None = None, interp_distance: float | None = None,
     ) -> None:
         # These are used implcitly if `GraphBuilder.build` method is used.
         _min_distance, _interp_distance = min_distance, interp_distance

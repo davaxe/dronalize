@@ -234,12 +234,12 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             ):
                 if self._progress_bar == ProgressBar.SOURCES:
                     progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value}, refresh=False
+                        {"scenes": self._mp_scene_counter.value}, refresh=False,
                     )
                     progress_bar.update(1)
                 elif self._progress_bar == ProgressBar.SCENES:
                     progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value}, refresh=False
+                        {"sources": self._mp_source_counter.value}, refresh=False,
                     )
                     progress_bar.update(len(scenes))
 
@@ -305,12 +305,12 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             for processed_scenes in work_iter:
                 if self._progress_bar == ProgressBar.SOURCES:
                     progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value}, refresh=False
+                        {"scenes": self._mp_scene_counter.value}, refresh=False,
                     )
                     progress_bar.update(1)
                 elif self._progress_bar == ProgressBar.SCENES:
                     progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value}, refresh=False
+                        {"sources": self._mp_source_counter.value}, refresh=False,
                     )
                     progress_bar.update(processed_scenes)
 

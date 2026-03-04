@@ -70,9 +70,13 @@ class SindGraphBuilder(OSMMapGraphBuilder):
 
     @override
     def _process_node(
-        self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element
+        self,
+        elem: ET.Element,
+        x_offset: float,
+        y_offset: float,
+        root: ET.Element,
     ) -> None:
-        """Process an OSM node element by converting to UTM and offsetting against the map origin."""
+        """Process an OSM node element."""
         node_id = int(elem.attrib["id"])
         lat = float(elem.attrib["lat"])
         lon = float(elem.attrib["lon"])

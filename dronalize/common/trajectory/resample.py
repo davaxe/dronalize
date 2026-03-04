@@ -316,11 +316,11 @@ def _return_type(
     fields = dict.fromkeys(pos_cols, pl.Float32)
     if add_derivative:
         fields.update(
-            dict.fromkeys(derivative_rename.get(1, [f"v{c}" for c in pos_cols]), pl.Float32)
+            dict.fromkeys(derivative_rename.get(1, [f"v{c}" for c in pos_cols]), pl.Float32),
         )
     if add_second_derivative:
         fields.update(
-            dict.fromkeys(derivative_rename.get(2, [f"a{c}" for c in pos_cols]), pl.Float32)
+            dict.fromkeys(derivative_rename.get(2, [f"a{c}" for c in pos_cols]), pl.Float32),
         )
     return pl.Struct(fields)
 
@@ -485,7 +485,7 @@ def _upsample_dataframe(
                 pl.col(frame_column).max() + 1,
                 step=1,
                 dtype=pl.Int32,
-            ).alias(frame_column)
+            ).alias(frame_column),
         )
         .explode(frame_column)
     )

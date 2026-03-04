@@ -20,7 +20,6 @@ from dronalize.core.pipeline import (
     Transform,
 )
 from dronalize.core.protocols.loader import BaseSceneLoader, Source
-from dronalize.core.transforms import pipeline_from_config
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -526,91 +525,6 @@ def test_pipeline_integration_complex() -> None:
     for r in results:
         assert "pos_x" in r.columns
         assert r["pos_x"].min() >= 100.0  # pyright: ignore[reportOperatorIssue]
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# pipeline_from_config
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def test_pipeline_from_config_basic_no_window_no_resample() -> None:
-    """Create and run a pipeline directly from configuration without windowing or resampling."""
-    config = LoaderConfig(3, 3, 0.1).with_filtering(min_agents=1)
-    pipe = pipeline_from_config(config)
-    assert len(pipe) > 0
-
-    lf = pl.DataFrame({
-        "frame": [0, 1, 2, 3, 4, 5],
-        "id": [1, 1, 1, 1, 1, 1],
-        "x": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
-        "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        "agent_category": [1, 1, 1, 1, 1, 1],
-    }).lazy()
-
-    results = list(pipe.execute(lf))
-    assert len(results) == 1
-    result = results[0].collect()
-    assert result.shape[0] == 6
-
-
-def test_pipeline_from_config_with_window_produces_fan_out() -> None:
-    """Create and run a pipeline from configuration to successfully produce multiple windows."""
-    config = (
-        LoaderConfig(3, 3, 0.1).with_window(step_size=2, window_size=6).with_filtering(min_agents=1)
-    )
-    pipe = pipeline_from_config(config)
-
-    lf = pl.DataFrame({
-        "frame": list(range(12)),
-        "id": [1] * 12,
-        "x": [float(i) for i in range(12)],
-        "y": [0.0] * 12,
-        "agent_category": [1] * 12,
-    }).lazy()
-
-    results = list(pipe.execute(lf))
-    assert len(results) >= 2
-
-
-def test_pipeline_from_config_with_yaw_from_vel() -> None:
-    """Create a pipeline from configuration that accurately calculates yaw, velocity, and acceleration."""
-    config = LoaderConfig(3, 3, 0.1).with_filtering(min_agents=1)
-    pipe = pipeline_from_config(
-        config,
-        add_derivative=True,
-        add_second_derivative=True,
-        derivative_rename={1: ["vx", "vy"], 2: ["ax", "ay"]},
-        add_yaw_from_vel=True,
-    )
-
-    lf = pl.DataFrame({
-        "frame": [0, 1, 2, 3, 4, 5],
-        "id": [1, 1, 1, 1, 1, 1],
-        "x": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
-        "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        "agent_category": [1, 1, 1, 1, 1, 1],
-    }).lazy()
-
-    result = next(iter(pipe.execute(lf))).collect()
-    assert "yaw" in result.columns
-    assert "vx" in result.columns
-    assert "ax" in result.columns
-
-
-def test_pipeline_from_config_no_category_column() -> None:
-    """Verify pipeline creation functions correctly even if no category column is specified."""
-    config = LoaderConfig(2, 2, 0.1).with_filtering(min_agents=1)
-    pipe = pipeline_from_config(config, category_column=None)
-
-    lf = pl.DataFrame({
-        "frame": [0, 1, 2, 3],
-        "id": [1, 1, 1, 1],
-        "x": [0.0, 1.0, 2.0, 3.0],
-        "y": [0.0, 0.0, 0.0, 0.0],
-    }).lazy()
-
-    results = list(pipe.execute(lf))
-    assert len(results) == 1
 
 
 # ═══════════════════════════════════════════════════════════════════════════

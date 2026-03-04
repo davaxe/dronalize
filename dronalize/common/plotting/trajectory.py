@@ -86,7 +86,7 @@ def plot_trajectories(
         x=alt.X(x_col, title=x_label or x_col),
         y=alt.Y(y_col, title=y_label or y_col),
         color=alt.Color(
-            group_by or alt.Undefined, scale=alt.Scale(scheme="category20"), legend=None
+            group_by or alt.Undefined, scale=alt.Scale(scheme="category20"), legend=None,
         ),
     )
 

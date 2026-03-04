@@ -73,7 +73,7 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[str, pl.LazyFrame]
+        self, source: Source[str, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         for df in prepare_agent_trajectories(
             source.inner,

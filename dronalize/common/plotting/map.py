@@ -122,10 +122,10 @@ def plot_map_graph(
                 ),
             ),
             size=alt.Size(
-                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_width), legend=None
+                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_width), legend=None,
             ),
             strokeDash=alt.StrokeDash(
-                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_dash), legend=None
+                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_dash), legend=None,
             ),
             opacity=alt.when(edge_selection).then(alt.value(alpha)).otherwise(alt.value(0.05)),
             tooltip=[

@@ -154,12 +154,12 @@ def filter_scene_expr(
     agent_validity = pl.lit(value=True)
     if filtering.require_frames is not None:
         agent_validity &= _check_required_frames(
-            set(filtering.require_frames), frame_column, scene_start_frame, agent_window
+            set(filtering.require_frames), frame_column, scene_start_frame, agent_window,
         )
 
     if filtering.filter_agent_category is not None and category_column is not None:
         agent_validity &= _check_agent_category(
-            set(filtering.filter_agent_category), category_column
+            set(filtering.filter_agent_category), category_column,
         )
 
     if filtering.require_all_valid:
@@ -167,13 +167,13 @@ def filter_scene_expr(
 
     if filtering.filter_slow_agents is not None:
         agent_validity &= _check_slow_agents(
-            filtering.filter_slow_agents, x_column, y_column, agent_window
+            filtering.filter_slow_agents, x_column, y_column, agent_window,
         )
 
     conditions.append(agent_validity)
     if filtering.min_agents > 0:
         conditions.append(
-            _check_min_agents(filtering.min_agents, agent_id, agent_validity, scene_window)
+            _check_min_agents(filtering.min_agents, agent_id, agent_validity, scene_window),
         )
 
     if not conditions:
@@ -191,7 +191,7 @@ def _check_required_frames(
     """Check if the agent contains all the required relative frame offsets."""
     relative_frame = pl.col(frame_column) - scene_start_frame
     return relative_frame.filter(relative_frame.is_in(require_frames)).n_unique().over(
-        agent_window
+        agent_window,
     ) == len(require_frames)
 
 
@@ -201,7 +201,7 @@ def _check_agent_category(filter_categories: set[int], category_column: str) -> 
 
 
 def _check_full_length(
-    frame_column: str, scene_window: pl.Expr | list[str], agent_window: list[str]
+    frame_column: str, scene_window: pl.Expr | list[str], agent_window: list[str],
 ) -> pl.Expr:
     """Ensure the agent's track length matches the total scene length."""
     scene_len = pl.col(frame_column).n_unique().over(scene_window)
@@ -209,7 +209,7 @@ def _check_full_length(
 
 
 def _check_slow_agents(
-    min_dist_per_step: float, x_column: str, y_column: str, agent_window: list[str]
+    min_dist_per_step: float, x_column: str, y_column: str, agent_window: list[str],
 ) -> pl.Expr:
     """Filter out agents moving less than the minimum distance per step."""
     dx = pl.col(x_column).diff().over(agent_window)
@@ -227,7 +227,7 @@ def _check_slow_agents(
 
 
 def _check_min_agents(
-    min_agents: int, agent_id: str, agent_validity: pl.Expr, scene_window: pl.Expr | list[str]
+    min_agents: int, agent_id: str, agent_validity: pl.Expr, scene_window: pl.Expr | list[str],
 ) -> pl.Expr:
     """Ensure the scene meets the minimum count of valid agents."""
     valid_agent_count = pl.col(agent_id).filter(agent_validity).n_unique().over(scene_window)
