@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.common.trajectory.resample import Resampling, resample
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
@@ -74,7 +74,8 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame],
+        self,
+        source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
 
@@ -86,7 +87,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
             ),
         )
 
-        source_resampled = resample_tracks(
+        source_resampled = resample(
             source_filtered,
             resampling,
             group_by=["file_id"],

@@ -142,8 +142,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         """
         self._count: int = 0
         self._source_counter: int = 0
-        self._enforce_schema = enforce_schema
-        self._loader_config = loader_config or type(self).default_config()
+        self._enforce_schema: bool = enforce_schema
+        self._loader_config: LoaderConfig | None = loader_config
 
     # --- Abstract Steps (The "Blanks" to fill) ---
 
@@ -299,7 +299,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         return None
 
     def process_next(
-        self, source: Source[IdT, SourceT],
+        self,
+        source: Source[IdT, SourceT],
     ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process a single data item through the pipeline.
 
@@ -413,7 +414,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     @property
     def loader_config(self) -> LoaderConfig:
         """Return the loader configuration."""
-        return self._loader_config
+        return self._loader_config or self.default_config()
 
     @property
     def original_input_len(self) -> int:

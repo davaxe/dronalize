@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 from typing_extensions import overload
 
@@ -216,7 +216,7 @@ class Pipeline:
         *,
         collect: bool = False,
         filter_empty: bool = True,
-    ) -> Iterator[pl.LazyFrame] | Iterator[pl.DataFrame]:
+    ) -> Iterator[pl.LazyFrame | pl.DataFrame]:
         """
         Execute every step in order, yielding the resulting LazyFrame(s).
 
@@ -329,7 +329,6 @@ class Pipeline:
         if not collect:
             return result
 
-        result = cast("pl.DataFrame", result)
         if filter_empty and result.height == 0:
             return None
 

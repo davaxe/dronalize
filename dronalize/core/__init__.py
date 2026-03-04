@@ -42,9 +42,6 @@ from dronalize.core.protocols import (
     BaseMapObject,
     BaseSceneLoader,
 )
-from dronalize.core.transforms import (
-    pipeline_from_config,
-)
 
 __all__ = [
     "AgentCategory",
@@ -70,6 +67,5 @@ __all__ = [
     "Transform",
     "get_edges_from_adj_list",
     "interpolate_position",
-    "pipeline_from_config",
     "transforms",
 ]

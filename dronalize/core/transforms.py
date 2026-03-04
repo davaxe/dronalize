@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
+from typing_extensions import overload
 
 from dronalize.common.trajectory.basic import yaw_from_pos_expr, yaw_from_vel_expr
 from dronalize.common.trajectory.derivative import derivative as _derivative_impl
 from dronalize.common.trajectory.filter import FilteringConfig, filter_scene_expr
 from dronalize.common.trajectory.rebalance import rebalance_highway_agents
-from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.common.trajectory.resample import Resampling
+from dronalize.common.trajectory.resample import resample as resample_impl
 from dronalize.common.trajectory.window import sliding_window
 
 if TYPE_CHECKING:
@@ -81,6 +83,29 @@ def filter_scene(
     return _filter
 
 
+def require_min(group_by: str | Sequence[str], minimum: int = 2) -> Transform:
+    """Require a minimum number of rows per group.
+
+    Parameters
+    ----------
+    group_by : str or Sequence[str]
+        Column(s) to group by.
+    minimum : int, optional
+        Minimum number of rows required per group. Default is 1.
+
+    Returns
+    -------
+    Transform
+    """
+
+    def _require_min(df: pl.LazyFrame) -> pl.LazyFrame:
+        return df.filter(pl.len().over(group_by) >= minimum)
+
+    _require_min.__name__ = "require_min"
+    _require_min.__qualname__ = "transforms.require_min"
+    return _require_min
+
+
 # -------------------------------------------------------------------
 # Resampling
 # -------------------------------------------------------------------
@@ -134,7 +159,7 @@ def resample(
     resampling_obj = resampling or Resampling(1, 1)
 
     def _resample(df: pl.LazyFrame) -> pl.LazyFrame:
-        return resample_tracks(
+        return resample_impl(
             df,
             resampling_obj,
             frame_column=frame_column,
@@ -314,13 +339,36 @@ def yaw_from_pos(
 # -------------------------------------------------------------------
 
 
+@overload
 def window(
     window_size: int,
     step_size: int,
     *,
     sliding_col: str = "frame",
     offset_sliding_col: bool = True,
-) -> FlatMapTransform:
+    return_iterable: Literal[False] = False,
+) -> Transform: ...
+
+
+@overload
+def window(
+    window_size: int,
+    step_size: int,
+    *,
+    sliding_col: str = "frame",
+    offset_sliding_col: bool = True,
+    return_iterable: Literal[True] = True,
+) -> FlatMapTransform: ...
+
+
+def window(
+    window_size: int,
+    step_size: int,
+    *,
+    sliding_col: str = "frame",
+    offset_sliding_col: bool = True,
+    return_iterable: bool = False,
+) -> FlatMapTransform | Transform:
     """Create a sliding-window fan-out transform.
 
     This is a 1:N step: a single LazyFrame is split into many
@@ -341,23 +389,38 @@ def window(
 
     Returns
     -------
-    FlatMapTransform
+    FlatMapTransform pr Transform
 
     """
+    if return_iterable:
 
-    def _window(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-        for window_df in sliding_window(
-            df,
-            window_size=window_size,
-            step_size=step_size,
-            sliding_col=sliding_col,
-            return_iterable=True,
-        ):
+        def _window(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
+            for window_df in sliding_window(
+                df,
+                window_size=window_size,
+                step_size=step_size,
+                sliding_col=sliding_col,
+                return_iterable=True,
+            ):
+                if offset_sliding_col:
+                    window_df = window_df.with_columns(  # noqa: PLW2901
+                        pl.col(sliding_col) - pl.col(sliding_col).min(),
+                    )
+                yield window_df.lazy()
+
+    else:
+
+        def _window(df: pl.LazyFrame) -> pl.LazyFrame:
+            out = sliding_window(
+                df,
+                window_size=window_size,
+                step_size=step_size,
+                sliding_col=sliding_col,
+                return_iterable=False,
+            )
             if offset_sliding_col:
-                window_df = window_df.with_columns(  # noqa: PLW2901
-                    pl.col(sliding_col) - pl.col(sliding_col).min(),
-                )
-            yield window_df.lazy()
+                out = out.with_columns(pl.col(sliding_col) - pl.col(sliding_col).min())
+            return out
 
     _window.__name__ = "window"
     _window.__qualname__ = "transforms.window"
@@ -374,7 +437,7 @@ def rebalance(
     *,
     req_lane_changes: int = 1,
     agent_id: str = "id",
-    n_lanechange_col: str = "lane_changes",
+    lane_changes_col: str = "lane_changes",
     seed: int | None = None,
     drop_lanechange_col: bool = True,
 ) -> Transform:
@@ -390,7 +453,7 @@ def rebalance(
         Minimum lane changes to count as LC agent.
     agent_id : str, optional
         Agent ID column.
-    n_lanechange_col : str, optional
+    lane_changes_col : str, optional
         Lane-change count column.
     seed : int, optional
         Random seed for reproducibility.
@@ -409,11 +472,11 @@ def rebalance(
             ratio=ratio,
             req_lane_changes=req_lane_changes,
             agent_id=agent_id,
-            n_lanechange_col=n_lanechange_col,
+            lane_changes_col=lane_changes_col,
             seed=seed,
         )
         if drop_lanechange_col:
-            result = result.drop(n_lanechange_col)
+            result = result.drop(lane_changes_col)
         return result
 
     _rebalance.__name__ = "rebalance"

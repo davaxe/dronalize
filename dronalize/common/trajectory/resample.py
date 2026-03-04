@@ -66,7 +66,7 @@ class Resampling:
         return self.up == 1 and self.down == 1
 
 
-def resample_tracks(
+def resample(
     data: DataFrameT,
     resampling: Resampling,
     frame_column: str = "frame",
@@ -360,7 +360,7 @@ def _apply_interpolation(
     # We generate indices 0, 1, ... M and scale them by step_size.
     t_new = np.arange(n_new, dtype=np.float32) * step_size
 
-    res = cubic_spline_interpolation(
+    res = _cubic_spline_interpolation(
         t,
         t_new,
         pos,
@@ -492,7 +492,7 @@ def _upsample_dataframe(
 
 
 @overload
-def cubic_spline_interpolation(
+def _cubic_spline_interpolation(
     t: npt.NDArray[np.float32],
     t_new: npt.NDArray[np.float32],
     pos: npt.NDArray[np.float32],
@@ -505,7 +505,7 @@ def cubic_spline_interpolation(
 
 
 @overload
-def cubic_spline_interpolation(
+def _cubic_spline_interpolation(
     t: npt.NDArray[np.float32],
     t_new: npt.NDArray[np.float32],
     pos: npt.NDArray[np.float32],
@@ -518,7 +518,7 @@ def cubic_spline_interpolation(
 
 
 @overload
-def cubic_spline_interpolation(
+def _cubic_spline_interpolation(
     t: npt.NDArray[np.float32],
     t_new: npt.NDArray[np.float32],
     pos: npt.NDArray[np.float32],
@@ -531,7 +531,7 @@ def cubic_spline_interpolation(
 
 
 @overload
-def cubic_spline_interpolation(
+def _cubic_spline_interpolation(
     t: npt.NDArray[np.float32],
     t_new: npt.NDArray[np.float32],
     pos: npt.NDArray[np.float32],
@@ -548,7 +548,7 @@ def cubic_spline_interpolation(
 
 
 @overload
-def cubic_spline_interpolation(
+def _cubic_spline_interpolation(
     t: npt.NDArray[np.float32],
     t_new: npt.NDArray[np.float32],
     pos: npt.NDArray[np.float32],
@@ -560,7 +560,7 @@ def cubic_spline_interpolation(
 ) -> npt.NDArray[np.float32] | tuple[npt.NDArray[np.float32], ...]: ...
 
 
-def cubic_spline_interpolation(
+def _cubic_spline_interpolation(
     t: npt.NDArray[np.float32],
     t_new: npt.NDArray[np.float32],
     pos: npt.NDArray[np.float32],

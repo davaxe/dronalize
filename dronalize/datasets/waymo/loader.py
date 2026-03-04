@@ -10,7 +10,7 @@ from typing_extensions import override
 # Assuming these exist in your project
 from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.common.trajectory.resample import Resampling, resample
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.protocols.loader import Source
@@ -118,7 +118,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
                 category_column="agent_category",
             ),
         )
-        df_resampled = resample_tracks(
+        df_resampled = resample(
             df_filtered,
             resampling,
             group_by=["id"],

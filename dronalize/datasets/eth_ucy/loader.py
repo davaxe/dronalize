@@ -6,14 +6,17 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 from typing_extensions import override
 
+import dronalize.core.transforms as tr
 from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.process import prepare_agent_trajectories
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes import map_context as mc
+from dronalize.core.pipeline import Pipeline
 from dronalize.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
+
+    from dronalize.core.datatypes.loader_config import WindowParams
 
 
 class EthUcyLoader(BaseSceneLoader[str, Path]):
@@ -40,12 +43,10 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             Data split to load. Defaults to "train".
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, enforce_schema=False)
         self._data_root = data_dir
         self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
         self._split = split
-        self._window_params = self.loader_config.window_params
-        self._filtering_params = self.loader_config.scene_filtering
 
     @override
     def sources(self) -> Iterable[Source[str, Path]]:
@@ -54,6 +55,73 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             # Sort to ensure consistent order across runs and systems.
             for data_file in sorted(data_dir.iterdir()):
                 yield Source(identifier=data_file.name, inner=data_file)
+
+    @override
+    def pipeline(self) -> Pipeline:
+        config = self.loader_config
+        window = config.window_params
+        has_window = window is not None
+        step_size, window_size = self._window_params(window)
+        return (
+            Pipeline()
+            # 1. Drop agents with only a single observation in the raw file.
+            #    This runs on the smallest possible data (pre-window explosion)
+            #    so agents that would be invalid in every window are never
+            #    duplicated across the ~N windows produced by step 2.
+            .then(tr.require_min("id", minimum=2))
+            # 2. Add window_index column (does NOT fan-out yet, keeps lazy).
+            #    With step_size=1 this multiplies the row count by ~window_size,
+            #    so it is important to reduce data before reaching this step.
+            .then(
+                tr.window(window_size, step_size, offset_sliding_col=False),
+                when=has_window,
+            )
+            # 3. Scene-level filter, scoped per window when windowing is active.
+            #    Must run after windowing because its semantics (require_all_valid,
+            #    min_agents, require_frames) are all per-window concepts.
+            .then(
+                tr.filter_scene(
+                    config.scene_filtering,
+                    group_by="window_index" if has_window else None,
+                ),
+                when=config.scene_filtering is not None,
+            )
+            # 4. Drop agents that appear only once *within* a window.  Step 1
+            #    already removed globally single-sample agents; this catches
+            #    agents whose track starts or ends mid-window, leaving them
+            #    with just one sample inside that particular window.
+            .then(
+                tr.require_min(["window_index", "id"] if has_window else "id", minimum=2),
+                when=has_window,
+            )
+            # 5. Resample + derivatives, grouped so each agent×window is
+            #    treated as an independent track.
+            .then(
+                tr.resample(
+                    config.resampling,
+                    config.sample_time,
+                    group_by=["window_index", "id"] if has_window else ["id"],
+                    add_derivative=True,
+                    add_second_derivative=True,
+                    derivative_rename=self.derivative_names(),
+                )
+            )
+            # 6. Fan-out: one LazyFrame per window, drop the window_index col.
+            #    Then zero-offset the frame column within each yielded group.
+            .then_flat_map(tr.group_by_yield("window_index"), when=has_window)
+            .then(
+                lambda df: df.with_columns(pl.col("frame") - pl.col("frame").min()),
+                when=has_window,
+            )
+        )
+
+    @staticmethod
+    def _window_params(window_params: WindowParams | None) -> tuple[int, int]:
+        step_size, window_size = 0, 0
+        if window_params is not None:
+            step_size = window_params.step_size
+            window_size = window_params.window_size
+        return step_size, window_size
 
     @override
     def num_sources(self) -> int | None:
@@ -66,17 +134,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
 
     @override
     def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        source_data = EthUcyLoader._read_data_file(source.inner)
-        for df in prepare_agent_trajectories(
-            source_data,
-            self.loader_config,
-            add_derivative=True,
-            add_second_derivative=True,
-            sliding_col="frame",
-            agent_category_col=None,
-            derivative_rename=self.derivative_names(),
-        ):
-            yield df, mc.NoMap()
+        yield EthUcyLoader._read_data_file(source.inner), mc.NoMap()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
@@ -95,7 +153,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             )
             .with_window(step_size=1)
             .with_filtering(require_all_valid=True)
-            .with_resampling(4, 1, method="spline")
+            .with_resampling(4, 1, method="fast")
         )
 
     @staticmethod
@@ -115,3 +173,13 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
             pl.col("id").cast(pl.Int32),
         )
+
+
+if __name__ == "__main__":
+    data_dir = Path("data")
+    loader = EthUcyLoader(data_dir=data_dir, dataset=["hotel"], split="train")
+    count = 0
+    for scene in loader.scenes():
+        count += 1
+
+    print(f"Total scenes: {count}")

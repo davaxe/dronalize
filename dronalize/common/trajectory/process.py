@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.common.trajectory.resample import Resampling, resample
 from dronalize.common.trajectory.window import sliding_window
 
 if TYPE_CHECKING:
@@ -86,7 +86,7 @@ def prepare_agent_trajectories(
     )
     group_by.append("id")
     scenes_filtered = scenes_filtered.filter(pl.len().over(group_by) > 1)
-    scenes_resampled = resample_tracks(
+    scenes_resampled = resample(
         scenes_filtered,
         resampling,
         group_by=group_by,

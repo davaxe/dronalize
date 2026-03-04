@@ -7,7 +7,7 @@ from typing_extensions import override
 from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import Resampling, resample_tracks
+from dronalize.common.trajectory.resample import Resampling, resample
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
@@ -108,7 +108,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             )
         else:
             source_resampled = yaw_from_vel(
-                resample_tracks(
+                resample(
                     source_filtered,
                     resampling,
                     group_by=["file_id"],

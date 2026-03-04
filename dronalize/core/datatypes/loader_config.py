@@ -26,6 +26,10 @@ class WindowParams:
     step_size: int
     """Number of frames to skip between windows."""
 
+    def __bool__(self) -> bool:
+        """Return True if windowing is enabled (i.e., step_size > 0)."""
+        return self.step_size > 0 and self.window_size > 0
+
 
 @dataclass(slots=True, frozen=True)
 class LoaderConfig:
