@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterator, Sequence
-from enum import IntEnum
 from typing import Generic, TypeVar
 
 import numpy as np
@@ -71,20 +70,43 @@ class StreamSplitter(Generic[T]):
             rounds : int, optional
                 The number of pre-generated rounds of shuffled group indices.
 
+        Raises
+        ------
+            ValueError
+                If groups are not unique, if the number of weights does not
+                match the number of groups, if any weight is negative, or if all
+                weights are zero.
+
         """
-        self._groups = list(set(groups))
-        n_groups = len(groups)
-        n_unique_groups = len(self._groups)
-        if n_groups != n_unique_groups:
+        # fromkeys preserves order and removes duplicates
+        self._groups = list(dict.fromkeys(groups))
+        if len(groups) != len(self._groups):
             msg = (
-                f"Groups must be unique. Found {n_groups} elements "
-                f"but only {n_unique_groups} unique groups."
+                f"Groups must be unique. Found {len(groups)} elements "
+                f"but only {len(self._groups)} unique groups."
+            )
+            raise ValueError(msg)
+        if weights is not None and len(weights) != len(self._groups):
+            msg = (
+                f"Number of weights must match number of groups. "
+                f"Found {len(weights)} weights but {len(self._groups)} groups."
             )
             raise ValueError(msg)
 
-        self._index_to_group = dict(enumerate(self._groups))
+        self._index_to_group = list(self._groups)
 
-        self._weights = np.array(weights) if weights is not None else np.ones(n_groups)
+        self._weights = np.array(weights) if weights is not None else np.ones(len(self._groups))
+
+        if np.any(self._weights < 0):
+            msg = "All weights must be non-negative."
+            raise ValueError(msg)
+
+        weights_sum = self._weights.sum()
+
+        if weights_sum == 0:
+            msg = f"At least one weight must be greater than zero got {self._weights}."
+            raise ValueError(msg)
+
         self._weights /= self._weights.sum()
 
         self._rng = np.random.default_rng(seed)
@@ -181,29 +203,3 @@ def _generate_shuffled_deck(
     # Independently shuffle each row
     rng = rng or np.random.default_rng()
     return rng.permuted(deck, axis=1)
-
-
-if __name__ == "__main__":
-    from enum import auto
-
-    class Group(IntEnum):
-        A = auto()
-        B = auto()
-        C = auto()
-        D = auto()
-        E = auto()
-
-    splitter = StreamSplitter(
-        [Group.A, Group.B, Group.C, Group.D, Group.E],
-        round_size=1000,
-        rounds=5,
-        weights=[0.1, 0.2, 0.3, 0.25, 0.15],
-    )
-
-    counts: dict[Group, int] = {group: 0 for group in Group}
-    for val in splitter.take(1000):
-        counts[val] += 1
-
-    total = sum(counts.values())
-    for group, count in counts.items():
-        print(f"{group}: {count} ({count / total:.2%})")
