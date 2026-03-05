@@ -51,7 +51,7 @@ class SindGraphBuilder(OSMMapGraphBuilder):
     def _extract_origin(osm_file: Path) -> tuple[float, float]:
         """Parse the XML sequentially to find the node tagged as 'origin'."""
         context = ET.iterparse(osm_file, events=("start", "end"))
-        current_node_element = None
+        current_node_element: ET.Element | None = None
 
         for event, elem in context:
             if event == "start" and elem.tag == "node":

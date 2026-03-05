@@ -45,7 +45,10 @@ class OSMMapGraphBuilder(GraphBuilder):
 
         """
         if not osm_file.exists():
-            msg = f"OSM file not found at {osm_file}. Please provide a valid path to the OSM data file."
+            msg = (
+                f"OSM file not found at {osm_file}. "
+                "Please provide a valid path to the OSM data file."
+            )
             raise FileNotFoundError(msg)
 
         super().__init__()
@@ -60,7 +63,11 @@ class OSMMapGraphBuilder(GraphBuilder):
         return EdgeType.from_str(way.tags.get("type"), way.tags.get("subtype"))
 
     def _process_node(
-        self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element,
+        self,
+        elem: ET.Element,
+        x_offset: float,
+        y_offset: float,
+        root: ET.Element,
     ) -> None:
         """Process an OSM node element."""
         node_id = int(elem.attrib["id"])

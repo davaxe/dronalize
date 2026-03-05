@@ -102,7 +102,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
 
     def __init__(
         self,
-        inner: BaseSceneLoader[IdT, SourceT],
+        inner: BaseSceneLoader[IdT, Any],
         chunksize: int | None = None,
         processes: int | None = None,
         *,

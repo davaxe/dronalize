@@ -108,18 +108,18 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
        derivatives, windowing, …).
     4. **create_scene()** — wrap the final DataFrame into a :class:`Scene`.
 
-    Subclasses **must** implement :meth:`sources`, :meth:`load_raw`, and
-    :meth:`default_config`.
+    Subclasses **must** implement `sources`, `load_raw`, and
+    `default_config`.
 
     For the processing step, subclasses can *either*:
 
-    * Override :meth:`pipeline` to return a composable
+    * Override `pipeline` to return a composable
       :class:`~dronalize.core.pipeline.Pipeline` (preferred), **or**
-    * Override :meth:`normalize` for simple 1:1 transforms (legacy).
+    * Override `normalize` for simple 1:1 transforms (legacy).
 
-    If :meth:`pipeline` returns a non-empty pipeline, it is used and
-    :meth:`normalize` is ignored.  If :meth:`pipeline` returns an empty
-    pipeline, :meth:`normalize` is called as a fallback for backward
+    If `pipeline` returns a non-empty pipeline, it is used and
+    `normalize` is ignored.  If `pipeline` returns an empty
+    pipeline, `normalize` is called as a fallback for backward
     compatibility.
     """
 
@@ -178,8 +178,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         """Convert the raw DataFrame into the common schema.
 
         .. deprecated::
-            Override :meth:`pipeline` instead.  This method is only called
-            as a fallback when :meth:`pipeline` returns an empty pipeline.
+            Override `pipeline` instead.  This method is only called
+            as a fallback when `pipeline` returns an empty pipeline.
 
         The default implementation is the identity (returns *df* unchanged).
 
@@ -201,17 +201,17 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
         The pipeline is a chain of :class:`~dronalize.core.pipeline.Transform`
         (1:1) and :class:`~dronalize.core.pipeline.FanOut` (1:N) steps that
-        are applied to every LazyFrame produced by :meth:`load_raw`.
+        are applied to every LazyFrame produced by `load_raw`.
 
         The default implementation returns an **empty** pipeline, which
-        causes :meth:`process_next` to fall back to :meth:`normalize`.
+        causes `process_next` to fall back to `normalize`.
         Override this method to define a composable pipeline.
 
         Returns
         -------
         Pipeline
             The processing pipeline.  An empty pipeline triggers the
-            legacy :meth:`normalize` fallback.
+            legacy `normalize` fallback.
 
         Example
         -------
@@ -304,9 +304,9 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process a single data item through the pipeline.
 
-        If :meth:`pipeline` returns a non-empty pipeline, each raw
+        If `pipeline` returns a non-empty pipeline, each raw
         LazyFrame is run through that pipeline (which may fan out into
-        multiple frames).  Otherwise, :meth:`normalize` is called as a
+        multiple frames).  Otherwise, `normalize` is called as a
         1:1 fallback.
 
         Parameters

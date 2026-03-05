@@ -35,12 +35,12 @@ class _PendingPathDict(TypedDict):
 class GraphBuilder(ABC):
     """Abstract base class for graph builders.
 
-    Subclasses only need to implement :meth:`build_impl` which populates
+    Subclasses only need to implement `build_impl` which populates
     the internal graph structure using the helper methods provided here
     (`add_node`, `add_edge`, `add_path`, `add_path_lazy`, etc.).
 
     Nodes are identified by **integer IDs** that are assigned automatically
-    when calling :meth:`add_node`.  There is no need for an external node
+    when calling `add_node`.  There is no need for an external node
     class — the builder stores coordinates directly in an efficient
     Structure-of-Arrays layout.
     """
@@ -65,7 +65,7 @@ class GraphBuilder(ABC):
         repr=False,
         init=False,
     )
-    """Paths queued via :meth:`add_path_lazy` for deferred processing."""
+    """Paths queued via `add_path_lazy` for deferred processing."""
 
     # ------------------------------------------------------------------
     # Node helpers
@@ -89,7 +89,7 @@ class GraphBuilder(ABC):
 
         If a node with the same ID already exists this is a no-op and the
         existing ID is returned (though in practice every call allocates a
-        fresh ID, so duplicates only arise when :meth:`add_node_with_id` is
+        fresh ID, so duplicates only arise when `add_node_with_id` is
         used).
 
         Parameters
@@ -516,7 +516,7 @@ class GraphBuilder(ABC):
         *,
         is_polygon: bool = False,
     ) -> None:
-        """Queue a path for deferred processing by :meth:`build`.
+        """Queue a path for deferred processing by `build`.
 
         Parameters
         ----------

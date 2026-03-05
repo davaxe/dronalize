@@ -154,7 +154,7 @@ class LineString(Geometry):
             yield (self._coordinates[i], self._coordinates[i + 1])
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class Polygon(Geometry):
     """A Polygon geometry type."""
 

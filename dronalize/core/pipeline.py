@@ -83,8 +83,8 @@ _PipelineEntry = _MapEntry | _FlatMapEntry
 class Pipeline:
     """Immutable, composable chain of LazyFrame transformations.
 
-    Build pipelines with :meth:`then` (1:1) and :meth:`then_flat_map`
-    (1:N).  Execute with :meth:`run`.
+    Build pipelines with `then` (1:1) and `then_flat_map`
+    (1:N).  Execute with `run`.
 
     Pipelines are **immutable** - every builder method returns a *new*
     `Pipeline` instance, so the original can be safely shared or
@@ -181,7 +181,7 @@ class Pipeline:
     ) -> Pipeline:
         """Append a 1:N flat-map step and return a *new* pipeline.
 
-        Any subsequent :meth:`then` transforms will be applied to
+        Any subsequent `then` transforms will be applied to
         **each** LazyFrame produced by this step independently.
 
         Parameters

@@ -7,9 +7,9 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.core.transforms as tr
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
+from dronalize.core import BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes import map_context as mc
+from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.pipeline import Pipeline
 from dronalize.core.protocols.loader import Source
 
@@ -43,7 +43,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             Data split to load. Defaults to "train".
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=False)
+        super().__init__(loader_config=loader_config, enforce_schema=True)
         self._data_root = data_dir
         self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
         self._split = split
@@ -109,6 +109,9 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             # 6. Fan-out: one LazyFrame per window, drop the window_index col.
             #    Then zero-offset the frame column within each yielded group.
             .then_flat_map(tr.group_by_yield("window_index"), when=has_window)
+            # 7. Add missing columns
+            .then(tr.yaw_from_vel())
+            .then(tr.with_columns(agent_category=pl.lit(AgentCategory.PEDESTRIAN)))
         )
 
     @staticmethod
@@ -163,18 +166,3 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
             pl.col("id").cast(pl.Int32),
         )
-
-
-if __name__ == "__main__":
-    data_dir = Path("data")
-    loader = EthUcyLoader(data_dir=data_dir, dataset=["hotel"], split="train")
-    count = 0
-    for scene in loader.scenes():
-        print(scene.inner)
-
-        if count == 5:
-            break
-
-        count + 1
-
-    print(f"Total scenes: {count}")

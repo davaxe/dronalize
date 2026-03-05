@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 from typing_extensions import overload
 
-from dronalize.common.trajectory.basic import yaw_from_pos_expr, yaw_from_vel_expr
+from dronalize.common.trajectory.basic import yaw_from_pos_expr as _yaw_from_pos_expr
+from dronalize.common.trajectory.basic import yaw_from_vel_expr as _yaw_from_vel_expr
 from dronalize.common.trajectory.derivative import derivative as _derivative_impl
 from dronalize.common.trajectory.filter import FilteringConfig, filter_scene_expr
 from dronalize.common.trajectory.rebalance import rebalance_highway_agents
@@ -26,7 +27,9 @@ __all__ = [
     "group_by_yield",
     "rebalance",
     "resample",
+    "select",
     "window",
+    "with_columns",
     "yaw_from_pos",
     "yaw_from_vel",
 ]
@@ -47,7 +50,7 @@ def filter_scene(
 ) -> Transform:
     """Create a filtering transform.
 
-    Wraps :func:`~dronalize.common.trajectory.filter.filter_scene_expr`.
+    Wraps `~dronalize.common.trajectory.filter.filter_scene_expr`.
 
     Parameters
     ----------
@@ -125,7 +128,7 @@ def resample(
 ) -> Transform:
     """Create a resampling transform.
 
-    Wraps :func:`~dronalize.common.trajectory.resample.resample_tracks`.
+    Wraps `~dronalize.common.trajectory.resample.resample_tracks`.
     If the resampling object specifies no resampling (ratio 1:1), the transform
     is still applied (it becomes a no-op for the resampling itself but
     may still add derivatives).
@@ -192,7 +195,7 @@ def derivative(
 ) -> Transform:
     """Create a derivative transform.
 
-    Wraps :func:`~dronalize.common.trajectory.derivative.derivative`.
+    Wraps `~dronalize.common.trajectory.derivative.derivative`.
 
     Parameters
     ----------
@@ -245,7 +248,7 @@ def yaw_from_vel(
 ) -> Transform:
     """Create a yaw-from-velocity transform.
 
-    Wraps :func:`~dronalize.common.trajectory.basic.yaw_from_vel`.
+    Wraps `~dronalize.common.trajectory.basic.yaw_from_vel`.
 
     Parameters
     ----------
@@ -270,7 +273,7 @@ def yaw_from_vel(
             return df.with_columns(
                 pl
                 .when(pl.col(yaw_col).is_null())
-                .then(yaw_from_vel_expr(vx_col, vy_col, yaw_col))
+                .then(_yaw_from_vel_expr(vx_col, vy_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
                 .alias(yaw_col),
             )
@@ -278,7 +281,7 @@ def yaw_from_vel(
     else:
 
         def _yaw_from_vel(df: pl.LazyFrame) -> pl.LazyFrame:
-            return df.with_columns(yaw_from_vel_expr(vx_col, vy_col, yaw_col))
+            return df.with_columns(_yaw_from_vel_expr(vx_col, vy_col, yaw_col))
 
     _yaw_from_vel.__name__ = "yaw_from_vel"
     _yaw_from_vel.__qualname__ = "transforms.yaw_from_vel"
@@ -294,7 +297,7 @@ def yaw_from_pos(
 ) -> Transform:
     """Create a yaw-from-position transform.
 
-    Wraps :func:`~dronalize.common.trajectory.basic.yaw_from_pos`.
+    Wraps `~dronalize.common.trajectory.basic.yaw_from_pos`.
 
     Parameters
     ----------
@@ -319,7 +322,7 @@ def yaw_from_pos(
             return df.with_columns(
                 pl
                 .when(pl.col(yaw_col).is_null())
-                .then(yaw_from_pos_expr(x_col, y_col, yaw_col))
+                .then(_yaw_from_pos_expr(x_col, y_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
                 .alias(yaw_col),
             )
@@ -327,7 +330,7 @@ def yaw_from_pos(
     else:
 
         def _yaw_from_pos(df: pl.LazyFrame) -> pl.LazyFrame:
-            return df.with_columns(yaw_from_pos_expr(x_col, y_col, yaw_col))
+            return df.with_columns(_yaw_from_pos_expr(x_col, y_col, yaw_col))
 
     _yaw_from_pos.__name__ = "yaw_from_pos"
     _yaw_from_pos.__qualname__ = "transforms.yaw_from_pos"
@@ -374,7 +377,7 @@ def window(
     This is a 1:N step: a single LazyFrame is split into many
     overlapping windows, each yielded as a separate LazyFrame.
 
-    Wraps :func:`~dronalize.common.trajectory.window.sliding_window`.
+    Wraps `~dronalize.common.trajectory.window.sliding_window`.
 
     Parameters
     ----------
@@ -443,7 +446,7 @@ def rebalance(
 ) -> Transform:
     """Create a highway agent rebalancing transform.
 
-    Wraps :func:`~dronalize.common.trajectory.rebalance.rebalance_highway_agents`.
+    Wraps `~dronalize.common.trajectory.rebalance.rebalance_highway_agents`.
 
     Parameters
     ----------
@@ -524,3 +527,56 @@ def group_by_yield(
     _group_by_yield.__name__ = "group_by_yield"
     _group_by_yield.__qualname__ = "transforms.group_by_yield"
     return _group_by_yield
+
+
+# --------------------------------------------------------------------
+# Common polars expressions
+# --------------------------------------------------------------------
+
+
+def select(*expr: pl.Expr, **named_expr: pl.Expr) -> Transform:
+    """Create a select transform from given expressions.
+
+    Parameters
+    ----------
+    *expr : pl.Expr
+        Positional expressions to pass to select.
+    **named_expr : pl.Expr
+        Keyword expressions to pass to select.
+
+    Returns
+    -------
+    Transform
+
+    """
+
+    def _select(df: pl.LazyFrame) -> pl.LazyFrame:
+        return df.select(*expr, **named_expr)
+
+    _select.__name__ = "select"
+    _select.__qualname__ = "transforms.select"
+    return _select
+
+
+def with_columns(*expr: pl.Expr, **named_expr: pl.Expr) -> Transform:
+    """Create a with_columns transform from given expressions.
+
+    Parameters
+    ----------
+    *expr : pl.Expr
+        Positional expressions to pass to with_columns.
+    **named_expr : pl.Expr
+        Keyword expressions to pass to with_columns.
+
+    Returns
+    -------
+    Transform
+
+    """
+
+    def _with_columns(df: pl.LazyFrame) -> pl.LazyFrame:
+        return df.with_columns(*expr, **named_expr)
+
+    _with_columns.__name__ = "with_columns"
+    _with_columns.__qualname__ = "transforms.with_columns"
+    return _with_columns

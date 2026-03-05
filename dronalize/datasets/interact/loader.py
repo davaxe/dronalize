@@ -149,8 +149,6 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
 
     @staticmethod
     def _map_agent_category() -> pl.Expr:
-        # "car" -> AgentCategory.CAR
-        # "pedestrian/bicycle" -> AgentCategory.PEDESTRIAN if avg speed < 2 m/s else AgentCategory.BICYCLE
         return (
             pl
             .when(pl.col("agent_category") == "car")

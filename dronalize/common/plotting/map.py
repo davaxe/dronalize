@@ -122,10 +122,14 @@ def plot_map_graph(
                 ),
             ),
             size=alt.Size(
-                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_width), legend=None,
+                "edge_type:N",
+                scale=alt.Scale(domain=plot_domain, range=plot_width),
+                legend=None,
             ),
             strokeDash=alt.StrokeDash(
-                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_dash), legend=None,
+                "edge_type:N",
+                scale=alt.Scale(domain=plot_domain, range=plot_dash),
+                legend=None,
             ),
             opacity=alt.when(edge_selection).then(alt.value(alpha)).otherwise(alt.value(0.05)),
             tooltip=[
@@ -175,7 +179,6 @@ def plot_map_graph(
         )
         layers.extend([nodes_start, nodes_end])
 
-    # 6. Apply chart properties, global text configurations, and bind the selection at the root layer
     return (
         alt
         .layer(*layers)

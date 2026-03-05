@@ -24,8 +24,9 @@ class HighWayLaneGraphBuilder(GraphBuilder):
 
     This makes three major assumptions about the structure of the highway and the data:
         1. The highway is mostly straight and oriented along either the Y-axis or X-axis.
-        2. Drivers drive in the center of their lanes, so lane centers can be estimated by aggregating
-           vehicle positions within each longitudinal bin.
+        2. Drivers drive in the center of their lanes, so lane centers can be
+        estimated by aggregating vehicle positions within each longitudinal bin.
+
     """
 
     def __init__(
@@ -103,7 +104,9 @@ class HighWayLaneGraphBuilder(GraphBuilder):
 
     @override
     def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None,
+        self,
+        min_distance: float | None = None,
+        interp_distance: float | None = None,
     ) -> None:
         if self._lane_description is not None:
             mapping = {lane_id: idx for idx, lane_id in enumerate(self._lane_description.ids)}
@@ -181,7 +184,9 @@ class HighWayLaneGraphBuilder(GraphBuilder):
         avg_half_width = (
             borders
             .join(
-                centers, left_on=["left_lane", "long_bin"], right_on=[self._lane_id_col, "long_bin"],
+                centers,
+                left_on=["left_lane", "long_bin"],
+                right_on=[self._lane_id_col, "long_bin"],
             )
             .select((pl.col("border_lat") - pl.col("lat_center")).abs())
             .collect()
