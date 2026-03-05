@@ -40,7 +40,11 @@ def test_ratio_enforcement() -> None:
     df = create_dummy_data(n_lc_agents=10, n_lk_agents=20)
 
     result = rebalance_highway_agents(
-        df, ratio=2.0, req_lane_changes=1, agent_id="id", n_lanechange_col="lane_changes"
+        df,
+        ratio=2.0,
+        req_lane_changes=1,
+        agent_id="id",
+        lane_changes_col="lane_changes",
     )
 
     # Verify result is a DataFrame (since input was DataFrame)

@@ -73,7 +73,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             #    With step_size=1 this multiplies the row count by ~window_size,
             #    so it is important to reduce data before reaching this step.
             .then(
-                tr.window(window_size, step_size, offset_sliding_col=False),
+                tr.window(window_size, step_size, offset_sliding_col=True),
                 when=has_window,
             )
             # 3. Scene-level filter, scoped per window when windowing is active.
@@ -94,7 +94,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
                 tr.require_min(["window_index", "id"] if has_window else "id", minimum=2),
                 when=has_window,
             )
-            # 5. Resample + derivatives, grouped so each agent×window is
+            # 5. Resample + derivatives, grouped so each agent * window is
             #    treated as an independent track.
             .then(
                 tr.resample(
@@ -109,10 +109,6 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             # 6. Fan-out: one LazyFrame per window, drop the window_index col.
             #    Then zero-offset the frame column within each yielded group.
             .then_flat_map(tr.group_by_yield("window_index"), when=has_window)
-            .then(
-                lambda df: df.with_columns(pl.col("frame") - pl.col("frame").min()),
-                when=has_window,
-            )
         )
 
     @staticmethod
@@ -135,12 +131,6 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
     @override
     def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         yield EthUcyLoader._read_data_file(source.inner), mc.NoMap()
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df, yaw_col="yaw").with_columns(
-            pl.lit(AgentCategory.PEDESTRIAN).alias("agent_category"),
-        )
 
     @classmethod
     @override
@@ -180,6 +170,11 @@ if __name__ == "__main__":
     loader = EthUcyLoader(data_dir=data_dir, dataset=["hotel"], split="train")
     count = 0
     for scene in loader.scenes():
-        count += 1
+        print(scene.inner)
+
+        if count == 5:
+            break
+
+        count + 1
 
     print(f"Total scenes: {count}")

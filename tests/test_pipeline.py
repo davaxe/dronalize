@@ -442,7 +442,7 @@ def test_transform_window_produces_multiple() -> None:
         "frame": list(range(10)),
         "x": [float(i) for i in range(10)],
     }).lazy()
-    fan = transform.window(window_size=5, step_size=2)
+    fan = transform.window(window_size=5, step_size=2, return_iterable=True)
     results = list(fan(lf))
     assert len(results) >= 2
 
@@ -453,7 +453,7 @@ def test_transform_window_offsets_frame() -> None:
         "frame": list(range(10)),
         "x": [float(i) for i in range(10)],
     }).lazy()
-    fan = transform.window(window_size=5, step_size=3)
+    fan = transform.window(window_size=5, step_size=3, return_iterable=True)
     for result_lf in fan(lf):
         result = result_lf.collect()
         # Frame should be zero-offset
@@ -466,7 +466,9 @@ def test_transform_window_no_offset() -> None:
         "frame": list(range(6)),
         "x": [float(i) for i in range(6)],
     }).lazy()
-    fan = transform.window(window_size=5, step_size=3, offset_sliding_col=False)
+    fan = transform.window(
+        window_size=5, step_size=3, offset_sliding_col=False, return_iterable=True
+    )
     results = [r.collect() for r in fan(lf)]
     # At least first window should start at frame 0
     assert results[0]["frame"].min() == 0
@@ -499,7 +501,7 @@ def test_pipeline_integration_window_then_transform() -> None:
     }).lazy()
     pipe = (
         Pipeline()
-        .then_flat_map(transform.window(window_size=5, step_size=3))
+        .then_flat_map(transform.window(window_size=5, step_size=3, return_iterable=True))
         .then(lambda df: df.with_columns(pl.lit(99).alias("marker")))
     )
     results = [r.collect() for r in pipe.execute(lf)]

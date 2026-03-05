@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, TypeVar, runtime_checkable
 
 from typing_extensions import overload
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
 
     import polars as pl
 
+T = TypeVar("T")
 
 # ---------------------------------------------------------------------------
 # Protocols
@@ -114,6 +115,63 @@ class Pipeline:
         """
         return Pipeline((*self._steps, _MapEntry(transform, name))) if when else self
 
+    def then_lazy(
+        self,
+        transform_factory: Callable[..., Transform],
+        *,
+        when: bool = True,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Like `then` but the transform is produced by a factory at build time.
+
+        This is useful for deferring expensive setup until it's known to be needed.
+
+        Parameters
+        ----------
+        transform_factory : Callable[..., Transform]
+            A factory that produces a Transform when called.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the transform appended if when is True, else the
+            unchanged pipeline.
+
+        """
+        if not when:
+            return self
+        transform = transform_factory()
+        return self.then(transform, name=name)
+
+    def then_if_present(
+        self,
+        transform_factory: Callable[[T], Transform],
+        arg: T | None,
+    ) -> Pipeline:
+        """Like `then` but only append the transform if *arg* is not None.
+
+        Parameters
+        ----------
+        transform_factory : Callable[[T], Transform]
+            A factory that produces a Transform when given an argument.
+        arg : T or None
+            The argument to pass to the factory. If None, this step is skipped.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the transform appended if arg is not None, else
+            the unchanged pipeline.
+        """
+        if arg is None:
+            return self
+        transform = transform_factory(arg)
+        return self.then(transform)
+
     def then_flat_map(
         self,
         flat_map: FlatMapTransform,
@@ -143,6 +201,63 @@ class Pipeline:
 
         """
         return Pipeline((*self._steps, _FlatMapEntry(flat_map, name))) if when else self
+
+    def then_lazy_flat_map(
+        self,
+        flat_map_factory: Callable[..., FlatMapTransform],
+        *,
+        when: bool = True,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Like `then_flat_map` but the flat-map is produced by a factory at build time.
+
+        This is useful for deferring expensive setup until it's known to be needed.
+
+        Parameters
+        ----------
+        flat_map_factory : Callable[..., FlatMapTransform]
+            A factory that produces a FlatMapTransform when called.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the flat-map step appended if when is True, else the
+            unchanged pipeline.
+
+        """
+        if not when:
+            return self
+        flat_map = flat_map_factory()
+        return self.then_flat_map(flat_map, name=name)
+
+    def then_if_present_flat_map(
+        self,
+        flat_map_factory: Callable[[T], FlatMapTransform],
+        arg: T | None,
+    ) -> Pipeline:
+        """Like `then_flat_map` but only append the flat-map if *arg* is not None.
+
+        Parameters
+        ----------
+        flat_map_factory : Callable[[T], FlatMapTransform]
+            A factory that produces a FlatMapTransform when given an argument.
+        arg : T or None
+            The argument to pass to the factory. If None, this step is skipped.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the flat-map step appended if arg is not None, else
+            the unchanged pipeline.
+        """
+        if arg is None:
+            return self
+        flat_map = flat_map_factory(arg)
+        return self.then_flat_map(flat_map)
 
     def compose(self, other: Pipeline, *, when: bool = True) -> Pipeline:
         """Concatenate *other* pipeline's steps after this one.
@@ -333,6 +448,56 @@ class Pipeline:
             return None
 
         return result
+
+    # -- common polars patterns ---------------------------------------------
+
+    def with_columns(self, *exprs: pl.Expr, **named_expr: pl.Expr) -> Pipeline:
+        """Append a with_columns step to the pipeline.
+
+        This is a common enough pattern that it gets its own convenience method.
+        Equivalent to `then(lambda df: df.with_columns(*exprs, **named_expr))`.
+
+        Parameters
+        ----------
+        *exprs : pl.Expr
+            see `pl.LazyFrame.with_columns`.
+        **named_expr : pl.Expr
+            see `pl.LazyFrame.with_columns`.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the with_columns step appended.
+        """
+
+        def transform(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.with_columns(*exprs, **named_expr)
+
+        return self.then(transform, name="with_columns")
+
+    def select(self, *exprs: pl.Expr, **named_expr: pl.Expr) -> Pipeline:
+        """Append a select step to the pipeline.
+
+        This is a common enough pattern that it gets its own convenience method.
+        Equivalent to `then(lambda df: df.select(*exprs, **named_expr))`.
+
+        Parameters
+        ----------
+        *exprs : pl.Expr
+            see `pl.LazyFrame.select`.
+        **named_expr : pl.Expr
+            see `pl.LazyFrame.select`.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the select step appended.
+        """
+
+        def transform(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.select(*exprs, **named_expr)
+
+        return self.then(transform, name="select")
 
     # -- introspection ------------------------------------------------------
 
