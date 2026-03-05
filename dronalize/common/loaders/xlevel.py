@@ -10,7 +10,8 @@ from dronalize.common.trajectory.process import prepare_agent_trajectories
 from dronalize.common.trajectory.rebalance import rebalance_highway_agents
 from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
+from dronalize.core.datatypes.loader_config import LoaderConfig
+from dronalize.core.protocols.loader import BaseSceneLoader, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -127,7 +128,8 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame],
+        self,
+        source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         data = source.inner
         if self._rebalance_ratio is not None:

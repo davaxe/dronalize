@@ -70,7 +70,7 @@ exclude = ["tests*", "examples*"]
 torch-cluster = ["torch"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "preprocessing/common", "preprocessing/core"]
+testpaths = ["tests", "dronalize/common", "dronalize/core"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
