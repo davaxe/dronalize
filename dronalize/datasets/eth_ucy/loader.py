@@ -61,41 +61,24 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
         config = self.loader_config
         window = config.window_params
         has_window = window is not None
-        step_size, window_size = self._window_params(window)
         return (
             Pipeline()
-            # 1. Drop agents with only a single observation in the raw file.
-            #    This runs on the smallest possible data (pre-window explosion)
-            #    so agents that would be invalid in every window are never
-            #    duplicated across the ~N windows produced by step 2.
             .then(tr.require_min("id", minimum=2))
-            # 2. Add window_index column (does NOT fan-out yet, keeps lazy).
-            #    With step_size=1 this multiplies the row count by ~window_size,
-            #    so it is important to reduce data before reaching this step.
-            .then(
-                tr.window(window_size, step_size, offset_sliding_col=True),
-                when=has_window,
+            .then_if_present(
+                lambda w: tr.window(w.window_size, w.step_size),
+                arg=config.window_params,
             )
-            # 3. Scene-level filter, scoped per window when windowing is active.
-            #    Must run after windowing because its semantics (require_all_valid,
-            #    min_agents, require_frames) are all per-window concepts.
-            .then(
-                tr.filter_scene(
+            .then_if_present(
+                lambda config: tr.filter_scene(
                     config.scene_filtering,
                     group_by="window_index" if has_window else None,
                 ),
-                when=config.scene_filtering is not None,
+                arg=config.scene_filtering,
             )
-            # 4. Drop agents that appear only once *within* a window.  Step 1
-            #    already removed globally single-sample agents; this catches
-            #    agents whose track starts or ends mid-window, leaving them
-            #    with just one sample inside that particular window.
             .then(
                 tr.require_min(["window_index", "id"] if has_window else "id", minimum=2),
                 when=has_window,
             )
-            # 5. Resample + derivatives, grouped so each agent * window is
-            #    treated as an independent track.
             .then(
                 tr.resample(
                     config.resampling,
@@ -106,10 +89,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
                     derivative_rename=self.derivative_names(),
                 )
             )
-            # 6. Fan-out: one LazyFrame per window, drop the window_index col.
-            #    Then zero-offset the frame column within each yielded group.
             .then_flat_map(tr.group_by_yield("window_index"), when=has_window)
-            # 7. Add missing columns
             .then(tr.yaw_from_vel())
             .then(tr.with_columns(agent_category=pl.lit(AgentCategory.PEDESTRIAN)))
         )

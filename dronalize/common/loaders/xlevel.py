@@ -115,10 +115,15 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
                 *self.track_data_select(),
             )
             combined = tracks_df.join(meta_df, left_on="id", right_on="id")
+            metadata: dict[str, float] = {}
+            if utm_x0 is not None and utm_y0 is not None:
+                metadata["utm_x0"] = utm_x0
+                metadata["utm_y0"] = utm_y0
             yield Source(
                 identifier=i,
                 inner=combined,
-                map_context=mc.Explicit(id=str(location_id), utm_x0=utm_x0, utm_y0=utm_y0),
+                map_context=mc.ReferencedMap(map_id=str(location_id)),
+                metadata=metadata,
             )
 
     @override

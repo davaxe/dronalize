@@ -94,7 +94,7 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
         ):
-            yield df, mc.Implicit()
+            yield df, mc.SharedMap()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

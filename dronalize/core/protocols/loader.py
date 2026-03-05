@@ -36,7 +36,7 @@ P = ParamSpec("P")
 
 
 @dataclass(slots=True, frozen=True)
-class Source(Generic[IdT, SourceT]):
+class (Generic[IdT, SourceT]):
     """Represents a raw data source for a scene, identified by a unique identifier."""
 
     identifier: IdT

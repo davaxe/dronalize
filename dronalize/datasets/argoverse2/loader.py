@@ -121,7 +121,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             )
 
         for _, group in source_resampled.collect().group_by(["file_id"]):
-            yield group.lazy(), mc.Explicit(map_path=str(group["map_path"].first()))
+            yield group.lazy(), mc.ReferencedMap(str(group["map_path"].first()))
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

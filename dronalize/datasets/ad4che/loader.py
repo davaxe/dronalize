@@ -68,7 +68,7 @@ class AD4CHELoader(XLevelDataLoader):
             yield Source(
                 identifier=i,
                 inner=combined,
-                map_context=mc.Explicit(id=str(location_id)),
+                map_context=mc.ReferencedMap(str(location_id)),
             )
 
     @override

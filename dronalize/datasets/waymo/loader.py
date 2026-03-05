@@ -98,14 +98,14 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
             # Map processing remains per-scenario (if needed)
-            map_context: mc.MapContext = mc.Explicit(tfrecord=str(source.inner), index=i)
+            map_context: mc.MapContext = mc.ReferencedMap(f"{source.inner}_index={i}")
             if self._include_map:
                 map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
                 current_map = WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
                     min_distance=self._min_distance,
                     interp_distance=self._interp_distance,
                 )
-                map_context = mc.Loaded(current_map)
+                map_context = mc.LoadedMap(current_map)
 
             yield _scenario_to_polars(scenario).lazy(), map_context
 

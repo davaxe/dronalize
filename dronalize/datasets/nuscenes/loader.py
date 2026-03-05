@@ -78,7 +78,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
             # More efficient: peek at the first row's scene_name directly
             scene_name = df.item(0, "scene_name")
             map_name = df.item(0, "map")
-            yield Source(identifier=(scene_name, map_name), inner=token, map_context=mc.Implicit())
+            yield Source(identifier=(scene_name, map_name), inner=token, map_context=mc.SharedMap())
 
     @override
     def num_sources(self) -> int | None:
@@ -86,9 +86,10 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
 
     @override
     def load_raw(
-        self, source: Source[tuple[str, str], str],
+        self,
+        source: Source[tuple[str, str], str],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        map_context = source.map_context or mc.Implicit()
+        map_context = source.map_context or mc.SharedMap()
         scenes = (
             self
             ._scene_cache[source.inner]
@@ -144,7 +145,9 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
     def _precompute_global_data(self) -> None:
         # 1. Build the global timeline (Sample + Scene + Log)
         timeline_lf = build_scene_timeline(
-            self._dfs["sample"], self._dfs["scene"], self._dfs["log"],
+            self._dfs["sample"],
+            self._dfs["scene"],
+            self._dfs["log"],
         )
 
         # 2. Process Ego

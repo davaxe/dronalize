@@ -100,7 +100,7 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         for _, group in source_resampled.collect().group_by(["file_id"]):
             yield (
                 yaw_from_vel(group.lazy()).drop("file_id"),
-                mc.Explicit(map=str(group["map"].first())),
+                mc.ReferencedMap(str(group["map"].first())),
             )
 
     @override

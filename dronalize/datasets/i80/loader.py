@@ -93,7 +93,8 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[int, pl.LazyFrame],
+        self,
+        source: Source[int, pl.LazyFrame],
     ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
         data = source.inner
         for df in prepare_agent_trajectories(
@@ -105,7 +106,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
         ):
-            yield df, mc.Implicit()
+            yield df, mc.SharedMap()
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
