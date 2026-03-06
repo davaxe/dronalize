@@ -8,7 +8,6 @@ from typing_extensions import override
 
 from dronalize.common.trajectory.basic import yaw_from_vel_expr
 from dronalize.common.trajectory.process import prepare_agent_trajectories
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
@@ -105,7 +104,7 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
             yield Source(
                 identifier=subdir.name,
                 inner=pl.concat([vehicle_df, pedestrian_df]),
-                map_context=mc.ReferencedMap(str(map_location)),
+                map_key=str(map_location),
             )
 
     @override
@@ -116,9 +115,9 @@ class SindLoader(BaseSceneLoader[str, pl.LazyFrame]):
     def load_raw(
         self,
         source: Source[str, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    ) -> Iterable[tuple[pl.LazyFrame, str | None]]:
         for df in prepare_agent_trajectories(source.inner, self.loader_config):
-            yield df, source.map_context or mc.NoMap()
+            yield df, source.map_key
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

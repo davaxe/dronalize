@@ -4,17 +4,19 @@
 # Graph building
 # Pipeline
 # Allow `from dronalize.core import transforms` as a module reference
-from dronalize.core import transforms
+from dronalize.core import pipelines, transforms
 from dronalize.core.datatypes import (
     AgentCategory,
     EdgeType,
-    Explicit,
-    Implicit,
-    Loaded,
     LoaderConfig,
-    MapContext,
     MapGraph,
+    MapKey,
+    MapResolver,
     Scene,
+    fixed_map,
+    keyed_map,
+    no_map,
+    preloaded_map,
 )
 from dronalize.core.graph import (
     Edges,
@@ -50,22 +52,25 @@ __all__ = [
     "BaseSceneLoader",
     "EdgeType",
     "Edges",
-    "Explicit",
     "FlatMapTransform",
     "GraphBuilder",
-    "Implicit",
     "InterpolationStage",
-    "Loaded",
     "LoaderConfig",
-    "MapContext",
     "MapGraph",
+    "MapKey",
+    "MapResolver",
     "ParallelSceneLoader",
     "Pipeline",
     "Point",
     "ProgressBar",
     "Scene",
     "Transform",
+    "fixed_map",
     "get_edges_from_adj_list",
     "interpolate_position",
+    "keyed_map",
+    "no_map",
+    "pipelines",
+    "preloaded_map",
     "transforms",
 ]

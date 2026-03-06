@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Generic, Self, TypeVar
 import polars as pl
 
 if TYPE_CHECKING:
-    from dronalize.core.datatypes.map_context import MapContext
+    from dronalize.core.datatypes.map_context import MapKey
 
 
 IdT = TypeVar("IdT", bound=(Hashable))
@@ -32,8 +32,15 @@ class Scene(Generic[IdT]):
     """Number of observed frames."""
     output_len: int
     """Number of predicted frames."""
-    map_context: MapContext
-    """Map context for the scene, which can be implicit, explicit, loaded, or no map."""
+    map_key: MapKey = None
+    """Lightweight map identifier for the scene.
+
+    A `None` value means "no map" or "use the default/only map".  A
+    non-`None` string is resolved by a
+    `~dronalize.core.datatypes.map_context.MapResolver` (typically
+    obtained from the loader that produced this scene) to produce a
+    `~dronalize.core.datatypes.map_graph.MapGraph`.
+    """
 
     def enforce_schema(self, schema: pl.Schema | None = None) -> Self:
         """Enforce the scene dataframe to follow a specified schema.
@@ -67,7 +74,7 @@ class Scene(Generic[IdT]):
             f"scene_number={self.scene_number}, "
             f"input_len={self.input_len}, "
             f"output_len={self.output_len}, "
-            f"map_context={self.map_context!r}, "
+            f"map_key={self.map_key!r}, "
             f"inner=DataFrame({rows} rows x {cols} cols))"
         )
 

@@ -9,7 +9,6 @@ from typing_extensions import override
 # Adjust imports to match your project structure
 from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.process import prepare_agent_trajectories
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
@@ -78,7 +77,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
             # More efficient: peek at the first row's scene_name directly
             scene_name = df.item(0, "scene_name")
             map_name = df.item(0, "map")
-            yield Source(identifier=(scene_name, map_name), inner=token, map_context=mc.SharedMap())
+            yield Source(identifier=(scene_name, map_name), inner=token, map_key=map_name)
 
     @override
     def num_sources(self) -> int | None:
@@ -88,8 +87,8 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
     def load_raw(
         self,
         source: Source[tuple[str, str], str],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        map_context = source.map_context or mc.SharedMap()
+    ) -> Iterable[tuple[pl.LazyFrame, str | None]]:
+        map_key = source.map_key
         scenes = (
             self
             ._scene_cache[source.inner]
@@ -115,7 +114,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
         ):
-            yield df, map_context
+            yield df, map_key
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

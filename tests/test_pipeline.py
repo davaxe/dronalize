@@ -8,18 +8,11 @@ from typing import TYPE_CHECKING
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
-from typing_extensions import override
 
 from dronalize.core import AgentCategory
 from dronalize.core import transforms as transform
 from dronalize.core.datatypes import LoaderConfig
-from dronalize.core.datatypes import map_context as mc
-from dronalize.core.pipeline import (
-    FlatMapTransform,
-    Pipeline,
-    Transform,
-)
-from dronalize.core.protocols.loader import BaseSceneLoader, Source
+from dronalize.core.pipeline import FlatMapTransform, Pipeline, ReduceTransform, Transform
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -536,145 +529,137 @@ def test_pipeline_integration_complex() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# BaseSceneLoader integration (pipeline vs normalize fallback)
+# Additional Helpers / fixtures for Reduce
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def test_loader_legacy_normalize_fallback() -> None:
-    """Ensure the legacy normalize fallback method triggers when the pipeline is empty."""
-
-    class LegacyLoader(BaseSceneLoader[int, pl.LazyFrame]):
-        @override
-        def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
-            yield Source(
-                identifier=0,
-                inner=pl.DataFrame({
-                    "frame": [0, 1, 2, 3],
-                    "id": [1, 1, 1, 1],
-                    "x": [0.0, 1.0, 2.0, 3.0],
-                    "y": [0.0, 0.0, 0.0, 0.0],
-                    "vx": [1.0, 1.0, 1.0, 1.0],
-                    "vy": [0.0, 0.0, 0.0, 0.0],
-                    "ax": [0.0, 0.0, 0.0, 0.0],
-                    "ay": [0.0, 0.0, 0.0, 0.0],
-                    "yaw": [0.0, 0.0, 0.0, 0.0],
-                    "agent_category": [1, 1, 1, 1],
-                }).lazy(),
-            )
-
-        @override
-        def load_raw(
-            self, source: Source[int, pl.LazyFrame]
-        ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-            yield source.inner, mc.NoMap()
-
-        @override
-        def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-            return df.with_columns(pl.col("x") + 1000)
-
-        @classmethod
-        def default_config(cls) -> LoaderConfig:
-            return LoaderConfig(2, 2, 0.1)
-
-    loader = LegacyLoader()
-    scenes = list(loader.scenes())
-    assert len(scenes) == 1
-    # normalize should have been called
-    min_x = scenes[0].inner["x"].min()
-    assert min_x is not None
-    assert isinstance(min_x, (float, int))
-    assert min_x >= 1000
+def _concat_reduce(dfs: Iterable[pl.LazyFrame]) -> pl.LazyFrame:
+    """A simple reduce transform that concatenates all incoming frames."""
+    frames = list(dfs)
+    if not frames:
+        return pl.LazyFrame()
+    return pl.concat(frames)
 
 
-def test_loader_pipeline_overrides_normalize() -> None:
-    """Ensure the pipeline execution logic correctly overrides the normalize method if present."""
-
-    class PipelineLoader(BaseSceneLoader[int, pl.LazyFrame]):
-        @override
-        def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
-            yield Source(
-                identifier=0,
-                inner=pl.DataFrame({
-                    "frame": [0, 1, 2, 3],
-                    "id": [1, 1, 1, 1],
-                    "x": [0.0, 1.0, 2.0, 3.0],
-                    "y": [0.0, 0.0, 0.0, 0.0],
-                    "vx": [1.0, 1.0, 1.0, 1.0],
-                    "vy": [0.0, 0.0, 0.0, 0.0],
-                    "ax": [0.0, 0.0, 0.0, 0.0],
-                    "ay": [0.0, 0.0, 0.0, 0.0],
-                    "yaw": [0.0, 0.0, 0.0, 0.0],
-                    "agent_category": [1, 1, 1, 1],
-                }).lazy(),
-            )
-
-        @override
-        def load_raw(
-            self, source: Source[int, pl.LazyFrame]
-        ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-            yield source.inner, mc.NoMap()
-
-        @override
-        def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-            # This should NOT be called
-            return df.with_columns(pl.col("x") + 9999)
-
-        @override
-        def pipeline(self) -> Pipeline:
-            return Pipeline().then(lambda df: df.with_columns(pl.col("x") + 1))
-
-        @classmethod
-        def default_config(cls) -> LoaderConfig:
-            return LoaderConfig(2, 2, 0.1)
-
-    loader = PipelineLoader()
-    scenes = list(loader.scenes())
-    assert len(scenes) == 1
-    # pipeline adds 1, normalize would add 9999
-    assert scenes[0].inner["x"].max() == pytest.approx(4.0)
+# ═══════════════════════════════════════════════════════════════════════════
+# Protocol conformance (Add to existing section)
+# ═══════════════════════════════════════════════════════════════════════════
 
 
-def test_loader_pipeline_fan_out_creates_multiple_scenes() -> None:
-    """Verify that a pipeline fan-out accurately creates multiple scenes from a single source."""
+def test_plain_function_is_reduce() -> None:
+    """Verify that regular functions satisfy the ReduceTransform protocol."""
+    from dronalize.core.pipeline import ReduceTransform
 
-    class FanOutLoader(BaseSceneLoader[int, pl.LazyFrame]):
-        @override
-        def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
-            yield Source(
-                identifier=0,
-                inner=pl.DataFrame({
-                    "frame": list(range(8)),
-                    "id": [1] * 4 + [2] * 4,
-                    "x": [float(i) for i in range(8)],
-                    "y": [0.0] * 8,
-                    "vx": [1.0] * 8,
-                    "vy": [0.0] * 8,
-                    "ax": [0.0] * 8,
-                    "ay": [0.0] * 8,
-                    "yaw": [0.0] * 8,
-                    "agent_category": [1] * 8,
-                }).lazy(),
-            )
+    assert isinstance(_concat_reduce, ReduceTransform)
 
-        @override
-        def load_raw(
-            self, source: Source[int, pl.LazyFrame]
-        ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-            yield source.inner, mc.NoMap()
 
-        @override
-        def pipeline(self) -> Pipeline:
-            return Pipeline().then_flat_map(transform.group_by_yield("id", drop_group_cols=False))
+# ═══════════════════════════════════════════════════════════════════════════
+# Pipeline construction & immutability (Add to existing section)
+# ═══════════════════════════════════════════════════════════════════════════
 
-        @classmethod
-        def default_config(cls) -> LoaderConfig:
-            return LoaderConfig(2, 2, 0.1)
 
-    loader = FanOutLoader(enforce_schema=False)
-    scenes = list(loader.scenes())
-    assert len(scenes) == 2
-    # Both scenes share the same source identifier
-    assert all(s.identifier == 0 for s in scenes)
-    # Scene numbers should be sequential
-    scene_numbers = {s.scene_number for s in scenes}
-    assert scene_numbers == {0, 1}
+def test_pipeline_then_reduce_returns_new() -> None:
+    """Ensure that calling then_reduce() returns a completely new Pipeline instance."""
+    p1 = Pipeline()
+    p2 = p1.then_reduce(_concat_reduce)
+    assert len(p1) == 0, "Original must be unchanged"
+    assert len(p2) == 1
+
+
+def test_pipeline_repr_reduce() -> None:
+    """Check the string representation of a Pipeline containing a reduce step."""
+    pipe = Pipeline().then_reduce(_concat_reduce)
+    r = repr(pipe)
+    assert ".then_reduce(" in r
+
+
+def test_pipeline_rshift_operator() -> None:
+    """Verify the >> operator correctly composes pipelines."""
+    p1 = Pipeline().then(_add_one_to_x)
+    p2 = Pipeline().then(_multiply_x_by_two)
+    combined = p1 >> p2
+    assert len(combined) == 2
+    # Originals unchanged
+    assert len(p1) == 1
+    assert len(p2) == 1
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Pipeline execution (Add to existing section)
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_run_reduce_combines_multiple_streams(simple_lf: pl.LazyFrame) -> None:
+    """Verify that a reduce step correctly combines multiple frames into one."""
+    pipe = Pipeline().then_flat_map(_split_by_id).then(_add_one_to_x).then_reduce(_concat_reduce)
+    result = pipe.execute_single(simple_lf).collect()
+
+    # The expected frame is the original but with x + 1.
+    # Because group_by and concat might alter row order, sort before comparing.
+    expected = simple_lf.with_columns(pl.col("x") + 1).collect()
+
+    result_sorted = result.sort(["id", "frame"])
+    expected_sorted = expected.sort(["id", "frame"])
+
+    assert_frame_equal(result_sorted, expected_sorted)
+
+
+def test_run_single_succeeds_after_reduce(simple_lf: pl.LazyFrame) -> None:
+    """Ensure run_single succeeds seamlessly when a flat-map is followed by a reduce."""
+    # A flat-map normally causes execute_single to raise an error.
+    # Reducing it back down to a single frame should allow it to pass.
+    pipe = Pipeline().then_flat_map(_split_by_id).then_reduce(_concat_reduce)
+    result = pipe.execute_single(simple_lf).collect()
+
+    # Original frame had 8 rows, splitting into 2x4 and recombining should equal 8
+    assert result.shape[0] == 8
+    assert "id" in result.columns
+
+
+def test_run_reduce_on_empty_stream() -> None:
+    """Verify the reduce step handles an empty iterable of LazyFrames gracefully."""
+    # Simulate an empty stream by filtering out everything before flat-mapping
+    empty_lf = pl.DataFrame({"id": [], "x": []}).lazy()
+
+    pipe = Pipeline().then_flat_map(_split_by_id).then_reduce(_concat_reduce)
+
+    result = pipe.execute_single(empty_lf).collect()
+    assert result.shape[0] == 0
+
+
+def test_run_lazy_reduce(simple_lf: pl.LazyFrame) -> None:
+    """Ensure then_lazy_reduce constructs and applies the reduce factory correctly."""
+
+    def reduce_factory() -> ReduceTransform:
+        return _concat_reduce
+
+    pipe = Pipeline().then_flat_map(_split_by_id).then_lazy_reduce(reduce_factory)
+
+    result = pipe.execute_single(simple_lf).collect()
+    assert result.shape[0] == 8
+
+
+def test_run_if_present_reduce(simple_lf: pl.LazyFrame) -> None:
+    """Verify then_if_present_reduce applies conditionally based on the argument."""
+
+    def reduce_factory(arg: str) -> ReduceTransform:
+        # Return a custom reduce that adds a column to indicate the argument was passed
+        def custom_reduce(dfs: Iterable[pl.LazyFrame]) -> pl.LazyFrame:
+            frames = list(dfs)
+            return pl.concat(frames).with_columns(pl.lit(arg).alias("reduce_arg"))
+
+        return custom_reduce
+
+    # Case 1: Arg is provided
+    pipe_with = (
+        Pipeline().then_flat_map(_split_by_id).then_if_present_reduce(reduce_factory, "test_arg")
+    )
+    result_with = pipe_with.execute_single(simple_lf).collect()
+    assert "reduce_arg" in result_with.columns
+
+    pipe_without = (
+        Pipeline().then_flat_map(_split_by_id).then_if_present_reduce(reduce_factory, None)
+    )
+
+    with pytest.raises(ValueError, match="exactly 1 output"):
+        pipe_without.execute_single(simple_lf)

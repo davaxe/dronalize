@@ -8,7 +8,6 @@ from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
 from dronalize.common.trajectory.resample import Resampling, resample
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
@@ -87,7 +86,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
     def load_raw(
         self,
         source: Source[int, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    ) -> Iterable[tuple[pl.LazyFrame, str]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         source_filtered = source.inner.filter(
             filter_scene_expr(
@@ -121,7 +120,7 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
             )
 
         for _, group in source_resampled.collect().group_by(["file_id"]):
-            yield group.lazy(), mc.ReferencedMap(str(group["map_path"].first()))
+            yield group.lazy(), str(group["map_path"].first())
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

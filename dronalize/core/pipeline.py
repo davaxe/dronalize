@@ -3,7 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, Protocol, TypeVar, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Literal,
+    ParamSpec,
+    Protocol,
+    TypedDict,
+    TypeVar,
+    Unpack,
+    runtime_checkable,
+)
 
 from typing_extensions import overload
 
@@ -13,6 +22,7 @@ if TYPE_CHECKING:
     import polars as pl
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 # ---------------------------------------------------------------------------
 # Protocols
@@ -38,6 +48,19 @@ class FlatMapTransform(Protocol):
 
     def __call__(self, df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
         """Apply the flat-map to a LazyFrame, yielding multiple outputs."""
+        ...
+
+
+@runtime_checkable
+class ReduceTransform(Protocol):
+    """A step that reduces multiple LazyFrames to a single output.
+
+    This is not currently used in the Pipeline but may be useful for future
+    extensions, e.g. for aggregating results across multiple scenes.
+    """
+
+    def __call__(self, dfs: Iterable[pl.LazyFrame]) -> pl.LazyFrame:
+        """Apply the reduce transform to an iterable of LazyFrames."""
         ...
 
 
@@ -72,7 +95,21 @@ class _FlatMapEntry:
             yield from self.fn(df)
 
 
-_PipelineEntry = _MapEntry | _FlatMapEntry
+@dataclass(slots=True, frozen=True)
+class _ReduceEntry:
+    """Wraps an N:1 ReduceTransform."""
+
+    fn: ReduceTransform
+    name: str | None = None
+
+    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
+        """Consume all inputs, apply reduction, and yield the single output."""
+        # Note: This materializes the iterable in memory, but the
+        # actual data inside the Polars frames remains lazy.
+        yield self.fn(inputs)
+
+
+_PipelineEntry = _MapEntry | _FlatMapEntry | _ReduceEntry
 
 # ---------------------------------------------------------------------------
 # Pipeline
@@ -95,15 +132,25 @@ class Pipeline:
 
     # -- builder API --------------------------------------------------------
 
-    def then(self, transform: Transform, *, when: bool = True, name: str | None = None) -> Pipeline:
+    def then(
+        self,
+        transform: Transform,
+        *,
+        when: bool = True,
+        otherwise: Transform | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
         """Append a 1:1 transform and return a *new* pipeline.
 
         Parameters
         ----------
-        transform : Callable[[LazyFrame], LazyFrame]
+        transform : Transform
             A callable that maps one LazyFrame to one LazyFrame.
         when : bool, optional
             If False, skip this step and return the unchanged pipeline.
+        otherwise : Transform, optional
+            If provided and `when` is `False`, this transform will be used
+            instead of skipping the step.
         name : str | None, optional
             An optional name for this step, used in the pipeline's repr.
 
@@ -113,13 +160,18 @@ class Pipeline:
             New pipeline with the transform appended.
 
         """
-        return Pipeline((*self._steps, _MapEntry(transform, name))) if when else self
+        if not when:
+            if otherwise is None:
+                return self
+            transform = otherwise
+        return Pipeline((*self._steps, _MapEntry(transform, name)))
 
     def then_lazy(
         self,
-        transform_factory: Callable[..., Transform],
+        transform: Callable[..., Transform],
         *,
         when: bool = True,
+        otherwise: Callable[..., Transform] | None = None,
         name: str | None = None,
     ) -> Pipeline:
         """Like `then` but the transform is produced by a factory at build time.
@@ -128,10 +180,13 @@ class Pipeline:
 
         Parameters
         ----------
-        transform_factory : Callable[..., Transform]
+        transform : Callable[..., Transform]
             A factory that produces a Transform when called.
         when : bool, optional
             If False, skip this step and return the unchanged pipeline.
+        otherwise : Callable[..., Transform], optional
+            If provided and `when` is `False`, this factory will be used to
+            produce a transform instead of skipping the step.
         name : str | None, optional
             An optional name for this step, used in the pipeline's repr.
 
@@ -143,9 +198,12 @@ class Pipeline:
 
         """
         if not when:
-            return self
-        transform = transform_factory()
-        return self.then(transform, name=name)
+            if otherwise is None:
+                return self
+            transform_ = otherwise()
+        else:
+            transform_ = transform()
+        return self.then(transform_, name=name)
 
     def then_if_present(
         self,
@@ -174,9 +232,10 @@ class Pipeline:
 
     def then_flat_map(
         self,
-        flat_map: FlatMapTransform,
+        transform: FlatMapTransform,
         *,
         when: bool = True,
+        otherwise: FlatMapTransform | None = None,
         name: str | None = None,
     ) -> Pipeline:
         """Append a 1:N flat-map step and return a *new* pipeline.
@@ -186,11 +245,14 @@ class Pipeline:
 
         Parameters
         ----------
-        flat_map : Callable[[LazyFrame], Iterable[LazyFrame]]
+        transform : FlatMapTransform
             A callable that maps one LazyFrame to an iterable of
             LazyFrames.
         when : bool, optional
             If False, skip this step and return the unchanged pipeline.
+        otherwise : FlatMapTransform, optional
+            If provided and `when` is `False`, this flat-map will be used
+            instead of skipping the step.
         name : str | None, optional
             An optional name for this step, used in the pipeline's repr.
 
@@ -200,13 +262,18 @@ class Pipeline:
             New pipeline with the flat-map step appended.
 
         """
-        return Pipeline((*self._steps, _FlatMapEntry(flat_map, name))) if when else self
+        if not when:
+            if otherwise is None:
+                return self
+            transform = otherwise
+        return Pipeline((*self._steps, _FlatMapEntry(transform, name)))
 
     def then_lazy_flat_map(
         self,
-        flat_map_factory: Callable[..., FlatMapTransform],
+        transform: Callable[..., FlatMapTransform],
         *,
         when: bool = True,
+        otherwise: Callable[..., FlatMapTransform] | None = None,
         name: str | None = None,
     ) -> Pipeline:
         """Like `then_flat_map` but the flat-map is produced by a factory at build time.
@@ -215,10 +282,13 @@ class Pipeline:
 
         Parameters
         ----------
-        flat_map_factory : Callable[..., FlatMapTransform]
+        transform : Callable[..., FlatMapTransform]
             A factory that produces a FlatMapTransform when called.
         when : bool, optional
             If False, skip this step and return the unchanged pipeline.
+        otherwise : Callable[..., FlatMapTransform], optional
+            If provided and `when` is `False`, this factory will be used to
+            produce a flat-map instead of skipping the step.
         name : str | None, optional
             An optional name for this step, used in the pipeline's repr.
 
@@ -230,9 +300,12 @@ class Pipeline:
 
         """
         if not when:
-            return self
-        flat_map = flat_map_factory()
-        return self.then_flat_map(flat_map, name=name)
+            if otherwise is None:
+                return self
+            transform_ = otherwise()
+        else:
+            transform_ = transform()
+        return self.then_flat_map(transform_, name=name)
 
     def then_if_present_flat_map(
         self,
@@ -259,7 +332,114 @@ class Pipeline:
         flat_map = flat_map_factory(arg)
         return self.then_flat_map(flat_map)
 
-    def compose(self, other: Pipeline, *, when: bool = True) -> Pipeline:
+    def then_reduce(
+        self,
+        transform: ReduceTransform,
+        *,
+        when: bool = True,
+        otherwise: ReduceTransform | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Append an N:1 reduce step and return a *new* pipeline.
+
+        This step will consume **all** LazyFrames produced by the previous steps
+        and yield a single output LazyFrame.
+
+        Parameters
+        ----------
+        transform : ReduceTransform
+            A callable that maps an iterable of LazyFrames to a single LazyFrame.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : ReduceTransform, optional
+            If provided and `when` is `False`, this reduce will be used instead
+            of skipping the step.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the reduce step appended.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            transform = otherwise
+        return Pipeline((*self._steps, _ReduceEntry(transform, name)))
+
+    def then_lazy_reduce(
+        self,
+        transform: Callable[..., ReduceTransform],
+        *,
+        when: bool = True,
+        otherwise: Callable[..., ReduceTransform] | None = None,
+        name: str | None = None,
+    ) -> Pipeline:
+        """Like `then_reduce` but the reduce is produced by a factory at build time.
+
+        This is useful for deferring expensive setup until it's known to be needed.
+
+        Parameters
+        ----------
+        transform : Callable[..., ReduceTransform]
+            A factory that produces a ReduceTransform when called.
+        when : bool, optional
+            If False, skip this step and return the unchanged pipeline.
+        otherwise : Callable[..., ReduceTransform], optional
+            If provided and `when` is `False`, this factory will be used to
+            produce a reduce instead of skipping the step.
+        name : str | None, optional
+            An optional name for this step, used in the pipeline's repr.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the reduce step appended if when is True, else the
+            unchanged pipeline.
+
+        """
+        if not when:
+            if otherwise is None:
+                return self
+            transform_ = otherwise()
+        else:
+            transform_ = transform()
+        return self.then_reduce(transform_, name=name)
+
+    def then_if_present_reduce(
+        self,
+        reduce_factory: Callable[[T], ReduceTransform],
+        arg: T | None,
+    ) -> Pipeline:
+        """Like `then_reduce` but only append the reduce if *arg* is not None.
+
+        Parameters
+        ----------
+        reduce_factory : Callable[[T], ReduceTransform]
+            A factory that produces a ReduceTransform when given an argument.
+        arg : T or None
+            The argument to pass to the factory. If None, this step is skipped.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the reduce step appended if arg is not None, else
+            the unchanged pipeline.
+        """
+        if arg is None:
+            return self
+        reduce = reduce_factory(arg)
+        return self.then_reduce(reduce)
+
+    def compose(
+        self,
+        other: Pipeline,
+        *,
+        when: bool = True,
+        otherwise: Pipeline | None = None,
+    ) -> Pipeline:
         """Concatenate *other* pipeline's steps after this one.
 
         Parameters
@@ -268,6 +448,9 @@ class Pipeline:
             Pipeline whose steps are appended.
         when : bool, optional
             If False, skip this step and return the unchanged pipeline.
+        otherwise : Pipeline, optional
+            If provided and `when` is `False`, this pipeline will be returned
+            instead of the unchanged pipeline.
 
         Returns
         -------
@@ -275,7 +458,26 @@ class Pipeline:
             New pipeline combining both step sequences.
 
         """
-        return Pipeline((*self._steps, *other._steps)) if when else self
+        if not when:
+            if otherwise is None:
+                return self
+            return otherwise
+        return Pipeline((*self._steps, *other._steps))
+
+    def checkpoint(
+        self, name: str = "checkpoint", **collect_kwargs: Unpack[_CollectKwargs]
+    ) -> Pipeline:
+        """Append a checkpoint that collects the LazyFrame(s) at this point.
+
+        Parameters
+        ----------
+        name : str, optional
+            An optional name for this checkpoint, used in the pipeline's repr.
+        **collect_kwargs : _CollectKwargs
+            Keyword arguments to pass to `pl.LazyFrame.collect()` when executing
+            this checkpoint.
+        """
+        return self.then(lambda df: df.collect(**collect_kwargs).lazy(), name=name)
 
     # -- slicing ------------------------------------------------------------
 
@@ -501,6 +703,30 @@ class Pipeline:
 
     # -- introspection ------------------------------------------------------
 
+    def inspect(self, f: Callable[[pl.LazyFrame], None]) -> Pipeline:
+        """Append an inspection step that applies f to each intermediate LazyFrame.
+
+        This is useful for debugging or logging the pipeline's behavior without
+        affecting the data flow.
+
+        Parameters
+        ----------
+        f : Callable[[pl.LazyFrame], None]
+            A function that takes a LazyFrame and returns None. It will be called
+            with each intermediate LazyFrame during execution.
+
+        Returns
+        -------
+        Pipeline
+            New pipeline with the inspection step appended.
+        """
+
+        def transform(df: pl.LazyFrame) -> pl.LazyFrame:
+            f(df)
+            return df
+
+        return self.then(transform, name=f"inspect({f.__name__})")
+
     def is_empty(self) -> bool:
         """Return True if the pipeline contains no steps."""
         return len(self._steps) == 0
@@ -523,10 +749,36 @@ class Pipeline:
         for entry in self._steps:
             if isinstance(entry, _MapEntry):
                 parts.append(f"  .then({entry.name or _fn_name(entry.fn)})")
-            else:
+            elif isinstance(entry, _FlatMapEntry):
                 parts.append(f"  .then_flat_map({entry.name or _fn_name(entry.fn)})")
+            elif isinstance(entry, _ReduceEntry):
+                parts.append(f"  .then_reduce({entry.name or _fn_name(entry.fn)})")
         body = "\n".join(parts) if parts else "  (empty)"
         return f"Pipeline(\n{body}\n)"
+
+    def __rshift__(self, other: Pipeline) -> Pipeline:
+        """Compose two pipelines.
+
+        This operator is a convenient shorthand for `compose`, allowing you to
+        write `p1 >> p2` instead of `p1.compose(p2)`.
+
+        """
+        return self.compose(other)
+
+
+class _CollectKwargs(TypedDict, total=False):
+    type_coercion: bool
+    predicate_pushdown: bool
+    projection_pushdown: bool
+    simplify_expression: bool
+    slice_pushdown: bool
+    comm_subplan_elim: bool
+    comm_subexpr_elim: bool
+    cluster_with_columns: bool
+    collapse_joins: bool
+    no_optimization: bool
+    engine: Literal["auto", "in-memory", "streaming", "gpu"]
+    background: Literal[False]
 
 
 def _fn_name(fn: object) -> str:

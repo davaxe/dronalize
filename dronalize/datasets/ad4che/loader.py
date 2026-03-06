@@ -7,7 +7,6 @@ from typing_extensions import override
 
 from dronalize.common.loaders.xlevel import XLevelDataLoader
 from dronalize.core import AgentCategory, LoaderConfig
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.protocols.loader import Source
 
 if TYPE_CHECKING:
@@ -68,7 +67,7 @@ class AD4CHELoader(XLevelDataLoader):
             yield Source(
                 identifier=i,
                 inner=combined,
-                map_context=mc.ReferencedMap(str(location_id)),
+                map_key=str(location_id),
             )
 
     @override

@@ -11,7 +11,6 @@ from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
 from dronalize.common.trajectory.resample import Resampling, resample
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.protocols.loader import Source
 
 if TYPE_CHECKING:
@@ -83,7 +82,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
     def load_raw(
         self,
         source: Source[str, list[Path]],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    ) -> Iterable[tuple[pl.LazyFrame, None]]:
         resampling = self.loader_config.resampling or Resampling(1, 1)
         data = (
             pl
@@ -125,7 +124,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
         )
 
         for _, group in data_processed.collect().group_by(["file_id", "case_id"]):
-            yield group.lazy().drop("file_id", "case_id"), mc.Implicit()
+            yield group.lazy().drop("file_id", "case_id"), None
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

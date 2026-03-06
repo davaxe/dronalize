@@ -12,7 +12,6 @@ from zarr.creation import open_array
 
 from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.process import prepare_agent_trajectories
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
 
@@ -84,8 +83,9 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
 
     @override
     def load_raw(
-        self, source: Source[int, _Source],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        self,
+        source: Source[int, _Source],
+    ) -> Iterable[tuple[pl.LazyFrame, None]]:
         scene_interval = source.inner.interval
         if scene_interval is not None:
             start, end = scene_interval
@@ -116,7 +116,7 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
                 add_second_derivative=True,
                 derivative_rename=self.derivative_names(),
             ):
-                yield df, mc.Implicit()
+                yield df, None
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

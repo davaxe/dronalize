@@ -12,13 +12,16 @@ from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
 from dronalize.common.trajectory.resample import Resampling, resample
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes import map_context as mc
+from dronalize.core.datatypes.map_context import MapResolver, no_map, preloaded_map
 from dronalize.core.protocols.loader import Source
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.core.datatypes.map_context import MapKey
+    from dronalize.core.datatypes.map_graph import MapGraph
 
 FilterStr = Literal[
     "*training.tfrecord*",
@@ -81,6 +84,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         self._include_map: bool = include_map
         self._interp_distance: float | None = interp_distance
         self._min_distance: float | None = min_distance
+        self._maps: dict[str, MapGraph] = {}
 
     @override
     def sources(self) -> Iterable[Source[str, Path]]:
@@ -93,21 +97,26 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         return sum(1 for _ in self._data_dir.glob(self._filter_str))
 
     @override
-    def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    def map_resolver(self) -> MapResolver:
+        if not self._include_map:
+            return no_map()
+        return preloaded_map(self._maps)
+
+    @override
+    def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, MapKey]]:
         for i, raw_data in enumerate(_read_tfrecord(source.inner)):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
-            # Map processing remains per-scenario (if needed)
-            map_context: mc.MapContext = mc.ReferencedMap(f"{source.inner}_index={i}")
+            key = f"{source.inner}_index={i}"
             if self._include_map:
                 map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
                 current_map = WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
                     min_distance=self._min_distance,
                     interp_distance=self._interp_distance,
                 )
-                map_context = mc.LoadedMap(current_map)
+                self._maps[key] = current_map
 
-            yield _scenario_to_polars(scenario).lazy(), map_context
+            yield _scenario_to_polars(scenario).lazy(), key
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

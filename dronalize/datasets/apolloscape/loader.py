@@ -6,9 +6,9 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.common.trajectory.process import prepare_agent_trajectories
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
+from dronalize.core.datatypes.loader_config import LoaderConfig
+from dronalize.core.protocols.loader import BaseSceneLoader, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -73,8 +73,9 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
 
     @override
     def load_raw(
-        self, source: Source[str, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+        self,
+        source: Source[str, pl.LazyFrame],
+    ) -> Iterable[tuple[pl.LazyFrame, None]]:
         for df in prepare_agent_trajectories(
             source.inner,
             self.loader_config,
@@ -82,7 +83,7 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
         ):
-            yield df, mc.NoMap()
+            yield df, None
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
@@ -111,3 +112,19 @@ _DATA_SCHEMA: pl.Schema = pl.Schema({
     "height": pl.Float32,
     "yaw": pl.Float32,
 })
+
+if __name__ == "__main__":
+    import os
+    import time
+    from pathlib import Path
+
+    # Get root from env-var
+    root = Path(os.getenv("TRAJ_DATA", "")) / "apollo" / "prediction_train"
+    loader = ApolloScapeLoader(root)
+    time_start = time.perf_counter()
+    counter = 0
+    for _ in loader.scenes():
+        counter += 1
+        if counter % 1 == 0:
+            print(f"Loaded {counter} scenes in {time.perf_counter() - time_start:.2f} seconds")
+    print(f"Total {counter} scenes in {time.perf_counter() - time_start:.2f} seconds")

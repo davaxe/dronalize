@@ -9,7 +9,6 @@ from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.process import prepare_agent_trajectories
 from dronalize.common.trajectory.rebalance import rebalance_highway_agents
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.protocols.loader import Source
 
 if TYPE_CHECKING:
@@ -95,7 +94,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
     def load_raw(
         self,
         source: Source[int, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    ) -> Iterable[tuple[pl.LazyFrame, None]]:
         data = source.inner
         for df in prepare_agent_trajectories(
             rebalance_highway_agents(data, ratio=self._rebalance_ratio).drop("lane_changes")
@@ -106,7 +105,7 @@ class I80Loader(BaseSceneLoader[int, pl.LazyFrame]):
             add_second_derivative=True,
             derivative_rename=self.derivative_names(),
         ):
-            yield df, mc.SharedMap()
+            yield df, None
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

@@ -558,7 +558,7 @@ class GraphBuilder(ABC):
         min_distance: float | None = None,
         interp_distance: float | None = None,
     ) -> MapGraph:
-        """Build the final :class:`MapGraph`.
+        """Build the final `MapGraph`.
 
         Parameters
         ----------
@@ -592,7 +592,7 @@ class GraphBuilder(ABC):
         return self.build_graph()
 
     def build_graph(self) -> MapGraph:
-        """Convert the internal state into a :class:`MapGraph`.
+        """Convert the internal state into a `MapGraph`.
 
         Returns
         -------

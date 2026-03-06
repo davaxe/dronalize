@@ -8,7 +8,6 @@ from typing_extensions import override
 from dronalize.common.trajectory.basic import yaw_from_vel
 from dronalize.common.trajectory.process import prepare_agent_trajectories
 from dronalize.common.trajectory.rebalance import rebalance_highway_agents
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.datatypes.loader_config import LoaderConfig
 from dronalize.core.protocols.loader import BaseSceneLoader, Source
@@ -122,7 +121,7 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
             yield Source(
                 identifier=i,
                 inner=combined,
-                map_context=mc.ReferencedMap(map_id=str(location_id)),
+                map_key=str(location_id),
                 metadata=metadata,
             )
 
@@ -135,13 +134,13 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
     def load_raw(
         self,
         source: Source[int, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
+    ) -> Iterable[tuple[pl.LazyFrame, str | None]]:
         data = source.inner
         if self._rebalance_ratio is not None:
             data = rebalance_highway_agents(data, ratio=self._rebalance_ratio).drop("lane_changes")
 
         for df in prepare_agent_trajectories(data, self.loader_config):
-            yield df, source.map_context or mc.NoMap()
+            yield df, source.map_key
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

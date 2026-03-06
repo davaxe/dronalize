@@ -7,16 +7,15 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.core.transforms as tr
+from dronalize.common.plotting import plot_trajectories
 from dronalize.core import BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes import map_context as mc
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.pipeline import Pipeline
+from dronalize.core.pipelines import trajectory_pipeline
 from dronalize.core.protocols.loader import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
-
-    from dronalize.core.datatypes.loader_config import WindowParams
 
 
 class EthUcyLoader(BaseSceneLoader[str, Path]):
@@ -57,50 +56,18 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
                 yield Source(identifier=data_file.name, inner=data_file)
 
     @override
+    def ingest(self, source: Source[str, Path]) -> Iterable[pl.LazyFrame]:
+        yield EthUcyLoader._read_data_file(source.inner)
+
+    @override
     def pipeline(self) -> Pipeline:
         config = self.loader_config
-        window = config.window_params
-        has_window = window is not None
         return (
             Pipeline()
-            .then(tr.require_min("id", minimum=2))
-            .then_if_present(
-                lambda w: tr.window(w.window_size, w.step_size),
-                arg=config.window_params,
-            )
-            .then_if_present(
-                lambda config: tr.filter_scene(
-                    config.scene_filtering,
-                    group_by="window_index" if has_window else None,
-                ),
-                arg=config.scene_filtering,
-            )
-            .then(
-                tr.require_min(["window_index", "id"] if has_window else "id", minimum=2),
-                when=has_window,
-            )
-            .then(
-                tr.resample(
-                    config.resampling,
-                    config.sample_time,
-                    group_by=["window_index", "id"] if has_window else ["id"],
-                    add_derivative=True,
-                    add_second_derivative=True,
-                    derivative_rename=self.derivative_names(),
-                )
-            )
-            .then_flat_map(tr.group_by_yield("window_index"), when=has_window)
+            .compose(trajectory_pipeline(config, derivative_rename=self.derivative_names()))
             .then(tr.yaw_from_vel())
             .then(tr.with_columns(agent_category=pl.lit(AgentCategory.PEDESTRIAN)))
         )
-
-    @staticmethod
-    def _window_params(window_params: WindowParams | None) -> tuple[int, int]:
-        step_size, window_size = 0, 0
-        if window_params is not None:
-            step_size = window_params.step_size
-            window_size = window_params.window_size
-        return step_size, window_size
 
     @override
     def num_sources(self) -> int | None:
@@ -110,10 +77,6 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             num_sources += sum(1 for _ in data_dir.iterdir())
 
         return num_sources
-
-    @override
-    def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, mc.MapContext]]:
-        yield EthUcyLoader._read_data_file(source.inner), mc.NoMap()
 
     @classmethod
     @override
@@ -146,3 +109,16 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
             pl.col("id").cast(pl.Int32),
         )
+
+
+if __name__ == "__main__":
+    import altair as alt
+
+    path = Path("data")
+    alt.renderers.enable("browser")
+    loader = EthUcyLoader(path, dataset=["hotel"], split="train")
+    count = 0
+    for scene in loader.scenes():
+        count += 1
+
+    print(f"Total scenes: {count}")
