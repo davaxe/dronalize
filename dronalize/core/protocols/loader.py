@@ -277,7 +277,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
             Always, unless overridden by a subclass that supports splits.
 
         """
-        raise SplitNotSupportedError(type(self).__name__, DatasetSplit.VALIDATE)
+        raise SplitNotSupportedError(type(self).__name__, DatasetSplit.VAL)
 
     def sources(self) -> Iterable[Source[IdT, SourceT]]:
         """Return sources for the currently configured split.
@@ -299,7 +299,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
             return self.train_sources()
         if self._split is DatasetSplit.TEST:
             return self.test_sources()
-        if self._split is DatasetSplit.VALIDATE:
+        if self._split is DatasetSplit.VAL:
             return self.validate_sources()
         return self.all_sources()
 

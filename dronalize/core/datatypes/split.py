@@ -6,24 +6,11 @@ from enum import StrEnum
 
 
 class DatasetSplit(StrEnum):
-    """Enum representing the available dataset splits.
-
-    Members
-    -------
-    TRAIN
-        The training split of the dataset.
-    TEST
-        The test split of the dataset.
-    VALIDATE
-        The validation split of the dataset.
-    ALL
-        All available data across every split.
-
-    """
+    """Enum representing the available dataset splits."""
 
     TRAIN = "train"
     TEST = "test"
-    VALIDATE = "validate"
+    VAL = "val"
     ALL = "all"
 
 

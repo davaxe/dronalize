@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -14,7 +15,6 @@ from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from pathlib import Path
 
 
 class ApolloScapeLoader(BaseSceneLoader[str, Path]):
@@ -117,7 +117,7 @@ class ApolloScapeLoader(BaseSceneLoader[str, Path]):
         split = self._split
         if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
             dirs.append(self._data_root / "prediction_train")
-        if split in {DatasetSplit.ALL, DatasetSplit.VALIDATE}:
+        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
             dirs.append(self._data_root / "val_split")
         if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
             dirs.append(self._data_root / "prediction_test")

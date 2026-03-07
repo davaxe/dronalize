@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from dronalize.core import AgentCategory
-from dronalize.loaders.base import XLevelDataLoader
+from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
 if TYPE_CHECKING:
     from pathlib import Path

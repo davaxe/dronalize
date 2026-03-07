@@ -12,7 +12,8 @@ from zarr.creation import open_array
 
 import dronalize.pipeline.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
+from dronalize.core.datatypes.loader_config import LoaderConfig
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 

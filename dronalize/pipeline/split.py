@@ -18,8 +18,8 @@ class StreamSplitter(Generic[T]):
     (`round_size`) before reshuffling. The number of pre-generated rounds can be
     specified with `rounds` parameter.
 
-    It works in the follwing steps:
-    1. Create a 2D array (deck) where each row is a shuffeled sequence of
+    It works in the following steps:
+    1. Create a 2D array (deck) where each row is a shuffled sequence of
     group entries where the number of entries for each group is determined
     by the provided weights and the specified `round_size`.
     2. Keep an index for the current position in the round.
@@ -32,7 +32,7 @@ class StreamSplitter(Generic[T]):
     Practical Considerations
     ------------------------
     This implementation will guarantee that the distribution of groups will
-    exaclty follow the specified weights if:
+    exactly follow the specified weights if:
     1. The number of groups assigned is a multiple of the `round_size`.
     2. The `round_size` is sufficiently large to allow for a exact integer count
     of each group based on the weights. For example if `round_size` is 4 only
@@ -40,7 +40,7 @@ class StreamSplitter(Generic[T]):
     `round_size` is 100, then weights that are multiples of 0.01 can be
     represented exactly.
 
-    In all other cases the implemntation will be as close as possible to the
+    In all other cases the implementation will be as close as possible to the
     specified weights and in the limit when number of distributed groups goes to
     infinity the distribution will converge to the uniform distribution defined
     by the weights.

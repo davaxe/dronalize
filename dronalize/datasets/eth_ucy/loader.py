@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
 
-class EthUcyLoader(BaseSceneLoader[str, Path]):
+class _EthUcyLoader(BaseSceneLoader[str, Path]):
     """Processor for ETH/UCY pedestrian trajectory datasets."""
 
     def __init__(
@@ -120,7 +120,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
         split_names: list[str] = []
         if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
             split_names.append("train")
-        if split in {DatasetSplit.ALL, DatasetSplit.VALIDATE}:
+        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
             split_names.append("val")
         if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
             split_names.append("test")
@@ -148,12 +148,97 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
         )
 
 
+class HotelLoader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY hotel dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="hotel",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
+class EthLoader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY eth dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="eth",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
+class UnivLoader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY univ dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="univ",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
+class Zara1Loader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY zara1 dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="zara1",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
+class Zara2Loader(_EthUcyLoader):
+    """Convenience alias for the ETH/UCY zara2 dataset."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+        split: DatasetSplit = DatasetSplit.ALL,
+    ) -> None:
+        super().__init__(
+            data_root=data_root,
+            dataset="zara2",
+            loader_config=loader_config,
+            split=split,
+        )
+
+
 if __name__ == "__main__":
     import altair as alt
 
     path = Path("data")
     alt.renderers.enable("browser")
-    loader = EthUcyLoader(path, dataset=["hotel"], split=DatasetSplit.TRAIN)
+    loader = _EthUcyLoader(path, dataset=["hotel"], split=DatasetSplit.TRAIN)
     count = 0
     for _scene in loader.scenes():
         count += 1

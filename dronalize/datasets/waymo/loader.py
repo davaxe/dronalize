@@ -114,7 +114,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         split = self._split
         if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
             dirs.append(self._data_root / "training")
-        if split in {DatasetSplit.ALL, DatasetSplit.VALIDATE}:
+        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
             dirs.append(self._data_root / "validation")
         if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
             dirs.append(self._data_root / "testing")

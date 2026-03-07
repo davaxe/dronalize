@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from dronalize.core import AgentCategory, LoaderConfig
 from dronalize.core.protocols.loader import Source
-from dronalize.loaders.base import XLevelDataLoader
+from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

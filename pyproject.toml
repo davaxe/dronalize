@@ -89,6 +89,7 @@ ignore = [
     "T201", "S101", "TRY003", "D100", "B008", "PLR0904",
     "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
     "DOC402", "CPY001", "D104", "TD005", "S405", "S314",
+    "RUF067",
 ]
 pydocstyle = { convention = "numpy" }
 

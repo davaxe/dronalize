@@ -132,7 +132,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
         split = self._split
         if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
             dirs.append(self._data_root / "train")
-        if split in {DatasetSplit.ALL, DatasetSplit.VALIDATE}:
+        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
             dirs.append(self._data_root / "val")
         if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
             dirs.extend([

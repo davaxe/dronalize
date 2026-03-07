@@ -8,8 +8,9 @@ from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
+from dronalize.core.datatypes.loader_config import LoaderConfig
 from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -106,7 +107,7 @@ class Argoverse1Loader(BaseSceneLoader[int, list[Path]]):
         split = self._split
         if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
             dirs.append(self._data_root / "forecasting_train_v1.1" / "train" / "data")
-        if split in {DatasetSplit.ALL, DatasetSplit.VALIDATE}:
+        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
             dirs.append(self._data_root / "forecasting_val_v1.1" / "val" / "data")
         if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
             dirs.append(self._data_root / "forecasting_test_v1.1" / "test_obs" / "data")
