@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 
     from dronalize.core.datatypes.loader_config import LoaderConfig
 
+# TODO: Look over docs and update if needed
+
 
 def trajectory_pipeline(
     config: LoaderConfig,

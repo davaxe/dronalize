@@ -48,25 +48,14 @@ class AD4CHELoader(XLevelDataLoader):
         self._rebalance_ratio = lane_change_ratio
 
     @override
-    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[int, Path]]:
         for i, subdir in enumerate(self._data_dir.iterdir(), start=1):
             recording_meta = subdir / f"{i:0>2}_recordingMeta.csv"
-            meta = subdir / f"{i:0>2}_tracksMeta.csv"
-            tracks = subdir / f"{i:0>2}_tracks.csv"
-
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
-            meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-                *self.meta_data_select(),
-            )
-
-            tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
-                *self.track_data_select(),
-            )
-            combined = tracks_df.join(meta_df, left_on="id", right_on="id")
             yield Source(
                 identifier=i,
-                inner=combined,
+                inner=subdir,
                 map_key=str(location_id),
             )
 
@@ -143,3 +132,16 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float32,
     "yAcceleration": pl.Float32,
 })
+
+if __name__ == "__main__":
+    import time
+    from pathlib import Path
+
+    loader = AD4CHELoader(Path("data/ad4che"))
+    cout = 0
+    start = time.perf_counter()
+    for scene in loader.scenes():
+        cout += 1
+
+    end = time.perf_counter()
+    print(f"Processed {cout} scenes in {end - start:.2f} seconds")

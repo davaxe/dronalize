@@ -9,6 +9,7 @@ from dronalize.core.datatypes.map_context import (
     keyed_map,
     no_map,
     preloaded_map,
+    resolved_map,
 )
 from dronalize.core.datatypes.map_graph import MapGraph
 from dronalize.core.datatypes.scene import Scene
@@ -27,4 +28,5 @@ __all__ = [
     "keyed_map",
     "no_map",
     "preloaded_map",
+    "resolved_map",
 ]

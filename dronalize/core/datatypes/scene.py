@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Hashable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 import polars as pl
 
+from dronalize.core.datatypes.map_context import MapResolver  # noqa: TC001
+
 if TYPE_CHECKING:
-    from dronalize.core.datatypes.map_context import MapKey
+    from dronalize.core.datatypes.map_context import MapGraph, MapKey
 
 
 IdT = TypeVar("IdT", bound=(Hashable))
@@ -33,14 +35,31 @@ class Scene(Generic[IdT]):
     output_len: int
     """Number of predicted frames."""
     map_key: MapKey = None
-    """Lightweight map identifier for the scene.
+    """Lightweight map identifier for the scene."""
+    map_resolver: MapResolver | None = field(default=None, compare=False, repr=False)
+    """Resolver attached by the loader that produced this scene."""
 
-    A `None` value means "no map" or "use the default/only map".  A
-    non-`None` string is resolved by a
-    `~dronalize.core.datatypes.map_context.MapResolver` (typically
-    obtained from the loader that produced this scene) to produce a
-    `~dronalize.core.datatypes.map_graph.MapGraph`.
-    """
+    def resolve_map(self) -> MapGraph | None:
+        """Resolve this scene's :attr:`map_key` into a :class:`MapGraph`.
+
+        Delegates to the :attr:`map_resolver` attached by the loader.
+        Returns ``None`` when no resolver is present or when the
+        resolver has no map for this key (e.g. ``include_map=False``
+        on Waymo).
+
+        Returns
+        -------
+        MapGraph or None
+            The map graph for this scene, or ``None`` if unavailable.
+
+        """
+        if self.map_resolver is None:
+            return None
+        return self.map_resolver(self.map_key)
+
+    def has_map(self) -> bool:
+        """Check if this scene has an attached map resolver and key."""
+        return self.map_resolver is not None and self.map_key is not None
 
     def enforce_schema(self, schema: pl.Schema | None = None) -> Self:
         """Enforce the scene dataframe to follow a specified schema.

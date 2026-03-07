@@ -3,8 +3,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Hashable, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Concatenate, Generic, ParamSpec, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Concatenate, Generic, ParamSpec, Protocol, TypeAlias, TypeVar
 
+import polars as pl
 from typing_extensions import override
 
 from dronalize.core.datatypes.map_context import MapKey, MapResolver, no_map
@@ -12,10 +13,11 @@ from dronalize.core.datatypes.scene import Scene
 from dronalize.core.pipeline import Pipeline
 
 if TYPE_CHECKING:
-    import polars as pl
-
     from dronalize.core.datatypes import LoaderConfig
 
+
+MapContext: TypeAlias = MapResolver | MapKey | None
+IngestOutput: TypeAlias = tuple[pl.LazyFrame, MapContext]
 
 SourceT = TypeVar("SourceT")
 SourceT_co = TypeVar("SourceT_co", covariant=True)
@@ -72,13 +74,55 @@ class SceneLoader(Protocol, Generic[IdT]):
         ...
 
 
+# TODO:
+# - Remove `load_raw`, `normalize` and related legacy code after all loaders
+# have been migrated to the new `ingest` + `pipeline` path.
+# - Eventually update all docs to be better.
+
+
 class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     """ABC interface for processing raw data sources into a standardized format.
 
-    Generic over the data scene source type and identifier type. Source type can
-    be anything (e.g., file path, URL, database connection, raw data).
-    Identifier type is used to uniquely identify each scene source (e.g., str,
-    int).
+    This class contains logic for orchestrating the loading and processing of
+    raw data sources into scenes, while allowing subclasses to implement the
+    specific details of how raw data is read and processed. The main processing
+    flow is as follows:
+
+    1. `sources()` discovers and yields raw data sources to process. Usually
+    sources are paths to files to be read.
+
+    2. `ingest()` for each source this function reads the raw data into one or
+    more `LazyFrame`s, along with optional map context. The map context can be
+    used to attach map information to the scene without including it in the raw
+    data frame.
+
+    3. `pipeline()` returns a composable processing pipeline that is applied to
+    each `LazyFrame` produced by `ingest()`. The pipeline consists of a chain of
+    transformations that convert process the raw data frame into the common
+    schema.
+
+    Cosiderations
+    -------------
+    - The map context can be: 1) a string (map key) that is later on passed to
+    the map resolver (if it exists), 2) an explicit resolver function that is
+    attached to the scene, or 3) None which means no information or at this
+    stage.
+
+    - When no map resolver is attached in the processing steps, the
+    `map_resolver()` function is used to provide a default resolver for the
+    scene. This allows for flexibility in how map information is associated with
+    scenes, and can accommodate datasets where map information is stored in
+    different ways (e.g., separate files, embedded in the raw data, or not
+    available at all). The default implementation is `no_map()`, which indicates
+    that no map is available for the scenes produced by this loader.
+
+    - There are some priorties when int comes to the map key (if used). If it is
+    directly attached to the source in the `sources()` step, that takes highest
+    priority since it is the most explicit. If not, then if the map context
+    returned by `ingest()` is a string, it is used as the map key. Finally, if
+    neither of those are available, the map key will be None and the resolver
+    (if any) will need to handle that case.
+
     """
 
     def __init__(
@@ -139,17 +183,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     # New path — ingest + pipeline  (override these for new loaders)
     # ===================================================================
 
-    def ingest(self, source: Source[IdT, SourceT]) -> Iterable[pl.LazyFrame]:
-        """Read a raw data source into one or more `LazyFrame` (s).
-
-        This is the **new-path** equivalent of `load_raw`.  It is
-        responsible *only* for reading / parsing the data — all
-        filtering, resampling, windowing, etc. belong in `pipeline`.
-
-        The default implementation delegates to `load_raw` (stripping
-        the legacy `MapKey` second element) so that existing loaders
-        continue to work without changes when they have not yet been
-        migrated.
+    def ingest(self, source: Source[IdT, SourceT]) -> Iterable[IngestOutput]:
+        """Read a raw data source into one or more ``(LazyFrame, MapResolver)`` pairs.
 
         Parameters
         ----------
@@ -158,12 +193,14 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
         Yields
         ------
-        pl.LazyFrame
-            One or more raw data frames.
+        tuple[pl.LazyFrame, MapResolver]
+            A raw data frame paired with the resolver that should be
+            attached to every scene derived from that frame.
 
         """
-        for lf, _map_ctx in self.load_raw(source):
-            yield lf
+        resolver = self.map_resolver()
+        for lf, _map_key in self.load_raw(source):
+            yield lf, resolver
 
     def pipeline(self) -> Pipeline:
         """Return the composable processing pipeline for this loader.
@@ -259,7 +296,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     def process_next(
         self,
         source: Source[IdT, SourceT],
-    ) -> Iterable[pl.DataFrame]:
+    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process a single data source through the appropriate path.
 
         * **New path:** `ingest` → `pipeline`  (when `pipeline`
@@ -274,8 +311,9 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
         Yields
         ------
-        pl.DataFrame
-            Processed data frames, one per resulting scene.
+        tuple[pl.DataFrame, MapResolver]
+            Processed data frames, each paired with the resolver that
+            should be used to look up the map for that scene.
 
         """
         pipe = self.pipeline()
@@ -290,7 +328,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         self,
         source: Source[IdT, SourceT],
         pipe: Pipeline,
-    ) -> Iterable[pl.DataFrame]:
+    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process next (new path).
 
         Parameters
@@ -302,17 +340,18 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
         Yields
         ------
-        pl.DataFrame
-            Processed data frames.
+        tuple[pl.DataFrame, MapResolver]
+            Processed data frames, each paired with its resolver.
 
         """
-        for raw_lf in self.ingest(source):
-            yield from pipe.execute(raw_lf, collect=True, filter_empty=True)
+        for raw_lf, resolver in self.ingest(source):
+            for df in pipe.execute(raw_lf, collect=True, filter_empty=True):
+                yield df, resolver
 
     def _process_legacy_path(
         self,
         source: Source[IdT, SourceT],
-    ) -> Iterable[pl.DataFrame]:
+    ) -> Iterable[tuple[pl.DataFrame, MapResolver]]:
         """Legacy path: load_raw → normalize.
 
         Parameters
@@ -322,14 +361,15 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
         Yields
         ------
-        pl.DataFrame
-            Processed data frames.
+        tuple[pl.DataFrame, MapResolver]
+            Processed data frames, each paired with the loader-level resolver.
 
         """
+        resolver = self.map_resolver()
         for raw_lf, _map_key in self.load_raw(source):
             df = self._try_collect(self.normalize(raw_lf))
             if df is not None:
-                yield df
+                yield df, resolver
 
     @staticmethod
     def _try_collect(lf: pl.LazyFrame) -> pl.DataFrame | None:
@@ -367,13 +407,14 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         self._source_counter = 0
         for source in self.sources():
             self._source_counter += 1
-            for scene_df in self.process_next(source):
-                yield self.create_scene(scene_df, source)
+            for scene_df, resolver in self.process_next(source):
+                yield self.create_scene(scene_df, source, resolver)
 
     def create_scene(
         self,
         df: pl.DataFrame,
         source: Source[IdT, SourceT],
+        resolver: MapContext | None = None,
     ) -> Scene[IdT]:
         """Create a Scene object from the processed DataFrame and its source.
 
@@ -390,6 +431,9 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         source : Source[IdT, SourceT]
             The originating source.  The scene inherits
             `source.identifier` and `source.map_key`.
+        resolver : MapResolver, optional
+            The resolver to attach to the scene.  When ``None``, falls
+            back to ``self.map_resolver()``.
 
         Returns
         -------
@@ -397,13 +441,16 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
             The created scene object.
 
         """
+        map_key = source.map_key or (resolver if isinstance(resolver, str) else None)
+        resolver = resolver if not isinstance(resolver, str) else self.map_resolver()
         scene = Scene(
             inner=df,
             identifier=source.identifier,
             scene_number=self._count,
             input_len=self.input_len,
             output_len=self.output_len,
-            map_key=source.map_key,
+            map_key=map_key,
+            map_resolver=resolver,
         )
         self._count += 1
         return scene if not self._enforce_schema else scene.enforce_schema()

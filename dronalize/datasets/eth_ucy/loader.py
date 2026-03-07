@@ -7,12 +7,11 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.core.transforms as tr
-from dronalize.common.plotting import plot_trajectories
 from dronalize.core import BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.pipeline import Pipeline
 from dronalize.core.pipelines import trajectory_pipeline
-from dronalize.core.protocols.loader import Source
+from dronalize.core.protocols.loader import IngestOutput, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -56,8 +55,25 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
                 yield Source(identifier=data_file.name, inner=data_file)
 
     @override
-    def ingest(self, source: Source[str, Path]) -> Iterable[pl.LazyFrame]:
-        yield EthUcyLoader._read_data_file(source.inner)
+    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+        yield (
+            pl.scan_csv(
+                path,
+                has_header=False,
+                separator="\t",
+                new_columns=["frame", "id", "x", "y"],
+                schema={
+                    "frame": pl.Int32,
+                    "id": pl.Int32,
+                    "x": pl.Float64,
+                    "y": pl.Float64,
+                },
+            ).with_columns(
+                ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
+                pl.col("id").cast(pl.Int32),
+            ),
+            None,
+        )
 
     @override
     def pipeline(self) -> Pipeline:
@@ -90,24 +106,6 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
             .with_window(step_size=1)
             .with_filtering(require_all_valid=True)
             .with_resampling(4, 1, method="fast")
-        )
-
-    @staticmethod
-    def _read_data_file(path: Path) -> pl.LazyFrame:
-        return pl.scan_csv(
-            path,
-            has_header=False,
-            separator="\t",
-            new_columns=["frame", "id", "x", "y"],
-            schema={
-                "frame": pl.Int32,
-                "id": pl.Int32,
-                "x": pl.Float64,
-                "y": pl.Float64,
-            },
-        ).with_columns(
-            ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
-            pl.col("id").cast(pl.Int32),
         )
 
 

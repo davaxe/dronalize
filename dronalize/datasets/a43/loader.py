@@ -5,18 +5,18 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.process import prepare_agent_trajectories
+import dronalize.core.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.protocols.loader import Source
+from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.protocols.loader import IngestOutput, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
 
-class A43Loader(BaseSceneLoader[int, pl.LazyFrame]):
+class A43Loader(BaseSceneLoader[int, Path]):
     """Scene loader for the A43 dataset."""
 
     def __init__(
@@ -38,59 +38,45 @@ class A43Loader(BaseSceneLoader[int, pl.LazyFrame]):
         self._data_dir = data_dir
 
     @override
-    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[int, Path]]:
         for i, csv_file in enumerate(self._data_dir.glob("*.csv")):
-            yield Source(
-                identifier=i,
-                inner=pl.scan_csv(csv_file).select(
-                    pl.col("ID").alias("id"),
-                    pl.col("tseconds").round(1).rank("dense").sub(1).alias("frame").cast(pl.Int64),
-                    *("x", "y", "vy", "vx", "ax", "ay"),
-                    pl
-                    .col("VehicleCategory")
-                    .replace_strict({
-                        "Motorcycle": AgentCategory.MOTORCYCLE,
-                        "Passenger Car": AgentCategory.CAR,
-                        "Semi-trailer truck": AgentCategory.TRUCK,
-                        "Truck": AgentCategory.TRUCK,
-                        "Van": AgentCategory.VAN,
-                        "Bus": AgentCategory.BUS,
-                    })
-                    .alias("agent_category"),
-                ),
-            )
+            yield Source(identifier=i, inner=csv_file)
 
     @override
-    def ingest(self, source: Source[int, pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
-        # This should eventually do what `sources` do now, e.g. scan_csv (change
-        # source to contain Path)
-        yield source.inner
-
-    @override
-    def pipeline(self) -> Pipeline: ...
+    def ingest(self, source: Source[int, Path]) -> Iterable[IngestOutput]:
+        yield (
+            pl.scan_csv(source.inner).select(
+                pl.col("ID").alias("id"),
+                pl.col("tseconds").round(1).rank("dense").sub(1).alias("frame").cast(pl.Int64),
+                *("x", "y", "vy", "vx", "ax", "ay"),
+                pl
+                .col("VehicleCategory")
+                .replace_strict({
+                    "Motorcycle": AgentCategory.MOTORCYCLE,
+                    "Passenger Car": AgentCategory.CAR,
+                    "Semi-trailer truck": AgentCategory.TRUCK,
+                    "Truck": AgentCategory.TRUCK,
+                    "Van": AgentCategory.VAN,
+                    "Bus": AgentCategory.BUS,
+                })
+                .alias("agent_category"),
+            ),
+            None,
+        )
 
     @override
     def num_sources(self) -> int | None:
         return sum(1 for _ in self._data_dir.rglob("trajectories*.csv"))
 
     @override
-    def load_raw(
-        self,
-        source: Source[int, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, None]]:
-        for df in prepare_agent_trajectories(
-            source.inner,
-            self.loader_config,
-            add_derivative=True,
-            add_second_derivative=True,
-            derivative_rename=self.derivative_names(),
-            stream_windows=False,
-        ):
-            yield df, None
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df)
+    def pipeline(self) -> Pipeline:
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(self.loader_config, derivative_rename=self.derivative_names())
+            )
+            .then(tr.yaw_from_vel())
+        )
 
     @classmethod
     @override

@@ -12,7 +12,7 @@ from dronalize.common.trajectory.derivative import derivative
 from dronalize.common.trajectory.filter import filter_scene_expr
 from dronalize.common.trajectory.resample import Resampling, resample
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes.map_context import MapResolver, no_map, preloaded_map
+from dronalize.core.datatypes.map_context import MapKey, MapResolver, no_map
 from dronalize.core.protocols.loader import Source
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
@@ -20,8 +20,8 @@ from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, sce
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.datatypes.map_context import MapKey
     from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.datasets.waymo.protos.lean_map_pb2 import LeanMapContainer
 
 FilterStr = Literal[
     "*training.tfrecord*",
@@ -84,7 +84,6 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         self._include_map: bool = include_map
         self._interp_distance: float | None = interp_distance
         self._min_distance: float | None = min_distance
-        self._maps: dict[str, MapGraph] = {}
 
     @override
     def sources(self) -> Iterable[Source[str, Path]]:
@@ -97,26 +96,24 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         return sum(1 for _ in self._data_dir.glob(self._filter_str))
 
     @override
-    def map_resolver(self) -> MapResolver:
-        if not self._include_map:
-            return no_map()
-        return preloaded_map(self._maps)
-
-    @override
-    def load_raw(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, MapKey]]:
-        for i, raw_data in enumerate(_read_tfrecord(source.inner)):
+    def ingest(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, MapResolver]]:
+        for raw_data in _read_tfrecord(source.inner):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
-            key = f"{source.inner}_index={i}"
             if self._include_map:
                 map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
-                current_map = WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
-                    min_distance=self._min_distance,
-                    interp_distance=self._interp_distance,
-                )
-                self._maps[key] = current_map
 
-            yield _scenario_to_polars(scenario).lazy(), key
+                def _resolver(
+                    key: MapKey | None = None,  # noqa: ARG001
+                    _map_data: LeanMapContainer = map_data,
+                ) -> MapGraph:
+                    return WaymoMapGraphBuilder.from_proto(_map_data.map_features).build()
+
+                resolver: MapResolver = _resolver
+            else:
+                resolver = no_map()
+
+            yield _scenario_to_polars(scenario).lazy(), resolver
 
     @override
     def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:

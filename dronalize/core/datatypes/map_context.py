@@ -10,7 +10,8 @@ Built-in resolver factories
 * `no_map` — dataset has no map data at all.
 * `fixed_map` — one shared map for the entire dataset, loaded lazily.
 * `keyed_map` — maps looked up by string key, with LRU caching.
-* `preloaded_map` — maps already built and stored in a dict.
+* `preloaded_map` — maps already built and stored in a dict, looked up by key.
+* `resolved_map` — a single already-built graph, no key lookup needed.
 """
 
 from __future__ import annotations
@@ -75,20 +76,12 @@ def no_map() -> MapResolver:
     MapResolver
         A resolver that always returns `None`.
 
-    Example
-    -------
-    ::
-
-        def map_resolver(self) -> MapResolver:
-            return no_map()
-
     """
 
     def _resolve(key: MapKey = None) -> None:  # noqa: ARG001
         return None
 
     _resolve.__name__ = "no_map"
-    _resolve.__qualname__ = "no_map._resolve"
     return _resolve
 
 
@@ -107,13 +100,6 @@ def fixed_map(loader: Callable[[], MapGraph]) -> MapResolver:
     -------
     MapResolver
 
-    Example
-    -------
-    ::
-
-        def map_resolver(self) -> MapResolver:
-            return fixed_map(lambda: load_osm(self._map_path))
-
     """
     cached: list[MapGraph] = []  # mutable container for closure-based cache
 
@@ -123,7 +109,6 @@ def fixed_map(loader: Callable[[], MapGraph]) -> MapResolver:
         return cached[0]
 
     _resolve.__name__ = "fixed_map"
-    _resolve.__qualname__ = "fixed_map._resolve"
     return _resolve
 
 
@@ -146,16 +131,6 @@ def keyed_map(
     -------
     MapResolver
 
-    Example
-    -------
-    ::
-
-        def map_resolver(self) -> MapResolver:
-            return keyed_map(
-                lambda key: load_osm(self._map_dir / key),
-                maxsize=4,
-            )
-
     """
 
     @lru_cache(maxsize=maxsize)
@@ -168,35 +143,26 @@ def keyed_map(
         return _cached_load(key)
 
     _resolve.__name__ = "keyed_map"
-    _resolve.__qualname__ = "keyed_map._resolve"
     return _resolve
 
 
 def preloaded_map(maps: dict[str, MapGraph]) -> MapResolver:
     """Create a resolver backed by a pre-populated dictionary.
 
-    This is useful when maps are built during ingestion (e.g. Waymo,
-    where the map is embedded in the same proto as the trajectories).
+    This is useful when maps have been built ahead of time and need to
+    be looked up by a string key (e.g. a batch of Argoverse2 scenarios
+    keyed by their map-JSON path).
 
     Parameters
     ----------
     maps : dict[str, MapGraph]
-        A dictionary mapping keys to already-built map graphs.  The dict
-        may be mutated externally (e.g. populated during ingestion) and
-        the resolver will see the updates.
+        A dictionary mapping string keys to already-built map graphs.
+        The dict may be mutated externally after the resolver is created
+        and the resolver will see the updates.
 
     Returns
     -------
     MapResolver
-
-    Example
-    -------
-    ::
-
-        self._maps: dict[str, MapGraph] = {}
-
-        def map_resolver(self) -> MapResolver:
-            return preloaded_map(self._maps)
 
     """
 
@@ -206,5 +172,40 @@ def preloaded_map(maps: dict[str, MapGraph]) -> MapResolver:
         return maps.get(key)
 
     _resolve.__name__ = "preloaded_map"
-    _resolve.__qualname__ = "preloaded_map._resolve"
+    return _resolve
+
+
+def resolved_map(graph: MapGraph) -> MapResolver:
+    """Create a resolver for a single already-built :class:`MapGraph`.
+
+    This is the correct factory for datasets where the map is embedded
+    alongside each individual trajectory record (e.g. Waymo), and is
+    therefore built during :meth:`~dronalize.core.protocols.loader.BaseSceneLoader.ingest`
+    rather than loaded on demand.
+
+    Unlike :func:`fixed_map`, no callable indirection is needed — the
+    graph is passed directly.  The resolver ignores the key entirely and
+    always returns the same graph, so :attr:`~dronalize.core.datatypes.scene.Scene.map_key`
+    should be left as ``None`` for scenes that use this resolver.
+
+    The graph lives only as long as the resolver closure that wraps it.
+    When the scenes produced from a single record are released, the
+    resolver (and the :class:`MapGraph` it holds) becomes eligible for
+    garbage collection.
+
+    Parameters
+    ----------
+    graph : MapGraph
+        The already-built map graph to return on every call.
+
+    Returns
+    -------
+    MapResolver
+
+    """
+
+    def _resolve(key: MapKey = None) -> MapGraph:  # noqa: ARG001
+        return graph
+
+    _resolve.__name__ = "resolved_map"
     return _resolve

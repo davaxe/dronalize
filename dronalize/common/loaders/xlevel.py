@@ -1,23 +1,23 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.process import prepare_agent_trajectories
-from dronalize.common.trajectory.rebalance import rebalance_highway_agents
+import dronalize.core.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.protocols.loader import BaseSceneLoader, Source
+from dronalize.core.pipeline import Pipeline
+from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from pathlib import Path
 
 
-class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
+class XLevelDataLoader(BaseSceneLoader[int, Path]):
     """Common trajectory data loader for X-level datasets.
 
     This class is meant as a base class for the datasets, since some of the processing is slightly
@@ -91,18 +91,13 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
         return _TRACK_SCHEMA
 
     @override
-    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[int, Path]]:
         num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
         for i in range(1, num_files // 4):
             recording_meta = self._data_dir / f"{i:0>2}_recordingMeta.csv"
-            meta = self._data_dir / f"{i:0>2}_tracksMeta.csv"
-            tracks = self._data_dir / f"{i:0>2}_tracks.csv"
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             columns = recording_meta_data.columns
-            meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-                *self.meta_data_select(),
-            )
 
             utm_x0: float | None = None
             utm_y0: float | None = None
@@ -110,20 +105,30 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
                 utm_x0 = recording_meta_data.select(pl.col("xUtmOrigin")).item()
                 utm_y0 = recording_meta_data.select(pl.col("yUtmOrigin")).item()
 
-            tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
-                *self.track_data_select(),
-            )
-            combined = tracks_df.join(meta_df, left_on="id", right_on="id")
             metadata: dict[str, float] = {}
             if utm_x0 is not None and utm_y0 is not None:
                 metadata["utm_x0"] = utm_x0
                 metadata["utm_y0"] = utm_y0
+
             yield Source(
                 identifier=i,
-                inner=combined,
+                inner=self._data_dir,
                 map_key=str(location_id),
                 metadata=metadata,
             )
+
+    @override
+    def ingest(self, source: Source[int, Path]) -> Iterable[IngestOutput]:
+        tracks = source.inner / f"{source.identifier:0>2}_tracks.csv"
+        meta = source.inner / f"{source.identifier:0>2}_tracksMeta.csv"
+        meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
+            *self.meta_data_select(),
+        )
+        tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
+            *self.track_data_select(),
+        )
+        combined = tracks_df.join(meta_df, left_on="id", right_on="id")
+        yield combined, None
 
     @override
     def num_sources(self) -> int | None:
@@ -131,20 +136,18 @@ class XLevelDataLoader(BaseSceneLoader[int, pl.LazyFrame]):
         return num_files // 4 - 1
 
     @override
-    def load_raw(
-        self,
-        source: Source[int, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, str | None]]:
-        data = source.inner
-        if self._rebalance_ratio is not None:
-            data = rebalance_highway_agents(data, ratio=self._rebalance_ratio).drop("lane_changes")
-
-        for df in prepare_agent_trajectories(data, self.loader_config):
-            yield df, source.map_key
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df)
+    def pipeline(self) -> Pipeline:
+        return (
+            Pipeline()
+            .then_if_present(
+                tr.rebalance,
+                arg=self._rebalance_ratio,
+            )
+            .compose(
+                trajectory_pipeline(self.loader_config, derivative_rename=self.derivative_names())
+            )
+            .then(tr.yaw_from_vel())
+        )
 
     @classmethod
     @override
