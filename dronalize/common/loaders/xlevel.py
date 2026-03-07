@@ -10,7 +10,7 @@ import dronalize.core.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.datatypes.loader_config import LoaderConfig
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
 
 if TYPE_CHECKING:
@@ -20,8 +20,9 @@ if TYPE_CHECKING:
 class XLevelDataLoader(BaseSceneLoader[int, Path]):
     """Common trajectory data loader for X-level datasets.
 
-    This class is meant as a base class for the datasets, since some of the processing is slightly
-    different for highway datasets (e.g., highD) compared to urban datasets (e.g., rounD, inD).
+    This class is meant as a base class for the datasets, since some of the
+    processing is slightly different for highway datasets (e.g., highD) compared
+    to urban datasets (e.g., rounD, inD).
 
     With no changes this supports: rounD, inD, exiD, uniD, and sinD.
     """
@@ -91,7 +92,7 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
         return _TRACK_SCHEMA
 
     @override
-    def sources(self) -> Iterable[Source[int, Path]]:
+    def all_sources(self) -> Iterable[Source[int, Path]]:
         num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
         for i in range(1, num_files // 4):
             recording_meta = self._data_dir / f"{i:0>2}_recordingMeta.csv"

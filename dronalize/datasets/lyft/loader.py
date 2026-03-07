@@ -13,7 +13,7 @@ from zarr.creation import open_array
 import dronalize.core.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
 
 if TYPE_CHECKING:
@@ -35,8 +35,9 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
     def __init__(
         self,
         data_dir: Path | str,
-        scene_batch_size: int | None = 1000,
         loader_config: LoaderConfig | None = None,
+        *,
+        scene_batch_size: int | None = 1000,
     ) -> None:
         """Initialize the processor.
 
@@ -65,7 +66,7 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
         )
 
     @override
-    def sources(self) -> Iterable[Source[int, _Source]]:
+    def all_sources(self) -> Iterable[Source[int, _Source]]:
         current: int = 0
         while current < self._total_scenes:
             end = min(current + self._batch_size, self._total_scenes)

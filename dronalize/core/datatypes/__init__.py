@@ -13,9 +13,11 @@ from dronalize.core.datatypes.map_context import (
 )
 from dronalize.core.datatypes.map_graph import MapGraph
 from dronalize.core.datatypes.scene import Scene
+from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
 
 __all__ = [
     "AgentCategory",
+    "DatasetSplit",
     "EdgeType",
     "FilteringConfig",
     "LoaderConfig",
@@ -23,6 +25,7 @@ __all__ = [
     "MapKey",
     "MapResolver",
     "Scene",
+    "SplitNotSupportedError",
     "WindowParams",
     "fixed_map",
     "keyed_map",

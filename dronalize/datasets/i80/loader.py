@@ -9,7 +9,7 @@ from typing_extensions import override
 import dronalize.core.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import IngestOutput, Source
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ class I80Loader(BaseSceneLoader[int, Path]):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
         loader_config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
@@ -37,7 +37,7 @@ class I80Loader(BaseSceneLoader[int, Path]):
 
         Parameters
         ----------
-        data_dir : Path
+        data_root : Path
             Path to root of the I80 dataset, containing subdirectories of data files.
         loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
@@ -48,11 +48,11 @@ class I80Loader(BaseSceneLoader[int, Path]):
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=False)
-        self._data_dir = data_dir
+        self._data_dir = data_root
         self._rebalance_ratio = lane_change_ratio
 
     @override
-    def sources(self) -> Iterable[Source[int, Path]]:
+    def all_sources(self) -> Iterable[Source[int, Path]]:
         for i, csv_file in enumerate(self._data_dir.rglob("trajectories*.csv")):
             yield Source(identifier=i, inner=csv_file)
 

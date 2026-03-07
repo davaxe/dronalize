@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -10,8 +10,9 @@ from typing_extensions import override
 import dronalize.core.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes.map_context import MapKey, MapResolver, no_map
+from dronalize.core.datatypes.split import DatasetSplit
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factory import trajectory_pipeline
 from dronalize.core.protocols.loader import IngestOutput, Source
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
@@ -22,26 +23,16 @@ if TYPE_CHECKING:
     from dronalize.core.datatypes.map_graph import MapGraph
     from dronalize.datasets.waymo.protos.lean_map_pb2 import LeanMapContainer
 
-FilterStr = Literal[
-    "*training.tfrecord*",
-    "*training_20s.tfrecord*",
-    "*validation.tfrecord*",
-    "validation_interactive.tfrecord*",
-    "*testing.tfrecord*",
-    "*testing_interactive.tfrecord*",
-    "*.tfrecord*",
-]
-
 
 class WaymoLoader(BaseSceneLoader[str, Path]):
     """Processor for Waymo Open Dataset scenarios stored in TFRecord format."""
 
     def __init__(
         self,
-        data_dir: Path | str,
-        filter_str: FilterStr,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
+        split: DatasetSplit = DatasetSplit.ALL,
         include_map: bool = True,
         interp_distance: float | None = None,
         min_distance: float | None = 1.5,
@@ -60,13 +51,14 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
 
         Parameters
         ----------
-        data_dir : Path or str
-            Directory containing the TFRecord files.
-        filter_str : str
-            String pattern to filter TFRecord files
-            (e.g., "*validation.tfrecord*").
+        data_root : Path or str
+            Root directory of the Waymo dataset.  This directory should
+            contain `training/`, `validation/`, and `testing/`
+            subdirectories with TFRecord files.
         loader_config : LoaderConfig, optional
             Configuration override. If None, the default configuration will be used.
+        split : DatasetSplit, optional
+            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
         include_map : bool, optional
             Whether to include map data in the scene. Defaults to True.
         interp_distance : float, optional
@@ -77,22 +69,57 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             Defaults to 1.5 meters.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._data_dir: Path = Path(data_dir) if isinstance(data_dir, str) else data_dir
-        self._filter_str: FilterStr = filter_str
+        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        self._data_root: Path = Path(data_root) if isinstance(data_root, str) else data_root
         self._include_map: bool = include_map
         self._interp_distance: float | None = interp_distance
         self._min_distance: float | None = min_distance
 
-    @override
-    def sources(self) -> Iterable[Source[str, Path]]:
-        # Sorting ensures deterministic processing order
-        for tfrecord_path in sorted(self._data_dir.glob(self._filter_str)):
+    # ------------------------------------------------------------------
+    # Split-aware source discovery
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _sources_from_dir(data_dir: Path) -> Iterable[Source[str, Path]]:
+        if not data_dir.is_dir():
+            return
+        for tfrecord_path in sorted(data_dir.glob("*.tfrecord*")):
             yield Source(identifier=tfrecord_path.stem, inner=tfrecord_path)
 
     @override
+    def all_sources(self) -> Iterable[Source[str, Path]]:
+        yield from self.train_sources()
+        yield from self.validate_sources()
+        yield from self.test_sources()
+
+    @override
+    def train_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_dir(self._data_root / "training")
+
+    @override
+    def validate_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_dir(self._data_root / "validation")
+
+    @override
+    def test_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_dir(self._data_root / "testing")
+
+    # ------------------------------------------------------------------
+    # Ingestion / pipeline
+    # ------------------------------------------------------------------
+
+    @override
     def num_sources(self) -> int | None:
-        return sum(1 for _ in self._data_dir.glob(self._filter_str))
+        dirs: list[Path] = []
+        split = self._split
+        if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
+            dirs.append(self._data_root / "training")
+        if split in {DatasetSplit.ALL, DatasetSplit.VALIDATE}:
+            dirs.append(self._data_root / "validation")
+        if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
+            dirs.append(self._data_root / "testing")
+
+        return sum(sum(1 for _ in d.glob("*.tfrecord*")) for d in dirs if d.is_dir())
 
     @override
     def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:

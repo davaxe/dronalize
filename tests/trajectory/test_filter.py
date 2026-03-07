@@ -225,3 +225,123 @@ def test_filter_slow_agents() -> None:
     # Only Agent 1 meets the speed requirement
     assert len(result) == 3
     assert result["id"].unique().to_list() == [1]
+
+
+def test_min_samples_per_agent_basic() -> None:
+    """Test that agents with fewer samples than the threshold are removed."""
+    # Agent 1: 5 samples, Agent 2: 2 samples, Agent 3: 1 sample
+    df = pl.DataFrame({
+        "scene": [1, 1, 1, 1, 1, 1, 1, 1],
+        "id": [1, 1, 1, 1, 1, 2, 2, 3],
+        "frame": [0, 1, 2, 3, 4, 0, 1, 0],
+    })
+
+    config = FilteringConfig(min_agents=0, min_samples_per_agent=3)
+    result = filter_scene(df, config, group_by="scene")
+
+    # Only Agent 1 has >= 3 samples
+    assert len(result) == 5
+    assert result["id"].unique().to_list() == [1]
+
+
+def test_min_samples_per_agent_all_pass() -> None:
+    """Test that no agents are removed when all meet the threshold."""
+    df = pl.DataFrame({
+        "scene": [1, 1, 1, 1, 1, 1],
+        "id": [1, 1, 1, 2, 2, 2],
+        "frame": [0, 1, 2, 0, 1, 2],
+    })
+
+    config = FilteringConfig(min_agents=0, min_samples_per_agent=3)
+    result = filter_scene(df, config, group_by="scene")
+
+    assert_frame_equal(result, df)
+
+
+def test_min_samples_per_agent_interacts_with_min_agents() -> None:
+    """Test that agents dropped by min_samples don't count toward min_agents."""
+    # Scene 1: Agent 1 has 5 samples, Agent 2 has 1 sample
+    # After min_samples_per_agent=3, only Agent 1 survives → 1 valid agent.
+    # With min_agents=2 the entire scene should be dropped.
+    df = pl.DataFrame({
+        "scene": [1, 1, 1, 1, 1, 1],
+        "id": [1, 1, 1, 1, 1, 2],
+        "frame": [0, 1, 2, 3, 4, 0],
+    })
+
+    config = FilteringConfig(min_agents=2, min_samples_per_agent=3)
+    result = filter_scene(df, config, group_by="scene")
+
+    assert len(result) == 0
+
+
+def test_min_samples_per_agent_no_groupby() -> None:
+    """Test min_samples_per_agent without a group_by column."""
+    df = pl.DataFrame({
+        "id": [1, 1, 1, 2],
+        "frame": [0, 1, 2, 0],
+    })
+
+    config = FilteringConfig(min_agents=0, min_samples_per_agent=2)
+    result = filter_scene(df, config, group_by=None)
+
+    assert len(result) == 3
+    assert result["id"].unique().to_list() == [1]
+
+
+def test_min_samples_per_agent_via_loader_config() -> None:
+    """Test that min_samples_per_agent is correctly threaded through LoaderConfig."""
+    df = pl.DataFrame({
+        "scene": [1, 1, 1, 1, 1],
+        "id": [1, 1, 1, 2, 2],
+        "frame": [0, 1, 2, 0, 1],
+    })
+
+    config = LoaderConfig(
+        input_len=1,
+        output_len=1,
+        sample_time=0.1,
+    ).with_filtering(min_agents=0, min_samples_per_agent=3)
+
+    assert config.scene_filtering is not None
+    assert config.scene_filtering.min_samples_per_agent == 3
+
+    result = filter_scene(df, config.scene_filtering, group_by="scene")
+
+    # Only Agent 1 has >= 3 samples
+    assert len(result) == 3
+    assert result["id"].unique().to_list() == [1]
+
+
+def test_min_samples_per_agent_none_disables() -> None:
+    """Test that min_samples_per_agent=None (default) does not filter anything."""
+    df = pl.DataFrame({
+        "scene": [1, 1],
+        "id": [1, 2],
+        "frame": [0, 0],
+    })
+
+    config = FilteringConfig(min_agents=0, min_samples_per_agent=None)
+    result = filter_scene(df, config, group_by="scene")
+
+    assert_frame_equal(result, df)
+
+
+def test_min_samples_per_agent_with_multiple_scenes() -> None:
+    """Test that min_samples_per_agent is evaluated per scene independently."""
+    # Scene 1: Agent 1 has 3 samples, Agent 2 has 1 sample
+    # Scene 2: Agent 3 has 2 samples, Agent 4 has 4 samples
+    # With min_samples_per_agent=3: Agent 1 (3) and Agent 4 (4) survive.
+    # Scene 1 keeps Agent 1 (3 rows), Scene 2 keeps Agent 4 (4 rows).
+    df = pl.DataFrame({
+        "scene": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2],
+        "id": [1, 1, 1, 2, 3, 3, 4, 4, 4, 4],
+        "frame": [0, 1, 2, 0, 0, 1, 0, 1, 2, 3],
+    })
+
+    config = FilteringConfig(min_agents=1, min_samples_per_agent=3)
+    result = filter_scene(df, config, group_by="scene")
+
+    assert sorted(result["scene"].unique().to_list()) == [1, 2]
+    assert sorted(result["id"].unique().to_list()) == [1, 4]
+    assert len(result) == 7

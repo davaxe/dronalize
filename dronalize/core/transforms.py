@@ -1,4 +1,4 @@
-"""Built-in transform / fan-out factory functions for pipelines."""
+"""Built-in transform /fan-out factory functions for pipelines."""
 
 from __future__ import annotations
 
@@ -360,7 +360,7 @@ def window(
     *,
     sliding_col: str = "frame",
     offset_sliding_col: bool = True,
-    return_iterable: Literal[True] = True,
+    return_iterable: Literal[True],
 ) -> FlatMapTransform: ...
 
 
@@ -374,10 +374,8 @@ def window(
 ) -> FlatMapTransform | Transform:
     """Create a sliding-window fan-out transform.
 
-    This is a 1:N step: a single LazyFrame is split into many
-    overlapping windows, each yielded as a separate LazyFrame.
-
-    Wraps `~dronalize.common.trajectory.window.sliding_window`.
+    This is a 1:N step: a single LazyFrame is split into many overlapping
+    windows, each yielded as a separate LazyFrame.
 
     Parameters
     ----------
@@ -392,12 +390,15 @@ def window(
 
     Returns
     -------
-    FlatMapTransform pr Transform
+    FlatMapTransform or Transform
+        Depending on `return_iterable`, either a transform that returns a single
+        frame with a window index column, or a flat-map transform that yields
+        each window as a separate frame.
 
     """
     if return_iterable:
 
-        def _window(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
+        def _window_iter(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
             for window_df in sliding_window(
                 df,
                 window_size=window_size,
@@ -411,9 +412,11 @@ def window(
                     )
                 yield window_df.lazy()
 
+        func_to_return = _window_iter
+
     else:
 
-        def _window(df: pl.LazyFrame) -> pl.LazyFrame:
+        def _window_single(df: pl.LazyFrame) -> pl.LazyFrame:
             out = sliding_window(
                 df,
                 window_size=window_size,
@@ -425,9 +428,13 @@ def window(
                 out = out.with_columns(pl.col(sliding_col) - pl.col(sliding_col).min())
             return out
 
-    _window.__name__ = "window"
-    _window.__qualname__ = "transforms.window"
-    return _window
+        func_to_return = _window_single
+
+    # Reassign names dynamically to the chosen function
+    func_to_return.__name__ = "window"
+    func_to_return.__qualname__ = "transforms.window"
+
+    return func_to_return
 
 
 # -------------------------------------------------------------------

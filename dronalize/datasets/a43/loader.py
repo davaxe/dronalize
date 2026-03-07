@@ -8,7 +8,7 @@ from typing_extensions import override
 import dronalize.core.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import IngestOutput, Source
 
 if TYPE_CHECKING:
@@ -21,24 +21,24 @@ class A43Loader(BaseSceneLoader[int, Path]):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
         loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the A43 dataset loader.
 
         Parameters
         ----------
-        data_dir : Path
+        data_root : Path
             Path to root of the A43 dataset, data files.
         loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._data_dir = data_dir
+        self._data_dir = data_root
 
     @override
-    def sources(self) -> Iterable[Source[int, Path]]:
+    def all_sources(self) -> Iterable[Source[int, Path]]:
         for i, csv_file in enumerate(self._data_dir.glob("*.csv")):
             yield Source(identifier=i, inner=csv_file)
 

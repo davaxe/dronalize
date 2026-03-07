@@ -9,7 +9,7 @@ from typing_extensions import override
 import dronalize.core.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
 
 if TYPE_CHECKING:
@@ -72,7 +72,7 @@ class NuScenesLoader(BaseSceneLoader[str, str]):
         self._precompute_global_data()
 
     @override
-    def sources(self) -> Iterable[Source[str, str]]:
+    def all_sources(self) -> Iterable[Source[str, str]]:
         for token, df in self._scene_cache.items():
             scene_name = df.item(0, "scene_name")
             map_name = df.item(0, "map")

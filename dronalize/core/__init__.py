@@ -4,15 +4,17 @@
 # Graph building
 # Pipeline
 # Allow `from dronalize.core import transforms` as a module reference
-from dronalize.core import pipelines, transforms
+from dronalize.core import pipeline_factories, transforms
 from dronalize.core.datatypes import (
     AgentCategory,
+    DatasetSplit,
     EdgeType,
     LoaderConfig,
     MapGraph,
     MapKey,
     MapResolver,
     Scene,
+    SplitNotSupportedError,
     fixed_map,
     keyed_map,
     no_map,
@@ -50,6 +52,7 @@ __all__ = [
     "BaseEnum",
     "BaseMapObject",
     "BaseSceneLoader",
+    "DatasetSplit",
     "EdgeType",
     "Edges",
     "FlatMapTransform",
@@ -64,13 +67,14 @@ __all__ = [
     "Point",
     "ProgressBar",
     "Scene",
+    "SplitNotSupportedError",
     "Transform",
     "fixed_map",
     "get_edges_from_adj_list",
     "interpolate_position",
     "keyed_map",
     "no_map",
-    "pipelines",
+    "pipeline_factories",
     "preloaded_map",
     "transforms",
 ]

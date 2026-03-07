@@ -346,8 +346,8 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         loader, source = args.loader, args.source
         scenes: list[Scene[IdT]] = []
 
-        for scene_data in loader.process_next(source):
-            scene = loader.create_scene(scene_data, source)
+        for scene_data, map_resolver in loader.process_next(source):
+            scene = loader.create_scene(scene_data, source, map_resolver)
             scenes.append(scene)
 
         if num_scenes := len(scenes):
@@ -391,7 +391,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         loader, source = args.loader, args.source
         scene_number: int = -1
         cb_args, cb_kwargs = args.cb_args or (), args.cb_kwargs or {}
-        for scene_data in loader.process_next(source):
+        for scene_data, map_resolver in loader.process_next(source):
             # Should be fine to aquire lock in loop, since `process_next` is
             # expected to be relatively slow. Not as easy to move outside the
             # loop here since we want to avoid loading all scenes into memory at
@@ -400,7 +400,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
 
-            scene = loader.create_scene(scene_data, source)
+            scene = loader.create_scene(scene_data, source, map_resolver)
             scene = replace(scene, scene_number=scene_number)
             args.fn(scene, *cb_args, **cb_kwargs)
             processed_scenes += 1

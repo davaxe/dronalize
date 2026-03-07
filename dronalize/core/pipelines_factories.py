@@ -19,8 +19,6 @@ if TYPE_CHECKING:
 
     from dronalize.core.datatypes.loader_config import LoaderConfig
 
-# TODO: Look over docs and update if needed
-
 
 def trajectory_pipeline(
     config: LoaderConfig,
@@ -29,7 +27,6 @@ def trajectory_pipeline(
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
     category_column: str | None = "agent_category",
-    min_agents: int = 2,
     add_derivative: bool = True,
     add_second_derivative: bool = True,
     derivative_rename: dict[int, list[str]] | None = None,
@@ -64,8 +61,6 @@ def trajectory_pipeline(
         Position column names.  Defaults to `("x", "y")`.
     category_column : str or None, optional
         Agent-category column name.  Defaults to `"agent_category"`.
-    min_agents : int, optional
-        Minimum agents per scene/window.  Defaults to 2.
     add_derivative : bool, optional
         Compute first-order derivatives.  Defaults to `True`.
     add_second_derivative : bool, optional
@@ -80,34 +75,17 @@ def trajectory_pipeline(
     Pipeline
         A fully composed pipeline ready to be further extended or executed.
 
-    Examples
-    --------
-    Minimal usage inside a loader's `pipeline` method::
-
-        @override
-        def pipeline(self) -> Pipeline:
-            config = self.loader_config
-            return (
-                Pipeline()
-                .then(tr.require_min("id", minimum=2))
-                .compose(trajectory_pipeline(config, derivative_rename=self.derivative_names()))
-                .then(tr.yaw_from_vel())
-                .with_columns(agent_category=pl.lit(AgentCategory.PEDESTRIAN))
-            )
     """
     has_window = config.window_params is not None
     group_by_filter: str | None = "window_index" if has_window else None
-    require_cols: str | list[str] = ["window_index", agent_id] if has_window else agent_id
     group_by_resample: list[str] = ["window_index", agent_id] if has_window else [agent_id]
 
     return (
         Pipeline()
-        # 1. Windowing
         .then_if_present(
             lambda w: tr.window(w.window_size, w.step_size),
             arg=config.window_params,
         )
-        # 2. Scene filtering
         .then_if_present(
             lambda c: tr.filter_scene(
                 c,
@@ -118,12 +96,6 @@ def trajectory_pipeline(
             ),
             arg=config.scene_filtering,
         )
-        # 3. Post-filter minimum-agent validation
-        .then(
-            tr.require_min(require_cols, minimum=min_agents),
-            when=has_window,
-        )
-        # 4. Resampling (+ derivatives)
         .then(
             tr.resample(
                 config.resampling,

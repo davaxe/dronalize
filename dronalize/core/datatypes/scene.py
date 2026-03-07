@@ -42,15 +42,15 @@ class Scene(Generic[IdT]):
     def resolve_map(self) -> MapGraph | None:
         """Resolve this scene's `map_key` into a `MapGraph`.
 
-        Delegates to the `map_resolver` attached by the loader. Returns ``None``
+        Delegates to the `map_resolver` attached by the loader. Returns `None`
         when no resolver is present or when the resolver has no map for this key
-        (e.g. ``include_map=False``
+        (e.g. `include_map=False`
         on Waymo).
 
         Returns
         -------
         MapGraph or None
-            The map graph for this scene, or ``None`` if unavailable.
+            The map graph for this scene, or `None` if unavailable.
 
         """
         if self.map_resolver is None:

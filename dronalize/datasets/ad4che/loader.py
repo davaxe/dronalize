@@ -19,8 +19,9 @@ class AD4CHELoader(XLevelDataLoader):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
         loader_config: LoaderConfig | None = None,
+        *,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the trajectory data loader for the AD4CHE dataset.
@@ -35,7 +36,7 @@ class AD4CHELoader(XLevelDataLoader):
 
         Parameters
         ----------
-        data_dir : Path
+        data_root : Path
             Path to the directory containing the .csv data files.
         loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
@@ -43,13 +44,13 @@ class AD4CHELoader(XLevelDataLoader):
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
-        super().__init__(data_dir, loader_config)
+        super().__init__(data_root / "AD4CHE_Data_V1.0", loader_config)
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 
     @override
-    def sources(self) -> Iterable[Source[int, Path]]:
-        for i, subdir in enumerate(self._data_dir.iterdir(), start=1):
+    def all_sources(self) -> Iterable[Source[int, Path]]:
+        for i, subdir in enumerate(sorted(self._data_dir.iterdir()), start=1):
             recording_meta = subdir / f"{i:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()

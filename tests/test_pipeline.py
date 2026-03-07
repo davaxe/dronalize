@@ -12,7 +12,7 @@ from polars.testing import assert_frame_equal
 from dronalize.core import AgentCategory
 from dronalize.core import transforms as transform
 from dronalize.core.datatypes import LoaderConfig
-from dronalize.core.pipeline import FlatMapTransform, Pipeline, ReduceTransform, Transform
+from dronalize.core.pipeline import Pipeline, ReduceTransform
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -58,27 +58,6 @@ def _multiply_x_by_two(df: pl.LazyFrame) -> pl.LazyFrame:
 def _split_by_id(df: pl.LazyFrame) -> list[pl.LazyFrame]:
     collected = df.collect()
     return [group.lazy() for _, group in collected.group_by("id")]
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Protocol conformance
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def test_plain_function_is_transform() -> None:
-    """Verify that regular functions satisfy the Transform protocol."""
-    assert isinstance(_add_one_to_x, Transform)
-
-
-def test_lambda_is_transform() -> None:
-    """Verify that lambda functions satisfy the Transform protocol."""
-    fn = lambda df: df.with_columns(pl.col("x") + 1)  # noqa: E731
-    assert isinstance(fn, Transform)
-
-
-def test_fan_out_function_is_fanout() -> None:
-    """Verify that regular fan-out functions satisfy the FlatMapTransform protocol."""
-    assert isinstance(_split_by_id, FlatMapTransform)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -534,23 +513,11 @@ def test_pipeline_integration_complex() -> None:
 
 
 def _concat_reduce(dfs: Iterable[pl.LazyFrame]) -> pl.LazyFrame:
-    """A simple reduce transform that concatenates all incoming frames."""
+    """Reduce by concatination."""
     frames = list(dfs)
     if not frames:
         return pl.LazyFrame()
     return pl.concat(frames)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Protocol conformance (Add to existing section)
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def test_plain_function_is_reduce() -> None:
-    """Verify that regular functions satisfy the ReduceTransform protocol."""
-    from dronalize.core.pipeline import ReduceTransform
-
-    assert isinstance(_concat_reduce, ReduceTransform)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

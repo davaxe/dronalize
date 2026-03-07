@@ -9,7 +9,7 @@ from typing_extensions import override
 import dronalize.core.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import IngestOutput, Source
 
 if TYPE_CHECKING:
@@ -37,7 +37,7 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
         self._cursor = self._conn.cursor()
 
     @override
-    def sources(self) -> Iterable[Source[str, str]]:
+    def all_sources(self) -> Iterable[Source[str, str]]:
         self._cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         for row in self._cursor.fetchall():
             yield Source(identifier=row[0], inner=row[0])

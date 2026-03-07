@@ -2,118 +2,27 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import (
-    TYPE_CHECKING,
-    Literal,
-    ParamSpec,
-    Protocol,
-    TypedDict,
-    TypeVar,
-    Unpack,
-    runtime_checkable,
-)
+from typing import TYPE_CHECKING, Literal, TypedDict, TypeVar, Unpack, cast
 
+import polars as pl
 from typing_extensions import overload
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+    from collections.abc import Iterator
 
-    import polars as pl
 
 T = TypeVar("T")
-P = ParamSpec("P")
 
-# ---------------------------------------------------------------------------
-# Protocols
-# ---------------------------------------------------------------------------
+Transform = Callable[[pl.LazyFrame], pl.LazyFrame]
+"""A 1:1 transformation from one LazyFrame to another."""
 
+FlatMapTransform = Callable[[pl.LazyFrame], Iterable[pl.LazyFrame]]
+"""A 1:N transformation that maps one LazyFrame to an iterable of LazyFrames."""
 
-@runtime_checkable
-class Transform(Protocol):
-    """A single LazyFrame -> LazyFrame transformation step."""
-
-    def __call__(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        """Apply the transform to a LazyFrame."""
-        ...
-
-
-@runtime_checkable
-class FlatMapTransform(Protocol):
-    """A step that may produce *multiple* LazyFrames from one input.
-
-    Typical example: sliding-window sampling that splits one recording
-    into many overlapping scenes.
-    """
-
-    def __call__(self, df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-        """Apply the flat-map to a LazyFrame, yielding multiple outputs."""
-        ...
-
-
-@runtime_checkable
-class ReduceTransform(Protocol):
-    """A step that reduces multiple LazyFrames to a single output.
-
-    This is not currently used in the Pipeline but may be useful for future
-    extensions, e.g. for aggregating results across multiple scenes.
-    """
-
-    def __call__(self, dfs: Iterable[pl.LazyFrame]) -> pl.LazyFrame:
-        """Apply the reduce transform to an iterable of LazyFrames."""
-        ...
-
-
-# ---------------------------------------------------------------------------
-# Internal entry wrappers
-# ---------------------------------------------------------------------------
-
-
-@dataclass(slots=True, frozen=True)
-class _MapEntry:
-    """Wraps a 1:1 Transform."""
-
-    fn: Transform
-    name: str | None = None
-
-    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
-        """Apply the transform for each input."""
-        for df in inputs:
-            yield self.fn(df)
-
-
-@dataclass(slots=True, frozen=True)
-class _FlatMapEntry:
-    """Wraps a 1:N FlatMapTransform."""
-
-    fn: FlatMapTransform
-    name: str | None = None
-
-    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
-        """Apply the flat-map for each input, yielding all outputs."""
-        for df in inputs:
-            yield from self.fn(df)
-
-
-@dataclass(slots=True, frozen=True)
-class _ReduceEntry:
-    """Wraps an N:1 ReduceTransform."""
-
-    fn: ReduceTransform
-    name: str | None = None
-
-    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
-        """Consume all inputs, apply reduction, and yield the single output."""
-        # Note: This materializes the iterable in memory, but the
-        # actual data inside the Polars frames remains lazy.
-        yield self.fn(inputs)
-
-
-_PipelineEntry = _MapEntry | _FlatMapEntry | _ReduceEntry
-
-# ---------------------------------------------------------------------------
-# Pipeline
-# ---------------------------------------------------------------------------
+ReduceTransform = Callable[[Iterable[pl.LazyFrame]], pl.LazyFrame]
+"""An N:1 transformation that reduces an iterable of LazyFrames to a single LazyFrame."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -646,6 +555,7 @@ class Pipeline:
         if not collect:
             return result
 
+        result = cast("pl.DataFrame", result)  # type checker cannot infer this
         if filter_empty and result.height == 0:
             return None
 
@@ -764,6 +674,54 @@ class Pipeline:
 
         """
         return self.compose(other)
+
+
+# ---------------------------------------------------------------------------
+# Internal entry wrappers
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True, frozen=True)
+class _MapEntry:
+    """Wraps a 1:1 Transform."""
+
+    fn: Transform
+    name: str | None = None
+
+    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
+        """Apply the transform for each input."""
+        for df in inputs:
+            yield self.fn(df)
+
+
+@dataclass(slots=True, frozen=True)
+class _FlatMapEntry:
+    """Wraps a 1:N FlatMapTransform."""
+
+    fn: FlatMapTransform
+    name: str | None = None
+
+    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
+        """Apply the flat-map for each input, yielding all outputs."""
+        for df in inputs:
+            yield from self.fn(df)
+
+
+@dataclass(slots=True, frozen=True)
+class _ReduceEntry:
+    """Wraps an N:1 ReduceTransform."""
+
+    fn: ReduceTransform
+    name: str | None = None
+
+    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
+        """Consume all inputs, apply reduction, and yield the single output."""
+        # Note: This materializes the iterable in memory, but the
+        # actual data inside the Polars frames remains lazy.
+        yield self.fn(inputs)
+
+
+_PipelineEntry = _MapEntry | _FlatMapEntry | _ReduceEntry
 
 
 class _CollectKwargs(TypedDict, total=False):

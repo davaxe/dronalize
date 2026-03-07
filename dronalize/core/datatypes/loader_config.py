@@ -97,6 +97,7 @@ class LoaderConfig:
         require_frames: Collection[int] | None = None,
         filter_agent_category: Collection[AgentCategory] | None = None,
         filter_slow_agents: float | None = None,
+        min_samples_per_agent: int | None = None,
     ) -> Self:
         """Return a copy with the given scene-filtering parameters.
 
@@ -119,6 +120,9 @@ class LoaderConfig:
         filter_slow_agents : float, optional
             Remove agents whose average speed (m/s) is below this threshold.
             Defaults to None (no filtering).
+        min_samples_per_agent : int, optional
+            Minimum number of data points (rows) required per agent. Agents
+            with fewer samples are removed. Defaults to None (no filtering).
 
         Returns
         -------
@@ -140,6 +144,7 @@ class LoaderConfig:
                 require_frames=require_frames,
                 filter_agent_category=filter_agent_category,
                 filter_slow_agents=filter_slow_agents,
+                min_samples_per_agent=min_samples_per_agent,
             ),
         )
 

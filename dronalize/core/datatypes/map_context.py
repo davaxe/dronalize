@@ -186,7 +186,7 @@ def resolved_map(graph: MapGraph) -> MapResolver:
     Unlike `fixed_map`, no callable indirection is needed — the graph is
     passed directly. The resolver ignores the key entirely and always returns
     the same graph, so `~dronalize.core.datatypes.scene.Scene.map_key`
-    should be left as ``None`` for scenes that use this resolver.
+    should be left as `None` for scenes that use this resolver.
 
     The graph lives only as long as the resolver closure that wraps it.
     When the scenes produced from a single record are released, the

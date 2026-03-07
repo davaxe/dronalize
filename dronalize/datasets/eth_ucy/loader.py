@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -9,8 +9,9 @@ from typing_extensions import override
 import dronalize.core.transforms as tr
 from dronalize.core import BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes.categories import AgentCategory
+from dronalize.core.datatypes.split import DatasetSplit
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import IngestOutput, Source
 
 if TYPE_CHECKING:
@@ -22,37 +23,63 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
         dataset: str | Sequence[str],
         loader_config: LoaderConfig | None = None,
-        split: Literal["train", "val", "test"] = "train",
+        *,
+        split: DatasetSplit = DatasetSplit.ALL,
     ) -> None:
         """Initialize with the given configuration.
 
         Parameters
         ----------
-        data_dir : Path
+        data_root : Path
             Path to the root directory containing the ETH/UCY data.
         dataset : str or Sequence[str]
             Name(s) of the dataset(s) to load (e.g., "hotel", "eth").
         loader_config : LoaderConfig, optional
             Configuration override. If None, default configuration will be used.
-        split : {"train", "val", "test"}, optional
-            Data split to load. Defaults to "train".
+        split : DatasetSplit, optional
+            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._data_root = data_dir
+        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        self._data_root = data_root
         self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
-        self._split = split
 
-    @override
-    def sources(self) -> Iterable[Source[str, Path]]:
-        for dataset in self._dataset:
-            data_dir = self._data_root / dataset / self._split
-            # Sort to ensure consistent order across runs and systems.
+    # ------------------------------------------------------------------
+    # Split-aware source discovery
+    # ------------------------------------------------------------------
+
+    def _sources_from_split(self, split_name: str) -> Iterable[Source[str, Path]]:
+        for dataset in sorted(self._dataset):
+            data_dir = self._data_root / dataset / split_name
+            if not data_dir.is_dir():
+                continue
             for data_file in sorted(data_dir.iterdir()):
                 yield Source(identifier=data_file.name, inner=data_file)
+
+    @override
+    def all_sources(self) -> Iterable[Source[str, Path]]:
+        yield from self.train_sources()
+        yield from self.validate_sources()
+        yield from self.test_sources()
+
+    @override
+    def train_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_split("train")
+
+    @override
+    def validate_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_split("val")
+
+    @override
+    def test_sources(self) -> Iterable[Source[str, Path]]:
+        return self._sources_from_split("test")
+
+    # ------------------------------------------------------------------
+    # Ingestion / pipeline
+    # ------------------------------------------------------------------
 
     @override
     def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
@@ -88,9 +115,21 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
     @override
     def num_sources(self) -> int | None:
         num_sources: int = 0
+        split = self._split
+
+        split_names: list[str] = []
+        if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
+            split_names.append("train")
+        if split in {DatasetSplit.ALL, DatasetSplit.VALIDATE}:
+            split_names.append("val")
+        if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
+            split_names.append("test")
+
         for dataset in self._dataset:
-            data_dir = self._data_root / dataset / self._split
-            num_sources += sum(1 for _ in data_dir.iterdir())
+            for split_name in split_names:
+                data_dir = self._data_root / dataset / split_name
+                if data_dir.is_dir():
+                    num_sources += sum(1 for _ in data_dir.iterdir())
 
         return num_sources
 
@@ -104,7 +143,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
                 sample_time=0.4,
             )
             .with_window(step_size=1)
-            .with_filtering(require_all_valid=True)
+            .with_filtering(require_all_valid=True, min_samples_per_agent=2)
             .with_resampling(4, 1, method="fast")
         )
 
@@ -114,7 +153,7 @@ if __name__ == "__main__":
 
     path = Path("data")
     alt.renderers.enable("browser")
-    loader = EthUcyLoader(path, dataset=["hotel"], split="train")
+    loader = EthUcyLoader(path, dataset=["hotel"], split=DatasetSplit.TRAIN)
     count = 0
     for _scene in loader.scenes():
         count += 1

@@ -36,6 +36,10 @@ class FilteringConfig:
     filter_slow_agents: float | None = None
     """Filter out agents with an average distance per step below this threshold."""
 
+    min_samples_per_agent: int | None = None
+    """Minimum number of data points (rows) required per agent. Agents with
+    fewer samples are removed before any other validity checks."""
+
     def __init__(
         self,
         min_agents: int = 2,
@@ -44,6 +48,7 @@ class FilteringConfig:
         require_frames: Collection[int] | None = None,
         filter_agent_category: Collection[AgentCategory] | None = None,
         filter_slow_agents: float | None = None,
+        min_samples_per_agent: int | None = None,
     ) -> None:
         """Initialize and normalise collections to frozensets."""
         object.__setattr__(self, "min_agents", min_agents)
@@ -59,6 +64,7 @@ class FilteringConfig:
             frozenset(filter_agent_category) if filter_agent_category is not None else None,
         )
         object.__setattr__(self, "filter_slow_agents", filter_slow_agents)
+        object.__setattr__(self, "min_samples_per_agent", min_samples_per_agent)
 
 
 def filter_scene(
@@ -78,7 +84,8 @@ def filter_scene(
     config : FilteringConfig
         FilteringConfig object with criteria for scene filtering.
     group_by : str or Sequence[str], optional
-        Column name to group by. Each group will be considered an independent scene.
+        Column name to group by. Each group will be considered an independent
+        scene.
     agent_id : str, optional
         Column name representing the agent ID.
     frame_column : str, optional
@@ -154,12 +161,16 @@ def filter_scene_expr(
     agent_validity = pl.lit(value=True)
     if filtering.require_frames is not None:
         agent_validity &= _check_required_frames(
-            set(filtering.require_frames), frame_column, scene_start_frame, agent_window,
+            set(filtering.require_frames),
+            frame_column,
+            scene_start_frame,
+            agent_window,
         )
 
     if filtering.filter_agent_category is not None and category_column is not None:
         agent_validity &= _check_agent_category(
-            set(filtering.filter_agent_category), category_column,
+            set(filtering.filter_agent_category),
+            category_column,
         )
 
     if filtering.require_all_valid:
@@ -167,7 +178,16 @@ def filter_scene_expr(
 
     if filtering.filter_slow_agents is not None:
         agent_validity &= _check_slow_agents(
-            filtering.filter_slow_agents, x_column, y_column, agent_window,
+            filtering.filter_slow_agents,
+            x_column,
+            y_column,
+            agent_window,
+        )
+
+    if filtering.min_samples_per_agent is not None:
+        agent_validity &= _check_min_samples(
+            filtering.min_samples_per_agent,
+            agent_window,
         )
 
     conditions.append(agent_validity)
@@ -201,7 +221,9 @@ def _check_agent_category(filter_categories: set[int], category_column: str) -> 
 
 
 def _check_full_length(
-    frame_column: str, scene_window: pl.Expr | list[str], agent_window: list[str],
+    frame_column: str,
+    scene_window: pl.Expr | list[str],
+    agent_window: list[str],
 ) -> pl.Expr:
     """Ensure the agent's track length matches the total scene length."""
     scene_len = pl.col(frame_column).n_unique().over(scene_window)
@@ -209,7 +231,10 @@ def _check_full_length(
 
 
 def _check_slow_agents(
-    min_dist_per_step: float, x_column: str, y_column: str, agent_window: list[str],
+    min_dist_per_step: float,
+    x_column: str,
+    y_column: str,
+    agent_window: list[str],
 ) -> pl.Expr:
     """Filter out agents moving less than the minimum distance per step."""
     dx = pl.col(x_column).diff().over(agent_window)
@@ -226,8 +251,19 @@ def _check_slow_agents(
     return avg_dist_per_step >= min_dist_per_step
 
 
+def _check_min_samples(
+    min_samples: int,
+    agent_window: pl.Expr | list[str],
+) -> pl.Expr:
+    """Require each agent to have at least *min_samples* data points."""
+    return pl.len().over(agent_window) >= min_samples
+
+
 def _check_min_agents(
-    min_agents: int, agent_id: str, agent_validity: pl.Expr, scene_window: pl.Expr | list[str],
+    min_agents: int,
+    agent_id: str,
+    agent_validity: pl.Expr,
+    scene_window: pl.Expr | list[str],
 ) -> pl.Expr:
     """Ensure the scene meets the minimum count of valid agents."""
     valid_agent_count = pl.col(agent_id).filter(agent_validity).n_unique().over(scene_window)

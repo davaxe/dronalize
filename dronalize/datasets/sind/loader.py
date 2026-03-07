@@ -10,7 +10,7 @@ from typing_extensions import override
 import dronalize.core.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.pipelines_factory import trajectory_pipeline
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ class SindLoader(BaseSceneLoader[str, Path]):
         self._data_dir = data_dir
 
     @override
-    def sources(self) -> Iterable[Source[str, Path]]:
+    def all_sources(self) -> Iterable[Source[str, Path]]:
         for subdir in self._data_dir.iterdir():
             map_location = self._resolve_map(subdir.name)
             yield Source(

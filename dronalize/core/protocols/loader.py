@@ -10,6 +10,7 @@ from typing_extensions import override
 
 from dronalize.core.datatypes.map_context import MapKey, MapResolver, no_map
 from dronalize.core.datatypes.scene import Scene
+from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
 
 if TYPE_CHECKING:
     from dronalize.core.datatypes import LoaderConfig
@@ -82,40 +83,54 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     specific details of how raw data is read and processed. The main processing
     flow is as follows:
 
-    1. `sources()` discovers and yields raw data sources to process. Usually
-    sources are paths to files to be read.
+    1. **Source discovery** — `sources()` dispatches to the appropriate source
+       method based on the `split` parameter:
 
-    2. `ingest()` for each source this function reads the raw data into one or
-    more `LazyFrame`s, along with optional map context. The map context can be
-    used to attach map information to the scene without including it in the raw
-    data frame.
+       - `DatasetSplit.ALL` (or `None`) → `all_sources()` *(abstract —
+         every subclass must implement this)*
+       - `DatasetSplit.TRAIN` → `train_sources()`
+       - `DatasetSplit.VALIDATE` → `validate_sources()`
+       - `DatasetSplit.TEST` → `test_sources()`
 
-    3. `pipeline()` returns a composable processing pipeline that is applied to
-    each `LazyFrame` produced by `ingest()`. The pipeline consists of a chain of
-    transformations that convert process the raw data frame into the common
-    schema.
+       The `train_sources`, `test_sources`, and `validate_sources`
+       methods are **optionally overridable**.  Their default implementations
+       raise `SplitNotSupportedError`, so datasets that do not ship with
+       predefined splits need only implement `all_sources()`.  Datasets
+       that *do* have splits override the relevant methods and typically
+       implement `all_sources()` by chaining all three split methods.
 
-    Cosiderations
-    -------------
-    - The map context can be: 1) a string (map key) that is later on passed to
-    the map resolver (if it exists), 2) an explicit resolver function that is
-    attached to the scene, or 3) None which means no information or at this
-    stage.
+    2. **Ingestion** — `ingest()` reads each source into one or more
+       `(LazyFrame, MapContext)` pairs. The map context can be used to
+       attach map information to the scene without including it in the raw
+       data frame.
+
+    3. **Pipeline** — `pipeline()` returns a composable processing pipeline
+       that is applied to each `LazyFrame` produced by `ingest()`. The
+       pipeline consists of a chain of transformations that process the raw
+       data frame into the common schema.
+
+    Considerations
+    --------------
+    - The map context can be: 1) a string (map key) that is later passed to
+      the map resolver (if it exists), 2) an explicit resolver function that
+      is attached to the scene, or 3) `None` which means no map information
+      at this stage.
 
     - When no map resolver is attached in the processing steps, the
-    `map_resolver()` function is used to provide a default resolver for the
-    scene. This allows for flexibility in how map information is associated with
-    scenes, and can accommodate datasets where map information is stored in
-    different ways (e.g., separate files, embedded in the raw data, or not
-    available at all). The default implementation is `no_map()`, which indicates
-    that no map is available for the scenes produced by this loader.
+      `map_resolver()` method is used to provide a default resolver for the
+      scene. This allows for flexibility in how map information is associated
+      with scenes, and can accommodate datasets where map information is
+      stored in different ways (e.g., separate files, embedded in the raw
+      data, or not available at all). The default implementation is
+      `no_map()`, which indicates that no map is available for the scenes
+      produced by this loader.
 
-    - There are some priorties when int comes to the map key (if used). If it is
-    directly attached to the source in the `sources()` step, that takes highest
-    priority since it is the most explicit. If not, then if the map context
-    returned by `ingest()` is a string, it is used as the map key. Finally, if
-    neither of those are available, the map key will be None and the resolver
-    (if any) will need to handle that case.
+    - There are priorities when it comes to the map key (if used). If it is
+      directly attached to the source in the `all_sources()` step, that
+      takes highest priority since it is the most explicit. If not, then if
+      the map context returned by `ingest()` is a string, it is used as the
+      map key. Finally, if neither of those are available, the map key will be
+      `None` and the resolver (if any) will need to handle that case.
 
     """
 
@@ -124,6 +139,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         loader_config: LoaderConfig | None = None,
         *,
         enforce_schema: bool = True,
+        split: DatasetSplit | None = None,
     ) -> None:
         """Initialize internal state.
 
@@ -134,6 +150,14 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         enforce_schema : bool, optional
             Whether to enforce the scene schema on each created scene.
             Defaults to True.
+        split : DatasetSplit, optional
+            The dataset split to load.  When `None` or
+            `DatasetSplit.ALL`, all data is loaded via `all_sources()`.
+            When set to `TRAIN`, `TEST`, or `VALIDATE`, the
+            corresponding `train_sources()`, `test_sources()`, or
+            `validate_sources()` method is called.  Loaders that do not
+            support splits will raise `SplitNotSupportedError` for any
+            value other than `None` / `ALL`.
 
         """
         self._count: int = 0
@@ -141,14 +165,19 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         self._enforce_schema: bool = enforce_schema
         self._loader_config: LoaderConfig | None = loader_config
         self._pipeline: Pipeline | None = None
+        self._split: DatasetSplit = split if split is not None else DatasetSplit.ALL
 
     # ===================================================================
     # Abstract — every subclass must implement these
     # ===================================================================
 
     @abstractmethod
-    def sources(self) -> Iterable[Source[IdT, SourceT]]:
-        """Discover and yield identifiers for each scene to process.
+    def all_sources(self) -> Iterable[Source[IdT, SourceT]]:
+        """Discover and yield identifiers for **all** scenes to process.
+
+        Every subclass must implement this method.  It is called when no
+        specific split is requested (i.e. `split` is `None` or
+        `DatasetSplit.ALL`).
 
         Ideally, this should be lightweight and not do any heavy processing.
 
@@ -161,7 +190,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
     @abstractmethod
     def ingest(self, source: Source[IdT, SourceT]) -> Iterable[IngestOutput]:
-        """Read a raw data source into one or more ``(LazyFrame, MapResolver)`` pairs.
+        """Read a raw data source into one or more `(LazyFrame, MapResolver)` pairs.
 
         Parameters
         ----------
@@ -205,6 +234,75 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
         """
 
+    def train_sources(self) -> Iterable[Source[IdT, SourceT]]:
+        """Return sources belonging to the **training** split.
+
+        Override this method in subclasses whose underlying dataset provides
+        a predefined training split.  The default implementation raises
+        `SplitNotSupportedError`.
+
+        Raises
+        ------
+        SplitNotSupportedError
+            Always, unless overridden by a subclass that supports splits.
+
+        """
+        raise SplitNotSupportedError(type(self).__name__, DatasetSplit.TRAIN)
+
+    def test_sources(self) -> Iterable[Source[IdT, SourceT]]:
+        """Return sources belonging to the **test** split.
+
+        Override this method in subclasses whose underlying dataset provides
+        a predefined test split.  The default implementation raises
+        `SplitNotSupportedError`.
+
+        Raises
+        ------
+        SplitNotSupportedError
+            Always, unless overridden by a subclass that supports splits.
+
+        """
+        raise SplitNotSupportedError(type(self).__name__, DatasetSplit.TEST)
+
+    def validate_sources(self) -> Iterable[Source[IdT, SourceT]]:
+        """Return sources belonging to the **validation** split.
+
+        Override this method in subclasses whose underlying dataset provides
+        a predefined validation split.  The default implementation raises
+        `SplitNotSupportedError`.
+
+        Raises
+        ------
+        SplitNotSupportedError
+            Always, unless overridden by a subclass that supports splits.
+
+        """
+        raise SplitNotSupportedError(type(self).__name__, DatasetSplit.VALIDATE)
+
+    def sources(self) -> Iterable[Source[IdT, SourceT]]:
+        """Return sources for the currently configured split.
+
+        This method dispatches to `all_sources()`,
+        `train_sources()`, `test_sources()`, or
+        `validate_sources()` based on the `split` value passed at
+        construction time.
+
+        Returns
+        -------
+        Iterable[Source[IdT, SourceT]]
+            The sources for the active split.
+
+        """
+        if self._split is DatasetSplit.ALL:
+            return self.all_sources()
+        if self._split is DatasetSplit.TRAIN:
+            return self.train_sources()
+        if self._split is DatasetSplit.TEST:
+            return self.test_sources()
+        if self._split is DatasetSplit.VALIDATE:
+            return self.validate_sources()
+        return self.all_sources()
+
     def map_resolver(self) -> MapResolver:
         """Return a resolver for this dataset's map data.
 
@@ -247,7 +345,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         self._source_counter = 0
         for source in self.sources():
             self._source_counter += 1
-            for scene_df, resolver in self._process_next(source):
+            for scene_df, resolver in self.process_next(source):
                 yield self.create_scene(scene_df, source, resolver)
 
     def create_scene(
@@ -272,8 +370,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
             The originating source.  The scene inherits
             `source.identifier` and `source.map_key`.
         resolver : MapResolver, optional
-            The resolver to attach to the scene.  When ``None``, falls
-            back to ``self.map_resolver()``.
+            The resolver to attach to the scene.  When `None`, falls
+            back to `self.map_resolver()`.
 
         Returns
         -------
@@ -394,7 +492,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         ratio = up / down
         return self.loader_config.sample_time / ratio
 
-    def _process_next(
+    def process_next(
         self,
         source: Source[IdT, SourceT],
     ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
