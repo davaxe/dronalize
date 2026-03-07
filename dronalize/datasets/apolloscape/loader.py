@@ -5,17 +5,18 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.trajectory.process import prepare_agent_trajectories
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.protocols.loader import BaseSceneLoader, Source
+from dronalize.core.pipeline import Pipeline
+from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
 
-class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
+class ApolloScapeLoader(BaseSceneLoader[str, Path]):
     """Loader for the ApolloScape dataset."""
 
     def __init__(self, data_dir: Path, loader_config: LoaderConfig | None = None) -> None:
@@ -46,48 +47,40 @@ class ApolloScapeLoader(BaseSceneLoader[str, pl.LazyFrame]):
         self._data_dir = data_dir
 
     @override
-    def sources(self) -> Iterable[Source[str, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[str, Path]]:
         for data_file in self._data_dir.glob("*.txt"):
-            yield Source(
-                identifier=data_file.stem,
-                inner=pl.scan_csv(
-                    data_file,
-                    has_header=False,
-                    schema=_DATA_SCHEMA,
-                    separator=" ",
-                ).select(
-                    *("frame", "id", "x", "y", "yaw"),
-                    pl.col("agent_category").replace_strict({
-                        1: AgentCategory.CAR.value,
-                        2: AgentCategory.TRUCK.value,
-                        3: AgentCategory.PEDESTRIAN.value,
-                        4: AgentCategory.BICYCLE.value,
-                        5: AgentCategory.UNKNOWN.value,
-                    }),
-                ),
-            )
+            yield Source(identifier=data_file.stem, inner=data_file)
+
+    @override
+    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+        yield (
+            pl.scan_csv(
+                source.inner,
+                has_header=False,
+                schema=_DATA_SCHEMA,
+                separator=" ",
+            ).select(
+                *("frame", "id", "x", "y", "yaw"),
+                pl.col("agent_category").replace_strict({
+                    1: AgentCategory.CAR.value,
+                    2: AgentCategory.TRUCK.value,
+                    3: AgentCategory.PEDESTRIAN.value,
+                    4: AgentCategory.BICYCLE.value,
+                    5: AgentCategory.UNKNOWN.value,
+                }),
+            ),
+            None,
+        )
 
     @override
     def num_sources(self) -> int | None:
         return sum(1 for _ in self._data_dir.glob("*.txt"))
 
     @override
-    def load_raw(
-        self,
-        source: Source[str, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, None]]:
-        for df in prepare_agent_trajectories(
-            source.inner,
-            self.loader_config,
-            add_derivative=True,
-            add_second_derivative=True,
-            derivative_rename=self.derivative_names(),
-        ):
-            yield df, None
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return df
+    def pipeline(self) -> Pipeline:
+        return Pipeline().compose(
+            trajectory_pipeline(self.loader_config, derivative_rename=self.derivative_names())
+        )
 
     @classmethod
     @override

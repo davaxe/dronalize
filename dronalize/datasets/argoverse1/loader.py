@@ -1,17 +1,22 @@
-from collections.abc import Iterable
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import Resampling, resample
+import dronalize.core.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
+from dronalize.core.pipeline import Pipeline
+from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
-class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
+class Argoverse1Loader(BaseSceneLoader[int, list[Path]]):
     """Processor for Argoverse 1 dataset stored in CSV format."""
 
     def __init__(
@@ -41,28 +46,35 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         self._batch_size: int | None = file_batch_size
 
     @override
-    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
+    def sources(self) -> Iterable[Source[int, list[Path]]]:
         files: list[Path] = sorted(self._data_path.glob("*.csv"))
         batch_size: int = self._batch_size or len(files)
         for start in range(0, len(files), batch_size):
             batch_files = files[start : start + batch_size]
-            yield Source(
-                identifier=start,
-                inner=pl
-                .scan_csv(batch_files, include_file_paths="file_id", schema=_SCHEMA)
-                .with_columns(
-                    pl
-                    .when(pl.col("OBJECT_TYPE") == "AV")
-                    .then(AgentCategory.CAR)
-                    .otherwise(AgentCategory.UNKNOWN)
-                    .alias("agent_category"),
-                    pl.col("TRACK_ID").rank(method="dense").sub(1).cast(pl.Int64).alias("id"),
-                    pl.col("TIMESTAMP").rank(method="dense").sub(1).cast(pl.Int64).alias("frame"),
-                    pl.col("file_id").cast(pl.Categorical).to_physical(),
-                )
-                .drop("OBJECT_TYPE", "TRACK_ID", "TIMESTAMP")
-                .rename({"X": "x", "Y": "y", "CITY_NAME": "map"}),
+            yield Source(identifier=start, inner=batch_files)
+
+    @override
+    def ingest(self, source: Source[int, list[Path]]) -> Iterable[IngestOutput]:
+        batch_lf = (
+            pl
+            .scan_csv(source.inner, include_file_paths="file_id", schema=_SCHEMA)
+            .with_columns(
+                pl
+                .when(pl.col("OBJECT_TYPE") == "AV")
+                .then(AgentCategory.CAR)
+                .otherwise(AgentCategory.UNKNOWN)
+                .alias("agent_category"),
+                pl.col("TRACK_ID").rank(method="dense").sub(1).cast(pl.Int64).alias("id"),
+                pl.col("TIMESTAMP").rank(method="dense").sub(1).cast(pl.Int64).alias("frame"),
+                pl.col("file_id").cast(pl.Categorical).to_physical(),
             )
+            .drop("OBJECT_TYPE", "TRACK_ID", "TIMESTAMP")
+            .rename({"X": "x", "Y": "y", "CITY_NAME": "map"})
+        )
+
+        for _, group in batch_lf.collect().group_by(["file_id"]):
+            map_key = str(group["map"].first())
+            yield group.lazy().drop("file_id"), map_key
 
     @override
     def num_sources(self) -> int | None:
@@ -72,39 +84,18 @@ class Argoverse1Loader(BaseSceneLoader[int, pl.LazyFrame]):
         return batches + int(extra > 0)
 
     @override
-    def load_raw(
-        self,
-        source: Source[int, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, str]]:
-        resampling = self.loader_config.resampling or Resampling(1, 1)
-
-        source_filtered = source.inner.filter(
-            filter_scene_expr(
-                self.loader_config.scene_filtering,
-                group_by=["file_id"],
-                category_column="agent_category",
-            ),
-        )
-
-        source_resampled = resample(
-            source_filtered,
-            resampling,
-            group_by=["file_id"],
-            add_derivative=True,
-            add_second_derivative=True,
-            dt=self.loader_config.sample_time,
-            derivative_rename=self.derivative_names(),
-            forward_fill=["agent_category"],
-        )
-        for _, group in source_resampled.collect().group_by(["file_id"]):
-            yield (
-                yaw_from_vel(group.lazy()).drop("file_id"),
-                str(group["map"].first()),
+    def pipeline(self) -> Pipeline:
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(
+                    self.loader_config,
+                    derivative_rename=self.derivative_names(),
+                    forward_fill=["agent_category"],
+                )
             )
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df, yaw_col="yaw")
+            .then(tr.yaw_from_vel())
+        )
 
     @classmethod
     @override

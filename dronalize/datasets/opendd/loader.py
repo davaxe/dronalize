@@ -6,10 +6,11 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.process import prepare_agent_trajectories
+import dronalize.core.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.protocols.loader import Source
+from dronalize.core.pipeline import Pipeline
+from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.protocols.loader import IngestOutput, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -47,7 +48,7 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
         return self._cursor.fetchone()[0]
 
     @override
-    def load_raw(self, source: Source[str, str]) -> Iterable[tuple[pl.LazyFrame, None]]:
+    def ingest(self, source: Source[str, str]) -> Iterable[IngestOutput]:
         table_name = source.inner
         # Possible to include: UTM_ANGLE, V, ACC, ACC_LAT, ACC_TAN
         query = f"""
@@ -59,11 +60,11 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
             CLASS
         FROM {table_name}
         """  # noqa: S608
-        scenes = (
+        yield (
             pl
             .read_database(query, self._conn)
             .lazy()
-            .with_columns([
+            .with_columns(
                 ((pl.col("TIMESTAMP") * 1000).round(4).rank(method="dense") - 1)
                 .cast(pl.Int64)
                 .alias("frame"),
@@ -83,21 +84,20 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
                     default=AgentCategory.UNKNOWN,
                 )
                 .alias("agent_category"),
-            ])
-            .drop("CLASS", "TIMESTAMP")
+            )
+            .drop("CLASS", "TIMESTAMP"),
+            None,
         )
-        for df in prepare_agent_trajectories(
-            scenes,
-            config=self.loader_config,
-            add_derivative=True,
-            add_second_derivative=True,
-            derivative_rename=self.derivative_names(),
-        ):
-            yield df, None
 
     @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df, yaw_col="yaw")
+    def pipeline(self) -> Pipeline:
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(self.loader_config, derivative_rename=self.derivative_names())
+            )
+            .then(tr.yaw_from_vel())
+        )
 
     @classmethod
     @override

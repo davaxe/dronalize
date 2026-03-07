@@ -140,7 +140,7 @@ if __name__ == "__main__":
     loader = AD4CHELoader(Path("data/ad4che"))
     cout = 0
     start = time.perf_counter()
-    for scene in loader.scenes():
+    for _scene in loader.scenes():
         cout += 1
 
     end = time.perf_counter()

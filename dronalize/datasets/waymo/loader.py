@@ -7,13 +7,12 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 from typing_extensions import override
 
-# Assuming these exist in your project
-from dronalize.common.trajectory.derivative import derivative
-from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import Resampling, resample
+import dronalize.core.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
 from dronalize.core.datatypes.map_context import MapKey, MapResolver, no_map
-from dronalize.core.protocols.loader import Source
+from dronalize.core.pipeline import Pipeline
+from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.protocols.loader import IngestOutput, Source
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
 
@@ -96,7 +95,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         return sum(1 for _ in self._data_dir.glob(self._filter_str))
 
     @override
-    def ingest(self, source: Source[str, Path]) -> Iterable[tuple[pl.LazyFrame, MapResolver]]:
+    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
         for raw_data in _read_tfrecord(source.inner):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
@@ -116,36 +115,35 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             yield _scenario_to_polars(scenario).lazy(), resolver
 
     @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        resampling = self.loader_config.resampling or Resampling(1, 1)
-        df_filtered = df.filter(
-            filter_scene_expr(
-                self.loader_config.scene_filtering,
-                category_column="agent_category",
-            ),
-        )
-        df_resampled = resample(
-            df_filtered,
-            resampling,
-            group_by=["id"],
-            add_derivative=resampling.method == "spline",
-            add_second_derivative=resampling.method == "spline",
-            dt=self.loader_config.sample_time,
-            derivative_rename=self.derivative_names(),
-            forward_fill=["agent_category"],
-        )
+    def pipeline(self) -> Pipeline:
+        resampling = self.loader_config.resampling
+        no_resampling = resampling is None or resampling.no_resampling
 
-        if resampling.method != "spline":
-            df_resampled = derivative(
-                df_resampled,
-                "vx",
-                "vy",
-                dt=self.loader_config.sample_time,
-                derivative_rename={1: ["ax", "ay"]},
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(
+                    self.loader_config,
+                    derivative_rename=self.derivative_names(),
+                    # When not using spline resampling, derivatives are computed
+                    # separately below since vx/vy already exist in the raw data
+                    # and only ax/ay need to be derived.
+                    add_derivative=not no_resampling,
+                    add_second_derivative=not no_resampling,
+                )
             )
-
-        # Change autonomous vehicle to id 0 (from id -1)
-        return df_resampled.with_columns(pl.col("id") + 1)
+            .then(
+                tr.derivative(
+                    "vx",
+                    "vy",
+                    dt=self.loader_config.sample_time,
+                    derivative_rename={1: ["ax", "ay"]},
+                ),
+                when=no_resampling,
+            )
+            # Shift autonomous vehicle id from -1 to 0
+            .then(tr.with_columns(pl.col("id") + 1))
+        )
 
     @classmethod
     @override

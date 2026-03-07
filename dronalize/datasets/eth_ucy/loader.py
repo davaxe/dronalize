@@ -58,7 +58,7 @@ class EthUcyLoader(BaseSceneLoader[str, Path]):
     def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
         yield (
             pl.scan_csv(
-                path,
+                source.inner,
                 has_header=False,
                 separator="\t",
                 new_columns=["frame", "id", "x", "y"],
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     alt.renderers.enable("browser")
     loader = EthUcyLoader(path, dataset=["hotel"], split="train")
     count = 0
-    for scene in loader.scenes():
+    for _scene in loader.scenes():
         count += 1
 
     print(f"Total scenes: {count}")

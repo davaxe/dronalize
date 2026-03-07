@@ -40,11 +40,11 @@ class Scene(Generic[IdT]):
     """Resolver attached by the loader that produced this scene."""
 
     def resolve_map(self) -> MapGraph | None:
-        """Resolve this scene's :attr:`map_key` into a :class:`MapGraph`.
+        """Resolve this scene's `map_key` into a `MapGraph`.
 
-        Delegates to the :attr:`map_resolver` attached by the loader.
-        Returns ``None`` when no resolver is present or when the
-        resolver has no map for this key (e.g. ``include_map=False``
+        Delegates to the `map_resolver` attached by the loader. Returns ``None``
+        when no resolver is present or when the resolver has no map for this key
+        (e.g. ``include_map=False``
         on Waymo).
 
         Returns

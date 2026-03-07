@@ -10,10 +10,10 @@ from typing_extensions import override
 
 from dronalize.core.datatypes.map_context import MapKey, MapResolver, no_map
 from dronalize.core.datatypes.scene import Scene
-from dronalize.core.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from dronalize.core.datatypes import LoaderConfig
+    from dronalize.core.pipeline import Pipeline
 
 
 MapContext: TypeAlias = MapResolver | MapKey | None
@@ -74,12 +74,6 @@ class SceneLoader(Protocol, Generic[IdT]):
         ...
 
 
-# TODO:
-# - Remove `load_raw`, `normalize` and related legacy code after all loaders
-# have been migrated to the new `ingest` + `pipeline` path.
-# - Eventually update all docs to be better.
-
-
 class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     """ABC interface for processing raw data sources into a standardized format.
 
@@ -130,7 +124,6 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         loader_config: LoaderConfig | None = None,
         *,
         enforce_schema: bool = True,
-        use_pipeline: bool = True,
     ) -> None:
         """Initialize internal state.
 
@@ -147,7 +140,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         self._source_counter: int = 0
         self._enforce_schema: bool = enforce_schema
         self._loader_config: LoaderConfig | None = loader_config
-        self._use_pipeline: bool | None = use_pipeline
+        self._pipeline: Pipeline | None = None
 
     # ===================================================================
     # Abstract — every subclass must implement these
@@ -157,6 +150,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     def sources(self) -> Iterable[Source[IdT, SourceT]]:
         """Discover and yield identifiers for each scene to process.
 
+        Ideally, this should be lightweight and not do any heavy processing.
+
         Yields
         ------
         Source[IdT, SourceT]
@@ -164,25 +159,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
 
         """
 
-    @classmethod
     @abstractmethod
-    def default_config(cls) -> LoaderConfig:
-        """Return the default processor configuration for this dataset.
-
-        This is a classmethod so that the default configuration can be
-        inspected without constructing a loader instance.
-
-        Returns
-        -------
-        LoaderConfig
-            Default configuration for this loader.
-
-        """
-
-    # ===================================================================
-    # New path — ingest + pipeline  (override these for new loaders)
-    # ===================================================================
-
     def ingest(self, source: Source[IdT, SourceT]) -> Iterable[IngestOutput]:
         """Read a raw data source into one or more ``(LazyFrame, MapResolver)`` pairs.
 
@@ -198,33 +175,41 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
             attached to every scene derived from that frame.
 
         """
-        resolver = self.map_resolver()
-        for lf, _map_key in self.load_raw(source):
-            yield lf, resolver
 
+    @abstractmethod
     def pipeline(self) -> Pipeline:
         """Return the composable processing pipeline for this loader.
 
-        The pipeline is a chain of `~dronalize.core.pipeline.Transform`
-        (1:1) and `~dronalize.core.pipeline.FlatMapTransform` (1:N)
-        steps that are applied to every `LazyFrame` produced by
-        `ingest`.
-
-        The default implementation returns an **empty** pipeline, which
-        causes `process_next` to fall back to the legacy
-        `load_raw` + `normalize` path.
+        The pipeline is a chain of transform steps that are applied to every
+        `LazyFrame` produced by `ingest`.
 
         Returns
         -------
         Pipeline
-            The processing pipeline.  An empty pipeline triggers the
-            legacy fallback.
+            The processing pipeline.
 
         """
-        return Pipeline()
+
+    @classmethod
+    @abstractmethod
+    def default_config(cls) -> LoaderConfig:
+        """Return the default processor configuration for this dataset.
+
+        This is a classmethod so that the default configuration can be inspected
+        without constructing a loader instance.
+
+        Returns
+        -------
+        LoaderConfig
+            Default configuration for this loader.
+
+        """
 
     def map_resolver(self) -> MapResolver:
         """Return a resolver for this dataset's map data.
+
+        If the `resolver` is not set anywhere else, this resolver will be
+        attached to the scene and can be used to resolve
 
         Returns
         -------
@@ -232,153 +217,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
             A callable that resolves map keys. The default returns `no_map`.
 
         """
+        _self = self
         return no_map()
-
-    # ===================================================================
-    # Legacy path — load_raw + normalize  (existing loaders use these)
-    # ===================================================================
-
-    def load_raw(
-        self,
-        source: Source[IdT, SourceT],
-    ) -> Iterable[tuple[pl.LazyFrame, MapKey]]:
-        """Read the raw data source into one or more DataFrame(s) (any schema).
-
-        .. deprecated::
-            Override `ingest` and `pipeline` instead.
-            This method is only called as a fallback when `pipeline()`
-            returns an empty pipeline and `ingest` has not been
-            overridden.
-
-        Parameters
-        ----------
-        source : Source[IdT, SourceT]
-            The raw data source to load.
-
-        Yields
-        ------
-        tuple[pl.LazyFrame, MapKey]
-            Raw data frame and an associated map key.
-
-        """
-        msg = (
-            f"{type(self).__name__} must implement either `ingest` (new path) "
-            f"or `load_raw` (legacy path)."
-        )
-        raise NotImplementedError(msg)
-
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        """Convert the raw DataFrame into the common schema.
-
-        .. deprecated::
-            Override `pipeline` instead.  This method is only called
-            as a fallback when `pipeline` returns an empty pipeline.
-
-        The default implementation is the identity (returns *df* unchanged).
-
-        Parameters
-        ----------
-        df : pl.LazyFrame
-            Raw data frame to normalize.
-
-        Returns
-        -------
-        pl.LazyFrame
-            Normalized data frame following the common schema.
-
-        """
-        return df
-
-    # ===================================================================
-    # Orchestration
-    # ===================================================================
-
-    def process_next(
-        self,
-        source: Source[IdT, SourceT],
-    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
-        """Process a single data source through the appropriate path.
-
-        * **New path:** `ingest` → `pipeline`  (when `pipeline`
-          is non-empty).
-        * **Legacy path:** `load_raw` → `normalize`  (when
-          `pipeline` is empty).
-
-        Parameters
-        ----------
-        source : Source[IdT, SourceT]
-            The source to process.
-
-        Yields
-        ------
-        tuple[pl.DataFrame, MapResolver]
-            Processed data frames, each paired with the resolver that
-            should be used to look up the map for that scene.
-
-        """
-        pipe = self.pipeline()
-        use_new_path = self._use_pipeline if self._use_pipeline is not None else bool(pipe)
-
-        if use_new_path:
-            yield from self._process_new_path(source, pipe)
-        else:
-            yield from self._process_legacy_path(source)
-
-    def _process_new_path(
-        self,
-        source: Source[IdT, SourceT],
-        pipe: Pipeline,
-    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
-        """Process next (new path).
-
-        Parameters
-        ----------
-        source : Source[IdT, SourceT]
-            The source to process.
-        pipe : Pipeline
-            A non-empty pipeline to apply.
-
-        Yields
-        ------
-        tuple[pl.DataFrame, MapResolver]
-            Processed data frames, each paired with its resolver.
-
-        """
-        for raw_lf, resolver in self.ingest(source):
-            for df in pipe.execute(raw_lf, collect=True, filter_empty=True):
-                yield df, resolver
-
-    def _process_legacy_path(
-        self,
-        source: Source[IdT, SourceT],
-    ) -> Iterable[tuple[pl.DataFrame, MapResolver]]:
-        """Legacy path: load_raw → normalize.
-
-        Parameters
-        ----------
-        source : Source[IdT, SourceT]
-            The source to process.
-
-        Yields
-        ------
-        tuple[pl.DataFrame, MapResolver]
-            Processed data frames, each paired with the loader-level resolver.
-
-        """
-        resolver = self.map_resolver()
-        for raw_lf, _map_key in self.load_raw(source):
-            df = self._try_collect(self.normalize(raw_lf))
-            if df is not None:
-                yield df, resolver
-
-    @staticmethod
-    def _try_collect(lf: pl.LazyFrame) -> pl.DataFrame | None:
-        """Collect a `LazyFrame`, returning `None` on empty or error."""
-        try:
-            df = lf.collect()
-        except ValueError:
-            return None
-        return df if not df.is_empty() else None
 
     @override
     def scenes_callback(
@@ -393,9 +233,9 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     def scenes(self) -> Iterable[Scene[IdT]]:
         """Iterate over all sources and process them into scenes.
 
-        This will lazy-load and process each source one at a time.
-        Counters are reset at the start of each call so a loader instance
-        can be iterated more than once.
+        This will lazy-load and process each source one at a time. Counters are
+        reset at the start of each call so a loader instance can be iterated
+        more than once.
 
         Yields
         ------
@@ -407,7 +247,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         self._source_counter = 0
         for source in self.sources():
             self._source_counter += 1
-            for scene_df, resolver in self.process_next(source):
+            for scene_df, resolver in self._process_next(source):
                 yield self.create_scene(scene_df, source, resolver)
 
     def create_scene(
@@ -419,9 +259,9 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         """Create a Scene object from the processed DataFrame and its source.
 
         This method also calls `Scene.enforce_schema()` if
-        `self._enforce_schema` is True to ensure the scene follows the
-        expected schema. If overriding this method, make sure to follow
-        the expected behavior regarding schema enforcement.
+        `self._enforce_schema` is True to ensure the scene follows the expected
+        schema. If overriding this method, make sure to follow the expected
+        behavior regarding schema enforcement.
 
         Parameters
         ----------
@@ -471,16 +311,16 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
             Total number of scenes, or `None` if not known in advance.
 
         """
-        _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
+        _self = self
         return None
 
     def num_sources(self) -> int | None:
         """Get the total number of sources that will be processed.
 
-        This is different from `num_scenes()` since each source can
-        potentially generate multiple scenes (e.g., by using sliding
-        window sampling). In some cases this can be expensive to compute
-        or not known in advance, in that case `None` is returned.
+        This is different from `num_scenes()` since each source can potentially
+        generate multiple scenes (e.g., by using sliding window sampling). In
+        some cases this can be expensive to compute or not known in advance, in
+        that case `None` is returned.
 
         Returns
         -------
@@ -488,7 +328,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
             Total number of sources, or `None` if not known in advance.
 
         """
-        _self = self  # To satisfy Ruff, since `self` will most likely be used in subclasses.
+        _self = self
         return None
 
     @staticmethod
@@ -553,3 +393,27 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         up, down = self.loader_config.resampling.factors
         ratio = up / down
         return self.loader_config.sample_time / ratio
+
+    def _process_next(
+        self,
+        source: Source[IdT, SourceT],
+    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
+        """Process next source.
+
+        Parameters
+        ----------
+        source : Source[IdT, SourceT]
+            The source to process.
+
+        Yields
+        ------
+        tuple[pl.DataFrame, MapResolver]
+            Processed data frames, each paired with its resolver.
+
+        """
+        if self._pipeline is None:
+            self._pipeline = self.pipeline()
+
+        for raw_lf, map_context in self.ingest(source):
+            for df in self._pipeline.execute(raw_lf, collect=True, filter_empty=True):
+                yield df, map_context

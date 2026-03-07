@@ -117,8 +117,8 @@ def _windowed_batch(
     """Process all windows in a single batch (fast, higher memory).
 
     All windows are exploded into one DataFrame via the non-iterable sliding
-    window path, then filtering and resampling are applied once across the
-    whole frame.  The result is split by ``window_index`` afterwards.
+    window path, then filtering and resampling are applied once across the whole
+    frame. The result is split by ``window_index`` afterwards.
     """
     assert config.window_params is not None
 
@@ -164,10 +164,10 @@ def _windowed_streaming(
 ) -> Iterable[pl.LazyFrame]:
     """Process windows one at a time (memory-efficient, slower).
 
-    The base data is collected once, then the sliding window iterator yields
-    one ``pl.DataFrame`` per window.  Filtering and resampling are applied
-    independently to each window so that only a single window needs to reside
-    in memory at any given time.
+    The base data is collected once, then the sliding window iterator yields one
+    ``pl.DataFrame`` per window. Filtering and resampling are applied
+    independently to each window so that only a single window needs to reside in
+    memory at any given time.
     """
     assert config.window_params is not None
 

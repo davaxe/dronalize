@@ -1,9 +1,9 @@
 """Reusable composite pipeline factories for common trajectory processing.
 
-This module provides pre-built :class:`~dronalize.core.pipeline.Pipeline`
+This module provides pre-built `~dronalize.core.pipeline.Pipeline`
 fragments that encapsulate recurring multi-step processing stages found
 across dataset loaders.  They are designed to be composed into a loader's
-``pipeline()`` method via :meth:`Pipeline.compose` or the ``>>`` operator.
+`pipeline()` method via `Pipeline.compose` or the `>>` operator.
 
 """
 
@@ -38,20 +38,18 @@ def trajectory_pipeline(
     """Build the standard windowing → filtering → resampling → splitting pipeline.
 
     This is the canonical processing pipeline that most trajectory-prediction
-    dataset loaders need.  It mirrors the logic formerly implemented by
-    :func:`~dronalize.common.trajectory.process.prepare_agent_trajectories`
-    but expressed as a composable :class:`Pipeline`.
+    dataset loaders need.
 
     The returned pipeline contains the following stages (each skipped
-    automatically when the corresponding config field is ``None``):
+    automatically when the corresponding config field is `None`):
 
-    1. **Windowing** — sliding-window sampling (``config.window_params``).
+    1. **Windowing** — sliding-window sampling (`config.window_params`).
     2. **Scene filtering** — agent validity / category / speed filtering
-       (``config.scene_filtering``).
+       (`config.scene_filtering`).
     3. **Post-filter validation** — require at least *min_agents* per window
        (only when windowing is active).
     4. **Resampling** — temporal resampling with optional derivatives.
-    5. **Window splitting** — flat-map by ``window_index`` so downstream
+    5. **Window splitting** — flat-map by `window_index` so downstream
        steps see one scene per frame (only when windowing is active).
 
     Parameters
@@ -59,19 +57,19 @@ def trajectory_pipeline(
     config : LoaderConfig
         Full loader configuration.
     agent_id : str, optional
-        Agent identifier column.  Defaults to ``"id"``.
+        Agent identifier column.  Defaults to `"id"`.
     frame_column : str, optional
-        Frame / timestep column.  Defaults to ``"frame"``.
+        Frame / timestep column.  Defaults to `"frame"`.
     pos_columns : Sequence[str], optional
-        Position column names.  Defaults to ``("x", "y")``.
+        Position column names.  Defaults to `("x", "y")`.
     category_column : str or None, optional
-        Agent-category column name.  Defaults to ``"agent_category"``.
+        Agent-category column name.  Defaults to `"agent_category"`.
     min_agents : int, optional
         Minimum agents per scene/window.  Defaults to 2.
     add_derivative : bool, optional
-        Compute first-order derivatives.  Defaults to ``True``.
+        Compute first-order derivatives.  Defaults to `True`.
     add_second_derivative : bool, optional
-        Compute second-order derivatives.  Defaults to ``True``.
+        Compute second-order derivatives.  Defaults to `True`.
     derivative_rename : dict[int, list[str]] or None, optional
         Custom derivative column names.
     forward_fill : Sequence[str] or None, optional
@@ -84,7 +82,7 @@ def trajectory_pipeline(
 
     Examples
     --------
-    Minimal usage inside a loader's ``pipeline`` method::
+    Minimal usage inside a loader's `pipeline` method::
 
         @override
         def pipeline(self) -> Pipeline:

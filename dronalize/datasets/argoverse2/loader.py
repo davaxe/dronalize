@@ -1,22 +1,22 @@
-from collections.abc import Iterable
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.derivative import derivative
-from dronalize.common.trajectory.filter import filter_scene_expr
-from dronalize.common.trajectory.resample import Resampling, resample
+import dronalize.core.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
+from dronalize.core.pipeline import Pipeline
+from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
 
-# TODO: Currently the column "focal_agent_id" is discarded and not used; might
-# want to provide a way to identify it downstream. Either implicitly by
-# assigning a specific id or explicitly by providing a way to specify it.
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
-class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
+class Argoverse2Loader(BaseSceneLoader[int, list[Path]]):
     """Processor for Argoverse2 trajectory data stored in Parquet files."""
 
     def __init__(
@@ -40,40 +40,41 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         super().__init__(loader_config=loader_config, enforce_schema=True)
         self._data_dir = data_dir
         self._file_batch_size = file_batch_size
-        self._unique_types: set[str] = set()
 
     @override
-    def sources(self) -> Iterable[Source[int, pl.LazyFrame]]:
-        # Sort to match files correctly
-        parquet_files = sorted(str(f) for f in self._data_dir.glob("*/*.parquet"))
-        json_files = sorted(str(f) for f in self._data_dir.glob("*/*.json"))
-        map_lookup = pl.DataFrame({"file_id": parquet_files, "map_path": json_files}).lazy()
-
+    def sources(self) -> Iterable[Source[int, list[Path]]]:
+        parquet_files = sorted(self._data_dir.glob("*/*.parquet"))
         batch_size: int = self._file_batch_size or len(parquet_files)
         for i in range(0, len(parquet_files), batch_size):
-            batch_files: list[str] = list(parquet_files[i : i + batch_size])
-            yield Source(
-                identifier=i,
-                inner=pl
-                .scan_parquet(batch_files, include_file_paths="file_id")
-                .join(map_lookup, on="file_id", how="left")
-                .with_columns(
-                    pl.col("file_id").cast(pl.Categorical).to_physical(),
-                    self._map_object_type_expr("object_type").alias("agent_category"),
-                    pl.col("track_id").str.replace("AV", "0").cast(pl.Int32),
-                )
-                .select(
-                    pl.col("file_id").cast(pl.Categorical).to_physical(),
-                    self._map_object_type_expr("object_type").alias("agent_category"),
-                    pl.col("track_id").str.replace("AV", "0").cast(pl.Int32).alias("id"),
-                    pl.col("timestep").alias("frame"),
-                    pl.col("position_x").alias("x"),
-                    pl.col("position_y").alias("y"),
-                    pl.col("velocity_x").alias("vx"),
-                    pl.col("velocity_y").alias("vy"),
-                    pl.col("heading").alias("yaw"),
-                ),
-            )
+            batch_files = parquet_files[i : i + batch_size]
+            yield Source(identifier=i, inner=batch_files)
+
+    @override
+    def ingest(self, source: Source[int, list[Path]]) -> Iterable[IngestOutput]:
+        # Build a mapping from parquet file path to its co-located JSON map path.
+        # Each parquet lives in a subdirectory like <scenario_id>/<scenario_id>.parquet
+        # alongside a <scenario_id>.json map file.
+        file_to_map: dict[str, str] = {}
+        for pq in source.inner:
+            json_candidates = list(pq.parent.glob("*.json"))
+            if json_candidates:
+                file_to_map[str(pq)] = str(json_candidates[0])
+
+        batch_lf = pl.scan_parquet(source.inner, include_file_paths="file_id").select(
+            pl.col("file_id"),
+            self._map_object_type_expr("object_type").alias("agent_category"),
+            pl.col("track_id").str.replace("AV", "0").cast(pl.Int32).alias("id"),
+            pl.col("timestep").alias("frame"),
+            pl.col("position_x").alias("x"),
+            pl.col("position_y").alias("y"),
+            pl.col("velocity_x").alias("vx"),
+            pl.col("velocity_y").alias("vy"),
+            pl.col("heading").alias("yaw"),
+        )
+
+        for (file_id,), group in batch_lf.collect().group_by(["file_id"]):
+            map_path = file_to_map.get(str(file_id))
+            yield group.lazy().drop("file_id"), map_path
 
     @override
     def num_sources(self) -> int | None:
@@ -83,48 +84,18 @@ class Argoverse2Loader(BaseSceneLoader[int, pl.LazyFrame]):
         return batches + int(extra > 0)
 
     @override
-    def load_raw(
-        self,
-        source: Source[int, pl.LazyFrame],
-    ) -> Iterable[tuple[pl.LazyFrame, str]]:
-        resampling = self.loader_config.resampling or Resampling(1, 1)
-        source_filtered = source.inner.filter(
-            filter_scene_expr(
-                self.loader_config.scene_filtering,
-                group_by=["file_id"],
-                category_column="agent_category",
-            ),
-        )
-
-        if resampling.no_resampling:
-            source_resampled = derivative(
-                source_filtered,
-                "vx",
-                "vy",
-                dt=self.loader_config.sample_time,
-                group_by=["file_id"],
-                derivative_rename={1: ["ax", "ay"]},
-            )
-        else:
-            source_resampled = yaw_from_vel(
-                resample(
-                    source_filtered,
-                    resampling,
-                    group_by=["file_id"],
-                    add_derivative=True,
-                    add_second_derivative=True,
-                    dt=self.loader_config.sample_time,
+    def pipeline(self) -> Pipeline:
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(
+                    self.loader_config,
                     derivative_rename=self.derivative_names(),
                     forward_fill=["agent_category"],
-                ),
+                )
             )
-
-        for _, group in source_resampled.collect().group_by(["file_id"]):
-            yield group.lazy(), str(group["map_path"].first())
-
-    @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return df
+            .then(tr.yaw_from_vel())
+        )
 
     @classmethod
     @override

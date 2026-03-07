@@ -6,17 +6,17 @@ from typing import TYPE_CHECKING, cast
 import polars as pl
 from typing_extensions import override
 
-# Adjust imports to match your project structure
-from dronalize.common.trajectory.basic import yaw_from_vel
-from dronalize.common.trajectory.process import prepare_agent_trajectories
+import dronalize.core.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.protocols.loader import BaseSceneLoader, LoaderConfig, Source
+from dronalize.core.pipeline import Pipeline
+from dronalize.core.pipelines import trajectory_pipeline
+from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
+class NuScenesLoader(BaseSceneLoader[str, str]):
     """Nuscenes trajectory processor.
 
     Strategy:
@@ -72,22 +72,18 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
         self._precompute_global_data()
 
     @override
-    def sources(self) -> Iterable[Source[tuple[str, str], str]]:
+    def sources(self) -> Iterable[Source[str, str]]:
         for token, df in self._scene_cache.items():
-            # More efficient: peek at the first row's scene_name directly
             scene_name = df.item(0, "scene_name")
             map_name = df.item(0, "map")
-            yield Source(identifier=(scene_name, map_name), inner=token, map_key=map_name)
+            yield Source(identifier=scene_name, inner=token, map_key=map_name)
 
     @override
     def num_sources(self) -> int | None:
         return len(self._scene_cache)
 
     @override
-    def load_raw(
-        self,
-        source: Source[tuple[str, str], str],
-    ) -> Iterable[tuple[pl.LazyFrame, str | None]]:
+    def ingest(self, source: Source[str, str]) -> Iterable[IngestOutput]:
         map_key = source.map_key
         scenes = (
             self
@@ -99,26 +95,26 @@ class NuScenesLoader(BaseSceneLoader[tuple[str, str], str]):
             ])
             .lazy()
         )
-        scenes = scenes.filter(
-            ~pl.col("status").is_in(self._status_to_filter),
-            *[
-                ~pl.col("full_category").str.contains(category)
-                for category in self._full_category_contains
-            ],
-        ).drop(["status", "full_category", "full_status"])
-
-        for df in prepare_agent_trajectories(
-            scenes,
-            config=self.loader_config,
-            add_derivative=True,
-            add_second_derivative=True,
-            derivative_rename=self.derivative_names(),
-        ):
-            yield df, map_key
+        yield (
+            scenes.filter(
+                ~pl.col("status").is_in(self._status_to_filter),
+                *[
+                    ~pl.col("full_category").str.contains(category)
+                    for category in self._full_category_contains
+                ],
+            ).drop(["status", "full_category", "full_status"]),
+            map_key,
+        )
 
     @override
-    def normalize(self, df: pl.LazyFrame) -> pl.LazyFrame:
-        return yaw_from_vel(df)
+    def pipeline(self) -> Pipeline:
+        return (
+            Pipeline()
+            .compose(
+                trajectory_pipeline(self.loader_config, derivative_rename=self.derivative_names())
+            )
+            .then(tr.yaw_from_vel())
+        )
 
     @classmethod
     @override
@@ -423,48 +419,6 @@ def extract_agent_tracks(
     ])
 
 
-_FULL_CATEGORY_MAPPING: dict[str, int] = {
-    # Vehicles
-    "vehicle.car": AgentCategory.CAR,
-    "vehicle.ego.car": AgentCategory.CAR,
-    "vehicle.van": AgentCategory.VAN,
-    "vehicle.construction": AgentCategory.VAN,
-    "vehicle.bus.bendy": AgentCategory.BUS,
-    "vehicle.bus.rigid": AgentCategory.BUS,
-    "vehicle.truck": AgentCategory.TRUCK,
-    "vehicle.trailer": AgentCategory.TRAILER,
-    "vehicle.motorcycle": AgentCategory.MOTORCYCLE,
-    "vehicle.bicycle": AgentCategory.BICYCLE,
-    "vehicle.emergency.ambulance": AgentCategory.CAR,
-    "vehicle.emergency.police": AgentCategory.CAR,
-    # Humans
-    "human.pedestrian.adult": AgentCategory.PEDESTRIAN,
-    "human.pedestrian.child": AgentCategory.PEDESTRIAN,
-    "human.pedestrian.construction_worker": AgentCategory.PEDESTRIAN,
-    "human.pedestrian.police_officer": AgentCategory.PEDESTRIAN,
-    "human.pedestrian.stroller": AgentCategory.PEDESTRIAN,
-    "human.pedestrian.wheelchair": AgentCategory.PEDESTRIAN,
-    "human.pedestrian": AgentCategory.PEDESTRIAN,  # Catch-all
-    # Static / Other
-    "static_object.bicycle_rack": AgentCategory.STATIC_OBJECT,
-    "movable_object.barrier": AgentCategory.MOVEABLE_OBJECT,
-    "movable_object.debris": AgentCategory.MOVEABLE_OBJECT,
-    "movable_object.pushable_pullable": AgentCategory.MOVEABLE_OBJECT,
-    "movable_object.trafficcone": AgentCategory.MOVEABLE_OBJECT,
-    "animal": AgentCategory.ANIMAL,
-}
-
-_STATUS_MAPPING = {
-    "vehicle.moving": "moving",
-    "vehicle.stopped": "stopped",
-    "vehicle.parked": "parked",
-    "pedestrian.moving": "moving",
-    "pedestrian.standing": "stopped",
-    "pedestrian.sitting_lying_down": "stopped",
-    "cycle.with_rider": "moving",
-    "cycle.without_rider": "stopped",
-}
-
 _SCHEMAS: dict[str, pl.Schema | None] = {
     "scene": pl.Schema({
         "token": pl.String,
@@ -540,4 +494,46 @@ _SCHEMAS: dict[str, pl.Schema | None] = {
         "height": pl.Int32,
         "width": pl.Int32,
     }),
+}
+
+_FULL_CATEGORY_MAPPING: dict[str, int] = {
+    # Vehicles
+    "vehicle.car": AgentCategory.CAR,
+    "vehicle.ego.car": AgentCategory.CAR,
+    "vehicle.van": AgentCategory.VAN,
+    "vehicle.construction": AgentCategory.VAN,
+    "vehicle.bus.bendy": AgentCategory.BUS,
+    "vehicle.bus.rigid": AgentCategory.BUS,
+    "vehicle.truck": AgentCategory.TRUCK,
+    "vehicle.trailer": AgentCategory.TRAILER,
+    "vehicle.motorcycle": AgentCategory.MOTORCYCLE,
+    "vehicle.bicycle": AgentCategory.BICYCLE,
+    "vehicle.emergency.ambulance": AgentCategory.CAR,
+    "vehicle.emergency.police": AgentCategory.CAR,
+    # Humans
+    "human.pedestrian.adult": AgentCategory.PEDESTRIAN,
+    "human.pedestrian.child": AgentCategory.PEDESTRIAN,
+    "human.pedestrian.construction_worker": AgentCategory.PEDESTRIAN,
+    "human.pedestrian.police_officer": AgentCategory.PEDESTRIAN,
+    "human.pedestrian.stroller": AgentCategory.PEDESTRIAN,
+    "human.pedestrian.wheelchair": AgentCategory.PEDESTRIAN,
+    "human.pedestrian": AgentCategory.PEDESTRIAN,  # Catch-all
+    # Static / Other
+    "static_object.bicycle_rack": AgentCategory.STATIC_OBJECT,
+    "movable_object.barrier": AgentCategory.MOVEABLE_OBJECT,
+    "movable_object.debris": AgentCategory.MOVEABLE_OBJECT,
+    "movable_object.pushable_pullable": AgentCategory.MOVEABLE_OBJECT,
+    "movable_object.trafficcone": AgentCategory.MOVEABLE_OBJECT,
+    "animal": AgentCategory.ANIMAL,
+}
+
+_STATUS_MAPPING: dict[str, str] = {
+    "vehicle.moving": "moving",
+    "vehicle.stopped": "stopped",
+    "vehicle.parked": "parked",
+    "pedestrian.moving": "moving",
+    "pedestrian.standing": "stopped",
+    "pedestrian.sitting_lying_down": "stopped",
+    "cycle.with_rider": "moving",
+    "cycle.without_rider": "stopped",
 }

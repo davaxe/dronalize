@@ -176,21 +176,21 @@ def preloaded_map(maps: dict[str, MapGraph]) -> MapResolver:
 
 
 def resolved_map(graph: MapGraph) -> MapResolver:
-    """Create a resolver for a single already-built :class:`MapGraph`.
+    """Create a resolver for a single already-built `MapGraph`.
 
-    This is the correct factory for datasets where the map is embedded
-    alongside each individual trajectory record (e.g. Waymo), and is
-    therefore built during :meth:`~dronalize.core.protocols.loader.BaseSceneLoader.ingest`
+    This is the correct factory for datasets where the map is embedded alongside
+    each individual trajectory record (e.g. Waymo), and is therefore built
+    during `~dronalize.core.protocols.loader.BaseSceneLoader.ingest`
     rather than loaded on demand.
 
-    Unlike :func:`fixed_map`, no callable indirection is needed — the
-    graph is passed directly.  The resolver ignores the key entirely and
-    always returns the same graph, so :attr:`~dronalize.core.datatypes.scene.Scene.map_key`
+    Unlike `fixed_map`, no callable indirection is needed — the graph is
+    passed directly. The resolver ignores the key entirely and always returns
+    the same graph, so `~dronalize.core.datatypes.scene.Scene.map_key`
     should be left as ``None`` for scenes that use this resolver.
 
     The graph lives only as long as the resolver closure that wraps it.
     When the scenes produced from a single record are released, the
-    resolver (and the :class:`MapGraph` it holds) becomes eligible for
+    resolver (and the `MapGraph` it holds) becomes eligible for
     garbage collection.
 
     Parameters
