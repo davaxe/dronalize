@@ -1,4 +1,4 @@
-from dronalize.common.map.osm import OSMMapGraphBuilder
+from dronalize.builders.graph_builder_osm import OSMMapGraphBuilder
 
 
 class InteractMapGraphBuilder(OSMMapGraphBuilder):

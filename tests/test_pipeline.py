@@ -10,9 +10,9 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from dronalize.core import AgentCategory
-from dronalize.core import transforms as transform
 from dronalize.core.datatypes import LoaderConfig
-from dronalize.core.pipeline import Pipeline, ReduceTransform
+from dronalize.pipeline import transforms as transform
+from dronalize.pipeline.pipeline import Pipeline, ReduceTransform
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

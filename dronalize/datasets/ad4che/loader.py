@@ -5,9 +5,9 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.common.loaders.xlevel import XLevelDataLoader
 from dronalize.core import AgentCategory, LoaderConfig
 from dronalize.core.protocols.loader import Source
+from dronalize.loaders.base import XLevelDataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

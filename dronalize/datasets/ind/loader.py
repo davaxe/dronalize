@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dronalize.common.loaders.xlevel import XLevelDataLoader
+from dronalize.loaders.base import XLevelDataLoader
 
 if TYPE_CHECKING:
     from pathlib import Path

@@ -7,15 +7,15 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-import dronalize.core.transforms as tr
+import dronalize.pipeline.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes.map_context import MapKey, MapResolver, no_map
+from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
 from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines_factory import trajectory_pipeline
 from dronalize.core.protocols.loader import IngestOutput, Source
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
+from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

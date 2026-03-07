@@ -3,19 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from fractions import Fraction
-from typing import TYPE_CHECKING, Literal, cast, overload
+from typing import TYPE_CHECKING, Literal, TypeVar, cast, overload
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
 from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
-from dronalize.common.trajectory.derivative import derivative
+from dronalize.ops.trajectory.derivative import derivative
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.common.trajectory import DataFrameT
+
+DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
 
 
 class ResamplingMethod(StrEnum):
@@ -69,10 +70,10 @@ class Resampling:
 def resample(
     data: DataFrameT,
     resampling: Resampling,
+    *,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
     group_by: str | Sequence[str] | None = None,
-    *,
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     dt: float = 1.0,
@@ -173,10 +174,10 @@ def _resample_dataframe_spline(
     data: DataFrameT,
     up: int,
     down: int = 1,
+    *,
     frame_column: str = "frame",
     pos_columns: Sequence[str] = ("x", "y"),
     group_by: Sequence[str] | None = None,
-    *,
     add_derivative: bool = False,
     add_second_derivative: bool = False,
     derivative_rename: dict[int, list[str]] | None = None,
@@ -376,6 +377,7 @@ def _resample_dataframe(
     data: DataFrameT,
     up: int,
     down: int,
+    *,
     frame_column: str = "frame",
     group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
@@ -422,13 +424,33 @@ def _downsample_dataframe(
     )
 
 
+@overload
 def _upsample_dataframe(
-    data: DataFrameT,
+    data: pl.DataFrame,
     factor: int,
     frame_column: str = "frame",
     group_by: Sequence[str] | None = None,
     forward_fill: Sequence[str] | None = None,
-) -> DataFrameT:
+) -> pl.DataFrame: ...
+
+
+@overload
+def _upsample_dataframe(
+    data: pl.LazyFrame,
+    factor: int,
+    frame_column: str = "frame",
+    group_by: Sequence[str] | None = None,
+    forward_fill: Sequence[str] | None = None,
+) -> pl.LazyFrame: ...
+
+
+def _upsample_dataframe(
+    data: pl.DataFrame | pl.LazyFrame,
+    factor: int,
+    frame_column: str = "frame",
+    group_by: Sequence[str] | None = None,
+    forward_fill: Sequence[str] | None = None,
+) -> pl.DataFrame | pl.LazyFrame:
     """Upsample by an integer factor using linear interpolation.
 
     Parameters

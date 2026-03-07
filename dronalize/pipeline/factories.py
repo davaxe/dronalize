@@ -11,8 +11,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import dronalize.core.transforms as tr
-from dronalize.core.pipeline import Pipeline
+import dronalize.pipeline.transforms as tr
+from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

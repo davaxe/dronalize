@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 import polars as pl
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.common.trajectory import DataFrameT
+
+DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
 
 
 def derivative(

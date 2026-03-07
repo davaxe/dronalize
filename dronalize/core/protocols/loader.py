@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Any, Concatenate, Generic, ParamSpec, Protocol
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.datatypes.map_context import MapKey, MapResolver, no_map
+from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
 
 if TYPE_CHECKING:
     from dronalize.core.datatypes import LoaderConfig
-    from dronalize.core.pipeline import Pipeline
+    from dronalize.pipeline.pipeline import Pipeline
 
 
 MapContext: TypeAlias = MapResolver | MapKey | None

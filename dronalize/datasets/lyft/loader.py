@@ -10,11 +10,11 @@ import polars as pl
 from typing_extensions import override
 from zarr.creation import open_array
 
-import dronalize.core.transforms as tr
+import dronalize.pipeline.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, LoaderConfig, Source
+from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

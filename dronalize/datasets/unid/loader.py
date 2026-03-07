@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dronalize.common.loaders.xlevel import XLevelDataLoader
+from dronalize.loaders.base import XLevelDataLoader
 
 
 class UniDLoader(XLevelDataLoader):

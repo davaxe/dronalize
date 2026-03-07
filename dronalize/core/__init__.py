@@ -1,24 +1,22 @@
-"""Core package — domain models, protocols, graph building, and parallelism."""
+"""Core package — domain types, protocols, and graph building infrastructure."""
 
-# Domain models
-# Graph building
-# Pipeline
-# Allow `from dronalize.core import transforms` as a module reference
-from dronalize.core import pipeline_factories, transforms
 from dronalize.core.datatypes import (
     AgentCategory,
     DatasetSplit,
     EdgeType,
+    FilteringConfig,
     LoaderConfig,
     MapGraph,
     MapKey,
     MapResolver,
     Scene,
     SplitNotSupportedError,
+    WindowParams,
     fixed_map,
     keyed_map,
     no_map,
     preloaded_map,
+    resolved_map,
 )
 from dronalize.core.graph import (
     Edges,
@@ -28,19 +26,6 @@ from dronalize.core.graph import (
     get_edges_from_adj_list,
     interpolate_position,
 )
-
-# Parallel execution
-from dronalize.core.parallel import (
-    ParallelSceneLoader,
-    ProgressBar,
-)
-from dronalize.core.pipeline import (
-    FlatMapTransform,
-    Pipeline,
-    Transform,
-)
-
-# Protocols & loader ABCs
 from dronalize.core.protocols import (
     BaseEnum,
     BaseMapObject,
@@ -55,26 +40,22 @@ __all__ = [
     "DatasetSplit",
     "EdgeType",
     "Edges",
-    "FlatMapTransform",
+    "FilteringConfig",
     "GraphBuilder",
     "InterpolationStage",
     "LoaderConfig",
     "MapGraph",
     "MapKey",
     "MapResolver",
-    "ParallelSceneLoader",
-    "Pipeline",
     "Point",
-    "ProgressBar",
     "Scene",
     "SplitNotSupportedError",
-    "Transform",
+    "WindowParams",
     "fixed_map",
     "get_edges_from_adj_list",
     "interpolate_position",
     "keyed_map",
     "no_map",
-    "pipeline_factories",
     "preloaded_map",
-    "transforms",
+    "resolved_map",
 ]

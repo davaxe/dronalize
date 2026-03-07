@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import utm
 from typing_extensions import override
 
-from dronalize.common.map.osm import OSMMapGraphBuilder
+from dronalize.builders.graph_builder_osm import OSMMapGraphBuilder
 
 if TYPE_CHECKING:
     from pathlib import Path

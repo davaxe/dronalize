@@ -4,7 +4,7 @@ from collections import Counter
 
 import pytest
 
-from dronalize.core.split import StreamSplitter
+from dronalize.pipeline.split import StreamSplitter
 
 
 def test_exact_distribution_for_round_multiples() -> None:

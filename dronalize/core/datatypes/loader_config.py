@@ -7,8 +7,8 @@ from typing import (
     Self,
 )
 
-from dronalize.common.trajectory.filter import FilteringConfig
-from dronalize.common.trajectory.resample import Resampling
+from dronalize.ops.trajectory.filter import FilteringConfig
+from dronalize.ops.trajectory.resample import Resampling
 
 if TYPE_CHECKING:
     from collections.abc import Collection

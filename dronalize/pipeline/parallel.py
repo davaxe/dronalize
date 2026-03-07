@@ -103,9 +103,9 @@ class ParallelSceneLoader(SceneLoader[IdT]):
     def __init__(
         self,
         inner: BaseSceneLoader[IdT, Any],
+        *,
         chunksize: int | None = None,
         processes: int | None = None,
-        *,
         maintain_order: bool = False,
         progress_bar: ProgressBar | bool = ProgressBar.NONE,
     ) -> None:

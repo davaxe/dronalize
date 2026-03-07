@@ -8,9 +8,9 @@ from typing_extensions import override
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.datatypes.loader_config import LoaderConfig
 from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.pipeline import Pipeline
-from dronalize.core.pipelines_factories import trajectory_pipeline
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
+from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

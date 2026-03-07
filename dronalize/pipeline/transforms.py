@@ -7,19 +7,19 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 from typing_extensions import overload
 
-from dronalize.common.trajectory.basic import yaw_from_pos_expr as _yaw_from_pos_expr
-from dronalize.common.trajectory.basic import yaw_from_vel_expr as _yaw_from_vel_expr
-from dronalize.common.trajectory.derivative import derivative as _derivative_impl
-from dronalize.common.trajectory.filter import FilteringConfig, filter_scene_expr
-from dronalize.common.trajectory.rebalance import rebalance_highway_agents
-from dronalize.common.trajectory.resample import Resampling
-from dronalize.common.trajectory.resample import resample as resample_impl
-from dronalize.common.trajectory.window import sliding_window
+from dronalize.ops.trajectory.basic import yaw_from_pos_expr as _yaw_from_pos_expr
+from dronalize.ops.trajectory.basic import yaw_from_vel_expr as _yaw_from_vel_expr
+from dronalize.ops.trajectory.derivative import derivative as _derivative_impl
+from dronalize.ops.trajectory.filter import FilteringConfig, filter_scene_expr
+from dronalize.ops.trajectory.rebalance import rebalance_highway_agents
+from dronalize.ops.trajectory.resample import Resampling
+from dronalize.ops.trajectory.resample import resample as resample_impl
+from dronalize.ops.trajectory.window import sliding_window
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.core.pipeline import FlatMapTransform, Transform
+    from dronalize.pipeline.pipeline import FlatMapTransform, Transform
 
 __all__ = [
     "derivative",

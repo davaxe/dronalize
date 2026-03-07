@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dronalize.common.loaders.xlevel import XLevelDataLoader
+from dronalize.loaders.xlevel_loader import XLevelDataLoader
 
 
 class RounDLoader(XLevelDataLoader):

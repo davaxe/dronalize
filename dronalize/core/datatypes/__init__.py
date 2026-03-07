@@ -2,7 +2,8 @@
 
 from dronalize.core.datatypes.categories import AgentCategory, EdgeType
 from dronalize.core.datatypes.loader_config import FilteringConfig, LoaderConfig, WindowParams
-from dronalize.core.datatypes.map_context import (
+from dronalize.core.datatypes.map_graph import MapGraph
+from dronalize.core.datatypes.map_resolver import (
     MapKey,
     MapResolver,
     fixed_map,
@@ -11,7 +12,6 @@ from dronalize.core.datatypes.map_context import (
     preloaded_map,
     resolved_map,
 )
-from dronalize.core.datatypes.map_graph import MapGraph
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
 

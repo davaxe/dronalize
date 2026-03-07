@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.common.map.lane import HighWayLaneGraphBuilder, LaneDescription
+from dronalize.builders.graph_builder_highway import HighWayLaneGraphBuilder, LaneDescription
 
 if TYPE_CHECKING:
     from pathlib import Path

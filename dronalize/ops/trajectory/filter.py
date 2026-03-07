@@ -1,19 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 import polars as pl
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Sequence
 
-    from dronalize.common.trajectory import DataFrameT
     from dronalize.core.datatypes.categories import AgentCategory
 
-
-# TODO: Possibly add filter option based on minimum required valid frames in
-# input and output, respectively.
+DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
 
 
 @dataclass(slots=True, frozen=True)
@@ -111,6 +108,7 @@ def filter_scene(
 
 def filter_scene_expr(
     config: FilteringConfig | None,
+    *,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",

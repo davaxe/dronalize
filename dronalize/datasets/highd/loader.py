@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.common.loaders.xlevel import XLevelDataLoader
 from dronalize.core import AgentCategory
+from dronalize.loaders.base import XLevelDataLoader
 
 if TYPE_CHECKING:
     from pathlib import Path

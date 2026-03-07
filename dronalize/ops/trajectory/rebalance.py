@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TypeVar
 
 import polars as pl
 
-from dronalize.common.trajectory.basic import lazy
+from dronalize.ops.trajectory.basic import lazy
 
-if TYPE_CHECKING:
-    from dronalize.common.trajectory import DataFrameT
+DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
 
 
 def rebalance_highway_agents(
     data: DataFrameT,
     ratio: float = 2.0,
     req_lane_changes: int = 1,
+    *,
     agent_id: str = "id",
     lane_changes_col: str = "lane_changes",
     seed: int | None = None,

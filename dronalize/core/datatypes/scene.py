@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Generic, Self, TypeVar
 
 import polars as pl
 
-from dronalize.core.datatypes.map_context import MapResolver  # noqa: TC001
+from dronalize.core.datatypes.map_resolver import MapResolver  # noqa: TC001
 
 if TYPE_CHECKING:
-    from dronalize.core.datatypes.map_context import MapGraph, MapKey
+    from dronalize.core.datatypes.map_resolver import MapGraph, MapKey
 
 
 IdT = TypeVar("IdT", bound=(Hashable))
