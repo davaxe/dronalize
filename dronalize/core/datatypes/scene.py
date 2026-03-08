@@ -136,14 +136,19 @@ class Scene(Generic[IdT]):
                 )
             }
 
-        candidates = target_candidates(self.inner, self.input_len, self.output_len)
+        candidates = target_candidates(self.inner, self.input_len)
         if multiple_targets is False:
             candidates = candidates[:1]
         elif isinstance(multiple_targets, int):
             candidates = candidates[:multiple_targets]
 
         return {
-            target: convert_to_numpy_dict(self.inner, self.input_len, self.output_len, target)
+            target: convert_to_numpy_dict(
+                self.inner,
+                self.input_len,
+                self.output_len,
+                target,
+            )
             for target in candidates
         }
 

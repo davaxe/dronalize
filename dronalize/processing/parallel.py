@@ -2,20 +2,21 @@ from __future__ import annotations
 
 import multiprocessing as mp
 from collections import deque
-from collections.abc import Callable, Hashable, Iterable
+from collections.abc import Callable, Hashable, Iterable, Iterator
 from dataclasses import replace
 from enum import IntEnum
+from functools import partial
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, NamedTuple, ParamSpec, TypeVar
 
 import tqdm
 from typing_extensions import Self, override
 
+from dronalize.core.datatypes.scene import Scene
 from dronalize.core.protocols.loader import BaseSceneLoader, SceneLoader, Source
 
 if TYPE_CHECKING:
     from multiprocessing.sharedctypes import Synchronized
 
-    from dronalize.core.datatypes.scene import Scene
     from dronalize.core.protocols.writer import SceneWriter
 
 
@@ -48,6 +49,8 @@ class ProgressBar(IntEnum):
 SourceT = TypeVar("SourceT")
 IdT = TypeVar("IdT", bound=Hashable)
 P = ParamSpec("P")
+PayloadT = TypeVar("PayloadT")
+ReturnT = TypeVar("ReturnT", int, list[Scene[Any]])
 
 
 class ParallelSceneLoader(SceneLoader[IdT]):
@@ -217,36 +220,9 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             Processed scenes one at a time.
 
         """
-        self._mp_scene_counter.value = 0
-        self._mp_source_counter.value = 0
-        with (
-            tqdm.tqdm(**self._tqdm_args()) as progress_bar,
-            mp.Pool(
-                self._processes,
-                initializer=_init_worker,
-                initargs=(self._mp_scene_counter, self._mp_source_counter),
-            ) as pool,
-        ):
-            map_fn = pool.imap if self._maintain_order else pool.imap_unordered
-            for scenes in map_fn(
-                ParallelSceneLoader._process_fn,
-                (_ProcessArgs(s, self._inner) for s in self._inner.sources()),
-                self._chunksize,
-            ):
-                if self._progress_bar == ProgressBar.SOURCES:
-                    progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value},
-                        refresh=False,
-                    )
-                    progress_bar.update(1)
-                elif self._progress_bar == ProgressBar.SCENES:
-                    progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value},
-                        refresh=False,
-                    )
-                    progress_bar.update(len(scenes))
-
-                yield from scenes
+        payloads = (_ProcessArgs(s, self._inner) for s in self._inner.sources())
+        for scenes in self._execute_parallel(self._process_fn, payloads):
+            yield from scenes
 
     @override
     def scenes_callback(
@@ -262,6 +238,10 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         yielding scenes if you want to perform side effects (e.g., saving to
         disk) without needing to store all scenes in memory at once.
 
+        The callback should be defined as a top-level function (not a lambda or
+        nested function) to ensure it is picklable and can be sent to worker
+        processes.
+
         Parameters
         ----------
         callback : Callable
@@ -273,51 +253,11 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         **kwargs : Any
             Additional keyword arguments to pass to the callback function.
 
-        .. note::
-            All additional arguments will be passed to the worker processes and
-            should be chosen carefully to avoid sending large amounts of data.
-
-            Due to the nature of multiprocessing, the callback function and its
-            arguments must be picklable. If you encounter issues with pickling,
-            consider using simpler data structures or functions defined at the
-            top level of a module.
-
         """
-        self._mp_scene_counter.value = 0
-        self._mp_source_counter.value = 0
-        loader = self._inner
-        with (
-            tqdm.tqdm(**self._tqdm_args()) as progress_bar,
-            mp.Pool(
-                self._processes,
-                initializer=_init_worker,
-                initargs=(self._mp_scene_counter, self._mp_source_counter),
-            ) as pool,
-        ):
-            map_fn = pool.imap if self._maintain_order else pool.imap_unordered
-            work_iter = map_fn(
-                ParallelSceneLoader._process_fn_callback,
-                (_ProcessArgs(s, loader, callback, args, kwargs) for s in loader.sources()),
-                self._chunksize,
-            )
-            if self._progress_bar == ProgressBar.NONE:
-                # Exaust the iterator
-                deque(work_iter, maxlen=0)
-                return
-
-            for processed_scenes in work_iter:
-                if self._progress_bar == ProgressBar.SOURCES:
-                    progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value},
-                        refresh=False,
-                    )
-                    progress_bar.update(1)
-                elif self._progress_bar == ProgressBar.SCENES:
-                    progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value},
-                        refresh=False,
-                    )
-                    progress_bar.update(processed_scenes)
+        # Bind args and kwargs early to avoid passing them through _ProcessArgs
+        bound_callback = partial(callback, *args, **kwargs)
+        payloads = (_ProcessArgs(s, self._inner, bound_callback) for s in self._inner.sources())
+        deque(self._execute_parallel(self._process_fn_callback, payloads), maxlen=0)
 
     @override
     def write_scenes(
@@ -327,44 +267,11 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        self._mp_scene_counter.value = 0
-        self._mp_source_counter.value = 0
-        loader = self._inner
-        with (
-            tqdm.tqdm(**self._tqdm_args()) as progress_bar,
-            mp.Pool(
-                self._processes,
-                initializer=_init_worker,
-                initargs=(self._mp_scene_counter, self._mp_source_counter),
-            ) as pool,
-        ):
-            map_fn = pool.imap if self._maintain_order else pool.imap_unordered
-            work_iter = map_fn(
-                ParallelSceneLoader._process_fn_write,
-                (
-                    (_ProcessArgs(s, loader, None, args, kwargs), writer_factory, finalize)
-                    for s in loader.sources()
-                ),
-                self._chunksize,
-            )
-            if self._progress_bar == ProgressBar.NONE:
-                # Exaust the iterator
-                deque(work_iter, maxlen=0)
-                return
-
-            for processed_scenes in work_iter:
-                if self._progress_bar == ProgressBar.SOURCES:
-                    progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value},
-                        refresh=False,
-                    )
-                    progress_bar.update(1)
-                elif self._progress_bar == ProgressBar.SCENES:
-                    progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value},
-                        refresh=False,
-                    )
-                    progress_bar.update(processed_scenes)
+        bound_factory = partial(writer_factory, *args, **kwargs)
+        payloads = (
+            (_ProcessArgs(s, self._inner), bound_factory, finalize) for s in self._inner.sources()
+        )
+        deque(self._execute_parallel(self._process_fn_write, payloads), maxlen=0)
 
     @staticmethod
     def _process_fn_write(
@@ -375,22 +282,18 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         ],
     ) -> int:
         args, writer_factory, finalize = payload
-        processed_scenes = 0
+        processed_scenes: int = 0
+        writer: SceneWriter = writer_factory()
 
-        loader, source = args.loader, args.source
-        writer = writer_factory(*args.cb_args or (), **args.cb_kwargs or {})
-        for scene_data, map_resolver in loader.process_next(source):
-            scene = loader.create_scene(scene_data, source, map_resolver)
-            with _scene_counter.get_lock():
-                _scene_counter.value += 1
-                scene_number = _scene_counter.value
-
-            scene = replace(scene, scene_number=scene_number)
+        for scene in ParallelSceneLoader._generate_scenes(args.loader, args.source):
             writer.write(scene)
             processed_scenes += 1
 
         writer.finalize()
         finalize(writer)
+        with _source_counter.get_lock():
+            _source_counter.value += 1
+
         return processed_scenes
 
     @staticmethod
@@ -408,24 +311,9 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             List of processed scenes from the given source.
 
         """
-        loader, source = args.loader, args.source
-        scenes: list[Scene[IdT]] = []
-
-        for scene_data, map_resolver in loader.process_next(source):
-            scene = loader.create_scene(scene_data, source, map_resolver)
-            scenes.append(scene)
-
-        if num_scenes := len(scenes):
-            with _scene_counter.get_lock():
-                start_index = _scene_counter.value + 1
-                _scene_counter.value += num_scenes
-
-            for i in range(num_scenes):
-                scenes[i] = replace(scenes[i], scene_number=start_index + i)
-
+        scenes = list(ParallelSceneLoader._generate_scenes(args.loader, args.source))
         with _source_counter.get_lock():
             _source_counter.value += 1
-
         return scenes
 
     @staticmethod
@@ -448,32 +336,71 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             Number of scenes processed from the given source.
 
         """
+        processed_scenes = 0
         if args.fn is None:
-            msg = "no callable function provided in _ProcessArgs for _process_fn_callable."
+            msg = "no callable function provided in _ProcessArgs."
             raise ValueError(msg)
 
-        processed_scenes = 0
-        loader, source = args.loader, args.source
-        scene_number: int = -1
-        cb_args, cb_kwargs = args.cb_args or (), args.cb_kwargs or {}
-        for scene_data, map_resolver in loader.process_next(source):
-            # Should be fine to aquire lock in loop, since `process_next` is
-            # expected to be relatively slow. Not as easy to move outside the
-            # loop here since we want to avoid loading all scenes into memory at
-            # once, which would happen if we used `_process_fn`.
-            with _scene_counter.get_lock():
-                _scene_counter.value += 1
-                scene_number = _scene_counter.value
-
-            scene = loader.create_scene(scene_data, source, map_resolver)
-            scene = replace(scene, scene_number=scene_number)
-            args.fn(scene, *cb_args, **cb_kwargs)
+        for scene in ParallelSceneLoader._generate_scenes(args.loader, args.source):
+            args.fn(scene)
             processed_scenes += 1
 
         with _source_counter.get_lock():
             _source_counter.value += 1
 
         return processed_scenes
+
+    @staticmethod
+    def _generate_scenes(
+        loader: BaseSceneLoader[IdT, SourceT], source: Source[IdT, SourceT]
+    ) -> Iterator[Scene[IdT]]:
+        """Core logic to process a source and yield properly numbered scenes."""
+        for scene_data, map_resolver in loader.process_next(source):
+            scene = loader.create_scene(scene_data, source, map_resolver)
+            with _scene_counter.get_lock():
+                _scene_counter.value += 1
+                scene_number = _scene_counter.value
+
+            yield replace(scene, scene_number=scene_number)
+
+    def _execute_parallel(
+        self,
+        process_fn: Callable[[PayloadT], ReturnT],
+        payloads: Iterable[PayloadT],
+    ) -> Iterable[ReturnT]:
+        """Centralized execution engine for managing the Pool and progress tracking."""
+        self._mp_scene_counter.value = 0
+        self._mp_source_counter.value = 0
+        with (
+            tqdm.tqdm(**self._tqdm_args()) as progress_bar,
+            mp.Pool(
+                self._processes,
+                initializer=_init_worker,
+                initargs=(self._mp_scene_counter, self._mp_source_counter),
+            ) as pool,
+        ):
+            map_fn = pool.imap if self._maintain_order else pool.imap_unordered
+            work_iter = map_fn(process_fn, payloads, self._chunksize)
+
+            if self._progress_bar == ProgressBar.NONE:
+                yield from work_iter
+                return
+
+            for result in work_iter:
+                processed_scenes = len(result) if isinstance(result, list) else result
+
+                if self._progress_bar == ProgressBar.SOURCES:
+                    progress_bar.set_postfix(
+                        {"scenes": self._mp_scene_counter.value}, refresh=False
+                    )
+                    progress_bar.update(1)
+                elif self._progress_bar == ProgressBar.SCENES:
+                    progress_bar.set_postfix(
+                        {"sources": self._mp_source_counter.value}, refresh=False
+                    )
+                    progress_bar.update(processed_scenes)
+
+                yield result
 
     def _total(self) -> int | None:
         if self._progress_bar == ProgressBar.SOURCES:
@@ -504,13 +431,11 @@ class ParallelSceneLoader(SceneLoader[IdT]):
 
 
 class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):
-    """Arguments for processing a single source in a worker process."""
+    """Simplified arguments for processing a single source in a worker process."""
 
     source: Source[IdT, SourceT]
     loader: BaseSceneLoader[IdT, SourceT]
-    fn: Callable[..., None] | None = None
-    cb_args: tuple | None = None
-    cb_kwargs: dict[str, Any] | None = None
+    fn: Callable[..., Any] | None = None
 
 
 # Worker initialization function to set up the global counter in each worker

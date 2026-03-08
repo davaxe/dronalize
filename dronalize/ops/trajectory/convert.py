@@ -12,6 +12,8 @@ from dronalize.core.datatypes.categories import AgentCategory
 
 
 class NumpySceneDict(TypedDict):
+    """TypedDict for the output of `convert_to_numpy_dict`."""
+
     num_nodes: int
     ta_index: int
     type: npt.NDArray[np.int32]
@@ -134,7 +136,6 @@ def convert_to_numpy_dict(
 def target_candidates(
     data: pl.DataFrame,
     input_len: int,
-    output_len: int,
     *,
     min_input_frames: int = 1,
     min_output_frames: int = 1,

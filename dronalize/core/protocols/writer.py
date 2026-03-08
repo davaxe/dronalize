@@ -1,22 +1,30 @@
-from abc import ABC, abstractmethod
-from enum import StrEnum
+from pathlib import Path
 from typing import Protocol
 
 from dronalize.core.datatypes.scene import Scene
-
-
-class TrajectoryFormat(StrEnum):
-    DATAFRAME = "dataframe"
-    """Raw DataFrame format, where each scene is written as a single DataFrame."""
-    NUMPY = "numpy"
-    """Nmupy format, where each scene is represented by a collection of arrays."""
+from dronalize.core.datatypes.split import DatasetSplit
 
 
 class SceneWriter(Protocol):
     """Protocol for writing processed scenes to disk."""
 
-    def write(self, processed: Scene) -> None:
-        """Write a single processed scene."""
+    def write(self, processed: Scene, split: DatasetSplit | None = None) -> bool:
+        """Write a single processed scene.
+
+        Parameters
+        ----------
+        processed : Scene
+            The processed scene to write.
+        split : DatasetSplit or None, optional
+            Optional information of what dataset split the scene belongs to.
+
+        Returns
+        -------
+        bool
+            Returns `True` if anything was actually written (e.g. the scene
+            passed validation and was not
+
+        """
         ...
 
     def finalize(self) -> None:
@@ -30,31 +38,18 @@ class SceneWriter(Protocol):
         """
         ...
 
+    def set_output_dir(self, output_dir: Path) -> None:
+        """Set the output directory for the writer.
 
-class BaseSceneWriter(ABC, SceneWriter):
-    def __init__(self, *, parallel: bool = False) -> None:
-        """Initialize the base scene writer.
+        This method can be used to specify the directory where the writer should
+        save its output files. This is particularly useful in parallel processing
+        contexts, where each process may need to write to a separate directory
+        to avoid conflicts.
 
         Parameters
         ----------
-        parallel : bool, optional
-            Whether this writer will be used in a parallel processing context.
-            This can be used to determine whether the writer needs to handle
-            potential write conflicts (e.g., by writing to separate files or
-            directories for each process). Default is `False`.
+        output_dir : Path
+            The path to the output directory where the writer should save its files.
 
         """
-        self._parallel: bool = parallel
-        if parallel and not self.support_parallel():
-            msg = f"{self.__class__.__name__} does not support parallel writing,"
-            " but was initialized with `parallel=True`"
-            raise ValueError(msg)
-
-    @abstractmethod
-    def write(self, processed: Scene) -> None: ...
-
-    @abstractmethod
-    def finalize(self) -> None: ...
-
-    @abstractmethod
-    def support_parallel(self) -> bool: ...
+        ...
