@@ -201,7 +201,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         self._count: int = 0
         self._source_counter: int = 0
         self._enforce_schema: bool = enforce_schema
-        self._loader_config: LoaderConfig | None = loader_config
+        self._loader_config: LoaderConfig = loader_config or self.default_config()
         self._pipeline: Pipeline | None = None
         self._split: DatasetSplit = split if split is not None else DatasetSplit.ALL
 

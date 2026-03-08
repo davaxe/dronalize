@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TypedDict
+
 import numpy as np
 import numpy.typing as npt
 import polars as pl
@@ -9,18 +11,36 @@ from dronalize.core.datatypes.categories import AgentCategory
 # TODO: Update this when ready
 
 
-def convert_to_agent_data_dict(
+class NumpySceneDict(TypedDict):
+    num_nodes: int
+    ta_index: int
+    type: npt.NDArray[np.int32]
+    inp_pos: npt.NDArray[np.float32]
+    inp_vel: npt.NDArray[np.float32]
+    inp_acc: npt.NDArray[np.float32]
+    inp_yaw: npt.NDArray[np.float32]
+    trg_pos: npt.NDArray[np.float32]
+    trg_vel: npt.NDArray[np.float32]
+    trg_acc: npt.NDArray[np.float32]
+    trg_yaw: npt.NDArray[np.float32]
+    input_mask: npt.NDArray[np.bool]
+    valid_mask: npt.NDArray[np.bool]
+    ma_mask: npt.NDArray[np.bool]
+    sa_mask: npt.NDArray[np.bool]
+
+
+def convert_to_numpy_dict(
     data: pl.DataFrame,
     input_len: int,
     output_len: int,
-    target_agent: int | None = None,
+    target_agent: int,
     *,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> dict:
-    """Convert `Scene` into an agent dictionary.
+) -> NumpySceneDict:
+    """Convert the dataframe for the scene into a dictionary of numpy arrays.
 
     The dictionary is in a format that is later compatible with PyTorch
-    Geometric HeteroData.
+    Geometric HeteroData when converted to Tensors.
 
     Parameters
     ----------
@@ -45,13 +65,12 @@ def convert_to_agent_data_dict(
         TypedDict.
 
     """
-    target_agent_id = _extract_target_agent(data, input_len, output_len, target_agent)
     time_steps = input_len + output_len
     start_frame = data["frame"].min()
     unique_ids = data["id"].unique().to_list()
-    if target_agent_id in unique_ids:
-        unique_ids.remove(target_agent_id)
-    sorted_ids = [target_agent_id, *sorted(unique_ids)]
+    if target_agent in unique_ids:
+        unique_ids.remove(target_agent)
+    sorted_ids = [target_agent, *sorted(unique_ids)]
 
     num_agents = len(sorted_ids)
     # Create a mapping dict: {track_id: tensor_row_index}
@@ -112,44 +131,36 @@ def convert_to_agent_data_dict(
     }
 
 
-def _extract_target_agent(
+def target_candidates(
     data: pl.DataFrame,
     input_len: int,
     output_len: int,
-    target_agent: int | None = None,
-) -> int:
-    if target_agent is None:
-        # Target agent needs to have valid data for the entire sequence (input +
-        # output).
-        candidates = (
-            data
-            .group_by("id")
-            .agg(
-                valid_frames=pl.col("frame").n_unique(),
-            )
-            .filter(pl.col("valid_frames") >= input_len + output_len)
-            .select(pl.col("id"))
+    *,
+    min_input_frames: int = 1,
+    min_output_frames: int = 1,
+) -> list[int]:
+    """Return candidate target agents that have sufficient valid frames.
+
+    An agent qualifies if it has at least `min_input_frames` observations
+    in the input window and at least `min_output_frames` in the output window.
+    """
+    start_frame = data["frame"].min()
+    return (
+        data
+        .with_columns((pl.col("frame") - start_frame).alias("t"))
+        .group_by("id")
+        .agg(
+            input_frames=pl.col("t").filter(pl.col("t") < input_len).n_unique(),
+            output_frames=pl.col("t").filter(pl.col("t") >= input_len).n_unique(),
         )
-
-        if candidates.is_empty():
-            msg = "No valid target agent found with sufficient valid frames."
-            raise ValueError(msg)
-
-        # Use a different variable name to avoid shadowing the argument
-        return int(candidates.select(pl.col("id").first()).item())
-
-    target_agent_frames = (
-        data.filter(pl.col("id") == target_agent).select(pl.col("frame").n_unique()).item()
+        .filter(
+            (pl.col("input_frames") >= min_input_frames)
+            & (pl.col("output_frames") >= min_output_frames)
+        )
+        .select("id")
+        .to_series()
+        .to_list()
     )
-    if target_agent_frames < input_len + output_len:
-        msg = (
-            f"Specified target agent {target_agent} does not have enough "
-            f"valid frames ({target_agent_frames}) for the required "
-            f"input ({input_len}) and output ({output_len}) length."
-        )
-        raise ValueError(msg)
-
-    return target_agent
 
 
 def _full_zeros(

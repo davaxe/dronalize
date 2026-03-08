@@ -238,7 +238,7 @@ if __name__ == "__main__":
 
     path = Path("data")
     alt.renderers.enable("browser")
-    loader = _EthUcyLoader(path, dataset=["hotel"], split=DatasetSplit.TRAIN)
+    loader = HotelLoader(path, split=DatasetSplit.TRAIN)
     count = 0
     for _scene in loader.scenes():
         count += 1

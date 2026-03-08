@@ -91,8 +91,7 @@ class LoaderConfig(BaseModel):
             else self.input_len + self.output_len,
             step_size=step_size,
         )
-        # Replaces dataclasses.replace()
-        return self.model_copy(update={"window_params": new_window_params})
+        return self.model_copy(update={"window": new_window_params})
 
     def with_filtering(
         self,
@@ -150,7 +149,7 @@ class LoaderConfig(BaseModel):
             filter_slow_agents=filter_slow_agents,
             min_samples_per_agent=min_samples_per_agent,
         )
-        return self.model_copy(update={"scene_filtering": new_filtering})
+        return self.model_copy(update={"filtering": new_filtering})
 
     def with_resampling(
         self,
