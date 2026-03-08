@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="opendd",
         loader_factory=OpenDDLoader,
+        default_config=OpenDDLoader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

@@ -76,7 +76,7 @@ def trajectory_pipeline(
         A fully composed pipeline ready to be further extended or executed.
 
     """
-    has_window = config.window_params is not None
+    has_window = config.window is not None
     group_by_filter: str | None = "window_index" if has_window else None
     group_by_resample: list[str] = ["window_index", agent_id] if has_window else [agent_id]
 
@@ -84,7 +84,7 @@ def trajectory_pipeline(
         Pipeline()
         .then_if_present(
             lambda w: tr.window(w.window_size, w.step_size),
-            arg=config.window_params,
+            arg=config.window,
         )
         .then_if_present(
             lambda c: tr.filter_scene(
@@ -94,7 +94,7 @@ def trajectory_pipeline(
                 frame_column=frame_column,
                 category_column=category_column,
             ),
-            arg=config.scene_filtering,
+            arg=config.filtering,
         )
         .then(
             tr.resample(

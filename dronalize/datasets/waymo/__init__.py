@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="waymo",
         loader_factory=WaymoLoader,
+        default_config=WaymoLoader.default_config(),
         has_map=True,
     ).with_all_splits()
 )

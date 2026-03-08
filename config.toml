@@ -1,0 +1,34 @@
+# config.to - Only specify what you want to override
+
+[a43]
+input_len = 25
+output_len = 55
+
+[a43.filtering]
+require_frames = [19]
+filter_agent_category = ["STATIC_OBJECT"]
+
+[a43.window]
+window_size = 80
+step_size = 1
+
+[a43.resampling]
+
+[argoverse2]
+input_len = 50
+output_len = 60
+
+[argoverse2.resampling]
+method = "spline"
+
+[argoverse2.filtering]
+filter_agent_categories = ["STATIC_OBJECT", "UNKNOWN", "UNIMPORTANT"]
+
+[ad4che]
+# Only override resampling
+[ad4che.resampling]
+up = 1
+down = 2
+
+[waymo]
+sample_time = 0.05

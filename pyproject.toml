@@ -23,7 +23,11 @@ dependencies = [
     "utm>=0.7.0",
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
+    "mosaicml-streaming>=0.13.0",
 ]
+
+[project.scripts]
+dronalize = "dronalize.__main__:main"
 
 [project.optional-dependencies]
 # Plotting (map graphs, trajectories)

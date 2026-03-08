@@ -14,6 +14,7 @@ from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
 
 if TYPE_CHECKING:
     from dronalize.core.datatypes import LoaderConfig
+    from dronalize.core.protocols.writer import SceneWriter
     from dronalize.pipeline.pipeline import Pipeline
 
 
@@ -44,7 +45,17 @@ class SceneLoader(Protocol, Generic[IdT]):
     """Minimal protocol for scene loading, used for type hinting."""
 
     def scenes(self) -> Iterable[Scene[IdT]]:
-        """Yield processed scenes one at a time."""
+        """Process scenes and yield them one by one.
+
+        This is the main method for processing scenes. It yields `Scene` objects
+        one at a time, allowing for memory-efficient processing of large datasets.
+
+        Yields
+        ------
+        Scene[IdT]
+            Each processed scene, with its identifier and associated data.
+
+        """
         ...
 
     def scenes_callback(
@@ -73,6 +84,33 @@ class SceneLoader(Protocol, Generic[IdT]):
 
         """
         ...
+
+    def write_scenes(
+        self,
+        writer_factory: Callable[P, SceneWriter],
+        finalize: Callable[[SceneWriter], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
+        """Process scenes and write them using the provided writer factory.
+
+        This method provides a convenient way to process scenes and write them
+        using a `SceneWriter`. The `writer_factory` is called once to create a
+        `SceneWriter` instance, which is then used to write each processed scene.
+        After all scenes have been processed, the `finalize` function is called
+        with the writer instance to perform any necessary cleanup or finalization
+        steps.
+
+        Parameters
+        ----------
+        writer_factory : Callable
+            A factory function that takes additional arguments and returns a
+            `SceneWriter` instance for writing scenes.
+        finalize : Callable
+            A function that takes the `SceneWriter` instance and performs any
+            necessary finalization steps after all scenes have been written.
+
+        """
 
 
 class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
@@ -318,6 +356,23 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         _self = self
         return no_map()
 
+    def set_loader_config(self, config: LoaderConfig) -> None:
+        """Set the loader configuration.
+
+        This can be used to update the loader's configuration after it has been
+        constructed.  Note that changing the configuration may not have any
+        effect if scenes have already been processed, since some configuration
+        values (e.g., input/output lengths) are determined at initialization
+        time.
+
+        Parameters
+        ----------
+        config : LoaderConfig
+            The new configuration to set.
+
+        """
+        self._loader_config = config
+
     @override
     def scenes_callback(
         self,
@@ -328,25 +383,29 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         for scene in self.scenes():
             callback(scene, *args, **kwargs)
 
+    @override
     def scenes(self) -> Iterable[Scene[IdT]]:
-        """Iterate over all sources and process them into scenes.
-
-        This will lazy-load and process each source one at a time. Counters are
-        reset at the start of each call so a loader instance can be iterated
-        more than once.
-
-        Yields
-        ------
-        Scene[IdT]
-            Processed scenes one at a time.
-
-        """
         self._count = 0
         self._source_counter = 0
         for source in self.sources():
             self._source_counter += 1
             for scene_df, resolver in self.process_next(source):
                 yield self.create_scene(scene_df, source, resolver)
+
+    @override
+    def write_scenes(
+        self,
+        writer_factory: Callable[P, SceneWriter],
+        finalize: Callable[[SceneWriter], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
+        writer = writer_factory(*args, **kwargs)
+        try:
+            for scene in self.scenes():
+                writer.write(scene)
+        finally:
+            finalize(writer)
 
     def create_scene(
         self,

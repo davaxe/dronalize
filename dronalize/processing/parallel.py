@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from multiprocessing.sharedctypes import Synchronized
 
     from dronalize.core.datatypes.scene import Scene
+    from dronalize.core.protocols.writer import SceneWriter
 
 
 class ProgressBar(IntEnum):
@@ -318,15 +319,79 @@ class ParallelSceneLoader(SceneLoader[IdT]):
                     )
                     progress_bar.update(processed_scenes)
 
-    @staticmethod
-    def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:
-        if num_sources is None:
-            return 1
+    @override
+    def write_scenes(
+        self,
+        writer_factory: Callable[P, SceneWriter],
+        finalize: Callable[[SceneWriter], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
+        self._mp_scene_counter.value = 0
+        self._mp_source_counter.value = 0
+        loader = self._inner
+        with (
+            tqdm.tqdm(**self._tqdm_args()) as progress_bar,
+            mp.Pool(
+                self._processes,
+                initializer=_init_worker,
+                initargs=(self._mp_scene_counter, self._mp_source_counter),
+            ) as pool,
+        ):
+            map_fn = pool.imap if self._maintain_order else pool.imap_unordered
+            work_iter = map_fn(
+                ParallelSceneLoader._process_fn_write,
+                (
+                    (_ProcessArgs(s, loader, None, args, kwargs), writer_factory, finalize)
+                    for s in loader.sources()
+                ),
+                self._chunksize,
+            )
+            if self._progress_bar == ProgressBar.NONE:
+                # Exaust the iterator
+                deque(work_iter, maxlen=0)
+                return
 
-        num_processes = num_processes or mp.cpu_count()
-        chunksize, extra = divmod(num_sources, num_processes * 4)
-        chunksize += int(extra > 0)
-        return max(chunksize, 1)
+            for processed_scenes in work_iter:
+                if self._progress_bar == ProgressBar.SOURCES:
+                    progress_bar.set_postfix(
+                        {"scenes": self._mp_scene_counter.value},
+                        refresh=False,
+                    )
+                    progress_bar.update(1)
+                elif self._progress_bar == ProgressBar.SCENES:
+                    progress_bar.set_postfix(
+                        {"sources": self._mp_source_counter.value},
+                        refresh=False,
+                    )
+                    progress_bar.update(processed_scenes)
+
+    @staticmethod
+    def _process_fn_write(
+        payload: tuple[
+            _ProcessArgs[IdT, SourceT],
+            Callable[..., SceneWriter],
+            Callable[[SceneWriter], None],
+        ],
+    ) -> int:
+        args, writer_factory, finalize = payload
+        processed_scenes = 0
+
+        loader, source = args.loader, args.source
+        writer = writer_factory(*args.cb_args or (), **args.cb_kwargs or {})
+        for scene_data, map_resolver in loader.process_next(source):
+            scene = loader.create_scene(scene_data, source, map_resolver)
+            with _scene_counter.get_lock():
+                _scene_counter.value += 1
+                scene_number = _scene_counter.value
+
+            scene = replace(scene, scene_number=scene_number)
+            writer.write(scene)
+            processed_scenes += 1
+
+        writer.finalize()
+        finalize(writer)
+        return processed_scenes
 
     @staticmethod
     def _process_fn(args: _ProcessArgs[IdT, SourceT]) -> list[Scene[IdT]]:
@@ -426,6 +491,16 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             "colour": "blue" if self._progress_bar == ProgressBar.SOURCES else "green",
             "unit_scale": True if self._progress_bar == ProgressBar.SCENES else None,
         }
+
+    @staticmethod
+    def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:
+        if num_sources is None:
+            return 1
+
+        num_processes = num_processes or mp.cpu_count()
+        chunksize, extra = divmod(num_sources, num_processes * 4)
+        chunksize += int(extra > 0)
+        return max(chunksize, 1)
 
 
 class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):

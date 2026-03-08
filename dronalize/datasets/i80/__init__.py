@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="i80",
         loader_factory=I80Loader,
+        default_config=I80Loader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="exid",
         loader_factory=ExiDLoader,
+        default_config=ExiDLoader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

@@ -3,8 +3,10 @@ from __future__ import annotations
 from enum import IntEnum, auto
 from typing import Final
 
+from dronalize.core.datatypes.enum import BaseEnum
 
-class AgentCategory(IntEnum):
+
+class AgentCategory(BaseEnum):
     """Enumeration of categories of agents / objects."""
 
     CAR = auto()

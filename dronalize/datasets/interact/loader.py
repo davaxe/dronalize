@@ -57,10 +57,10 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
             `InteractionLoader` does not support windowing.
 
         """
-        if loader_config is not None and loader_config.window_params is not None:
+        if loader_config is not None and loader_config.window is not None:
             msg = (
                 f"InteractionProcessor does not support window_params, "
-                f"but got {loader_config.window_params}"
+                f"but got {loader_config.window}"
             )
             raise ValueError(msg)
 

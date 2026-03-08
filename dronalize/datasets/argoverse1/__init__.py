@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="argoverse1",
         loader_factory=Argoverse1Loader,
+        default_config=Argoverse1Loader.default_config(),
         has_map=True,
     ).with_all_splits()
 )

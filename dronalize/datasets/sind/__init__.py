@@ -7,6 +7,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="sind",
         loader_factory=SindLoader,
+        default_config=SindLoader.default_config(),
         has_map=False,
         predefined_splits=None,
     )

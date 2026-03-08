@@ -46,7 +46,7 @@ class SindLoader(BaseSceneLoader[str, Path]):
         """
         if filter_parked_vehicles:
             resolved = loader_config or type(self).default_config()
-            filtering = resolved.scene_filtering
+            filtering = resolved.filtering
             if filtering is not None:
                 loader_config = _replace(
                     resolved,

@@ -1,6 +1,6 @@
 """Plot package — optional visualisation utilities for trajectories and map graphs.
 
-Requires the ``plot`` extra::
+Requires the `plot` extra::
 
     pip install dronalize[plot]
 """

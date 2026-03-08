@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="unid",
         loader_factory=UniDLoader,
+        default_config=UniDLoader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

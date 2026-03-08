@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dronalize.ops.trajectory.filter import FilteringConfig
 from dronalize.ops.trajectory.resample import Resampling, ResamplingMethod
@@ -42,18 +42,30 @@ class LoaderConfig(BaseModel):
     resampling: Resampling | None = Field(
         default=None, description="Resampling config if applicable."
     )
-    window_params: WindowParams | None = Field(
+    window: WindowParams | None = Field(
         default=None,
         description="Used for datasets where multiple samples can be generated from a single "
         "scene by using a sliding window approach. If None, it is assumed that each "
         "scene corresponds to exactly one sample.",
     )
-    scene_filtering: FilteringConfig | None = Field(
+    filtering: FilteringConfig | None = Field(
         default=None,
         description=(
             "Configuration for filtering scenes based on agent validity and scene composition."
         ),
     )
+
+    @model_validator(mode="after")
+    def _validate(self) -> LoaderConfig:
+        if self.window is None:
+            return self
+        if self.window.window_size != self.input_len + self.output_len:
+            msg = (
+                f"Window size ({self.window.window_size}) must equal input_len + output_len "
+                f"({self.input_len + self.output_len}) for consistent windowing."
+            )
+            raise ValueError(msg)
+        return self
 
     # -- builder helpers (return new frozen instances) -----------------------
 

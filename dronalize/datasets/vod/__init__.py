@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="vod",
         loader_factory=VodLoader,
+        default_config=VodLoader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

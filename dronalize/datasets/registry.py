@@ -10,6 +10,7 @@ from dronalize.core.datatypes.split import DatasetSplit
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from dronalize.core.datatypes.loader_config import LoaderConfig
     from dronalize.core.protocols.loader import BaseSceneLoader
 
 
@@ -22,6 +23,9 @@ class DatasetDescriptor:
 
     loader_factory: Callable[..., BaseSceneLoader]
     """Factory function that creates a scene loader for the dataset."""
+
+    default_config: LoaderConfig
+    """Default loader configuration for the dataset."""
 
     has_map: bool = False
     """Whether the dataset has available map data."""
@@ -37,6 +41,7 @@ class DatasetDescriptor:
             name=self.name,
             loader_factory=self.loader_factory,
             has_map=self.has_map,
+            default_config=self.default_config,
             predefined_splits=[DatasetSplit(s) if isinstance(s, str) else s for s in splits]
             if splits is not None
             else None,

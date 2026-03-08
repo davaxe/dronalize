@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="highd",
         loader_factory=HighDLoader,
+        default_config=HighDLoader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

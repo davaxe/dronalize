@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="ind",
         loader_factory=InDLoader,
+        default_config=InDLoader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

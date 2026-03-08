@@ -7,6 +7,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="apolloscape",
         loader_factory=ApolloScapeLoader,
+        default_config=ApolloScapeLoader.default_config(),
         has_map=False,
         predefined_splits=None,
     )

@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="interact",
         loader_factory=InteractionLoader,
+        default_config=InteractionLoader.default_config(),
         has_map=True,
     ).with_all_splits()
 )

@@ -8,9 +8,9 @@ from dronalize.ops.trajectory.filter import FilteringConfig, filter_scene
 def test_no_scene_filtering() -> None:
     """Test that setting scene_filtering to None returns the original DataFrame."""
     df = pl.DataFrame({"id": [1, 1], "frame": [0, 1], "scene": [1, 1]})
-    config = LoaderConfig(input_len=1, output_len=1, sample_time=0.1, scene_filtering=None)
+    config = LoaderConfig(input_len=1, output_len=1, sample_time=0.1, filtering=None)
 
-    result = filter_scene(df, config.scene_filtering, group_by="scene")
+    result = filter_scene(df, config.filtering, group_by="scene")
     assert len(result) == 2
 
     assert_frame_equal(result, df)
@@ -33,13 +33,13 @@ def test_filter_agent_category() -> None:
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(
+        filtering=FilteringConfig(
             min_agents=0,
             filter_agent_category=[AgentCategory.UNIMPORTANT],
         ),
     )
 
-    result = filter_scene(df, config.scene_filtering, group_by="scene", category_column="category")
+    result = filter_scene(df, config.filtering, group_by="scene", category_column="category")
 
     assert len(result) == 2
     assert AgentCategory.UNIMPORTANT not in result["category"].to_list()
@@ -57,10 +57,10 @@ def test_min_agents_threshold() -> None:
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(min_agents=2),
+        filtering=FilteringConfig(min_agents=2),
     )
 
-    result = filter_scene(df, config.scene_filtering, group_by="scene")
+    result = filter_scene(df, config.filtering, group_by="scene")
 
     # Scene 2 should be completely removed
     assert result["scene"].unique().to_list() == [1]
@@ -83,9 +83,9 @@ def test_require_all_valid() -> None:
         input_len=2,
         output_len=2,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(min_agents=2, require_all_valid=True),
+        filtering=FilteringConfig(min_agents=2, require_all_valid=True),
     )
-    result_strict = filter_scene(df, config_strict.scene_filtering, group_by="scene")
+    result_strict = filter_scene(df, config_strict.filtering, group_by="scene")
     assert len(result_strict) == 0
 
     # Case B: require 1 valid agent. Agent 1 is valid, so the scene survives,
@@ -94,9 +94,9 @@ def test_require_all_valid() -> None:
         input_len=2,
         output_len=2,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(min_agents=1, require_all_valid=True),
+        filtering=FilteringConfig(min_agents=1, require_all_valid=True),
     )
-    result_lenient = filter_scene(df, config_lenient.scene_filtering, group_by="scene")
+    result_lenient = filter_scene(df, config_lenient.filtering, group_by="scene")
     assert len(result_lenient) == 4
     assert result_lenient["id"].unique().to_list() == [1]
 
@@ -115,13 +115,13 @@ def test_require_frames() -> None:
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(
+        filtering=FilteringConfig(
             min_agents=0,
             require_frames=[0, 4],  # We require relative frames 0 and 4
         ),
     )
 
-    result = filter_scene(df, config.scene_filtering, group_by="scene")
+    result = filter_scene(df, config.filtering, group_by="scene")
 
     # Scene 2 lacks relative frame 4, so it drops
     assert result["scene"].unique().to_list() == [1]
@@ -141,10 +141,10 @@ def test_require_prediction_frame() -> None:
         input_len=3,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(min_agents=0, require_frames=[2]),
+        filtering=FilteringConfig(min_agents=0, require_frames=[2]),
     )
 
-    result = filter_scene(df, config.scene_filtering, group_by="scene")
+    result = filter_scene(df, config.filtering, group_by="scene")
 
     assert result["scene"].unique().to_list() == [1]
 
@@ -169,13 +169,13 @@ def test_complex_interaction() -> None:
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(
+        filtering=FilteringConfig(
             min_agents=3,
             filter_agent_category=[AgentCategory.UNIMPORTANT],
         ),
     )
 
-    result = filter_scene(df, config.scene_filtering, group_by="scene", category_column="category")
+    result = filter_scene(df, config.filtering, group_by="scene", category_column="category")
 
     assert len(result) == 0
 
@@ -188,11 +188,11 @@ def test_no_groupby() -> None:
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(min_agents=2),
+        filtering=FilteringConfig(min_agents=2),
     )
 
     # Because group_by is None, it groups over pl.lit(1)
-    result = filter_scene(df, config.scene_filtering, group_by=None)
+    result = filter_scene(df, config.filtering, group_by=None)
 
     assert len(result) == 2
 
@@ -214,13 +214,13 @@ def test_filter_slow_agents() -> None:
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        scene_filtering=FilteringConfig(
+        filtering=FilteringConfig(
             min_agents=0,
             filter_slow_agents=2.0 * 0.1,
         ),
     )
 
-    result = filter_scene(df, config.scene_filtering, group_by="scene")
+    result = filter_scene(df, config.filtering, group_by="scene")
 
     # Only Agent 1 meets the speed requirement
     assert len(result) == 3
@@ -303,10 +303,10 @@ def test_min_samples_per_agent_via_loader_config() -> None:
         sample_time=0.1,
     ).with_filtering(min_agents=0, min_samples_per_agent=3)
 
-    assert config.scene_filtering is not None
-    assert config.scene_filtering.min_samples_per_agent == 3
+    assert config.filtering is not None
+    assert config.filtering.min_samples_per_agent == 3
 
-    result = filter_scene(df, config.scene_filtering, group_by="scene")
+    result = filter_scene(df, config.filtering, group_by="scene")
 
     # Only Agent 1 has >= 3 samples
     assert len(result) == 3

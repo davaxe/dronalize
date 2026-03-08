@@ -34,8 +34,8 @@ class Resampling(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    up: int = Field(gt=0, description="Upsampling factor.")
-    down: int = Field(gt=0, description="Downsampling factor.")
+    up: int = Field(gt=0, description="Upsampling factor.", default=1)
+    down: int = Field(gt=0, description="Downsampling factor.", default=1)
     method: ResamplingMethod = Field(
         default=ResamplingMethod.FAST, description="Method used for resampling."
     )

@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import TYPE_CHECKING, Annotated, TypeVar
 
 import polars as pl
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from dronalize.core.datatypes.categories import AgentCategory  # noqa: TC001
+from dronalize.core.datatypes.categories import AgentCategory
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
 DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
 
@@ -19,12 +18,24 @@ def _to_frozenset(v: Iterable | str | AgentCategory | None) -> frozenset | None:
     if v is None:
         return None
 
-    # Strings are technically iterable, but usually represent a single category/item.
-    # Non-iterables (like ints or Enums) also get wrapped in a list first.
-    if isinstance(v, str) or not isinstance(v, Iterable):
+    # Handle single string
+    if isinstance(v, str):
+        return frozenset([AgentCategory.from_str(v)])
+
+    # Handle single enum instance
+    if isinstance(v, AgentCategory):
         return frozenset([v])
 
-    return frozenset(v)
+    # Handle iterables (like lists of strings or mixed types)
+    parsed_items = []
+    for item in v:
+        if isinstance(item, str):
+            parsed_items.append(AgentCategory.from_str(item))
+        else:
+            # Let Pydantic handle valid ints or existing Enums
+            parsed_items.append(item)
+
+    return frozenset(parsed_items)
 
 
 class FilteringConfig(BaseModel):

@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="round",
         loader_factory=RounDLoader,
+        default_config=RounDLoader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

@@ -13,6 +13,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="eth",
         loader_factory=EthLoader,
+        default_config=EthLoader.default_config(),
         has_map=False,
     ).with_all_splits()
 )
@@ -21,6 +22,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="hotel",
         loader_factory=HotelLoader,
+        default_config=HotelLoader.default_config(),
         has_map=False,
     ).with_all_splits()
 )
@@ -29,6 +31,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="univ",
         loader_factory=UnivLoader,
+        default_config=UnivLoader.default_config(),
         has_map=False,
     ).with_all_splits()
 )
@@ -37,6 +40,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="zara1",
         loader_factory=Zara1Loader,
+        default_config=Zara1Loader.default_config(),
         has_map=False,
     ).with_all_splits()
 )

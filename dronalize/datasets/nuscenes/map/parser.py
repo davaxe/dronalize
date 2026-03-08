@@ -550,15 +550,15 @@ def _many_from_dict(
     Parameters
     ----------
     cls : type[T]
-        Class to deserialize the items into. Must have a ``from_dict``
-        class method and an ``id`` attribute.
+        Class to deserialize the items into. Must have a `from_dict`
+        class method and an `id` attribute.
     data : Iterable[dict]
         An iterable of dictionaries representing the items to deserialize.
 
     Returns
     -------
     dict[str, T]
-        A dictionary mapping UUIDs to deserialized objects of type ``cls``.
+        A dictionary mapping UUIDs to deserialized objects of type `cls`.
 
     """
     objects: dict[str, T] = {}

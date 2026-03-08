@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="lyft",
         loader_factory=LyftLoader,
+        default_config=LyftLoader.default_config(),
         has_map=True,
         predefined_splits=None,
     )

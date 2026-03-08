@@ -8,6 +8,7 @@ registry.register(
     registry.DatasetDescriptor(
         name="us101",
         loader_factory=US101Loader,
+        default_config=US101Loader.default_config(),
         has_map=True,
         predefined_splits=None,
     )
