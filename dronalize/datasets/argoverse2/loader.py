@@ -142,7 +142,7 @@ class Argoverse2Loader(BaseSceneLoader[int, list[Path]]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(50, 60, 0.1).with_filtering(
+        return LoaderConfig(input_len=50, output_len=60, sample_time=0.1).with_filtering(
             require_frames=[49],
             filter_agent_category=[
                 AgentCategory.STATIC_OBJECT,

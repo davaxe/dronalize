@@ -134,7 +134,9 @@ class Argoverse1Loader(BaseSceneLoader[int, list[Path]]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(20, 30, 0.1).with_filtering(require_frames=[19])
+        return LoaderConfig(input_len=20, output_len=30, sample_time=0.1).with_filtering(
+            require_frames=[19]
+        )
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[int, list[Path]]]:
         files: list[Path] = sorted(data_dir.glob("*.csv"))

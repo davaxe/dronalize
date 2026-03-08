@@ -121,7 +121,7 @@ class NuScenesLoader(BaseSceneLoader[str, str]):
     @override
     def default_config(cls) -> LoaderConfig:
         return (
-            LoaderConfig(4, 12, 0.5)
+            LoaderConfig(input_len=4, output_len=12, sample_time=0.5)
             .with_resampling(up=5, down=1)
             .with_window(step_size=1)
             .with_filtering(require_frames=[3])

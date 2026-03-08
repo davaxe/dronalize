@@ -81,7 +81,11 @@ class A43Loader(BaseSceneLoader[int, Path]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(20, 50, 0.1).with_window(25).with_filtering(require_frames=[19])
+        return (
+            LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
+            .with_window(25)
+            .with_filtering(require_frames=[19])
+        )
 
 
 if __name__ == "__main__":

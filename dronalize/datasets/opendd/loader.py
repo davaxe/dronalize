@@ -103,7 +103,7 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
     @override
     def default_config(cls) -> LoaderConfig:
         return (
-            LoaderConfig(60, 150, 1 / 30)
+            LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
             .with_resampling(1, 3)
             .with_window(75)
             .with_filtering(require_frames=[59])

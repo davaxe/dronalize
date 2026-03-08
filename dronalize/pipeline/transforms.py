@@ -159,7 +159,7 @@ def resample(
     Transform
 
     """
-    resampling_obj = resampling or Resampling(1, 1)
+    resampling_obj = resampling or Resampling(up=1, down=1)
 
     def _resample(df: pl.LazyFrame) -> pl.LazyFrame:
         return resample_impl(

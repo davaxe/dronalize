@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from enum import StrEnum
 from fractions import Fraction
 from typing import TYPE_CHECKING, Literal, TypeVar, cast, overload
@@ -8,6 +7,7 @@ from typing import TYPE_CHECKING, Literal, TypeVar, cast, overload
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
 from dronalize.ops.trajectory.derivative import derivative
@@ -29,32 +29,24 @@ class ResamplingMethod(StrEnum):
     """Cubic spline-based resampling."""
 
 
-@dataclass(slots=True, frozen=True)
-class Resampling:
+class Resampling(BaseModel):
     """Configuration for resampling trajectories."""
 
-    up: int
-    """Upsampling factor."""
-    down: int
-    """Downsampling factor."""
-    method: ResamplingMethod = ResamplingMethod.FAST
-    """Method used for resampling."""
+    model_config = ConfigDict(frozen=True)
 
-    def __init__(
-        self,
-        up: int,
-        down: int,
-        method: Literal["fast", "spline"] | ResamplingMethod = ResamplingMethod.FAST,
-    ) -> None:
-        """Simplify the resampling ratio to its smallest integer ratio form."""
-        simplified_up, simplified_down = Fraction(up, down).as_integer_ratio()
-        if method == "fast":
-            method = ResamplingMethod.FAST
-        elif method == "spline":
-            method = ResamplingMethod.SPLINE
+    up: int = Field(gt=0, description="Upsampling factor.")
+    down: int = Field(gt=0, description="Downsampling factor.")
+    method: ResamplingMethod = Field(
+        default=ResamplingMethod.FAST, description="Method used for resampling."
+    )
+
+    @model_validator(mode="after")
+    def _simplify_ratio(self) -> Resampling:
+        simplified_up, simplified_down = Fraction(self.up, self.down).as_integer_ratio()
+        # setattr is needed since the model is frozen.
         object.__setattr__(self, "up", simplified_up)
         object.__setattr__(self, "down", simplified_down)
-        object.__setattr__(self, "method", method)
+        return self
 
     @property
     def factors(self) -> tuple[int, int]:

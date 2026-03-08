@@ -175,7 +175,9 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(10, 80, 0.1).with_filtering(require_frames=[9])
+        return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filtering(
+            require_frames=[9]
+        )
 
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:

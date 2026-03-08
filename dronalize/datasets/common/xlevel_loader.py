@@ -154,7 +154,7 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
     @override
     def default_config(cls) -> LoaderConfig:
         return (
-            LoaderConfig(50, 125, 0.04)
+            LoaderConfig(input_len=50, output_len=125, sample_time=0.04)
             .with_resampling(2, 5)
             .with_window(25)
             .with_filtering(

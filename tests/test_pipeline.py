@@ -340,7 +340,7 @@ def test_transform_derivative_second_with_intermediate() -> None:
 
 def test_transform_filter_no_config_passes_all(trajectory_lf: pl.LazyFrame) -> None:
     """Ensure the filter transform passes all rows when no specific rules apply."""
-    config = LoaderConfig(3, 3, 0.1)
+    config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1)
     fn = transform.filter_scene(config.scene_filtering)
     result = fn(trajectory_lf).collect()
     assert_frame_equal(result, trajectory_lf.collect())
@@ -350,7 +350,9 @@ def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
     """Verify the filter transform removes agents that match the specified filtering category."""
     # Filter out agent_category == 1 -> should remove all
 
-    config = LoaderConfig(3, 3, 0.1).with_filtering(filter_agent_category=[AgentCategory.CAR])
+    config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filtering(
+        filter_agent_category=[AgentCategory.CAR]
+    )
     fn = transform.filter_scene(config.scene_filtering)
     result = fn(trajectory_lf).collect()
     # All agents have category 1 (CAR), and min_agents=2 by default,
@@ -361,7 +363,7 @@ def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
 
 def test_transform_resample_identity(simple_lf: pl.LazyFrame) -> None:
     """Ensure resampling with identical rates accurately preserves the row count."""
-    config = LoaderConfig(2, 2, 1.0)
+    config = LoaderConfig(input_len=2, output_len=2, sample_time=1.0)
     fn = transform.resample(config.resampling, config.sample_time, group_by="id")
     result = fn(simple_lf).collect()
     # 1:1 resampling should preserve row count
@@ -375,7 +377,7 @@ def test_transform_resample_downsample() -> None:
         "x": [float(i) for i in range(10)],
         "y": [0.0] * 10,
     }).lazy()
-    config = LoaderConfig(5, 5, 0.1).with_resampling(1, 2)
+    config = LoaderConfig(input_len=5, output_len=5, sample_time=0.1).with_resampling(1, 2)
     fn = transform.resample(config.resampling, config.sample_time)
     result = fn(lf).collect()
     assert result.shape[0] == 5

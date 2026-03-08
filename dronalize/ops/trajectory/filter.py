@@ -1,67 +1,72 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Annotated, TypeVar
 
 import polars as pl
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+
+from dronalize.core.datatypes.categories import AgentCategory  # noqa: TC001
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Sequence
-
-    from dronalize.core.datatypes.categories import AgentCategory
+    from collections.abc import Sequence
 
 DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
 
 
-@dataclass(slots=True, frozen=True)
-class FilteringConfig:
+def _to_frozenset(v: Iterable | str | AgentCategory | None) -> frozenset | None:
+    """Coerces single items, lists, or sets into a frozenset."""
+    if v is None:
+        return None
+
+    # Strings are technically iterable, but usually represent a single category/item.
+    # Non-iterables (like ints or Enums) also get wrapped in a list first.
+    if isinstance(v, str) or not isinstance(v, Iterable):
+        return frozenset([v])
+
+    return frozenset(v)
+
+
+class FilteringConfig(BaseModel):
     """Configuration for filtering scenes based on agent validity and scene composition."""
 
-    min_agents: int = 2
-    """Minimum number of agents required in a scene to be valid."""
+    model_config = ConfigDict(frozen=True)
 
-    require_all_valid: bool = False
-    """If True, requires all agents in a scene to have valid positions for all
-    time-steps in the scene."""
+    min_agents: int = Field(
+        default=2, ge=0, description="Minimum number of agents required in a scene to be valid."
+    )
 
-    require_frames: frozenset[int] | None = None
-    """Specific frames offset required for the agent to be considered valid."""
+    require_all_valid: bool = Field(
+        default=False,
+        description=(
+            "If True, requires all agents in a scene to have valid positions "
+            "for all time-steps in the scene."
+        ),
+    )
 
-    filter_agent_category: frozenset[AgentCategory] | None = None
-    """Set of agent categories to filter out from scenes."""
+    require_frames: Annotated[frozenset[int] | None, BeforeValidator(_to_frozenset)] = Field(
+        default=None,
+        description="Specific frames offset required for the agent to be considered valid.",
+    )
 
-    filter_slow_agents: float | None = None
-    """Filter out agents with an average distance per step below this threshold."""
+    filter_agent_category: Annotated[
+        frozenset[AgentCategory] | None, BeforeValidator(_to_frozenset)
+    ] = Field(default=None, description="Set of agent categories to filter out from scenes.")
 
-    min_samples_per_agent: int | None = None
-    """Minimum number of data points (rows) required per agent. Agents with
-    fewer samples are removed before any other validity checks."""
+    filter_slow_agents: float | None = Field(
+        default=None,
+        ge=0.0,
+        description="Filter out agents with an average distance per step below this threshold.",
+    )
 
-    def __init__(
-        self,
-        min_agents: int = 2,
-        *,
-        require_all_valid: bool = False,
-        require_frames: Collection[int] | None = None,
-        filter_agent_category: Collection[AgentCategory] | None = None,
-        filter_slow_agents: float | None = None,
-        min_samples_per_agent: int | None = None,
-    ) -> None:
-        """Initialize and normalise collections to frozensets."""
-        object.__setattr__(self, "min_agents", min_agents)
-        object.__setattr__(self, "require_all_valid", require_all_valid)
-        object.__setattr__(
-            self,
-            "require_frames",
-            frozenset(require_frames) if require_frames is not None else None,
-        )
-        object.__setattr__(
-            self,
-            "filter_agent_category",
-            frozenset(filter_agent_category) if filter_agent_category is not None else None,
-        )
-        object.__setattr__(self, "filter_slow_agents", filter_slow_agents)
-        object.__setattr__(self, "min_samples_per_agent", min_samples_per_agent)
+    min_samples_per_agent: int | None = Field(
+        default=None,
+        ge=1,
+        description=(
+            "Minimum number of data points (rows) required per agent. "
+            "Agents with fewer samples are removed before any other validity checks."
+        ),
+    )
 
 
 def filter_scene(

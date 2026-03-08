@@ -37,4 +37,8 @@ class VodLoader(NuScenesLoader):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(5, 30, 0.1).with_window(5).with_filtering(require_frames=[4])
+        return (
+            LoaderConfig(input_len=5, output_len=30, sample_time=0.1)
+            .with_window(5)
+            .with_filtering(require_frames=[4])
+        )
