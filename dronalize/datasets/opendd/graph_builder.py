@@ -22,8 +22,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 from typing_extensions import Self, override
 
 from dronalize.core import (
+    BaseGraphBuilder,
     EdgeType,
-    GraphBuilder,
     Point,
 )
 
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class OpenDDMapGraphBuilder(GraphBuilder):
+class OpenDDMapGraphBuilder(BaseGraphBuilder):
     """A builder for creating a graph representation of an OpenDD map.
 
     Maps are stored in a SQLite database, typically located at:

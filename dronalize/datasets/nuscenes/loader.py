@@ -60,10 +60,10 @@ class NuScenesLoader(BaseSceneLoader[str, str]):
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)
-        self.data_dir = Path(data_dir)
+        self.data_dir: Path = Path(data_dir)
         self._dfs: dict[str, pl.LazyFrame] = {}
-        self._use_parquet = use_parquet_cache
-        self._parquet_dir = Path(parquet_dir) if parquet_dir is not None else self.data_dir
+        self._use_parquet: bool = use_parquet_cache
+        self._parquet_dir: Path = Path(parquet_dir) if parquet_dir is not None else self.data_dir
 
         # Cache for the processed data: {scene_token: DataFrame}
         self._scene_cache: dict[str, pl.DataFrame] = {}
@@ -75,8 +75,8 @@ class NuScenesLoader(BaseSceneLoader[str, str]):
     @override
     def all_sources(self) -> Iterable[Source[str, str]]:
         for token, df in self._scene_cache.items():
-            scene_name = df.item(0, "scene_name")
-            map_name = df.item(0, "map")
+            scene_name: str = df.item(0, "scene_name")
+            map_name: str = df.item(0, "map")
             yield Source(identifier=scene_name, inner=token, map_key=map_name)
 
     @override

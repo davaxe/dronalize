@@ -8,7 +8,7 @@ from scipy.interpolate import UnivariateSpline
 from typing_extensions import Self, override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.builder import GraphBuilder, Point
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
 
 
 @dataclass(slots=True, frozen=True)
@@ -19,7 +19,7 @@ class LaneDescription:
     direction: list[bool]
 
 
-class HighWayLaneGraphBuilder(GraphBuilder):
+class HighWayLaneGraphBuilder(BaseGraphBuilder):
     """A graph builder that constructs a lane graph for a highway based on vehicle trajectory data.
 
     This makes three major assumptions about the structure of the highway and the data:

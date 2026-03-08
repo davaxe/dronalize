@@ -3,33 +3,8 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Any, Generic, Protocol, TypeVar
 
 from typing_extensions import Self
-
-ID = TypeVar("ID", bound=object)
-
-
-class BaseMapObject(Protocol, Generic[ID]):
-    """Base class for all map objects in a map."""
-
-    id: ID
-
-    @classmethod
-    def from_dict(cls: type[Self], data: dict[str, Any]) -> Self:
-        """Create an instance of the class from a dictionary."""
-        ...
-
-    @classmethod
-    def try_from_dict(
-        cls: type[Self],
-        data: dict[str, Any],
-    ) -> Self | None:
-        """Try to create an instance from a dictionary."""
-        try:
-            return cls.from_dict(data)
-        except (ValueError, TypeError):
-            return None
 
 
 class BaseEnum(IntEnum):

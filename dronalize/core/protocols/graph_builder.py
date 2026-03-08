@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from itertools import starmap
 from math import ceil
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Protocol, TypedDict
 
 import numpy as np
 import numpy.typing as npt
@@ -18,9 +18,6 @@ from dronalize.core.datatypes.map_graph import MapGraph
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-# ---------------------------------------------------------------------------
-# Public type alias for coordinate pairs used throughout the builder API.
-# ---------------------------------------------------------------------------
 Point = tuple[float, float]
 """A 2-D point as `(x, y)`."""
 
@@ -31,8 +28,34 @@ class _PendingPathDict(TypedDict):
     is_polygon: bool
 
 
+class GraphBuilder(Protocol):
+    """Minimal protocol for building a map graph."""
+
+    def build(
+        self,
+        min_distance: float | None = None,
+        interp_distance: float | None = None,
+    ) -> MapGraph:
+        """Build the final `MapGraph`.
+
+        Parameters
+        ----------
+        min_distance : float, optional
+            Minimum distance between nodes when adding edges.
+        interp_distance : float, optional
+            Target distance for interpolation.
+
+        Returns
+        -------
+        MapGraph
+            The constructed graph.
+
+        """
+        ...
+
+
 @dataclass
-class GraphBuilder(ABC):
+class BaseGraphBuilder(GraphBuilder, ABC):
     """Abstract base class for graph builders.
 
     Subclasses only need to implement `build_impl` which populates

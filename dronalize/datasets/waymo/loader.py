@@ -13,7 +13,7 @@ from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
 from dronalize.core.datatypes.split import DatasetSplit
 from dronalize.core.protocols.loader import IngestOutput, Source
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
-from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2, scenario_pb2
+from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -264,10 +264,12 @@ def _read_tfrecord(path: Path) -> Iterable[bytes]:
         offset = data_end + 4
 
 
+# Integer values correspond to waymo.open_dataset.Track.ObjectType enum:
+# TYPE_UNSET=0, TYPE_VEHICLE=1, TYPE_PEDESTRIAN=2, TYPE_CYCLIST=3, TYPE_OTHER=4
 _OBJECT_TYPE_TO_CATEGORY: dict[int, AgentCategory] = {
-    scenario_pb2.Track.TYPE_UNSET: AgentCategory.UNKNOWN,
-    scenario_pb2.Track.TYPE_VEHICLE: AgentCategory.CAR,
-    scenario_pb2.Track.TYPE_PEDESTRIAN: AgentCategory.PEDESTRIAN,
-    scenario_pb2.Track.TYPE_CYCLIST: AgentCategory.BICYCLE,
-    scenario_pb2.Track.TYPE_OTHER: AgentCategory.UNKNOWN,
+    0: AgentCategory.UNKNOWN,  # TYPE_UNSET
+    1: AgentCategory.CAR,  # TYPE_VEHICLE
+    2: AgentCategory.PEDESTRIAN,  # TYPE_PEDESTRIAN
+    3: AgentCategory.BICYCLE,  # TYPE_CYCLIST
+    4: AgentCategory.UNKNOWN,  # TYPE_OTHER
 }

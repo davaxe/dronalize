@@ -22,10 +22,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.map_object import BaseEnum
+from dronalize.core.datatypes.enum import BaseEnum
 
 if TYPE_CHECKING:
-    from dronalize.core.graph.builder import Point
+    from dronalize.core.protocols.graph_builder import Point
 
 
 class Argoverse2Map:

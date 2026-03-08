@@ -19,14 +19,14 @@ from typing import TYPE_CHECKING, Literal
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph import GraphBuilder, Point
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
 from dronalize.datasets.argoverse2.map import parser
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class Argoverse2GraphBuilder(GraphBuilder):
+class Argoverse2GraphBuilder(BaseGraphBuilder):
     """A builder for creating a graph representation of an Argoverse2 map."""
 
     def __init__(self, map_data: parser.Argoverse2Map) -> None:

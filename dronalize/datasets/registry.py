@@ -30,14 +30,16 @@ class DatasetDescriptor:
     """Predefined splits for the dataset, if any."""
 
     def with_splits(
-        self, splits: list[DatasetSplit | Literal["test", "val", "train"]]
+        self, splits: list[DatasetSplit | Literal["test", "val", "train"]] | None
     ) -> DatasetDescriptor:
         """Return a copy of this descriptor with the specified predefined splits."""
         return DatasetDescriptor(
             name=self.name,
             loader_factory=self.loader_factory,
             has_map=self.has_map,
-            predefined_splits=[DatasetSplit(s) if isinstance(s, str) else s for s in splits],
+            predefined_splits=[DatasetSplit(s) if isinstance(s, str) else s for s in splits]
+            if splits is not None
+            else None,
         )
 
     def with_all_splits(self) -> DatasetDescriptor:

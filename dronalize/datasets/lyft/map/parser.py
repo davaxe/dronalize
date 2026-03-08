@@ -26,13 +26,13 @@ import numpy as np
 import numpy.typing as npt
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.map_object import BaseEnum
+from dronalize.core.datatypes.enum import BaseEnum
 from dronalize.datasets.lyft.protos import road_network_pb2 as proto
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.core.graph.builder import Point
+    from dronalize.core.protocols.graph_builder import Point
 
 
 class LyftLVL5Map:

@@ -22,14 +22,14 @@ import numpy.typing as npt
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph import GraphBuilder, Point
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
 from dronalize.datasets.argoverse1.map import parser, utils
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-class Argoverse1MapGraphBuilder(GraphBuilder):
+class Argoverse1MapGraphBuilder(BaseGraphBuilder):
     """A builder for creating a graph representation of an Argoverse1 map."""
 
     class SegmentEndpoint(TypedDict):

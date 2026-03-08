@@ -7,7 +7,7 @@ import utm
 from typing_extensions import override
 
 from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.graph.builder import GraphBuilder, Point
+from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
 
 
 @dataclass
@@ -17,7 +17,7 @@ class OSMWay:
     tags: dict[str, str]
 
 
-class OSMMapGraphBuilder(GraphBuilder):
+class OSMMapGraphBuilder(BaseGraphBuilder):
     """GraphBuilder implementation that constructs a MapGraph from OpenStreetMap (OSM) XML data."""
 
     def __init__(
