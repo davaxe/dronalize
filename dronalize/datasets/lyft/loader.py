@@ -13,6 +13,8 @@ from zarr.creation import open_array
 import dronalize.pipeline.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.datatypes.loader_config import LoaderConfig
+from dronalize.core.datatypes.map_graph import MapGraph
+from dronalize.core.datatypes.split import DatasetSplit
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
@@ -22,12 +24,29 @@ if TYPE_CHECKING:
 
     from zarr.core import Array
 
+    from dronalize.core.datatypes.map_resolver import MapResolver
+
 
 @dataclass
 class _Source:
     """Source for the lyft case is the interval of scenes to load from the Zarr dataset."""
 
     interval: tuple[int, int]
+    split: DatasetSplit
+
+
+@dataclass(slots=True)
+class _ArrayData:
+    """Helper class to hold the Zarr arrays for a dataset split."""
+
+    scenes: Array
+    frames: Array
+    agents: Array
+
+    @property
+    def total_scenes(self) -> int:
+        """Return the total number of scenes in this split."""
+        return self.scenes.shape[0]
 
 
 class LyftLoader(BaseSceneLoader[int, _Source]):
@@ -35,17 +54,18 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
 
     def __init__(
         self,
-        data_dir: Path | str,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
-        scene_batch_size: int | None = 1000,
+        split: DatasetSplit = DatasetSplit.ALL,
+        scene_batch_size: int | None = 100,
     ) -> None:
         """Initialize the processor.
 
         Parameters
         ----------
-        data_dir : Path or str
-            Path to the Zarr dataset directory.
+        data_root : Path or str
+            Root directory of the dataset.
         scene_batch_size : int, optional
             Number of scenes to load in each batch. Higher batch size may lead
             to faster processing at diminishing returns, but also higher memory
@@ -53,45 +73,99 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
         loader_config : LoaderConfig, optional
             Processor configuration override. If None, the default
             configuration will be used.
-
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._zarr_path = Path(data_dir)
-        self._scenes: Array = open_array(self._zarr_path / "scenes", mode="r")
-        self._frames: Array = open_array(self._zarr_path / "frames", mode="r")
-        self._agents: Array = open_array(self._zarr_path / "agents", mode="r")
+        if split == DatasetSplit.TEST:
+            msg = "Lyft dataset does not have a predefined test split."
+            raise ValueError(msg)
 
-        self._total_scenes: int = int(self._scenes.shape[0])
-        self._batch_size: int = (
-            scene_batch_size if scene_batch_size is not None else self._total_scenes
-        )
+        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        self._data_root = Path(data_root)
+        self._data: dict[DatasetSplit, _ArrayData] = {}
+        self._batch_size: int | None = scene_batch_size
+
+    def _get_arrays(self, split: DatasetSplit) -> _ArrayData:
+        """Lazily load and return the arrays for a given split."""
+        if split not in self._data:
+            split_paths = {
+                DatasetSplit.VAL: "validate/validate.zarr",
+                DatasetSplit.TRAIN: "train/train.zarr",
+            }
+
+            if split not in split_paths:
+                msg = f"Unsupported split: {split}"
+                raise ValueError(msg)
+
+            split_path = self._data_root / split_paths[split]
+            scenes = open_array(split_path / "scenes", mode="r")
+            frames = open_array(split_path / "frames", mode="r")
+            agents = open_array(split_path / "agents", mode="r")
+            self._data[split] = _ArrayData(scenes=scenes, frames=frames, agents=agents)
+
+        return self._data[split]
+
+    def _generate_sources(self, split: DatasetSplit) -> Iterable[Source[int, _Source]]:
+        arrays = self._get_arrays(split)
+        total_scenes = arrays.total_scenes
+        batch_size = self._batch_size or total_scenes
+
+        current: int = 0
+        while current < total_scenes:
+            end = min(current + batch_size, total_scenes)
+            yield Source(
+                current,
+                inner=_Source(interval=(current, end), split=split),
+            )
+            current += batch_size
 
     @override
     def all_sources(self) -> Iterable[Source[int, _Source]]:
-        current: int = 0
-        while current < self._total_scenes:
-            end = min(current + self._batch_size, self._total_scenes)
-            yield Source(
-                identifier=current,
-                inner=_Source(interval=(current, end)),
-            )
-            current += self._batch_size
+        yield from self.train_sources()
+        yield from self.validate_sources()
+        yield from self.test_sources()
+
+    @override
+    def train_sources(self) -> Iterable[Source[int, _Source]]:
+        yield from self._generate_sources(DatasetSplit.TRAIN)
+
+    @override
+    def validate_sources(self) -> Iterable[Source[int, _Source]]:
+        yield from self._generate_sources(DatasetSplit.VAL)
 
     @override
     def num_sources(self) -> int | None:
-        return (self._total_scenes + self._batch_size - 1) // self._batch_size
+        def _count_sources(split: DatasetSplit) -> int:
+            total_scenes = self._get_arrays(split).total_scenes
+            return self._source_count(total_scenes, self._batch_size)
+
+        total = 0
+        if self._split in {DatasetSplit.TRAIN, DatasetSplit.ALL}:
+            total += _count_sources(DatasetSplit.TRAIN)
+        if self._split in {DatasetSplit.VAL, DatasetSplit.ALL}:
+            total += _count_sources(DatasetSplit.VAL)
+        return total
+
+    @staticmethod
+    def _source_count(total_scenes: int, batch_size: int | None) -> int:
+        if batch_size is None:
+            return 1
+        return (total_scenes + batch_size - 1) // batch_size
 
     @override
     def ingest(self, source: Source[int, _Source]) -> Iterable[IngestOutput]:
         start, end = source.inner.interval
-        scenes_np = cast("npt.NDArray", self._scenes[start:end])
+
+        # Now uses the lazy loader directly to ensure availability
+        arrays = self._get_arrays(source.inner.split)
+
+        scenes_np = cast("npt.NDArray", arrays.scenes[start:end])
 
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
         frame_end = np.max(scenes_np[:]["frame_index_interval"])
-        frames_np = cast("npt.NDArray", self._frames[frame_start:frame_end])
+        frames_np = cast("npt.NDArray", arrays.frames[frame_start:frame_end])
+
         agent_start = np.min(frames_np[:]["agent_index_interval"])
         agent_end = np.max(frames_np[:]["agent_index_interval"])
-        agents_np = cast("npt.NDArray", self._agents[agent_start:agent_end])
+        agents_np = cast("npt.NDArray", arrays.agents[agent_start:agent_end])
 
         for scene_data in scenes_np:
             df = _scene_to_polars(
@@ -129,6 +203,19 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
                 require_frames=[19, -1],
             )
         )
+
+    @override
+    def map_resolver(self) -> MapResolver:
+
+        def _resolve(key: str | None = None) -> MapGraph | None:
+            _key = key
+            if self._shared_memory_name is None or isinstance(self._shared_memory_name, dict):
+                return None
+
+            with MapGraph.from_shared(self._shared_memory_name) as map_graph:
+                return map_graph
+
+        return _resolve
 
 
 @dataclass

@@ -8,7 +8,7 @@ registry.register(
         name="sind",
         loader_factory=SindLoader,
         default_config=SindLoader.default_config(),
-        has_map=False,
+        has_map=True,
         predefined_splits=None,
     )
 )

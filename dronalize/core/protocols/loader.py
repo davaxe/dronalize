@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Concatenate, Generic, Protocol
+from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Generic, Protocol
 
 import polars as pl
 from typing_extensions import override
@@ -253,12 +253,14 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
 
     """
 
+    _shared_memory_name: ClassVar[dict[MapKey, str] | str | None] = None
+
     def __init__(
         self,
         loader_config: LoaderConfig | None = None,
         *,
-        enforce_schema: bool = True,
         split: DatasetSplit | None = None,
+        enforce_schema: bool = True,
     ) -> None:
         """Initialize internal state.
 
@@ -624,3 +626,35 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
         for raw_lf, map_context in self.ingest(source):
             for df in self._pipeline.execute(raw_lf, collect=True, filter_empty=True):
                 yield df, map_context
+
+    @classmethod
+    def set_shared_memory(
+        cls,
+        name: str | None = None,
+        mappings: dict[MapKey, str] | None = None,
+    ) -> None:
+        """Set the shared memory name or mapping for this loader class.
+
+        This is used to share data (e.g., map graphs) between processes when
+        using multiprocessing. The `name` parameter sets a single shared memory
+        name for all map keys, while the `mappings` parameter allows for
+        specifying different shared memory names for different map keys.
+
+        Parameters
+        ----------
+        name : str, optional
+            A single shared memory name to use for all map keys. If provided,
+            this will override any existing mappings.
+        mappings : dict[MapKey, str], optional
+            A dictionary mapping specific map keys to shared memory names. If
+            provided, this will override any existing mappings and the `name`
+            parameter.
+
+        """
+        if mappings is not None and name is not None:
+            msg = "Cannot set both 'name' and 'mappings'. Please choose one."
+            raise ValueError(msg)
+        if mappings is not None:
+            cls._shared_memory_name = mappings
+        elif name is not None:
+            cls._shared_memory_name = name

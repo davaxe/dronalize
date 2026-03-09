@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dronalize.ops.trajectory.filter import FilteringConfig
-from dronalize.ops.trajectory.resample import Resampling, ResamplingMethod
+from dronalize.pipeline.ops.filter import FilteringConfig
+from dronalize.pipeline.ops.resample import Resampling, ResamplingMethod
 
 if TYPE_CHECKING:
     from collections.abc import Collection

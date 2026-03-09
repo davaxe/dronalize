@@ -1,34 +1,35 @@
 # config.to - Only specify what you want to override
 
+[global]
+
+[global.execution]
+parallel = true
+workers = -1 # -1 for all available cores ( or remove)
+
 [a43]
+
+[a43.execution]
+workers = 1
+
+[a43.loader]
 input_len = 25
 output_len = 55
+sample_time = 0.1
 
-[a43.filtering]
+[a43.loader.filtering]
 require_frames = [19]
 filter_agent_category = ["STATIC_OBJECT"]
 
-[a43.window]
+[a43.loader.window]
 window_size = 80
 step_size = 1
 
-[a43.resampling]
+[a43.loader.extra_kwargs]
+rebalance = true
 
-[argoverse2]
-input_len = 50
-output_len = 60
+[a43.loader.resampling]
 
-[argoverse2.resampling]
-method = "spline"
-
-[argoverse2.filtering]
-filter_agent_categories = ["STATIC_OBJECT", "UNKNOWN", "UNIMPORTANT"]
-
-[ad4che]
-# Only override resampling
-[ad4che.resampling]
-up = 1
-down = 2
-
-[waymo]
-sample_time = 0.05
+[a43.map]
+min_distance = 0.5
+interp_distance = 1
+include_map = false

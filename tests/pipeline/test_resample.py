@@ -1,7 +1,7 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from dronalize.ops.trajectory.resample import Resampling, ResamplingMethod, resample
+from dronalize.pipeline.ops.resample import Resampling, ResamplingMethod, resample
 
 
 def test_no_resampling() -> None:

@@ -31,10 +31,6 @@ class SplitNotSupportedError(ValueError):
     """
 
     def __init__(self, loader_name: str, split: DatasetSplit) -> None:
-        super().__init__(
-            f"{loader_name} does not support split '{split.value}'. "
-            f"This dataset has no predefined splits. "
-            f"Use DatasetSplit.ALL (or omit the split parameter) to load all data."
-        )
+        super().__init__(f"{loader_name} does not support split '{split.value}'. ")
         self.loader_name = loader_name
         self.split = split

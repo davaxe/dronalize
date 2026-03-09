@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING, TypedDict, Unpack
 
 import numpy as np
 from streaming import MDSWriter
-from typing_extensions import override
+from streaming.base.util import merge_index
+from typing_extensions import Self, override
 
 from dronalize.core.datatypes.split import DatasetSplit
 from dronalize.core.protocols.writer import SceneWriter
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     from dronalize.core.datatypes.map_graph import NumpyMapGraphDict
     from dronalize.core.datatypes.scene import Scene
@@ -47,6 +48,30 @@ class MDSSceneWriter(SceneWriter):
         # Save inner writer args for later use during deferred initialization.
         self._inner_args = inner_args
 
+    @override
+    @classmethod
+    def as_factory(
+        cls,
+        output_dir: str,
+        *,
+        splits: list[DatasetSplit] | None = None,
+        parallel: bool = True,
+        multiple_targets: int | bool = False,
+        **inner_args: Unpack[_MDSWriterArgs],
+    ) -> Callable[[int], Self]:
+        def _factory(worker_id: int) -> Self:
+            parallel_group = worker_id
+            return cls(
+                output_dir,
+                splits=splits,
+                parallel=parallel,
+                multiple_targets=multiple_targets,
+                parallel_group=parallel_group,
+                **inner_args,
+            )
+
+        return _factory
+
     @staticmethod
     def _init_writers(
         output_dir: Path,
@@ -63,9 +88,11 @@ class MDSSceneWriter(SceneWriter):
             final_dir = (
                 split_dir
                 if not parallel
-                else split_dir / str(parallel_group or mp.current_process().name)
+                else split_dir
+                / str(parallel_group if parallel_group is not None else mp.current_process().name)
             )
             writers[split] = MDSWriter(out=str(final_dir), columns=_MDS_COLUMNS, **inner_args)
+
         return writers
 
     @override
@@ -85,12 +112,10 @@ class MDSSceneWriter(SceneWriter):
                 parallel_group=self._parallel_group,
                 **self._inner_args,
             )
-
         map_sample = self._encode_map(processed)
         samples = processed.to_numpy_dict(multiple_targets=self._multiple_targets)
-        for (target_id, numpy_dict), split in zip(
-            samples.items(), splits or itertools.repeat(None), strict=False
-        ):
+        splits_iter = splits if splits is not None else itertools.repeat(None)
+        for (target_id, numpy_dict), split in zip(samples.items(), splits_iter, strict=False):
             if split not in self._writers:
                 msg = f"Scene {processed.scene_number} belongs to split {split}"
                 ", but no writer is configured for this split."
@@ -127,7 +152,7 @@ class MDSSceneWriter(SceneWriter):
         return len(samples) > 0
 
     @override
-    def finalize(self) -> None:
+    def finish_local(self) -> None:
         if self._writers is None:
             return
 
@@ -135,6 +160,14 @@ class MDSSceneWriter(SceneWriter):
             writer.finish()
 
         self._writers = None
+
+    @override
+    def finish_final(self) -> None:
+        # In paralell context the index need to be merged
+        if not self._parallel:
+            return
+
+        merge_index(str(self._base_output_dir), keep_local=True)
 
     @staticmethod
     def _encode_map(scene: Scene) -> NumpyMapGraphDict:
@@ -214,7 +247,8 @@ if __name__ == "__main__":
     for scene in loader.scenes():
         count += 1
         writer.write(scene)
-    writer.finalize()
+    writer.finish_local()
+    writer.finish_final()
 
     print(f"Wrote {count} samples to MDS format in 'output/scenes'")
 

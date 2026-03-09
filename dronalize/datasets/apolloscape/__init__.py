@@ -9,6 +9,5 @@ registry.register(
         loader_factory=ApolloScapeLoader,
         default_config=ApolloScapeLoader.default_config(),
         has_map=False,
-        predefined_splits=None,
-    )
+    ).with_splits("train", "val")
 )

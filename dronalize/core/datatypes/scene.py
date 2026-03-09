@@ -7,7 +7,7 @@ import polars as pl
 
 from dronalize.core._types import IdT
 from dronalize.core.datatypes.map_resolver import MapResolver  # noqa: TC001
-from dronalize.ops.trajectory.convert import (
+from dronalize.pipeline.ops.convert import (
     NumpySceneDict,
     convert_to_numpy_dict,
     target_candidates,

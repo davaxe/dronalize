@@ -2,16 +2,51 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal, Protocol
 
+from dronalize.core.datatypes.map_config import MapConfig
 from dronalize.core.datatypes.split import DatasetSplit
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator
+    from pathlib import Path
 
     from dronalize.core.datatypes.loader_config import LoaderConfig
     from dronalize.core.protocols.loader import BaseSceneLoader
+
+
+class DatasetLifecycleContext(Protocol):
+    """Defines the resource lifecycle contract for a dataset.
+
+    Implementations must act as context managers that perform necessary
+    initialization (e.g., allocating shared memory for maps) before yielding,
+    and guarantee resource cleanup after the context exits.
+
+    """
+
+    def __call__(
+        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig
+    ) -> AbstractContextManager[None]:
+        """Execute the dataset lifecycle context.
+
+        Parameters
+        ----------
+        root : Path
+            Root directory of the dataset.
+        loader_config : LoaderConfig
+            Configuration for the dataset loader.
+        map_config : MapConfig
+            Configuration for building or loading the map graph.
+
+        Returns
+        -------
+        AbstractContextManager[None]
+            A context manager governing the dataset's temporary resources.
+
+        """
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +62,12 @@ class DatasetDescriptor:
     default_config: LoaderConfig
     """Default loader configuration for the dataset."""
 
+    default_map_config: MapConfig = field(default_factory=MapConfig.default)
+    """Default map configuration for the dataset, if applicable."""
+
+    lifecycle_context: DatasetLifecycleContext | None = None
+    """Optional lifecycle context for the dataset, which can manage resources like shared memory."""
+
     has_map: bool = False
     """Whether the dataset has available map data."""
 
@@ -34,7 +75,7 @@ class DatasetDescriptor:
     """Predefined splits for the dataset, if any."""
 
     def with_splits(
-        self, splits: list[DatasetSplit | Literal["test", "val", "train"]] | None
+        self, *splits: DatasetSplit | Literal["train", "val", "test"]
     ) -> DatasetDescriptor:
         """Return a copy of this descriptor with the specified predefined splits."""
         return DatasetDescriptor(
@@ -49,7 +90,18 @@ class DatasetDescriptor:
 
     def with_all_splits(self) -> DatasetDescriptor:
         """Indicate that this dataset has all three standard splits (train, val, test)."""
-        return self.with_splits([DatasetSplit.TEST, DatasetSplit.TRAIN, DatasetSplit.VAL])
+        return self.with_splits(DatasetSplit.TEST, DatasetSplit.TRAIN, DatasetSplit.VAL)
+
+    @contextmanager
+    def execute_lifecycle_context(
+        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig
+    ) -> Generator[None, None, None]:
+        """Execute the lifecycle context manager, if defined."""
+        if self.lifecycle_context is not None:
+            with self.lifecycle_context(root, loader_config, map_config):
+                yield
+        else:
+            yield
 
 
 _REGISTRY: dict[str, DatasetDescriptor] = {}

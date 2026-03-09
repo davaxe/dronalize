@@ -23,7 +23,7 @@ class SindLoader(BaseSceneLoader[str, Path]):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
         loader_config: LoaderConfig | None = None,
         *,
         filter_parked_vehicles: bool = False,
@@ -32,8 +32,8 @@ class SindLoader(BaseSceneLoader[str, Path]):
 
         Parameters
         ----------
-        data_dir : Path
-            The directory containing the SIND dataset (i.e. the data directory).
+        data_root : Path
+            Path to the directory containing the SIND dataset.
         loader_config : LoaderConfig, optional
             Overrides for the default loader configuration.
         filter_parked_vehicles : bool, optional
@@ -59,7 +59,7 @@ class SindLoader(BaseSceneLoader[str, Path]):
                 )
 
         super().__init__(loader_config, enforce_schema=True)
-        self._data_dir = data_dir
+        self._data_dir = data_root
 
     @override
     def all_sources(self) -> Iterable[Source[str, Path]]:

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import functools
 import multiprocessing as mp
 import threading
 from collections import deque
+from dataclasses import dataclass
 from multiprocessing.util import Finalize
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, NamedTuple, TypeVar
 
@@ -16,14 +18,27 @@ from dronalize.core.protocols.loader import ProcessableLoader, SceneLoader, Sour
 from dronalize.processing.common import ProgressBar
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+    from collections.abc import Callable, Generator, Iterable, Iterator
     from multiprocessing.sharedctypes import Synchronized
+    from multiprocessing.synchronize import Lock
 
     from dronalize.core.datatypes.split import DatasetSplit
     from dronalize.core.protocols.writer import SceneWriter
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene[Any]])
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerInfo:
+    """Information about the current worker process."""
+
+    worker_id: int
+    """Id of the current worker process, starting from 0."""
+    num_workers: int
+    """Total number of worker processes."""
+    remaining_workers: int
+    """Remaining number of worker processes."""
 
 
 class ParallelProcessor(SceneLoader[IdT]):
@@ -132,6 +147,7 @@ class ParallelProcessor(SceneLoader[IdT]):
         self._mp_scene_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_source_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_split_queue: mp.Queue[DatasetSplit] | None = None
+        self._mp_info_lock: Lock = mp.Lock()
         self._chunksize: int = chunksize or self._optimal_chunksize(inner.num_sources(), processes)
         self._processes: int | None = processes
         self._maintain_order: bool = maintain_order
@@ -328,14 +344,16 @@ class ParallelProcessor(SceneLoader[IdT]):
     def _process_fn_write(args: _ProcessArgs[IdT, SourceT]) -> int:
         processed_scenes: int = 0
 
-        def stream_split() -> Iterator[DatasetSplit] | None:
+        def stream_split() -> Iterator[DatasetSplit]:
             if _split_queue is None:
-                return None  # noqa: B901
+                msg = "Split generator was not initialized for this worker process."
+                raise ValueError(msg)
             while True:
                 yield _split_queue.get()
 
+        stream_split_iter = stream_split() if _split_queue is not None else None
         for scene in ParallelProcessor._generate_scenes(args.loader, args.source):
-            _writer.write(scene, splits=stream_split())
+            _writer.write(scene, splits=stream_split_iter)
             processed_scenes += 1
 
         with _source_counter.get_lock():
@@ -496,6 +514,7 @@ class ParallelProcessor(SceneLoader[IdT]):
         Synchronized[int],
         Synchronized[int],
         Synchronized[int],
+        Lock,
         mp.Queue[DatasetSplit] | None,
     ]:
         """Convenience property to get the arguments needed for worker initialization."""
@@ -503,6 +522,7 @@ class ParallelProcessor(SceneLoader[IdT]):
             self._mp_worker_counter,
             self._mp_scene_counter,
             self._mp_source_counter,
+            self._mp_info_lock,
             self._mp_split_queue,
         )
 
@@ -522,16 +542,31 @@ _scene_counter: Synchronized[int]
 _source_counter: Synchronized[int]
 _split_queue: mp.Queue[DatasetSplit] | None
 _worker_id: int
+_worker_info_lock: Lock
+
+
+@contextlib.contextmanager
+def _get_worker_info() -> Generator[WorkerInfo, None, None]:
+    with _worker_info_lock, _worker_counter.get_lock():
+        info = WorkerInfo(
+            worker_id=_worker_id,
+            num_workers=_worker_counter.value,
+            remaining_workers=_worker_counter.value,
+        )
+        yield info
 
 
 def _init_worker(
     worker_counter: Synchronized[int],
     scene_counter: Synchronized[int],
     source_counter: Synchronized[int],
+    info_lock: Lock,
     split_queue: mp.Queue[DatasetSplit] | None,
 ) -> None:
     # This is the standard and most efficient way to share a counter across
     # processes in Python's multiprocessing module.
+    global _worker_counter  # noqa: PLW0603
+    _worker_counter = worker_counter
     global _worker_id  # noqa: PLW0603
     with worker_counter.get_lock():
         _worker_id = worker_counter.value
@@ -540,6 +575,8 @@ def _init_worker(
     _scene_counter = scene_counter
     global _source_counter  # noqa: PLW0603
     _source_counter = source_counter
+    global _worker_info_lock  # noqa: PLW0603
+    _worker_info_lock = info_lock
     global _split_queue  # noqa: PLW0603
     _split_queue = split_queue
 
@@ -548,19 +585,26 @@ def _init_write_worker(
     worker_counter: Synchronized[int],
     scene_counter: Synchronized[int],
     source_counter: Synchronized[int],
+    info_lock: Lock,
     split_queue: mp.Queue[DatasetSplit] | None,
     writer_factory: Callable[[int], SceneWriter],
     finalize: Callable[[SceneWriter], None] | None,
 ) -> None:
-    _init_worker(worker_counter, scene_counter, source_counter, split_queue)
+    _init_worker(worker_counter, scene_counter, source_counter, info_lock, split_queue)
 
     global _writer  # noqa: PLW0603
     _writer = writer_factory(_worker_id)
 
     def cleanup() -> None:
-        if _writer is not None and finalize is not None:
-            finalize(_writer)
-        elif _writer is not None:
-            _writer.finalize()
+        with _get_worker_info() as info:
+            if _writer is not None and finalize is not None:
+                finalize(_writer)
+            elif _writer is not None:
+                _writer.finish_local()
+
+            if info.remaining_workers == 1:
+                _writer.finish_final()
+
+            _worker_counter.value -= 1
 
     Finalize(obj=None, callback=cleanup, exitpriority=10)

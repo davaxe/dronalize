@@ -1,14 +1,21 @@
-import functools
-from collections.abc import Iterator
-from pathlib import Path
-from typing import ParamSpec, Protocol
+from __future__ import annotations
 
-from dronalize.core.datatypes.scene import Scene
-from dronalize.core.datatypes.split import DatasetSplit
+import functools
+from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, runtime_checkable
+
+from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+    from pathlib import Path
+
+    from dronalize.core.datatypes.scene import Scene
+    from dronalize.core.datatypes.split import DatasetSplit
 
 P = ParamSpec("P")
 
 
+@runtime_checkable
 class SceneWriter(Protocol):
     """Protocol for writing processed scenes to disk."""
 
@@ -21,7 +28,7 @@ class SceneWriter(Protocol):
             The processed scene to write.
         splits : Iterator[DatasetSplit] or None, optional
             An optional iterator of dataset splits that the scene belongs to.
-            An iterator is primarly used to allow for multiple splits per write
+            An iterator is primarily used to allow for multiple splits per write
             call.
 
         Returns
@@ -33,8 +40,8 @@ class SceneWriter(Protocol):
         """
         ...
 
-    def finalize(self) -> None:
-        """Finalize the writing process.
+    def finish_local(self) -> None:
+        """Finalize the writing process for the local process.
 
         This method can be used to perform any necessary cleanup or finalization
         steps after all scenes have been written. For example, closing file
@@ -59,3 +66,39 @@ class SceneWriter(Protocol):
 
         """
         ...
+
+    def finish_final(self) -> None:
+        """Perform any final cleanup after all writing is complete.
+
+        This will be called once in parallel context after all processes have
+        completed their writing and finalization steps. For non-paralell context
+        this will be called immediately after `finish_local`.
+
+        """
+        ...
+
+    @classmethod
+    def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int], Self]:  # noqa: ANN401
+        """Create a factory function for this writer class.
+
+        This should return a factory function that takes an integer identfier
+        and return a instance of the class ready to be used independently
+        across multiple processes. Most commonly, the identifier can be used
+        to set an individual output directory for each process to make sure
+        there are no conflicts.
+
+        Parameters
+        ----------
+        *args : Any (should be specified more concretely in subclasses)
+            Positional arguments to be passed to the writer constructor.
+        **kwargs : Any (should be specified more concretely in subclasses)
+            Keyword arguments to be passed to the writer constructor.
+
+        Returns
+        -------
+        Callable[[int], Self]
+            A factory function that takes an integer identifier and returns an
+            instance of the writer class.
+
+        """
+        return functools.partial(cls, *args, **kwargs)
