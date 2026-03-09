@@ -1,16 +1,29 @@
+from __future__ import annotations
+
 import itertools
 import multiprocessing as mp
-from collections.abc import Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING, TypedDict, Unpack
 
 import numpy as np
 from streaming import MDSWriter
 from typing_extensions import override
 
-from dronalize.core.datatypes.map_graph import NumpyMapGraphDict
-from dronalize.core.datatypes.scene import Scene
 from dronalize.core.datatypes.split import DatasetSplit
 from dronalize.core.protocols.writer import SceneWriter
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dronalize.core.datatypes.map_graph import NumpyMapGraphDict
+    from dronalize.core.datatypes.scene import Scene
+
+
+class _MDSWriterArgs(TypedDict, total=False):
+    compression: str | None
+    hashes: list[str] | None
+    size_limit: str | int
+    exist_ok: bool
 
 
 class MDSSceneWriter(SceneWriter):
@@ -20,41 +33,40 @@ class MDSSceneWriter(SceneWriter):
         *,
         splits: list[DatasetSplit] | None = None,
         parallel: bool = False,
-        multiple_targets: bool | int = False,
-        compression: str | None = None,
-        size_limit: str | int = "67mb",
+        multiple_targets: int | bool = False,
+        parallel_group: int | str | None = None,
+        **inner_args: Unpack[_MDSWriterArgs],
     ) -> None:
         self._base_output_dir: Path = Path(output_dir)
         self._multiple_targets: int | bool = multiple_targets
         self._parallel: bool = parallel
+        self._parallel_group: int | str | None = parallel_group
         self._splits: list[DatasetSplit] | None = splits
+        # Defer writer initialization until the first write call.
+        self._writers: dict[DatasetSplit | None, MDSWriter] | None = None
+        # Save inner writer args for later use during deferred initialization.
+        self._inner_args = inner_args
 
-        self._writers: dict[DatasetSplit | None, MDSWriter] = (
-            {
-                split: MDSWriter(
-                    out=str(self._base_output_dir / split.value / mp.current_process().name)
-                    if parallel
-                    else str(self._base_output_dir / split.value)
-                    if split
-                    else str(self._base_output_dir),
-                    columns=_MDS_COLUMNS,
-                    compression=compression,
-                    size_limit=size_limit,
-                )
-                for split in splits
-            }
-            if splits
-            else {
-                None: MDSWriter(
-                    out=str(self._base_output_dir / mp.current_process().name)
-                    if parallel
-                    else str(self._base_output_dir),
-                    columns=_MDS_COLUMNS,
-                    compression=compression,
-                    size_limit=size_limit,
-                )
-            }
-        )
+    @staticmethod
+    def _init_writers(
+        output_dir: Path,
+        *,
+        splits: list[DatasetSplit] | None,
+        parallel: bool,
+        parallel_group: int | str | None,
+        **inner_args: Unpack[_MDSWriterArgs],
+    ) -> dict[DatasetSplit | None, MDSWriter]:
+        """Initialize MDSWriters for the given splits and output directory."""
+        writers: dict[DatasetSplit | None, MDSWriter] = {}
+        for split in splits or [None]:
+            split_dir = output_dir / split.value if split else output_dir
+            final_dir = (
+                split_dir
+                if not parallel
+                else split_dir / str(parallel_group or mp.current_process().name)
+            )
+            writers[split] = MDSWriter(out=str(final_dir), columns=_MDS_COLUMNS, **inner_args)
+        return writers
 
     @override
     def set_output_dir(self, output_dir: Path) -> None:
@@ -65,6 +77,14 @@ class MDSSceneWriter(SceneWriter):
     @override
     def write(self, processed: Scene, splits: Iterator[DatasetSplit] | None = None) -> bool:
         # Resolve the map once per scene (shared across target-agent samples)
+        if self._writers is None:
+            self._writers = self._init_writers(
+                self._base_output_dir,
+                splits=self._splits,
+                parallel=self._parallel,
+                parallel_group=self._parallel_group,
+                **self._inner_args,
+            )
 
         map_sample = self._encode_map(processed)
         samples = processed.to_numpy_dict(multiple_targets=self._multiple_targets)
@@ -108,8 +128,13 @@ class MDSSceneWriter(SceneWriter):
 
     @override
     def finalize(self) -> None:
+        if self._writers is None:
+            return
+
         for writer in self._writers.values():
             writer.finish()
+
+        self._writers = None
 
     @staticmethod
     def _encode_map(scene: Scene) -> NumpyMapGraphDict:
@@ -182,9 +207,9 @@ if __name__ == "__main__":
     from dronalize.datasets.eth_ucy import HotelLoader
 
     path = Path("data")
-    loader = HotelLoader(path, split=DatasetSplit.VAL)
+    loader = HotelLoader(path, split=DatasetSplit.ALL)
     # Example usage
-    writer = MDSSceneWriter("output/scenes", parallel=False)
+    writer = MDSSceneWriter("output/scenes", parallel=True, exist_ok=True)
     count = 0
     for scene in loader.scenes():
         count += 1

@@ -1,9 +1,12 @@
+import functools
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Protocol
+from typing import ParamSpec, Protocol
 
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.datatypes.split import DatasetSplit
+
+P = ParamSpec("P")
 
 
 class SceneWriter(Protocol):

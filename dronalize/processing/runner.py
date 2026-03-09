@@ -16,16 +16,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 from dronalize.core.protocols.writer import SceneWriter
 from dronalize.datasets.registry import DatasetDescriptor, get
 from dronalize.processing.config import ConfigDict, load_overrides, resolve_config
-from dronalize.processing.parallel import ParallelSceneLoader, ProgressBar
+from dronalize.processing.parallel import ParallelProcessor, ProgressBar
+from dronalize.processing.sequential import SequentialProcessor
 
 if TYPE_CHECKING:
     from dronalize.core.datatypes.split import DatasetSplit
-    from dronalize.core.protocols.loader import BaseSceneLoader, SceneLoader
+    from dronalize.core.protocols.loader import BaseSceneLoader
 
 
 WriterFactory = Callable[[str, Path], SceneWriter]
@@ -97,14 +98,6 @@ def process_dataset(
 
     scene_loader = _maybe_parallelize(loader, parallel=parallel, num_workers=num_workers)
 
-    def _factory() -> SceneWriter:
-        return writer
-
-    def _finalize(writer: SceneWriter) -> None:
-        writer.finalize()
-
-    scene_loader.write_scenes(_factory, _finalize)
-
 
 def _build_loader(
     descriptor: DatasetDescriptor,
@@ -129,18 +122,36 @@ def _build_loader(
     return descriptor.loader_factory(data_root, **kwargs)
 
 
+@overload
+def _maybe_parallelize(
+    loader: BaseSceneLoader,
+    *,
+    parallel: Literal[False],
+    num_workers: int | None = None,
+) -> SequentialProcessor: ...
+
+
+@overload
+def _maybe_parallelize(
+    loader: BaseSceneLoader,
+    *,
+    parallel: Literal[True],
+    num_workers: int | None = None,
+) -> ParallelProcessor: ...
+
+
 def _maybe_parallelize(
     loader: BaseSceneLoader,
     *,
     parallel: bool,
-    num_workers: int | None,
-) -> SceneLoader:
+    num_workers: int | None = None,
+) -> SequentialProcessor | ParallelProcessor:
     """Optionally wrap a loader in `ParallelSceneLoader`."""
     if not parallel:
-        return loader
+        return SequentialProcessor(loader, progress_bar=ProgressBar.SOURCES)
 
     parallel_kwargs: dict[str, Any] = {"progress_bar": ProgressBar.SOURCES}
     if num_workers is not None:
         parallel_kwargs["processes"] = num_workers
 
-    return ParallelSceneLoader(loader, **parallel_kwargs)
+    return ParallelProcessor(loader, **parallel_kwargs)

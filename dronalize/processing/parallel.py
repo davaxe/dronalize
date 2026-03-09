@@ -4,8 +4,6 @@ import functools
 import multiprocessing as mp
 import threading
 from collections import deque
-from dataclasses import replace
-from enum import IntEnum
 from multiprocessing.util import Finalize
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, NamedTuple, TypeVar
 
@@ -14,7 +12,8 @@ from typing_extensions import Self, override
 
 from dronalize.core._types import IdT, P, PayloadT, SourceT
 from dronalize.core.datatypes.scene import Scene
-from dronalize.core.protocols.loader import BaseSceneLoader, SceneLoader, Source
+from dronalize.core.protocols.loader import ProcessableLoader, SceneLoader, Source
+from dronalize.processing.common import ProgressBar
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
@@ -24,37 +23,11 @@ if TYPE_CHECKING:
     from dronalize.core.protocols.writer import SceneWriter
 
 
-class ProgressBar(IntEnum):
-    """Enum to specify which progress bars to show."""
-
-    NONE = 0
-    """No progress bars."""
-    SOURCES = 1
-    """Show progress bar for sources (# processed scenes are shown in postfix)."""
-    SCENES = 2
-    """Show progress bar for scenes (# processed sources are shown in postfix)."""
-
-    def unit(self) -> str:
-        """Return unit depending on the type of progress bar.
-
-        Returns
-        -------
-        str
-            Unit string for the tqdm progress bar.
-
-        """
-        if self == ProgressBar.SOURCES:
-            return " sources"
-        if self == ProgressBar.SCENES:
-            return " scenes"
-        return ""
-
-
 ReturnT = TypeVar("ReturnT", int, list[Scene[Any]])
 
 
-class ParallelSceneLoader(SceneLoader[IdT]):
-    """A generic parallel data loader that wraps another BaseSceneLoader.
+class ParallelProcessor(SceneLoader[IdT]):
+    """A generic parallel data processor/loader that wraps a loader.
 
     It uses Python's multiprocessing module to parallelize the processing of
     sources across multiple CPU cores. The number of processes and chunksize can
@@ -106,7 +79,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
 
     def __init__(
         self,
-        inner: BaseSceneLoader[IdT, Any],
+        inner: ProcessableLoader[IdT, Any],
         *,
         chunksize: int | None = None,
         processes: int | None = None,
@@ -271,11 +244,9 @@ class ParallelSceneLoader(SceneLoader[IdT]):
     @override
     def write_scenes(
         self,
-        writer_factory: Callable[Concatenate[int, P], SceneWriter],
+        writer_factory: Callable[[int], SceneWriter],
         finalize: Callable[[SceneWriter], None] | None = None,
         split_generator: Iterable[DatasetSplit] | None = None,
-        *args: P.args,
-        **kwargs: P.kwargs,
     ) -> None:
         """Process scenes in parallel and write them using a SceneWriter.
 
@@ -306,10 +277,6 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             An optional generator that yields DatasetSplit values. If provided, a
             the values from this generator will synchronously fed to worker worker
             processess and passed into the `SceneWriter.write`.
-        *args : P.args
-            Additional positional arguments to pass to the `writer_factory`.
-        **kwargs : P.kwargs
-            Additional keyword arguments to pass to the `writer_factory`.
 
         Practical Considerations
         ------------------------
@@ -317,7 +284,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         as there are scenes. See `StreamSplitter` for a generic and configurable
         implementation of a split generator.
 
-        Moreover, if splits are provided using `StreamSplitter` the writer
+        Moreover if splits are provided using `StreamSplitter` the writer
         should not consume a split unless it is actually use, because this will
         result in a skewed distribution (different from the specified weights)
         of scenes across splits. For example, if the writer consumes a split for
@@ -340,7 +307,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
                 daemon=True,
             )
             thread.start()
-        bound_factory = functools.partial(writer_factory, *args, **kwargs)
+        bound_factory = functools.partial(writer_factory)
         payloads = (_ProcessArgs(s, self._inner) for s in self._inner.sources())
         initargs = (*self._init_args, bound_factory, finalize)
         deque(
@@ -367,7 +334,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             while True:
                 yield _split_queue.get()
 
-        for scene in ParallelSceneLoader._generate_scenes(args.loader, args.source):
+        for scene in ParallelProcessor._generate_scenes(args.loader, args.source):
             _writer.write(scene, splits=stream_split())
             processed_scenes += 1
 
@@ -391,7 +358,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             List of processed scenes from the given source.
 
         """
-        scenes = list(ParallelSceneLoader._generate_scenes(args.loader, args.source))
+        scenes = list(ParallelProcessor._generate_scenes(args.loader, args.source))
         with _source_counter.get_lock():
             _source_counter.value += 1
         return scenes
@@ -421,7 +388,7 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             msg = "no callable function provided in _ProcessArgs."
             raise ValueError(msg)
 
-        for scene in ParallelSceneLoader._generate_scenes(args.loader, args.source):
+        for scene in ParallelProcessor._generate_scenes(args.loader, args.source):
             args.fn(scene)
             processed_scenes += 1
 
@@ -432,16 +399,14 @@ class ParallelSceneLoader(SceneLoader[IdT]):
 
     @staticmethod
     def _generate_scenes(
-        loader: BaseSceneLoader[IdT, SourceT], source: Source[IdT, SourceT]
+        loader: ProcessableLoader[IdT, SourceT], source: Source[IdT, SourceT]
     ) -> Iterator[Scene[IdT]]:
         """Core logic to process a source and yield properly numbered scenes."""
         for scene_data, map_resolver in loader.process_next(source):
-            scene = loader.create_scene(scene_data, source, map_resolver)
             with _scene_counter.get_lock():
                 _scene_counter.value += 1
                 scene_number = _scene_counter.value
-
-            yield replace(scene, scene_number=scene_number)
+            yield loader.create_scene(scene_data, source, map_resolver, scene_number)
 
     def _execute_parallel(
         self,
@@ -463,6 +428,8 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             work_iter = map_fn(process_fn, payloads, self._chunksize)
 
             yield from self._track_progress(work_iter, progress_bar)
+            pool.close()
+            pool.join()
 
     def _track_progress(
         self, work_iter: Iterable[ReturnT], progress_bar: tqdm.tqdm
@@ -544,7 +511,7 @@ class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):
     """Simplified arguments for processing a single source in a worker process."""
 
     source: Source[IdT, SourceT]
-    loader: BaseSceneLoader[IdT, SourceT]
+    loader: ProcessableLoader[IdT, SourceT]
     fn: Callable[..., Any] | None = None
 
 

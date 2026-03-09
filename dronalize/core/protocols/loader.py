@@ -84,10 +84,8 @@ class SceneLoader(Protocol, Generic[IdT]):
 
     def write_scenes(
         self,
-        writer_factory: Callable[P, SceneWriter],
+        writer_factory: Callable[..., SceneWriter],
         finalize: Callable[[SceneWriter], None],
-        *args: P.args,
-        **kwargs: P.kwargs,
     ) -> None:
         """Process scenes and write them using the provided writer factory.
 
@@ -110,7 +108,93 @@ class SceneLoader(Protocol, Generic[IdT]):
         """
 
 
-class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
+class ProcessableLoader(Protocol, Generic[IdT, SourceT]):
+    """Minimal protocol required to work with a processor abstraction.
+
+    This protocol defines the essential interface for discovering data sources,
+    tracking dataset sizes, processing raw sources into tabular data, and
+    constructing final scene objects.
+
+    """
+
+    def sources(self) -> Iterable[Source[IdT, SourceT]]:
+        """Discover and yield the data sources to be processed.
+
+        Returns
+        -------
+        Iterable[Source[IdT, SourceT]]
+            An iterable containing the raw data sources to process.
+        """
+        ...
+
+    def num_sources(self) -> int | None:
+        """Get the total number of sources that will be processed.
+
+        Returns
+        -------
+        int or None
+            Total number of sources, or None if the count is unknown or
+            expensive to compute in advance.
+        """
+        ...
+
+    def num_scenes(self) -> int | None:
+        """Get the total number of scenes that will be generated.
+
+        Returns
+        -------
+        int or None
+            Total number of scenes, or None if the count is unknown or depends
+            on dynamic processing (e.g., sliding window extraction).
+        """
+        ...
+
+    def process_next(
+        self, source: Source[IdT, SourceT]
+    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
+        """Process a single raw data source into data frames and map contexts.
+
+        Parameters
+        ----------
+        source : Source[IdT, SourceT]
+            The raw data source to process.
+
+        Yields
+        ------
+        tuple[pl.DataFrame, MapContext]
+            Processed Polars DataFrames paired with their corresponding map context.
+        """
+        ...
+
+    def create_scene(
+        self,
+        df: pl.DataFrame,
+        source: Source[IdT, SourceT],
+        resolver: MapContext | None = None,
+        scene_number: int | None = None,
+    ) -> Scene[IdT]:
+        """Construct a Scene object from processed data.
+
+        Parameters
+        ----------
+        df : pl.DataFrame
+            The processed data frame containing the scene data.
+        source : Source[IdT, SourceT]
+            The originating raw data source.
+        resolver : MapContext | None, optional
+            The map context or resolver associated with the scene.
+        scene_number : int | None, optional
+            An optional numeric index or identifier for the generated scene.
+
+        Returns
+        -------
+        Scene[IdT]
+            The fully constructed scene object.
+        """
+        ...
+
+
+class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
     """ABC interface for processing raw data sources into a standardized format.
 
     This class contains logic for orchestrating the loading and processing of
@@ -314,6 +398,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         """
         raise SplitNotSupportedError(type(self).__name__, DatasetSplit.VAL)
 
+    @override
     def sources(self) -> Iterable[Source[IdT, SourceT]]:
         """Return sources for the currently configured split.
 
@@ -404,11 +489,13 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         finally:
             finalize(writer)
 
+    @override
     def create_scene(
         self,
         df: pl.DataFrame,
         source: Source[IdT, SourceT],
         resolver: MapContext | None = None,
+        scene_number: int | None = None,
     ) -> Scene[IdT]:
         """Create a Scene object from the processed DataFrame and its source.
 
@@ -440,7 +527,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         scene = Scene(
             inner=df,
             identifier=source.identifier,
-            scene_number=self._count,
+            scene_number=scene_number if scene_number is not None else self._count,
             input_len=self.input_len,
             output_len=self.output_len,
             map_key=map_key,
@@ -453,35 +540,13 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
     # Convenience / introspection
     # ===================================================================
 
+    @override
     def num_scenes(self) -> int | None:
-        """Get the total number of scenes that will be processed.
-
-        In some cases this can be expensive to compute or not known in advance,
-        in that case `None` is returned.
-
-        Returns
-        -------
-        int or None
-            Total number of scenes, or `None` if not known in advance.
-
-        """
         _self = self
         return None
 
+    @override
     def num_sources(self) -> int | None:
-        """Get the total number of sources that will be processed.
-
-        This is different from `num_scenes()` since each source can potentially
-        generate multiple scenes (e.g., by using sliding window sampling). In
-        some cases this can be expensive to compute or not known in advance, in
-        that case `None` is returned.
-
-        Returns
-        -------
-        int or None
-            Total number of sources, or `None` if not known in advance.
-
-        """
         _self = self
         return None
 
@@ -548,23 +613,11 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], Generic[IdT, SourceT]):
         ratio = up / down
         return self.loader_config.sample_time / ratio
 
+    @override
     def process_next(
         self,
         source: Source[IdT, SourceT],
     ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
-        """Process next source.
-
-        Parameters
-        ----------
-        source : Source[IdT, SourceT]
-            The source to process.
-
-        Yields
-        ------
-        tuple[pl.DataFrame, MapResolver]
-            Processed data frames, each paired with its resolver.
-
-        """
         if self._pipeline is None:
             self._pipeline = self.pipeline()
 
