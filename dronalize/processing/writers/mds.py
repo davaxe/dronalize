@@ -1,4 +1,6 @@
+import itertools
 import multiprocessing as mp
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -61,20 +63,19 @@ class MDSSceneWriter(SceneWriter):
             self._base_output_dir /= mp.current_process().name
 
     @override
-    def write(self, processed: Scene, split: DatasetSplit | None = None) -> bool:
-        if split in self._writers:
-            writer = self._writers[split]
-        elif self._splits is None:
-            # If the supported splits were not predefined, accept any split and
-            # use a single writer
-            writer = self._writers[None]
-        else:
-            msg = f"Scene split {split} not in writer splits {self._splits}"
-            raise ValueError(msg)
+    def write(self, processed: Scene, splits: Iterator[DatasetSplit] | None = None) -> bool:
         # Resolve the map once per scene (shared across target-agent samples)
+
         map_sample = self._encode_map(processed)
         samples = processed.to_numpy_dict(multiple_targets=self._multiple_targets)
-        for target_id, numpy_dict in samples.items():
+        for (target_id, numpy_dict), split in zip(
+            samples.items(), splits or itertools.repeat(None), strict=False
+        ):
+            if split not in self._writers:
+                msg = f"Scene {processed.scene_number} belongs to split {split}"
+                ", but no writer is configured for this split."
+                raise ValueError(msg)
+
             sample = {
                 # -- scalar metadata --
                 "scene_number": processed.scene_number,
@@ -101,7 +102,7 @@ class MDSSceneWriter(SceneWriter):
                 # -- map --
                 **map_sample,
             }
-            writer.write(sample)
+            self._writers[split].write(sample)
 
         return len(samples) > 0
 

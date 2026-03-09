@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, TypedDict, TypeVar, Unpack, cast
+from typing import TYPE_CHECKING, Literal, TypedDict, Unpack, cast
 
 import polars as pl
 from typing_extensions import overload
@@ -12,8 +12,8 @@ from typing_extensions import overload
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from dronalize.core._types import T
 
-T = TypeVar("T")
 
 Transform = Callable[[pl.LazyFrame], pl.LazyFrame]
 """A 1:1 transformation from one LazyFrame to another."""

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 
-DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
+if TYPE_CHECKING:
+    from dronalize.core._types import DataFrameT
 
 
 def lazy(data: pl.DataFrame | pl.LazyFrame) -> pl.LazyFrame:

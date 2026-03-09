@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Protocol
 
@@ -8,15 +9,17 @@ from dronalize.core.datatypes.split import DatasetSplit
 class SceneWriter(Protocol):
     """Protocol for writing processed scenes to disk."""
 
-    def write(self, processed: Scene, split: DatasetSplit | None = None) -> bool:
+    def write(self, processed: Scene, splits: Iterator[DatasetSplit] | None = None) -> bool:
         """Write a single processed scene.
 
         Parameters
         ----------
         processed : Scene
             The processed scene to write.
-        split : DatasetSplit or None, optional
-            Optional information of what dataset split the scene belongs to.
+        splits : Iterator[DatasetSplit] or None, optional
+            An optional iterator of dataset splits that the scene belongs to.
+            An iterator is primarly used to allow for multiple splits per write
+            call.
 
         Returns
         -------

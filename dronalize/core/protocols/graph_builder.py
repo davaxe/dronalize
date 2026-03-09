@@ -628,8 +628,8 @@ class BaseGraphBuilder(GraphBuilder, ABC):
             np.array(self._y, dtype=np.float32),
         ])
 
-        edge_indices = np.array([self._edge_src, self._edge_dst], dtype=np.int64)
-        edge_types = np.array(self._edge_types, dtype=np.int64)
+        edge_indices = np.array([self._edge_src, self._edge_dst], dtype=np.int32)
+        edge_types = np.array(self._edge_types, dtype=np.int32)
 
         return MapGraph(
             edge_indices=edge_indices,

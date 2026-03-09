@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, TypeVar
+from typing import TYPE_CHECKING, Annotated
 
 import polars as pl
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
@@ -10,7 +10,7 @@ from dronalize.core.datatypes.categories import AgentCategory
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
+    from dronalize.core._types import DataFrameT
 
 
 def _to_frozenset(v: Iterable | str | AgentCategory | None) -> frozenset | None:

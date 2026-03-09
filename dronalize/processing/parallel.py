@@ -1,22 +1,26 @@
 from __future__ import annotations
 
+import functools
 import multiprocessing as mp
+import threading
 from collections import deque
-from collections.abc import Callable, Hashable, Iterable, Iterator
 from dataclasses import replace
 from enum import IntEnum
-from functools import partial
-from typing import TYPE_CHECKING, Any, Concatenate, Generic, NamedTuple, ParamSpec, TypeVar
+from multiprocessing.util import Finalize
+from typing import TYPE_CHECKING, Any, Concatenate, Generic, NamedTuple, TypeVar
 
 import tqdm
 from typing_extensions import Self, override
 
+from dronalize.core._types import IdT, P, PayloadT, SourceT
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.protocols.loader import BaseSceneLoader, SceneLoader, Source
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Iterator
     from multiprocessing.sharedctypes import Synchronized
 
+    from dronalize.core.datatypes.split import DatasetSplit
     from dronalize.core.protocols.writer import SceneWriter
 
 
@@ -46,10 +50,6 @@ class ProgressBar(IntEnum):
         return ""
 
 
-SourceT = TypeVar("SourceT")
-IdT = TypeVar("IdT", bound=Hashable)
-P = ParamSpec("P")
-PayloadT = TypeVar("PayloadT")
 ReturnT = TypeVar("ReturnT", int, list[Scene[Any]])
 
 
@@ -155,8 +155,10 @@ class ParallelSceneLoader(SceneLoader[IdT]):
             raise ValueError(msg)
 
         self._inner = inner
+        self._mp_worker_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_scene_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_source_counter: Synchronized[int] = mp.Value("i", 0)
+        self._mp_split_queue: mp.Queue[DatasetSplit] | None = None
         self._chunksize: int = chunksize or self._optimal_chunksize(inner.num_sources(), processes)
         self._processes: int | None = processes
         self._maintain_order: bool = maintain_order
@@ -221,7 +223,9 @@ class ParallelSceneLoader(SceneLoader[IdT]):
 
         """
         payloads = (_ProcessArgs(s, self._inner) for s in self._inner.sources())
-        for scenes in self._execute_parallel(self._process_fn, payloads):
+        for scenes in self._execute_parallel(
+            self._process_fn, payloads, _init_worker, *self._init_args
+        ):
             yield from scenes
 
     @override
@@ -255,42 +259,118 @@ class ParallelSceneLoader(SceneLoader[IdT]):
 
         """
         # Bind args and kwargs early to avoid passing them through _ProcessArgs
-        bound_callback = partial(callback, *args, **kwargs)
+        bound_callback = functools.partial(callback, *args, **kwargs)
         payloads = (_ProcessArgs(s, self._inner, bound_callback) for s in self._inner.sources())
-        deque(self._execute_parallel(self._process_fn_callback, payloads), maxlen=0)
+        deque(
+            self._execute_parallel(
+                self._process_fn_callback, payloads, _init_worker, *self._init_args
+            ),
+            maxlen=0,
+        )
 
     @override
     def write_scenes(
         self,
-        writer_factory: Callable[P, SceneWriter],
-        finalize: Callable[[SceneWriter], None],
+        writer_factory: Callable[Concatenate[int, P], SceneWriter],
+        finalize: Callable[[SceneWriter], None] | None = None,
+        split_generator: Iterable[DatasetSplit] | None = None,
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        bound_factory = partial(writer_factory, *args, **kwargs)
-        payloads = (
-            (_ProcessArgs(s, self._inner), bound_factory, finalize) for s in self._inner.sources()
+        """Process scenes in parallel and write them using a SceneWriter.
+
+        This is a customlized method that initialize one SceneWriter per worker
+        process using the provided `writer_factory`, and then calls the `write`
+        method of the SceneWriter for each processed scene. This is useful for
+        efficiently writing large datasets in parallel without needing to send
+        scenes back to the main process. A unique integer (0, 1, ..., n) is
+        passed to the `writer_factory` for each worker process, which can be used
+        to create separate output files for each process if desired.
+
+        Parameters
+        ----------
+        writer_factory : Callable[[int, P], SceneWriter]
+            A factory function that takes a worker ID and additional arguments,
+            and returns a SceneWriter instance. This factory will be called once
+            per worker process to create a writer for that process.
+        finalize : Callable[[SceneWriter], None], optional
+            An optional function that takes a SceneWriter and performs any
+            necessary finalization (e.g., closing files). If not provided, the
+            `finalize` method of the SceneWriter will be called by default.
+
+            However, if a finalize function is provided, it will be called
+            instead of the default, which means that the SceneWriter's
+            `finalize` method will not be called unless the provided function
+            explicitly calls it.
+        split_generator : Iterable[DatasetSplit], optional
+            An optional generator that yields DatasetSplit values. If provided, a
+            the values from this generator will synchronously fed to worker worker
+            processess and passed into the `SceneWriter.write`.
+        *args : P.args
+            Additional positional arguments to pass to the `writer_factory`.
+        **kwargs : P.kwargs
+            Additional keyword arguments to pass to the `writer_factory`.
+
+        Practical Considerations
+        ------------------------
+        If provided the `split_generator` shoud at least provide as many splits
+        as there are scenes. See `StreamSplitter` for a generic and configurable
+        implementation of a split generator.
+
+        Moreover, if splits are provided using `StreamSplitter` the writer
+        should not consume a split unless it is actually use, because this will
+        result in a skewed distribution (different from the specified weights)
+        of scenes across splits. For example, if the writer consumes a split for
+        each scene, but some scenes are filtered out and not written, then the
+        resulting distribution of scenes across splits will be different from
+        the specified weights in `StreamSplitter`. In this case, it is
+        recommended to only consume a split from the generator when a scene is
+        actually written, which can be achieved by passing the split generator
+        to the `SceneWriter.write` method and consuming splits there.
+
+        """
+        stop_event: threading.Event | None = None
+        thread: threading.Thread | None = None
+        if split_generator is not None:
+            self._mp_split_queue = mp.Queue(maxsize=10)
+            stop_event = threading.Event()
+            thread = threading.Thread(
+                target=self._feed_split_queue,
+                args=(split_generator, self._mp_split_queue, stop_event),
+                daemon=True,
+            )
+            thread.start()
+        bound_factory = functools.partial(writer_factory, *args, **kwargs)
+        payloads = (_ProcessArgs(s, self._inner) for s in self._inner.sources())
+        initargs = (*self._init_args, bound_factory, finalize)
+        deque(
+            self._execute_parallel(self._process_fn_write, payloads, _init_write_worker, *initargs),
+            maxlen=0,
         )
-        deque(self._execute_parallel(self._process_fn_write, payloads), maxlen=0)
+
+        if stop_event is not None and thread is not None:
+            stop_event.set()
+            thread.join(timeout=0)
+
+        if self._mp_split_queue is not None:
+            self._mp_split_queue.get()
+            self._mp_split_queue.close()
+            self._mp_split_queue = None
 
     @staticmethod
-    def _process_fn_write(
-        payload: tuple[
-            _ProcessArgs[IdT, SourceT],
-            Callable[..., SceneWriter],
-            Callable[[SceneWriter], None],
-        ],
-    ) -> int:
-        args, writer_factory, finalize = payload
+    def _process_fn_write(args: _ProcessArgs[IdT, SourceT]) -> int:
         processed_scenes: int = 0
-        writer: SceneWriter = writer_factory()
+
+        def stream_split() -> Iterator[DatasetSplit] | None:
+            if _split_queue is None:
+                return None  # noqa: B901
+            while True:
+                yield _split_queue.get()
 
         for scene in ParallelSceneLoader._generate_scenes(args.loader, args.source):
-            writer.write(scene)
+            _writer.write(scene, splits=stream_split())
             processed_scenes += 1
 
-        writer.finalize()
-        finalize(writer)
         with _source_counter.get_lock():
             _source_counter.value += 1
 
@@ -367,40 +447,53 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         self,
         process_fn: Callable[[PayloadT], ReturnT],
         payloads: Iterable[PayloadT],
+        initializer: Callable[P, Any],
+        *args: P.args,
+        **kwargs: P.kwargs,
     ) -> Iterable[ReturnT]:
         """Centralized execution engine for managing the Pool and progress tracking."""
-        self._mp_scene_counter.value = 0
-        self._mp_source_counter.value = 0
+        pool_initializer = functools.partial(initializer, *args, **kwargs)
+        self._mp_scene_counter.value, self._mp_source_counter.value = 0, 0
+
         with (
             tqdm.tqdm(**self._tqdm_args()) as progress_bar,
-            mp.Pool(
-                self._processes,
-                initializer=_init_worker,
-                initargs=(self._mp_scene_counter, self._mp_source_counter),
-            ) as pool,
+            mp.Pool(self._processes, initializer=pool_initializer) as pool,
         ):
             map_fn = pool.imap if self._maintain_order else pool.imap_unordered
             work_iter = map_fn(process_fn, payloads, self._chunksize)
 
-            if self._progress_bar == ProgressBar.NONE:
-                yield from work_iter
-                return
+            yield from self._track_progress(work_iter, progress_bar)
 
-            for result in work_iter:
-                processed_scenes = len(result) if isinstance(result, list) else result
+    def _track_progress(
+        self, work_iter: Iterable[ReturnT], progress_bar: tqdm.tqdm
+    ) -> Iterable[ReturnT]:
+        if self._progress_bar == ProgressBar.NONE:
+            yield from work_iter
+            return
 
-                if self._progress_bar == ProgressBar.SOURCES:
-                    progress_bar.set_postfix(
-                        {"scenes": self._mp_scene_counter.value}, refresh=False
-                    )
-                    progress_bar.update(1)
-                elif self._progress_bar == ProgressBar.SCENES:
-                    progress_bar.set_postfix(
-                        {"sources": self._mp_source_counter.value}, refresh=False
-                    )
-                    progress_bar.update(processed_scenes)
+        for result in work_iter:
+            self._update_progress_bar(progress_bar, result)
+            yield result
 
-                yield result
+    def _update_progress_bar(self, progress_bar: tqdm.tqdm, result: ReturnT) -> None:
+        if self._progress_bar == ProgressBar.SOURCES:
+            progress_bar.set_postfix({"scenes": self._mp_scene_counter.value}, refresh=False)
+            progress_bar.update(1)
+
+        elif self._progress_bar == ProgressBar.SCENES:
+            progress_bar.set_postfix({"sources": self._mp_source_counter.value}, refresh=False)
+            processed_scenes = len(result) if isinstance(result, list) else result
+            progress_bar.update(processed_scenes)
+
+    @staticmethod
+    def _feed_split_queue(
+        split_generator: Iterator[DatasetSplit],
+        q: mp.Queue[DatasetSplit],
+        stop_event: threading.Event,
+    ) -> None:
+        while not stop_event.is_set():
+            split = next(split_generator)
+            q.put(split)
 
     def _total(self) -> int | None:
         if self._progress_bar == ProgressBar.SOURCES:
@@ -429,6 +522,23 @@ class ParallelSceneLoader(SceneLoader[IdT]):
         chunksize += int(extra > 0)
         return max(chunksize, 1)
 
+    @property
+    def _init_args(
+        self,
+    ) -> tuple[
+        Synchronized[int],
+        Synchronized[int],
+        Synchronized[int],
+        mp.Queue[DatasetSplit] | None,
+    ]:
+        """Convenience property to get the arguments needed for worker initialization."""
+        return (
+            self._mp_worker_counter,
+            self._mp_scene_counter,
+            self._mp_source_counter,
+            self._mp_split_queue,
+        )
+
 
 class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):
     """Simplified arguments for processing a single source in a worker process."""
@@ -440,14 +550,50 @@ class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):
 
 # Worker initialization function to set up the global counter in each worker
 # process.
+_worker_counter: Synchronized[int]
 _scene_counter: Synchronized[int]
 _source_counter: Synchronized[int]
+_split_queue: mp.Queue[DatasetSplit] | None
+_worker_id: int
 
 
-def _init_worker(scene_counter: Synchronized[int], source_counter: Synchronized[int]) -> None:
+def _init_worker(
+    worker_counter: Synchronized[int],
+    scene_counter: Synchronized[int],
+    source_counter: Synchronized[int],
+    split_queue: mp.Queue[DatasetSplit] | None,
+) -> None:
     # This is the standard and most efficient way to share a counter across
     # processes in Python's multiprocessing module.
+    global _worker_id  # noqa: PLW0603
+    with worker_counter.get_lock():
+        _worker_id = worker_counter.value
+        worker_counter.value += 1
     global _scene_counter  # noqa: PLW0603
     _scene_counter = scene_counter
     global _source_counter  # noqa: PLW0603
     _source_counter = source_counter
+    global _split_queue  # noqa: PLW0603
+    _split_queue = split_queue
+
+
+def _init_write_worker(
+    worker_counter: Synchronized[int],
+    scene_counter: Synchronized[int],
+    source_counter: Synchronized[int],
+    split_queue: mp.Queue[DatasetSplit] | None,
+    writer_factory: Callable[[int], SceneWriter],
+    finalize: Callable[[SceneWriter], None] | None,
+) -> None:
+    _init_worker(worker_counter, scene_counter, source_counter, split_queue)
+
+    global _writer  # noqa: PLW0603
+    _writer = writer_factory(_worker_id)
+
+    def cleanup() -> None:
+        if _writer is not None and finalize is not None:
+            finalize(_writer)
+        elif _writer is not None:
+            _writer.finalize()
+
+    Finalize(obj=None, callback=cleanup, exitpriority=10)

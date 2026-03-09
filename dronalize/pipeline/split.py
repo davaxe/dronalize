@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Hashable, Iterator, Sequence
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic
 
 import numpy as np
 import numpy.typing as npt
 
-T = TypeVar("T", bound=Hashable)
+from dronalize.core._types import IdT as T
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Sequence
 
 
 class StreamSplitter(Generic[T]):

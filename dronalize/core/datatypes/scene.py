@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Hashable
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Generic, Self
 
 import polars as pl
 
+from dronalize.core._types import IdT
 from dronalize.core.datatypes.map_resolver import MapResolver  # noqa: TC001
 from dronalize.ops.trajectory.convert import (
     NumpySceneDict,
@@ -15,9 +15,6 @@ from dronalize.ops.trajectory.convert import (
 
 if TYPE_CHECKING:
     from dronalize.core.datatypes.map_resolver import MapGraph, MapKey
-
-
-IdT = TypeVar("IdT", bound=(Hashable))
 
 
 @dataclass(slots=True, frozen=True)

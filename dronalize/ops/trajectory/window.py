@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, TypeVar, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 import polars as pl
 import polars.selectors as sl
@@ -10,7 +10,7 @@ from dronalize.ops.trajectory.basic import collect
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
+    from dronalize.core._types import DataFrameT
 
 
 @overload

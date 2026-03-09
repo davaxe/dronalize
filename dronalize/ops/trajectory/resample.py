@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 from fractions import Fraction
-from typing import TYPE_CHECKING, Literal, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -15,8 +15,7 @@ from dronalize.ops.trajectory.derivative import derivative
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-
-DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
+    from dronalize.core._types import DataFrameT
 
 
 class ResamplingMethod(StrEnum):

@@ -1,30 +1,27 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Hashable, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Concatenate, Generic, ParamSpec, Protocol, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, Concatenate, Generic, Protocol
 
 import polars as pl
 from typing_extensions import override
 
+from dronalize.core._types import IdT, P, SourceT
 from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
     from dronalize.core.datatypes import LoaderConfig
     from dronalize.core.protocols.writer import SceneWriter
     from dronalize.pipeline.pipeline import Pipeline
 
 
-MapContext: TypeAlias = MapResolver | MapKey | None
-IngestOutput: TypeAlias = tuple[pl.LazyFrame, MapContext]
-
-SourceT = TypeVar("SourceT")
-SourceT_co = TypeVar("SourceT_co", covariant=True)
-IdT = TypeVar("IdT", bound=Hashable)
-P = ParamSpec("P")
+MapContext = MapResolver | MapKey | None
+IngestOutput = tuple[pl.LazyFrame, MapContext]
 
 
 @dataclass(slots=True, frozen=True)
