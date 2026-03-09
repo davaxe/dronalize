@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from multiprocessing.shared_memory import SharedMemory
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -13,6 +14,8 @@ from zarr.creation import open_array
 import dronalize.pipeline.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.datatypes.loader_config import LoaderConfig
+from dronalize.core.datatypes.map_graph import MapGraph
+from dronalize.core.datatypes.map_resolver import MapResolver
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
@@ -129,6 +132,18 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
                 require_frames=[19, -1],
             )
         )
+
+    @override
+    def map_resolver(self) -> MapResolver:
+        def _resolve(key: str | None = None) -> MapGraph | None:
+            _key = key
+            if self._shared_memory_name is None:
+                return None
+
+            with MapGraph.from_shared(self._shared_memory_name) as map_graph:
+                return map_graph
+
+        return _resolve
 
 
 @dataclass

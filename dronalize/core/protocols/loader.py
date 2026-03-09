@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Concatenate, Generic, Protocol
+from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Generic, Protocol
 
 import polars as pl
 from typing_extensions import override
@@ -252,6 +252,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
       `None` and the resolver (if any) will need to handle that case.
 
     """
+
+    _shared_memory_name: ClassVar[str | None] = None
 
     def __init__(
         self,
@@ -624,3 +626,17 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
         for raw_lf, map_context in self.ingest(source):
             for df in self._pipeline.execute(raw_lf, collect=True, filter_empty=True):
                 yield df, map_context
+
+    @classmethod
+    def set_shared_memory(cls, name: str) -> None:
+        """Set the name of the shared memory segment to use for this loader.
+
+        This memory could be used for anything, but is mainly meant for sharing
+        Maps across processes without needing to serialize them with each scene.
+
+        Parameters
+        ----------
+        name : str
+            The name of the shared memory segment to use.
+        """
+        cls._shared_memory_name = name
