@@ -9,7 +9,7 @@ registry.register(
         name="ind",
         loader_factory=InDLoader,
         default_config=InDLoader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.BUILDER_ONLY,
         predefined_splits=None,
     )
 )

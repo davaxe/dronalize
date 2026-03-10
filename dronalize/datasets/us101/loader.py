@@ -20,7 +20,8 @@ class US101Loader(I80Loader):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_root: Path,
+        *,
         loader_config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1,
     ) -> None:
@@ -36,7 +37,7 @@ class US101Loader(I80Loader):
 
         Parameters
         ----------
-        data_dir : Path
+        data_root : Path
             Path to root of the US101 dataset, containing subdirectories of data files.
         loader_config : LoaderConfig, optional
             Processor configuration. If None, default configuration will be used.
@@ -46,4 +47,8 @@ class US101Loader(I80Loader):
             non-lane changes.
 
         """
-        super().__init__(data_dir, loader_config, lane_change_ratio)
+        super().__init__(
+            data_root,
+            loader_config=loader_config,
+            lane_change_ratio=lane_change_ratio,
+        )

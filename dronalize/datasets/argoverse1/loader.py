@@ -24,9 +24,9 @@ class Argoverse1Loader(BaseSceneLoader[int, list[Path]]):
     def __init__(
         self,
         data_root: Path,
-        file_batch_size: int | None = 100,
-        loader_config: LoaderConfig | None = None,
         *,
+        loader_config: LoaderConfig | None = None,
+        file_batch_size: int | None = 100,
         split: DatasetSplit = DatasetSplit.ALL,
     ) -> None:
         """Initialize the data processor.

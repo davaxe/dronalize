@@ -12,11 +12,7 @@ from dronalize.core.datatypes import (
     Scene,
     SplitNotSupportedError,
     WindowParams,
-    fixed_map,
-    keyed_map,
     no_map,
-    preloaded_map,
-    resolved_map,
 )
 from dronalize.core.protocols import (
     BaseGraphBuilder,
@@ -39,9 +35,5 @@ __all__ = [
     "Scene",
     "SplitNotSupportedError",
     "WindowParams",
-    "fixed_map",
-    "keyed_map",
     "no_map",
-    "preloaded_map",
-    "resolved_map",
 ]

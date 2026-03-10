@@ -9,7 +9,7 @@ registry.register(
         name="vod",
         loader_factory=VodLoader,
         default_config=VodLoader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.BUILDER_ONLY,
         predefined_splits=None,
     )
 )

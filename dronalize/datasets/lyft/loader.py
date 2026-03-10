@@ -213,6 +213,7 @@ class LyftLoader(BaseSceneLoader[int, _Source]):
                 return None
 
             with MapGraph.from_shared(self._shared_memory_name) as map_graph:
+                # TODO: Verify that this is safe
                 return map_graph
 
         return _resolve

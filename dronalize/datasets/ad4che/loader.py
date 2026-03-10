@@ -50,20 +50,18 @@ class AD4CHELoader(XLevelDataLoader):
 
     @override
     def all_sources(self) -> Iterable[Source[int, Path]]:
-        for i, subdir in enumerate(sorted(self._data_dir.iterdir()), start=1):
-            recording_meta = subdir / f"{i:0>2}_recordingMeta.csv"
+        for recording_id, subdir, recording_meta in self._recordings():
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             yield Source(
-                identifier=i,
+                identifier=recording_id,
                 inner=subdir,
                 map_key=str(location_id),
             )
 
     @override
     def num_sources(self) -> int | None:
-        num_files: int = sum(1 for p in self._data_dir.iterdir())
-        return num_files // 4 - 1
+        return sum(1 for _ in self._recordings())
 
     @staticmethod
     def meta_data_select() -> list[pl.Expr]:
@@ -114,6 +112,15 @@ class AD4CHELoader(XLevelDataLoader):
             .with_filtering(require_frames=[59])
             .with_window(45)
         )
+
+    def _recordings(self) -> Iterable[tuple[int, Path, Path]]:
+        """Yield discovered recording identifiers with their directories and metadata files."""
+        for subdir in sorted(path for path in self._data_dir.iterdir() if path.is_dir()):
+            recording_meta = next(iter(sorted(subdir.glob("*_recordingMeta.csv"))), None)
+            if recording_meta is None:
+                continue
+            prefix, _, _ = recording_meta.stem.partition("_")
+            yield int(prefix), subdir, recording_meta
 
 
 _META_SCHEMA: pl.Schema = pl.Schema({

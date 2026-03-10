@@ -6,11 +6,7 @@ from dronalize.core.datatypes.map_graph import MapGraph
 from dronalize.core.datatypes.map_resolver import (
     MapKey,
     MapResolver,
-    fixed_map,
-    keyed_map,
     no_map,
-    preloaded_map,
-    resolved_map,
 )
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
@@ -27,9 +23,5 @@ __all__ = [
     "Scene",
     "SplitNotSupportedError",
     "WindowParams",
-    "fixed_map",
-    "keyed_map",
     "no_map",
-    "preloaded_map",
-    "resolved_map",
 ]

@@ -13,6 +13,6 @@ registry.register(
         default_config=LyftLoader.default_config(),
         lifecycle_context=lyft_lifecylce_context,
         default_map_config=MapConfig.default(),
-        has_map=True,
+        map_mode=registry.MapMode.SHARED_SINGLE,
     ).with_splits("train", "val")
 )

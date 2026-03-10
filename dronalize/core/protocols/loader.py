@@ -648,7 +648,8 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
         mappings : dict[MapKey, str], optional
             A dictionary mapping specific map keys to shared memory names. If
             provided, this will override any existing mappings and the `name`
-            parameter.
+            parameter. When both *name* and *mappings* are omitted, any
+            existing shared-memory configuration is cleared.
 
         """
         if mappings is not None and name is not None:
@@ -658,3 +659,5 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
             cls._shared_memory_name = mappings
         elif name is not None:
             cls._shared_memory_name = name
+        else:
+            cls._shared_memory_name = None

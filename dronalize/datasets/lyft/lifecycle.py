@@ -42,6 +42,7 @@ def lyft_lifecylce_context(
     """
     _loader_config = loader_config
     if not map_config.include_map:
+        LyftLoader.set_shared_memory()
         yield
         return
 
@@ -56,3 +57,4 @@ def lyft_lifecylce_context(
     yield
     shm.close()
     shm.unlink()
+    LyftLoader.set_shared_memory()

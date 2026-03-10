@@ -22,6 +22,7 @@ class I80Loader(BaseSceneLoader[int, Path]):
     def __init__(
         self,
         data_root: Path,
+        *,
         loader_config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1.0,
     ) -> None:

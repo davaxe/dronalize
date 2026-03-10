@@ -42,6 +42,7 @@ def nuscenes_lifecylce_context(
     """
     _loader_config = loader_config
     if not map_config.include_map:
+        NuScenesLoader.set_shared_memory()
         yield
         return
 
@@ -55,12 +56,12 @@ def nuscenes_lifecylce_context(
             min_distance=map_config.min_distance,
             interp_distance=map_config.interp_distance,
         )
-        print(f"Built map graph for {path.stem}: {map_graph}")
         shm.append(map_graph.to_shared())
-        name_mapping[path.name] = shm[-1].name
+        name_mapping[path.stem] = shm[-1].name
 
     NuScenesLoader.set_shared_memory(mappings=name_mapping)
     yield
     for sm in shm:
         sm.close()
         sm.unlink()
+    NuScenesLoader.set_shared_memory()

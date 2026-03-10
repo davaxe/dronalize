@@ -548,12 +548,11 @@ _worker_info_lock: Lock
 @contextlib.contextmanager
 def _get_worker_info() -> Generator[WorkerInfo, None, None]:
     with _worker_info_lock, _worker_counter.get_lock():
-        info = WorkerInfo(
+        yield WorkerInfo(
             worker_id=_worker_id,
             num_workers=_worker_counter.value,
             remaining_workers=_worker_counter.value,
         )
-        yield info
 
 
 def _init_worker(

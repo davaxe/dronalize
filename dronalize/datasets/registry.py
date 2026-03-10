@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field, replace
+from enum import IntEnum, auto
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from dronalize.core.datatypes.map_config import MapConfig
@@ -47,6 +48,17 @@ class DatasetLifecycleContext(Protocol):
         ...
 
 
+class MapMode(IntEnum):
+    """How a dataset exposes map data at runtime."""
+
+    NONE = auto()
+    BUILDER_ONLY = auto()
+    INLINE = auto()
+    LAZY_KEYED = auto()
+    SHARED_SINGLE = auto()
+    SHARED_KEYED = auto()
+
+
 @dataclass(frozen=True, slots=True)
 class DatasetDescriptor:
     """Everything needed to fully process a single dataset."""
@@ -66,11 +78,16 @@ class DatasetDescriptor:
     lifecycle_context: DatasetLifecycleContext | None = None
     """Optional lifecycle context for the dataset, which can manage resources like shared memory."""
 
-    has_map: bool = False
-    """Whether the dataset has available map data."""
+    map_mode: MapMode = MapMode.NONE
+    """How this dataset exposes map data at runtime."""
 
     predefined_splits: list[DatasetSplit] | None = None
     """Predefined splits for the dataset, if any."""
+
+    @property
+    def has_map(self) -> bool:
+        """Compatibility flag for code that only distinguishes map vs. no map."""
+        return self.map_mode is not MapMode.NONE
 
     def with_splits(
         self, *splits: DatasetSplit | Literal["train", "val", "test"]

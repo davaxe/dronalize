@@ -9,7 +9,7 @@ registry.register(
         name="ad4che",
         loader_factory=AD4CHELoader,
         default_config=AD4CHELoader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.BUILDER_ONLY,
         predefined_splits=None,
     )
 )

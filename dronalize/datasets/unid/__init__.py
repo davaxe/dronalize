@@ -9,7 +9,7 @@ registry.register(
         name="unid",
         loader_factory=UniDLoader,
         default_config=UniDLoader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.BUILDER_ONLY,
         predefined_splits=None,
     )
 )

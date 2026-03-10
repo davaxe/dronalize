@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace as _replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,6 +16,8 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+# TODO: Add support for filtering parked vehicles.
+
 
 class SindLoader(BaseSceneLoader[str, Path]):
     """Loader for the SIND dataset."""
@@ -25,8 +26,6 @@ class SindLoader(BaseSceneLoader[str, Path]):
         self,
         data_root: Path,
         loader_config: LoaderConfig | None = None,
-        *,
-        filter_parked_vehicles: bool = False,
     ) -> None:
         """Initialize the SindLoader.
 
@@ -36,28 +35,8 @@ class SindLoader(BaseSceneLoader[str, Path]):
             Path to the directory containing the SIND dataset.
         loader_config : LoaderConfig, optional
             Overrides for the default loader configuration.
-        filter_parked_vehicles : bool, optional
-            Whether to filter out parked vehicles based on their speed.
-            If True, all agents with an average speed less than 0.1 will be
-            removed. This will override any existing setting for the
-            `filter_slow_agents` parameter in the `scene_filtering`
-            configuration.
 
         """
-        if filter_parked_vehicles:
-            resolved = loader_config or type(self).default_config()
-            filtering = resolved.filtering
-            if filtering is not None:
-                loader_config = _replace(
-                    resolved,
-                    scene_filtering=_replace(filtering, filter_slow_agents=0.1),
-                )
-            else:
-                loader_config = resolved.with_filtering(
-                    require_frames=[resolved.input_len - 1],
-                    filter_slow_agents=0.1 * 0.1,  # 0.1 m/s,
-                )
-
         super().__init__(loader_config, enforce_schema=True)
         self._data_dir = data_root
 

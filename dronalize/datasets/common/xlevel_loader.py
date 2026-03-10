@@ -93,9 +93,8 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
 
     @override
     def all_sources(self) -> Iterable[Source[int, Path]]:
-        num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
-        for i in range(1, num_files // 4):
-            recording_meta = self._data_dir / f"{i:0>2}_recordingMeta.csv"
+        for recording_id in self._recording_ids():
+            recording_meta = self._data_dir / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             columns = recording_meta_data.columns
@@ -112,7 +111,7 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
                 metadata["utm_y0"] = utm_y0
 
             yield Source(
-                identifier=i,
+                identifier=recording_id,
                 inner=self._data_dir,
                 map_key=str(location_id),
                 metadata=metadata,
@@ -133,8 +132,7 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
 
     @override
     def num_sources(self) -> int | None:
-        num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
-        return num_files // 4 - 1
+        return len(self._recording_ids())
 
     @override
     def pipeline(self) -> Pipeline:
@@ -162,6 +160,14 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
                 filter_agent_category=[AgentCategory.TRAILER],
             )
         )
+
+    def _recording_ids(self) -> list[int]:
+        """Return sorted recording identifiers discovered from metadata files."""
+        recording_ids: list[int] = []
+        for recording_meta in sorted(self._data_dir.glob("*_recordingMeta.csv")):
+            prefix, _, _ = recording_meta.stem.partition("_")
+            recording_ids.append(int(prefix))
+        return recording_ids
 
 
 _META_SCHEMA: pl.Schema = pl.Schema({

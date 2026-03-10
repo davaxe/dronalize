@@ -9,7 +9,7 @@ registry.register(
         name="a43",
         loader_factory=A43Loader,
         default_config=A43Loader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.BUILDER_ONLY,
         predefined_splits=None,
     )
 )

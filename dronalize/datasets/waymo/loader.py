@@ -133,7 +133,10 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
                     key: MapKey | None = None,  # noqa: ARG001
                     _map_data: LeanMapContainer = map_data,
                 ) -> MapGraph:
-                    return WaymoMapGraphBuilder.from_proto(_map_data.map_features).build()
+                    return WaymoMapGraphBuilder.from_proto(_map_data.map_features).build(
+                        min_distance=self._min_distance,
+                        interp_distance=self._interp_distance,
+                    )
 
                 resolver: MapResolver = _resolver
             else:
