@@ -1,17 +1,3 @@
-"""Orchestration functions for dataset processing.
-
-This module is the central entrypoint that ties together:
-
-- **Registry** — dataset discovery via `DatasetDescriptor`
-- **Config** — TOML-based per-dataset configuration overrides
-- **Loaders** — `BaseSceneLoader` instances that produce `Scene` objects
-- **Writers** — any `SceneWriter`-compatible sink
-
-The two public functions are:
-
-- `process_dataset` — process a single dataset end-to-end.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -20,14 +6,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 from dronalize.core.protocols.writer import SceneWriter
 from dronalize.datasets.registry import DatasetDescriptor, get
-from dronalize.processing.config import (
-    ConfigDict,
-    load_config,
-    resolve_loader_config,
-    resolve_map_config,
-)
+from dronalize.processing.config import Config, ConfigDict, load_config, resolve_config
 from dronalize.processing.parallel import ParallelProcessor
-from dronalize.processing.writers.mds import MDSSceneWriter
+from dronalize.processing.sequential import SequentialProcessor
 
 if TYPE_CHECKING:
     from dronalize.core.datatypes.loader_config import LoaderConfig
@@ -35,7 +16,7 @@ if TYPE_CHECKING:
     from dronalize.core.protocols.loader import BaseSceneLoader
 
 
-WriterFactory = Callable[[int], SceneWriter]
+WriterFactory = Callable[[int | None], SceneWriter]
 
 
 def process_dataset(
@@ -45,8 +26,6 @@ def process_dataset(
     writer: SceneWriter | WriterFactory,
     config_overrides: ConfigDict | Path | None = None,
     split: DatasetSplit | None = None,
-    parallel: bool = False,
-    num_workers: int | None = None,
 ) -> None:
     """Process a single dataset end-to-end and write scenes via *writer*.
 
@@ -61,8 +40,9 @@ def process_dataset(
         the first positional argument to the loader factory.
     writer : SceneWriter
         Any object satisfying the `SceneWriter` protocol. Each produced `Scene`
-        is handed to `writer.write()`; after all scenes have been processed
-        `writer.finalize()` is called.
+        is handed to `writer.write()`. When processing completes, writers are
+        finalized via `finish_local()` and `finish_final()`, unless a custom
+        finalize callback is used by the underlying processor.
     config_overrides : ConfigDict or Path, optional
         Per-dataset configuration overrides (same shape as one section of the
         TOML config file). Merged on top of the loader's `default_config()`.
@@ -72,12 +52,6 @@ def process_dataset(
     split : DatasetSplit, optional
         Dataset split to process. Forwarded to the loader constructor. `None`
         means *all data*.
-    parallel : bool
-        If `True`, wrap the loader in a `ParallelSceneLoader` for multi-process
-        execution.
-    num_workers : int, optional
-        Number of worker processes when *parallel* is `True`. `None` lets
-        `ParallelSceneLoader` pick its own default.
     """
     if isinstance(descriptor, str):
         descriptor = get(descriptor)
@@ -86,7 +60,11 @@ def process_dataset(
         all_overrides = load_config(config_overrides)
         config_overrides = all_overrides.get(descriptor.name)
 
-    if parallel and isinstance(writer, SceneWriter):
+    config_overrides = config_overrides or {}
+    config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
+    config = resolve_config(config, config_overrides)
+
+    if config.execution.parallel and isinstance(writer, SceneWriter):
         msg = (
             "When `parallel=True`, `writer` must be a factory function that takes a "
             "process index and returns a `SceneWriter` instance. Use "
@@ -94,27 +72,29 @@ def process_dataset(
         )
         raise ValueError(msg)
 
-    config_overrides = config_overrides or {}
-
-    loader_config = resolve_loader_config(
-        descriptor.default_config, config_overrides.get("loader", {})
-    )
-    map_config = resolve_map_config(descriptor.default_map_config, config_overrides.get("map", {}))
-
-    extra_kwargs = config_overrides.get("loader", {}).get("extra_kwargs", None)
-    with descriptor.execute_lifecycle_context(data_root, loader_config, map_config):
+    with descriptor.execute_lifecycle_context(data_root, config.loader, config.map):
         loader = _build_loader(
             descriptor,
             data_root=data_root,
-            loader_config=loader_config,
+            loader_config=config.loader,
             split=split,
-            extra_kwargs=extra_kwargs,
         )
-        if parallel:
+        if config.execution.parallel:
             writer = cast("WriterFactory", writer)
-            ParallelProcessor(loader, processes=num_workers, progress_bar=True).write_scenes(
+            ParallelProcessor(
+                loader,
+                processes=config.execution.workers,
+                chunksize=config.execution.chunksize,
+                progress_bar=True,
+            ).write_scenes(
                 writer_factory=writer,
             )
+            return
+
+        if isinstance(writer, Callable):
+            writer = writer(None)
+
+        SequentialProcessor(loader, progress_bar=True).write_scenes(writer_factory=lambda: writer)
 
 
 def _build_loader(
@@ -123,27 +103,11 @@ def _build_loader(
     data_root: Path,
     loader_config: LoaderConfig,
     split: DatasetSplit | None,
-    extra_kwargs: dict[str, Any] | None,
 ) -> BaseSceneLoader:
     """Instantiate a loader from a descriptor and its resolved config."""
-    kwargs: dict[str, Any] = {}
-    if loader_config is not None:
-        kwargs["loader_config"] = loader_config
+    kwargs: dict[str, Any] = dict(loader_config.extra_kwargs)
+    kwargs["loader_config"] = loader_config
     if split is not None:
         kwargs["split"] = split
-    if extra_kwargs:
-        kwargs.update(extra_kwargs)
 
     return descriptor.loader_factory(data_root, **kwargs)
-
-
-if __name__ == "__main__":
-    process_dataset(
-        "lyft",
-        data_root=Path("/home/west/Developer/behavior-prediction/datasets/lyft"),
-        writer=MDSSceneWriter.as_factory(output_dir="output/test", exist_ok=False),
-        config_overrides=None,
-        split=None,
-        parallel=True,
-        num_workers=4,
-    )

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from dronalize.core.datatypes.map_config import MapConfig
@@ -23,7 +23,6 @@ class DatasetLifecycleContext(Protocol):
     Implementations must act as context managers that perform necessary
     initialization (e.g., allocating shared memory for maps) before yielding,
     and guarantee resource cleanup after the context exits.
-
     """
 
     def __call__(
@@ -44,7 +43,6 @@ class DatasetLifecycleContext(Protocol):
         -------
         AbstractContextManager[None]
             A context manager governing the dataset's temporary resources.
-
         """
         ...
 
@@ -78,15 +76,8 @@ class DatasetDescriptor:
         self, *splits: DatasetSplit | Literal["train", "val", "test"]
     ) -> DatasetDescriptor:
         """Return a copy of this descriptor with the specified predefined splits."""
-        return DatasetDescriptor(
-            name=self.name,
-            loader_factory=self.loader_factory,
-            has_map=self.has_map,
-            default_config=self.default_config,
-            predefined_splits=[DatasetSplit(s) if isinstance(s, str) else s for s in splits]
-            if splits is not None
-            else None,
-        )
+        normalized_splits = [DatasetSplit(s) if isinstance(s, str) else s for s in splits]
+        return replace(self, predefined_splits=normalized_splits)
 
     def with_all_splits(self) -> DatasetDescriptor:
         """Indicate that this dataset has all three standard splits (train, val, test)."""
@@ -115,7 +106,15 @@ def register(descriptor: DatasetDescriptor) -> DatasetDescriptor:
     descriptor : DatasetDescriptor
         The descriptor to register.
 
+    Raises
+    ------
+    ValueError
+        If a dataset with the same canonical name has already been registered.
     """
+    existing = _REGISTRY.get(descriptor.name)
+    if existing is not None and existing != descriptor:
+        msg = f"Dataset '{descriptor.name}' is already registered."
+        raise ValueError(msg)
     _REGISTRY[descriptor.name] = descriptor
     return descriptor
 
@@ -133,8 +132,17 @@ def get(name: str) -> DatasetDescriptor:
     DatasetDescriptor
         The descriptor for the requested dataset.
 
+    Raises
+    ------
+    KeyError
+        If the dataset name is unknown.
     """
-    return _REGISTRY[name]
+    try:
+        return _REGISTRY[name]
+    except KeyError as exc:
+        known = ", ".join(available()) or "none"
+        msg = f"Unknown dataset '{name}'. Available datasets: {known}."
+        raise KeyError(msg) from exc
 
 
 def available() -> list[str]:

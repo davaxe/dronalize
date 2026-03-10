@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import tomllib
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 from dronalize.core.datatypes.loader_config import LoaderConfig
 from dronalize.core.datatypes.map_config import MapConfig
@@ -22,14 +22,6 @@ class ExecutionConfig(BaseModel):
     chunksize: int | None = None
 
 
-class Config(BaseModel):
-    """Pydantic model representing the structure of the configuration overrides."""
-
-    loader: LoaderConfig
-    map: MapConfig = Field(default_factory=MapConfig.default)
-    execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
-
-
 class ExecutionConfigDict(TypedDict, total=False):
     """TypedDict for execution configuration overrides."""
 
@@ -38,24 +30,8 @@ class ExecutionConfigDict(TypedDict, total=False):
     chunksize: int | None
 
 
-class ConfigDict(TypedDict, total=False):
-    """TypedDict representing the structure of the configuration overrides.
-
-    Each dataset section in the TOML config file corresponds to a `ConfigDict`,
-    which may contain overrides for the loader and map configurations. The keys
-    in this dictionary should match the fields of the `Config` model, and the
-    values should match the corresponding `LoaderConfigDict` and `MapConfigDict`
-    structures.
-
-    """
-
-    loader: LoaderConfigDict
-    map: MapConfigDict
-    execution: ExecutionConfigDict
-
-
 class LoaderConfigDict(TypedDict, total=False):
-    """TypedDict representing the structure of the configuration overrides."""
+    """TypedDict representing the structure of the loader configuration overrides."""
 
     input_len: int
     output_len: int
@@ -100,11 +76,38 @@ class MapConfigDict(TypedDict, total=False):
     include_map: bool
 
 
+class ConfigDict(TypedDict, total=False):
+    """TypedDict representing the structure of the configuration overrides.
+
+    Each dataset section in the TOML config file corresponds to a `ConfigDict`,
+    which may contain overrides for the loader and map configurations. The keys
+    in this dictionary should match the fields of the `Config` model, and the
+    values should match the corresponding `LoaderConfigDict` and `MapConfigDict`
+    structures.
+    """
+
+    loader: LoaderConfigDict
+    map: MapConfigDict
+    execution: ExecutionConfigDict
+
+
+class ConfigFile(RootModel[dict[str, ConfigDict]]):
+    """Validated view of the dataset override file."""
+
+
+class Config(BaseModel):
+    """Pydantic model representing the structure of the configuration overrides."""
+
+    loader: LoaderConfig
+    map: MapConfig = Field(default_factory=MapConfig.default)
+    execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
+
+
 def load_config(config_path: Path) -> dict[str, ConfigDict]:
-    """Load and parse the configuration overrides from the given path."""
+    """Load, validate, and parse the configuration overrides from the given path."""
     with config_path.open("rb") as f:
         raw_data = tomllib.load(f)
-    return cast("dict[str, ConfigDict]", raw_data)
+    return ConfigFile.model_validate(raw_data).root
 
 
 def resolve_config(default: Config | ConfigDict, overrides: Config | ConfigDict) -> Config:
@@ -158,46 +161,8 @@ def _deep_merge(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> dict[s
     """Recursively merge two dictionaries."""
     merged = dict(base)
     for key, value in overrides.items():
-        # If both the base value and the override value are dicts, merge them recursively
         if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
             merged[key] = _deep_merge(merged[key], value)
-        # Otherwise, the override completely replaces the base value (or creates a new key)
         else:
             merged[key] = value
     return merged
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    from rich import print as rprint
-
-    # 1. Define global defaults via Pydantic models
-    default = Config(
-        loader=LoaderConfig(input_len=10, output_len=20, sample_time=0.1),
-        map=MapConfig(min_distance=1, interp_distance=2, include_map=True),
-        execution=ExecutionConfig(parallel=True, workers=4),
-    )
-
-    config_path = Path("config.toml")
-
-    # Simulate loading if the file doesn't exist yet for testing purposes
-    if config_path.exists():
-        config = load_config(config_path)
-    else:
-        # Mocking the loaded TOML for demonstration
-        config = {"a43": {"loader": {"input_len": 25}, "execution": {"parallel": False}}}
-
-    global_config = config.get("global", {})
-    a43_config = config.get("a43", {})
-
-    # 2. Resolve configurations by merging defaults with TOML dataset overrides
-    resolved_loader_config = resolve_loader_config(default.loader, a43_config.get("loader", {}))
-    resolved_map_config = resolve_map_config(default.map, a43_config.get("map", {}))
-    resolved_execution_config = resolve_execution_config(
-        default.execution, a43_config.get("execution", {})
-    )
-
-    rprint("--- Resolved Execution Config ---")
-    rprint(resolved_execution_config)
-    # Expected output: ExecutionConfig(parallel=False, workers=4)

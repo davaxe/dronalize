@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -53,6 +53,9 @@ class LoaderConfig(BaseModel):
         description=(
             "Configuration for filtering scenes based on agent validity and scene composition."
         ),
+    )
+    extra_kwargs: dict[str, Any] = Field(
+        default_factory=dict, description=("Extra keyword arguments to pass to the loader factory.")
     )
 
     @model_validator(mode="after")

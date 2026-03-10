@@ -78,7 +78,7 @@ class SceneWriter(Protocol):
         ...
 
     @classmethod
-    def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int], Self]:  # noqa: ANN401
+    def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int | None], Self]:  # noqa: ANN401
         """Create a factory function for this writer class.
 
         This should return a factory function that takes an integer identfier
@@ -96,7 +96,7 @@ class SceneWriter(Protocol):
 
         Returns
         -------
-        Callable[[int], Self]
+        Callable[[int | None], Self]
             A factory function that takes an integer identifier and returns an
             instance of the writer class.
 

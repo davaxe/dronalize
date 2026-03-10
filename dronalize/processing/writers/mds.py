@@ -58,8 +58,8 @@ class MDSSceneWriter(SceneWriter):
         parallel: bool = True,
         multiple_targets: int | bool = False,
         **inner_args: Unpack[_MDSWriterArgs],
-    ) -> Callable[[int], Self]:
-        def _factory(worker_id: int) -> Self:
+    ) -> Callable[[int | None], Self]:
+        def _factory(worker_id: int | None) -> Self:
             parallel_group = worker_id
             return cls(
                 output_dir,
