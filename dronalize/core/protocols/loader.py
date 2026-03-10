@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Generic, Protocol
 
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core._types import IdT, P, SourceT
+from dronalize.core._types import P, SceneId, SourceT
 from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
@@ -25,10 +26,10 @@ IngestOutput = tuple[pl.LazyFrame, MapContext]
 
 
 @dataclass(slots=True, frozen=True)
-class Source(Generic[IdT, SourceT]):
+class Source(Generic[SourceT]):
     """Represents a raw data source for a scene, identified by a unique identifier."""
 
-    identifier: IdT
+    identifier: SceneId
     """Generic identifier for the source, e.g., file name, URL, database key."""
     inner: SourceT
     """The actual source data, which can be of any type (e.g., file path, raw data)."""
@@ -38,10 +39,10 @@ class Source(Generic[IdT, SourceT]):
     """Additional metadata associated with the source."""
 
 
-class SceneLoader(Protocol, Generic[IdT]):
+class SceneLoader(Protocol):
     """Minimal protocol for scene loading, used for type hinting."""
 
-    def scenes(self) -> Iterable[Scene[IdT]]:
+    def scenes(self) -> Iterable[Scene]:
         """Process scenes and yield them one by one.
 
         This is the main method for processing scenes. It yields `Scene` objects
@@ -49,7 +50,7 @@ class SceneLoader(Protocol, Generic[IdT]):
 
         Yields
         ------
-        Scene[IdT]
+        Scene
             Each processed scene, with its identifier and associated data.
 
         """
@@ -57,7 +58,7 @@ class SceneLoader(Protocol, Generic[IdT]):
 
     def scenes_callback(
         self,
-        callback: Callable[Concatenate[Scene[IdT], P], None],
+        callback: Callable[Concatenate[Scene, P], None],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
@@ -87,7 +88,7 @@ class SceneLoader(Protocol, Generic[IdT]):
         writer_factory: Callable[..., SceneWriter],
         finalize: Callable[[SceneWriter], None],
     ) -> None:
-        """Process scenes and write them using the provided writer factory.
+        """Process scenes and write them with a writer created by the factory.
 
         This method provides a convenient way to process scenes and write them
         using a `SceneWriter`. The `writer_factory` is called once to create a
@@ -108,8 +109,8 @@ class SceneLoader(Protocol, Generic[IdT]):
         """
 
 
-class ProcessableLoader(Protocol, Generic[IdT, SourceT]):
-    """Minimal protocol required to work with a processor abstraction.
+class ProcessableLoader(Protocol, Generic[SourceT]):
+    """Minimal protocol required to work with a loader abstraction.
 
     This protocol defines the essential interface for discovering data sources,
     tracking dataset sizes, processing raw sources into tabular data, and
@@ -117,12 +118,12 @@ class ProcessableLoader(Protocol, Generic[IdT, SourceT]):
 
     """
 
-    def sources(self) -> Iterable[Source[IdT, SourceT]]:
+    def sources(self) -> Iterable[Source[SourceT]]:
         """Discover and yield the data sources to be processed.
 
         Returns
         -------
-        Iterable[Source[IdT, SourceT]]
+        Iterable[Source[SourceT]]
             An iterable containing the raw data sources to process.
         """
         ...
@@ -150,13 +151,13 @@ class ProcessableLoader(Protocol, Generic[IdT, SourceT]):
         ...
 
     def process_next(
-        self, source: Source[IdT, SourceT]
+        self, source: Source[SourceT]
     ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process a single raw data source into data frames and map contexts.
 
         Parameters
         ----------
-        source : Source[IdT, SourceT]
+        source : Source[SourceT]
             The raw data source to process.
 
         Yields
@@ -169,17 +170,17 @@ class ProcessableLoader(Protocol, Generic[IdT, SourceT]):
     def create_scene(
         self,
         df: pl.DataFrame,
-        source: Source[IdT, SourceT],
+        source: Source[SourceT],
         resolver: MapContext | None = None,
         scene_number: int | None = None,
-    ) -> Scene[IdT]:
+    ) -> Scene:
         """Construct a Scene object from processed data.
 
         Parameters
         ----------
         df : pl.DataFrame
             The processed data frame containing the scene data.
-        source : Source[IdT, SourceT]
+        source : Source[SourceT]
             The originating raw data source.
         resolver : MapContext | None, optional
             The map context or resolver associated with the scene.
@@ -188,13 +189,13 @@ class ProcessableLoader(Protocol, Generic[IdT, SourceT]):
 
         Returns
         -------
-        Scene[IdT]
+        Scene
             The fully constructed scene object.
         """
         ...
 
 
-class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
+class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     """ABC interface for processing raw data sources into a standardized format.
 
     This class contains logic for orchestrating the loading and processing of
@@ -293,7 +294,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
     # ===================================================================
 
     @abstractmethod
-    def all_sources(self) -> Iterable[Source[IdT, SourceT]]:
+    def all_sources(self) -> Iterable[Source[SourceT]]:
         """Discover and yield identifiers for **all** scenes to process.
 
         Every subclass must implement this method.  It is called when no
@@ -304,18 +305,18 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
 
         Yields
         ------
-        Source[IdT, SourceT]
+        Source[SourceT]
             Each raw data source to be processed.
 
         """
 
     @abstractmethod
-    def ingest(self, source: Source[IdT, SourceT]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[SourceT]) -> Iterable[IngestOutput]:
         """Read a raw data source into one or more `(LazyFrame, MapResolver)` pairs.
 
         Parameters
         ----------
-        source : Source[IdT, SourceT]
+        source : Source[SourceT]
             The raw data source to read.
 
         Yields
@@ -343,7 +344,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
     @classmethod
     @abstractmethod
     def default_config(cls) -> LoaderConfig:
-        """Return the default processor configuration for this dataset.
+        """Return the default loader configuration for this dataset.
 
         This is a classmethod so that the default configuration can be inspected
         without constructing a loader instance.
@@ -355,7 +356,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
 
         """
 
-    def train_sources(self) -> Iterable[Source[IdT, SourceT]]:
+    def train_sources(self) -> Iterable[Source[SourceT]]:
         """Return sources belonging to the **training** split.
 
         Override this method in subclasses whose underlying dataset provides
@@ -370,7 +371,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
         """
         raise SplitNotSupportedError(type(self).__name__, DatasetSplit.TRAIN)
 
-    def test_sources(self) -> Iterable[Source[IdT, SourceT]]:
+    def test_sources(self) -> Iterable[Source[SourceT]]:
         """Return sources belonging to the **test** split.
 
         Override this method in subclasses whose underlying dataset provides
@@ -385,7 +386,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
         """
         raise SplitNotSupportedError(type(self).__name__, DatasetSplit.TEST)
 
-    def validate_sources(self) -> Iterable[Source[IdT, SourceT]]:
+    def validate_sources(self) -> Iterable[Source[SourceT]]:
         """Return sources belonging to the **validation** split.
 
         Override this method in subclasses whose underlying dataset provides
@@ -401,7 +402,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
         raise SplitNotSupportedError(type(self).__name__, DatasetSplit.VAL)
 
     @override
-    def sources(self) -> Iterable[Source[IdT, SourceT]]:
+    def sources(self) -> Iterable[Source[SourceT]]:
         """Return sources for the currently configured split.
 
         This method dispatches to `all_sources()`,
@@ -411,7 +412,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
 
         Returns
         -------
-        Iterable[Source[IdT, SourceT]]
+        Iterable[Source[SourceT]]
             The sources for the active split.
 
         """
@@ -425,11 +426,11 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
             return self.validate_sources()
         return self.all_sources()
 
-    def map_resolver(self) -> MapResolver:
+    def map_resolver(self) -> MapResolver:  # noqa: PLR6301
         """Return a resolver for this dataset's map data.
 
-        If the `resolver` is not set anywhere else, this resolver will be
-        attached to the scene and can be used to resolve
+        If no resolver is attached during ingestion, this dataset-level resolver
+        is attached to created scenes and used to resolve their `map_key`.
 
         Returns
         -------
@@ -437,8 +438,32 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
             A callable that resolves map keys. The default returns `no_map`.
 
         """
-        _self = self
         return no_map()
+
+    @staticmethod
+    def _normalize_data_root(data_root: Path | str) -> Path:
+        """Normalize a filesystem input into a `Path` instance."""
+        return Path(data_root)
+
+    @staticmethod
+    def _count_matching_files(
+        directories: Iterable[Path],
+        pattern: str,
+        *,
+        recursive: bool = False,
+    ) -> int:
+        """Count files matching a glob pattern across existing directories only."""
+        total = 0
+        for directory in directories:
+            if not directory.is_dir():
+                continue
+            matches = directory.rglob(pattern) if recursive else directory.glob(pattern)
+            total += sum(1 for _ in matches)
+        return total
+
+    def _invalid_loader_argument(self, detail: str) -> ValueError:
+        """Create a consistent loader configuration error."""
+        return ValueError(f"{type(self).__name__}: {detail}")
 
     def set_loader_config(self, config: LoaderConfig) -> None:
         """Set the loader configuration.
@@ -460,7 +485,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
     @override
     def scenes_callback(
         self,
-        callback: Callable[Concatenate[Scene[IdT], P], None],
+        callback: Callable[Concatenate[Scene, P], None],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
@@ -468,7 +493,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
             callback(scene, *args, **kwargs)
 
     @override
-    def scenes(self) -> Iterable[Scene[IdT]]:
+    def scenes(self) -> Iterable[Scene]:
         self._count = 0
         self._source_counter = 0
         for source in self.sources():
@@ -495,10 +520,10 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
     def create_scene(
         self,
         df: pl.DataFrame,
-        source: Source[IdT, SourceT],
+        source: Source[SourceT],
         resolver: MapContext | None = None,
         scene_number: int | None = None,
-    ) -> Scene[IdT]:
+    ) -> Scene:
         """Create a Scene object from the processed DataFrame and its source.
 
         This method also calls `Scene.enforce_schema()` if
@@ -511,7 +536,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
         df : pl.DataFrame
             Processed DataFrame for the scene, expected to follow the
             common schema.
-        source : Source[IdT, SourceT]
+        source : Source[SourceT]
             The originating source.  The scene inherits
             `source.identifier` and `source.map_key`.
         resolver : MapResolver, optional
@@ -520,7 +545,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
 
         Returns
         -------
-        Scene[IdT]
+        Scene
             The created scene object.
 
         """
@@ -544,12 +569,10 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
 
     @override
     def num_scenes(self) -> int | None:
-        _self = self
         return None
 
     @override
     def num_sources(self) -> int | None:
-        _self = self
         return None
 
     @staticmethod
@@ -618,7 +641,7 @@ class BaseSceneLoader(ABC, SceneLoader[IdT], ProcessableLoader[IdT, SourceT]):
     @override
     def process_next(
         self,
-        source: Source[IdT, SourceT],
+        source: Source[SourceT],
     ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         if self._pipeline is None:
             self._pipeline = self.pipeline()

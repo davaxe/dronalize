@@ -17,62 +17,53 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class InteractionLoader(BaseSceneLoader[str, list[Path]]):
-    """Processor for the INTERACTION dataset."""
+class InteractionLoader(BaseSceneLoader[list[Path]]):
+    """Loader for the INTERACTION dataset."""
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
         file_batch_size: int | None = None,
-        split: DatasetSplit = DatasetSplit.ALL,
+        split: DatasetSplit | None = None,
     ) -> None:
-        """Initialize the processor.
+        """Initialize the dataset loader.
 
-        The processor will read all CSV files in the given directory, and
+        The loader reads all CSV files in the given directory and
         expects them to have the same schema as the INTERACTION dataset.
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             Path to the root of the INTERACTION dataset.  This directory
             should contain `train/`, `val/`, `test_multi-agent/`,
             and `test_conditional-multi-agent/` subdirectories.
         loader_config : LoaderConfig, optional
-            Processor configuration override. If None, the default
-            configuration will be used.
+            Loader configuration override. If None, the default configuration
+            is used.
         file_batch_size : int, optional
             Number of files to read in each batch. If None, all files will be
             read at once. Higher batch size may lead to faster processing at
             diminishing returns, but also higher memory usage. `None` is not
             recommended for large amounts of data.
         split : DatasetSplit, optional
-            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
-
-        Raises
-        ------
-        ValueError
-            If `window_params` is set in the config, since
-            `InteractionLoader` does not support windowing.
+            Which dataset split to load. Defaults to all sources.
 
         """
         if loader_config is not None and loader_config.window is not None:
-            msg = (
-                f"InteractionProcessor does not support window_params, "
-                f"but got {loader_config.window}"
-            )
-            raise ValueError(msg)
+            msg = f"does not support loader_config.window={loader_config.window!r}."
+            raise self._invalid_loader_argument(msg)
 
         super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
-        self._data_root = data_root
+        self._data_root = self._normalize_data_root(data_root)
         self._file_batch_size: int | None = file_batch_size
 
     # ------------------------------------------------------------------
     # Split-aware source discovery
     # ------------------------------------------------------------------
 
-    def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[str, list[Path]]]:
+    def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         if not data_dir.is_dir():
             return
         csv_files = sorted(data_dir.rglob("*.csv"))
@@ -82,21 +73,21 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
             yield Source(f"{data_dir.name}_b{start}", batch_files)
 
     @override
-    def all_sources(self) -> Iterable[Source[str, list[Path]]]:
+    def all_sources(self) -> Iterable[Source[list[Path]]]:
         yield from self.train_sources()
         yield from self.validate_sources()
         yield from self.test_sources()
 
     @override
-    def train_sources(self) -> Iterable[Source[str, list[Path]]]:
+    def train_sources(self) -> Iterable[Source[list[Path]]]:
         return self._sources_from_dir(self._data_root / "train")
 
     @override
-    def validate_sources(self) -> Iterable[Source[str, list[Path]]]:
+    def validate_sources(self) -> Iterable[Source[list[Path]]]:
         return self._sources_from_dir(self._data_root / "val")
 
     @override
-    def test_sources(self) -> Iterable[Source[str, list[Path]]]:
+    def test_sources(self) -> Iterable[Source[list[Path]]]:
         yield from self._sources_from_dir(self._data_root / "test_multi-agent")
         yield from self._sources_from_dir(self._data_root / "test_conditional-multi-agent")
 
@@ -105,7 +96,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
     # ------------------------------------------------------------------
 
     @override
-    def ingest(self, source: Source[str, list[Path]]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
         data = (
             pl
             .scan_csv(source.inner, include_file_paths="file_id", schema=_SCHEMA)
@@ -140,7 +131,7 @@ class InteractionLoader(BaseSceneLoader[str, list[Path]]):
                 self._data_root / "test_conditional-multi-agent",
             ])
 
-        num_files = sum(len(list(d.rglob("*.csv"))) for d in dirs if d.is_dir())
+        num_files = self._count_matching_files(dirs, "*.csv", recursive=True)
 
         if self._file_batch_size is None:
             # One batch per directory

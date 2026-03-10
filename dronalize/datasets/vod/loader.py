@@ -7,10 +7,11 @@ from dronalize.datasets.nuscenes.loader import NuScenesLoader
 
 
 class VodLoader(NuScenesLoader):
-    """View-of-Delft dataset processor.
+    """Loader for the View-of-Delft dataset.
 
-    This shares the same base processing logic as NuScenesProcessor but with
-    specific category filtering. For further details se the nuScenes processor.
+    This shares the same base loading logic as `NuScenesLoader`, but with
+    dataset-specific category filtering. For further details, see
+    `NuScenesLoader`.
 
     """
 
@@ -19,7 +20,7 @@ class VodLoader(NuScenesLoader):
         data_dir: Path | str,
         loader_config: LoaderConfig | None = None,
     ) -> None:
-        """Initialize the processor.
+        """Initialize the dataset loader.
 
         Parameters
         ----------

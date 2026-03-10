@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dronalize.pipeline.ops.filter import FilteringConfig
+from dronalize.core.datatypes.filtering_config import FilteringConfig
 from dronalize.pipeline.ops.resample import Resampling, ResamplingMethod
 
 if TYPE_CHECKING:

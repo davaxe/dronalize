@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class XLevelDataLoader(BaseSceneLoader[int, Path]):
+class XLevelDataLoader(BaseSceneLoader[Path]):
     """Common trajectory data loader for X-level datasets.
 
     This class is meant as a base class for the datasets, since some of the
@@ -29,21 +29,21 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_dir: Path | str,
         loader_config: LoaderConfig | None = None,
     ) -> None:
-        """Initialize the trajectory data loader for a X-level dataset (e.g., rounD, inD).
+        """Initialize the loader for an X-level dataset (e.g., rounD, inD).
 
         Parameters
         ----------
-        data_dir : Path
+        data_dir : Path or str
             Path to the directory containing the .csv data files.
         loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+            Loader configuration. If None, the default configuration is used.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=False)
-        self._data_dir = data_dir
+        self._data_dir = self._normalize_data_root(data_dir)
         self._rebalance_ratio = None
 
     @staticmethod
@@ -92,7 +92,7 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
         return _TRACK_SCHEMA
 
     @override
-    def all_sources(self) -> Iterable[Source[int, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         for recording_id in self._recording_ids():
             recording_meta = self._data_dir / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
@@ -118,7 +118,7 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
             )
 
     @override
-    def ingest(self, source: Source[int, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         tracks = source.inner / f"{source.identifier:0>2}_tracks.csv"
         meta = source.inner / f"{source.identifier:0>2}_tracksMeta.csv"
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(

@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Generic, Self
+from typing import TYPE_CHECKING, Self
 
 import polars as pl
 
-from dronalize.core._types import IdT
 from dronalize.core.datatypes.map_resolver import MapResolver  # noqa: TC001
 from dronalize.pipeline.ops.convert import (
     NumpySceneDict,
@@ -14,11 +13,12 @@ from dronalize.pipeline.ops.convert import (
 )
 
 if TYPE_CHECKING:
+    from dronalize.core._types import SceneId
     from dronalize.core.datatypes.map_resolver import MapGraph, MapKey
 
 
 @dataclass(slots=True, frozen=True)
-class Scene(Generic[IdT]):
+class Scene:
     """Scene data class wrapping a DataFrame and its identifier.
 
     The dataframe is expected to at least contain all columns defined in
@@ -28,7 +28,7 @@ class Scene(Generic[IdT]):
 
     inner: pl.DataFrame
     """Inner DataFrame containing the scene data."""
-    identifier: IdT
+    identifier: SceneId
     """Identifier for the scene (e.g., file name, index, scene name/token)."""
     scene_number: int
     """Unique scene number assigned during processing."""

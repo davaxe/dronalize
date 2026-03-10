@@ -36,7 +36,7 @@ class ExiDLoader(XLevelDataLoader):
         data_root : Path
             Path to root of the exiD dataset.
         loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+            Loader configuration. If None, the default configuration is used.
 
         """
         super().__init__(data_root / "data", loader_config)

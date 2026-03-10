@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.core._types import IdT as T
+T = TypeVar("T")
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence

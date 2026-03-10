@@ -5,20 +5,20 @@ from typing import TYPE_CHECKING, Any, Concatenate
 import tqdm
 from typing_extensions import override
 
-from dronalize.core._types import IdT, P
 from dronalize.core.protocols.loader import ProcessableLoader, SceneLoader
 from dronalize.processing.common import ProgressBar
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    from dronalize.core._types import P
     from dronalize.core.datatypes.scene import Scene
     from dronalize.core.datatypes.split import DatasetSplit
     from dronalize.core.protocols.writer import SceneWriter
 
 
-class SequentialProcessor(SceneLoader[IdT]):
-    """A sequential data processor/loader that wraps a loader.
+class SequentialProcessor(SceneLoader):
+    """Sequential scene processor that wraps a processable loader.
 
     It processes data strictly in the main thread. This avoids the overhead
     associated with Python's multiprocessing module, making it ideal for
@@ -28,16 +28,16 @@ class SequentialProcessor(SceneLoader[IdT]):
 
     def __init__(
         self,
-        inner: ProcessableLoader[IdT, Any],
+        inner: ProcessableLoader[Any],
         *,
         progress_bar: ProgressBar | bool = ProgressBar.NONE,
     ) -> None:
-        """Initialize the processor.
+        """Initialize the sequential processor.
 
         Parameters
         ----------
-        inner : ProcessableLoader[IdT, SourceT]
-            The underlying loader to wrap and process sequentially.
+        inner : ProcessableLoader[SourceT]
+            The underlying loader that discovers sources and creates scenes.
         progress_bar : ProgressBar | bool, optional
             Whether to show a progress bar and at what level (sources or scenes).
 
@@ -48,14 +48,14 @@ class SequentialProcessor(SceneLoader[IdT]):
         )
 
     @override
-    def scenes(self) -> Iterable[Scene[IdT]]:
+    def scenes(self) -> Iterable[Scene]:
         """Process scenes sequentially and yield them one by one."""
         yield from self._generate_and_track()
 
     @override
     def scenes_callback(
         self,
-        callback: Callable[Concatenate[Scene[IdT], P], None],
+        callback: Callable[Concatenate[Scene, P], None],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
@@ -99,7 +99,7 @@ class SequentialProcessor(SceneLoader[IdT]):
             "unit_scale": True if self._progress_bar == ProgressBar.SCENES else None,
         }
 
-    def _generate_and_track(self) -> Iterable[Scene[IdT]]:
+    def _generate_and_track(self) -> Iterable[Scene]:
         """Core private generator handling both scene creation and progress tracking."""
         scene_counter = 0
         source_counter = 0

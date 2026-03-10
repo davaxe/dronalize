@@ -15,11 +15,11 @@ if TYPE_CHECKING:
 
 
 class AD4CHELoader(XLevelDataLoader):
-    """Processor for the AD4CHE dataset."""
+    """Loader for the AD4CHE dataset."""
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
         lane_change_ratio: float | None = 1.0,
@@ -36,20 +36,21 @@ class AD4CHELoader(XLevelDataLoader):
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             Path to the directory containing the .csv data files.
         loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+            Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
+        data_root = self._normalize_data_root(data_root)
         super().__init__(data_root / "AD4CHE_Data_V1.0", loader_config)
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 
     @override
-    def all_sources(self) -> Iterable[Source[int, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         for recording_id, subdir, recording_meta in self._recordings():
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()

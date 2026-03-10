@@ -24,15 +24,15 @@ if TYPE_CHECKING:
     from dronalize.datasets.waymo.protos.lean_map_pb2 import LeanMapContainer
 
 
-class WaymoLoader(BaseSceneLoader[str, Path]):
-    """Processor for Waymo Open Dataset scenarios stored in TFRecord format."""
+class WaymoLoader(BaseSceneLoader[Path]):
+    """Loader for Waymo Open Dataset scenarios stored in TFRecord format."""
 
     def __init__(
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
-        split: DatasetSplit = DatasetSplit.ALL,
+        split: DatasetSplit | None = None,
         include_map: bool = True,
         interp_distance: float | None = None,
         min_distance: float | None = 1.5,
@@ -56,9 +56,9 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             contain `training/`, `validation/`, and `testing/`
             subdirectories with TFRecord files.
         loader_config : LoaderConfig, optional
-            Configuration override. If None, the default configuration will be used.
+            Loader configuration override. If None, the default configuration is used.
         split : DatasetSplit, optional
-            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
+            Which dataset split to load. Defaults to all sources.
         include_map : bool, optional
             Whether to include map data in the scene. Defaults to True.
         interp_distance : float, optional
@@ -70,7 +70,7 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
-        self._data_root: Path = Path(data_root) if isinstance(data_root, str) else data_root
+        self._data_root = self._normalize_data_root(data_root)
         self._include_map: bool = include_map
         self._interp_distance: float | None = interp_distance
         self._min_distance: float | None = min_distance
@@ -80,28 +80,28 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _sources_from_dir(data_dir: Path) -> Iterable[Source[str, Path]]:
+    def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
         if not data_dir.is_dir():
             return
         for tfrecord_path in sorted(data_dir.glob("*.tfrecord*")):
             yield Source(identifier=tfrecord_path.stem, inner=tfrecord_path)
 
     @override
-    def all_sources(self) -> Iterable[Source[str, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         yield from self.train_sources()
         yield from self.validate_sources()
         yield from self.test_sources()
 
     @override
-    def train_sources(self) -> Iterable[Source[str, Path]]:
+    def train_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "training")
 
     @override
-    def validate_sources(self) -> Iterable[Source[str, Path]]:
+    def validate_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "validation")
 
     @override
-    def test_sources(self) -> Iterable[Source[str, Path]]:
+    def test_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "testing")
 
     # ------------------------------------------------------------------
@@ -119,10 +119,10 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
             dirs.append(self._data_root / "testing")
 
-        return sum(sum(1 for _ in d.glob("*.tfrecord*")) for d in dirs if d.is_dir())
+        return self._count_matching_files(dirs, "*.tfrecord*")
 
     @override
-    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         for raw_data in _read_tfrecord(source.inner):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 

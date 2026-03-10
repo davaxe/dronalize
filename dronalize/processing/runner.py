@@ -42,7 +42,7 @@ def process_dataset(
         Any object satisfying the `SceneWriter` protocol. Each produced `Scene`
         is handed to `writer.write()`. When processing completes, writers are
         finalized via `finish_local()` and `finish_final()`, unless a custom
-        finalize callback is used by the underlying processor.
+        finalize callback is used by the underlying execution wrapper.
     config_overrides : ConfigDict or Path, optional
         Per-dataset configuration overrides (same shape as one section of the
         TOML config file). Merged on top of the loader's `default_config()`.

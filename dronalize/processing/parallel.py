@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Concatenate, Generic, NamedTuple, TypeVar
 import tqdm
 from typing_extensions import Self, override
 
-from dronalize.core._types import IdT, P, PayloadT, SourceT
+from dronalize.core._types import P, PayloadT, SourceT
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.protocols.loader import ProcessableLoader, SceneLoader, Source
 from dronalize.processing.common import ProgressBar
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from dronalize.core.protocols.writer import SceneWriter
 
 
-ReturnT = TypeVar("ReturnT", int, list[Scene[Any]])
+ReturnT = TypeVar("ReturnT", int, list[Scene])
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,8 +41,8 @@ class WorkerInfo:
     """Remaining number of worker processes."""
 
 
-class ParallelProcessor(SceneLoader[IdT]):
-    """A generic parallel data processor/loader that wraps a loader.
+class ParallelProcessor(SceneLoader):
+    """Parallel scene processor that wraps a processable loader.
 
     It uses Python's multiprocessing module to parallelize the processing of
     sources across multiple CPU cores. The number of processes and chunksize can
@@ -78,11 +78,11 @@ class ParallelProcessor(SceneLoader[IdT]):
     be preferred when possible. In extreme cases using multiprocessing can slow
     down processing due to the overhead.
 
-    4. Since `DataLoaders` utilizes Polars, which also uses multiple cores for
+    4. Since the wrapped loaders use Polars, which also uses multiple cores for
     processing, there may be some contention for CPU resources between the
-    multiprocessing in `ParallelSceneLoader` and the multithreading in Polars.
+    multiprocessing in `ParallelProcessor` and the multithreading in Polars.
     Setting the environment variable `POLARS_MAX_THREADS=X`, where X is a number
-    that balances the workload between `ParallelSceneLoader` and Polars. An
+    that balances the workload between `ParallelProcessor` and Polars. An
     alternative option is to lower the `processes` parameter in this class.
 
     5. The input dataloader will be sent to each worker process. This means that
@@ -94,7 +94,7 @@ class ParallelProcessor(SceneLoader[IdT]):
 
     def __init__(
         self,
-        inner: ProcessableLoader[IdT, Any],
+        inner: ProcessableLoader[Any],
         *,
         chunksize: int | None = None,
         processes: int | None = None,
@@ -119,8 +119,8 @@ class ParallelProcessor(SceneLoader[IdT]):
 
         Parameters
         ----------
-        inner : BaseSceneLoader[IdT, SourceT]
-            The underlying BaseSceneLoader to use for processing each source.
+        inner : BaseSceneLoader[SourceT]
+            The underlying loader to use for processing each source.
         chunksize : int, optional
             The number of sources to process in each batch when using
             multiprocessing. Larger chunksizes can reduce overhead but may lead
@@ -139,7 +139,7 @@ class ParallelProcessor(SceneLoader[IdT]):
 
         """
         if processes is not None and processes <= 1:
-            msg = "number of processes must be greater than 1 for ParallelSceneLoader."
+            msg = "number of processes must be greater than 1 for ParallelProcessor."
             raise ValueError(msg)
 
         self._inner = inner
@@ -193,7 +193,7 @@ class ParallelProcessor(SceneLoader[IdT]):
         return self
 
     @override
-    def scenes(self) -> Iterable[Scene[IdT]]:
+    def scenes(self) -> Iterable[Scene]:
         """Process scenes in parallel and yield them one by one.
 
         This uses `multiprocessing` to process data in parallel. It works by
@@ -207,7 +207,7 @@ class ParallelProcessor(SceneLoader[IdT]):
 
         Yields
         ------
-        Scene[IdT]
+        Scene
             Processed scenes one at a time.
 
         """
@@ -220,7 +220,7 @@ class ParallelProcessor(SceneLoader[IdT]):
     @override
     def scenes_callback(
         self,
-        callback: Callable[Concatenate[Scene[IdT], P], None],
+        callback: Callable[Concatenate[Scene, P], None],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
@@ -341,7 +341,7 @@ class ParallelProcessor(SceneLoader[IdT]):
             self._mp_split_queue = None
 
     @staticmethod
-    def _process_fn_write(args: _ProcessArgs[IdT, SourceT]) -> int:
+    def _process_fn_write(args: _ProcessArgs[SourceT]) -> int:
         processed_scenes: int = 0
 
         def stream_split() -> Iterator[DatasetSplit]:
@@ -362,17 +362,17 @@ class ParallelProcessor(SceneLoader[IdT]):
         return processed_scenes
 
     @staticmethod
-    def _process_fn(args: _ProcessArgs[IdT, SourceT]) -> list[Scene[IdT]]:
+    def _process_fn(args: _ProcessArgs[SourceT]) -> list[Scene]:
         """Worker process function that processes a single source and returns a list of Scenes.
 
         Parameters
         ----------
-        args : _ProcessArgs[IdT, SourceT]
+        args : _ProcessArgs[SourceT]
             Arguments containing the source and loader to process.
 
         Returns
         -------
-        list[Scene[IdT]]
+        list[Scene]
             List of processed scenes from the given source.
 
         """
@@ -382,7 +382,7 @@ class ParallelProcessor(SceneLoader[IdT]):
         return scenes
 
     @staticmethod
-    def _process_fn_callback(args: _ProcessArgs[IdT, SourceT]) -> int:
+    def _process_fn_callback(args: _ProcessArgs[SourceT]) -> int:
         """Worker process function that applies a callback to each Scene.
 
         This function returns the number of processed scenes (used for keeping
@@ -392,7 +392,7 @@ class ParallelProcessor(SceneLoader[IdT]):
 
         Parameters
         ----------
-        args : _ProcessArgs[IdT, SourceT]
+        args : _ProcessArgs[SourceT]
             Arguments containing the source, loader, and callback to apply.
 
         Returns
@@ -417,8 +417,8 @@ class ParallelProcessor(SceneLoader[IdT]):
 
     @staticmethod
     def _generate_scenes(
-        loader: ProcessableLoader[IdT, SourceT], source: Source[IdT, SourceT]
-    ) -> Iterator[Scene[IdT]]:
+        loader: ProcessableLoader[SourceT], source: Source[SourceT]
+    ) -> Iterator[Scene]:
         """Core logic to process a source and yield properly numbered scenes."""
         for scene_data, map_resolver in loader.process_next(source):
             with _scene_counter.get_lock():
@@ -527,11 +527,11 @@ class ParallelProcessor(SceneLoader[IdT]):
         )
 
 
-class _ProcessArgs(NamedTuple, Generic[IdT, SourceT]):
+class _ProcessArgs(NamedTuple, Generic[SourceT]):
     """Simplified arguments for processing a single source in a worker process."""
 
-    source: Source[IdT, SourceT]
-    loader: ProcessableLoader[IdT, SourceT]
+    source: Source[SourceT]
+    loader: ProcessableLoader[SourceT]
     fn: Callable[..., Any] | None = None
 
 

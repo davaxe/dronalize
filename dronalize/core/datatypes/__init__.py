@@ -1,7 +1,8 @@
 """Core domain models for the preprocessing pipeline."""
 
 from dronalize.core.datatypes.categories import AgentCategory, EdgeType
-from dronalize.core.datatypes.loader_config import FilteringConfig, LoaderConfig, WindowParams
+from dronalize.core.datatypes.filtering_config import FilteringConfig
+from dronalize.core.datatypes.loader_config import LoaderConfig, WindowParams
 from dronalize.core.datatypes.map_graph import MapGraph
 from dronalize.core.datatypes.map_resolver import (
     MapKey,

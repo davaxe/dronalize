@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import polars as pl
@@ -16,12 +15,13 @@ from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
     from dronalize.core.datatypes.map_resolver import MapResolver
 
 
-class NuScenesLoader(BaseSceneLoader[str, tuple[int, str]]):
-    """Nuscenes trajectory processor.
+class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
+    """Loader for nuScenes trajectories.
 
     Strategy:
     1. Load all tables globally (cached).
@@ -34,7 +34,7 @@ class NuScenesLoader(BaseSceneLoader[str, tuple[int, str]]):
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
     ) -> None:
-        """Initialize the data processor.
+        """Initialize the dataset loader.
 
         Parameters
         ----------
@@ -45,7 +45,7 @@ class NuScenesLoader(BaseSceneLoader[str, tuple[int, str]]):
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._data_root = Path(data_root)
+        self._data_root = self._normalize_data_root(data_root)
         self._data_dirs: list[Path] = self._find_data_dir()
         self._dfs: list[dict[str, pl.LazyFrame]] = []
 
@@ -73,7 +73,7 @@ class NuScenesLoader(BaseSceneLoader[str, tuple[int, str]]):
         return paths
 
     @override
-    def all_sources(self) -> Iterable[Source[str, tuple[int, str]]]:
+    def all_sources(self) -> Iterable[Source[tuple[int, str]]]:
         for i, dfs in enumerate(self._scene_cache):
             for token, df in dfs.items():
                 scene_name: str = df.item(0, "scene_name")
@@ -85,7 +85,7 @@ class NuScenesLoader(BaseSceneLoader[str, tuple[int, str]]):
         return sum(len(dfs) for dfs in self._scene_cache)
 
     @override
-    def ingest(self, source: Source[str, tuple[int, str]]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[tuple[int, str]]) -> Iterable[IngestOutput]:
         map_key = source.map_key
         index, token = source.inner
         scenes = (

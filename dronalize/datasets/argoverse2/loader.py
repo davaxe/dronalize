@@ -18,22 +18,22 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class Argoverse2Loader(BaseSceneLoader[int, list[Path]]):
-    """Processor for Argoverse2 trajectory data stored in Parquet files."""
+class Argoverse2Loader(BaseSceneLoader[list[Path]]):
+    """Loader for Argoverse 2 trajectory data stored in Parquet files."""
 
     def __init__(
         self,
-        data_root: Path,
-        *,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        *,
         file_batch_size: int | None = 100,
-        split: DatasetSplit = DatasetSplit.ALL,
+        split: DatasetSplit | None = None,
     ) -> None:
-        """Initialize the Argoverse2TrajectoryProcessor.
+        """Initialize the dataset loader.
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             Path to the root directory of the Argoverse 2 dataset.
             This directory should contain `train/`, `val/`, and `test/`
             subdirectories with Parquet files.
@@ -42,18 +42,18 @@ class Argoverse2Loader(BaseSceneLoader[int, list[Path]]):
         loader_config : LoaderConfig, optional
             Configuration for the loader.
         split : DatasetSplit, optional
-            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
+            Which dataset split to load. Defaults to all sources.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
-        self._data_root = data_root
+        self._data_root = self._normalize_data_root(data_root)
         self._file_batch_size = file_batch_size
 
     # ------------------------------------------------------------------
     # Split-aware source discovery
     # ------------------------------------------------------------------
 
-    def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[int, list[Path]]]:
+    def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         parquet_files = sorted(data_dir.glob("*/*.parquet"))
         batch_size: int = self._file_batch_size or len(parquet_files)
         for i in range(0, len(parquet_files), batch_size):
@@ -61,21 +61,21 @@ class Argoverse2Loader(BaseSceneLoader[int, list[Path]]):
             yield Source(identifier=i, inner=batch_files)
 
     @override
-    def all_sources(self) -> Iterable[Source[int, list[Path]]]:
+    def all_sources(self) -> Iterable[Source[list[Path]]]:
         yield from self.train_sources()
         yield from self.validate_sources()
         yield from self.test_sources()
 
     @override
-    def train_sources(self) -> Iterable[Source[int, list[Path]]]:
+    def train_sources(self) -> Iterable[Source[list[Path]]]:
         return self._sources_from_dir(self._data_root / "train")
 
     @override
-    def validate_sources(self) -> Iterable[Source[int, list[Path]]]:
+    def validate_sources(self) -> Iterable[Source[list[Path]]]:
         return self._sources_from_dir(self._data_root / "val")
 
     @override
-    def test_sources(self) -> Iterable[Source[int, list[Path]]]:
+    def test_sources(self) -> Iterable[Source[list[Path]]]:
         return self._sources_from_dir(self._data_root / "test")
 
     # ------------------------------------------------------------------
@@ -83,7 +83,7 @@ class Argoverse2Loader(BaseSceneLoader[int, list[Path]]):
     # ------------------------------------------------------------------
 
     @override
-    def ingest(self, source: Source[int, list[Path]]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
         # Build a mapping from parquet file path to its co-located JSON map path.
         # Each parquet lives in a subdirectory like <scenario_id>/<scenario_id>.parquet
         # alongside a <scenario_id>.json map file.
@@ -120,7 +120,7 @@ class Argoverse2Loader(BaseSceneLoader[int, list[Path]]):
         if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
             dirs.append(self._data_root / "test")
 
-        num_files = sum(sum(1 for _ in d.glob("*/*.parquet")) for d in dirs if d.is_dir())
+        num_files = self._count_matching_files(dirs, "*/*.parquet")
         batch_size = self._file_batch_size or num_files or 1
         batches, extra = divmod(num_files, batch_size)
         return batches + int(extra > 0)

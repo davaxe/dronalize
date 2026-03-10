@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 class HighDLoader(XLevelDataLoader):
-    """Processor for the highD dataset."""
+    """Loader for the highD dataset."""
 
     def __init__(
         self,
@@ -38,7 +38,7 @@ class HighDLoader(XLevelDataLoader):
         data_root : Path
             Path to the root directory of the highD dataset, which should contain a "data"
         loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+            Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio to rebalance lane changing vs non-lane changing agents.
 

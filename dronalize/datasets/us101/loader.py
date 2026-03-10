@@ -40,7 +40,7 @@ class US101Loader(I80Loader):
         data_root : Path
             Path to root of the US101 dataset, containing subdirectories of data files.
         loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+            Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio for rebalancing highway agents. If None, no rebalancing will
             be applied. Default is 1.0, i.e. same number of lane changes as

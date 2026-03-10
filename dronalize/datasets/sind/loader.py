@@ -19,29 +19,29 @@ if TYPE_CHECKING:
 # TODO: Add support for filtering parked vehicles.
 
 
-class SindLoader(BaseSceneLoader[str, Path]):
+class SindLoader(BaseSceneLoader[Path]):
     """Loader for the SIND dataset."""
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the SindLoader.
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             Path to the directory containing the SIND dataset.
         loader_config : LoaderConfig, optional
-            Overrides for the default loader configuration.
+            Loader configuration override.
 
         """
         super().__init__(loader_config, enforce_schema=True)
-        self._data_dir = data_root
+        self._data_dir = self._normalize_data_root(data_root)
 
     @override
-    def all_sources(self) -> Iterable[Source[str, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         for subdir in self._data_dir.iterdir():
             map_location = self._resolve_map(subdir.name)
             yield Source(
@@ -51,7 +51,7 @@ class SindLoader(BaseSceneLoader[str, Path]):
             )
 
     @override
-    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         subdir = source.inner
         pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
         vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
@@ -95,6 +95,8 @@ class SindLoader(BaseSceneLoader[str, Path]):
 
     @override
     def num_sources(self) -> int | None:
+        if not self._data_dir.is_dir():
+            return 0
         return sum(1 for _ in self._data_dir.iterdir())
 
     @override
