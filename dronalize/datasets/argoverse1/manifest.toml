@@ -1,0 +1,2 @@
+module = "dronalize.datasets.argoverse1"
+datasets = ["argoverse1"]

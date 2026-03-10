@@ -1,0 +1,4 @@
+module = "dronalize.datasets.ad4che"
+datasets = ["ad4che"]
+optional_dependencies = ["cv2"]
+extra = "ad4che"
