@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from dronalize.core.protocols.writer import SceneWriter
 from dronalize.datasets.registry import DatasetDescriptor, get
@@ -26,6 +26,8 @@ from dronalize.processing.config import (
     resolve_loader_config,
     resolve_map_config,
 )
+from dronalize.processing.parallel import ParallelProcessor
+from dronalize.processing.writers.mds import MDSSceneWriter
 
 if TYPE_CHECKING:
     from dronalize.core.datatypes.loader_config import LoaderConfig
@@ -33,19 +35,14 @@ if TYPE_CHECKING:
     from dronalize.core.protocols.loader import BaseSceneLoader
 
 
-WriterFactory = Callable[[str, Path], SceneWriter]
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+WriterFactory = Callable[[int], SceneWriter]
 
 
 def process_dataset(
     descriptor: DatasetDescriptor | str,
     *,
     data_root: Path,
-    writer: SceneWriter,
+    writer: SceneWriter | WriterFactory,
     config_overrides: ConfigDict | Path | None = None,
     split: DatasetSplit | None = None,
     parallel: bool = False,
@@ -89,6 +86,14 @@ def process_dataset(
         all_overrides = load_config(config_overrides)
         config_overrides = all_overrides.get(descriptor.name)
 
+    if parallel and isinstance(writer, SceneWriter):
+        msg = (
+            "When `parallel=True`, `writer` must be a factory function that takes a "
+            "process index and returns a `SceneWriter` instance. Use "
+            "`SceneWriter.as_factory` classmethod to create a factory function."
+        )
+        raise ValueError(msg)
+
     config_overrides = config_overrides or {}
 
     loader_config = resolve_loader_config(
@@ -105,6 +110,11 @@ def process_dataset(
             split=split,
             extra_kwargs=extra_kwargs,
         )
+        if parallel:
+            writer = cast("WriterFactory", writer)
+            ParallelProcessor(loader, processes=num_workers, progress_bar=True).write_scenes(
+                writer_factory=writer,
+            )
 
 
 def _build_loader(
@@ -128,4 +138,12 @@ def _build_loader(
 
 
 if __name__ == "__main__":
-    ...
+    process_dataset(
+        "lyft",
+        data_root=Path("/home/west/Developer/behavior-prediction/datasets/lyft"),
+        writer=MDSSceneWriter.as_factory(output_dir="output/test", exist_ok=False),
+        config_overrides=None,
+        split=None,
+        parallel=True,
+        num_workers=4,
+    )

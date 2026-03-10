@@ -5,20 +5,21 @@ from typing import TYPE_CHECKING
 
 from dronalize.core.datatypes.loader_config import LoaderConfig
 from dronalize.core.datatypes.map_config import MapConfig
-from dronalize.datasets.lyft.loader import LyftLoader
-from dronalize.datasets.lyft.map.graph_builder import LyftMapGraphBuilder
+from dronalize.datasets.nuscenes.loader import NuScenesLoader
+from dronalize.datasets.nuscenes.map.graph_builder import NuScenesMapGraphBuilder
 
 if TYPE_CHECKING:
     from multiprocessing.shared_memory import SharedMemory
 
     from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.core.datatypes.map_resolver import MapKey
 
 
 @contextmanager
-def lyft_lifecylce_context(
+def nuscenes_lifecylce_context(
     root: Path, loader_config: LoaderConfig, map_config: MapConfig
 ) -> Generator[None, None, None]:
-    """Lifecycle context for the Lyft dataset.
+    """Lifecycle context for the Nuscenes dataset.
 
     This will build the map graph from the raw map files and store it in shared
     memory for use by the scene loader. The shared memory is cleaned up after
@@ -30,14 +31,13 @@ def lyft_lifecylce_context(
     Parameters
     ----------
     root : Path
-        Root directory of the dataset, which contains the raw map files.
+        Root directory of the dataset.
     loader_config : LoaderConfig
         The loader configuration for this dataset. Not used in this startup hook,
         but included in the signature for consistency with other datasets.
     map_config : MapConfig
         The map configuration for this dataset, which specifies parameters for
-        building the map graph. If `map_config.include_map` is False, this startup
-        hook will do nothing.
+        building the map graph.
 
     """
     _loader_config = loader_config
@@ -45,14 +45,22 @@ def lyft_lifecylce_context(
         yield
         return
 
-    map_path = root
-    meta_json_path = root / "meta.json"
-    builder = LyftMapGraphBuilder.from_files(map_path, meta_json_path)
-    map_graph: MapGraph = builder.build(
-        min_distance=map_config.min_distance, interp_distance=map_config.interp_distance
-    )
-    shm: SharedMemory = map_graph.to_shared()
-    LyftLoader.set_shared_memory(shm.name)
+    map_dir = root / "nuScenes-map-expansion-v1.3" / "expansion"
+
+    shm: list[SharedMemory] = []
+    name_mapping: dict[MapKey, str] = {}
+    for path in map_dir.glob("*.json"):
+        builder = NuScenesMapGraphBuilder.from_json_file(path)
+        map_graph: MapGraph = builder.build(
+            min_distance=map_config.min_distance,
+            interp_distance=map_config.interp_distance,
+        )
+        print(f"Built map graph for {path.stem}: {map_graph}")
+        shm.append(map_graph.to_shared())
+        name_mapping[path.name] = shm[-1].name
+
+    NuScenesLoader.set_shared_memory(mappings=name_mapping)
     yield
-    shm.close()
-    shm.unlink()
+    for sm in shm:
+        sm.close()
+        sm.unlink()

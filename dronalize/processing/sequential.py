@@ -79,7 +79,8 @@ class SequentialProcessor(SceneLoader[IdT]):
         if finalize is not None:
             finalize(writer)
         else:
-            writer.finalize()
+            writer.finish_local()
+            writer.finish_final()
 
     def _total(self) -> int | None:
         if self._progress_bar == ProgressBar.SOURCES:

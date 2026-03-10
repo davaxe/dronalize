@@ -1,6 +1,15 @@
 # config.to - Only specify what you want to override
 
+[global]
+
+[global.execution]
+parallel = true
+workers = -1 # -1 for all available cores ( or remove)
+
 [a43]
+
+[a43.execution]
+workers = 1
 
 [a43.loader]
 input_len = 25

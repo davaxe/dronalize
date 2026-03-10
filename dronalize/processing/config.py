@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import tomllib
@@ -13,25 +14,44 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+class ExecutionConfig(BaseModel):
+    """Pydantic model for execution configuration defaults."""
+
+    parallel: bool = False
+    workers: int = Field(default_factory=lambda: max(1, mp.cpu_count() - 1))
+    chunksize: int | None = None
+
+
 class Config(BaseModel):
     """Pydantic model representing the structure of the configuration overrides."""
 
     loader: LoaderConfig
     map: MapConfig = Field(default_factory=MapConfig.default)
+    execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
+
+
+class ExecutionConfigDict(TypedDict, total=False):
+    """TypedDict for execution configuration overrides."""
+
+    parallel: bool
+    workers: int
+    chunksize: int | None
 
 
 class ConfigDict(TypedDict, total=False):
     """TypedDict representing the structure of the configuration overrides.
 
-    Each dataset section in the TOML config file corresponds to a `ConfigDict`, which
-    may contain overrides for the loader and map configurations. The keys in this
-    dictionary should match the fields of the `Config` model, and the values should
-    match the corresponding `LoaderConfigDict` and `MapConfigDict` structures.
+    Each dataset section in the TOML config file corresponds to a `ConfigDict`,
+    which may contain overrides for the loader and map configurations. The keys
+    in this dictionary should match the fields of the `Config` model, and the
+    values should match the corresponding `LoaderConfigDict` and `MapConfigDict`
+    structures.
 
     """
 
     loader: LoaderConfigDict
     map: MapConfigDict
+    execution: ExecutionConfigDict
 
 
 class LoaderConfigDict(TypedDict, total=False):
@@ -87,25 +107,51 @@ def load_config(config_path: Path) -> dict[str, ConfigDict]:
     return cast("dict[str, ConfigDict]", raw_data)
 
 
-def resolve_loader_config(default: LoaderConfig, overrides: LoaderConfigDict) -> LoaderConfig:
+def resolve_config(default: Config | ConfigDict, overrides: Config | ConfigDict) -> Config:
     """Merge the default config with the overrides.
 
     Parameters
     ----------
-    default : LoaderConfig
+    default : Config | ConfigDict
         The default configuration to use as a base.
-    overrides : ConfigDict
-        The configuration overrides loaded from the toml file. This will be
-        deeply merged with the default config.
+    overrides : Config | ConfigDict
+        The configuration overrides. This will be deeply merged with the
+        default config, taking priority.
     """
-    merged_data = _deep_merge(default.model_dump(), overrides)
+    base_data = default.model_dump() if isinstance(default, Config) else default
+    override_data = overrides.model_dump() if isinstance(overrides, Config) else overrides
+    merged_data = _deep_merge(base_data, override_data)
+    return Config.model_validate(merged_data)
+
+
+def resolve_loader_config(
+    default: LoaderConfig | LoaderConfigDict, overrides: LoaderConfig | LoaderConfigDict
+) -> LoaderConfig:
+    """Merge the default loader config with the overrides."""
+    base_data = default.model_dump() if isinstance(default, LoaderConfig) else default
+    override_data = overrides.model_dump() if isinstance(overrides, LoaderConfig) else overrides
+    merged_data = _deep_merge(base_data, override_data)
     return LoaderConfig.model_validate(merged_data)
 
 
-def resolve_map_config(default: MapConfig, overrides: MapConfigDict) -> MapConfig:
+def resolve_map_config(
+    default: MapConfig | MapConfigDict, overrides: MapConfig | MapConfigDict
+) -> MapConfig:
     """Merge the default map config with the overrides."""
-    merged_data = _deep_merge(default.model_dump(), overrides)
+    base_data = default.model_dump() if isinstance(default, MapConfig) else default
+    override_data = overrides.model_dump() if isinstance(overrides, MapConfig) else overrides
+    merged_data = _deep_merge(base_data, override_data)
     return MapConfig.model_validate(merged_data)
+
+
+def resolve_execution_config(
+    default: ExecutionConfig | ExecutionConfigDict, overrides: ExecutionConfig | ExecutionConfigDict
+) -> ExecutionConfig:
+    """Merge the default execution config with the overrides."""
+    base_data = default.model_dump() if isinstance(default, ExecutionConfig) else default
+    override_data = overrides.model_dump() if isinstance(overrides, ExecutionConfig) else overrides
+    merged_data = _deep_merge(base_data, override_data)
+    return ExecutionConfig.model_validate(merged_data)
 
 
 def _deep_merge(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> dict[str, Any]:
@@ -126,18 +172,32 @@ if __name__ == "__main__":
 
     from rich import print as rprint
 
+    # 1. Define global defaults via Pydantic models
     default = Config(
         loader=LoaderConfig(input_len=10, output_len=20, sample_time=0.1),
         map=MapConfig(min_distance=1, interp_distance=2, include_map=True),
+        execution=ExecutionConfig(parallel=True, workers=4),
     )
 
     config_path = Path("config.toml")
-    config = load_config(config_path)
-    a43_config = config["a43"]
-    rprint(a43_config)
-    rprint(default.loader)
+
+    # Simulate loading if the file doesn't exist yet for testing purposes
+    if config_path.exists():
+        config = load_config(config_path)
+    else:
+        # Mocking the loaded TOML for demonstration
+        config = {"a43": {"loader": {"input_len": 25}, "execution": {"parallel": False}}}
+
+    global_config = config.get("global", {})
+    a43_config = config.get("a43", {})
+
+    # 2. Resolve configurations by merging defaults with TOML dataset overrides
     resolved_loader_config = resolve_loader_config(default.loader, a43_config.get("loader", {}))
-    rprint(resolved_loader_config)
-    rprint(default.map)
     resolved_map_config = resolve_map_config(default.map, a43_config.get("map", {}))
-    rprint(resolved_map_config)
+    resolved_execution_config = resolve_execution_config(
+        default.execution, a43_config.get("execution", {})
+    )
+
+    rprint("--- Resolved Execution Config ---")
+    rprint(resolved_execution_config)
+    # Expected output: ExecutionConfig(parallel=False, workers=4)

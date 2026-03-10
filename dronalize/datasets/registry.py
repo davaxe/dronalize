@@ -75,7 +75,7 @@ class DatasetDescriptor:
     """Predefined splits for the dataset, if any."""
 
     def with_splits(
-        self, splits: list[DatasetSplit | Literal["test", "val", "train"]] | None
+        self, *splits: DatasetSplit | Literal["train", "val", "test"]
     ) -> DatasetDescriptor:
         """Return a copy of this descriptor with the specified predefined splits."""
         return DatasetDescriptor(
@@ -90,7 +90,7 @@ class DatasetDescriptor:
 
     def with_all_splits(self) -> DatasetDescriptor:
         """Indicate that this dataset has all three standard splits (train, val, test)."""
-        return self.with_splits([DatasetSplit.TEST, DatasetSplit.TRAIN, DatasetSplit.VAL])
+        return self.with_splits(DatasetSplit.TEST, DatasetSplit.TRAIN, DatasetSplit.VAL)
 
     @contextmanager
     def execute_lifecycle_context(

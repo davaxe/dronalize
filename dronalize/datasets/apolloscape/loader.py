@@ -72,7 +72,6 @@ class ApolloScapeLoader(BaseSceneLoader[str, Path]):
     def all_sources(self) -> Iterable[Source[str, Path]]:
         yield from self.train_sources()
         yield from self.validate_sources()
-        yield from self.test_sources()
 
     @override
     def train_sources(self) -> Iterable[Source[str, Path]]:
@@ -80,15 +79,7 @@ class ApolloScapeLoader(BaseSceneLoader[str, Path]):
 
     @override
     def validate_sources(self) -> Iterable[Source[str, Path]]:
-        return self._sources_from_dir(self._data_root / "val_split")
-
-    @override
-    def test_sources(self) -> Iterable[Source[str, Path]]:
         return self._sources_from_dir(self._data_root / "prediction_test")
-
-    # ------------------------------------------------------------------
-    # Ingestion / pipeline
-    # ------------------------------------------------------------------
 
     @override
     def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
@@ -119,8 +110,6 @@ class ApolloScapeLoader(BaseSceneLoader[str, Path]):
             dirs.append(self._data_root / "prediction_train")
         if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
             dirs.append(self._data_root / "val_split")
-        if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
-            dirs.append(self._data_root / "prediction_test")
 
         return sum(sum(1 for _ in d.glob("*.txt")) for d in dirs if d.is_dir())
 
@@ -153,19 +142,3 @@ _DATA_SCHEMA: pl.Schema = pl.Schema({
     "height": pl.Float32,
     "yaw": pl.Float32,
 })
-
-if __name__ == "__main__":
-    import os
-    import time
-    from pathlib import Path
-
-    # Get root from env-var
-    root = Path(os.getenv("TRAJ_DATA", "")) / "apollo"
-    loader = ApolloScapeLoader(root, split=DatasetSplit.TRAIN)
-    time_start = time.perf_counter()
-    counter = 0
-    for _ in loader.scenes():
-        counter += 1
-        if counter % 1 == 0:
-            print(f"Loaded {counter} scenes in {time.perf_counter() - time_start:.2f} seconds")
-    print(f"Total {counter} scenes in {time.perf_counter() - time_start:.2f} seconds")

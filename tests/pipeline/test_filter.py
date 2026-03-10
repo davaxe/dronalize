@@ -2,7 +2,7 @@ import polars as pl
 from polars.testing import assert_frame_equal
 
 from dronalize.core import AgentCategory, LoaderConfig
-from dronalize.ops.trajectory.filter import FilteringConfig, filter_scene
+from dronalize.pipeline.ops.filter import FilteringConfig, filter_scene
 
 
 def test_no_scene_filtering() -> None:

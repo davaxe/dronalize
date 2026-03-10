@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 from typing_extensions import overload
 
-from dronalize.ops.trajectory.basic import yaw_from_pos_expr as _yaw_from_pos_expr
-from dronalize.ops.trajectory.basic import yaw_from_vel_expr as _yaw_from_vel_expr
-from dronalize.ops.trajectory.derivative import derivative as _derivative_impl
-from dronalize.ops.trajectory.filter import FilteringConfig, filter_scene_expr
-from dronalize.ops.trajectory.rebalance import rebalance_highway_agents
-from dronalize.ops.trajectory.resample import Resampling
-from dronalize.ops.trajectory.resample import resample as resample_impl
-from dronalize.ops.trajectory.window import sliding_window
+from dronalize.pipeline.ops.basic import yaw_from_pos_expr as _yaw_from_pos_expr
+from dronalize.pipeline.ops.basic import yaw_from_vel_expr as _yaw_from_vel_expr
+from dronalize.pipeline.ops.derivative import derivative as _derivative_impl
+from dronalize.pipeline.ops.filter import FilteringConfig, filter_scene_expr
+from dronalize.pipeline.ops.rebalance import rebalance_highway_agents
+from dronalize.pipeline.ops.resample import Resampling
+from dronalize.pipeline.ops.resample import resample as resample_impl
+from dronalize.pipeline.ops.window import sliding_window
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

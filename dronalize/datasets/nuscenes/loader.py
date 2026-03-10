@@ -9,6 +9,7 @@ from typing_extensions import override
 import dronalize.pipeline.transforms as tr
 from dronalize.core.datatypes.categories import AgentCategory
 from dronalize.core.datatypes.loader_config import LoaderConfig
+from dronalize.core.datatypes.map_graph import MapGraph
 from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
@@ -16,8 +17,10 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.core.datatypes.map_resolver import MapResolver
 
-class NuScenesLoader(BaseSceneLoader[str, str]):
+
+class NuScenesLoader(BaseSceneLoader[str, tuple[int, str]]):
     """Nuscenes trajectory processor.
 
     Strategy:
@@ -28,67 +31,66 @@ class NuScenesLoader(BaseSceneLoader[str, str]):
 
     def __init__(
         self,
-        data_dir: Path | str,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
-        *,
-        use_parquet_cache: bool = True,
-        parquet_dir: Path | str | None = None,
     ) -> None:
         """Initialize the data processor.
 
         Parameters
         ----------
-        data_dir : Path or str
-            Data directory containing the raw nuScenes trajectories.
-            This is the directory that for example includes:
-
-            - category.json
-            - instance.json
-            - sample_annotation.json
-            - sample_data.json
-            - ego_pose.json
-            - scene.json
-            - log.json
-
+        data_root : Path or str
+            Root directory of the dataset.
         loader_config : LoaderConfig, optional
             Configuration for the loader.
-        use_parquet_cache : bool, optional
-            Whether to use parquet cache. This will make subsequent processing
-            faster.
-        parquet_dir : Path or str, optional
-            Directory to save the parquet cache files.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)
-        self.data_dir: Path = Path(data_dir)
-        self._dfs: dict[str, pl.LazyFrame] = {}
-        self._use_parquet: bool = use_parquet_cache
-        self._parquet_dir: Path = Path(parquet_dir) if parquet_dir is not None else self.data_dir
+        self._data_root = Path(data_root)
+        self._data_dirs: list[Path] = self._find_data_dir()
+        self._dfs: list[dict[str, pl.LazyFrame]] = []
 
         # Cache for the processed data: {scene_token: DataFrame}
-        self._scene_cache: dict[str, pl.DataFrame] = {}
+        self._scene_cache: list[dict[str, pl.DataFrame]] = []
         self._schemas: dict[str, pl.Schema | None] = _SCHEMAS
 
         self._load_tables()
         self._precompute_global_data()
 
+    def _find_data_dir(self) -> list[Path]:
+        required_files = set(_SCHEMAS.keys())
+        paths: list[Path] = []
+        max_level = 3
+        current_root = self._data_root
+        for level in range(max_level + 1):
+            pattern = "*/" * level + "*"
+
+            for path in current_root.glob(pattern):
+                if path.is_dir():
+                    files = {p.stem for p in path.glob("*.json")}
+                    if required_files.issubset(files):
+                        paths.append(path)
+
+        return paths
+
     @override
-    def all_sources(self) -> Iterable[Source[str, str]]:
-        for token, df in self._scene_cache.items():
-            scene_name: str = df.item(0, "scene_name")
-            map_name: str = df.item(0, "map")
-            yield Source(identifier=scene_name, inner=token, map_key=map_name)
+    def all_sources(self) -> Iterable[Source[str, tuple[int, str]]]:
+        for i, dfs in enumerate(self._scene_cache):
+            for token, df in dfs.items():
+                scene_name: str = df.item(0, "scene_name")
+                map_name: str = df.item(0, "map")
+                yield Source(identifier=scene_name, inner=(i, token), map_key=map_name)
 
     @override
     def num_sources(self) -> int | None:
-        return len(self._scene_cache)
+        return sum(len(dfs) for dfs in self._scene_cache)
 
     @override
-    def ingest(self, source: Source[str, str]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[str, tuple[int, str]]) -> Iterable[IngestOutput]:
         map_key = source.map_key
+        index, token = source.inner
         scenes = (
             self
-            ._scene_cache[source.inner]
+            ._scene_cache[index][token]
             .drop([
                 "scene_token",
                 "scene_name",
@@ -127,55 +129,75 @@ class NuScenesLoader(BaseSceneLoader[str, str]):
             .with_filtering(require_frames=[3])
         )
 
+    @override
+    def map_resolver(self) -> MapResolver:
+        def _resolver(key: str | None = None) -> MapGraph | None:
+            if (
+                self._shared_memory_name is None
+                or isinstance(self._shared_memory_name, str)
+                or key is None
+            ):
+                return None
+
+            shared_name = self._shared_memory_name[key]
+            with MapGraph.from_shared(shared_name) as graph:
+                return graph
+
+        return _resolver
+
     def _load_tables(self) -> None:
         """Load all required tables using the generic loader."""
-        for name, schema in self._schemas.items():
-            self._dfs[name] = load_cached_table(
-                name=name,
-                base_dir=self.data_dir,
-                schema=schema,
-                use_parquet=self._use_parquet,
-                parquet_dir=self._parquet_dir,
-            )
+        for data_dir in self._data_dirs:
+            data_dict = {}
+            for name, schema in self._schemas.items():
+                data_dict[name] = load_cached_table(
+                    name=name,
+                    base_dir=data_dir,
+                    schema=schema,
+                )
+            self._dfs.append(data_dict)
 
     def _precompute_global_data(self) -> None:
         # 1. Build the global timeline (Sample + Scene + Log)
-        timeline_lf = build_scene_timeline(
-            self._dfs["sample"],
-            self._dfs["scene"],
-            self._dfs["log"],
-        )
+        for dfs in self._dfs:
+            timeline_lf = build_scene_timeline(
+                dfs["sample"],
+                dfs["scene"],
+                dfs["log"],
+            )
 
-        # 2. Process Ego
-        ego_lf = extract_ego_tracks(timeline_lf, self._dfs["sample_data"], self._dfs["ego_pose"])
+            # 2. Process Ego
+            ego_lf = extract_ego_tracks(timeline_lf, dfs["sample_data"], dfs["ego_pose"])
 
-        # 3. Process Agents (with explicit mappings passed in)
-        agents_lf = extract_agent_tracks(
-            timeline_lf,
-            self._dfs["sample_annotation"],
-            self._dfs["instance"],
-            self._dfs["category"],
-            self._dfs["attribute"],
-            category_mapping=_FULL_CATEGORY_MAPPING,
-            status_mapping=_STATUS_MAPPING,
-            default_agent_category=AgentCategory.UNKNOWN,
-            default_status="unknown",
-        )
+            # 3. Process Agents (with explicit mappings passed in)
+            agents_lf = extract_agent_tracks(
+                timeline_lf,
+                dfs["sample_annotation"],
+                dfs["instance"],
+                dfs["category"],
+                dfs["attribute"],
+                category_mapping=_FULL_CATEGORY_MAPPING,
+                status_mapping=_STATUS_MAPPING,
+                default_agent_category=AgentCategory.UNKNOWN,
+                default_status="unknown",
+            )
 
-        # 4. Align columns and merge
-        # Ensure agents have the exact same column order as ego
-        agents_lf = agents_lf.select(ego_lf.columns)
-        combined_df = (
-            pl
-            .concat([ego_lf, agents_lf])
-            .sort(["scene_token", "frame", "id"])
-            .collect(engine="streaming")
-        )
+            # 4. Align columns and merge
+            # Ensure agents have the exact same column order as ego
+            agents_lf = agents_lf.select(ego_lf.collect_schema().names())
+            combined_df = (
+                pl
+                .concat([ego_lf, agents_lf])
+                .sort(["scene_token", "frame", "id"])
+                .collect(engine="streaming")
+            )
 
-        self._scene_cache = cast(
-            "dict[str, pl.DataFrame]",
-            combined_df.partition_by("scene_token", as_dict=True),
-        )
+            self._scene_cache.append(
+                cast(
+                    "dict[str, pl.DataFrame]",
+                    combined_df.partition_by("scene_token", as_dict=True),
+                )
+            )
 
         self._status_to_filter: list[str] = ["parked", "undefined"]
         self._full_category_contains: list[str] = ["object"]
@@ -185,9 +207,6 @@ def load_cached_table(
     name: str,
     base_dir: Path,
     schema: pl.Schema | None = None,
-    *,
-    use_parquet: bool = True,
-    parquet_dir: Path | None = None,
 ) -> pl.LazyFrame:
     """Load a table from Parquet if available/enabled, otherwise falls back to JSON.
 
@@ -199,11 +218,6 @@ def load_cached_table(
         Base directory where the JSON file is located.
     schema : pl.Schema, optional
         Schema to use for reading the JSON file.
-    use_parquet : bool, optional
-        Whether to use parquet files if available. Defaults to True.
-    parquet_dir : Path, optional
-        Directory where parquet files are stored. If None, defaults to
-        `base_dir`.
 
     Returns
     -------
@@ -211,25 +225,11 @@ def load_cached_table(
         LazyFrame of the loaded table.
 
     """
-    p_dir = parquet_dir if parquet_dir is not None else base_dir
     json_path = base_dir / f"{name}.json"
-    parquet_path = p_dir / f"{name}.parquet"
-
-    if use_parquet and parquet_path.exists():
-        return pl.scan_parquet(parquet_path)
 
     # Fallback to JSON
     lf = pl.read_json(json_path, schema=schema)
-    lf = lf.lazy()
-
-    if use_parquet:
-        # Create directory if it doesn't exist before sinking
-        p_dir.mkdir(parents=True, exist_ok=True)
-        lf.sink_parquet(parquet_path)
-        # Reload from the new parquet to ensure consistency
-        return pl.scan_parquet(parquet_path)
-
-    return lf
+    return lf.lazy()
 
 
 def build_scene_timeline(

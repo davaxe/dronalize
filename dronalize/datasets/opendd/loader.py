@@ -16,24 +16,26 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+# TODO: OpenDD have some sort of split definition, update to support this
+
 
 class OpenDDLoader(BaseSceneLoader[str, str]):
     """Processor for OpenDD dataset stored in SQLite format."""
 
-    def __init__(self, data_dir: Path, loader_config: LoaderConfig | None = None) -> None:
+    def __init__(self, data_root: Path, loader_config: LoaderConfig | None = None) -> None:
         """Initialize the OpenDD processor.
 
         Parameters
         ----------
-        data_dir : Path
-            Path to the OpenDD SQLite database file.
+        data_root : Path
+            Path to the directory containing the OpenDD SQLite database file.
         loader_config : LoaderConfig, optional
             Processor configuration override. If None, the default configuration
             will be used.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._conn = sqlite3.connect(data_dir)
+        self._conn = sqlite3.connect(data_root)
         self._cursor = self._conn.cursor()
 
     @override
@@ -107,4 +109,44 @@ class OpenDDLoader(BaseSceneLoader[str, str]):
             .with_resampling(1, 3)
             .with_window(75)
             .with_filtering(require_frames=[59])
+        )
+
+
+class MultiOpenDDLoader(OpenDDLoader):
+    """Loader for multiple OpenDD datasets stored in separate directories."""
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+    ) -> None:
+        """Initialize the MultiOpenDDLoader.
+
+        Parameters
+        ----------
+        data_root : Path
+            Path to the directory containing subdirectories for each OpenDD part.
+        loader_config : LoaderConfig, optional
+            Processor configuration override.
+
+        """
+        super().__init__(loader_config=loader_config, data_root=data_root)
+        self._data_root = data_root
+
+    def _subdirs(self) -> Iterable[Path]:
+        for subdir in self._data_root.iterdir():
+            if subdir.is_dir():
+                yield subdir
+
+    @override
+    def all_sources(self) -> Iterable[Source[str, str]]:
+        for subdir in self._subdirs():
+            sub_loader = OpenDDLoader(subdir, loader_config=self.loader_config)
+            yield from sub_loader.all_sources()
+
+    @override
+    def num_sources(self) -> int | None:
+        return sum(
+            OpenDDLoader(subdir, loader_config=self.loader_config).num_sources() or 0
+            for subdir in self._subdirs()
         )
