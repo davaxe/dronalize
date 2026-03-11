@@ -8,21 +8,22 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
-from dronalize.config.map import MapConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.loader import IngestOutput, MapKey, MapResolver, Source
-from dronalize.core.split import DatasetSplit
-from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
+from dronalize.datasets.waymo.map.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.map_graph import MapGraph
-    from dronalize.core.scene import Scene
+    from dronalize.config.map import MapConfig
+    from dronalize.maps.graph import MapGraph
+    from dronalize.maps.resolver import MapKey, MapResolver
+    from dronalize.scene import Scene
 
 
 class WaymoLoader(BaseSceneLoader[Path]):
@@ -32,9 +33,8 @@ class WaymoLoader(BaseSceneLoader[Path]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
-        *,
-        split: DatasetSplit | None = None,
         map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         """Initialize.
 
@@ -56,17 +56,16 @@ class WaymoLoader(BaseSceneLoader[Path]):
             subdirectories with TFRecord files.
         loader_config : , optional
             Loader configuration override. If None, the default configuration is used.
-        split : DatasetSplit, optional
-            Which dataset split to load. Defaults to all sources.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. Can contain one or more predefined splits,
+            or `None` to process all sources.
         map_config : MapConfig, optional
             Map configuration. If None, the default configuration is used.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
-        self._data_root = self._normalize_data_root(data_root)
-
-        self._map_config = map_config or MapConfig.default()
-        self._include_map: bool = self._map_config.include_map
+        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        self._data_root: Path = self._normalize_data_root(data_root)
+        self._include_map: bool = self.map_config.include_map
 
     @staticmethod
     def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
@@ -95,16 +94,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
 
     @override
     def num_sources(self) -> int | None:
-        dirs: list[Path] = []
-        split = self._split
-        if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
-            dirs.append(self._data_root / "training")
-        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
-            dirs.append(self._data_root / "validation")
-        if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
-            dirs.append(self._data_root / "testing")
-
-        return self._count_matching_files(dirs, "*.tfrecord*")
+        return sum(self._count_sources_for_split(split) for split in self._splits)
 
     @override
     def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
@@ -116,15 +106,13 @@ class WaymoLoader(BaseSceneLoader[Path]):
                 def _resolver(
                     scene: Scene,
                     key: MapKey | None = None,
-                    map_config: MapConfig | None = self._map_config,
                     _raw_data: bytes = raw_data,
                 ) -> MapGraph:
-                    _ = scene, key, map_config
-                    map_config = map_config or MapConfig.default()
+                    _ = scene, key
                     map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
-                    return WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
-                        min_distance=map_config.min_distance,
-                        interp_distance=map_config.interp_distance,
+                    return WaymoMapBuilder.from_proto(map_data.map_features).build(
+                        min_distance=self.map_config.min_distance,
+                        interp_distance=self.map_config.interp_distance,
                     )
 
                 resolver = _resolver
@@ -171,20 +159,33 @@ class WaymoLoader(BaseSceneLoader[Path]):
             require_frames=[9]
         )
 
+    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+        if split is DatasetSplit.TRAIN:
+            return self._count_matching_files([self._data_root / "training"], "*.tfrecord*")
+        if split is DatasetSplit.VAL:
+            return self._count_matching_files([self._data_root / "validation"], "*.tfrecord*")
+        if split is DatasetSplit.TEST:
+            return self._count_matching_files([self._data_root / "testing"], "*.tfrecord*")
+        return (
+            self._count_matching_files([self._data_root / "training"], "*.tfrecord*")
+            + self._count_matching_files([self._data_root / "validation"], "*.tfrecord*")
+            + self._count_matching_files([self._data_root / "testing"], "*.tfrecord*")
+        )
+
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:
     ego_track_index = scenario.sdc_track_index
     cat_map = _OBJECT_TYPE_TO_CATEGORY
 
     # Pre-fetch lists to avoid dictionary lookups in the inner loop
-    l_frame = []
-    l_tid = []
-    l_x = []
-    l_y = []
-    l_vx = []
-    l_vy = []
-    l_yaw = []
-    l_cat = []
+    l_frame: list[int] = []
+    l_tid: list[int] = []
+    l_x: list[float] = []
+    l_y: list[float] = []
+    l_vx: list[float] = []
+    l_vy: list[float] = []
+    l_yaw: list[float] = []
+    l_cat: list[int] = []
 
     for i, track in enumerate(scenario.tracks):
         # Resolve track constants

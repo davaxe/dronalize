@@ -5,9 +5,12 @@ from typing import TYPE_CHECKING
 from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
+    from dronalize.categories import DatasetSplit
     from dronalize.config import LoaderConfig
+    from dronalize.config.map import MapConfig
 
 
 class InDLoader(XLevelDataLoader):
@@ -26,8 +29,10 @@ class InDLoader(XLevelDataLoader):
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         """Initialize the trajectory data loader for the inD dataset.
 
@@ -37,6 +42,15 @@ class InDLoader(XLevelDataLoader):
             Path to root of the inD dataset.
         loader_config : , optional
             Loader configuration. If None, the default configuration is used.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. This dataset does not define predefined
+            splits, so `None` or `DatasetSplit.ALL` process all sources.
 
         """
-        super().__init__(data_root / "data", loader_config)
+        data_root = self._normalize_data_root(data_root)
+        super().__init__(
+            data_root / "data",
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+        )

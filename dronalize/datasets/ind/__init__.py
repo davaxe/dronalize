@@ -1,15 +1,20 @@
-from dronalize.datasets import registry
-from dronalize.datasets.ind.graph_builder import InDGraphBuilder
+__dronalize_builtin__ = {"datasets": ["ind"]}
+
+from dronalize.datasets import _registry
+from dronalize.datasets.ind import _scope
 from dronalize.datasets.ind.loader import InDLoader
+from dronalize.datasets.ind.map.builder import InDMapBuilder
 
-__all__ = ["InDGraphBuilder", "InDLoader"]
+__all__ = ["InDLoader", "InDMapBuilder"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="ind",
         loader_factory=InDLoader,
         default_config=InDLoader.default_config(),
-        map_mode=registry.MapMode.BUILDER_ONLY,
-        predefined_splits=None,
+        default_map_config=InDLoader.default_map_config(),
+        map_mode=_registry.MapMode.SHARED_KEYED,
+        predefined_splits=[],
+        execution_scope_fn=_scope.ind_execution_scope,
     )
 )

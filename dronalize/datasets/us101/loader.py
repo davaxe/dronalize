@@ -5,9 +5,12 @@ from typing import TYPE_CHECKING
 from dronalize.datasets.i80.loader import I80Loader
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
+    from dronalize.categories import DatasetSplit
     from dronalize.config import LoaderConfig
+    from dronalize.config.map import MapConfig
 
 
 class US101Loader(I80Loader):
@@ -20,9 +23,11 @@ class US101Loader(I80Loader):
 
     def __init__(
         self,
-        data_root: Path,
-        *,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        *,
         lane_change_ratio: float | None = 1,
     ) -> None:
         """Initialize the US101 dataset loader.
@@ -45,10 +50,15 @@ class US101Loader(I80Loader):
             Ratio for rebalancing highway agents. If None, no rebalancing will
             be applied. Default is 1.0, i.e. same number of lane changes as
             non-lane changes.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. This dataset does not define predefined
+            splits, so `None` or `DatasetSplit.ALL` process all sources.
 
         """
         super().__init__(
             data_root,
             loader_config=loader_config,
+            map_config=map_config,
             lane_change_ratio=lane_change_ratio,
+            splits=splits,
         )

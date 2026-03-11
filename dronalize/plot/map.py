@@ -1,19 +1,21 @@
+# pyright: standard
+
 from __future__ import annotations
 
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Final
 
+import altair as alt  # Optional dependency, checked at import time (in __init__.py)
 import polars as pl
 
-from dronalize.core._compat import require_optional
-from dronalize.core.categories import EdgeType
+from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:
     from types import ModuleType
 
-    import altair as alt
+    from dronalize.maps.graph import MapGraph
 
-    from dronalize.core.map_graph import MapGraph
+Chart = alt.Chart | alt.LayerChart
 
 
 def plot_map_graph(
@@ -25,7 +27,7 @@ def plot_map_graph(
     include_nodes: bool = False,
     disable_max_rows: bool = True,
     **kwargs: Any,  # noqa: ANN401
-) -> alt.Chart:
+) -> Chart:
     """Plot a map graph using Altair.
 
     Parameters
@@ -51,8 +53,6 @@ def plot_map_graph(
         An Altair `alt.Chart` object.
 
     """
-    alt = require_optional("altair", extra="plot")
-
     if disable_max_rows:
         alt.data_transformers.disable_max_rows()
 

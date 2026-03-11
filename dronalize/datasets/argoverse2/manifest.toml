@@ -1,2 +1,0 @@
-module = "dronalize.datasets.argoverse2"
-datasets = ["argoverse2"]

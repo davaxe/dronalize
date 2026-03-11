@@ -1,15 +1,20 @@
-from dronalize.datasets import registry
-from dronalize.datasets.round.graph_builder import RounDGraphBuilder
+__dronalize_builtin__ = {"datasets": ["round"]}
+
+from dronalize.datasets import _registry
+from dronalize.datasets.round import _scope
 from dronalize.datasets.round.loader import RounDLoader
+from dronalize.datasets.round.map.builder import RounDMapBuilder
 
-__all__ = ["RounDGraphBuilder", "RounDLoader"]
+__all__ = ["RounDLoader", "RounDMapBuilder"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="round",
         loader_factory=RounDLoader,
         default_config=RounDLoader.default_config(),
-        map_mode=registry.MapMode.BUILDER_ONLY,
-        predefined_splits=None,
+        default_map_config=RounDLoader.default_map_config(),
+        map_mode=_registry.MapMode.SHARED_KEYED,
+        predefined_splits=[],
+        execution_scope_fn=_scope.round_execution_scope,
     )
 )

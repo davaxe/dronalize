@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
 from dronalize.config.filtering import FilteringConfig
 from dronalize.pipeline.functional.resample import Resampling, ResamplingMethod
@@ -10,13 +11,13 @@ from dronalize.pipeline.functional.resample import Resampling, ResamplingMethod
 if TYPE_CHECKING:
     from collections.abc import Collection
 
-    from dronalize.core.categories import AgentCategory
+    from dronalize.categories import AgentCategory
 
 
 class WindowParams(BaseModel):
     """Configuration for sliding window sampling of scenes."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
     window_size: int = Field(gt=0, description="Number of frames in each window.")
     step_size: int = Field(gt=0, description="Number of frames to skip between windows.")
 
@@ -26,14 +27,9 @@ class WindowParams(BaseModel):
 
 
 class LoaderConfig(BaseModel):
-    """Base configuration class for trajectory data processing.
+    """Base configuration class for trajectory data processing."""
 
-    All builder-style methods (`with_*`) return **new** instances, leaving the
-    original unchanged. This makes configs safe to share, compare, serialise
-    and merge.
-    """
-
-    model_config = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     input_len: int = Field(gt=0, description="Observation length in frames.")
     output_len: int = Field(gt=0, description="Prediction length in frames.")
@@ -44,9 +40,11 @@ class LoaderConfig(BaseModel):
     )
     window: WindowParams | None = Field(
         default=None,
-        description="Used for datasets where multiple samples can be generated from a single "
-        "scene by using a sliding window approach. If None, it is assumed that each "
-        "scene corresponds to exactly one sample.",
+        description=(
+            "Used for datasets where multiple samples can be generated from a single "
+            "scene by using a sliding window approach. If None, it is assumed that each "
+            "scene corresponds to exactly one sample."
+        ),
     )
     filtering: FilteringConfig | None = Field(
         default=None,
@@ -137,10 +135,14 @@ class LoaderConfig(BaseModel):
             A **new** config instance with scene-filtering parameters set.
         """
         if require_frames is not None:
+            total_frames = self.input_len + self.output_len
             require_frames = {
-                frame if frame > 0 else (self.input_len + self.output_len + frame)
-                for frame in require_frames
+                frame if frame >= 0 else (total_frames + frame) for frame in require_frames
             }
+            for frame in require_frames:
+                if frame < 0 or frame >= total_frames:
+                    msg = f"Invalid frame index: {frame}"
+                    raise ValueError(msg)
 
         new_filtering = FilteringConfig.create(
             min_agents=min_agents,

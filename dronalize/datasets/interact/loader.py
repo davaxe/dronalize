@@ -7,15 +7,16 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.interfaces import IngestOutput, Source
-from dronalize.core.split import DatasetSplit
+from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.config.map import MapConfig
 
 
 class InteractionLoader(BaseSceneLoader[list[Path]]):
@@ -25,9 +26,10 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         *,
         file_batch_size: int | None = None,
-        split: DatasetSplit | None = None,
     ) -> None:
         """Initialize the dataset loader.
 
@@ -43,26 +45,26 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         loader_config : , optional
             Loader configuration override. If None, the default configuration
             is used.
+        map_config : MapConfig, optional
+            Map configuration override. If None, the default configuration is
+            used.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. Can contain one or more predefined splits,
+            or `None` to process all sources.
         file_batch_size : int, optional
             Number of files to read in each batch. If None, all files will be
             read at once. Higher batch size may lead to faster processing at
             diminishing returns, but also higher memory usage. `None` is not
             recommended for large amounts of data.
-        split : DatasetSplit, optional
-            Which dataset split to load. Defaults to all sources.
 
         """
         if loader_config is not None and loader_config.window is not None:
             msg = f"does not support loader_config.window={loader_config.window!r}."
             raise self._invalid_loader_argument(msg)
 
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
-        self._data_root = self._normalize_data_root(data_root)
+        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        self._data_root: Path = self._normalize_data_root(data_root)
         self._file_batch_size: int | None = file_batch_size
-
-    # ------------------------------------------------------------------
-    # Split-aware source discovery
-    # ------------------------------------------------------------------
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         if not data_dir.is_dir():
@@ -92,10 +94,6 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         yield from self._sources_from_dir(self._data_root / "test_multi-agent")
         yield from self._sources_from_dir(self._data_root / "test_conditional-multi-agent")
 
-    # ------------------------------------------------------------------
-    # Ingestion / pipeline
-    # ------------------------------------------------------------------
-
     @override
     def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
         data = (
@@ -120,25 +118,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
 
     @override
     def num_sources(self) -> int | None:
-        dirs: list[Path] = []
-        split = self._split
-        if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
-            dirs.append(self._data_root / "train")
-        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
-            dirs.append(self._data_root / "val")
-        if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
-            dirs.extend([
-                self._data_root / "test_multi-agent",
-                self._data_root / "test_conditional-multi-agent",
-            ])
-
-        num_files = self._count_matching_files(dirs, "*.csv", recursive=True)
-
-        if self._file_batch_size is None:
-            # One batch per directory
-            return sum(1 for d in dirs if d.is_dir() and any(d.rglob("*.csv")))
-
-        return (num_files + self._file_batch_size - 1) // self._file_batch_size
+        return sum(self._count_sources_for_split(split) for split in self._splits)
 
     @override
     def pipeline(self) -> Pipeline:
@@ -185,6 +165,30 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
                 .otherwise(AgentCategory.BICYCLE.value),
             )
             .otherwise(pl.col("agent_type"))
+        )
+
+    def _count_sources(self, data_dir: Path) -> int:
+        num_files = self._count_matching_files([data_dir], "*.csv", recursive=True)
+        if num_files == 0:
+            return 0
+        batch_size = self._file_batch_size or num_files
+        batches, extra = divmod(num_files, batch_size)
+        return batches + int(extra > 0)
+
+    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+        if split is DatasetSplit.TRAIN:
+            return self._count_sources(self._data_root / "train")
+        if split is DatasetSplit.VAL:
+            return self._count_sources(self._data_root / "val")
+        if split is DatasetSplit.TEST:
+            return self._count_sources(self._data_root / "test_multi-agent") + self._count_sources(
+                self._data_root / "test_conditional-multi-agent"
+            )
+        return (
+            self._count_sources(self._data_root / "train")
+            + self._count_sources(self._data_root / "val")
+            + self._count_sources(self._data_root / "test_multi-agent")
+            + self._count_sources(self._data_root / "test_conditional-multi-agent")
         )
 
 

@@ -1,18 +1,26 @@
-from dronalize.config.map import MapConfig
-from dronalize.datasets import registry
-from dronalize.datasets.lyft.lifecycle import lyft_lifecylce_context
-from dronalize.datasets.lyft.loader import LyftLoader
-from dronalize.datasets.lyft.map.graph_builder import LyftMapGraphBuilder
+__dronalize_builtin__ = {
+    "datasets": ["lyft"],
+    "optional_dependencies": ["zarr", "numcodecs", "google.protobuf"],
+    "extra": "lyft",
+}
 
-__all__ = ["LyftLoader", "LyftMapGraphBuilder"]
+from dronalize.datasets import _registry
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.ensure_builtin_dependencies(__name__, __dronalize_builtin__)
+
+from dronalize.datasets.lyft import _scope  # noqa: E402
+from dronalize.datasets.lyft.loader import LyftLoader  # noqa: E402
+from dronalize.datasets.lyft.map.builder import LyftMapBuilder  # noqa: E402
+
+__all__ = ["LyftLoader", "LyftMapBuilder"]
+
+_registry.register(
+    _registry.DatasetDescriptor(
         name="lyft",
         loader_factory=LyftLoader,
         default_config=LyftLoader.default_config(),
-        lifecycle_context=lyft_lifecylce_context,
-        default_map_config=MapConfig.default(),
-        map_mode=registry.MapMode.SHARED_SINGLE,
+        default_map_config=LyftLoader.default_map_config(),
+        execution_scope_fn=_scope.lyft_execution_scope,
+        map_mode=_registry.MapMode.SHARED_SINGLE,
     ).with_splits("train", "val")
 )

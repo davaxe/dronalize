@@ -19,12 +19,14 @@ dependencies = [
     "polars>=1.0.0",
     "pyarrow>=14.0.0",
     "scipy>=1.10.0",
-    "tqdm>=4.65.0",
-    "utm>=0.7.0",
+    "tomli>=2.0.1; python_version < '3.11'",
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
     "mosaicml-streaming>=0.13.0",
 ]
+
+[project.scripts]
+dronalize = "dronalize.__main__:main"
 
 [project.optional-dependencies]
 # Plotting (map graphs, trajectories)
@@ -50,12 +52,15 @@ example = [
     "wandb>=0.15.0",
 ]
 
+cli = ["typer>=0.24.1", "rich>=14.3.3"]
+
 [dependency-groups]
 dev = [
     "pytest>=7.0",
     "scipy-stubs",
     "ipython",
-    "dronalize[plot,lyft,ad4che]",
+    "tomli>=2.0.1",
+    "dronalize[plot,lyft,ad4che, cli]",
 ]
 tools = [
     "mkdocs-material>=9.6.0",
@@ -93,7 +98,7 @@ ignore = [
     "T201", "S101", "TRY003", "D100", "B008", "PLR0904",
     "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
     "DOC402", "CPY001", "D104", "TD005", "S405", "S314",
-    "RUF067", "PLC2801",
+    "RUF067", "PLC2801", "S608", "S311"
 ]
 pydocstyle = { convention = "numpy" }
 
@@ -112,3 +117,26 @@ project-excludes = [
     "**/*_pb2.py",
     "**/*_pb2.pyi",
 ]
+
+[tool.pyright]
+pythonVersion = "3.10"
+pythonPlatform = "All"
+typeCheckingMode = "recommended"
+reportIgnoreCommentWithoutRule = true
+include = ["dronalize", "tests"]
+exclude = [
+    "protos",
+    "**/protos",
+    "**/*_pb2.py",
+    "**/*_pb2.pyi",
+    "**/*_pb2_grpc.py",
+]
+ignore = [
+    "protos",
+    "**/protos",
+    "**/*_pb2.py",
+    "**/*_pb2.pyi",
+    "**/*_pb2_grpc.py",
+]
+reportAny = false
+reportExplicitAny = false

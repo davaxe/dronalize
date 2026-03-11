@@ -1,2 +1,0 @@
-module = "dronalize.datasets.ind"
-datasets = ["ind"]

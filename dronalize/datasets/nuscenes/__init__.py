@@ -1,17 +1,20 @@
-from dronalize.datasets import registry
-from dronalize.datasets.nuscenes.lifecycle import nuscenes_lifecylce_context
+__dronalize_builtin__ = {"datasets": ["nuscenes"]}
+
+from dronalize.datasets import _registry
+from dronalize.datasets.nuscenes import _scope
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
-from dronalize.datasets.nuscenes.map.graph_builder import NuScenesMapGraphBuilder
+from dronalize.datasets.nuscenes.map.builder import NuScenesMapBuilder
 
-__all__ = ["NuScenesLoader", "NuScenesMapGraphBuilder"]
+__all__ = ["NuScenesLoader", "NuScenesMapBuilder"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="nuscenes",
         loader_factory=NuScenesLoader,
         default_config=NuScenesLoader.default_config(),
-        lifecycle_context=nuscenes_lifecylce_context,
-        map_mode=registry.MapMode.SHARED_KEYED,
-        predefined_splits=None,
+        default_map_config=NuScenesLoader.default_map_config(),
+        map_mode=_registry.MapMode.SHARED_KEYED,
+        predefined_splits=[],
+        execution_scope_fn=_scope.nuscenes_execution_scope,
     )
 )

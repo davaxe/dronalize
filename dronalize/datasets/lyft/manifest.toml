@@ -1,4 +1,0 @@
-module = "dronalize.datasets.lyft"
-datasets = ["lyft"]
-optional_dependencies = ["zarr", "numcodecs", "google.protobuf"]
-extra = "lyft"

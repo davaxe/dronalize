@@ -1,6 +1,6 @@
 """Reusable composite pipeline factories for common trajectory processing.
 
-This module provides pre-built `~dronalize.core.pipeline.Pipeline`
+This module provides pre-built `~dronalize.pipeline.Pipeline`
 fragments that encapsulate recurring multi-step processing stages found
 across dataset loaders.  They are designed to be composed into a loader's
 `pipeline()` method via `Pipeline.compose` or the `>>` operator.

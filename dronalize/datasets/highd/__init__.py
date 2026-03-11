@@ -1,15 +1,18 @@
-from dronalize.datasets import registry
-from dronalize.datasets.highd.graph_builder import HighDMapGraphBuilder
+__dronalize_builtin__ = {"datasets": ["highd"]}
+
+from dronalize.datasets import _registry
 from dronalize.datasets.highd.loader import HighDLoader
+from dronalize.datasets.highd.map.builder import HighDMapBuilder
 
-__all__ = ["HighDLoader", "HighDMapGraphBuilder"]
+__all__ = ["HighDLoader", "HighDMapBuilder"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="highd",
         loader_factory=HighDLoader,
         default_config=HighDLoader.default_config(),
-        map_mode=registry.MapMode.BUILDER_ONLY,
-        predefined_splits=None,
+        default_map_config=HighDLoader.default_map_config(),
+        map_mode=_registry.MapMode.LAZY_KEYED,
+        predefined_splits=[],
     )
 )

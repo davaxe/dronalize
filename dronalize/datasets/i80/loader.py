@@ -7,14 +7,16 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.interfaces import IngestOutput, Source
+from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.config.map import MapConfig
 
 
 class I80Loader(BaseSceneLoader[Path]):
@@ -23,8 +25,10 @@ class I80Loader(BaseSceneLoader[Path]):
     def __init__(
         self,
         data_root: Path | str,
-        *,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        *,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the I80 dataset loader.
@@ -47,11 +51,14 @@ class I80Loader(BaseSceneLoader[Path]):
             Ratio for rebalancing highway agents. If None, no rebalancing will
             be applied. Default is 1.0, i.e. same number of lane changes as
             non-lane changes.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. This dataset does not define predefined
+            splits, so `None` or `DatasetSplit.ALL` process all sources.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=False)
-        self._data_dir = self._normalize_data_root(data_root)
-        self._rebalance_ratio = lane_change_ratio
+        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        self._data_dir: Path = self._normalize_data_root(data_root)
+        self._rebalance_ratio: float | None = lane_change_ratio
 
     @override
     def all_sources(self) -> Iterable[Source[Path]]:
@@ -85,7 +92,7 @@ class I80Loader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return LoaderConfig(
+        return (
             Pipeline()
             .then_if_present(
                 tr.rebalance,
@@ -111,7 +118,7 @@ class I80Loader(BaseSceneLoader[Path]):
         lane_id_col: str = "Lane_ID",
         id_col: str = "Vehicle_ID",
     ) -> pl.Expr:
-        return LoaderConfig(
+        return (
             pl
             .col(lane_id_col)
             .ne(pl.col(lane_id_col).shift())

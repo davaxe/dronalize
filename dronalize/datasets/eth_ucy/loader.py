@@ -7,10 +7,10 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.interfaces import IngestOutput, Source
-from dronalize.core.split import DatasetSplit
+from dronalize.config.map import MapConfig
+from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -27,7 +27,8 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
         dataset: str | Sequence[str],
         *,
         loader_config: LoaderConfig | None = None,
-        split: DatasetSplit | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         """Initialize with the given configuration.
 
@@ -39,17 +40,14 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
             Name(s) of the dataset(s) to load (e.g., "hotel", "eth").
         loader_config : , optional
             Loader configuration override. If None, the default configuration is used.
-        split : DatasetSplit, optional
-            Which dataset split to load. Defaults to all sources.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. Can contain one or more predefined splits,
+            or `None` to process all sources.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
-        self._data_root = self._normalize_data_root(data_root)
-        self._dataset = {dataset} if isinstance(dataset, str) else set(dataset)
-
-    # ------------------------------------------------------------------
-    # Split-aware source discovery
-    # ------------------------------------------------------------------
+        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        self._data_root: Path = self._normalize_data_root(data_root)
+        self._dataset: set[str] = {dataset} if isinstance(dataset, str) else set(dataset)
 
     def _sources_from_split(self, split_name: str) -> Iterable[Source[Path]]:
         for dataset in sorted(self._dataset):
@@ -76,10 +74,6 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
     @override
     def test_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_split("test")
-
-    # ------------------------------------------------------------------
-    # Ingestion / pipeline
-    # ------------------------------------------------------------------
 
     @override
     def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
@@ -114,24 +108,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
 
     @override
     def num_sources(self) -> int | None:
-        num_sources: int = 0
-        split = self._split
-
-        split_names: list[str] = []
-        if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
-            split_names.append("train")
-        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
-            split_names.append("val")
-        if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
-            split_names.append("test")
-
-        for dataset in self._dataset:
-            for split_name in split_names:
-                data_dir = self._data_root / dataset / split_name
-                if data_dir.is_dir():
-                    num_sources += sum(1 for _ in data_dir.iterdir())
-
-        return num_sources
+        return sum(self._count_sources_for_split(split) for split in self._splits)
 
     @classmethod
     @override
@@ -147,6 +124,26 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
             .with_resampling(4, 1, method="fast")
         )
 
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.no_map()
+
+    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+        if split is DatasetSplit.ALL:
+            return (
+                self._count_sources_for_split(DatasetSplit.TRAIN)
+                + self._count_sources_for_split(DatasetSplit.VAL)
+                + self._count_sources_for_split(DatasetSplit.TEST)
+            )
+
+        num_sources = 0
+        for dataset in self._dataset:
+            data_dir = self._data_root / dataset / split.name
+            if data_dir.is_dir():
+                num_sources += sum(1 for _ in data_dir.iterdir())
+        return num_sources
+
 
 class HotelLoader(_EthUcyLoader):
     """Convenience alias for the ETH/UCY hotel dataset."""
@@ -154,15 +151,16 @@ class HotelLoader(_EthUcyLoader):
     def __init__(
         self,
         data_root: Path | str,
-        *,
         loader_config: LoaderConfig | None = None,
-        split: DatasetSplit | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
             dataset="hotel",
             loader_config=loader_config,
-            split=split,
+            map_config=map_config,
+            splits=splits,
         )
 
 
@@ -172,15 +170,16 @@ class EthLoader(_EthUcyLoader):
     def __init__(
         self,
         data_root: Path | str,
-        *,
         loader_config: LoaderConfig | None = None,
-        split: DatasetSplit | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
             dataset="eth",
             loader_config=loader_config,
-            split=split,
+            map_config=map_config,
+            splits=splits,
         )
 
 
@@ -190,15 +189,16 @@ class UnivLoader(_EthUcyLoader):
     def __init__(
         self,
         data_root: Path | str,
-        *,
         loader_config: LoaderConfig | None = None,
-        split: DatasetSplit | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
             dataset="univ",
             loader_config=loader_config,
-            split=split,
+            map_config=map_config,
+            splits=splits,
         )
 
 
@@ -208,15 +208,16 @@ class Zara1Loader(_EthUcyLoader):
     def __init__(
         self,
         data_root: Path | str,
-        *,
         loader_config: LoaderConfig | None = None,
-        split: DatasetSplit | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
             dataset="zara1",
             loader_config=loader_config,
-            split=split,
+            map_config=map_config,
+            splits=splits,
         )
 
 
@@ -226,26 +227,14 @@ class Zara2Loader(_EthUcyLoader):
     def __init__(
         self,
         data_root: Path | str,
-        *,
         loader_config: LoaderConfig | None = None,
-        split: DatasetSplit | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
             dataset="zara2",
             loader_config=loader_config,
-            split=split,
+            map_config=map_config,
+            splits=splits,
         )
-
-
-if __name__ == "__main__":
-    import altair as alt
-
-    path = Path("data")
-    alt.renderers.enable("browser")
-    loader = HotelLoader(path, split=DatasetSplit.TRAIN)
-    count = 0
-    for _scene in loader.scenes():
-        count += 1
-
-    print(f"Total scenes: {count}")

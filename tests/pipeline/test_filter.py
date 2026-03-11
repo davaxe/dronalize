@@ -1,9 +1,9 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
+from dronalize.categories import AgentCategory
 from dronalize.config import LoaderConfig
 from dronalize.config.filtering import FilteringConfig
-from dronalize.core import AgentCategory
 from dronalize.pipeline.functional.filter import filter_scene
 
 

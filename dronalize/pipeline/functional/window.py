@@ -10,7 +10,7 @@ from dronalize.pipeline.functional.basic import collect
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core._types import DataFrameT
+    from dronalize._internal._types import DataFrameT
 
 
 @overload

@@ -1,4 +1,0 @@
-module = "dronalize.datasets.waymo"
-datasets = ["waymo"]
-optional_dependencies = ["google.protobuf"]
-extra = "waymo"

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, ClassVar
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from dronalize.core.categories import AgentCategory
+from dronalize.categories import AgentCategory
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -50,7 +50,7 @@ FrozenAgentSet = Annotated[
 class FilteringConfig(BaseModel):
     """Configuration for filtering scenes based on agent validity and scene composition."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     min_agents: int = Field(
         default=2, ge=0, description="Minimum number of agents required in a scene to be valid."

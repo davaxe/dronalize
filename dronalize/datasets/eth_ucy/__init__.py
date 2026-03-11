@@ -1,4 +1,6 @@
-from dronalize.datasets import registry
+__dronalize_builtin__ = {"datasets": ["eth", "hotel", "univ", "zara1", "zara2"]}
+
+from dronalize.datasets import _registry
 from dronalize.datasets.eth_ucy.loader import (
     EthLoader,
     HotelLoader,
@@ -9,38 +11,52 @@ from dronalize.datasets.eth_ucy.loader import (
 
 __all__ = ["EthLoader", "HotelLoader", "UnivLoader", "Zara1Loader", "Zara2Loader"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="eth",
         loader_factory=EthLoader,
         default_config=EthLoader.default_config(),
-        map_mode=registry.MapMode.NONE,
+        default_map_config=EthLoader.default_map_config(),
+        map_mode=_registry.MapMode.NONE,
     ).with_all_splits()
 )
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="hotel",
         loader_factory=HotelLoader,
         default_config=HotelLoader.default_config(),
-        map_mode=registry.MapMode.NONE,
+        default_map_config=HotelLoader.default_map_config(),
+        map_mode=_registry.MapMode.NONE,
     ).with_all_splits()
 )
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="univ",
         loader_factory=UnivLoader,
         default_config=UnivLoader.default_config(),
-        map_mode=registry.MapMode.NONE,
+        default_map_config=UnivLoader.default_map_config(),
+        map_mode=_registry.MapMode.NONE,
     ).with_all_splits()
 )
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="zara1",
         loader_factory=Zara1Loader,
         default_config=Zara1Loader.default_config(),
-        map_mode=registry.MapMode.NONE,
+        default_map_config=Zara1Loader.default_map_config(),
+        map_mode=_registry.MapMode.NONE,
+    ).with_all_splits()
+)
+
+_registry.register(
+    _registry.DatasetDescriptor(
+        name="zara2",
+        loader_factory=Zara2Loader,
+        default_config=Zara2Loader.default_config(),
+        default_map_config=Zara2Loader.default_map_config(),
+        map_mode=_registry.MapMode.NONE,
     ).with_all_splits()
 )

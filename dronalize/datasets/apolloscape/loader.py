@@ -6,16 +6,17 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
-from dronalize.core.base import BaseSceneLoader
-from dronalize.core.categories import AgentCategory
-from dronalize.core.loader import IngestOutput, Source
-from dronalize.core.split import DatasetSplit
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.config.map import MapConfig
 
 
 class ApolloScapeLoader(BaseSceneLoader[Path]):
@@ -25,8 +26,8 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
-        *,
-        split: DatasetSplit | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         """Initialize the loader with the given data directory and loader configuration.
 
@@ -51,12 +52,13 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
             and `val_split/` subdirectories.
         loader_config : LoaderConfig, optional
             Configuration override.
-        split : DatasetSplit, optional
-            Which dataset split to load. Defaults to all sources.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. Can contain one or more predefined splits,
+            or `None` to process all sources.
 
         """
-        super().__init__(loader_config, enforce_schema=True, split=split)
-        self._data_root = self._normalize_data_root(data_root)
+        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        self._data_root: Path = self._normalize_data_root(data_root)
 
     # ------------------------------------------------------------------
     # Split-aware source discovery
@@ -105,14 +107,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
 
     @override
     def num_sources(self) -> int | None:
-        dirs: list[Path] = []
-        split = self._split
-        if split in {DatasetSplit.ALL, DatasetSplit.TRAIN}:
-            dirs.append(self._data_root / "prediction_train")
-        if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
-            dirs.append(self._data_root / "val_split")
-
-        return self._count_matching_files(dirs, "*.txt")
+        return sum(self._count_sources_for_split(split) for split in self._splits)
 
     @override
     def pipeline(self) -> Pipeline:
@@ -129,6 +124,15 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
             .with_filtering(require_frames=[3])
             .with_window(1)
         )
+
+    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+        if split is DatasetSplit.TRAIN:
+            return self._count_matching_files([self._data_root / "prediction_train"], "*.txt")
+        if split is DatasetSplit.VAL:
+            return self._count_matching_files([self._data_root / "val_split"], "*.txt")
+        return self._count_matching_files(
+            [self._data_root / "prediction_train"], "*.txt"
+        ) + self._count_matching_files([self._data_root / "val_split"], "*.txt")
 
 
 _DATA_SCHEMA: pl.Schema = pl.Schema({

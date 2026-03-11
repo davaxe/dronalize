@@ -7,7 +7,7 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.core._types import DataFrameT
+    from dronalize._internal._types import DataFrameT
 
 
 def derivative(
@@ -93,7 +93,7 @@ def derivative(
     for i in range(1, n + 1):
         rename_list = derivative_rename.get(i, [f"d{i}_{original_root}" for original_root in x])
 
-        next_order_exprs = []
+        next_order_exprs: list[pl.Expr] = []
         for j, expr in enumerate(current_exprs):
             # Compute the next derivative using the current expression object
             grad_expr = get_gradient_expr(expr)

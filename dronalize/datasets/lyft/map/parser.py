@@ -1,17 +1,3 @@
-# Copyright 2024-2025, Theodor Westny. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from __future__ import annotations
 
 import json
@@ -20,18 +6,18 @@ from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.core.categories import EdgeType
 from dronalize.datasets.lyft.protos import road_network_pb2 as proto
+from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.core.graph_builder import Point
+    from dronalize.maps.builder import Point
 
 
 class LyftLVL5Map:
@@ -50,26 +36,26 @@ class LyftLVL5Map:
         """Initialize the LyftLVL5Map with the given protobuf map and meta JSON."""
         with Path.open(protobuf_map_path, "rb") as file:
             map_fragment = proto.MapFragment()
-            map_fragment.ParseFromString(file.read())
+            _ = map_fragment.ParseFromString(file.read())
 
         with Path.open(meta_json, "r") as file:
-            self.meta = json.load(file)
+            self.meta: dict[str, Any] = json.load(file)
 
-        self.ecef_to_world = np.linalg.inv(
+        self._ecef_to_world: npt.NDArray[np.float64] = np.linalg.inv(
             np.array(self.meta["world_to_ecef"], dtype=np.float64),
         )
-        self.elements = map_fragment.elements
+        self.elements: Sequence[proto.MapElement] = map_fragment.elements
 
     @cached_property
     def lanes(self) -> dict[str, Lane]:
         """Get all lanes in the map."""
         lanes: dict[str, Lane] = {}
         for el in self.elements:
-            lane_id = _global_id_to_str(el.id)
+            lane_id: str = _global_id_to_str(el.id)
             lane = Lane.from_proto_lane(
                 lane_id,
                 el.element.lane,
-                transformation=self.ecef_to_world,
+                transformation=self._ecef_to_world,
             )
             lanes[_global_id_to_str(el.id)] = lane
 
@@ -78,7 +64,7 @@ class LyftLVL5Map:
     @cached_property
     def road_network_segments(self) -> dict[str, RoadNetworkSegment]:
         """Get all road network segments in the map."""
-        segments = {}
+        segments: dict[str, RoadNetworkSegment] = {}
         for el in self.elements:
             if el.element.HasField("segment"):
                 segment = RoadNetworkSegment.from_proto_road_network_segment(
@@ -91,12 +77,12 @@ class LyftLVL5Map:
     @cached_property
     def traffic_control_elements(self) -> dict[str, TrafficControlElement]:
         """Get all traffic control elements in the map."""
-        elements = {}
+        elements: dict[str, TrafficControlElement] = {}
         for el in self.elements:
             if el.element.HasField("traffic_control_element"):
                 element = TrafficControlElement.from_proto_traffic_control_element(
                     el.element.traffic_control_element,
-                    transformation=self.ecef_to_world,
+                    transformation=self._ecef_to_world,
                 )
                 elements[_global_id_to_str(el.id)] = element
 
@@ -105,7 +91,7 @@ class LyftLVL5Map:
     @cached_property
     def road_network_nodes(self) -> dict[str, RoadNetworkNode]:
         """Get all road network nodes in the map."""
-        nodes = {}
+        nodes: dict[str, RoadNetworkNode] = {}
         for el in self.elements:
             if el.element.HasField("node"):
                 node = RoadNetworkNode.from_proto_road_network_node(
@@ -118,7 +104,7 @@ class LyftLVL5Map:
     @cached_property
     def junctions(self) -> dict[str, Junction]:
         """Get all junctions in the map."""
-        junctions = {}
+        junctions: dict[str, Junction] = {}
         for el in self.elements:
             if el.element.HasField("junction"):
                 junction = Junction.from_proto_junction(el.element.junction)
@@ -423,7 +409,7 @@ class LaneBoundary:
         cls,
         boundary: proto.Lane.Boundary,
         frame: proto.GeoFrame,
-        transformation: npt.NDArray[np.float32] | None = None,
+        transformation: npt.NDArray[np.float64] | None = None,
     ) -> LaneBoundary:
         """Create a `LaneBoundary` instance from a `Lane` protobuf message."""
         cm_to_m: float = 0.01
@@ -459,7 +445,7 @@ class LaneBoundary:
         if not self.type_change_distances:
             return self.lane_types[0].to_edge_type()
 
-        edge_types = []
+        edge_types: list[EdgeType] = []
         acc_distance: float = 0.0
         change_count: int = 0
         edge_type: EdgeType = self.lane_types[0].to_edge_type()
@@ -493,7 +479,7 @@ class LaneBoundary:
         if not self.type_change_distances:
             return self.lane_types[0].to_edge_type()
 
-        edge_types = []
+        edge_types: list[EdgeType] = []
         acc_distance: float = 0.0
         change_count: int = 0
         edge_type: EdgeType = self.lane_types[0].to_edge_type()
@@ -546,7 +532,7 @@ class Lane:
         cls,
         lane_id: str,
         lane: proto.Lane,
-        transformation: npt.NDArray[np.float32] | None = None,
+        transformation: npt.NDArray[np.float64] | None = None,
     ) -> Lane:
         """Create a `Lane` instance from a protobuf message."""
         return cls(
@@ -622,7 +608,7 @@ class TrafficControlElement:
     def from_proto_traffic_control_element(
         cls,
         element: proto.TrafficControlElement,
-        transformation: npt.NDArray[np.float32] | None = None,
+        transformation: npt.NDArray[np.float64] | None = None,
     ) -> TrafficControlElement:
         """Create a `TrafficControlElement` instance from a protobuf message."""
         cm_to_m = 0.01
@@ -675,7 +661,7 @@ def _parse_points(
     dy: Sequence[float],
     dz: Sequence[float],
     frame: proto.GeoFrame,
-    transformation: npt.NDArray[np.float32] | None = None,
+    transformation: npt.NDArray[np.float64] | None = None,
 ) -> list[Point]:
     if not dx or not dy or not dz:
         return []
@@ -704,7 +690,7 @@ def transform(
     u: float,
     lat: float,
     lon: float,
-    transformation: npt.NDArray[np.float32] | None = None,
+    transformation: npt.NDArray[np.float64] | None = None,
 ) -> tuple[float, float, float]:
     """Transform lyft map nodes to world coordinates."""
     x, y, z = _enu_to_ecef(e, n, u, lat, lon)

@@ -1,8 +1,11 @@
+# pyright: standard
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dronalize.core._compat import require_optional
+import altair as alt  # Optional dependency, checked at import time (in __init__.py)
+
 from dronalize.plot.map import _build_map_graph_layers, _empty_chart
 from dronalize.plot.trajectory import _build_trajectory_layers, _sample_trajectory_groups
 
@@ -10,10 +13,11 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    import altair as alt
     import polars as pl
 
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.maps.graph import MapGraph
+
+Chart = alt.Chart | alt.LayerChart
 
 
 def plot_trajectories_on_map(
@@ -37,9 +41,8 @@ def plot_trajectories_on_map(
     include_map_nodes: bool = False,
     disable_max_rows: bool = True,
     **kwargs: Any,  # noqa: ANN401
-) -> alt.Chart:
+) -> Chart:
     """Plot trajectories and a map graph in the same Altair figure."""
-    alt = require_optional("altair", extra="plot")
     alt.renderers.enable("browser")
 
     if disable_max_rows:

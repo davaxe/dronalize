@@ -1,13 +1,16 @@
-from dronalize.datasets import registry
-from dronalize.datasets.argoverse2.loader import Argoverse2Loader
-from dronalize.datasets.argoverse2.map.graph_builder import Argoverse2GraphBuilder
+__dronalize_builtin__ = {"datasets": ["argoverse2"]}
 
-__all__ = ["Argoverse2GraphBuilder", "Argoverse2Loader"]
-registry.register(
-    registry.DatasetDescriptor(
+from dronalize.datasets import _registry
+from dronalize.datasets.argoverse2.loader import Argoverse2Loader
+from dronalize.datasets.argoverse2.map.builder import Argoverse2MapBuilder
+
+__all__ = ["Argoverse2Loader", "Argoverse2MapBuilder"]
+_registry.register(
+    _registry.DatasetDescriptor(
         name="argoverse2",
         loader_factory=Argoverse2Loader,
         default_config=Argoverse2Loader.default_config(),
-        map_mode=registry.MapMode.BUILDER_ONLY,
+        default_map_config=Argoverse2Loader.default_map_config(),
+        map_mode=_registry.MapMode.LAZY_KEYED,
     ).with_all_splits()
 )

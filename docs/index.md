@@ -13,7 +13,7 @@ The toolbox provides utilities for data preprocessing, visualization, and evalua
 - **Unified preprocessing** — Standardized pipelines for 20+ trajectory datasets
 - **Visualization tools** — Plot trajectories, map graphs, and overlays
 - **Evaluation metrics** — Comprehensive suite of prediction metrics (minADE, minFDE, Miss Rate, NLL, and more)
-- **Modular pipeline** — Configurable transforms, graph builders, and data loaders
+- **Modular pipeline** — Configurable transforms, map builders, and data loaders
 - **ML-ready** — Built on PyTorch, PyTorch Geometric, and PyTorch Lightning
 
 ---

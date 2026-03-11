@@ -7,17 +7,21 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
-from dronalize.core.base import BaseSceneLoader
-from dronalize.core.categories import AgentCategory
-from dronalize.core.loader import IngestOutput, Source
+from dronalize.config.map import MapConfig
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
+from dronalize.maps.resolver import MapResolver, no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-# TODO: Add support for filtering parked vehicles.
+
+# TODO: Figure out if the dataset directory layout should change to match the
+# one in repo: https://github.com/SOTIF-AVLab/SinD
 
 
 class SindLoader(BaseSceneLoader[Path]):
@@ -27,6 +31,8 @@ class SindLoader(BaseSceneLoader[Path]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         """Initialize the SindLoader.
 
@@ -36,15 +42,18 @@ class SindLoader(BaseSceneLoader[Path]):
             Path to the directory containing the SIND dataset.
         loader_config : LoaderConfig, optional
             Loader configuration override.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. This dataset does not define predefined
+            splits, so `None` or `DatasetSplit.ALL` process all sources.
 
         """
-        super().__init__(loader_config, enforce_schema=True)
-        self._data_dir = self._normalize_data_root(data_root)
+        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        self._data_dir: Path = self._normalize_data_root(data_root) / "data"
 
     @override
     def all_sources(self) -> Iterable[Source[Path]]:
         for subdir in self._data_dir.iterdir():
-            map_location = self._resolve_map(subdir.name)
+            map_location = self._resolve_map_key(subdir.name)
             yield Source(
                 identifier=subdir.name,
                 inner=subdir,
@@ -66,11 +75,14 @@ class SindLoader(BaseSceneLoader[Path]):
                 "car": AgentCategory.CAR.value,
                 "truck": AgentCategory.TRUCK.value,
                 "tricycle": AgentCategory.TRICYCLE.value,
+                "bus": AgentCategory.BUS.value,
+                "bicycle": AgentCategory.BICYCLE.value,
             })
             .alias("agent_category"),
             pl.col("heading_rad").alias("yaw"),
             *("x", "y", "vx", "vy", "ax", "ay"),
         )
+
         pedestrian_df = pl.scan_csv(
             pedestrian_data_path,
             schema_overrides=_PEDESTRIAN_SCHEMA,
@@ -86,6 +98,7 @@ class SindLoader(BaseSceneLoader[Path]):
             .col("agent_type")
             .replace_strict({
                 "pedestrian": AgentCategory.PEDESTRIAN.value,
+                "animal": AgentCategory.ANIMAL.value,
             })
             .alias("agent_category"),
             pl.lit(None).alias("yaw"),
@@ -119,15 +132,26 @@ class SindLoader(BaseSceneLoader[Path]):
             .with_filtering(require_frames=[19])
         )
 
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.no_extraction()
+
+    @override
+    def map_resolver(self) -> MapResolver:
+        if self._shared_memory_name is None:
+            return no_map()
+        return shared_map(self._shared_memory_name)
+
     @staticmethod
-    def _resolve_map(path_name: str) -> str:
+    def _resolve_map_key(path_name: str) -> str:
         if path_name.startswith("changchun"):
-            return "Changchun_Pudong.osm"
+            return "changchun"
         if path_name.startswith("xian"):
-            return "Xi'an_Shanglin.osm"
+            return "xian"
         if "NR" in path_name:
-            return "NR_ll2.osm"
-        return "map_relink_law_save.osm"
+            return "nr_ll2"
+        return "map_relink_law_save"
 
 
 _VEHICLE_SCHEMA = pl.Schema({

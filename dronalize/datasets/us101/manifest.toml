@@ -1,2 +1,0 @@
-module = "dronalize.datasets.us101"
-datasets = ["us101"]

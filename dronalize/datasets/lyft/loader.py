@@ -10,15 +10,14 @@ from typing_extensions import override
 from zarr.creation import open_array
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
-from dronalize.core.base import BaseSceneLoader
-from dronalize.core.categories import AgentCategory
-from dronalize.core.interfaces import IngestOutput, Source
-from dronalize.core.map_graph import MapGraph
-from dronalize.core.split import DatasetSplit
+from dronalize.datasets.common import utils
+from dronalize.loading import BaseSceneLoader, IngestOutput, Source
+from dronalize.maps.resolver import no_map, shared_map
+from dronalize.pipeline import Pipeline
 from dronalize.pipeline.factories import trajectory_pipeline
-from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -26,8 +25,7 @@ if TYPE_CHECKING:
 
     from zarr.core import Array
 
-    from dronalize.core.interfaces import MapKey, MapResolver
-    from dronalize.core.scene import Scene
+    from dronalize.maps import MapResolver
 
 
 @dataclass
@@ -59,8 +57,9 @@ class LyftLoader(BaseSceneLoader[_Source]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         *,
-        split: DatasetSplit | None = None,
         scene_batch_size: int | None = 100,
     ) -> None:
         """Initialize the dataset loader.
@@ -77,12 +76,21 @@ class LyftLoader(BaseSceneLoader[_Source]):
             Loader configuration override. If None, the default configuration
             is used.
         """
-        if split == DatasetSplit.TEST:
-            msg = "does not support split=TEST."
+        requested_splits = (
+            [DatasetSplit.ALL]
+            if splits is None
+            else [splits]
+            if isinstance(splits, DatasetSplit)
+            else list(splits)
+        )
+        if DatasetSplit.TEST in requested_splits:
+            msg = "does not support splits containing TEST."
             raise self._invalid_loader_argument(msg)
+        if splits is not None and not isinstance(splits, DatasetSplit):
+            splits = requested_splits
 
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
-        self._data_root = self._normalize_data_root(data_root)
+        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        self._data_root: Path = self._normalize_data_root(data_root)
         self._data: dict[DatasetSplit, _ArrayData] = {}
         self._batch_size: int | None = scene_batch_size
 
@@ -124,7 +132,6 @@ class LyftLoader(BaseSceneLoader[_Source]):
     def all_sources(self) -> Iterable[Source[_Source]]:
         yield from self.train_sources()
         yield from self.validate_sources()
-        yield from self.test_sources()
 
     @override
     def train_sources(self) -> Iterable[Source[_Source]]:
@@ -141,10 +148,14 @@ class LyftLoader(BaseSceneLoader[_Source]):
             return self._source_count(total_scenes, self._batch_size)
 
         total = 0
-        if self._split in {DatasetSplit.TRAIN, DatasetSplit.ALL}:
-            total += _count_sources(DatasetSplit.TRAIN)
-        if self._split in {DatasetSplit.VAL, DatasetSplit.ALL}:
-            total += _count_sources(DatasetSplit.VAL)
+        for split in self._splits:
+            if split is DatasetSplit.TRAIN:
+                total += _count_sources(DatasetSplit.TRAIN)
+            elif split is DatasetSplit.VAL:
+                total += _count_sources(DatasetSplit.VAL)
+            else:
+                total += _count_sources(DatasetSplit.TRAIN)
+                total += _count_sources(DatasetSplit.VAL)
         return total
 
     @staticmethod
@@ -160,15 +171,15 @@ class LyftLoader(BaseSceneLoader[_Source]):
         # Now uses the lazy loader directly to ensure availability
         arrays = self._get_arrays(source.inner.split)
 
-        scenes_np = cast("npt.NDArray", arrays.scenes[start:end])
+        scenes_np = cast("npt.NDArray[np.void]", arrays.scenes[start:end])
 
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
         frame_end = np.max(scenes_np[:]["frame_index_interval"])
-        frames_np = cast("npt.NDArray", arrays.frames[frame_start:frame_end])
+        frames_np = cast("npt.NDArray[np.void]", arrays.frames[frame_start:frame_end])
 
         agent_start = np.min(frames_np[:]["agent_index_interval"])
         agent_end = np.max(frames_np[:]["agent_index_interval"])
-        agents_np = cast("npt.NDArray", arrays.agents[agent_start:agent_end])
+        agents_np = cast("npt.NDArray[np.void]", arrays.agents[agent_start:agent_end])
 
         for scene_data in scenes_np:
             df = _scene_to_polars(
@@ -207,29 +218,23 @@ class LyftLoader(BaseSceneLoader[_Source]):
             )
         )
 
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.auto_extraction()
+
     @override
     def map_resolver(self) -> MapResolver:
-
-        def _resolve(
-            scene: Scene, key: MapKey = None, map_config: MapConfig | None = None
-        ) -> MapGraph | None:
-            _ = key, scene, map_config
-            if self._shared_memory_name is None or isinstance(self._shared_memory_name, dict):
-                return None
-
-            with MapGraph.from_shared(self._shared_memory_name) as map_graph:
-                # Copy is currently needed since it will be released as
-                # soon as the context is exited.
-                return map_graph.copy()
-
-        return _resolve
+        if self._shared_memory_name is None:
+            return no_map()
+        return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 
 
 @dataclass
 class _LyftScene:
     """A single scene in the Lyft dataset."""
 
-    scene_data: npt.NDArray
+    scene_data: npt.NDArray[np.void]
 
     @property
     def scene_name(self) -> str:
@@ -265,9 +270,9 @@ _CATEGORY_LOOKUP = np.array([
 
 
 def _scene_to_polars(
-    scene_data: npt.NDArray,
-    frames: npt.NDArray,
-    agents: npt.NDArray,
+    scene_data: npt.NDArray[np.void],
+    frames: npt.NDArray[np.void],
+    agents: npt.NDArray[np.void],
     frame_offset: int = 0,
     agent_offset: int = 0,
 ) -> pl.DataFrame:
@@ -339,19 +344,3 @@ def _scene_to_polars(
         "agent_category": agent_categories,
     })
     return pl.concat([ego_df, agent_df])
-
-
-if __name__ == "__main__":
-    import os
-    from pathlib import Path
-
-    from dronalize.datasets.common._debug import _debug_visualize_scenes
-    from dronalize.datasets.lyft.lifecycle import lyft_lifecylce_context
-    from dronalize.datasets.lyft.loader import LyftLoader as _LyftLoader
-
-    path = Path(os.environ.get("TRAJ_DATA", "data")) / "lyft"
-    loader = _LyftLoader(path)
-    with lyft_lifecylce_context(
-        path, _LyftLoader.default_config(), map_config=MapConfig.default()
-    ) as lifecycle:
-        _debug_visualize_scenes(loader, max_scenes=1, title_prefix="Lyft", skip_scenes=100)

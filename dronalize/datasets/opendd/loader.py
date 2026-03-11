@@ -8,14 +8,17 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.loader import IngestOutput, Source
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.config.map import MapConfig
 
 
 def _table_query(table_name: str) -> str:
@@ -27,13 +30,19 @@ def _table_query(table_name: str) -> str:
         UTM_Y as y,
         CLASS
     FROM {table_name}
-    """  # noqa: S608
+    """
 
 
 class OpenDDLoader(BaseSceneLoader[str]):
     """Loader for OpenDD data stored in a single SQLite database."""
 
-    def __init__(self, data_root: Path | str, loader_config: LoaderConfig | None = None) -> None:
+    def __init__(
+        self,
+        data_root: Path | str,
+        loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+    ) -> None:
         """Initialize the OpenDD loader.
 
         Parameters
@@ -43,10 +52,13 @@ class OpenDDLoader(BaseSceneLoader[str]):
         loader_config : , optional
             Loader configuration override. If None, the default configuration
             is used.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. This dataset does not define predefined
+            splits, so `None` or `DatasetSplit.ALL` process all sources.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._db_path = self._normalize_data_root(data_root)
+        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        self._db_path: Path = self._normalize_data_root(data_root)
         self._conn: sqlite3.Connection | None = None
 
     def _connection(self) -> sqlite3.Connection:
@@ -94,7 +106,7 @@ class OpenDDLoader(BaseSceneLoader[str]):
     def ingest(self, source: Source[str]) -> Iterable[IngestOutput]:
         yield (
             pl
-            .read_database(_table_query(source.inner), self._connection())
+            .read_database(_table_query(source.inner), self._connection(), iter_batches=False)
             .lazy()
             .with_columns(
                 ((pl.col("TIMESTAMP") * 1000).round(4).rank(method="dense") - 1)
@@ -143,6 +155,9 @@ class MultiOpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        *,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         """Initialize the multi-database OpenDD loader.
 
@@ -154,10 +169,18 @@ class MultiOpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         loader_config : , optional
             Loader configuration override. If None, the default configuration
             is used.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Dataset split selection. This dataset does not define predefined
+            splits, so `None` or `DatasetSplit.ALL` process all sources.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._data_root = self._normalize_data_root(data_root)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            enforce_schema=True,
+        )
+        self._data_root: Path = self._normalize_data_root(data_root)
 
     def _db_paths(self) -> Iterable[Path]:
         if self._data_root.is_file():
