@@ -10,11 +10,11 @@ from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core import LoaderConfig
+    from dronalize.config import LoaderConfig
 
 
 class HighDLoader(XLevelDataLoader):
-    """Processor for the highD dataset."""
+    """Loader for the highD dataset."""
 
     def __init__(
         self,
@@ -37,8 +37,8 @@ class HighDLoader(XLevelDataLoader):
         ----------
         data_root : Path
             Path to the root directory of the highD dataset, which should contain a "data"
-        loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+        loader_config : , optional
+            Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio to rebalance lane changing vs non-lane changing agents.
 
@@ -62,21 +62,6 @@ class HighDLoader(XLevelDataLoader):
             .alias("agent_category"),
         ]
 
-<<<<<<< HEAD
-    @override
-    def num_scenes(self) -> int | None:
-        num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
-        return num_files // 4 - 1
-
-    @override
-    def load_raw(self, source: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-        yield from prepare_agent_trajectories(
-            rebalance_highway_agents(source, ratio=self._rebalance_ratio).drop("lane_changes")
-            if self._rebalance_ratio
-            else source.drop("lane_changes"),
-            self.processor_config,
-        )
-=======
     @staticmethod
     def track_data_select() -> list[pl.Expr]:
         """Select the relevant columns from the track CSV."""
@@ -90,7 +75,6 @@ class HighDLoader(XLevelDataLoader):
             pl.col("xAcceleration").alias("ax"),
             pl.col("yAcceleration").alias("ay"),
         ]
->>>>>>> 11be367 (Added support for: rounD, exiD, uniD, and inD)
 
     @staticmethod
     def meta_schema() -> pl.Schema:

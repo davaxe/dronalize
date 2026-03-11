@@ -7,8 +7,9 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.config import LoaderConfig
+from dronalize.core import AgentCategory, BaseSceneLoader
+from dronalize.core.interfaces import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -16,12 +17,13 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class I80Loader(BaseSceneLoader[int, Path]):
+class I80Loader(BaseSceneLoader[Path]):
     """Scene loader for the I-80 dataset."""
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
+        *,
         loader_config: LoaderConfig | None = None,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
@@ -37,10 +39,10 @@ class I80Loader(BaseSceneLoader[int, Path]):
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             Path to root of the I80 dataset, containing subdirectories of data files.
-        loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+        loader_config : , optional
+            Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio for rebalancing highway agents. If None, no rebalancing will
             be applied. Default is 1.0, i.e. same number of lane changes as
@@ -48,16 +50,16 @@ class I80Loader(BaseSceneLoader[int, Path]):
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=False)
-        self._data_dir = data_root
+        self._data_dir = self._normalize_data_root(data_root)
         self._rebalance_ratio = lane_change_ratio
 
     @override
-    def all_sources(self) -> Iterable[Source[int, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         for i, csv_file in enumerate(self._data_dir.rglob("trajectories*.csv")):
             yield Source(identifier=i, inner=csv_file)
 
     @override
-    def ingest(self, source: Source[int, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         yield (
             pl.scan_csv(source.inner).select(
                 pl.col("Vehicle_ID").alias("id"),
@@ -79,11 +81,11 @@ class I80Loader(BaseSceneLoader[int, Path]):
 
     @override
     def num_sources(self) -> int | None:
-        return sum(1 for _ in self._data_dir.rglob("trajectories*.csv"))
+        return self._count_matching_files([self._data_dir], "trajectories*.csv", recursive=True)
 
     @override
     def pipeline(self) -> Pipeline:
-        return (
+        return LoaderConfig(
             Pipeline()
             .then_if_present(
                 tr.rebalance,
@@ -109,7 +111,7 @@ class I80Loader(BaseSceneLoader[int, Path]):
         lane_id_col: str = "Lane_ID",
         id_col: str = "Vehicle_ID",
     ) -> pl.Expr:
-        return (
+        return LoaderConfig(
             pl
             .col(lane_id_col)
             .ne(pl.col(lane_id_col).shift())

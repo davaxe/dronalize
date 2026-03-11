@@ -7,7 +7,7 @@ from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core import LoaderConfig
+    from dronalize.config import LoaderConfig
 
 
 class InDLoader(XLevelDataLoader):
@@ -35,8 +35,8 @@ class InDLoader(XLevelDataLoader):
         ----------
         data_root : Path
             Path to root of the inD dataset.
-        loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+        loader_config : , optional
+            Loader configuration. If None, the default configuration is used.
 
         """
         super().__init__(data_root / "data", loader_config)

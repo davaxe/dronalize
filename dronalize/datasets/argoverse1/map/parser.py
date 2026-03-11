@@ -16,17 +16,16 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from enum import auto
+from enum import IntEnum, auto
 from typing import TYPE_CHECKING
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.datatypes.enum import BaseEnum
+from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from dronalize.core.protocols.graph_builder import Point
+    from dronalize.core.graph_builder import Point
 
 
 class Argoverse1Map:
@@ -84,7 +83,7 @@ class Argoverse1Map:
         self._parsed = True
 
 
-class TurnType(BaseEnum):
+class TurnType(IntEnum):
     """Represents the turn direction of a lane segment (way)."""
 
     NONE = auto()
@@ -151,7 +150,7 @@ class LaneSegment:
                 case ("k", "has_traffic_control"), ("v", v):
                     segment.has_traffic_control = v == "True"
                 case ("k", "turn_direction"), ("v", v):
-                    segment.turn_direction = TurnType.from_str(v)
+                    segment.turn_direction = TurnType[v]
                 case ("k", "l_neighbor_id"), ("v", v):
                     segment.l_neighbor_id = None if v == "None" else int(v)
                 case ("k", "r_neighbor_id"), ("v", v):

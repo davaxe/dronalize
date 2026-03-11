@@ -1,51 +1,30 @@
 from __future__ import annotations
 
-from dronalize.datasets import (
-    a43,
-    ad4che,
-    apolloscape,
-    argoverse1,
-    argoverse2,
-    eth_ucy,
-    exid,
-    highd,
-    i80,
-    ind,
-    interact,
-    lyft,
-    nuscenes,
-    opendd,
-    round,  # noqa: A004
-    sind,
-    unid,
-    us101,
-    vod,
-    waymo,
-)
+import importlib
+import pkgutil
+
 from dronalize.datasets.registry import available, get
 
-# Import built-in dataset packages for registration side effects.
-_ = (
-    a43,
-    ad4che,
-    apolloscape,
-    argoverse1,
-    argoverse2,
-    eth_ucy,
-    exid,
-    highd,
-    i80,
-    ind,
-    interact,
-    lyft,
-    nuscenes,
-    opendd,
-    round,
-    sind,
-    unid,
-    us101,
-    vod,
-    waymo,
-)
-
 __all__ = ["available", "get"]
+
+_DATASET_MODULES = {
+    module_info.name
+    for module_info in pkgutil.iter_modules(__path__)
+    if module_info.name not in {"common", "registry"}
+}
+
+
+def __getattr__(name: str) -> object:
+    """Lazily expose dataset submodules from the package root."""
+    if name in _DATASET_MODULES:
+        module = importlib.import_module(f"{__name__}.{name}")
+        globals()[name] = module
+        return module
+
+    msg = f"module '{__name__}' has no attribute '{name}'"
+    raise AttributeError(msg)
+
+
+def __dir__() -> list[str]:
+    """Expose lazy dataset modules during interactive discovery."""
+    return sorted(set(globals()) | _DATASET_MODULES)

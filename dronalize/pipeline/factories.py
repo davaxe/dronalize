@@ -17,7 +17,7 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.core.datatypes.loader_config import LoaderConfig
+    from dronalize.config.loader import LoaderConfig
 
 
 def trajectory_pipeline(
@@ -40,9 +40,9 @@ def trajectory_pipeline(
     The returned pipeline contains the following stages (each skipped
     automatically when the corresponding config field is `None`):
 
-    1. **Windowing** — sliding-window sampling (`config.window_params`).
+    1. **Windowing** — sliding-window sampling (`config.window`).
     2. **Scene filtering** — agent validity / category / speed filtering
-       (`config.scene_filtering`).
+       (`config.filtering`).
     3. **Post-filter validation** — require at least *min_agents* per window
        (only when windowing is active).
     4. **Resampling** — temporal resampling with optional derivatives.

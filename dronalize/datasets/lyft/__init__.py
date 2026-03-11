@@ -1,4 +1,4 @@
-from dronalize.core.datatypes.map_config import MapConfig
+from dronalize.config.map import MapConfig
 from dronalize.datasets import registry
 from dronalize.datasets.lyft.lifecycle import lyft_lifecylce_context
 from dronalize.datasets.lyft.loader import LyftLoader
@@ -13,6 +13,6 @@ registry.register(
         default_config=LyftLoader.default_config(),
         lifecycle_context=lyft_lifecylce_context,
         default_map_config=MapConfig.default(),
-        has_map=True,
+        map_mode=registry.MapMode.SHARED_SINGLE,
     ).with_splits("train", "val")
 )

@@ -6,10 +6,11 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
+from dronalize.config.loader import LoaderConfig
+from dronalize.core.base import BaseSceneLoader
+from dronalize.core.categories import AgentCategory
+from dronalize.core.loader import IngestOutput, Source
+from dronalize.core.split import DatasetSplit
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -17,15 +18,15 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class ApolloScapeLoader(BaseSceneLoader[str, Path]):
+class ApolloScapeLoader(BaseSceneLoader[Path]):
     """Loader for the ApolloScape dataset."""
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
-        split: DatasetSplit = DatasetSplit.ALL,
+        split: DatasetSplit | None = None,
     ) -> None:
         """Initialize the loader with the given data directory and loader configuration.
 
@@ -44,45 +45,45 @@ class ApolloScapeLoader(BaseSceneLoader[str, Path]):
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             The root directory of the ApolloScape dataset.  This directory
             should contain `prediction_train/`, `prediction_test/`,
             and `val_split/` subdirectories.
         loader_config : LoaderConfig, optional
             Configuration override.
         split : DatasetSplit, optional
-            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
+            Which dataset split to load. Defaults to all sources.
 
         """
         super().__init__(loader_config, enforce_schema=True, split=split)
-        self._data_root = data_root
+        self._data_root = self._normalize_data_root(data_root)
 
     # ------------------------------------------------------------------
     # Split-aware source discovery
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _sources_from_dir(data_dir: Path) -> Iterable[Source[str, Path]]:
+    def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
         if not data_dir.is_dir():
             return
         for data_file in sorted(data_dir.glob("*.txt")):
             yield Source(identifier=data_file.stem, inner=data_file)
 
     @override
-    def all_sources(self) -> Iterable[Source[str, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         yield from self.train_sources()
         yield from self.validate_sources()
 
     @override
-    def train_sources(self) -> Iterable[Source[str, Path]]:
+    def train_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "prediction_train")
 
     @override
-    def validate_sources(self) -> Iterable[Source[str, Path]]:
+    def validate_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "prediction_test")
 
     @override
-    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         yield (
             pl.scan_csv(
                 source.inner,
@@ -111,7 +112,7 @@ class ApolloScapeLoader(BaseSceneLoader[str, Path]):
         if split in {DatasetSplit.ALL, DatasetSplit.VAL}:
             dirs.append(self._data_root / "val_split")
 
-        return sum(sum(1 for _ in d.glob("*.txt")) for d in dirs if d.is_dir())
+        return self._count_matching_files(dirs, "*.txt")
 
     @override
     def pipeline(self) -> Pipeline:

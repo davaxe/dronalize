@@ -9,7 +9,7 @@ registry.register(
         name="opendd",
         loader_factory=OpenDDLoader,
         default_config=OpenDDLoader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.BUILDER_ONLY,
         predefined_splits=None,
     )
 )

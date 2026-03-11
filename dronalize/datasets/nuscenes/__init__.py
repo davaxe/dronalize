@@ -11,7 +11,7 @@ registry.register(
         loader_factory=NuScenesLoader,
         default_config=NuScenesLoader.default_config(),
         lifecycle_context=nuscenes_lifecylce_context,
-        has_map=True,
+        map_mode=registry.MapMode.SHARED_KEYED,
         predefined_splits=None,
     )
 )

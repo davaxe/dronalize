@@ -7,18 +7,19 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 from typing_extensions import overload
 
-from dronalize.pipeline.ops.basic import yaw_from_pos_expr as _yaw_from_pos_expr
-from dronalize.pipeline.ops.basic import yaw_from_vel_expr as _yaw_from_vel_expr
-from dronalize.pipeline.ops.derivative import derivative as _derivative_impl
-from dronalize.pipeline.ops.filter import FilteringConfig, filter_scene_expr
-from dronalize.pipeline.ops.rebalance import rebalance_highway_agents
-from dronalize.pipeline.ops.resample import Resampling
-from dronalize.pipeline.ops.resample import resample as resample_impl
-from dronalize.pipeline.ops.window import sliding_window
+from dronalize.pipeline.functional.basic import yaw_from_pos_expr as _yaw_from_pos_expr
+from dronalize.pipeline.functional.basic import yaw_from_vel_expr as _yaw_from_vel_expr
+from dronalize.pipeline.functional.derivative import derivative as _derivative_impl
+from dronalize.pipeline.functional.filter import filter_scene_expr
+from dronalize.pipeline.functional.rebalance import rebalance_highway_agents
+from dronalize.pipeline.functional.resample import Resampling
+from dronalize.pipeline.functional.resample import resample as resample_impl
+from dronalize.pipeline.functional.window import sliding_window
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from dronalize.config.filtering import FilteringConfig
     from dronalize.pipeline.pipeline import FlatMapTransform, Transform
 
 __all__ = [
@@ -33,11 +34,6 @@ __all__ = [
     "yaw_from_pos",
     "yaw_from_vel",
 ]
-
-
-# -------------------------------------------------------------------
-# Filtering
-# -------------------------------------------------------------------
 
 
 def filter_scene(
@@ -109,11 +105,6 @@ def require_min(group_by: str | Sequence[str], minimum: int = 2) -> Transform:
     return _require_min
 
 
-# -------------------------------------------------------------------
-# Resampling
-# -------------------------------------------------------------------
-
-
 def resample(
     resampling: Resampling | None = None,
     sample_time: float = 1.0,
@@ -180,11 +171,6 @@ def resample(
     return _resample
 
 
-# -------------------------------------------------------------------
-# Derivatives
-# -------------------------------------------------------------------
-
-
 def derivative(
     *columns: str,
     dt: float = 1.0,
@@ -232,11 +218,6 @@ def derivative(
     _derivative.__name__ = "derivative"
     _derivative.__qualname__ = "transforms.derivative"
     return _derivative
-
-
-# -------------------------------------------------------------------
-# Yaw estimation
-# -------------------------------------------------------------------
 
 
 def yaw_from_vel(
@@ -337,11 +318,6 @@ def yaw_from_pos(
     return _yaw_from_pos
 
 
-# -------------------------------------------------------------------
-# Sliding window (fan-out)
-# -------------------------------------------------------------------
-
-
 @overload
 def window(
     window_size: int,
@@ -435,11 +411,6 @@ def window(
     func_to_return.__qualname__ = "transforms.window"
 
     return func_to_return
-
-
-# -------------------------------------------------------------------
-# Rebalancing (highway lane-change ratio)
-# -------------------------------------------------------------------
 
 
 def rebalance(

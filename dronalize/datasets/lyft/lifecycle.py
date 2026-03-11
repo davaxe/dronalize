@@ -3,15 +3,15 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.datatypes.map_config import MapConfig
+from dronalize.config.loader import LoaderConfig
+from dronalize.config.map import MapConfig
 from dronalize.datasets.lyft.loader import LyftLoader
 from dronalize.datasets.lyft.map.graph_builder import LyftMapGraphBuilder
 
 if TYPE_CHECKING:
     from multiprocessing.shared_memory import SharedMemory
 
-    from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
 
 
 @contextmanager
@@ -40,8 +40,10 @@ def lyft_lifecylce_context(
         hook will do nothing.
 
     """
+    print("Setting up Lyft dataset lifecycle context...")
     _loader_config = loader_config
     if not map_config.include_map:
+        LyftLoader.set_shared_memory()
         yield
         return
 
@@ -56,3 +58,5 @@ def lyft_lifecylce_context(
     yield
     shm.close()
     shm.unlink()
+    print("Cleaned up Lyft dataset lifecycle context.")
+    LyftLoader.set_shared_memory()

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.graph_builder import BaseGraphBuilder
+from dronalize.core.base import BaseGraphBuilder
+from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
     from pathlib import Path

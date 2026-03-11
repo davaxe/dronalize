@@ -8,10 +8,11 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
-from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.config import LoaderConfig
+from dronalize.config.map import MapConfig
+from dronalize.core import AgentCategory, BaseSceneLoader
+from dronalize.core.loader import IngestOutput, MapKey, MapResolver, Source
+from dronalize.core.split import DatasetSplit
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
 from dronalize.pipeline.factories import trajectory_pipeline
@@ -20,22 +21,20 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.datatypes.map_graph import MapGraph
-    from dronalize.datasets.waymo.protos.lean_map_pb2 import LeanMapContainer
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.scene import Scene
 
 
-class WaymoLoader(BaseSceneLoader[str, Path]):
-    """Processor for Waymo Open Dataset scenarios stored in TFRecord format."""
+class WaymoLoader(BaseSceneLoader[Path]):
+    """Loader for Waymo Open Dataset scenarios stored in TFRecord format."""
 
     def __init__(
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
-        split: DatasetSplit = DatasetSplit.ALL,
-        include_map: bool = True,
-        interp_distance: float | None = None,
-        min_distance: float | None = 1.5,
+        split: DatasetSplit | None = None,
+        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize.
 
@@ -55,58 +54,44 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
             Root directory of the Waymo dataset.  This directory should
             contain `training/`, `validation/`, and `testing/`
             subdirectories with TFRecord files.
-        loader_config : LoaderConfig, optional
-            Configuration override. If None, the default configuration will be used.
+        loader_config : , optional
+            Loader configuration override. If None, the default configuration is used.
         split : DatasetSplit, optional
-            Which dataset split to load.  Defaults to `DatasetSplit.ALL`.
-        include_map : bool, optional
-            Whether to include map data in the scene. Defaults to True.
-        interp_distance : float, optional
-            Distance threshold for interpolating map points.
-            Defaults to None (no interpolation).
-        min_distance : float, optional
-            Minimum distance between map points after processing.
-            Defaults to 1.5 meters.
+            Which dataset split to load. Defaults to all sources.
+        map_config : MapConfig, optional
+            Map configuration. If None, the default configuration is used.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
-        self._data_root: Path = Path(data_root) if isinstance(data_root, str) else data_root
-        self._include_map: bool = include_map
-        self._interp_distance: float | None = interp_distance
-        self._min_distance: float | None = min_distance
+        self._data_root = self._normalize_data_root(data_root)
 
-    # ------------------------------------------------------------------
-    # Split-aware source discovery
-    # ------------------------------------------------------------------
+        self._map_config = map_config or MapConfig.default()
+        self._include_map: bool = self._map_config.include_map
 
     @staticmethod
-    def _sources_from_dir(data_dir: Path) -> Iterable[Source[str, Path]]:
+    def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
         if not data_dir.is_dir():
             return
         for tfrecord_path in sorted(data_dir.glob("*.tfrecord*")):
             yield Source(identifier=tfrecord_path.stem, inner=tfrecord_path)
 
     @override
-    def all_sources(self) -> Iterable[Source[str, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         yield from self.train_sources()
         yield from self.validate_sources()
         yield from self.test_sources()
 
     @override
-    def train_sources(self) -> Iterable[Source[str, Path]]:
+    def train_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "training")
 
     @override
-    def validate_sources(self) -> Iterable[Source[str, Path]]:
+    def validate_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "validation")
 
     @override
-    def test_sources(self) -> Iterable[Source[str, Path]]:
+    def test_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "testing")
-
-    # ------------------------------------------------------------------
-    # Ingestion / pipeline
-    # ------------------------------------------------------------------
 
     @override
     def num_sources(self) -> int | None:
@@ -119,25 +104,32 @@ class WaymoLoader(BaseSceneLoader[str, Path]):
         if split in {DatasetSplit.ALL, DatasetSplit.TEST}:
             dirs.append(self._data_root / "testing")
 
-        return sum(sum(1 for _ in d.glob("*.tfrecord*")) for d in dirs if d.is_dir())
+        return self._count_matching_files(dirs, "*.tfrecord*")
 
     @override
-    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         for raw_data in _read_tfrecord(source.inner):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
-
+            resolver: MapResolver | None
             if self._include_map:
-                map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
 
                 def _resolver(
-                    key: MapKey | None = None,  # noqa: ARG001
-                    _map_data: LeanMapContainer = map_data,
+                    scene: Scene,
+                    key: MapKey | None = None,
+                    map_config: MapConfig | None = self._map_config,
+                    _raw_data: bytes = raw_data,
                 ) -> MapGraph:
-                    return WaymoMapGraphBuilder.from_proto(_map_data.map_features).build()
+                    _ = scene, key, map_config
+                    map_config = map_config or MapConfig.default()
+                    map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
+                    return WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
+                        min_distance=map_config.min_distance,
+                        interp_distance=map_config.interp_distance,
+                    )
 
-                resolver: MapResolver = _resolver
+                resolver = _resolver
             else:
-                resolver = no_map()
+                resolver = None
 
             yield _scenario_to_polars(scenario).lazy(), resolver
 

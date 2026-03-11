@@ -14,7 +14,7 @@ registry.register(
         name="eth",
         loader_factory=EthLoader,
         default_config=EthLoader.default_config(),
-        has_map=False,
+        map_mode=registry.MapMode.NONE,
     ).with_all_splits()
 )
 
@@ -23,7 +23,7 @@ registry.register(
         name="hotel",
         loader_factory=HotelLoader,
         default_config=HotelLoader.default_config(),
-        has_map=False,
+        map_mode=registry.MapMode.NONE,
     ).with_all_splits()
 )
 
@@ -32,7 +32,7 @@ registry.register(
         name="univ",
         loader_factory=UnivLoader,
         default_config=UnivLoader.default_config(),
-        has_map=False,
+        map_mode=registry.MapMode.NONE,
     ).with_all_splits()
 )
 
@@ -41,6 +41,6 @@ registry.register(
         name="zara1",
         loader_factory=Zara1Loader,
         default_config=Zara1Loader.default_config(),
-        has_map=False,
+        map_mode=registry.MapMode.NONE,
     ).with_all_splits()
 )

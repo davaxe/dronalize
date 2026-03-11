@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import override
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
+from dronalize.core.categories import EdgeType
+from dronalize.core.graph_builder import BaseGraphBuilder, Point
 from dronalize.datasets.argoverse2.map import parser
 
 if TYPE_CHECKING:

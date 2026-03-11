@@ -9,7 +9,7 @@ registry.register(
         name="exid",
         loader_factory=ExiDLoader,
         default_config=ExiDLoader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.BUILDER_ONLY,
         predefined_splits=None,
     )
 )

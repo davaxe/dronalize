@@ -7,43 +7,50 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.config import LoaderConfig
+from dronalize.config.map import MapConfig
+from dronalize.core import AgentCategory, BaseSceneLoader
+from dronalize.core.loader import IngestOutput, Source
+from dronalize.datasets.a43.graph_builder import A43GraphBuilder
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.core.interfaces import MapKey, MapResolver
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.scene import Scene
 
-class A43Loader(BaseSceneLoader[int, Path]):
+
+class A43Loader(BaseSceneLoader[Path]):
     """Scene loader for the A43 dataset."""
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
     ) -> None:
         """Initialize the A43 dataset loader.
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             Path to root of the A43 dataset, data files.
         loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+            Loader configuration. If None, the default configuration is used.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True)
-        self._data_dir = data_root
+        self._data_dir = self._normalize_data_root(data_root)
 
     @override
-    def all_sources(self) -> Iterable[Source[int, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         for i, csv_file in enumerate(self._data_dir.glob("*.csv")):
             yield Source(identifier=i, inner=csv_file)
 
     @override
-    def ingest(self, source: Source[int, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         yield (
             pl.scan_csv(source.inner).select(
                 pl.col("ID").alias("id"),
@@ -61,12 +68,12 @@ class A43Loader(BaseSceneLoader[int, Path]):
                 })
                 .alias("agent_category"),
             ),
-            None,
+            source.inner.stem,
         )
 
     @override
     def num_sources(self) -> int | None:
-        return sum(1 for _ in self._data_dir.rglob("trajectories*.csv"))
+        return self._count_matching_files([self._data_dir], "trajectories*.csv", recursive=True)
 
     @override
     def pipeline(self) -> Pipeline:
@@ -87,19 +94,21 @@ class A43Loader(BaseSceneLoader[int, Path]):
             .with_filtering(require_frames=[19])
         )
 
+    @override
+    def map_resolver(self) -> MapResolver:
 
-if __name__ == "__main__":
-    import os
-    import time
-    from pathlib import Path
+        def _resolver(
+            scene: Scene,
+            key: MapKey = None,
+            map_config: MapConfig | None = None,
+        ) -> MapGraph | None:
+            if key is None:
+                return None
 
-    # Get root from env-var
-    root = Path(os.getenv("TRAJ_DATA", "")) / "A43"
-    loader = A43Loader(root)
-    time_start = time.perf_counter()
-    counter = 0
-    for _ in loader.scenes():
-        counter += 1
-        if counter % 1 == 0:
-            print(f"Loaded {counter} scenes in {time.perf_counter() - time_start:.2f} seconds")
-    print(f"Loaded {counter} scenes in {time.perf_counter() - time_start:.2f} seconds")
+            map_config = map_config or MapConfig.default()
+            min_x = scene.inner.select(pl.col("x")).min().item()
+            max_x = scene.inner.select(pl.col("x")).max().item()
+            builder = A43GraphBuilder(key, min_x, max_x)
+            return builder.build(map_config.min_distance, map_config.interp_distance)
+
+        return _resolver

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.core._types import IdT as T
+T = TypeVar("T")
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -31,8 +31,8 @@ class StreamSplitter(Generic[T]):
     4. Repeat step 3 indefinitely to provide an infinite stream of group
     assignments.
 
-    Practical Considerations
-    ------------------------
+    Notes
+    -----
     This implementation will guarantee that the distribution of groups will
     exactly follow the specified weights if:
     1. The number of groups assigned is a multiple of the `round_size`.
@@ -61,23 +61,23 @@ class StreamSplitter(Generic[T]):
 
         Parameters
         ----------
-            groups : Sequence[T]
-                A sequence of unique groups to split the stream into.
-            weights : Sequence[float], optional
-                A sequence of weights corresponding to each group. If None,
-                groups are treated as equally weighted. The weights will be
-                normalized to sum to 1.
-            round_size : int, optional
-                The number of samples in each round before reshuffling.
-            rounds : int, optional
-                The number of pre-generated rounds of shuffled group indices.
+        groups : Sequence[T]
+            A sequence of unique groups to split the stream into.
+        weights : Sequence[float], optional
+            A sequence of weights corresponding to each group. If None,
+            groups are treated as equally weighted. The weights will be
+            normalized to sum to 1.
+        round_size : int, optional
+            The number of samples in each round before reshuffling.
+        rounds : int, optional
+            The number of pre-generated rounds of shuffled group indices.
 
         Raises
         ------
-            ValueError
-                If groups are not unique, if the number of weights does not
-                match the number of groups, if any weight is negative, or if all
-                weights are zero.
+        ValueError
+            If groups are not unique, if the number of weights does not
+            match the number of groups, if any weight is negative, or if all
+            weights are zero.
 
         """
         # fromkeys preserves order and removes duplicates
@@ -117,7 +117,7 @@ class StreamSplitter(Generic[T]):
         self._round_index = 0
 
     def next(self) -> T:
-        """Return the next group in the stream.
+        """Next group in the stream.
 
         Returns
         -------
@@ -138,15 +138,16 @@ class StreamSplitter(Generic[T]):
         return self._index_to_group[value]
 
     def take(self, n: int) -> Iterator[T]:
-        """Return an iterator that yields the next `n` groups in the stream.
+        """Take the next `n` groups as an iterator.
 
         Parameters
         ----------
-            n : int
-                The number of groups to yield from the stream.
+        n : int
+            The number of groups to yield from the stream.
 
         Returns
         -------
+        Iterator[T]
             An iterator that yields the next `n` groups based on the current
             round's shuffled deck.
 
@@ -158,6 +159,7 @@ class StreamSplitter(Generic[T]):
 
         Returns
         -------
+        Iterator[T]
             An infinite iterator that yields groups based on the current round's
             shuffled deck.
 

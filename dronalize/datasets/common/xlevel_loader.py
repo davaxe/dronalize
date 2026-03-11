@@ -7,9 +7,10 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
+from dronalize.config.loader import LoaderConfig
+from dronalize.core.base import BaseSceneLoader
+from dronalize.core.categories import AgentCategory
+from dronalize.core.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-class XLevelDataLoader(BaseSceneLoader[int, Path]):
+class XLevelDataLoader(BaseSceneLoader[Path]):
     """Common trajectory data loader for X-level datasets.
 
     This class is meant as a base class for the datasets, since some of the
@@ -29,21 +30,21 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
 
     def __init__(
         self,
-        data_dir: Path,
+        data_dir: Path | str,
         loader_config: LoaderConfig | None = None,
     ) -> None:
-        """Initialize the trajectory data loader for a X-level dataset (e.g., rounD, inD).
+        """Initialize the loader for an X-level dataset (e.g., rounD, inD).
 
         Parameters
         ----------
-        data_dir : Path
+        data_dir : Path or str
             Path to the directory containing the .csv data files.
         loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+            Loader configuration. If None, the default configuration is used.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=False)
-        self._data_dir = data_dir
+        self._data_dir = self._normalize_data_root(data_dir)
         self._rebalance_ratio = None
 
     @staticmethod
@@ -92,10 +93,9 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
         return _TRACK_SCHEMA
 
     @override
-    def all_sources(self) -> Iterable[Source[int, Path]]:
-        num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
-        for i in range(1, num_files // 4):
-            recording_meta = self._data_dir / f"{i:0>2}_recordingMeta.csv"
+    def all_sources(self) -> Iterable[Source[Path]]:
+        for recording_id in self._recording_ids():
+            recording_meta = self._data_dir / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = recording_meta_data.select(pl.col("locationId")).item()
             columns = recording_meta_data.columns
@@ -112,14 +112,14 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
                 metadata["utm_y0"] = utm_y0
 
             yield Source(
-                identifier=i,
+                identifier=recording_id,
                 inner=self._data_dir,
                 map_key=str(location_id),
                 metadata=metadata,
             )
 
     @override
-    def ingest(self, source: Source[int, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         tracks = source.inner / f"{source.identifier:0>2}_tracks.csv"
         meta = source.inner / f"{source.identifier:0>2}_tracksMeta.csv"
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
@@ -129,12 +129,11 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
             *self.track_data_select(),
         )
         combined = tracks_df.join(meta_df, left_on="id", right_on="id")
-        yield combined, None
+        yield combined, source.map_key
 
     @override
     def num_sources(self) -> int | None:
-        num_files: int = sum(1 for p in self._data_dir.iterdir() if p.is_file())
-        return num_files // 4 - 1
+        return len(self._recording_ids())
 
     @override
     def pipeline(self) -> Pipeline:
@@ -162,6 +161,14 @@ class XLevelDataLoader(BaseSceneLoader[int, Path]):
                 filter_agent_category=[AgentCategory.TRAILER],
             )
         )
+
+    def _recording_ids(self) -> list[int]:
+        """Return sorted recording identifiers discovered from metadata files."""
+        recording_ids: list[int] = []
+        for recording_meta in sorted(self._data_dir.glob("*_recordingMeta.csv")):
+            prefix, _, _ = recording_meta.stem.partition("_")
+            recording_ids.append(int(prefix))
+        return recording_ids
 
 
 _META_SCHEMA: pl.Schema = pl.Schema({

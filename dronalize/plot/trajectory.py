@@ -9,6 +9,7 @@ from dronalize.core._compat import require_optional
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
+    from types import ModuleType
 
     import altair as alt
 
@@ -68,14 +69,72 @@ def plot_trajectories(
     """
     alt = require_optional("altair", extra="plot")
     alt.renderers.enable("browser")
-    if n_groups is not None and group_by is not None:
-        unique_groups = data.select(group_by).unique()
-        if unique_groups.height > n_groups:
-            selected_ids = unique_groups.sample(n_groups, seed=group_sample_seed)
-            data = data.join(selected_ids, on=group_by, how="semi")
+    data = _sample_trajectory_groups(
+        data,
+        group_by=group_by,
+        n_groups=n_groups,
+        group_sample_seed=group_sample_seed,
+    )
 
+    layers = _build_trajectory_layers(
+        data,
+        alt=alt,
+        x_col=x_col,
+        y_col=y_col,
+        group_by=group_by,
+        frame_col=frame_col,
+        x_label=x_label,
+        y_label=y_label,
+        highlight_frame=highlight_frame,
+    )
+
+    chart = (
+        alt
+        .layer(*layers)
+        .properties(title=title or "", **kwargs)
+        .interactive()
+        .configure_axis(grid=True, gridColor="grey", gridOpacity=0.2, gridDash=[2, 2])
+    )
+
+    if save_path:
+        chart.save(save_path)
+
+    return chart
+
+
+def _sample_trajectory_groups(
+    data: pl.DataFrame,
+    *,
+    group_by: str | None,
+    n_groups: int | None,
+    group_sample_seed: int | None,
+) -> pl.DataFrame:
+    """Optionally subsample grouped trajectories before plotting."""
+    if n_groups is None or group_by is None:
+        return data
+
+    unique_groups = data.select(group_by).unique()
+    if unique_groups.height <= n_groups:
+        return data
+
+    selected_ids = unique_groups.sample(n_groups, seed=group_sample_seed)
+    return data.join(selected_ids, on=group_by, how="semi")
+
+
+def _build_trajectory_layers(
+    data: pl.DataFrame,
+    *,
+    alt: ModuleType,
+    x_col: str,
+    y_col: str,
+    group_by: str | None,
+    frame_col: str,
+    x_label: str | None,
+    y_label: str | None,
+    highlight_frame: int | Sequence[int] | None,
+) -> list[alt.Chart]:
+    """Build the layered Altair charts for trajectory plotting."""
     if group_by:
-        # maintain_order=True is needed to identify the correct first/last rows per group
         start_df = data.group_by(group_by, maintain_order=True).head(1)
         end_df = data.group_by(group_by, maintain_order=True).tail(1)
     else:
@@ -83,10 +142,12 @@ def plot_trajectories(
         end_df = data.tail(1)
 
     base = alt.Chart(data).encode(
-        x=alt.X(x_col, title=x_label or x_col),
-        y=alt.Y(y_col, title=y_label or y_col),
+        x=alt.X(x_col, title=x_label or x_col, scale=alt.Scale(zero=False)),
+        y=alt.Y(y_col, title=y_label or y_col, scale=alt.Scale(zero=False)),
         color=alt.Color(
-            group_by or alt.Undefined, scale=alt.Scale(scheme="category20"), legend=None,
+            group_by or alt.Undefined,
+            scale=alt.Scale(scheme="category20"),
+            legend=None,
         ),
     )
 
@@ -118,9 +179,8 @@ def plot_trajectories(
         .encode(x=x_col, y=y_col, tooltip=tooltips)
     )
 
-    layers = lines + start_markers + end_markers
+    layers = [lines, start_markers, end_markers]
     if highlight_frame is not None:
-        # Normalize input to a list
         frames_to_highlight = (
             [highlight_frame] if isinstance(highlight_frame, int) else list(highlight_frame)
         )
@@ -140,16 +200,6 @@ def plot_trajectories(
                 )
                 .encode(x=x_col, y=y_col, tooltip=tooltips)
             )
-            layers += highlight_layer
+            layers.append(highlight_layer)
 
-    chart = (
-        layers
-        .properties(title=title or "", **kwargs)
-        .interactive()
-        .configure_axis(grid=True, gridColor="grey", gridOpacity=0.2, gridDash=[2, 2])
-    )
-
-    if save_path:
-        chart.save(save_path)
-
-    return chart
+    return layers

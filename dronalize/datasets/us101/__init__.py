@@ -9,7 +9,7 @@ registry.register(
         name="us101",
         loader_factory=US101Loader,
         default_config=US101Loader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.BUILDER_ONLY,
         predefined_splits=None,
     )
 )

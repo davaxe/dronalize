@@ -1,6 +1,6 @@
 import polars as pl
 
-from dronalize.pipeline.ops.window import sliding_window
+from dronalize.pipeline.functional.window import sliding_window
 
 
 def test_iterable_basic_window_count() -> None:

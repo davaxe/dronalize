@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.graph_builder import BaseGraphBuilder
+from dronalize.core.base import BaseGraphBuilder
+from dronalize.core.categories import EdgeType
 from dronalize.datasets.waymo.protos import lean_map_pb2
 
 if TYPE_CHECKING:

@@ -13,7 +13,7 @@ from dronalize.datasets.nuscenes.map.parser import NuScenesMap
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core.protocols.graph_builder import Point
+    from dronalize.core.interfaces import Point
 
 
 class VODMapGraphBuilder(NuScenesMapGraphBuilder):

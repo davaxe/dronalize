@@ -9,6 +9,6 @@ registry.register(
         name="waymo",
         loader_factory=WaymoLoader,
         default_config=WaymoLoader.default_config(),
-        has_map=True,
+        map_mode=registry.MapMode.INLINE,
     ).with_all_splits()
 )

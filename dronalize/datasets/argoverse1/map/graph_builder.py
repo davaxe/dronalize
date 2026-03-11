@@ -21,8 +21,8 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
+from dronalize.core.categories import EdgeType
+from dronalize.core.graph_builder import BaseGraphBuilder, Point
 from dronalize.datasets.argoverse1.map import parser, utils
 
 if TYPE_CHECKING:

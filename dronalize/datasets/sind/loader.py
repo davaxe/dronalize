@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace as _replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -8,61 +7,42 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
+from dronalize.config.loader import LoaderConfig
+from dronalize.core.base import BaseSceneLoader
+from dronalize.core.categories import AgentCategory
+from dronalize.core.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+# TODO: Add support for filtering parked vehicles.
 
-class SindLoader(BaseSceneLoader[str, Path]):
+
+class SindLoader(BaseSceneLoader[Path]):
     """Loader for the SIND dataset."""
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
-        *,
-        filter_parked_vehicles: bool = False,
     ) -> None:
         """Initialize the SindLoader.
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             Path to the directory containing the SIND dataset.
         loader_config : LoaderConfig, optional
-            Overrides for the default loader configuration.
-        filter_parked_vehicles : bool, optional
-            Whether to filter out parked vehicles based on their speed.
-            If True, all agents with an average speed less than 0.1 will be
-            removed. This will override any existing setting for the
-            `filter_slow_agents` parameter in the `scene_filtering`
-            configuration.
+            Loader configuration override.
 
         """
-        if filter_parked_vehicles:
-            resolved = loader_config or type(self).default_config()
-            filtering = resolved.filtering
-            if filtering is not None:
-                loader_config = _replace(
-                    resolved,
-                    scene_filtering=_replace(filtering, filter_slow_agents=0.1),
-                )
-            else:
-                loader_config = resolved.with_filtering(
-                    require_frames=[resolved.input_len - 1],
-                    filter_slow_agents=0.1 * 0.1,  # 0.1 m/s,
-                )
-
         super().__init__(loader_config, enforce_schema=True)
-        self._data_dir = data_root
+        self._data_dir = self._normalize_data_root(data_root)
 
     @override
-    def all_sources(self) -> Iterable[Source[str, Path]]:
+    def all_sources(self) -> Iterable[Source[Path]]:
         for subdir in self._data_dir.iterdir():
             map_location = self._resolve_map(subdir.name)
             yield Source(
@@ -72,7 +52,7 @@ class SindLoader(BaseSceneLoader[str, Path]):
             )
 
     @override
-    def ingest(self, source: Source[str, Path]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         subdir = source.inner
         pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
         vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
@@ -116,6 +96,8 @@ class SindLoader(BaseSceneLoader[str, Path]):
 
     @override
     def num_sources(self) -> int | None:
+        if not self._data_dir.is_dir():
+            return 0
         return sum(1 for _ in self._data_dir.iterdir())
 
     @override
@@ -148,7 +130,7 @@ class SindLoader(BaseSceneLoader[str, Path]):
         return "map_relink_law_save.osm"
 
 
-_VEHICLE_SCHEMA = {
+_VEHICLE_SCHEMA = pl.Schema({
     "track_id": pl.Int32,
     "frame_id": pl.Int32,
     "agent_type": pl.Utf8,
@@ -159,9 +141,9 @@ _VEHICLE_SCHEMA = {
     "vy": pl.Float32,
     "ax": pl.Float32,
     "ay": pl.Float32,
-}
+})
 
-_PEDESTRIAN_SCHEMA = {
+_PEDESTRIAN_SCHEMA = pl.Schema({
     "track_id": pl.Utf8,
     "frame_id": pl.Int32,
     "agent_type": pl.Utf8,
@@ -171,4 +153,4 @@ _PEDESTRIAN_SCHEMA = {
     "vy": pl.Float32,
     "ax": pl.Float32,
     "ay": pl.Float32,
-}
+})

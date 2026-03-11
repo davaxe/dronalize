@@ -5,21 +5,28 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core import AgentCategory, LoaderConfig
-from dronalize.core.protocols.loader import Source
+from dronalize.config import LoaderConfig
+from dronalize.config.map import MapConfig
+from dronalize.core import AgentCategory
+from dronalize.core.interfaces import Source
+from dronalize.datasets.ad4che.graph_builder import AD4CHEGraphBuilder
 from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+    from dronalize.core.interfaces import MapKey, MapResolver
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.scene import Scene
+
 
 class AD4CHELoader(XLevelDataLoader):
-    """Processor for the AD4CHE dataset."""
+    """Loader for the AD4CHE dataset."""
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         *,
         lane_change_ratio: float | None = 1.0,
@@ -36,34 +43,31 @@ class AD4CHELoader(XLevelDataLoader):
 
         Parameters
         ----------
-        data_root : Path
+        data_root : Path or str
             Path to the directory containing the .csv data files.
         loader_config : LoaderConfig, optional
-            Processor configuration. If None, default configuration will be used.
+            Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
+        data_root = self._normalize_data_root(data_root)
         super().__init__(data_root / "AD4CHE_Data_V1.0", loader_config)
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 
     @override
-    def all_sources(self) -> Iterable[Source[int, Path]]:
-        for i, subdir in enumerate(sorted(self._data_dir.iterdir()), start=1):
-            recording_meta = subdir / f"{i:0>2}_recordingMeta.csv"
-            recording_meta_data = pl.read_csv(recording_meta)
-            location_id = recording_meta_data.select(pl.col("locationId")).item()
+    def all_sources(self) -> Iterable[Source[Path]]:
+        for recording_id, subdir in self._recordings():
             yield Source(
-                identifier=i,
+                identifier=recording_id,
                 inner=subdir,
-                map_key=str(location_id),
+                map_key=f"{subdir.name}/{recording_id:02d}_laneWidthColorAndID.png",
             )
 
     @override
     def num_sources(self) -> int | None:
-        num_files: int = sum(1 for p in self._data_dir.iterdir())
-        return num_files // 4 - 1
+        return sum(1 for _ in self._recordings())
 
     @staticmethod
     def meta_data_select() -> list[pl.Expr]:
@@ -115,6 +119,32 @@ class AD4CHELoader(XLevelDataLoader):
             .with_window(45)
         )
 
+    @override
+    def map_resolver(self) -> MapResolver:
+        def _resolver(
+            scene: Scene,
+            key: MapKey = None,
+            map_config: MapConfig | None = None,
+        ) -> MapGraph | None:
+            _ = scene
+            if key is None:
+                return None
+            map_config = map_config or MapConfig.default()
+            path = self._data_dir / key
+            print(f"Resolving map for key {key} at path {path}")
+            return AD4CHEGraphBuilder(path).build(
+                map_config.min_distance, map_config.interp_distance
+            )
+
+        return _resolver
+
+    def _recordings(self) -> Iterable[tuple[int, Path]]:
+        """Yield discovered recording identifiers with their directories and metadata files."""
+        for subdir in sorted(path for path in self._data_dir.iterdir() if path.is_dir()):
+            # subdir is on format DJI_XXXX
+            number_str = subdir.name.split("_")[-1]
+            yield int(number_str), subdir
+
 
 _META_SCHEMA: pl.Schema = pl.Schema({
     "id": pl.Int32,
@@ -133,16 +163,3 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float32,
     "yAcceleration": pl.Float32,
 })
-
-if __name__ == "__main__":
-    import time
-    from pathlib import Path
-
-    loader = AD4CHELoader(Path("data/ad4che"))
-    cout = 0
-    start = time.perf_counter()
-    for _scene in loader.scenes():
-        cout += 1
-
-    end = time.perf_counter()
-    print(f"Processed {cout} scenes in {end - start:.2f} seconds")

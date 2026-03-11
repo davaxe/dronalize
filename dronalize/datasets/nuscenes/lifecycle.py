@@ -3,16 +3,16 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.datatypes.map_config import MapConfig
+from dronalize.config.loader import LoaderConfig
+from dronalize.config.map import MapConfig
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
 from dronalize.datasets.nuscenes.map.graph_builder import NuScenesMapGraphBuilder
 
 if TYPE_CHECKING:
     from multiprocessing.shared_memory import SharedMemory
 
-    from dronalize.core.datatypes.map_graph import MapGraph
-    from dronalize.core.datatypes.map_resolver import MapKey
+    from dronalize.core.interfaces import MapKey
+    from dronalize.core.map_graph import MapGraph
 
 
 @contextmanager
@@ -42,6 +42,7 @@ def nuscenes_lifecylce_context(
     """
     _loader_config = loader_config
     if not map_config.include_map:
+        NuScenesLoader.set_shared_memory()
         yield
         return
 
@@ -55,12 +56,12 @@ def nuscenes_lifecylce_context(
             min_distance=map_config.min_distance,
             interp_distance=map_config.interp_distance,
         )
-        print(f"Built map graph for {path.stem}: {map_graph}")
         shm.append(map_graph.to_shared())
-        name_mapping[path.name] = shm[-1].name
+        name_mapping[path.stem] = shm[-1].name
 
     NuScenesLoader.set_shared_memory(mappings=name_mapping)
     yield
     for sm in shm:
         sm.close()
         sm.unlink()
+    NuScenesLoader.set_shared_memory()

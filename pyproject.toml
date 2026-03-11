@@ -26,9 +26,6 @@ dependencies = [
     "mosaicml-streaming>=0.13.0",
 ]
 
-[project.scripts]
-dronalize = "dronalize.__main__:main"
-
 [project.optional-dependencies]
 # Plotting (map graphs, trajectories)
 plot = ["altair>=5.0.0"]
@@ -61,6 +58,8 @@ dev = [
     "dronalize[plot,lyft,ad4che]",
 ]
 tools = [
+    "mkdocs-material>=9.6.0",
+    "mkdocstrings[python]>=1.0.3",
     "pyrefly>=0.55.0",
     "ruff>=0.15.4",
 ]
