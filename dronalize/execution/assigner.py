@@ -5,20 +5,22 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import numpy as np
 import numpy.typing as npt
 
+from dronalize.core.split import DatasetSplit
+
 T = TypeVar("T")
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
 
-class StreamSplitter(Generic[T]):
-    """A class for splitting a stream of data into groups.
+class WeightedAssigner(Generic[T]):
+    """A class for assigning a stream of data into groups.
 
-    The StreamSplitter takes a sequence of unique groups and optional weights,
-    and provides an infinite stream of group assignments. The groups are
-    shuffled in rounds, where each round consists of a fixed number of samples
-    (`round_size`) before reshuffling. The number of pre-generated rounds can be
-    specified with `rounds` parameter.
+    The `WeightedAssigner takes a sequence of unique groups and optional
+    weights, and provides an infinite stream of group assignments. The groups
+    are shuffled in rounds, where each round consists of a fixed number of
+    samples (`round_size`) before reshuffling. The number of pre-generated
+    rounds can be specified with `rounds` parameter.
 
     It works in the following steps:
     1. Create a 2D array (deck) where each row is a shuffled sequence of
@@ -57,12 +59,12 @@ class StreamSplitter(Generic[T]):
         rounds: int = 10,
         seed: int | None = None,
     ) -> None:
-        """Initialize the StreamSplitter.
+        """Initialize and construct the WeightedAssigner.
 
         Parameters
         ----------
         groups : Sequence[T]
-            A sequence of unique groups to split the stream into.
+            A sequence of unique groups to assign the stream into.
         weights : Sequence[float], optional
             A sequence of weights corresponding to each group. If None,
             groups are treated as equally weighted. The weights will be
@@ -126,10 +128,10 @@ class StreamSplitter(Generic[T]):
 
         Examples
         --------
-        >>> splitter = StreamSplitter([1, 2], seed=42, round_size=2)
-        >>> splitter.next() # First is 2 by chance
+        >>> assigner = WeightedAssigner([1, 2], seed=42, round_size=2)
+        >>> assigner.next() # First is 2 by chance
         2
-        >>> splitter.next() # Second is guarenteed 1, since `round_size` is 2
+        >>> assigner.next() # Second is guaranteed 1, since `round_size` is 2
         1
         """
         index = self._index
@@ -207,3 +209,6 @@ def _generate_shuffled_deck(
     # Independently shuffle each row
     rng = rng or np.random.default_rng()
     return rng.permuted(deck, axis=1)
+
+
+SplitAssigner = WeightedAssigner[DatasetSplit]

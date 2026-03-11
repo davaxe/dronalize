@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
+from typing_extensions import override
 
+from dronalize.config.map import MapConfig
 from dronalize.core import AgentCategory
+from dronalize.datasets.common import utils
 from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
+from dronalize.datasets.highd.graph_builder import HighDMapGraphBuilder
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from dronalize.config import LoaderConfig
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.map_resolver import MapKey, MapResolver
+    from dronalize.core.scene import Scene
 
 
 class HighDLoader(XLevelDataLoader):
@@ -18,10 +24,11 @@ class HighDLoader(XLevelDataLoader):
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
-        lane_change_ratio: float | None = 1.0,
+        lane_change_ratio: float | None = None,
     ) -> None:
         """Initialize the trajectory data loader for the highD dataset.
 
@@ -43,11 +50,13 @@ class HighDLoader(XLevelDataLoader):
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
-        super().__init__(data_root / "data", loader_config)
+        data_root = self._normalize_data_root(data_root)
+        super().__init__(data_root / "data", loader_config=loader_config, map_config=map_config)
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 
     @staticmethod
+    @override
     def meta_data_select() -> list[pl.Expr]:
         """Select the relevant columns from the metadata CSV."""
         return [
@@ -63,6 +72,7 @@ class HighDLoader(XLevelDataLoader):
         ]
 
     @staticmethod
+    @override
     def track_data_select() -> list[pl.Expr]:
         """Select the relevant columns from the track CSV."""
         return [
@@ -77,14 +87,41 @@ class HighDLoader(XLevelDataLoader):
         ]
 
     @staticmethod
+    @override
     def meta_schema() -> pl.Schema:
         """Define the schema for the metadata CSV."""
         return _META_SCHEMA
 
     @staticmethod
+    @override
     def track_schema() -> pl.Schema:
         """Define the schema for the track CSV."""
         return _TRACK_SCHEMA
+
+    @staticmethod
+    @override
+    def location_id_select(meta_df: pl.DataFrame, path: Path) -> str:
+        return str(path)
+
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.no_extraction(interp_distance=10)
+
+    @override
+    def map_resolver(self) -> MapResolver:
+        def _resolver(scene: Scene, key: MapKey) -> MapGraph | None:
+            if key is None:
+                return None
+
+            min_x = scene.inner.select(pl.col("x")).min().item()
+            max_x = scene.inner.select(pl.col("x")).max().item()
+            dist = max_x - min_x
+            builder = HighDMapGraphBuilder(Path(key), min_x - dist * 0.1, max_x + dist * 0.1)
+            map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
+            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
+
+        return _resolver
 
 
 _META_SCHEMA: pl.Schema = pl.Schema({

@@ -146,7 +146,7 @@ class ParallelExecutor(SceneLoader):
         self._mp_worker_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_scene_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_source_counter: Synchronized[int] = mp.Value("i", 0)
-        self._mp_split_queue: mp.Queue[DatasetSplit] | None = None
+        self._mp_split_queue: mp.Queue[DatasetSplit | None] | None = None
         self._mp_info_lock: Lock = mp.Lock()
         self._chunksize: int = chunksize or self._optimal_chunksize(inner.num_sources(), processes)
         self._processes: int | None = processes
@@ -266,7 +266,7 @@ class ParallelExecutor(SceneLoader):
     ) -> None:
         """Process scenes in parallel and write them using a SceneWriter.
 
-        This is a customlized method that initialize one SceneWriter per worker
+        This is a customized method that initialize one SceneWriter per worker
         process using the provided `writer_factory`, and then calls the `write`
         method of the SceneWriter for each processed scene. This is useful for
         efficiently writing large datasets in parallel without needing to send
@@ -292,11 +292,11 @@ class ParallelExecutor(SceneLoader):
         split_generator : Iterable[DatasetSplit], optional
             An optional generator that yields DatasetSplit values. If provided, a
             the values from this generator will synchronously fed to worker worker
-            processess and passed into the `SceneWriter.write`.
+            processes and passed into the `SceneWriter.write`.
 
         Practical Considerations
         ------------------------
-        If provided the `split_generator` shoud at least provide as many splits
+        If provided the `split_generator` should at least provide as many splits
         as there are scenes. See `StreamSplitter` for a generic and configurable
         implementation of a split generator.
 
@@ -349,7 +349,11 @@ class ParallelExecutor(SceneLoader):
                 msg = "Split generator was not initialized for this worker process."
                 raise ValueError(msg)
             while True:
-                yield _split_queue.get()
+                item = _split_queue.get()
+                if item is None:
+                    msg = "Split generator exhausted before writing completed."
+                    raise ValueError(msg)
+                yield item
 
         stream_split_iter = stream_split() if _split_queue is not None else None
         for scene in ParallelExecutor._generate_scenes(args.loader, args.source):
@@ -473,12 +477,15 @@ class ParallelExecutor(SceneLoader):
     @staticmethod
     def _feed_split_queue(
         split_generator: Iterator[DatasetSplit],
-        q: mp.Queue[DatasetSplit],
+        q: mp.Queue[DatasetSplit | None],
         stop_event: threading.Event,
     ) -> None:
-        while not stop_event.is_set():
-            split = next(split_generator)
-            q.put(split)
+        try:
+            while not stop_event.is_set():
+                split = next(split_generator)
+                q.put(split)
+        finally:
+            q.put(None)
 
     def _total(self) -> int | None:
         if self._progress_bar == ProgressBar.SOURCES:
@@ -515,7 +522,7 @@ class ParallelExecutor(SceneLoader):
         Synchronized[int],
         Synchronized[int],
         Lock,
-        mp.Queue[DatasetSplit] | None,
+        mp.Queue[DatasetSplit | None] | None,
     ]:
         """Convenience property to get the arguments needed for worker initialization."""
         return (
@@ -540,9 +547,10 @@ class _ProcessArgs(NamedTuple, Generic[SourceT]):
 _worker_counter: Synchronized[int]
 _scene_counter: Synchronized[int]
 _source_counter: Synchronized[int]
-_split_queue: mp.Queue[DatasetSplit] | None
+_split_queue: mp.Queue[DatasetSplit | None] | None
 _worker_id: int
 _worker_info_lock: Lock
+_writer: SceneWriter
 
 
 @contextlib.contextmanager
@@ -560,7 +568,7 @@ def _init_worker(
     scene_counter: Synchronized[int],
     source_counter: Synchronized[int],
     info_lock: Lock,
-    split_queue: mp.Queue[DatasetSplit] | None,
+    split_queue: mp.Queue[DatasetSplit | None] | None,
 ) -> None:
     # This is the standard and most efficient way to share a counter across
     # processes in Python's multiprocessing module.
@@ -585,7 +593,7 @@ def _init_write_worker(
     scene_counter: Synchronized[int],
     source_counter: Synchronized[int],
     info_lock: Lock,
-    split_queue: mp.Queue[DatasetSplit] | None,
+    split_queue: mp.Queue[DatasetSplit | None] | None,
     writer_factory: Callable[[int], SceneWriter],
     finalize: Callable[[SceneWriter], None] | None,
 ) -> None:

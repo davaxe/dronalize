@@ -17,6 +17,8 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.config.map import MapConfig
+
 
 def _table_query(table_name: str) -> str:
     return f"""
@@ -33,7 +35,12 @@ def _table_query(table_name: str) -> str:
 class OpenDDLoader(BaseSceneLoader[str]):
     """Loader for OpenDD data stored in a single SQLite database."""
 
-    def __init__(self, data_root: Path | str, loader_config: LoaderConfig | None = None) -> None:
+    def __init__(
+        self,
+        data_root: Path | str,
+        loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+    ) -> None:
         """Initialize the OpenDD loader.
 
         Parameters
@@ -45,7 +52,7 @@ class OpenDDLoader(BaseSceneLoader[str]):
             is used.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, map_config=map_config)
         self._db_path = self._normalize_data_root(data_root)
         self._conn: sqlite3.Connection | None = None
 
@@ -143,6 +150,7 @@ class MultiOpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize the multi-database OpenDD loader.
 
@@ -156,7 +164,11 @@ class MultiOpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
             is used.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            enforce_schema=True,
+        )
         self._data_root = self._normalize_data_root(data_root)
 
     def _db_paths(self) -> Iterable[Path]:

@@ -17,6 +17,8 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.config.map import MapConfig
+
 
 class InteractionLoader(BaseSceneLoader[list[Path]]):
     """Loader for the INTERACTION dataset."""
@@ -25,6 +27,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
         file_batch_size: int | None = None,
         split: DatasetSplit | None = None,
@@ -56,7 +59,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
             msg = f"does not support loader_config.window={loader_config.window!r}."
             raise self._invalid_loader_argument(msg)
 
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        super().__init__(loader_config=loader_config, map_config=map_config, split=split)
         self._data_root = self._normalize_data_root(data_root)
         self._file_batch_size: int | None = file_batch_size
 

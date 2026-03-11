@@ -4,23 +4,25 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+from collections.abc import Callable
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field, replace
 from enum import IntEnum, auto
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Concatenate, Literal, Protocol
 
 import tomllib
 
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
+from dronalize.core._types import P
+from dronalize.core.base import BaseSceneLoader
 from dronalize.core.split import DatasetSplit
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Generator
 
-    from dronalize.config.loader import LoaderConfig
-    from dronalize.core.base import BaseSceneLoader
 
 _MANIFEST_NAME = "manifest.toml"
 _REGISTRY: dict[str, DatasetDescriptor] = {}
@@ -82,6 +84,11 @@ class MapMode(IntEnum):
     """Similar to SHARED_SINGLE, but supports multiple maps distinguished by keys."""
 
 
+LoaderFactory = Callable[
+    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P], BaseSceneLoader[Any]
+]
+
+
 @dataclass(frozen=True, slots=True)
 class DatasetDescriptor:
     """Everything needed to fully process a single dataset."""
@@ -89,13 +96,13 @@ class DatasetDescriptor:
     name: str
     """Canonical slug, e.g. "ind", "argoverse2", "waymo"."""
 
-    loader_factory: Callable[..., BaseSceneLoader]
+    loader_factory: LoaderFactory
     """Factory function that creates a scene loader for the dataset."""
 
     default_config: LoaderConfig
     """Default loader configuration for the dataset."""
 
-    default_map_config: MapConfig = field(default_factory=MapConfig.default)
+    default_map_config: MapConfig
     """Default map configuration for the dataset, if applicable."""
 
     lifecycle_context: DatasetLifecycleContext | None = None
@@ -104,7 +111,7 @@ class DatasetDescriptor:
     map_mode: MapMode = MapMode.NONE
     """How this dataset exposes map data at runtime."""
 
-    predefined_splits: list[DatasetSplit] | None = None
+    predefined_splits: list[DatasetSplit] = field(default_factory=list)
     """Predefined splits for the dataset, if any."""
 
     @property

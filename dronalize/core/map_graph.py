@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import multiprocessing.shared_memory as shm
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from typing_extensions import Self
@@ -349,7 +349,7 @@ class MapGraph:
 
     def extract_radius(
         self,
-        center: tuple[float, float] | npt.NDArray[np.floating],
+        center: tuple[float, float] | npt.NDArray[np.floating[Any]] | None,
         radius: float,
     ) -> MapGraph:
         """Extract a subgraph within a specified radius from a center point.
@@ -368,6 +368,9 @@ class MapGraph:
             given radius.
 
         """
+        if center is None:
+            center = np.mean(self.node_positions, axis=0)
+
         center_arr = np.asarray(center, dtype=np.float32)
 
         # Squared-distance avoids the sqrt
@@ -420,6 +423,44 @@ class MapGraph:
         )
 
         return self._subgraph_from_mask(within_mask)
+
+    def extract_relevant(
+        self,
+        relevant_positions: npt.NDArray[np.floating[Any]],
+        padding_factor: float = 1.0,
+        *,
+        use_bbox: bool = False,
+    ) -> MapGraph:
+        """Extract to cover relevant positions.
+
+        Parameters
+        ----------
+        relevant_positions : npt.NDArray[np.floating[Any]]
+            The positions of relevant positions (not nodes).
+        padding_factor : float, optional
+            Factor to pad the extracted area, by default 1.0 (no padding).
+        use_bbox : bool, optional
+            Whether to use a bounding box instead of a radius, by default False
+
+        Returns
+        -------
+        MapGraph
+            The extracted subgraph.
+
+        """
+        if not use_bbox:
+            center = relevant_positions.mean(axis=0)
+            distances = np.linalg.norm(relevant_positions - center, axis=1)
+            radius = distances.max() * padding_factor
+            return self.extract_radius(center, radius)
+
+        mins = relevant_positions.min(axis=0)
+        maxs = relevant_positions.max(axis=0)
+        center = (mins + maxs) / 2
+        half_w = (maxs[0] - mins[0]) * padding_factor
+        half_h = (maxs[1] - mins[1]) * padding_factor
+
+        return self.extract_bbox(center, half_w, half_h)
 
     def _subgraph_from_mask(
         self,

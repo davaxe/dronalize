@@ -3,6 +3,7 @@ from pathlib import Path
 from typing_extensions import override
 
 from dronalize.config import LoaderConfig
+from dronalize.config.map import MapConfig
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
 
 
@@ -19,6 +20,7 @@ class VodLoader(NuScenesLoader):
         self,
         data_dir: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize the dataset loader.
 
@@ -30,7 +32,7 @@ class VodLoader(NuScenesLoader):
             Custom configuration, or default if None.
 
         """
-        super().__init__(data_dir, loader_config=loader_config)
+        super().__init__(data_dir, loader_config=loader_config, map_config=map_config)
         self._full_category_contains = [
             "vehicle.ego",
         ]

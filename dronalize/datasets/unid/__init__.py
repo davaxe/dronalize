@@ -1,4 +1,5 @@
 from dronalize.datasets import registry
+from dronalize.datasets.unid import _lifecycle
 from dronalize.datasets.unid.graph_builder import UniDGraphBuilder
 from dronalize.datasets.unid.loader import UniDLoader
 
@@ -9,7 +10,9 @@ registry.register(
         name="unid",
         loader_factory=UniDLoader,
         default_config=UniDLoader.default_config(),
-        map_mode=registry.MapMode.BUILDER_ONLY,
-        predefined_splits=None,
+        default_map_config=UniDLoader.default_map_config(),
+        map_mode=registry.MapMode.SHARED_KEYED,
+        predefined_splits=[],
+        lifecycle_context=_lifecycle.unid_lifecycle_context,
     )
 )

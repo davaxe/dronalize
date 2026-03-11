@@ -11,7 +11,6 @@ from dronalize.plot import plot_trajectories, plot_trajectories_on_map
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
-    from dronalize.config.map import MapConfig
     from dronalize.core.interfaces import SceneLoader
     from dronalize.core.scene import Scene
 
@@ -21,11 +20,11 @@ def _debug_visualize_scenes(
     *,
     max_scenes: int = 1,
     skip_scenes: int = 0,
+    step: int = 1,
     group_by: str = "id",
     n_groups: int | None = None,
     group_sample_seed: int | None = None,
     highlight_frame: int | Sequence[int] | None = None,
-    map_config: MapConfig | None = None,
     include_map: bool = True,
     include_map_nodes: bool = False,
     show: bool = True,
@@ -33,7 +32,7 @@ def _debug_visualize_scenes(
     trajectory_kwargs: dict[str, Any] | None = None,
     overlay_kwargs: dict[str, Any] | None = None,
 ) -> list[alt.TopLevelMixin]:
-    alt.renderers.enable("browser")
+    _ = alt.renderers.enable("browser")
 
     trajectory_kwargs = {} if trajectory_kwargs is None else dict(trajectory_kwargs)
     overlay_kwargs = {} if overlay_kwargs is None else dict(overlay_kwargs)
@@ -42,7 +41,7 @@ def _debug_visualize_scenes(
     start = time.perf_counter()
 
     scenes: Iterator[Scene] = source.scenes().__iter__()
-    for scene in islice(scenes, skip_scenes, skip_scenes + max_scenes):
+    for scene in islice(scenes, skip_scenes, skip_scenes + max_scenes * step, step):
         title_parts: list[str] = []
         if title_prefix:
             title_parts.append(title_prefix)
@@ -53,7 +52,7 @@ def _debug_visualize_scenes(
 
         map_graph = None
         if include_map:
-            map_graph = scene.resolve_map(map_config)
+            map_graph = scene.resolve_map()
 
         if map_graph is not None:
             chart = plot_trajectories_on_map(

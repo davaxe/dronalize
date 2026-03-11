@@ -19,7 +19,13 @@ P = ParamSpec("P")
 class SceneWriter(Protocol):
     """Protocol for writing processed scenes to disk."""
 
-    def write(self, processed: Scene, splits: Iterator[DatasetSplit] | None = None) -> bool:
+    def write(
+        self,
+        processed: Scene,
+        splits: Iterator[DatasetSplit] | None = None,
+        *,
+        strict: bool = False,
+    ) -> bool:
         """Write a single processed scene.
 
         Parameters
@@ -30,12 +36,15 @@ class SceneWriter(Protocol):
             An optional iterator of dataset splits that the scene belongs to.
             An iterator is primarily used to allow for multiple splits per write
             call.
+        strict : bool, optional
+            Whether to raise an error if the `splits` iterator is longer than
+            the total written samples. Defaults to `False`.
 
         Returns
         -------
         bool
             Returns `True` if anything was actually written (e.g. the scene
-            passed validation and was not
+            passed validation and was not skipped), otherwise `False`.
 
         """
         ...
@@ -81,7 +90,7 @@ class SceneWriter(Protocol):
     def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int | None], Self]:  # noqa: ANN401
         """Create a factory function for this writer class.
 
-        This should return a factory function that takes an integer identfier
+        This should return a factory function that takes an integer identifier
         and return a instance of the class ready to be used independently
         across multiple processes. Most commonly, the identifier can be used
         to set an individual output directory for each process to make sure

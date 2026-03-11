@@ -41,9 +41,7 @@ class AgentCategory(IntEnum):
             return value
         if isinstance(value, int):
             return cls(value)
-        if isinstance(value, str):
-            return cls.from_string(value)
-        return None
+        return cls.from_string(value)
 
 
 class EdgeType(IntEnum):

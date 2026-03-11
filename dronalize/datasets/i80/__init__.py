@@ -9,7 +9,8 @@ registry.register(
         name="i80",
         loader_factory=I80Loader,
         default_config=I80Loader.default_config(),
+        default_map_config=I80Loader.default_map_config(),
         map_mode=registry.MapMode.BUILDER_ONLY,
-        predefined_splits=None,
+        predefined_splits=[],
     )
 )

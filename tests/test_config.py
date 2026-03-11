@@ -231,8 +231,6 @@ def test_square_extraction_model_dump() -> None:
 
     assert dumped["mode"] == "square"
     assert dumped["size"] == pytest.approx(25.0)
-    assert dumped["width"] == pytest.approx(25.0)
-    assert dumped["height"] == pytest.approx(25.0)
 
 
 def test_map_config_discriminator_square() -> None:

@@ -9,7 +9,6 @@ from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
 from dronalize.config import LoaderConfig
-from dronalize.config.map import MapConfig
 from dronalize.core import AgentCategory, BaseSceneLoader
 from dronalize.core.loader import IngestOutput, MapKey, MapResolver, Source
 from dronalize.core.split import DatasetSplit
@@ -21,6 +20,7 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.config.map import MapConfig
     from dronalize.core.map_graph import MapGraph
     from dronalize.core.scene import Scene
 
@@ -32,9 +32,9 @@ class WaymoLoader(BaseSceneLoader[Path]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
         split: DatasetSplit | None = None,
-        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize.
 
@@ -62,11 +62,9 @@ class WaymoLoader(BaseSceneLoader[Path]):
             Map configuration. If None, the default configuration is used.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        super().__init__(loader_config=loader_config, map_config=map_config, split=split)
         self._data_root = self._normalize_data_root(data_root)
-
-        self._map_config = map_config or MapConfig.default()
-        self._include_map: bool = self._map_config.include_map
+        self._include_map: bool = self.map_config.include_map
 
     @staticmethod
     def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
@@ -116,15 +114,13 @@ class WaymoLoader(BaseSceneLoader[Path]):
                 def _resolver(
                     scene: Scene,
                     key: MapKey | None = None,
-                    map_config: MapConfig | None = self._map_config,
                     _raw_data: bytes = raw_data,
                 ) -> MapGraph:
-                    _ = scene, key, map_config
-                    map_config = map_config or MapConfig.default()
+                    _ = scene, key
                     map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
                     return WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
-                        min_distance=map_config.min_distance,
-                        interp_distance=map_config.interp_distance,
+                        min_distance=self.map_config.min_distance,
+                        interp_distance=self.map_config.interp_distance,
                     )
 
                 resolver = _resolver

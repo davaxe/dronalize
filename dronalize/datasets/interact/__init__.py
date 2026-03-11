@@ -9,6 +9,7 @@ registry.register(
         name="interact",
         loader_factory=InteractionLoader,
         default_config=InteractionLoader.default_config(),
+        default_map_config=InteractionLoader.default_map_config(),
         map_mode=registry.MapMode.BUILDER_ONLY,
     ).with_all_splits()
 )

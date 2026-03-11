@@ -8,9 +8,12 @@ from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
 from dronalize.config.loader import LoaderConfig
+from dronalize.config.map import MapConfig
 from dronalize.core.base import BaseSceneLoader
 from dronalize.core.categories import AgentCategory
 from dronalize.core.loader import IngestOutput, Source
+from dronalize.core.map_resolver import MapResolver, no_map, shared_map
+from dronalize.datasets.common import utils
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -32,6 +35,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
         self,
         data_dir: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize the loader for an X-level dataset (e.g., rounD, inD).
 
@@ -43,7 +47,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
             Loader configuration. If None, the default configuration is used.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=False)
+        super().__init__(loader_config=loader_config, map_config=map_config)
         self._data_dir = self._normalize_data_root(data_dir)
         self._rebalance_ratio = None
 
@@ -83,6 +87,12 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
         ]
 
     @staticmethod
+    def location_id_select(meta_df: pl.DataFrame, path: Path) -> str:
+        """Select the relevant columns from the recording metadata CSV."""
+        _ = path  # Added path since highD wants to use  the path as key
+        return meta_df.select(pl.col("locationId")).item()
+
+    @staticmethod
     def meta_schema() -> pl.Schema:
         """Define the schema for the metadata CSV."""
         return _META_SCHEMA
@@ -97,7 +107,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
         for recording_id in self._recording_ids():
             recording_meta = self._data_dir / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
-            location_id = recording_meta_data.select(pl.col("locationId")).item()
+            location_id = self.location_id_select(recording_meta_data, recording_meta)
             columns = recording_meta_data.columns
 
             utm_x0: float | None = None
@@ -129,6 +139,12 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
             *self.track_data_select(),
         )
         combined = tracks_df.join(meta_df, left_on="id", right_on="id")
+        if "utm_x0" in source.metadata and "utm_y0" in source.metadata:
+            combined = combined.with_columns(
+                (pl.col("x") + source.metadata["utm_x0"]).alias("x"),
+                (pl.col("y") + source.metadata["utm_y0"]).alias("y"),
+            )
+
         yield combined, source.map_key
 
     @override
@@ -161,6 +177,17 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
                 filter_agent_category=[AgentCategory.TRAILER],
             )
         )
+
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.no_extraction()
+
+    @override
+    def map_resolver(self) -> MapResolver:
+        if self._shared_memory_name is None:
+            return no_map()
+        return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 
     def _recording_ids(self) -> list[int]:
         """Return sorted recording identifiers discovered from metadata files."""

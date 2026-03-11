@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.config import LoaderConfig
+    from dronalize.config.map import MapConfig
 
 
 class InDLoader(XLevelDataLoader):
@@ -26,8 +27,9 @@ class InDLoader(XLevelDataLoader):
 
     def __init__(
         self,
-        data_root: Path,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize the trajectory data loader for the inD dataset.
 
@@ -39,4 +41,5 @@ class InDLoader(XLevelDataLoader):
             Loader configuration. If None, the default configuration is used.
 
         """
-        super().__init__(data_root / "data", loader_config)
+        data_root = self._normalize_data_root(data_root)
+        super().__init__(data_root / "data", loader_config=loader_config, map_config=map_config)

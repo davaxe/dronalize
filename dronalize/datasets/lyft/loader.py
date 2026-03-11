@@ -15,10 +15,11 @@ from dronalize.config.map import MapConfig
 from dronalize.core.base import BaseSceneLoader
 from dronalize.core.categories import AgentCategory
 from dronalize.core.interfaces import IngestOutput, Source
-from dronalize.core.map_graph import MapGraph
+from dronalize.core.map_resolver import no_map, shared_map
 from dronalize.core.split import DatasetSplit
+from dronalize.datasets.common import utils
+from dronalize.pipeline import Pipeline
 from dronalize.pipeline.factories import trajectory_pipeline
-from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -26,8 +27,7 @@ if TYPE_CHECKING:
 
     from zarr.core import Array
 
-    from dronalize.core.interfaces import MapKey, MapResolver
-    from dronalize.core.scene import Scene
+    from dronalize.core.interfaces import MapResolver
 
 
 @dataclass
@@ -59,6 +59,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
         split: DatasetSplit | None = None,
         scene_batch_size: int | None = 100,
@@ -81,7 +82,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
             msg = "does not support split=TEST."
             raise self._invalid_loader_argument(msg)
 
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        super().__init__(loader_config=loader_config, map_config=map_config, split=split)
         self._data_root = self._normalize_data_root(data_root)
         self._data: dict[DatasetSplit, _ArrayData] = {}
         self._batch_size: int | None = scene_batch_size
@@ -207,22 +208,16 @@ class LyftLoader(BaseSceneLoader[_Source]):
             )
         )
 
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.auto_extraction()
+
     @override
     def map_resolver(self) -> MapResolver:
-
-        def _resolve(
-            scene: Scene, key: MapKey = None, map_config: MapConfig | None = None
-        ) -> MapGraph | None:
-            _ = key, scene, map_config
-            if self._shared_memory_name is None or isinstance(self._shared_memory_name, dict):
-                return None
-
-            with MapGraph.from_shared(self._shared_memory_name) as map_graph:
-                # Copy is currently needed since it will be released as
-                # soon as the context is exited.
-                return map_graph.copy()
-
-        return _resolve
+        if self._shared_memory_name is None:
+            return no_map()
+        return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 
 
 @dataclass
@@ -339,19 +334,3 @@ def _scene_to_polars(
         "agent_category": agent_categories,
     })
     return pl.concat([ego_df, agent_df])
-
-
-if __name__ == "__main__":
-    import os
-    from pathlib import Path
-
-    from dronalize.datasets.common._debug import _debug_visualize_scenes
-    from dronalize.datasets.lyft.lifecycle import lyft_lifecylce_context
-    from dronalize.datasets.lyft.loader import LyftLoader as _LyftLoader
-
-    path = Path(os.environ.get("TRAJ_DATA", "data")) / "lyft"
-    loader = _LyftLoader(path)
-    with lyft_lifecylce_context(
-        path, _LyftLoader.default_config(), map_config=MapConfig.default()
-    ) as lifecycle:
-        _debug_visualize_scenes(loader, max_scenes=1, title_prefix="Lyft", skip_scenes=100)

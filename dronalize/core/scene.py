@@ -8,7 +8,6 @@ import polars as pl
 from dronalize.core.map_resolver import MapResolver  # noqa: TC001
 
 if TYPE_CHECKING:
-    from dronalize.config.map import MapConfig
     from dronalize.core.map_graph import MapGraph
     from dronalize.core.map_resolver import MapKey
 
@@ -35,23 +34,13 @@ class Scene:
     map_resolver: MapResolver | None = field(default=None, compare=False, repr=False)
     """Resolver attached by the loader that produced this scene."""
 
-    def resolve_map(
-        self,
-        map_config: MapConfig | None = None,
-    ) -> MapGraph | None:
+    def resolve_map(self) -> MapGraph | None:
         """Resolve this scene's `map_key` into a `MapGraph`.
 
         Delegates to the `map_resolver` attached by the loader. Returns `None`
         when no resolver is present or when the resolver has no map for this key
         (e.g. `include_map=False`
         on Waymo).
-
-        Parameters
-        ----------
-        map_config : MapConfig, optional
-            Optional configuration for map resolution, such as desired output
-            format or resolution. The exact effect depends on the implementation
-            of the attached `map_resolver`.
 
         Returns
         -------
@@ -61,7 +50,7 @@ class Scene:
         """
         if self.map_resolver is None:
             return None
-        return self.map_resolver(self, self.map_key, map_config)
+        return self.map_resolver(self, self.map_key)
 
     def has_map(self) -> bool:
         """Check if this scene has an attached map resolver and key."""

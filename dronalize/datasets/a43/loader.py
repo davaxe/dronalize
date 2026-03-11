@@ -10,8 +10,10 @@ import dronalize.pipeline.transforms as tr
 from dronalize.config import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.loader import IngestOutput, Source
+from dronalize.core.loader import Source
+from dronalize.core.scene import Scene
 from dronalize.datasets.a43.graph_builder import A43GraphBuilder
+from dronalize.datasets.common import utils
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -19,6 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.interfaces import MapKey, MapResolver
+    from dronalize.core.loader import IngestOutput
     from dronalize.core.map_graph import MapGraph
     from dronalize.core.scene import Scene
 
@@ -30,6 +33,7 @@ class A43Loader(BaseSceneLoader[Path]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize the A43 dataset loader.
 
@@ -41,7 +45,7 @@ class A43Loader(BaseSceneLoader[Path]):
             Loader configuration. If None, the default configuration is used.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, map_config=map_config)
         self._data_dir = self._normalize_data_root(data_root)
 
     @override
@@ -94,21 +98,21 @@ class A43Loader(BaseSceneLoader[Path]):
             .with_filtering(require_frames=[19])
         )
 
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.no_extraction()
+
     @override
     def map_resolver(self) -> MapResolver:
-
-        def _resolver(
-            scene: Scene,
-            key: MapKey = None,
-            map_config: MapConfig | None = None,
-        ) -> MapGraph | None:
+        def _resolver(scene: Scene, key: MapKey) -> MapGraph | None:
             if key is None:
                 return None
 
-            map_config = map_config or MapConfig.default()
             min_x = scene.inner.select(pl.col("x")).min().item()
             max_x = scene.inner.select(pl.col("x")).max().item()
             builder = A43GraphBuilder(key, min_x, max_x)
-            return builder.build(map_config.min_distance, map_config.interp_distance)
+            map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
+            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 
         return _resolver

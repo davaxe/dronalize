@@ -8,6 +8,7 @@ registry.register(
         name="apolloscape",
         loader_factory=ApolloScapeLoader,
         default_config=ApolloScapeLoader.default_config(),
+        default_map_config=ApolloScapeLoader.default_map_config(),
         map_mode=registry.MapMode.NONE,
     ).with_splits("train", "val")
 )

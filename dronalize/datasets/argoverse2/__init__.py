@@ -8,6 +8,7 @@ registry.register(
         name="argoverse2",
         loader_factory=Argoverse2Loader,
         default_config=Argoverse2Loader.default_config(),
-        map_mode=registry.MapMode.BUILDER_ONLY,
+        default_map_config=Argoverse2Loader.default_map_config(),
+        map_mode=registry.MapMode.LAZY_KEYED,
     ).with_all_splits()
 )

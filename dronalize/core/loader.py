@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Generic, Protocol
 import polars as pl
 from typing_extensions import override
 
+from dronalize.config.map import MapConfig
 from dronalize.core._types import P, SourceId, SourceT
 from dronalize.core.exceptions import LoaderConfigError
 from dronalize.core.map_resolver import MapKey, MapResolver, no_map
@@ -258,6 +259,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     def __init__(
         self,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
         split: DatasetSplit | None = None,
         enforce_schema: bool = True,
@@ -285,6 +287,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         self._source_counter: int = 0
         self._enforce_schema: bool = enforce_schema
         self._loader_config: LoaderConfig = loader_config or self.default_config()
+        self._map_config: MapConfig = map_config or self.default_map_config()
         self._pipeline: Pipeline | None = None
         self._split: DatasetSplit = split if split is not None else DatasetSplit.ALL
 
@@ -354,6 +357,18 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             Default configuration for this loader.
 
         """
+
+    @classmethod
+    def default_map_config(cls) -> MapConfig:
+        """Return the default map configuration for this dataset.
+
+        Returns
+        -------
+        MapConfig
+            Default map configuration for this loader.
+
+        """
+        return MapConfig.default()
 
     def train_sources(self) -> Iterable[Source[SourceT]]:
         """Return sources belonging to the **training** split.
@@ -591,7 +606,12 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     @property
     def loader_config(self) -> LoaderConfig:
         """Return the loader configuration."""
-        return self._loader_config or self.default_config()
+        return self._loader_config
+
+    @property
+    def map_config(self) -> MapConfig:
+        """Return the map configuration."""
+        return self._map_config
 
     @property
     def original_input_len(self) -> int:
@@ -682,4 +702,3 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             cls._shared_memory_name = name
         else:
             cls._shared_memory_name = None
-        print(f"{cls.__name__} shared memory configuration set to: {cls._shared_memory_name}")

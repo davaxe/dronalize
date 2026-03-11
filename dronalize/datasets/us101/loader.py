@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.config import LoaderConfig
+    from dronalize.config.map import MapConfig
 
 
 class US101Loader(I80Loader):
@@ -20,9 +21,10 @@ class US101Loader(I80Loader):
 
     def __init__(
         self,
-        data_root: Path,
-        *,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        *,
         lane_change_ratio: float | None = 1,
     ) -> None:
         """Initialize the US101 dataset loader.
@@ -50,5 +52,6 @@ class US101Loader(I80Loader):
         super().__init__(
             data_root,
             loader_config=loader_config,
+            map_config=map_config,
             lane_change_ratio=lane_change_ratio,
         )

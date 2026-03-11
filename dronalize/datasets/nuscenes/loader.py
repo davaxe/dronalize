@@ -10,7 +10,7 @@ from dronalize.config.loader import LoaderConfig
 from dronalize.core.base import BaseSceneLoader
 from dronalize.core.categories import AgentCategory
 from dronalize.core.loader import IngestOutput, Source
-from dronalize.core.map_graph import MapGraph
+from dronalize.core.map_resolver import no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 
     from dronalize.config.map import MapConfig
     from dronalize.core.interfaces import MapResolver
-    from dronalize.core.scene import Scene
 
 
 class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
@@ -36,6 +35,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize the dataset loader.
 
@@ -47,7 +47,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
             Configuration for the loader.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True)
+        super().__init__(loader_config=loader_config, map_config=map_config)
         self._data_root = self._normalize_data_root(data_root)
         self._data_dirs: list[Path] = self._find_data_dir()
         self._dfs: list[dict[str, pl.LazyFrame]] = []
@@ -134,22 +134,9 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
 
     @override
     def map_resolver(self) -> MapResolver:
-        def _resolver(
-            scene: Scene, key: str | None = None, map_config: MapConfig | None = None
-        ) -> MapGraph | None:
-            _ = scene, map_config
-            if (
-                self._shared_memory_name is None
-                or isinstance(self._shared_memory_name, str)
-                or key is None
-            ):
-                return None
-
-            shared_name = self._shared_memory_name[key]
-            with MapGraph.from_shared(shared_name) as graph:
-                return graph
-
-        return _resolver
+        if self._shared_memory_name is None:
+            return no_map()
+        return shared_map(self._shared_memory_name)
 
     def _load_tables(self) -> None:
         """Load all required tables using the generic loader."""

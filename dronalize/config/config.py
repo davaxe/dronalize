@@ -46,7 +46,9 @@ def load_config(config_path: Path) -> dict[str, dict[str, Any]]:
 
 
 def resolve_config(
-    model_cls: type[TModel], default: TModel | dict[str, Any], overrides: TModel | dict[str, Any]
+    model_cls: type[TModel],
+    default: TModel | dict[str, Any],
+    overrides: TModel | dict[str, Any],
 ) -> TModel:
     """Merge a default config model/dict with overrides and validate into the target model.
 

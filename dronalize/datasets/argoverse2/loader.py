@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -8,15 +9,22 @@ from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
 from dronalize.config.loader import LoaderConfig
+from dronalize.config.map import MapConfig
 from dronalize.core.base import BaseSceneLoader
 from dronalize.core.categories import AgentCategory
 from dronalize.core.interfaces import IngestOutput, Source
 from dronalize.core.split import DatasetSplit
+from dronalize.datasets.argoverse2.map.graph_builder import Argoverse2GraphBuilder
+from dronalize.datasets.common import utils
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.map_resolver import MapKey, MapResolver
+    from dronalize.core.scene import Scene
 
 
 class Argoverse2Loader(BaseSceneLoader[list[Path]]):
@@ -26,6 +34,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
         file_batch_size: int | None = 100,
         split: DatasetSplit | None = None,
@@ -46,13 +55,9 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             Which dataset split to load. Defaults to all sources.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        super().__init__(loader_config=loader_config, map_config=map_config, split=split)
         self._data_root = self._normalize_data_root(data_root)
         self._file_batch_size = file_batch_size
-
-    # ------------------------------------------------------------------
-    # Split-aware source discovery
-    # ------------------------------------------------------------------
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         parquet_files = sorted(data_dir.glob("*/*.parquet"))
@@ -78,10 +83,6 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
     @override
     def test_sources(self) -> Iterable[Source[list[Path]]]:
         return self._sources_from_dir(self._data_root / "test")
-
-    # ------------------------------------------------------------------
-    # Ingestion / pipeline
-    # ------------------------------------------------------------------
 
     @override
     def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
@@ -152,6 +153,34 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             ],
         )
 
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.no_extraction()
+
+    @override
+    def map_resolver(self) -> MapResolver:
+        def _resolver(scene: Scene, key: MapKey = None) -> MapGraph | None:
+            if key is None:
+                return None
+
+            return utils.extract_based_on_scene(
+                self._get_map(key, self.map_config.min_distance, self.map_config.interp_distance),
+                scene,
+                self.map_config.extraction,
+            )
+
+        return _resolver
+
+    @staticmethod
+    @functools.lru_cache(maxsize=10)
+    def _get_map(
+        key: str,
+        min_distance: float | None,
+        interp_distance: float | None,
+    ) -> MapGraph:
+        return Argoverse2GraphBuilder.from_json_file(Path(key)).build(min_distance, interp_distance)
+
     @staticmethod
     def _map_object_type_expr(col: str) -> pl.Expr:
         mapping = {
@@ -171,3 +200,15 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             default=AgentCategory.UNKNOWN,
             return_dtype=pl.Int32,
         )
+
+
+if __name__ == "__main__":
+    import os
+    from pathlib import Path
+
+    from dronalize.datasets.argoverse2 import Argoverse2Loader as _Argoverse2Loader
+    from dronalize.datasets.common._debug import _debug_visualize_scenes
+
+    path = Path(os.environ.get("TRAJ_DATA", "data")) / "av2"
+    loader = _Argoverse2Loader(path)
+    _debug_visualize_scenes(loader, max_scenes=1, title_prefix="av2", skip_scenes=5)

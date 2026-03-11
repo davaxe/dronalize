@@ -10,7 +10,7 @@ from streaming import MDSWriter
 from streaming.base.util import merge_index
 from typing_extensions import Self, override
 
-from dronalize.converters.numpy import map_graph_to_numpy
+from dronalize.converters.numpy import map_graph_to_numpy, scene_to_numpy_dict
 from dronalize.core.interfaces import SceneWriter
 from dronalize.core.split import DatasetSplit
 
@@ -47,7 +47,7 @@ class MDSSceneWriter(SceneWriter):
         # Defer writer initialization until the first write call.
         self._writers: dict[DatasetSplit | None, MDSWriter] | None = None
         # Save inner writer args for later use during deferred initialization.
-        self._inner_args = inner_args
+        self._inner_args: _MDSWriterArgs = inner_args
 
     @override
     @classmethod
@@ -103,7 +103,13 @@ class MDSSceneWriter(SceneWriter):
             self._base_output_dir /= mp.current_process().name
 
     @override
-    def write(self, processed: Scene, splits: Iterator[DatasetSplit] | None = None) -> bool:
+    def write(
+        self,
+        processed: Scene,
+        splits: Iterator[DatasetSplit] | None = None,
+        *,
+        strict: bool = False,
+    ) -> bool:
         # Resolve the map once per scene (shared across target-agent samples)
         if self._writers is None:
             self._writers = self._init_writers(
@@ -114,11 +120,10 @@ class MDSSceneWriter(SceneWriter):
                 **self._inner_args,
             )
         map_sample = self._encode_map(processed)
-        from dronalize.converters.numpy import scene_to_numpy_dict
 
         samples = scene_to_numpy_dict(processed, multiple_targets=self._multiple_targets)
         splits_iter = splits if splits is not None else itertools.repeat(None)
-        for (target_id, numpy_dict), split in zip(samples.items(), splits_iter, strict=False):
+        for (target_id, numpy_dict), split in zip(samples.items(), splits_iter, strict=strict):
             if split not in self._writers:
                 msg = f"Scene {processed.scene_number} belongs to split {split}"
                 ", but no writer is configured for this split."

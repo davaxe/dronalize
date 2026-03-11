@@ -8,10 +8,14 @@ from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
 from dronalize.config.loader import LoaderConfig
+from dronalize.config.map import MapConfig
 from dronalize.core.base import BaseSceneLoader
 from dronalize.core.categories import AgentCategory
+from dronalize.core.interfaces import no_map
 from dronalize.core.loader import IngestOutput, Source
+from dronalize.core.map_resolver import MapResolver, shared_map
 from dronalize.core.split import DatasetSplit
+from dronalize.datasets.common import utils
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -26,6 +30,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
         file_batch_size: int | None = 100,
         split: DatasetSplit | None = None,
@@ -51,7 +56,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
             Which dataset split to load. Defaults to all sources.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
+        super().__init__(loader_config=loader_config, map_config=map_config, split=split)
         self._data_root = self._normalize_data_root(data_root)
         self._batch_size: int | None = file_batch_size
 
@@ -74,10 +79,6 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         return self._sources_from_dir(
             self._data_root / "forecasting_test_v1.1" / "test_obs" / "data"
         )
-
-    # ------------------------------------------------------------------
-    # Ingestion / pipeline
-    # ------------------------------------------------------------------
 
     @override
     def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
@@ -139,6 +140,17 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
             require_frames=[19]
         )
 
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.auto_extraction()
+
+    @override
+    def map_resolver(self) -> MapResolver:
+        if self._shared_memory_name is None:
+            return no_map()
+        return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
+
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         files: list[Path] = sorted(data_dir.glob("*.csv"))
         batch_size: int = self._batch_size or len(files)
@@ -155,3 +167,18 @@ _SCHEMA: pl.Schema = pl.Schema({
     "Y": pl.Float32,
     "CITY_NAME": pl.String,
 })
+
+if __name__ == "__main__":
+    import os
+    from pathlib import Path
+
+    from dronalize.datasets.argoverse1 import Argoverse1Loader as _Argoverse1Loader
+    from dronalize.datasets.argoverse1._lifecycle import argoverse1_lifecycle_context
+    from dronalize.datasets.common._debug import _debug_visualize_scenes
+
+    path = Path(os.environ.get("TRAJ_DATA", "data")) / "argoverse"
+    loader = _Argoverse1Loader(path)
+    with argoverse1_lifecycle_context(
+        path, _Argoverse1Loader.default_config(), map_config=_Argoverse1Loader.default_map_config()
+    ) as lifecycle:
+        _debug_visualize_scenes(loader, max_scenes=1, title_prefix="av1", skip_scenes=100)

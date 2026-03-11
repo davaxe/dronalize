@@ -10,6 +10,7 @@ from dronalize.config.map import MapConfig
 from dronalize.core import AgentCategory
 from dronalize.core.interfaces import Source
 from dronalize.datasets.ad4che.graph_builder import AD4CHEGraphBuilder
+from dronalize.datasets.common import utils
 from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
 if TYPE_CHECKING:
@@ -28,6 +29,7 @@ class AD4CHELoader(XLevelDataLoader):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
@@ -52,7 +54,11 @@ class AD4CHELoader(XLevelDataLoader):
 
         """
         data_root = self._normalize_data_root(data_root)
-        super().__init__(data_root / "AD4CHE_Data_V1.0", loader_config)
+        super().__init__(
+            data_root / "AD4CHE_Data_V1.0",
+            loader_config=loader_config,
+            map_config=map_config,
+        )
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
         self._rebalance_ratio = lane_change_ratio
 
@@ -119,22 +125,22 @@ class AD4CHELoader(XLevelDataLoader):
             .with_window(45)
         )
 
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.auto_extraction(padding_factor=1.15)
+
     @override
     def map_resolver(self) -> MapResolver:
-        def _resolver(
-            scene: Scene,
-            key: MapKey = None,
-            map_config: MapConfig | None = None,
-        ) -> MapGraph | None:
+        def _resolver(scene: Scene, key: MapKey) -> MapGraph | None:
             _ = scene
             if key is None:
                 return None
-            map_config = map_config or MapConfig.default()
             path = self._data_dir / key
-            print(f"Resolving map for key {key} at path {path}")
-            return AD4CHEGraphBuilder(path).build(
-                map_config.min_distance, map_config.interp_distance
+            map_graph = AD4CHEGraphBuilder(path).build(
+                self.map_config.min_distance, self.map_config.interp_distance
             )
+            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 
         return _resolver
 

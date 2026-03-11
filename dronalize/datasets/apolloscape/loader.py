@@ -17,6 +17,8 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.config.map import MapConfig
+
 
 class ApolloScapeLoader(BaseSceneLoader[Path]):
     """Loader for the ApolloScape dataset."""
@@ -25,6 +27,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
         *,
         split: DatasetSplit | None = None,
     ) -> None:
@@ -55,7 +58,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
             Which dataset split to load. Defaults to all sources.
 
         """
-        super().__init__(loader_config, enforce_schema=True, split=split)
+        super().__init__(loader_config=loader_config, map_config=map_config, split=split)
         self._data_root = self._normalize_data_root(data_root)
 
     # ------------------------------------------------------------------

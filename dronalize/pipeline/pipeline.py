@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Literal, TypedDict, Unpack, cast, overload
 
 import polars as pl
-from typing_extensions import overload
+from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -653,6 +653,7 @@ class Pipeline:
         """Return True when the pipeline contains at least one step."""
         return len(self._steps) > 0
 
+    @override
     def __repr__(self) -> str:
         """Return a human-readable representation of the pipeline."""
         parts: list[str] = []
@@ -674,11 +675,6 @@ class Pipeline:
 
         """
         return self.compose(other)
-
-
-# ---------------------------------------------------------------------------
-# Internal entry wrappers
-# ---------------------------------------------------------------------------
 
 
 @dataclass(slots=True, frozen=True)

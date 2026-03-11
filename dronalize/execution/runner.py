@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.config.loader import LoaderConfig
+    from dronalize.config.map import MapConfig
     from dronalize.core.base import BaseSceneLoader
     from dronalize.core.split import DatasetSplit
 
@@ -44,7 +45,7 @@ def process_dataset(
         is handed to `writer.write()`. When processing completes, writers are
         finalized via `finish_local()` and `finish_final()`, unless a custom
         finalize callback is used by the underlying execution wrapper.
-    config_overrides : ConfigDict or Path, optional
+    config_overrides_path : Path or None, optional
         Per-dataset configuration overrides (same shape as one section of the
         TOML config file). Merged on top of the loader's `default_config()`.
         When `None` the default config is used unchanged. If it is a `Path`, the
@@ -78,6 +79,7 @@ def process_dataset(
             descriptor,
             data_root=data_root,
             loader_config=config.loader,
+            map_config=config.map,
             split=split,
         )
         if config.execution.parallel:
@@ -103,12 +105,18 @@ def _build_loader(
     *,
     data_root: Path,
     loader_config: LoaderConfig,
+    map_config: MapConfig,
     split: DatasetSplit | None,
 ) -> BaseSceneLoader:
     """Instantiate a loader from a descriptor and its resolved config."""
     kwargs: dict[str, Any] = dict(loader_config.extra_kwargs)
-    kwargs["loader_config"] = loader_config
+    if split is not None and split not in descriptor.predefined_splits:
+        msg: str = (
+            f"Split {split} not supported for dataset {descriptor.name}"
+            f" (supported splits: {descriptor.predefined_splits})"
+        )
+        raise ValueError(msg)
     if split is not None:
         kwargs["split"] = split
 
-    return descriptor.loader_factory(data_root, **kwargs)
+    return descriptor.loader_factory(data_root, loader_config, map_config, **kwargs)

@@ -16,6 +16,8 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.config.map import MapConfig
+
 
 class I80Loader(BaseSceneLoader[Path]):
     """Scene loader for the I-80 dataset."""
@@ -23,8 +25,9 @@ class I80Loader(BaseSceneLoader[Path]):
     def __init__(
         self,
         data_root: Path | str,
-        *,
         loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        *,
         lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the I80 dataset loader.
@@ -49,7 +52,7 @@ class I80Loader(BaseSceneLoader[Path]):
             non-lane changes.
 
         """
-        super().__init__(loader_config=loader_config, enforce_schema=False)
+        super().__init__(loader_config=loader_config, map_config=map_config)
         self._data_dir = self._normalize_data_root(data_root)
         self._rebalance_ratio = lane_change_ratio
 
@@ -85,7 +88,7 @@ class I80Loader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return LoaderConfig(
+        return (
             Pipeline()
             .then_if_present(
                 tr.rebalance,
@@ -111,7 +114,7 @@ class I80Loader(BaseSceneLoader[Path]):
         lane_id_col: str = "Lane_ID",
         id_col: str = "Vehicle_ID",
     ) -> pl.Expr:
-        return LoaderConfig(
+        return (
             pl
             .col(lane_id_col)
             .ne(pl.col(lane_id_col).shift())

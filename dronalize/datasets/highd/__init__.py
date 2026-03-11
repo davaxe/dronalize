@@ -9,7 +9,8 @@ registry.register(
         name="highd",
         loader_factory=HighDLoader,
         default_config=HighDLoader.default_config(),
-        map_mode=registry.MapMode.BUILDER_ONLY,
-        predefined_splits=None,
+        default_map_config=HighDLoader.default_map_config(),
+        map_mode=registry.MapMode.LAZY_KEYED,
+        predefined_splits=[],
     )
 )
