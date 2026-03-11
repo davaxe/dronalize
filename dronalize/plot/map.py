@@ -9,6 +9,8 @@ from dronalize.core._compat import require_optional
 from dronalize.core.datatypes.categories import EdgeType
 
 if TYPE_CHECKING:
+    from types import ModuleType
+
     import altair as alt
 
     from dronalize.core.datatypes.map_graph import MapGraph
@@ -55,16 +57,42 @@ def plot_map_graph(
         alt.data_transformers.disable_max_rows()
 
     if graph.num_edges == 0:
-        return alt.Chart(pl.DataFrame()).mark_text(size=16).encode(text=alt.value("Empty Graph"))
+        return _empty_chart(alt, "Empty Graph")
 
-    # 1. Prepare segments into a DataFrame
+    layers, edge_selection = _build_map_graph_layers(
+        graph,
+        alt=alt,
+        alpha=alpha,
+        include_nodes=include_nodes,
+    )
+
+    return (
+        alt
+        .layer(*layers)
+        .add_params(edge_selection)
+        .properties(width=width, height=height, title="Map Graph Visualization", **kwargs)
+        .configure_view(stroke=None)
+        .configure_title(fontSize=22)
+        .configure_axis(labelFontSize=14, titleFontSize=16)
+        .configure_legend(labelFontSize=14, titleFontSize=16)
+        .interactive()
+    )
+
+
+def _empty_chart(alt: ModuleType, message: str) -> alt.Chart:
+    """Create a simple text chart used for empty plotting inputs."""
+    return alt.Chart(pl.DataFrame()).mark_text(size=16).encode(text=alt.value(message))
+
+
+def _prepare_map_edge_dataframe(graph: MapGraph) -> pl.DataFrame:
+    """Convert graph edges into a tabular representation for Altair."""
     start_indices = graph.edge_indices[0]
     end_indices = graph.edge_indices[1]
 
     start_pos = graph.node_positions[start_indices]
     end_pos = graph.node_positions[end_indices]
 
-    df_edges = (
+    return (
         pl
         .DataFrame({
             "x1": start_pos[:, 0],
@@ -85,7 +113,17 @@ def plot_map_graph(
         .drop("edge_type_int")
     )
 
-    # 2. Dynamically build domains and ranges for *only* the data present
+
+def _build_map_graph_layers(
+    graph: MapGraph,
+    *,
+    alt: ModuleType,
+    alpha: float,
+    include_nodes: bool,
+) -> tuple[list[alt.Chart], Any]:
+    """Build the layered Altair charts for a map graph."""
+    df_edges = _prepare_map_edge_dataframe(graph)
+
     color_dict, width_dict, dash_dict = _get_altair_style_dicts()
 
     present_types = df_edges["edge_type"].unique().to_list()
@@ -97,11 +135,8 @@ def plot_map_graph(
     plot_dash = [dash_dict.get(pt, [1, 0]) for pt in present_types]
 
     axis_scale = alt.Scale(zero=False)
-
-    # 3. Setup Legend Selection
     edge_selection = alt.selection_point(fields=["edge_type"], bind="legend")
 
-    # 4. Create the lines chart
     lines = (
         alt
         .Chart(df_edges)
@@ -145,9 +180,7 @@ def plot_map_graph(
 
     layers = [lines]
 
-    # 5. Create the nodes charts mapped directly to the edge properties
-    if include_nodes and graph.num_edges > 0:
-        # Start nodes of the edges
+    if include_nodes:
         nodes_start = (
             alt
             .Chart(df_edges)
@@ -162,7 +195,6 @@ def plot_map_graph(
                 ],
             )
         )
-        # End nodes of the edges
         nodes_end = (
             alt
             .Chart(df_edges)
@@ -179,17 +211,7 @@ def plot_map_graph(
         )
         layers.extend([nodes_start, nodes_end])
 
-    return (
-        alt
-        .layer(*layers)
-        .add_params(edge_selection)
-        .properties(width=width, height=height, title="Map Graph Visualization", **kwargs)
-        .configure_view(stroke=None)
-        .configure_title(fontSize=22)
-        .configure_axis(labelFontSize=14, titleFontSize=16)
-        .configure_legend(labelFontSize=14, titleFontSize=16)
-        .interactive()
-    )
+    return layers, edge_selection
 
 
 _STYLE_MAP: Final[dict[int, dict]] = {
