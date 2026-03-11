@@ -61,23 +61,23 @@ class StreamSplitter(Generic[T]):
 
         Parameters
         ----------
-            groups : Sequence[T]
-                A sequence of unique groups to split the stream into.
-            weights : Sequence[float], optional
-                A sequence of weights corresponding to each group. If None,
-                groups are treated as equally weighted. The weights will be
-                normalized to sum to 1.
-            round_size : int, optional
-                The number of samples in each round before reshuffling.
-            rounds : int, optional
-                The number of pre-generated rounds of shuffled group indices.
+        groups : Sequence[T]
+            A sequence of unique groups to split the stream into.
+        weights : Sequence[float], optional
+            A sequence of weights corresponding to each group. If None,
+            groups are treated as equally weighted. The weights will be
+            normalized to sum to 1.
+        round_size : int, optional
+            The number of samples in each round before reshuffling.
+        rounds : int, optional
+            The number of pre-generated rounds of shuffled group indices.
 
         Raises
         ------
-            ValueError
-                If groups are not unique, if the number of weights does not
-                match the number of groups, if any weight is negative, or if all
-                weights are zero.
+        ValueError
+            If groups are not unique, if the number of weights does not
+            match the number of groups, if any weight is negative, or if all
+            weights are zero.
 
         """
         # fromkeys preserves order and removes duplicates
@@ -142,11 +142,12 @@ class StreamSplitter(Generic[T]):
 
         Parameters
         ----------
-            n : int
-                The number of groups to yield from the stream.
+        n : int
+            The number of groups to yield from the stream.
 
         Returns
         -------
+        Iterator[T]
             An iterator that yields the next `n` groups based on the current
             round's shuffled deck.
 
@@ -158,6 +159,7 @@ class StreamSplitter(Generic[T]):
 
         Returns
         -------
+        Iterator[T]
             An infinite iterator that yields groups based on the current round's
             shuffled deck.
 
