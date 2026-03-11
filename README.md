@@ -85,16 +85,16 @@ for its functionality.
 # Documentation Overview
 The **Dronalize** toolbox provides a streamlined preprocessing and evaluation pipeline for working with trajectory prediction datasets. While some components are described in the main README, detailed documentation are split into topic-specific pages:
 
-- [Installation Guide](docs/installation.md)
-- [Datasets](docs/datasets.md)
-- [Preprocessing](docs/preprocessing.md)
-- [Modeling](docs/modeling.md)
-- [Data Loading](docs/data_loading.md)
-- [Training](docs/training.md)
-- [Metrics](docs/metrics.md)
-- [Related Work](docs/related_work.md)
-- [Contributing](docs/contributing.md)
-- [Cite](docs/cite.md)
+- [Installation Guide](_docs/installation.md)
+- [Datasets](_docs/datasets.md)
+- [Preprocessing](_docs/preprocessing.md)
+- [Modeling](_docs/modeling.md)
+- [Data Loading](_docs/data_loading.md)
+- [Training](_docs/training.md)
+- [Metrics](_docs/metrics.md)
+- [Related Work](_docs/related_work.md)
+- [Contributing](_docs/contributing.md)
+- [Cite](_docs/cite.md)
 
 <br>
 

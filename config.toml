@@ -1,0 +1,73 @@
+# config.toml - Complete override example
+
+[global.execution]
+parallel = true
+workers = -1 # -1 for all available cores
+chunksize = 100
+
+[global.map]
+min_distance = 1.75
+interp_distance = 3.0
+include_map = true
+
+[global.map.extraction]
+mode = "none"
+
+# ------------------------------------------------------------------------------
+# Dataset 'a43' Overrides
+# Demonstrates heavy loader filtering and radial map extraction
+# ------------------------------------------------------------------------------
+[a43.execution]
+workers = 1
+
+[a43.loader]
+input_len = 25
+output_len = 55
+sample_time = 0.1
+
+[a43.loader.filtering]
+min_agents = 2
+require_all_valid = true
+require_frames = [19, 20, 21]
+filter_agent_category = ["STATIC_OBJECT", "PEDESTRIAN"]
+filter_slow_agents = 0.5
+min_samples_per_agent = 10
+
+[a43.loader.window]
+window_size = 80
+step_size = 1
+
+[a43.loader.extra_kwargs]
+rebalance = true
+custom_flag = "active"
+
+[a43.loader.resampling]
+up = 2
+down = 1
+method = "linear"
+
+[a43.map]
+min_distance = 0.5
+interp_distance = 1.0
+include_map = false
+
+[a43.map.extraction]
+mode = "radial"
+radius = 50.0
+
+# ------------------------------------------------------------------------------
+# Dataset 'b99' Overrides
+# Demonstrates partial overrides and rectangular map extraction
+# ------------------------------------------------------------------------------
+[b99.loader]
+input_len = 10
+output_len = 30
+sample_time = 0.5
+
+[b99.loader.resampling]
+method = "spline"
+
+[b99.map.extraction]
+mode = "rectangular"
+width = 120.5
+height = 80.0

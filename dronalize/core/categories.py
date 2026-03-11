@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+from enum import IntEnum, auto
+from typing import Final
+
+
+class AgentCategory(IntEnum):
+    """Enumeration of categories of agents / objects."""
+
+    CAR = auto()
+    VAN = auto()
+    TRAILER = auto()
+    TRUCK = auto()
+    TRAM = auto()
+    BUS = auto()
+    MOTORCYCLE = auto()
+    BICYCLE = auto()
+    PEDESTRIAN = auto()
+    TRICYCLE = auto()
+    ANIMAL = auto()
+    STATIC_OBJECT = auto()
+    MOVEABLE_OBJECT = auto()
+    EMERGENCY_VEHICLE = auto()
+    UNKNOWN = auto()
+    UNIMPORTANT = auto()
+
+    @classmethod
+    def from_string(cls, s: str) -> AgentCategory:
+        """Convert a string to an AgentCategory, case-insensitive."""
+        s = s.lower()
+        for category in AgentCategory:
+            if category.name.lower() == s:
+                return category
+        msg = f"Unknown agent category: {s}"
+        raise ValueError(msg)
+
+    @classmethod
+    def from_value(cls, value: int | str | AgentCategory) -> AgentCategory:
+        """Convert an integer or string to an AgentCategory."""
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, int):
+            return cls(value)
+        if isinstance(value, str):
+            return cls.from_string(value)
+        return None
+
+
+class EdgeType(IntEnum):
+    """Enumeration of edge types in the lane graph."""
+
+    NONE = 1
+    ROAD_BORDER = 2
+    CURB = 3
+    REGULATORY = 4
+    VIRTUAL = 5
+    LINE_THIN = 6
+    LINE_THIN_DASHED = 7
+    LINE_THICK = 8
+    LINE_THICK_DASHED = 9
+    PEDESTRIAN_MARKING = 10
+    BIKE_MARKING = 11
+    GUARD_RAIL = 12
+    STOP = 13
+    LINE_THIN_DOUBLE = 14
+    LINE_THIN_DOUBLE_DASHED = 15
+
+    @classmethod
+    def from_str(
+        cls,
+        type_str: str | None,
+        subtype: str | None = None,
+    ) -> EdgeType:
+        """Convert string representation to EdgeType."""
+        if type_str is None:
+            return cls.NONE
+
+        # First check high-priority mappings
+        type_map: dict[str, EdgeType] = _STR_TO_EDGE
+
+        # Check if it's a high-priority type first
+        edge_type = type_map.get(type_str)
+        if edge_type is not None:
+            return edge_type
+
+        # Only then check for line types
+        if type_str == "line_thin":
+            return cls.LINE_THIN_DASHED if subtype == "dashed" else cls.LINE_THIN
+        if type_str == "line_thick":
+            return cls.LINE_THICK_DASHED if subtype == "dashed" else cls.LINE_THICK
+
+        return cls.NONE
+
+
+_STR_TO_EDGE: Final[dict[str, EdgeType]] = {
+    "road_border": EdgeType.ROAD_BORDER,
+    "curbstone": EdgeType.CURB,
+    "stop_line": EdgeType.STOP,
+    "regulatory_element": EdgeType.REGULATORY,
+    "virtual": EdgeType.VIRTUAL,
+    "pedestrian_marking": EdgeType.PEDESTRIAN_MARKING,
+    "bike_marking": EdgeType.BIKE_MARKING,
+    "guard_rail": EdgeType.GUARD_RAIL,
+    "fence": EdgeType.ROAD_BORDER,
+    "wall": EdgeType.ROAD_BORDER,
+}

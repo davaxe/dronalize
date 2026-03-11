@@ -1,19 +1,24 @@
 ### Folders ###
+.vscode
+.zed
+old
 data/
 lightning_logs/
 wandb/
 /saved_models/
 media/
-
+.VisualStudioCode
 ### Apptainer ###
 *.sif
-
 ### Slurm ###
 slurm*.out
 
 ### Files ###
 *.csv
 *.zip
+
+### UV ###
+uv.lock
 
 ### JupyterNotebooks ###
 Untitled*

@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from dronalize.config import LoaderConfig
+
+
+class InDLoader(XLevelDataLoader):
+    """Trajectory data loader for the inD dataset.
+
+    The inD (intersections Drone) dataset was recorded at urban intersections in
+    Germany using drone footage. It contains naturalistic trajectories of
+    various traffic participants — including cars, trucks, bicycles, and
+    pedestrians — navigating through signalised and unsignalised intersections.
+
+    This loader inherits all trajectory processing logic from
+    `XLevelDataLoader`, as the inD dataset follows the same CSV format used
+    across the X-level dataset family.
+
+    """
+
+    def __init__(
+        self,
+        data_root: Path,
+        loader_config: LoaderConfig | None = None,
+    ) -> None:
+        """Initialize the trajectory data loader for the inD dataset.
+
+        Parameters
+        ----------
+        data_root : Path
+            Path to root of the inD dataset.
+        loader_config : , optional
+            Loader configuration. If None, the default configuration is used.
+
+        """
+        super().__init__(data_root / "data", loader_config)
