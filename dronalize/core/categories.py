@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from enum import IntEnum, StrEnum, auto
+from enum import IntEnum, auto
 from typing import Final
 
 
-class AgentCategory(StrEnum):
+class AgentCategory(IntEnum):
     """Enumeration of categories of agents / objects."""
 
     CAR = auto()
@@ -23,6 +23,27 @@ class AgentCategory(StrEnum):
     EMERGENCY_VEHICLE = auto()
     UNKNOWN = auto()
     UNIMPORTANT = auto()
+
+    @classmethod
+    def from_string(cls, s: str) -> AgentCategory:
+        """Convert a string to an AgentCategory, case-insensitive."""
+        s = s.lower()
+        for category in AgentCategory:
+            if category.name.lower() == s:
+                return category
+        msg = f"Unknown agent category: {s}"
+        raise ValueError(msg)
+
+    @classmethod
+    def from_value(cls, value: int | str | AgentCategory) -> AgentCategory:
+        """Convert an integer or string to an AgentCategory."""
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, int):
+            return cls(value)
+        if isinstance(value, str):
+            return cls.from_string(value)
+        return None
 
 
 class EdgeType(IntEnum):

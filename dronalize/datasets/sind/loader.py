@@ -7,9 +7,10 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
+from dronalize.config.loader import LoaderConfig
+from dronalize.core.base import BaseSceneLoader
+from dronalize.core.categories import AgentCategory
+from dronalize.core.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -129,7 +130,7 @@ class SindLoader(BaseSceneLoader[Path]):
         return "map_relink_law_save.osm"
 
 
-_VEHICLE_SCHEMA = {
+_VEHICLE_SCHEMA = pl.Schema({
     "track_id": pl.Int32,
     "frame_id": pl.Int32,
     "agent_type": pl.Utf8,
@@ -140,9 +141,9 @@ _VEHICLE_SCHEMA = {
     "vy": pl.Float32,
     "ax": pl.Float32,
     "ay": pl.Float32,
-}
+})
 
-_PEDESTRIAN_SCHEMA = {
+_PEDESTRIAN_SCHEMA = pl.Schema({
     "track_id": pl.Utf8,
     "frame_id": pl.Int32,
     "agent_type": pl.Utf8,
@@ -152,4 +153,4 @@ _PEDESTRIAN_SCHEMA = {
     "vy": pl.Float32,
     "ax": pl.Float32,
     "ay": pl.Float32,
-}
+})

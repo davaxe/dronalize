@@ -8,8 +8,9 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.config import LoaderConfig
+from dronalize.core import AgentCategory, BaseSceneLoader
+from dronalize.core.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -39,7 +40,7 @@ class OpenDDLoader(BaseSceneLoader[str]):
         ----------
         data_root : Path or str
             Path to the SQLite database file.
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration override. If None, the default configuration
             is used.
 
@@ -150,7 +151,7 @@ class MultiOpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         data_root : Path or str
             Path to a directory containing one subdirectory or database file per
             OpenDD segment.
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration override. If None, the default configuration
             is used.
 

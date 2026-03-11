@@ -5,16 +5,12 @@ from typing import TYPE_CHECKING, Self
 
 import polars as pl
 
-from dronalize.core.datatypes.map_resolver import MapResolver  # noqa: TC001
-from dronalize.pipeline.ops.convert import (
-    NumpySceneDict,
-    convert_to_numpy_dict,
-    target_candidates,
-)
+from dronalize.core.map_resolver import MapResolver  # noqa: TC001
 
 if TYPE_CHECKING:
-    from dronalize.core.datatypes.map_config import MapConfig
-    from dronalize.core.datatypes.map_resolver import MapGraph, MapKey
+    from dronalize.config.map import MapConfig
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.map_resolver import MapKey
 
 
 @dataclass(slots=True, frozen=True)
@@ -105,56 +101,6 @@ class Scene:
             f"map_key={self.map_key!r}, "
             f"inner=DataFrame({rows} rows x {cols} cols))"
         )
-
-    def to_numpy_dict(
-        self,
-        *,
-        multiple_targets: bool | int = False,
-        target_agent: int | None = None,
-    ) -> dict[int, NumpySceneDict]:
-        """Convert to a numpy representation compatible with Pytorch.
-
-        Parameters
-        ----------
-        multiple_targets : bool or int, optional
-            Whether to return multile "samples" from each scene by changing the
-            target angent. If `True` as many as possible samples will be
-            returned, if an integer is given, at most that many samples will be
-            returned.
-        target_agent : int, optional
-            If `multiple_targets` is False, this specifies the track ID to use as
-            the target agent. If None, the first valid track will be used as the
-            target.
-
-        Returns
-        -------
-        dict[int, NumpySceneDict]
-            A dictionary mapping target agent track IDs to their corresponding
-            numpy representations of the scene data.
-
-        """
-        if not multiple_targets and target_agent is not None:
-            return {
-                target_agent: convert_to_numpy_dict(
-                    self.inner, self.input_len, self.output_len, target_agent
-                )
-            }
-
-        candidates = target_candidates(self.inner, self.input_len)
-        if multiple_targets is False:
-            candidates = candidates[:1]
-        elif isinstance(multiple_targets, int):
-            candidates = candidates[:multiple_targets]
-
-        return {
-            target: convert_to_numpy_dict(
-                self.inner,
-                self.input_len,
-                self.output_len,
-                target,
-            )
-            for target in candidates
-        }
 
     @staticmethod
     def _base_schema() -> pl.Schema:

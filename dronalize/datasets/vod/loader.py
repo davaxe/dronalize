@@ -2,7 +2,7 @@ from pathlib import Path
 
 from typing_extensions import override
 
-from dronalize.core import LoaderConfig
+from dronalize.config import LoaderConfig
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
 
 
@@ -26,7 +26,7 @@ class VodLoader(NuScenesLoader):
         ----------
         data_dir : Path or str
             Directory of the trajectory data JSON files.
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Custom configuration, or default if None.
 
         """

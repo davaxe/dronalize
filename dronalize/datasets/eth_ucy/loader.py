@@ -7,10 +7,10 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core import BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.config.loader import LoaderConfig
+from dronalize.core import AgentCategory, BaseSceneLoader
+from dronalize.core.interfaces import IngestOutput, Source
+from dronalize.core.split import DatasetSplit
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -37,7 +37,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
             Path to the root directory containing the ETH/UCY data.
         dataset : str or Sequence[str]
             Name(s) of the dataset(s) to load (e.g., "hotel", "eth").
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration override. If None, the default configuration is used.
         split : DatasetSplit, optional
             Which dataset split to load. Defaults to all sources.
@@ -89,12 +89,12 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
                 has_header=False,
                 separator="\t",
                 new_columns=["frame", "id", "x", "y"],
-                schema={
+                schema=pl.Schema({
                     "frame": pl.Int32,
                     "id": pl.Int32,
                     "x": pl.Float64,
                     "y": pl.Float64,
-                },
+                }),
             ).with_columns(
                 ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
                 pl.col("id").cast(pl.Int32),

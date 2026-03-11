@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import polars as pl
 from scipy.interpolate import UnivariateSpline
 from typing_extensions import Self, override
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
+from dronalize.core.base import BaseGraphBuilder
+from dronalize.core.categories import EdgeType
+
+if TYPE_CHECKING:
+    from dronalize.core.graph_builder import Point
 
 
 @dataclass(slots=True, frozen=True)

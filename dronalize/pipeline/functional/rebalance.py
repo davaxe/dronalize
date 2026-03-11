@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.pipeline.ops.basic import lazy
+from dronalize.pipeline.functional.basic import lazy
 
 if TYPE_CHECKING:
     from dronalize.core._types import DataFrameT

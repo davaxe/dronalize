@@ -13,14 +13,14 @@ from typing import TYPE_CHECKING, Literal, Protocol
 
 import tomllib
 
-from dronalize.core.datatypes.map_config import MapConfig
-from dronalize.core.datatypes.split import DatasetSplit
+from dronalize.config.map import MapConfig
+from dronalize.core.split import DatasetSplit
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator
 
-    from dronalize.core.datatypes.loader_config import LoaderConfig
-    from dronalize.core.protocols.loader import BaseSceneLoader
+    from dronalize.config.loader import LoaderConfig
+    from dronalize.core.base import BaseSceneLoader
 
 _MANIFEST_NAME = "manifest.toml"
 _REGISTRY: dict[str, DatasetDescriptor] = {}

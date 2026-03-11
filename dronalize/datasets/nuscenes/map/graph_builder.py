@@ -6,12 +6,14 @@ from typing import TYPE_CHECKING, TypedDict
 
 from typing_extensions import Self, override
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
+from dronalize.core.base import BaseGraphBuilder
+from dronalize.core.categories import EdgeType
 from dronalize.datasets.nuscenes.map import parser
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from dronalize.core.interfaces import Point
 
 
 class NuScenesMapGraphBuilder(BaseGraphBuilder):

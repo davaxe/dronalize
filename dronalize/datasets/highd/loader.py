@@ -10,7 +10,7 @@ from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core import LoaderConfig
+    from dronalize.config import LoaderConfig
 
 
 class HighDLoader(XLevelDataLoader):
@@ -37,7 +37,7 @@ class HighDLoader(XLevelDataLoader):
         ----------
         data_root : Path
             Path to the root directory of the highD dataset, which should contain a "data"
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio to rebalance lane changing vs non-lane changing agents.

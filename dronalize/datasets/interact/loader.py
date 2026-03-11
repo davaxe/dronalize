@@ -7,9 +7,10 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.config import LoaderConfig
+from dronalize.core import AgentCategory, BaseSceneLoader
+from dronalize.core.interfaces import IngestOutput, Source
+from dronalize.core.split import DatasetSplit
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -39,7 +40,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
             Path to the root of the INTERACTION dataset.  This directory
             should contain `train/`, `val/`, `test_multi-agent/`,
             and `test_conditional-multi-agent/` subdirectories.
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration override. If None, the default configuration
             is used.
         file_batch_size : int, optional

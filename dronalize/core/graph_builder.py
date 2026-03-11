@@ -12,8 +12,8 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import Self
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.datatypes.map_graph import MapGraph
+from dronalize.core.categories import EdgeType
+from dronalize.core.map_graph import MapGraph
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

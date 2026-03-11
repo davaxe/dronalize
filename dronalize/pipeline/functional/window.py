@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Literal, overload
 import polars as pl
 import polars.selectors as sl
 
-from dronalize.pipeline.ops.basic import collect
+from dronalize.pipeline.functional.basic import collect
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

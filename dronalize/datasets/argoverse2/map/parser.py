@@ -16,16 +16,15 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from enum import auto
+from enum import IntEnum, auto
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.datatypes.enum import BaseEnum
+from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
-    from dronalize.core.protocols.graph_builder import Point
+    from dronalize.core.graph_builder import Point
 
 
 class Argoverse2Map:
@@ -68,7 +67,7 @@ class Argoverse2Map:
         return {area["id"]: DrivableArea.from_dict(area) for area in areas_data.values()}
 
 
-class LaneType(BaseEnum):
+class LaneType(IntEnum):
     """Represents the type of lane segment."""
 
     VEHICLE = 0
@@ -76,7 +75,7 @@ class LaneType(BaseEnum):
     BUS = 2
 
 
-class LaneBoundaryType(BaseEnum):
+class LaneBoundaryType(IntEnum):
     """Represents the type of lane marking."""
 
     NONE = auto()
@@ -116,7 +115,7 @@ class LaneBoundary:
 
         points: list[Point] = [(node["x"], node["y"]) for node in data[boundary_key]]
         return cls(
-            lane_type=LaneBoundaryType.from_str(data[type_key]),
+            lane_type=LaneBoundaryType[data[type_key]],
             points=points,
         )
 
@@ -163,7 +162,7 @@ class LaneSegment:
         """Create a `LaneSegment` instance from a dictionary."""
         segment = cls(
             id=data["id"],
-            lane_type=LaneType.from_str(data["lane_type"]),
+            lane_type=LaneType[data["lane_type"]],
             right_neighbor_id=data.get("right_neighbor_id"),
             left_neighbor_id=data.get("left_neighbor_id"),
         )

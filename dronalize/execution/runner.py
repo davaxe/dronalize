@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from dronalize.core.protocols.writer import SceneWriter
+from dronalize.config.config import Config, load_config, resolve_config
+from dronalize.core.interfaces import SceneWriter
 from dronalize.datasets.registry import DatasetDescriptor, get
-from dronalize.processing.config import Config, ConfigDict, load_config, resolve_config
-from dronalize.processing.parallel import ParallelProcessor
-from dronalize.processing.sequential import SequentialProcessor
+from dronalize.execution.parallel import ParallelExecutor
+from dronalize.execution.sequential import SequentialExecutor
 
 if TYPE_CHECKING:
-    from dronalize.core.datatypes.loader_config import LoaderConfig
-    from dronalize.core.datatypes.split import DatasetSplit
-    from dronalize.core.protocols.loader import BaseSceneLoader
+    from pathlib import Path
+
+    from dronalize.config.loader import LoaderConfig
+    from dronalize.core.base import BaseSceneLoader
+    from dronalize.core.split import DatasetSplit
 
 
 WriterFactory = Callable[[int | None], SceneWriter]
@@ -24,7 +25,7 @@ def process_dataset(
     *,
     data_root: Path,
     writer: SceneWriter | WriterFactory,
-    config_overrides: ConfigDict | Path | None = None,
+    config_overrides_path: Path | None = None,
     split: DatasetSplit | None = None,
 ) -> None:
     """Process a single dataset end-to-end and write scenes via *writer*.
@@ -56,13 +57,13 @@ def process_dataset(
     if isinstance(descriptor, str):
         descriptor = get(descriptor)
 
-    if isinstance(config_overrides, Path):
-        all_overrides = load_config(config_overrides)
-        config_overrides = all_overrides.get(descriptor.name)
+    config_overrides = {}
+    if config_overrides_path is not None:
+        all_overrides = load_config(config_overrides_path)
+        config_overrides = all_overrides.get(descriptor.name, {})
 
-    config_overrides = config_overrides or {}
     config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
-    config = resolve_config(config, config_overrides)
+    config = resolve_config(Config, default=config, overrides=config_overrides)
 
     if config.execution.parallel and isinstance(writer, SceneWriter):
         msg = (
@@ -81,7 +82,7 @@ def process_dataset(
         )
         if config.execution.parallel:
             writer = cast("WriterFactory", writer)
-            ParallelProcessor(
+            ParallelExecutor(
                 loader,
                 processes=config.execution.workers,
                 chunksize=config.execution.chunksize,
@@ -94,7 +95,7 @@ def process_dataset(
         if isinstance(writer, Callable):
             writer = writer(None)
 
-        SequentialProcessor(loader, progress_bar=True).write_scenes(writer_factory=lambda: writer)
+        SequentialExecutor(loader, progress_bar=True).write_scenes(writer_factory=lambda: writer)
 
 
 def _build_loader(

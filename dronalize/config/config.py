@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import tomllib
 from pydantic import BaseModel, Field, RootModel
 
-from dronalize.core.datatypes.map_config import MapConfig
+from dronalize.config.map import MapConfig
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-    from dronalize.core.datatypes.loader_config import LoaderConfig
+    from dronalize.config.loader import LoaderConfig
 
 # Define a TypeVar bound to BaseModel for generic type hinting
 TModel = TypeVar("TModel", bound=BaseModel)

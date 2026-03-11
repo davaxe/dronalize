@@ -5,9 +5,10 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core import AgentCategory, LoaderConfig
-from dronalize.core.datatypes.map_config import MapConfig
-from dronalize.core.protocols.loader import Source
+from dronalize.config import LoaderConfig
+from dronalize.config.map import MapConfig
+from dronalize.core import AgentCategory
+from dronalize.core.interfaces import Source
 from dronalize.datasets.ad4che.graph_builder import AD4CHEGraphBuilder
 from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
@@ -15,9 +16,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-    from dronalize.core.datatypes.map_graph import MapGraph
-    from dronalize.core.datatypes.map_resolver import MapKey, MapResolver
-    from dronalize.core.datatypes.scene import Scene
+    from dronalize.core.interfaces import MapKey, MapResolver
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.scene import Scene
 
 
 class AD4CHELoader(XLevelDataLoader):

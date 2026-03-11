@@ -1,4 +1,4 @@
-from dronalize.core.datatypes.map_config import MapConfig
+from dronalize.config.map import MapConfig
 from dronalize.datasets import registry
 from dronalize.datasets.lyft.lifecycle import lyft_lifecylce_context
 from dronalize.datasets.lyft.loader import LyftLoader

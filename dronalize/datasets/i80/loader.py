@@ -7,8 +7,9 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.config import LoaderConfig
+from dronalize.core import AgentCategory, BaseSceneLoader
+from dronalize.core.interfaces import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -40,7 +41,7 @@ class I80Loader(BaseSceneLoader[Path]):
         ----------
         data_root : Path or str
             Path to root of the I80 dataset, containing subdirectories of data files.
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio for rebalancing highway agents. If None, no rebalancing will
@@ -84,7 +85,7 @@ class I80Loader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return (
+        return LoaderConfig(
             Pipeline()
             .then_if_present(
                 tr.rebalance,
@@ -110,7 +111,7 @@ class I80Loader(BaseSceneLoader[Path]):
         lane_id_col: str = "Lane_ID",
         id_col: str = "Vehicle_ID",
     ) -> pl.Expr:
-        return (
+        return LoaderConfig(
             pl
             .col(lane_id_col)
             .ne(pl.col(lane_id_col).shift())

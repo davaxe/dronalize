@@ -10,7 +10,7 @@ import polars as pl
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
-from dronalize.pipeline.ops.derivative import derivative
+from dronalize.pipeline.functional.derivative import derivative
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

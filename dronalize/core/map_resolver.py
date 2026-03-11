@@ -3,16 +3,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from dronalize.core.datatypes.map_config import MapConfig
-    from dronalize.core.datatypes.map_graph import MapGraph
-    from dronalize.core.datatypes.scene import Scene
+    from dronalize.config.map import MapConfig
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.scene import Scene
 
 MapKey = str | None
 """Lightweight map identifier stored on each scene.
 
 `None` means "no map" or "use the default/only map".  A non-`None`
 string is resolved by a `MapResolver` to produce a
-`~dronalize.core.datatypes.map_graph.MapGraph`.
+`~dronalize.core.map_graph.MapGraph`.
 """
 
 

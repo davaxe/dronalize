@@ -7,7 +7,7 @@ from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core import LoaderConfig
+    from dronalize.config import LoaderConfig
 
 
 class ExiDLoader(XLevelDataLoader):
@@ -35,7 +35,7 @@ class ExiDLoader(XLevelDataLoader):
         ----------
         data_root : Path
             Path to root of the exiD dataset.
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration. If None, the default configuration is used.
 
         """

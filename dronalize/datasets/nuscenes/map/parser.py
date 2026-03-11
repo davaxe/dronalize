@@ -19,15 +19,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from enum import auto
+from enum import IntEnum, auto
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from typing_extensions import Self
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.datatypes.enum import BaseEnum
+from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -153,7 +152,7 @@ class NuScenesMap:
         return _many_from_dict(ArclinePathV1, data_iter)
 
 
-class StopLineType(BaseEnum):
+class StopLineType(IntEnum):
     """Enum representing different types of stop lines in a NuScenes map."""
 
     TURN_STOP = auto()
@@ -162,7 +161,7 @@ class StopLineType(BaseEnum):
     TRAFFIC_LIGHT = auto()
 
 
-class SegmentDividerType(BaseEnum):
+class SegmentDividerType(IntEnum):
     """Enum representing different types of segment dividers in a NuScenes map."""
 
     NIL = auto()
@@ -187,7 +186,7 @@ _SEGMENT_DIVIDER_TYPE_TO_EDGE_TYPE: dict[SegmentDividerType, EdgeType] = {
 }
 
 
-class LaneType(BaseEnum):
+class LaneType(IntEnum):
     """Enum representing different types of lanes in a NuScenes map."""
 
     # First two are available in NuScenes. The rest are in View of Delft (VOD)
@@ -416,9 +415,7 @@ class StopLine:
         return cls(
             id=str(data["token"]),
             polygon=str(data["polygon_token"]),
-            stop_line_type=StopLineType.from_str(
-                data.get("stop_line_type", "TURN_STOP"),
-            ),
+            stop_line_type=StopLineType[data.get("stop_line_type", "TURN_STOP")],
             pedestrian_crossings=[str(pc) for pc in data.get("ped_crossing_tokens", [])],
             traffic_lights=[str(tl) for tl in data.get("traffic_light_tokens", [])],
         )
@@ -442,6 +439,25 @@ class StopLine:
         )
 
 
+def _resolve_lane_type(value: str | None) -> LaneType:
+    """Resolve a lane type from a string or integer string value.
+
+    Tries the member name first (NuScenes), then the integer value (VOD),
+    and falls back to `LaneType.NONE` if neither matches.
+    """
+    if value is None:
+        return LaneType.NONE
+    if value in LaneType.__members__:
+        return LaneType[value]
+    try:
+        int_value = int(value)
+        if int_value in LaneType._value2member_map_:
+            return LaneType(int_value)
+    except (ValueError, TypeError):
+        pass
+    return LaneType.NONE
+
+
 @dataclass
 class Lane:
     """A lane in NuScenes, represented by a polygon and lane dividers."""
@@ -462,9 +478,7 @@ class Lane:
         return cls(
             id=str(data["token"]),
             polygon=str(data["polygon_token"]),
-            lane_type=LaneType.try_from_str(data.get("lane_type", "NONE"))
-            or LaneType.try_from_int(int(data.get("lane_type", -1)))
-            or LaneType.NONE,
+            lane_type=_resolve_lane_type(data.get("lane_type")),
             left_lane_divider_segments=_parse_segment_divider(
                 data.get("left_lane_divider_segments", []),
             ),
@@ -529,7 +543,7 @@ def _parse_segment_divider(
     return [
         (
             str(segment_dict["node_token"]),
-            SegmentDividerType.from_str(segment_dict["segment_type"]),
+            SegmentDividerType[segment_dict["segment_type"]],
         )
         for segment_dict in segments
     ]

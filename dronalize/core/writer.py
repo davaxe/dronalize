@@ -9,8 +9,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
     from pathlib import Path
 
-    from dronalize.core.datatypes.scene import Scene
-    from dronalize.core.datatypes.split import DatasetSplit
+    from dronalize.core.scene import Scene
+    from dronalize.core.split import DatasetSplit
 
 P = ParamSpec("P")
 

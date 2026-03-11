@@ -10,14 +10,15 @@ from streaming import MDSWriter
 from streaming.base.util import merge_index
 from typing_extensions import Self, override
 
-from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.protocols.writer import SceneWriter
+from dronalize.converters.numpy import map_graph_to_numpy
+from dronalize.core.interfaces import SceneWriter
+from dronalize.core.split import DatasetSplit
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
 
-    from dronalize.core.datatypes.map_graph import NumpyMapGraphDict
-    from dronalize.core.datatypes.scene import Scene
+    from dronalize.converters.numpy import NumpyMapGraphDict
+    from dronalize.core.scene import Scene
 
 
 class _MDSWriterArgs(TypedDict, total=False):
@@ -113,7 +114,9 @@ class MDSSceneWriter(SceneWriter):
                 **self._inner_args,
             )
         map_sample = self._encode_map(processed)
-        samples = processed.to_numpy_dict(multiple_targets=self._multiple_targets)
+        from dronalize.converters.numpy import scene_to_numpy_dict
+
+        samples = scene_to_numpy_dict(processed, multiple_targets=self._multiple_targets)
         splits_iter = splits if splits is not None else itertools.repeat(None)
         for (target_id, numpy_dict), split in zip(samples.items(), splits_iter, strict=False):
             if split not in self._writers:
@@ -182,7 +185,8 @@ class MDSSceneWriter(SceneWriter):
                 "map_node_types": _PLACEHOLDER_I32,
                 "map_edge_types": _PLACEHOLDER_I32,
             }
-        return graph.to_numpy_dict()
+
+        return map_graph_to_numpy(graph)
 
 
 # -- Column schema ----------------------------------------------------------

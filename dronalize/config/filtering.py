@@ -1,36 +1,50 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from dronalize.core.datatypes.categories import AgentCategory
+from dronalize.core.categories import AgentCategory
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-def _ensure_frozenset(v: Any) -> frozenset[Any] | None:
+def _ensure_frozenset_agent(
+    v: AgentTypeValue | Iterable[AgentTypeValue] | None,
+) -> frozenset[AgentCategory] | None:
     if v is None:
         return None
 
     # If it's a single item, wrap it in a list first
     if isinstance(v, (str, int, AgentCategory)):
-        v = [v]
+        v = [AgentCategory.from_value(v)]
 
-    normalized_items = []
-    for item in v:
-        if isinstance(item, str):
-            normalized_items.append(item.lower())
-        else:
-            normalized_items.append(item)
+    normalized_items = [AgentCategory.from_value(item) for item in v]
 
     return frozenset(normalized_items)
 
 
+def _ensure_frozenset_int(v: int | Iterable[int] | None) -> frozenset[int] | None:
+    if v is None:
+        return None
+
+    # If it's a single item, wrap it in a list first
+    if isinstance(v, int):
+        v = [v]
+
+    normalized_items = [int(item) for item in v]
+
+    return frozenset(normalized_items)
+
+
+AgentTypeValue = int | str | AgentCategory
+
 # Type aliases for cleaner fields
-FrozenIntSet = Annotated[frozenset[int] | None, BeforeValidator(_ensure_frozenset)]
-FrozenAgentSet = Annotated[frozenset[AgentCategory] | None, BeforeValidator(_ensure_frozenset)]
+FrozenIntSet = Annotated[frozenset[int] | None, BeforeValidator(_ensure_frozenset_int)]
+FrozenAgentSet = Annotated[
+    frozenset[AgentCategory] | None, BeforeValidator(_ensure_frozenset_agent)
+]
 
 
 class FilteringConfig(BaseModel):
@@ -81,7 +95,7 @@ class FilteringConfig(BaseModel):
         min_agents: int = 2,
         require_all_valid: bool = False,
         require_frames: int | Iterable[int] | None = None,
-        filter_agent_category: str | AgentCategory | Iterable[str | AgentCategory] | None = None,
+        filter_agent_category: AgentTypeValue | Iterable[AgentTypeValue] | None = None,
         filter_slow_agents: float | None = None,
         min_samples_per_agent: int | None = None,
     ) -> FilteringConfig:

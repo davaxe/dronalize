@@ -9,15 +9,16 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core._types import P, SourceId, SourceT
-from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
-from dronalize.core.datatypes.scene import Scene
-from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
+from dronalize.core.exceptions import LoaderConfigError
+from dronalize.core.map_resolver import MapKey, MapResolver, no_map
+from dronalize.core.scene import Scene
+from dronalize.core.split import DatasetSplit, SplitNotSupportedError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from dronalize.core.datatypes import LoaderConfig
-    from dronalize.core.protocols.writer import SceneWriter
+    from dronalize.config.loader import LoaderConfig
+    from dronalize.core.writer import SceneWriter
     from dronalize.pipeline.pipeline import Pipeline
 
 
@@ -461,7 +462,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     def _invalid_loader_argument(self, detail: str) -> ValueError:
         """Create a consistent loader configuration error."""
-        return ValueError(f"{type(self).__name__}: {detail}")
+        return LoaderConfigError(f"{type(self).__name__}: {detail}")
 
     def set_loader_config(self, config: LoaderConfig) -> None:
         """Set the loader configuration.

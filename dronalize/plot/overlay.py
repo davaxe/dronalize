@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     import altair as alt
     import polars as pl
 
-    from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
 
 
 def plot_trajectories_on_map(

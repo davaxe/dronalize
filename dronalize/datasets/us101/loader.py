@@ -7,7 +7,7 @@ from dronalize.datasets.i80.loader import I80Loader
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core import LoaderConfig
+    from dronalize.config import LoaderConfig
 
 
 class US101Loader(I80Loader):
@@ -39,7 +39,7 @@ class US101Loader(I80Loader):
         ----------
         data_root : Path
             Path to root of the US101 dataset, containing subdirectories of data files.
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration. If None, the default configuration is used.
         lane_change_ratio : float, optional
             Ratio for rebalancing highway agents. If None, no rebalancing will

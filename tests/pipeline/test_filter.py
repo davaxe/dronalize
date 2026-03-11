@@ -1,9 +1,10 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from dronalize.core import AgentCategory, LoaderConfig
-from dronalize.core.datatypes.filtering_config import FilteringConfig
-from dronalize.pipeline.ops.filter import filter_scene
+from dronalize.config import LoaderConfig
+from dronalize.config.filtering import FilteringConfig
+from dronalize.core import AgentCategory
+from dronalize.pipeline.functional.filter import filter_scene
 
 
 def test_no_scene_filtering() -> None:
@@ -34,7 +35,7 @@ def test_filter_agent_category() -> None:
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        filtering=FilteringConfig(
+        filtering=FilteringConfig.create(
             min_agents=0,
             filter_agent_category=[AgentCategory.UNIMPORTANT],
         ),
@@ -116,10 +117,7 @@ def test_require_frames() -> None:
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        filtering=FilteringConfig(
-            min_agents=0,
-            require_frames=[0, 4],  # We require relative frames 0 and 4
-        ),
+        filtering=FilteringConfig.create(min_agents=0, require_frames=[0, 4]),
     )
 
     result = filter_scene(df, config.filtering, group_by="scene")
@@ -142,7 +140,7 @@ def test_require_prediction_frame() -> None:
         input_len=3,
         output_len=1,
         sample_time=0.1,
-        filtering=FilteringConfig(min_agents=0, require_frames=[2]),
+        filtering=FilteringConfig.create(min_agents=0, require_frames=[2]),
     )
 
     result = filter_scene(df, config.filtering, group_by="scene")
@@ -164,13 +162,11 @@ def test_complex_interaction() -> None:
         ],
     })
 
-    # We have 4 agents total, but 2 are UNIMPORTANT.
-    # If we require min_agents=3, the 2 valid ones won't meet the threshold.
     config = LoaderConfig(
         input_len=1,
         output_len=1,
         sample_time=0.1,
-        filtering=FilteringConfig(
+        filtering=FilteringConfig.create(
             min_agents=3,
             filter_agent_category=[AgentCategory.UNIMPORTANT],
         ),

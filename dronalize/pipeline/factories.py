@@ -17,7 +17,7 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.core.datatypes.loader_config import LoaderConfig
+    from dronalize.config.loader import LoaderConfig
 
 
 def trajectory_pipeline(

@@ -58,6 +58,8 @@ dev = [
     "dronalize[plot,lyft,ad4che]",
 ]
 tools = [
+    "mkdocs>=1.6.1",
+    "mkdocstrings[python]>=1.0.3",
     "pyrefly>=0.55.0",
     "ruff>=0.15.4",
 ]

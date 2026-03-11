@@ -3,15 +3,15 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.datatypes.map_config import MapConfig
+from dronalize.config.loader import LoaderConfig
+from dronalize.config.map import MapConfig
 from dronalize.datasets.lyft.loader import LyftLoader
 from dronalize.datasets.lyft.map.graph_builder import LyftMapGraphBuilder
 
 if TYPE_CHECKING:
     from multiprocessing.shared_memory import SharedMemory
 
-    from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
 
 
 @contextmanager

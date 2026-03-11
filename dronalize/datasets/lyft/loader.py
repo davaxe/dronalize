@@ -10,12 +10,13 @@ from typing_extensions import override
 from zarr.creation import open_array
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.datatypes.map_config import MapConfig
-from dronalize.core.datatypes.map_graph import MapGraph
-from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.protocols.loader import BaseSceneLoader, IngestOutput, Source
+from dronalize.config.loader import LoaderConfig
+from dronalize.config.map import MapConfig
+from dronalize.core.base import BaseSceneLoader
+from dronalize.core.categories import AgentCategory
+from dronalize.core.interfaces import IngestOutput, Source
+from dronalize.core.map_graph import MapGraph
+from dronalize.core.split import DatasetSplit
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -25,8 +26,8 @@ if TYPE_CHECKING:
 
     from zarr.core import Array
 
-    from dronalize.core.datatypes.map_resolver import MapKey, MapResolver
-    from dronalize.core.datatypes.scene import Scene
+    from dronalize.core.interfaces import MapKey, MapResolver
+    from dronalize.core.scene import Scene
 
 
 @dataclass
@@ -153,7 +154,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
         return (total_scenes + batch_size - 1) // batch_size
 
     @override
-    def ingest(self, source: Source[_Source]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[_Source]) -> Iterable[IngestOutput]:  # type: ignore[override]
         start, end = source.inner.interval
 
         # Now uses the lazy loader directly to ensure availability

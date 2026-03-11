@@ -7,8 +7,8 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from dronalize.config.filtering import FilteringConfig
     from dronalize.core._types import DataFrameT
-    from dronalize.core.datatypes.filtering_config import FilteringConfig
 
 
 def filter_scene(

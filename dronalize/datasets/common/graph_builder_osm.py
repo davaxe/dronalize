@@ -2,12 +2,16 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import utm
 from typing_extensions import override
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.protocols.graph_builder import BaseGraphBuilder, Point
+from dronalize.core.base import BaseGraphBuilder
+from dronalize.core.categories import EdgeType
+
+if TYPE_CHECKING:
+    from dronalize.core.graph_builder import Point
 
 
 @dataclass

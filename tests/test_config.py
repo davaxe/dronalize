@@ -1,17 +1,17 @@
 import pytest
 from pydantic import ValidationError
 
-from dronalize.core.datatypes.categories import AgentCategory
-from dronalize.core.datatypes.filtering_config import FilteringConfig
+from dronalize.config.filtering import FilteringConfig
 
 # Adjust the import path based on your project structure
-from dronalize.core.datatypes.map_config import (
+from dronalize.config.map import (
     MapConfig,
     NoneExtraction,
     RadialExtraction,
     RectangularExtraction,
     SquareExtraction,
 )
+from dronalize.core.categories import AgentCategory
 
 
 def test_radial_extraction_valid() -> None:
@@ -168,8 +168,7 @@ def test_filtering_config_invalid_agent_category() -> None:
         FilteringConfig.create(filter_agent_category=["CAR", "SPACESHIP"])
 
     error_msg = str(exc_info.value)
-    assert "Input should be" in error_msg
-    assert "SPACESHIP".lower() in error_msg
+    assert "SPACESHIP" in error_msg
 
 
 def test_filtering_config_single_frame_int() -> None:

@@ -13,17 +13,17 @@ import tqdm
 from typing_extensions import Self, override
 
 from dronalize.core._types import P, PayloadT, SourceT
-from dronalize.core.datatypes.scene import Scene
-from dronalize.core.protocols.loader import ProcessableLoader, SceneLoader, Source
-from dronalize.processing.common import ProgressBar
+from dronalize.core.interfaces import ProcessableLoader, SceneLoader, Source
+from dronalize.core.scene import Scene
+from dronalize.execution.common import ProgressBar
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable, Iterator
     from multiprocessing.sharedctypes import Synchronized
     from multiprocessing.synchronize import Lock
 
-    from dronalize.core.datatypes.split import DatasetSplit
-    from dronalize.core.protocols.writer import SceneWriter
+    from dronalize.core.interfaces import SceneWriter
+    from dronalize.core.split import DatasetSplit
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene])
@@ -41,7 +41,7 @@ class WorkerInfo:
     """Remaining number of worker processes."""
 
 
-class ParallelProcessor(SceneLoader):
+class ParallelExecutor(SceneLoader):
     """Parallel scene processor that wraps a processable loader.
 
     It uses Python's multiprocessing module to parallelize the processing of
@@ -80,9 +80,9 @@ class ParallelProcessor(SceneLoader):
 
     4. Since the wrapped loaders use Polars, which also uses multiple cores for
     processing, there may be some contention for CPU resources between the
-    multiprocessing in `ParallelProcessor` and the multithreading in Polars.
+    multiprocessing in `ParallelExecutor` and the multithreading in Polars.
     Setting the environment variable `POLARS_MAX_THREADS=X`, where X is a number
-    that balances the workload between `ParallelProcessor` and Polars. An
+    that balances the workload between `ParallelExecutor` and Polars. An
     alternative option is to lower the `processes` parameter in this class.
 
     5. The input dataloader will be sent to each worker process. This means that
@@ -139,7 +139,7 @@ class ParallelProcessor(SceneLoader):
 
         """
         if processes is not None and processes <= 1:
-            msg = "number of processes must be greater than 1 for ParallelProcessor."
+            msg = "number of processes must be greater than 1 for ParallelExecutor."
             raise ValueError(msg)
 
         self._inner = inner
@@ -352,7 +352,7 @@ class ParallelProcessor(SceneLoader):
                 yield _split_queue.get()
 
         stream_split_iter = stream_split() if _split_queue is not None else None
-        for scene in ParallelProcessor._generate_scenes(args.loader, args.source):
+        for scene in ParallelExecutor._generate_scenes(args.loader, args.source):
             _writer.write(scene, splits=stream_split_iter)
             processed_scenes += 1
 
@@ -376,7 +376,7 @@ class ParallelProcessor(SceneLoader):
             List of processed scenes from the given source.
 
         """
-        scenes = list(ParallelProcessor._generate_scenes(args.loader, args.source))
+        scenes = list(ParallelExecutor._generate_scenes(args.loader, args.source))
         with _source_counter.get_lock():
             _source_counter.value += 1
         return scenes
@@ -406,7 +406,7 @@ class ParallelProcessor(SceneLoader):
             msg = "no callable function provided in _ProcessArgs."
             raise ValueError(msg)
 
-        for scene in ParallelProcessor._generate_scenes(args.loader, args.source):
+        for scene in ParallelExecutor._generate_scenes(args.loader, args.source):
             args.fn(scene)
             processed_scenes += 1
 

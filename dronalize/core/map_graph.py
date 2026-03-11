@@ -2,28 +2,17 @@ from __future__ import annotations
 
 import multiprocessing.shared_memory as shm
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING
 
 import numpy as np
 from typing_extensions import Self
-
-from dronalize.core._compat import require_optional
 
 if TYPE_CHECKING:
     from types import TracebackType
 
     import numpy.typing as npt
 
-
-class NumpyMapGraphDict(TypedDict):
-    """TypedDict for representing a MapGraph as a dictionary of NumPy arrays."""
-
-    map_num_nodes: int
-    map_num_edges: int
-    map_node_positions: npt.NDArray[np.float32]
-    map_edge_indices: npt.NDArray[np.int32]
-    map_node_types: npt.NDArray[np.int32]
-    map_edge_types: npt.NDArray[np.int32]
+    from dronalize.converters.numpy import NumpyMapGraphDict
 
 
 class SharedMapGraph:
@@ -144,12 +133,7 @@ class SharedMapGraph:
                 msg = "Shared memory graph is not loaded. Cannot clone."
                 raise RuntimeError(msg)
 
-        return MapGraph(
-            node_positions=np.copy(self._map_graph.node_positions),
-            edge_indices=np.copy(self._map_graph.edge_indices),
-            node_types=np.copy(self._map_graph.node_types),
-            edge_types=np.copy(self._map_graph.edge_types),
-        )
+        return self._map_graph.copy()
 
 
 @dataclass(init=False, repr=False, slots=True)
@@ -323,50 +307,6 @@ class MapGraph:
         self.edge_indices = np.array([], dtype=np.int32).reshape(2, 0)
         self.node_types = np.array([], dtype=np.int32)
         self.edge_types = np.array([], dtype=np.int32)
-
-    def to_torch_graph(self) -> dict[Any, Any]:
-        """Convert the `MapGraph` to a format compatible with PyTorch Geometric.
-
-        Uses `torch.from_numpy` for zero-copy conversion (the returned tensors
-        share the same underlying memory as the NumPy arrays).
-
-        Returns
-        -------
-        dict
-            Dictionary with node and edge data suitable for PyTorch Geometric.
-
-        """
-        torch = require_optional("torch", extra="torch")
-
-        return {
-            "map_point": {
-                "num_nodes": self.num_nodes,
-                "type": torch.from_numpy(self.node_types),
-                "position": torch.from_numpy(self.node_positions),
-            },
-            ("map_point", "to", "map_point"): {
-                "edge_index": torch.from_numpy(self.edge_indices),
-                "type": torch.from_numpy(self.edge_types),
-            },
-        }
-
-    def to_numpy_dict(self) -> NumpyMapGraphDict:
-        """Convert the `MapGraph` to a dictionary of NumPy arrays.
-
-        Returns
-        -------
-        dict
-            Dictionary containing the graph data as NumPy arrays.
-
-        """
-        return {
-            "map_num_nodes": self.num_nodes,
-            "map_num_edges": self.num_edges,
-            "map_node_positions": self.node_positions,
-            "map_edge_indices": self.edge_indices,
-            "map_node_types": self.node_types,
-            "map_edge_types": self.edge_types,
-        }
 
     @classmethod
     def from_numpy_dict(cls, data: NumpyMapGraphDict) -> Self:

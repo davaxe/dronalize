@@ -5,19 +5,19 @@ from typing import TYPE_CHECKING, Any, Concatenate
 import tqdm
 from typing_extensions import override
 
-from dronalize.core.protocols.loader import ProcessableLoader, SceneLoader
-from dronalize.processing.common import ProgressBar
+from dronalize.core.interfaces import ProcessableLoader, SceneLoader
+from dronalize.execution.common import ProgressBar
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from dronalize.core._types import P
-    from dronalize.core.datatypes.scene import Scene
-    from dronalize.core.datatypes.split import DatasetSplit
-    from dronalize.core.protocols.writer import SceneWriter
+    from dronalize.core.interfaces import SceneWriter
+    from dronalize.core.scene import Scene
+    from dronalize.core.split import DatasetSplit
 
 
-class SequentialProcessor(SceneLoader):
+class SequentialExecutor(SceneLoader):
     """Sequential scene processor that wraps a processable loader.
 
     It processes data strictly in the main thread. This avoids the overhead

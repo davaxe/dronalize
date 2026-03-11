@@ -3,16 +3,16 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.datatypes.map_config import MapConfig
+from dronalize.config.loader import LoaderConfig
+from dronalize.config.map import MapConfig
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
 from dronalize.datasets.nuscenes.map.graph_builder import NuScenesMapGraphBuilder
 
 if TYPE_CHECKING:
     from multiprocessing.shared_memory import SharedMemory
 
-    from dronalize.core.datatypes.map_graph import MapGraph
-    from dronalize.core.datatypes.map_resolver import MapKey
+    from dronalize.core.interfaces import MapKey
+    from dronalize.core.map_graph import MapGraph
 
 
 @contextmanager

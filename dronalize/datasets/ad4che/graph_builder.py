@@ -8,7 +8,7 @@ import numpy.typing as npt
 from typing_extensions import override
 
 from dronalize.core import EdgeType
-from dronalize.core.protocols.graph_builder import BaseGraphBuilder
+from dronalize.core.base import BaseGraphBuilder
 
 if TYPE_CHECKING:
     from pathlib import Path

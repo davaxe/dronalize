@@ -8,10 +8,11 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
-from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
-from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
-from dronalize.core.datatypes.split import DatasetSplit
-from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.config import LoaderConfig
+from dronalize.config.map import MapConfig
+from dronalize.core import AgentCategory, BaseSceneLoader
+from dronalize.core.loader import IngestOutput, MapKey, MapResolver, Source
+from dronalize.core.split import DatasetSplit
 from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
 from dronalize.pipeline.factories import trajectory_pipeline
@@ -20,8 +21,8 @@ from dronalize.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.datatypes.map_graph import MapGraph
-    from dronalize.core.datatypes.scene import Scene
+    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.scene import Scene
 
 
 class WaymoLoader(BaseSceneLoader[Path]):
@@ -33,9 +34,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         *,
         split: DatasetSplit | None = None,
-        include_map: bool = True,
-        interp_distance: float | None = None,
-        min_distance: float | None = 1.5,
+        map_config: MapConfig | None = None,
     ) -> None:
         """Initialize.
 
@@ -55,29 +54,19 @@ class WaymoLoader(BaseSceneLoader[Path]):
             Root directory of the Waymo dataset.  This directory should
             contain `training/`, `validation/`, and `testing/`
             subdirectories with TFRecord files.
-        loader_config : LoaderConfig, optional
+        loader_config : , optional
             Loader configuration override. If None, the default configuration is used.
         split : DatasetSplit, optional
             Which dataset split to load. Defaults to all sources.
-        include_map : bool, optional
-            Whether to include map data in the scene. Defaults to True.
-        interp_distance : float, optional
-            Distance threshold for interpolating map points.
-            Defaults to None (no interpolation).
-        min_distance : float, optional
-            Minimum distance between map points after processing.
-            Defaults to 1.5 meters.
+        map_config : MapConfig, optional
+            Map configuration. If None, the default configuration is used.
 
         """
         super().__init__(loader_config=loader_config, enforce_schema=True, split=split)
         self._data_root = self._normalize_data_root(data_root)
-        self._include_map: bool = include_map
-        self._interp_distance: float | None = interp_distance
-        self._min_distance: float | None = min_distance
 
-    # ------------------------------------------------------------------
-    # Split-aware source discovery
-    # ------------------------------------------------------------------
+        self._map_config = map_config or MapConfig.default()
+        self._include_map: bool = self._map_config.include_map
 
     @staticmethod
     def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
@@ -121,29 +110,26 @@ class WaymoLoader(BaseSceneLoader[Path]):
     def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
         for raw_data in _read_tfrecord(source.inner):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
-
+            resolver: MapResolver | None
             if self._include_map:
-                # NOTE: Parsing of the map is moved inside the resolver function
-                # to avoid unnecessary parsing when map is not needed. However,
-                # this only saves performance if the resolver is not expected to
-                # be called multiple times.
+
                 def _resolver(
                     scene: Scene,
                     key: MapKey | None = None,
-                    min_distance: float | None = self._min_distance,
-                    interp_distance: float | None = self._interp_distance,
+                    map_config: MapConfig | None = self._map_config,
                     _raw_data: bytes = raw_data,
                 ) -> MapGraph:
-                    _ = scene, key
+                    _ = scene, key, map_config
+                    map_config = map_config or MapConfig.default()
                     map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
                     return WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
-                        min_distance=min_distance,
-                        interp_distance=interp_distance,
+                        min_distance=map_config.min_distance,
+                        interp_distance=map_config.interp_distance,
                     )
 
-                resolver: MapResolver = _resolver
+                resolver = _resolver
             else:
-                resolver = no_map()
+                resolver = None
 
             yield _scenario_to_polars(scenario).lazy(), resolver
 

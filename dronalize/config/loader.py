@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from dronalize.core.datatypes.filtering_config import FilteringConfig
-from dronalize.pipeline.ops.resample import Resampling, ResamplingMethod
+from dronalize.config.filtering import FilteringConfig
+from dronalize.pipeline.functional.resample import Resampling, ResamplingMethod
 
 if TYPE_CHECKING:
     from collections.abc import Collection
 
-    from dronalize.core.datatypes.categories import AgentCategory
+    from dronalize.core.categories import AgentCategory
 
 
 class WindowParams(BaseModel):
@@ -142,11 +142,11 @@ class LoaderConfig(BaseModel):
                 for frame in require_frames
             }
 
-        new_filtering = FilteringConfig(
+        new_filtering = FilteringConfig.create(
             min_agents=min_agents,
             require_all_valid=require_all_valid,
             require_frames=frozenset(require_frames) if require_frames is not None else None,
-            filter_agent_category=frozenset(filter_agent_category)
+            filter_agent_category=filter_agent_category
             if filter_agent_category is not None
             else None,
             filter_slow_agents=filter_slow_agents,

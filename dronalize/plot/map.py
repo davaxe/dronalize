@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING, Any, Final
 import polars as pl
 
 from dronalize.core._compat import require_optional
-from dronalize.core.datatypes.categories import EdgeType
+from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
     from types import ModuleType
 
     import altair as alt
 
-    from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
 
 
 def plot_map_graph(

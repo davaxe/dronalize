@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass, field
-from enum import auto
+from enum import IntEnum, auto
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -25,14 +25,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.core.datatypes.categories import EdgeType
-from dronalize.core.datatypes.enum import BaseEnum
+from dronalize.core.categories import EdgeType
 from dronalize.datasets.lyft.protos import road_network_pb2 as proto
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.core.protocols.graph_builder import Point
+    from dronalize.core.graph_builder import Point
 
 
 class LyftLVL5Map:
@@ -128,7 +127,7 @@ class LyftLVL5Map:
         return junctions
 
 
-class LaneBoundaryType(BaseEnum):
+class LaneBoundaryType(IntEnum):
     """Types of lane boundaries (dividers) in the road network."""
 
     UNKNOWN = 0
@@ -167,7 +166,7 @@ _LANE_BOUNDARY_TYPE_TO_EDGE_TYPE = {
 }
 
 
-class TurnType(BaseEnum):
+class TurnType(IntEnum):
     """Types of turns in the lane segment."""
 
     UNKNOWN = 0
@@ -179,7 +178,7 @@ class TurnType(BaseEnum):
     U_TURN = 6
 
 
-class RoadType(BaseEnum):
+class RoadType(IntEnum):
     """Types of roads in the road network.
 
     Based on the OpenStreetMap road classification (from road_network.proto):
@@ -212,7 +211,7 @@ class RoadType(BaseEnum):
     CYCLEWAY = 23
 
 
-class SideOfSegment(BaseEnum):
+class SideOfSegment(IntEnum):
     """Indicates the side of the road segment."""
 
     UNKNOWN = 0
@@ -222,7 +221,7 @@ class SideOfSegment(BaseEnum):
     NEITHER = 4
 
 
-class TravelDirection(BaseEnum):
+class TravelDirection(IntEnum):
     """Indicates the travel direction in the road network segment."""
 
     UNKNOWN = 0
@@ -382,9 +381,9 @@ class RoadNetworkSegment:
             backward_lane_set=LaneSet.from_proto_lane_set(segment.backward_lane_set),
             num_bidirectional_lanes=segment.num_bidirectional_lanes,
             lanes=[_global_id_to_str(lane) for lane in segment.lanes],
-            road_type=RoadType.from_int(segment.road_class),
-            travel_direction=TravelDirection.from_int(segment.travel_direction),
-            walkable=SideOfSegment.from_int(segment.walkable),
+            road_type=RoadType(segment.road_class),
+            travel_direction=TravelDirection(segment.travel_direction),
+            walkable=SideOfSegment(segment.walkable),
         )
 
     def get_lane_id(self, lane_index: int) -> str:
@@ -428,9 +427,7 @@ class LaneBoundary:
     ) -> LaneBoundary:
         """Create a `LaneBoundary` instance from a `Lane` protobuf message."""
         cm_to_m: float = 0.01
-        lane_types = [
-            LaneBoundaryType.from_int(boundary_type) for boundary_type in boundary.divider_type
-        ]
+        lane_types = [LaneBoundaryType(boundary_type) for boundary_type in boundary.divider_type]
         type_change_distances = [x * cm_to_m for x in iter(boundary.type_change_point_cm)]
 
         dx = [x * cm_to_m for x in boundary.vertex_deltas_x_cm]
@@ -567,16 +564,14 @@ class Lane:
                 lane.geo_frame,
                 transformation,
             ),
-            travel_direction=TravelDirection.from_int(
-                lane.orientation_in_parent_segment,
-            ),
+            travel_direction=TravelDirection(lane.orientation_in_parent_segment),
             lane_successors=[_global_id_to_str(successor) for successor in lane.lanes_ahead],
             can_have_parked_cars=lane.can_have_parked_cars,
-            turn_type=TurnType.from_int(lane.turn_type_in_parent_junction),
+            turn_type=TurnType(lane.turn_type_in_parent_junction),
         )
 
 
-class TrafficControlElementType(BaseEnum):
+class TrafficControlElementType(IntEnum):
     """Types of traffic control elements."""
 
     NOT_RELEVANT = auto()  # Not relevant in the context of this project
@@ -592,7 +587,7 @@ class TrafficControlElementType(BaseEnum):
     STOP_FOR_PEDESTRIANS = auto()
 
 
-class GeometryType(BaseEnum):
+class GeometryType(IntEnum):
     """Types of geometry for traffic control elements."""
 
     UNKNOWN = 0
@@ -642,7 +637,7 @@ class TrafficControlElement:
 
         return cls(
             control_element_type=cls._solve_type(element),
-            geometry_type=GeometryType.from_int(int(element.geometry_type)),
+            geometry_type=GeometryType(int(element.geometry_type)),
             points=points,
         )
 
