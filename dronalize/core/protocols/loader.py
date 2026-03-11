@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Generic, Protocol
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core._types import P, SceneId, SourceT
+from dronalize.core._types import P, SourceId, SourceT
 from dronalize.core.datatypes.map_resolver import MapKey, MapResolver, no_map
 from dronalize.core.datatypes.scene import Scene
 from dronalize.core.datatypes.split import DatasetSplit, SplitNotSupportedError
@@ -29,7 +29,7 @@ IngestOutput = tuple[pl.LazyFrame, MapContext]
 class Source(Generic[SourceT]):
     """Represents a raw data source for a scene, identified by a unique identifier."""
 
-    identifier: SceneId
+    identifier: SourceId
     """Generic identifier for the source, e.g., file name, URL, database key."""
     inner: SourceT
     """The actual source data, which can be of any type (e.g., file path, raw data)."""
@@ -150,9 +150,7 @@ class ProcessableLoader(Protocol, Generic[SourceT]):
         """
         ...
 
-    def process_next(
-        self, source: Source[SourceT]
-    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
+    def process_next(self, source: Source[SourceT]) -> Iterable[tuple[pl.DataFrame, MapContext]]:
         """Process a single raw data source into data frames and map contexts.
 
         Parameters
@@ -553,7 +551,6 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         resolver = resolver if not isinstance(resolver, str) else self.map_resolver()
         scene = Scene(
             inner=df,
-            identifier=source.identifier,
             scene_number=scene_number if scene_number is not None else self._count,
             input_len=self.input_len,
             output_len=self.output_len,
@@ -684,3 +681,4 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             cls._shared_memory_name = name
         else:
             cls._shared_memory_name = None
+        print(f"{cls.__name__} shared memory configuration set to: {cls._shared_memory_name}")

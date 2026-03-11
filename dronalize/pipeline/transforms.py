@@ -36,11 +36,6 @@ __all__ = [
 ]
 
 
-# -------------------------------------------------------------------
-# Filtering
-# -------------------------------------------------------------------
-
-
 def filter_scene(
     config: FilteringConfig | None = None,
     *,
@@ -110,11 +105,6 @@ def require_min(group_by: str | Sequence[str], minimum: int = 2) -> Transform:
     return _require_min
 
 
-# -------------------------------------------------------------------
-# Resampling
-# -------------------------------------------------------------------
-
-
 def resample(
     resampling: Resampling | None = None,
     sample_time: float = 1.0,
@@ -181,11 +171,6 @@ def resample(
     return _resample
 
 
-# -------------------------------------------------------------------
-# Derivatives
-# -------------------------------------------------------------------
-
-
 def derivative(
     *columns: str,
     dt: float = 1.0,
@@ -233,11 +218,6 @@ def derivative(
     _derivative.__name__ = "derivative"
     _derivative.__qualname__ = "transforms.derivative"
     return _derivative
-
-
-# -------------------------------------------------------------------
-# Yaw estimation
-# -------------------------------------------------------------------
 
 
 def yaw_from_vel(
@@ -338,11 +318,6 @@ def yaw_from_pos(
     return _yaw_from_pos
 
 
-# -------------------------------------------------------------------
-# Sliding window (fan-out)
-# -------------------------------------------------------------------
-
-
 @overload
 def window(
     window_size: int,
@@ -436,11 +411,6 @@ def window(
     func_to_return.__qualname__ = "transforms.window"
 
     return func_to_return
-
-
-# -------------------------------------------------------------------
-# Rebalancing (highway lane-change ratio)
-# -------------------------------------------------------------------
 
 
 def rebalance(

@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import tomllib
 from pydantic import BaseModel, Field, RootModel
 
-from dronalize.core.datatypes.loader_config import LoaderConfig
 from dronalize.core.datatypes.map_config import MapConfig
 
 if TYPE_CHECKING:
-    from collections.abc import Collection, Mapping
+    from collections.abc import Mapping
     from pathlib import Path
+
+    from dronalize.core.datatypes.loader_config import LoaderConfig
+
+# Define a TypeVar bound to BaseModel for generic type hinting
+TModel = TypeVar("TModel", bound=BaseModel)
 
 
 class ExecutionConfig(BaseModel):
@@ -22,79 +26,6 @@ class ExecutionConfig(BaseModel):
     chunksize: int | None = None
 
 
-class ExecutionConfigDict(TypedDict, total=False):
-    """TypedDict for execution configuration overrides."""
-
-    parallel: bool
-    workers: int
-    chunksize: int | None
-
-
-class LoaderConfigDict(TypedDict, total=False):
-    """TypedDict representing the structure of the loader configuration overrides."""
-
-    input_len: int
-    output_len: int
-    sample_time: float
-    resampling: ResamplingDict
-    filtering: FilteringDict
-    window: WindowDict
-    extra_kwargs: dict[str, Any]
-
-
-class ResamplingDict(TypedDict, total=False):
-    """TypedDict for resampling configuration."""
-
-    up: int
-    down: int
-    method: str
-
-
-class FilteringDict(TypedDict, total=False):
-    """TypedDict for filtering configuration."""
-
-    min_agents: int
-    require_all_valid: bool
-    require_frames: Collection[int]
-    filter_agent_category: Collection[int | str]
-    filter_slow_agents: float
-    min_samples_per_agent: int
-
-
-class WindowDict(TypedDict, total=False):
-    """TypedDict for windowing configuration."""
-
-    step_size: int
-    window_size: int
-
-
-class MapConfigDict(TypedDict, total=False):
-    """TypedDict for map configuration."""
-
-    min_distance: float
-    interp_distance: float
-    include_map: bool
-
-
-class ConfigDict(TypedDict, total=False):
-    """TypedDict representing the structure of the configuration overrides.
-
-    Each dataset section in the TOML config file corresponds to a `ConfigDict`,
-    which may contain overrides for the loader and map configurations. The keys
-    in this dictionary should match the fields of the `Config` model, and the
-    values should match the corresponding `LoaderConfigDict` and `MapConfigDict`
-    structures.
-    """
-
-    loader: LoaderConfigDict
-    map: MapConfigDict
-    execution: ExecutionConfigDict
-
-
-class ConfigFile(RootModel[dict[str, ConfigDict]]):
-    """Validated view of the dataset override file."""
-
-
 class Config(BaseModel):
     """Pydantic model representing the structure of the configuration overrides."""
 
@@ -103,58 +34,36 @@ class Config(BaseModel):
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
 
 
-def load_config(config_path: Path) -> dict[str, ConfigDict]:
+class ConfigFile(RootModel[dict[str, dict[str, Any]]]):
+    """Validated view of the dataset override file."""
+
+
+def load_config(config_path: Path) -> dict[str, dict[str, Any]]:
     """Load, validate, and parse the configuration overrides from the given path."""
     with config_path.open("rb") as f:
         raw_data = tomllib.load(f)
     return ConfigFile.model_validate(raw_data).root
 
 
-def resolve_config(default: Config | ConfigDict, overrides: Config | ConfigDict) -> Config:
-    """Merge the default config with the overrides.
+def resolve_config(
+    model_cls: type[TModel], default: TModel | dict[str, Any], overrides: TModel | dict[str, Any]
+) -> TModel:
+    """Merge a default config model/dict with overrides and validate into the target model.
 
     Parameters
     ----------
-    default : Config | ConfigDict
+    model_cls : type[TModel]
+        The Pydantic model class to validate the final merged data against.
+    default : TModel | dict[str, Any]
         The default configuration to use as a base.
-    overrides : Config | ConfigDict
-        The configuration overrides. This will be deeply merged with the
-        default config, taking priority.
+    overrides : TModel | dict[str, Any]
+        The configuration overrides. Deeply merged with the default config, taking priority.
     """
-    base_data = default.model_dump() if isinstance(default, Config) else default
-    override_data = overrides.model_dump() if isinstance(overrides, Config) else overrides
+    base_data = default.model_dump() if isinstance(default, BaseModel) else default
+    override_data = overrides.model_dump() if isinstance(overrides, BaseModel) else overrides
+
     merged_data = _deep_merge(base_data, override_data)
-    return Config.model_validate(merged_data)
-
-
-def resolve_loader_config(
-    default: LoaderConfig | LoaderConfigDict, overrides: LoaderConfig | LoaderConfigDict
-) -> LoaderConfig:
-    """Merge the default loader config with the overrides."""
-    base_data = default.model_dump() if isinstance(default, LoaderConfig) else default
-    override_data = overrides.model_dump() if isinstance(overrides, LoaderConfig) else overrides
-    merged_data = _deep_merge(base_data, override_data)
-    return LoaderConfig.model_validate(merged_data)
-
-
-def resolve_map_config(
-    default: MapConfig | MapConfigDict, overrides: MapConfig | MapConfigDict
-) -> MapConfig:
-    """Merge the default map config with the overrides."""
-    base_data = default.model_dump() if isinstance(default, MapConfig) else default
-    override_data = overrides.model_dump() if isinstance(overrides, MapConfig) else overrides
-    merged_data = _deep_merge(base_data, override_data)
-    return MapConfig.model_validate(merged_data)
-
-
-def resolve_execution_config(
-    default: ExecutionConfig | ExecutionConfigDict, overrides: ExecutionConfig | ExecutionConfigDict
-) -> ExecutionConfig:
-    """Merge the default execution config with the overrides."""
-    base_data = default.model_dump() if isinstance(default, ExecutionConfig) else default
-    override_data = overrides.model_dump() if isinstance(overrides, ExecutionConfig) else overrides
-    merged_data = _deep_merge(base_data, override_data)
-    return ExecutionConfig.model_validate(merged_data)
+    return model_cls.model_validate(merged_data)
 
 
 def _deep_merge(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> dict[str, Any]:

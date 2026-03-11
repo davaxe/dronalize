@@ -8,12 +8,18 @@ from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
 from dronalize.core import AgentCategory, BaseSceneLoader, LoaderConfig
+from dronalize.core.datatypes.map_config import MapConfig
 from dronalize.core.protocols.loader import IngestOutput, Source
+from dronalize.datasets.a43.graph_builder import A43GraphBuilder
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.core.datatypes.map_resolver import MapKey, MapResolver
+    from dronalize.core.datatypes.scene import Scene
 
 
 class A43Loader(BaseSceneLoader[Path]):
@@ -61,7 +67,7 @@ class A43Loader(BaseSceneLoader[Path]):
                 })
                 .alias("agent_category"),
             ),
-            None,
+            source.inner.stem,
         )
 
     @override
@@ -87,19 +93,21 @@ class A43Loader(BaseSceneLoader[Path]):
             .with_filtering(require_frames=[19])
         )
 
+    @override
+    def map_resolver(self) -> MapResolver:
 
-if __name__ == "__main__":
-    import os
-    import time
-    from pathlib import Path
+        def _resolver(
+            scene: Scene,
+            key: MapKey = None,
+            map_config: MapConfig | None = None,
+        ) -> MapGraph | None:
+            if key is None:
+                return None
 
-    # Get root from env-var
-    root = Path(os.getenv("TRAJ_DATA", "")) / "A43"
-    loader = A43Loader(root)
-    time_start = time.perf_counter()
-    counter = 0
-    for _ in loader.scenes():
-        counter += 1
-        if counter % 1 == 0:
-            print(f"Loaded {counter} scenes in {time.perf_counter() - time_start:.2f} seconds")
-    print(f"Loaded {counter} scenes in {time.perf_counter() - time_start:.2f} seconds")
+            map_config = map_config or MapConfig.default()
+            min_x = scene.inner.select(pl.col("x")).min().item()
+            max_x = scene.inner.select(pl.col("x")).max().item()
+            builder = A43GraphBuilder(key, min_x, max_x)
+            return builder.build(map_config.min_distance, map_config.interp_distance)
+
+        return _resolver

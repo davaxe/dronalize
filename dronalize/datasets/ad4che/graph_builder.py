@@ -13,7 +13,7 @@ from dronalize.core.protocols.graph_builder import BaseGraphBuilder
 if TYPE_CHECKING:
     from pathlib import Path
 
-PIXEL_TO_METER: Final[float] = 0.0375
+PIXEL_TO_METER: Final[float] = 0.038
 
 
 class AD4CHEGraphBuilder(BaseGraphBuilder):
@@ -45,8 +45,13 @@ class AD4CHEGraphBuilder(BaseGraphBuilder):
             by default 3.0.
 
         """
+        if not map_image_path.is_file():
+            msg = f"Map image file does not exist: {map_image_path}"
+            raise ValueError(msg)
+
         super().__init__()
         self.map_image_path = map_image_path
+
         self.pixel_to_meter = pixel_to_meter
         self.spatial_ds = spatial_ds
 
@@ -62,20 +67,23 @@ class AD4CHEGraphBuilder(BaseGraphBuilder):
             msg = f"Failed to load image: {self.map_image_path}"
             raise ValueError(msg)
 
-        border_mask = _get_black_border_pixels(gray)
+        gray = cv2.flip(gray, 0)
+        h_pixels, _w_pixels = gray.shape
+        h_meters = h_pixels * self.pixel_to_meter
 
+        border_mask = _get_black_border_pixels(gray)
         contours, _ = cv2.findContours(border_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         for cnt in contours:
             if len(cnt) > 1:
                 coords = cnt[:, 0, :] * self.pixel_to_meter
-
                 # Downsample
                 coords = _spatial_downsample_polyline(coords, d_min=self.spatial_ds)
 
                 if len(coords) < 2:
                     continue
-                points = [(float(pt[0]), -float(pt[1])) for pt in coords]
+
+                points = [(float(pt[0]), h_meters - float(pt[1])) for pt in coords]
 
                 self.add_path_lazy(
                     points=points,

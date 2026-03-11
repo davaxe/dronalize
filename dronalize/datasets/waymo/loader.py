@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.datatypes.map_graph import MapGraph
-    from dronalize.datasets.waymo.protos.lean_map_pb2 import LeanMapContainer
+    from dronalize.core.datatypes.scene import Scene
 
 
 class WaymoLoader(BaseSceneLoader[Path]):
@@ -104,10 +104,6 @@ class WaymoLoader(BaseSceneLoader[Path]):
     def test_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "testing")
 
-    # ------------------------------------------------------------------
-    # Ingestion / pipeline
-    # ------------------------------------------------------------------
-
     @override
     def num_sources(self) -> int | None:
         dirs: list[Path] = []
@@ -127,15 +123,22 @@ class WaymoLoader(BaseSceneLoader[Path]):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
 
             if self._include_map:
-                map_data = lean_map_pb2.LeanMapContainer.FromString(raw_data)
-
+                # NOTE: Parsing of the map is moved inside the resolver function
+                # to avoid unnecessary parsing when map is not needed. However,
+                # this only saves performance if the resolver is not expected to
+                # be called multiple times.
                 def _resolver(
-                    key: MapKey | None = None,  # noqa: ARG001
-                    _map_data: LeanMapContainer = map_data,
+                    scene: Scene,
+                    key: MapKey | None = None,
+                    min_distance: float | None = self._min_distance,
+                    interp_distance: float | None = self._interp_distance,
+                    _raw_data: bytes = raw_data,
                 ) -> MapGraph:
-                    return WaymoMapGraphBuilder.from_proto(_map_data.map_features).build(
-                        min_distance=self._min_distance,
-                        interp_distance=self._interp_distance,
+                    _ = scene, key
+                    map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
+                    return WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
+                        min_distance=min_distance,
+                        interp_distance=interp_distance,
                     )
 
                 resolver: MapResolver = _resolver

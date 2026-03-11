@@ -125,6 +125,32 @@ class SharedMapGraph:
         if self._map_graph is not None:
             self._map_graph.release()
 
+    def copy(self, *, open_if_needed: bool = False) -> MapGraph:
+        """Create a deep copy of the `MapGraph` data.
+
+        This is useful if you want to modify the graph data without affecting
+        the shared memory version.
+
+        Returns
+        -------
+        MapGraph
+            A new `MapGraph` instance with copied data.
+
+        """
+        if self._map_graph is None:
+            if open_if_needed:
+                self._map_graph = self.open()
+            else:
+                msg = "Shared memory graph is not loaded. Cannot clone."
+                raise RuntimeError(msg)
+
+        return MapGraph(
+            node_positions=np.copy(self._map_graph.node_positions),
+            edge_indices=np.copy(self._map_graph.edge_indices),
+            node_types=np.copy(self._map_graph.node_types),
+            edge_types=np.copy(self._map_graph.edge_types),
+        )
+
 
 @dataclass(init=False, repr=False, slots=True)
 class MapGraph:
@@ -363,6 +389,22 @@ class MapGraph:
             edge_indices=data["map_edge_indices"],
             node_types=data["map_node_types"],
             edge_types=data["map_edge_types"],
+        )
+
+    def copy(self) -> MapGraph:
+        """Create a deep copy of the `MapGraph` instance.
+
+        Returns
+        -------
+        MapGraph
+            A new `MapGraph` instance with copied data.
+
+        """
+        return MapGraph(
+            node_positions=np.copy(self.node_positions),
+            edge_indices=np.copy(self.edge_indices),
+            node_types=np.copy(self.node_types),
+            edge_types=np.copy(self.edge_types),
         )
 
     def extract_radius(

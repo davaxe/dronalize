@@ -13,7 +13,7 @@ from dronalize.pipeline.ops.convert import (
 )
 
 if TYPE_CHECKING:
-    from dronalize.core._types import SceneId
+    from dronalize.core.datatypes.map_config import MapConfig
     from dronalize.core.datatypes.map_resolver import MapGraph, MapKey
 
 
@@ -28,8 +28,6 @@ class Scene:
 
     inner: pl.DataFrame
     """Inner DataFrame containing the scene data."""
-    identifier: SceneId
-    """Identifier for the scene (e.g., file name, index, scene name/token)."""
     scene_number: int
     """Unique scene number assigned during processing."""
     input_len: int
@@ -41,13 +39,23 @@ class Scene:
     map_resolver: MapResolver | None = field(default=None, compare=False, repr=False)
     """Resolver attached by the loader that produced this scene."""
 
-    def resolve_map(self) -> MapGraph | None:
+    def resolve_map(
+        self,
+        map_config: MapConfig | None = None,
+    ) -> MapGraph | None:
         """Resolve this scene's `map_key` into a `MapGraph`.
 
         Delegates to the `map_resolver` attached by the loader. Returns `None`
         when no resolver is present or when the resolver has no map for this key
         (e.g. `include_map=False`
         on Waymo).
+
+        Parameters
+        ----------
+        map_config : MapConfig, optional
+            Optional configuration for map resolution, such as desired output
+            format or resolution. The exact effect depends on the implementation
+            of the attached `map_resolver`.
 
         Returns
         -------
@@ -57,11 +65,11 @@ class Scene:
         """
         if self.map_resolver is None:
             return None
-        return self.map_resolver(self.map_key)
+        return self.map_resolver(self, self.map_key, map_config)
 
     def has_map(self) -> bool:
         """Check if this scene has an attached map resolver and key."""
-        return self.map_resolver is not None and self.map_key is not None
+        return self.map_resolver is not None
 
     def enforce_schema(self, schema: pl.Schema | None = None) -> Self:
         """Enforce the scene dataframe to follow a specified schema.
@@ -91,7 +99,6 @@ class Scene:
         """Return a compact representation with metadata and DataFrame shape."""
         rows, cols = self.inner.shape
         return (
-            f"Scene(identifier={self.identifier!r}, "
             f"scene_number={self.scene_number}, "
             f"input_len={self.input_len}, "
             f"output_len={self.output_len}, "

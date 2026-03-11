@@ -128,7 +128,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
             *self.track_data_select(),
         )
         combined = tracks_df.join(meta_df, left_on="id", right_on="id")
-        yield combined, None
+        yield combined, source.map_key
 
     @override
     def num_sources(self) -> int | None:

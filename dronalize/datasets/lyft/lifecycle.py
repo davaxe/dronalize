@@ -40,6 +40,7 @@ def lyft_lifecylce_context(
         hook will do nothing.
 
     """
+    print("Setting up Lyft dataset lifecycle context...")
     _loader_config = loader_config
     if not map_config.include_map:
         LyftLoader.set_shared_memory()
@@ -57,4 +58,5 @@ def lyft_lifecylce_context(
     yield
     shm.close()
     shm.unlink()
+    print("Cleaned up Lyft dataset lifecycle context.")
     LyftLoader.set_shared_memory()

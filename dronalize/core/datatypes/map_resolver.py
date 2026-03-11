@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from dronalize.core.datatypes.map_config import MapConfig
     from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.core.datatypes.scene import Scene
 
 MapKey = str | None
 """Lightweight map identifier stored on each scene.
@@ -25,14 +27,26 @@ class MapResolver(Protocol):
     scenes via its `map_resolver()` method.
     """
 
-    def __call__(self, key: MapKey = None) -> MapGraph | None:
+    def __call__(
+        self,
+        scene: Scene,
+        key: MapKey = None,
+        map_config: MapConfig | None = None,
+    ) -> MapGraph | None:
         """Resolve *key* into a `MapGraph`, or `None`.
 
         Parameters
         ----------
+        scene : Scene
+            The scene for which to resolve the map.  This is provided for
+            context and potential use in resolution, but resolvers are not
+            required to use it.
         key : MapKey
             The map key to resolve.  `None` may be used for datasets
             that have a single shared map or no map at all.
+        map_config : MapConfig or None
+            The configuration for the map.  If `None`, a default configuration
+            is used.
 
         Returns
         -------
@@ -54,8 +68,12 @@ def no_map() -> MapResolver:
 
     """
 
-    def _resolve(key: MapKey = None) -> None:  # noqa: ARG001
-        return None
+    def _resolve(
+        scene: Scene,
+        key: MapKey = None,
+        map_config: MapConfig | None = None,
+    ) -> None:
+        _ = scene, key, map_config  # Unuse
 
     _resolve.__name__ = "no_map"
     return _resolve

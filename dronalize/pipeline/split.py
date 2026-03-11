@@ -31,8 +31,8 @@ class StreamSplitter(Generic[T]):
     4. Repeat step 3 indefinitely to provide an infinite stream of group
     assignments.
 
-    Practical Considerations
-    ------------------------
+    Notes
+    -----
     This implementation will guarantee that the distribution of groups will
     exactly follow the specified weights if:
     1. The number of groups assigned is a multiple of the `round_size`.
@@ -117,7 +117,7 @@ class StreamSplitter(Generic[T]):
         self._round_index = 0
 
     def next(self) -> T:
-        """Return the next group in the stream.
+        """Next group in the stream.
 
         Returns
         -------
@@ -138,7 +138,7 @@ class StreamSplitter(Generic[T]):
         return self._index_to_group[value]
 
     def take(self, n: int) -> Iterator[T]:
-        """Return an iterator that yields the next `n` groups in the stream.
+        """Take the next `n` groups as an iterator.
 
         Parameters
         ----------

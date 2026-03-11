@@ -6,12 +6,18 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core import AgentCategory, LoaderConfig
+from dronalize.core.datatypes.map_config import MapConfig
 from dronalize.core.protocols.loader import Source
+from dronalize.datasets.ad4che.graph_builder import AD4CHEGraphBuilder
 from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
+
+    from dronalize.core.datatypes.map_graph import MapGraph
+    from dronalize.core.datatypes.map_resolver import MapKey, MapResolver
+    from dronalize.core.datatypes.scene import Scene
 
 
 class AD4CHELoader(XLevelDataLoader):
@@ -51,13 +57,11 @@ class AD4CHELoader(XLevelDataLoader):
 
     @override
     def all_sources(self) -> Iterable[Source[Path]]:
-        for recording_id, subdir, recording_meta in self._recordings():
-            recording_meta_data = pl.read_csv(recording_meta)
-            location_id = recording_meta_data.select(pl.col("locationId")).item()
+        for recording_id, subdir in self._recordings():
             yield Source(
                 identifier=recording_id,
                 inner=subdir,
-                map_key=str(location_id),
+                map_key=f"{subdir.name}/{recording_id:02d}_laneWidthColorAndID.png",
             )
 
     @override
@@ -114,14 +118,31 @@ class AD4CHELoader(XLevelDataLoader):
             .with_window(45)
         )
 
-    def _recordings(self) -> Iterable[tuple[int, Path, Path]]:
+    @override
+    def map_resolver(self) -> MapResolver:
+        def _resolver(
+            scene: Scene,
+            key: MapKey = None,
+            map_config: MapConfig | None = None,
+        ) -> MapGraph | None:
+            _ = scene
+            if key is None:
+                return None
+            map_config = map_config or MapConfig.default()
+            path = self._data_dir / key
+            print(f"Resolving map for key {key} at path {path}")
+            return AD4CHEGraphBuilder(path).build(
+                map_config.min_distance, map_config.interp_distance
+            )
+
+        return _resolver
+
+    def _recordings(self) -> Iterable[tuple[int, Path]]:
         """Yield discovered recording identifiers with their directories and metadata files."""
         for subdir in sorted(path for path in self._data_dir.iterdir() if path.is_dir()):
-            recording_meta = next(iter(sorted(subdir.glob("*_recordingMeta.csv"))), None)
-            if recording_meta is None:
-                continue
-            prefix, _, _ = recording_meta.stem.partition("_")
-            yield int(prefix), subdir, recording_meta
+            # subdir is on format DJI_XXXX
+            number_str = subdir.name.split("_")[-1]
+            yield int(number_str), subdir
 
 
 _META_SCHEMA: pl.Schema = pl.Schema({
@@ -141,16 +162,3 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float32,
     "yAcceleration": pl.Float32,
 })
-
-if __name__ == "__main__":
-    import time
-    from pathlib import Path
-
-    loader = AD4CHELoader(Path("data/ad4che"))
-    cout = 0
-    start = time.perf_counter()
-    for _scene in loader.scenes():
-        cout += 1
-
-    end = time.perf_counter()
-    print(f"Processed {cout} scenes in {end - start:.2f} seconds")

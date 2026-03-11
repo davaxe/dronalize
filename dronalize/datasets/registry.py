@@ -22,17 +22,8 @@ if TYPE_CHECKING:
     from dronalize.core.datatypes.loader_config import LoaderConfig
     from dronalize.core.protocols.loader import BaseSceneLoader
 
-# ==============================================================================
-# Constants & Global State
-# ==============================================================================
-
 _MANIFEST_NAME = "manifest.toml"
 _REGISTRY: dict[str, DatasetDescriptor] = {}
-
-
-# ==============================================================================
-# Protocols, Enums & Dataclasses
-# ==============================================================================
 
 
 class DatasetLifecycleContext(Protocol):
@@ -69,11 +60,26 @@ class MapMode(IntEnum):
     """How a dataset exposes map data at runtime."""
 
     NONE = auto()
+    """The dataset does not include map data."""
+
     BUILDER_ONLY = auto()
+    """No map data is included at runtime, but builder is available."""
+
     INLINE = auto()
+    """Map data is included in the same files as the scene data."""
+
     LAZY_KEYED = auto()
+    """Map data is stored separately from the scene data and accessed via keys.
+
+    These are accessed lazily, meaning that the map data for a scene is only
+    loaded when it is explicitly requested by the scene loader.
+    """
+
     SHARED_SINGLE = auto()
+    """Map data is built once and stored in shared memory for access."""
+
     SHARED_KEYED = auto()
+    """Similar to SHARED_SINGLE, but supports multiple maps distinguished by keys."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,11 +142,6 @@ class _BuiltinDatasetSpec:
     module: str
     optional_dependencies: tuple[str, ...] = ()
     extra: str | None = None
-
-
-# ==============================================================================
-# Public API
-# ==============================================================================
 
 
 def register(descriptor: DatasetDescriptor) -> DatasetDescriptor:
@@ -206,12 +207,7 @@ def available() -> list[str]:
         for name, spec in _builtin_datasets().items()
         if not _missing_optional_dependencies(spec)
     }
-    return sorted(set(_REGISTRY) | builtin_names)
-
-
-# ==============================================================================
-# Internal Helpers
-# ==============================================================================
+    return sorted(set(_REGISTRY.keys()) | builtin_names)
 
 
 def _parse_manifest(manifest_path: Path) -> dict[str, _BuiltinDatasetSpec]:

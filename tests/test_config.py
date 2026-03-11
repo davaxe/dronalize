@@ -1,116 +1,307 @@
-from dronalize.core.datatypes.loader_config import LoaderConfig
-from dronalize.core.datatypes.map_config import MapConfig
+import pytest
+from pydantic import ValidationError
 
-# Adjust the import path based on the actual name of your module containing the config code
-from dronalize.pipeline.ops.resample import Resampling, ResamplingMethod
-from dronalize.processing.config import (
-    Config,
-    ConfigDict,
-    ExecutionConfig,
-    ExecutionConfigDict,
-    LoaderConfigDict,
-    MapConfigDict,
-    _deep_merge,  # noqa: PLC2701
-    resolve_config,
-    resolve_execution_config,
-    resolve_loader_config,
-    resolve_map_config,
+from dronalize.core.datatypes.categories import AgentCategory
+from dronalize.core.datatypes.filtering_config import FilteringConfig
+
+# Adjust the import path based on your project structure
+from dronalize.core.datatypes.map_config import (
+    MapConfig,
+    NoneExtraction,
+    RadialExtraction,
+    RectangularExtraction,
+    SquareExtraction,
 )
 
 
-def test_deep_merge_flat() -> None:
-    """Merge flat dictionaries and prioritize override values."""
-    base = {"a": 1, "b": 2}
-    overrides = {"b": 3, "c": 4}
+def test_radial_extraction_valid() -> None:
+    """Initialize RadialExtraction with a valid radius."""
+    extraction = RadialExtraction(radius=10.5)
 
-    result = _deep_merge(base, overrides)
-
-    assert result == {"a": 1, "b": 3, "c": 4}
+    assert extraction.mode == "radial"
+    assert extraction.radius == pytest.approx(10.5)
 
 
-def test_deep_merge_nested() -> None:
-    """Merge nested dictionaries recursively without losing base keys."""
-    base = {"nested": {"a": 1, "b": 2}, "other": 5}
-    overrides = {"nested": {"b": 99, "c": 3}}
+def test_rectangular_extraction_valid() -> None:
+    """Initialize RectangularExtraction with valid dimensions."""
+    extraction = RectangularExtraction(width=5.0, height=8.0)
 
-    result = _deep_merge(base, overrides)
-
-    assert result == {"nested": {"a": 1, "b": 99, "c": 3}, "other": 5}
-
-
-def test_resolve_execution_config_pydantic_base_dict_override() -> None:
-    """Resolve execution configuration using a Pydantic base and TypedDict override."""
-    default = ExecutionConfig(parallel=False, workers=2, chunksize=10)
-    overrides: ExecutionConfigDict = {"parallel": True, "workers": 8}
-
-    result = resolve_execution_config(default, overrides)
-
-    assert isinstance(result, ExecutionConfig)
-    assert result.parallel is True
-    assert result.workers == 8
-    assert result.chunksize == 10  # Preserved from default
+    assert extraction.mode == "rectangular"
+    assert extraction.width == pytest.approx(5.0)
+    assert extraction.height == pytest.approx(8.0)
 
 
-def test_resolve_execution_config_dict_base_pydantic_override() -> None:
-    """Resolve execution configuration using a TypedDict base and Pydantic override."""
-    default: ExecutionConfigDict = {"parallel": True, "workers": 4, "chunksize": 50}
-    overrides = ExecutionConfig(parallel=False, workers=1, chunksize=None)
+def test_map_config_default_initialization() -> None:
+    """Generate a default MapConfig and verify default values."""
+    config = MapConfig.default()
 
-    result = resolve_execution_config(default, overrides)
-
-    assert isinstance(result, ExecutionConfig)
-    assert result.parallel is False
-    assert result.workers == 1
-    assert result.chunksize is None
+    assert config.min_distance == pytest.approx(1.75)
+    assert config.interp_distance == pytest.approx(3.0)
+    assert config.include_map is True
+    assert isinstance(config.extraction, NoneExtraction)
+    assert config.extraction.mode == "none"
 
 
-def test_resolve_map_config_partial_override() -> None:
-    """Resolve map configuration with partial TypedDict overrides."""
-    # Assuming MapConfig takes these arguments based on the TypedDict definition
-    default = MapConfig(min_distance=1.0, interp_distance=2.0, include_map=True)
-    overrides: MapConfigDict = {"include_map": False}
+def test_map_config_discriminator_radial() -> None:
+    """Parse a dictionary with radial mode to ensure proper union routing."""
+    config_dict = {
+        "extraction": {
+            "mode": "radial",
+            "radius": 15.0,
+        }
+    }
 
-    result = resolve_map_config(default, overrides)
+    config = MapConfig.model_validate(config_dict)
 
-    assert isinstance(result, MapConfig)
-    assert result.include_map is False
-    assert abs(result.min_distance - 1.0) < 1e-6
+    assert isinstance(config.extraction, RadialExtraction)
+    assert config.extraction.radius == pytest.approx(15.0)
 
 
-def test_resolve_loader_config_nested_dict_override() -> None:
-    """Resolve loader configuration prioritizing deeply nested dictionary overrides."""
-    default = LoaderConfig(
-        input_len=10,
-        output_len=20,
-        sample_time=0.1,
-        resampling=Resampling(up=1, down=1, method=ResamplingMethod.FAST),
+def test_map_config_discriminator_rectangular() -> None:
+    """Parse a dictionary with rectangular mode to ensure proper union routing."""
+    config_dict = {
+        "extraction": {
+            "mode": "rectangular",
+            "width": 20.0,
+            "height": 10.0,
+        }
+    }
+
+    config = MapConfig.model_validate(config_dict)
+
+    assert isinstance(config.extraction, RectangularExtraction)
+    assert config.extraction.width == pytest.approx(20.0)
+    assert config.extraction.height == pytest.approx(10.0)
+
+
+def test_map_config_missing_discriminator_params() -> None:
+    """Raise ValidationError when required parameters for a specific mode are missing."""
+    config_dict = {
+        "extraction": {
+            "mode": "radial",
+            # missing "radius"
+        }
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        MapConfig.model_validate(config_dict)
+
+    assert "Field required" in str(exc_info.value)
+    assert "radius" in str(exc_info.value)
+
+
+def test_map_config_invalid_mode() -> None:
+    """Raise ValidationError when an unsupported extraction mode is provided."""
+    config_dict = {
+        "extraction": {
+            "mode": "triangular",  # invalid mode
+            "radius": 5.0,
+        }
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        MapConfig.model_validate(config_dict)
+
+    assert (
+        "Input tag 'triangular' found using 'mode' does not match any of the expected tags"
+        in str(exc_info.value)
     )
-    overrides: LoaderConfigDict = {"output_len": 50, "resampling": {"method": "spline"}}
-
-    result = resolve_loader_config(default, overrides)
-    assert result.resampling is not None
-
-    assert isinstance(result, LoaderConfig)
-    assert result.output_len == 50
-    assert result.input_len == 10
-    # The nested dict should deep-merge, keeping 'up' and 'down' but changing 'method'
-    assert result.resampling.model_dump() == {"up": 1, "down": 1, "method": "spline"}
 
 
-def test_resolve_config_full_model() -> None:
-    """Resolve the root Config object combining multiple nested sub-configurations."""
-    default = Config(
-        loader=LoaderConfig(input_len=5, output_len=5, sample_time=0.5),
-        map=MapConfig(min_distance=5.0, interp_distance=5.0, include_map=True),
-        execution=ExecutionConfig(parallel=False, workers=1),
-    )
+def test_map_config_additional_params() -> None:
+    """Raise ValidationError when an unsupported extraction mode is provided."""
+    config_dict = {
+        "extraction": {
+            "mode": "radial",
+            "radius": 5.0,
+            "width": 10.0,
+        }
+    }
+    config = MapConfig.model_validate(config_dict)
+    assert isinstance(config.extraction, RadialExtraction)
+    assert config.extraction.radius == pytest.approx(5.0)
+    # The extra "width" parameter should be ignored and not cause a validation error
 
-    overrides: ConfigDict = {"loader": {"input_len": 100}, "execution": {"parallel": True}}
 
-    result = resolve_config(default, overrides)
+def test_map_config_distance_validation_success() -> None:
+    """Initialize MapConfig with valid distance parameters."""
+    config = MapConfig(min_distance=2.0, interp_distance=2.5)
 
-    assert isinstance(result, Config)
-    assert result.loader.input_len == 100
-    assert result.loader.output_len == 5  # Preserved
-    assert result.execution.parallel is True
-    assert result.map.include_map is True  # Untouched sub-model
+    assert config.min_distance == pytest.approx(2.0)
+    assert config.interp_distance == pytest.approx(2.5)
+
+
+def test_map_config_distance_validation_failure() -> None:
+    """Raise ValidationError when interp_distance is smaller than min_distance."""
+    with pytest.raises(ValidationError) as exc_info:
+        MapConfig(min_distance=5.0, interp_distance=2.0)
+
+    error_msg = str(exc_info.value)
+    assert "Value error" in error_msg
+    assert "interp_distance (2.0) must be greater than or equal to min_distance (5.0)" in error_msg
+
+
+def test_filtering_config_single_agent_category_string() -> None:
+    """Parse a single string into a frozenset of AgentCategory."""
+    config = FilteringConfig.create(filter_agent_category="CAR")
+
+    assert config.filter_agent_category == frozenset([AgentCategory.CAR])
+
+
+def test_filtering_config_list_agent_category_strings() -> None:
+    """Parse a list of strings into a frozenset of AgentCategory."""
+    config = FilteringConfig.create(filter_agent_category=["CAR", "PEDESTRIAN"])
+
+    assert config.filter_agent_category == frozenset([AgentCategory.CAR, AgentCategory.PEDESTRIAN])
+
+
+def test_filtering_config_existing_enum_member() -> None:
+    """Accept an existing Enum member directly and coerce it into a frozenset."""
+    config = FilteringConfig.create(filter_agent_category=AgentCategory.VAN)
+
+    assert config.filter_agent_category == frozenset([AgentCategory.VAN])
+
+
+def test_filtering_config_invalid_agent_category() -> None:
+    """Raise ValidationError when an invalid agent category string is provided."""
+    with pytest.raises(ValidationError) as exc_info:
+        FilteringConfig.create(filter_agent_category=["CAR", "SPACESHIP"])
+
+    error_msg = str(exc_info.value)
+    assert "Input should be" in error_msg
+    assert "SPACESHIP".lower() in error_msg
+
+
+def test_filtering_config_single_frame_int() -> None:
+    """Parse a single integer into a frozenset of integers for require_frames."""
+    config = FilteringConfig.create(require_frames=19)
+
+    assert config.require_frames == frozenset([19])
+
+
+def test_filtering_config_list_frames() -> None:
+    """Parse a list of integers into a frozenset of integers for require_frames."""
+    config = FilteringConfig.create(require_frames=[19, 20, 21])
+
+    assert config.require_frames == frozenset([19, 20, 21])
+
+
+def test_filtering_config_none_values() -> None:
+    """Retain None values when no explicit frames or categories are provided."""
+    config = FilteringConfig()
+
+    assert config.filter_agent_category is None
+    assert config.require_frames is None
+
+
+def test_filtering_config_full_dict_validation() -> None:
+    """Validate a complete dictionary matching a TOML configuration block."""
+    raw_data = {
+        "min_agents": 3,
+        "require_all_valid": True,
+        "require_frames": [10, 15],
+        "filter_agent_category": "STATIC_OBJECT",
+        "filter_slow_agents": 1.5,
+        "min_samples_per_agent": 5,
+    }
+
+    config = FilteringConfig.model_validate(raw_data)
+
+    assert config.min_agents == 3
+    assert config.require_all_valid is True
+    assert config.require_frames == frozenset([10, 15])
+    assert config.filter_agent_category == frozenset([AgentCategory.STATIC_OBJECT])
+    assert config.filter_slow_agents == pytest.approx(1.5)
+    assert config.min_samples_per_agent == 5
+
+
+def test_square_extraction_valid() -> None:
+    """Initialize SquareExtraction and verify computed dimensions."""
+    extraction = SquareExtraction(size=10.0)
+
+    assert extraction.mode == "square"
+    assert extraction.size == pytest.approx(10.0)
+    assert extraction.width == pytest.approx(10.0)
+    assert extraction.height == pytest.approx(10.0)
+
+
+def test_square_extraction_model_dump() -> None:
+    """Serialize SquareExtraction to verify computed fields are included in output."""
+    extraction = SquareExtraction(size=25.0)
+    dumped = extraction.model_dump()
+
+    assert dumped["mode"] == "square"
+    assert dumped["size"] == pytest.approx(25.0)
+    assert dumped["width"] == pytest.approx(25.0)
+    assert dumped["height"] == pytest.approx(25.0)
+
+
+def test_map_config_discriminator_square() -> None:
+    """Parse a dictionary with square mode to ensure proper union routing."""
+    config_dict = {
+        "extraction": {
+            "mode": "square",
+            "size": 15.0,
+        }
+    }
+
+    config = MapConfig.model_validate(config_dict)
+
+    assert isinstance(config.extraction, SquareExtraction)
+    assert config.extraction.size == pytest.approx(15.0)
+    assert config.extraction.width == pytest.approx(15.0)
+    assert config.extraction.height == pytest.approx(15.0)
+
+
+@pytest.mark.parametrize("mode_alias", ["circular", "radius", "circle"])
+def test_radial_extraction_aliases(mode_alias: str) -> None:
+    """Ensure radial extraction accepts all defined string aliases."""
+    config_dict = {
+        "extraction": {
+            "mode": mode_alias,
+            "radius": 12.5,
+        }
+    }
+
+    config = MapConfig.model_validate(config_dict)
+
+    assert isinstance(config.extraction, RadialExtraction)
+    # The mode string is preserved as the alias the user provided
+    assert config.extraction.mode == mode_alias
+    assert config.extraction.radius == pytest.approx(12.5)
+
+
+@pytest.mark.parametrize("mode_alias", ["box", "rectangle"])
+def test_rectangular_extraction_aliases(mode_alias: str) -> None:
+    """Ensure rectangular extraction accepts all defined string aliases."""
+    config_dict = {
+        "extraction": {
+            "mode": mode_alias,
+            "width": 20.0,
+            "height": 10.0,
+        }
+    }
+
+    config = MapConfig.model_validate(config_dict)
+
+    assert isinstance(config.extraction, RectangularExtraction)
+    # The mode string is preserved as the alias the user provided
+    assert config.extraction.mode == mode_alias
+    assert config.extraction.width == pytest.approx(20.0)
+    assert config.extraction.height == pytest.approx(10.0)
+
+
+def test_square_extraction_missing_size() -> None:
+    """Raise ValidationError when the size parameter is missing for square extraction."""
+    config_dict = {
+        "extraction": {
+            "mode": "square",
+            # missing "size"
+        }
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        MapConfig.model_validate(config_dict)
+
+    assert "Field required" in str(exc_info.value)
+    assert "size" in str(exc_info.value)
