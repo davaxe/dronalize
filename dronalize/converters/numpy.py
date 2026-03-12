@@ -6,12 +6,12 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from dronalize.core.categories import AgentCategory
+from dronalize.categories import AgentCategory
 from dronalize.pipeline.functional.targets import target_candidates
 
 if TYPE_CHECKING:
-    from dronalize.core.map_graph import MapGraph
-    from dronalize.core.scene import Scene
+    from dronalize.maps.graph import MapGraph
+    from dronalize.scene import Scene
 
 
 class NumpySceneDict(TypedDict):
@@ -71,10 +71,7 @@ def scene_to_numpy_dict(
         }
 
     candidates = target_candidates(scene.inner, scene.input_len)
-    if multiple_targets is False:
-        candidates = candidates[:1]
-    elif isinstance(multiple_targets, int):
-        candidates = candidates[:multiple_targets]
+    candidates = candidates[:1] if multiple_targets is False else candidates[:multiple_targets]
 
     return {
         target: _convert_to_numpy_dict(

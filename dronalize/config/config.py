@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-from typing import TYPE_CHECKING, Any, TypeVar
+import sys
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
-import tomllib
 from pydantic import BaseModel, Field, RootModel
 
 from dronalize.config.map import MapConfig
 
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
 if TYPE_CHECKING:
-    from collections.abc import Mapping
     from pathlib import Path
 
     from dronalize.config.loader import LoaderConfig
 
 # Define a TypeVar bound to BaseModel for generic type hinting
 TModel = TypeVar("TModel", bound=BaseModel)
+ConfigSection = dict[str, object]
 
 
 class ExecutionConfig(BaseModel):
@@ -34,21 +40,23 @@ class Config(BaseModel):
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
 
 
-class ConfigFile(RootModel[dict[str, dict[str, Any]]]):
+class ConfigFile(RootModel[dict[str, ConfigSection]]):
     """Validated view of the dataset override file."""
 
 
-def load_config(config_path: Path) -> dict[str, dict[str, Any]]:
+def load_config(config_path: Path) -> dict[str, ConfigSection]:
     """Load, validate, and parse the configuration overrides from the given path."""
     with config_path.open("rb") as f:
         raw_data = tomllib.load(f)
-    return ConfigFile.model_validate(raw_data).root
+    config_file = ConfigFile.model_validate(raw_data).root
+    global_section: ConfigSection = config_file.get("global", {})
+    return {k: _deep_merge(global_section, v) for k, v in config_file.items() if k != "global"}
 
 
 def resolve_config(
     model_cls: type[TModel],
-    default: TModel | dict[str, Any],
-    overrides: TModel | dict[str, Any],
+    default: TModel | ConfigSection,
+    overrides: TModel | ConfigSection,
 ) -> TModel:
     """Merge a default config model/dict with overrides and validate into the target model.
 
@@ -56,9 +64,9 @@ def resolve_config(
     ----------
     model_cls : type[TModel]
         The Pydantic model class to validate the final merged data against.
-    default : TModel | dict[str, Any]
+    default : TModel | ConfigSection
         The default configuration to use as a base.
-    overrides : TModel | dict[str, Any]
+    overrides : TModel | ConfigSection
         The configuration overrides. Deeply merged with the default config, taking priority.
     """
     base_data = default.model_dump() if isinstance(default, BaseModel) else default
@@ -68,12 +76,24 @@ def resolve_config(
     return model_cls.model_validate(merged_data)
 
 
-def _deep_merge(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> dict[str, Any]:
+def _is_config_section(value: object) -> TypeGuard[Mapping[str, object]]:
+    return isinstance(value, Mapping) and all(isinstance(k, str) for k in value)
+
+
+def _deep_merge(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> ConfigSection:
     """Recursively merge two dictionaries."""
     merged = dict(base)
     for key, value in overrides.items():
-        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-            merged[key] = _deep_merge(merged[key], value)
+        base_value = merged.get(key)
+        if _is_config_section(value) and _is_config_section(base_value):
+            merged[key] = _deep_merge(dict(base_value), dict(value))
         else:
             merged[key] = value
     return merged
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    path = Path("config.toml")
+    config = load_config(path)

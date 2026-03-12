@@ -9,8 +9,8 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
+from dronalize.categories import AgentCategory
 from dronalize.config import LoaderConfig
-from dronalize.core import AgentCategory
 from dronalize.pipeline import transforms as transform
 from dronalize.pipeline.pipeline import Pipeline, ReduceTransform
 

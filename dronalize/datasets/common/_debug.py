@@ -11,11 +11,11 @@ from dronalize.plot import plot_trajectories, plot_trajectories_on_map
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
-    from dronalize.core.interfaces import SceneLoader
-    from dronalize.core.scene import Scene
+    from dronalize.loading import SceneLoader
+    from dronalize.scene import Scene
 
 
-def _debug_visualize_scenes(
+def debug_visualize_scenes(
     source: SceneLoader,
     *,
     max_scenes: int = 1,

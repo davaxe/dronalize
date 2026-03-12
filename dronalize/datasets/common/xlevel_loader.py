@@ -7,13 +7,13 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
-from dronalize.core.base import BaseSceneLoader
-from dronalize.core.categories import AgentCategory
-from dronalize.core.loader import IngestOutput, Source
-from dronalize.core.map_resolver import MapResolver, no_map, shared_map
 from dronalize.datasets.common import utils
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
+from dronalize.maps.resolver import MapResolver, no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -48,8 +48,8 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config)
-        self._data_dir = self._normalize_data_root(data_dir)
-        self._rebalance_ratio = None
+        self._data_dir: Path = self._normalize_data_root(data_dir)
+        self._rebalance_ratio: float | None = None
 
     @staticmethod
     def meta_data_select() -> list[pl.Expr]:

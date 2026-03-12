@@ -1,18 +1,20 @@
-from dronalize.datasets import registry
-from dronalize.datasets.unid import _lifecycle
-from dronalize.datasets.unid.graph_builder import UniDGraphBuilder
+__dronalize_builtin__ = {"datasets": ["unid"]}
+
+from dronalize.datasets import _registry
+from dronalize.datasets.unid import _scope
 from dronalize.datasets.unid.loader import UniDLoader
+from dronalize.datasets.unid.map.builder import UniDMapBuilder
 
-__all__ = ["UniDGraphBuilder", "UniDLoader"]
+__all__ = ["UniDLoader", "UniDMapBuilder"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="unid",
         loader_factory=UniDLoader,
         default_config=UniDLoader.default_config(),
         default_map_config=UniDLoader.default_map_config(),
-        map_mode=registry.MapMode.SHARED_KEYED,
+        map_mode=_registry.MapMode.SHARED_KEYED,
         predefined_splits=[],
-        lifecycle_context=_lifecycle.unid_lifecycle_context,
+        execution_scope_fn=_scope.unid_execution_scope,
     )
 )

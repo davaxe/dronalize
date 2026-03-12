@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from dronalize.core._compat import require_optional
+from dronalize._internal._compat import require_optional
 
 if TYPE_CHECKING:
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.maps.graph import MapGraph
 
 
 def map_graph_to_torch(graph: MapGraph) -> dict[Any, Any]:

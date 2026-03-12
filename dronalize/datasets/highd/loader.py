@@ -6,17 +6,17 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
+from dronalize.categories import AgentCategory
 from dronalize.config.map import MapConfig
-from dronalize.core import AgentCategory
 from dronalize.datasets.common import utils
 from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
-from dronalize.datasets.highd.graph_builder import HighDMapGraphBuilder
+from dronalize.datasets.highd.map.builder import HighDMapBuilder
 
 if TYPE_CHECKING:
     from dronalize.config import LoaderConfig
-    from dronalize.core.map_graph import MapGraph
-    from dronalize.core.map_resolver import MapKey, MapResolver
-    from dronalize.core.scene import Scene
+    from dronalize.maps.graph import MapGraph
+    from dronalize.maps.resolver import MapKey, MapResolver
+    from dronalize.scene import Scene
 
 
 class HighDLoader(XLevelDataLoader):
@@ -50,10 +50,13 @@ class HighDLoader(XLevelDataLoader):
             Ratio to rebalance lane changing vs non-lane changing agents.
 
         """
-        data_root = self._normalize_data_root(data_root)
-        super().__init__(data_root / "data", loader_config=loader_config, map_config=map_config)
+        super().__init__(
+            self._normalize_data_root(data_root) / "data",
+            loader_config=loader_config,
+            map_config=map_config,
+        )
         # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
-        self._rebalance_ratio = lane_change_ratio
+        self._rebalance_ratio: float | None = lane_change_ratio
 
     @staticmethod
     @override
@@ -117,7 +120,7 @@ class HighDLoader(XLevelDataLoader):
             min_x = scene.inner.select(pl.col("x")).min().item()
             max_x = scene.inner.select(pl.col("x")).max().item()
             dist = max_x - min_x
-            builder = HighDMapGraphBuilder(Path(key), min_x - dist * 0.1, max_x + dist * 0.1)
+            builder = HighDMapBuilder(Path(key), min_x - dist * 0.1, max_x + dist * 0.1)
             map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 

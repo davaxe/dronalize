@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Generic, TypeVar
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.core.split import DatasetSplit
+from dronalize.categories import DatasetSplit
 
 T = TypeVar("T")
 
@@ -83,7 +83,7 @@ class WeightedAssigner(Generic[T]):
 
         """
         # fromkeys preserves order and removes duplicates
-        self._groups = list(dict.fromkeys(groups))
+        self._groups: list[T] = list(dict.fromkeys(groups))
         if len(groups) != len(self._groups):
             msg = (
                 f"Groups must be unique. Found {len(groups)} elements "
@@ -97,26 +97,31 @@ class WeightedAssigner(Generic[T]):
             )
             raise ValueError(msg)
 
-        self._index_to_group = list(self._groups)
-
-        self._weights = np.array(weights) if weights is not None else np.ones(len(self._groups))
+        self._index_to_group: list[T] = list(self._groups)
+        self._weights: npt.NDArray[np.float64] = (
+            np.array(weights, dtype=np.float64)
+            if weights is not None
+            else np.ones(len(self._groups), dtype=np.float64)
+        )
 
         if np.any(self._weights < 0):
             msg = "All weights must be non-negative."
             raise ValueError(msg)
 
-        weights_sum = self._weights.sum()
+        weights_sum = float(self._weights.sum())
 
         if weights_sum == 0:
             msg = f"At least one weight must be greater than zero got {self._weights}."
             raise ValueError(msg)
 
-        self._weights /= self._weights.sum()
+        self._weights /= weights_sum
 
-        self._rng = np.random.default_rng(seed)
-        self._deck = _generate_shuffled_deck(self._weights, round_size, rounds, self._rng)
-        self._index = 0
-        self._round_index = 0
+        self._rng: np.random.Generator = np.random.default_rng(seed)
+        self._deck: npt.NDArray[np.int32] = _generate_shuffled_deck(
+            self._weights, round_size, rounds, self._rng
+        )
+        self._index: int = 0
+        self._round_index: int = 0
 
     def next(self) -> T:
         """Next group in the stream.
@@ -135,7 +140,7 @@ class WeightedAssigner(Generic[T]):
         1
         """
         index = self._index
-        value = self._deck[self._round_index, index]
+        value = int(self._deck[self._round_index, index])
         self._update()
         return self._index_to_group[value]
 
@@ -178,11 +183,11 @@ class WeightedAssigner(Generic[T]):
         if self._index >= self._deck.shape[1]:
             self._index = 0
             # Random row selection for the next round
-            self._round_index = self._rng.integers(0, self._deck.shape[0])
+            self._round_index = int(self._rng.integers(0, int(self._deck.shape[0])))
 
 
 def _generate_shuffled_deck(
-    weights: np.ndarray,
+    weights: npt.NDArray[np.float64],
     round_size: int,
     rounds: int,
     rng: np.random.Generator | None = None,
@@ -192,7 +197,7 @@ def _generate_shuffled_deck(
     counts = np.floor(float_counts).astype(np.int32)
 
     # Handle rounding remainders to strictly enforce round_size
-    remainder = round_size - counts.sum()
+    remainder = round_size - int(counts.sum())
     if remainder > 0:
         # Distribute remainder to the groups with the largest fractional parts
         fractional_parts = float_counts - counts
@@ -201,14 +206,14 @@ def _generate_shuffled_deck(
 
     # Create the base 1D array for a single round
     n_groups = len(weights)
-    base_round = np.repeat(np.arange(n_groups), counts)
+    base_round = np.repeat(np.arange(n_groups, dtype=np.int32), counts)
 
     # Duplicate the base round to create a 2D array
     deck = np.tile(base_round, (rounds, 1))
 
     # Independently shuffle each row
     rng = rng or np.random.default_rng()
-    return rng.permuted(deck, axis=1)
+    return rng.permuted(deck, axis=1).astype(np.int32)
 
 
 SplitAssigner = WeightedAssigner[DatasetSplit]

@@ -61,7 +61,7 @@ nav:
       - Visualization: user-guide/visualization.md
   - API Reference:
       - api/index.md
-      - Core: api/core.md
+      - Core API: api/core.md
       - Config: api/config.md
       - Pipeline: api/pipeline.md
       - Datasets: api/datasets.md

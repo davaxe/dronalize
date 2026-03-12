@@ -7,12 +7,12 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
-from dronalize.core.base import BaseSceneLoader
-from dronalize.core.categories import AgentCategory
-from dronalize.core.loader import IngestOutput, Source
-from dronalize.core.map_resolver import MapResolver, no_map, shared_map
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
+from dronalize.maps.resolver import MapResolver, no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -20,9 +20,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-# TODO: Add support for filtering parked vehicles. Moreover, figure out if the
-# dataset directory layout should change to match the one in repo:
-# https://github.com/SOTIF-AVLab/SinD
+# TODO: Figure out if the dataset directory layout should change to match the
+# one in repo: https://github.com/SOTIF-AVLab/SinD
 
 
 class SindLoader(BaseSceneLoader[Path]):
@@ -45,7 +44,7 @@ class SindLoader(BaseSceneLoader[Path]):
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config)
-        self._data_dir = self._normalize_data_root(data_root) / "data"
+        self._data_dir: Path = self._normalize_data_root(data_root) / "data"
 
     @override
     def all_sources(self) -> Iterable[Source[Path]]:

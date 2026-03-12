@@ -10,14 +10,12 @@ from typing_extensions import override
 from zarr.creation import open_array
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
-from dronalize.core.base import BaseSceneLoader
-from dronalize.core.categories import AgentCategory
-from dronalize.core.interfaces import IngestOutput, Source
-from dronalize.core.map_resolver import no_map, shared_map
-from dronalize.core.split import DatasetSplit
 from dronalize.datasets.common import utils
+from dronalize.loading import BaseSceneLoader, IngestOutput, Source
+from dronalize.maps.resolver import no_map, shared_map
 from dronalize.pipeline import Pipeline
 from dronalize.pipeline.factories import trajectory_pipeline
 
@@ -27,7 +25,7 @@ if TYPE_CHECKING:
 
     from zarr.core import Array
 
-    from dronalize.core.interfaces import MapResolver
+    from dronalize.maps import MapResolver
 
 
 @dataclass
@@ -83,7 +81,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
             raise self._invalid_loader_argument(msg)
 
         super().__init__(loader_config=loader_config, map_config=map_config, split=split)
-        self._data_root = self._normalize_data_root(data_root)
+        self._data_root: Path = self._normalize_data_root(data_root)
         self._data: dict[DatasetSplit, _ArrayData] = {}
         self._batch_size: int | None = scene_batch_size
 
@@ -161,15 +159,15 @@ class LyftLoader(BaseSceneLoader[_Source]):
         # Now uses the lazy loader directly to ensure availability
         arrays = self._get_arrays(source.inner.split)
 
-        scenes_np = cast("npt.NDArray", arrays.scenes[start:end])
+        scenes_np = cast("npt.NDArray[np.void]", arrays.scenes[start:end])
 
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
         frame_end = np.max(scenes_np[:]["frame_index_interval"])
-        frames_np = cast("npt.NDArray", arrays.frames[frame_start:frame_end])
+        frames_np = cast("npt.NDArray[np.void]", arrays.frames[frame_start:frame_end])
 
         agent_start = np.min(frames_np[:]["agent_index_interval"])
         agent_end = np.max(frames_np[:]["agent_index_interval"])
-        agents_np = cast("npt.NDArray", arrays.agents[agent_start:agent_end])
+        agents_np = cast("npt.NDArray[np.void]", arrays.agents[agent_start:agent_end])
 
         for scene_data in scenes_np:
             df = _scene_to_polars(
@@ -224,7 +222,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
 class _LyftScene:
     """A single scene in the Lyft dataset."""
 
-    scene_data: npt.NDArray
+    scene_data: npt.NDArray[np.void]
 
     @property
     def scene_name(self) -> str:
@@ -260,9 +258,9 @@ _CATEGORY_LOOKUP = np.array([
 
 
 def _scene_to_polars(
-    scene_data: npt.NDArray,
-    frames: npt.NDArray,
-    agents: npt.NDArray,
+    scene_data: npt.NDArray[np.void],
+    frames: npt.NDArray[np.void],
+    agents: npt.NDArray[np.void],
     frame_offset: int = 0,
     agent_offset: int = 0,
 ) -> pl.DataFrame:

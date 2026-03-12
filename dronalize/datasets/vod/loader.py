@@ -33,9 +33,8 @@ class VodLoader(NuScenesLoader):
 
         """
         super().__init__(data_dir, loader_config=loader_config, map_config=map_config)
-        self._full_category_contains = [
-            "vehicle.ego",
-        ]
+        # Overrides the internal nuScenes category filtering
+        self._full_category_contains: list[str] = ["vehicle.ego"]
 
     @classmethod
     @override

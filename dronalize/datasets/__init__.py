@@ -3,9 +3,15 @@ from __future__ import annotations
 import importlib
 import pkgutil
 
-from dronalize.datasets.registry import available, get
+from dronalize.datasets._registry import (
+    DatasetDescriptor,
+    ExecutionScope,
+    available,
+    get,
+    register,
+)
 
-__all__ = ["available", "get"]
+__all__ = ["DatasetDescriptor", "ExecutionScope", "available", "get", "register"]
 
 _DATASET_MODULES = {
     module_info.name

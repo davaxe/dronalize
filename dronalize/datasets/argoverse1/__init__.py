@@ -1,17 +1,19 @@
-from dronalize.datasets import registry
-from dronalize.datasets.argoverse1 import _lifecycle
+__dronalize_builtin__ = {"datasets": ["argoverse1"]}
+
+from dronalize.datasets import _registry
+from dronalize.datasets.argoverse1 import _scope
 from dronalize.datasets.argoverse1.loader import Argoverse1Loader
-from dronalize.datasets.argoverse1.map.graph_builder import Argoverse1MapGraphBuilder
+from dronalize.datasets.argoverse1.map.builder import Argoverse1MapBuilder
 
-__all__ = ["Argoverse1Loader", "Argoverse1MapGraphBuilder"]
+__all__ = ["Argoverse1Loader", "Argoverse1MapBuilder"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="argoverse1",
         loader_factory=Argoverse1Loader,
         default_config=Argoverse1Loader.default_config(),
         default_map_config=Argoverse1Loader.default_map_config(),
-        map_mode=registry.MapMode.LAZY_KEYED,
-        lifecycle_context=_lifecycle.argoverse1_lifecycle_context,
+        map_mode=_registry.MapMode.LAZY_KEYED,
+        execution_scope_fn=_scope.argoverse1_execution_scope,
     ).with_all_splits()
 )

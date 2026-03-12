@@ -1,21 +1,21 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
-from dronalize.config.config import Config, load_config, resolve_config
-from dronalize.core.interfaces import SceneWriter
-from dronalize.datasets.registry import DatasetDescriptor, get
+from dronalize.config.config import Config, ConfigSection, load_config, resolve_config
+from dronalize.datasets._registry import DatasetDescriptor, get
 from dronalize.execution.parallel import ParallelExecutor
 from dronalize.execution.sequential import SequentialExecutor
+from dronalize.loading import SceneWriter
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from dronalize.categories import DatasetSplit
     from dronalize.config.loader import LoaderConfig
     from dronalize.config.map import MapConfig
-    from dronalize.core.base import BaseSceneLoader
-    from dronalize.core.split import DatasetSplit
+    from dronalize.loading import BaseSceneLoader
 
 
 WriterFactory = Callable[[int | None], SceneWriter]
@@ -26,7 +26,7 @@ def process_dataset(
     *,
     data_root: Path,
     writer: SceneWriter | WriterFactory,
-    config_overrides_path: Path | None = None,
+    config_path: Path | None = None,
     split: DatasetSplit | None = None,
 ) -> None:
     """Process a single dataset end-to-end and write scenes via *writer*.
@@ -45,7 +45,7 @@ def process_dataset(
         is handed to `writer.write()`. When processing completes, writers are
         finalized via `finish_local()` and `finish_final()`, unless a custom
         finalize callback is used by the underlying execution wrapper.
-    config_overrides_path : Path or None, optional
+    config_path : Path or None, optional
         Per-dataset configuration overrides (same shape as one section of the
         TOML config file). Merged on top of the loader's `default_config()`.
         When `None` the default config is used unchanged. If it is a `Path`, the
@@ -58,13 +58,13 @@ def process_dataset(
     if isinstance(descriptor, str):
         descriptor = get(descriptor)
 
-    config_overrides = {}
-    if config_overrides_path is not None:
-        all_overrides = load_config(config_overrides_path)
-        config_overrides = all_overrides.get(descriptor.name, {})
+    config_section: ConfigSection = {}
+    if config_path is not None:
+        all_overrides = load_config(config_path)
+        config_section = all_overrides.get(descriptor.name, {})
 
-    config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
-    config = resolve_config(Config, default=config, overrides=config_overrides)
+    config: Config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
+    config = resolve_config(Config, default=config, overrides=config_section)
 
     if config.execution.parallel and isinstance(writer, SceneWriter):
         msg = (
@@ -74,7 +74,7 @@ def process_dataset(
         )
         raise ValueError(msg)
 
-    with descriptor.execute_lifecycle_context(data_root, config.loader, config.map):
+    with descriptor.execution_scope(data_root, config.loader, config.map):
         loader = _build_loader(
             descriptor,
             data_root=data_root,
@@ -82,8 +82,7 @@ def process_dataset(
             map_config=config.map,
             split=split,
         )
-        if config.execution.parallel:
-            writer = cast("WriterFactory", writer)
+        if config.execution.parallel and isinstance(writer, Callable):
             ParallelExecutor(
                 loader,
                 processes=config.execution.workers,
@@ -107,9 +106,9 @@ def _build_loader(
     loader_config: LoaderConfig,
     map_config: MapConfig,
     split: DatasetSplit | None,
-) -> BaseSceneLoader:
+) -> BaseSceneLoader[object]:
     """Instantiate a loader from a descriptor and its resolved config."""
-    kwargs: dict[str, Any] = dict(loader_config.extra_kwargs)
+    kwargs: dict[str, object] = dict(loader_config.extra_kwargs)
     if split is not None and split not in descriptor.predefined_splits:
         msg: str = (
             f"Split {split} not supported for dataset {descriptor.name}"

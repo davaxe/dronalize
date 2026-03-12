@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, Self
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing_extensions import Self
 
 from dronalize.config.filtering import FilteringConfig
 from dronalize.pipeline.functional.resample import Resampling, ResamplingMethod
@@ -10,7 +11,7 @@ from dronalize.pipeline.functional.resample import Resampling, ResamplingMethod
 if TYPE_CHECKING:
     from collections.abc import Collection
 
-    from dronalize.core.categories import AgentCategory
+    from dronalize.categories import AgentCategory
 
 
 class WindowParams(BaseModel):

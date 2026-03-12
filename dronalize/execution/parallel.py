@@ -7,26 +7,28 @@ import threading
 from collections import deque
 from dataclasses import dataclass
 from multiprocessing.util import Finalize
-from typing import TYPE_CHECKING, Any, Concatenate, Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Concatenate, Generic, NamedTuple, NoReturn, TypeVar
 
 import tqdm
-from typing_extensions import Self, override
+from typing_extensions import Self, TypedDict, override
 
-from dronalize.core._types import P, PayloadT, SourceT
-from dronalize.core.interfaces import ProcessableLoader, SceneLoader, Source
-from dronalize.core.scene import Scene
+from dronalize._internal._types import P, PayloadT, SourceT
 from dronalize.execution.common import ProgressBar
+from dronalize.loading import ProcessableLoader, SceneLoader, Source
+from dronalize.scene import Scene
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable, Iterator
     from multiprocessing.sharedctypes import Synchronized
     from multiprocessing.synchronize import Lock
 
-    from dronalize.core.interfaces import SceneWriter
-    from dronalize.core.split import DatasetSplit
+    from dronalize.categories import DatasetSplit
+    from dronalize.loading import SceneWriter
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene])
+# Type var for static methods (they can't inherit from a generic type)
+_S = TypeVar("_S")
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,7 +43,16 @@ class WorkerInfo:
     """Remaining number of worker processes."""
 
 
-class ParallelExecutor(SceneLoader):
+class _TqdmArgs(TypedDict):
+    total: int | None
+    disable: bool
+    unit: str
+    desc: str
+    colour: str
+    unit_scale: bool | float
+
+
+class ParallelExecutor(SceneLoader, Generic[SourceT]):
     """Parallel scene processor that wraps a processable loader.
 
     It uses Python's multiprocessing module to parallelize the processing of
@@ -94,7 +105,7 @@ class ParallelExecutor(SceneLoader):
 
     def __init__(
         self,
-        inner: ProcessableLoader[Any],
+        inner: ProcessableLoader[SourceT],
         *,
         chunksize: int | None = None,
         processes: int | None = None,
@@ -142,7 +153,7 @@ class ParallelExecutor(SceneLoader):
             msg = "number of processes must be greater than 1 for ParallelExecutor."
             raise ValueError(msg)
 
-        self._inner = inner
+        self._inner: ProcessableLoader[SourceT] = inner
         self._mp_worker_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_scene_counter: Synchronized[int] = mp.Value("i", 0)
         self._mp_source_counter: Synchronized[int] = mp.Value("i", 0)
@@ -250,7 +261,7 @@ class ParallelExecutor(SceneLoader):
         # Bind args and kwargs early to avoid passing them through _ProcessArgs
         bound_callback = functools.partial(callback, *args, **kwargs)
         payloads = (_ProcessArgs(s, self._inner, bound_callback) for s in self._inner.sources())
-        deque(
+        _ = deque(
             self._execute_parallel(
                 self._process_fn_callback, payloads, _init_worker, *self._init_args
             ),
@@ -326,7 +337,7 @@ class ParallelExecutor(SceneLoader):
         bound_factory = functools.partial(writer_factory)
         payloads = (_ProcessArgs(s, self._inner) for s in self._inner.sources())
         initargs = (*self._init_args, bound_factory, finalize)
-        deque(
+        _ = deque(
             self._execute_parallel(self._process_fn_write, payloads, _init_write_worker, *initargs),
             maxlen=0,
         )
@@ -336,12 +347,12 @@ class ParallelExecutor(SceneLoader):
             thread.join(timeout=0)
 
         if self._mp_split_queue is not None:
-            self._mp_split_queue.get()
+            _ = self._mp_split_queue.get()
             self._mp_split_queue.close()
             self._mp_split_queue = None
 
     @staticmethod
-    def _process_fn_write(args: _ProcessArgs[SourceT]) -> int:
+    def _process_fn_write(args: _ProcessArgs[_S]) -> int:
         processed_scenes: int = 0
 
         def stream_split() -> Iterator[DatasetSplit]:
@@ -357,7 +368,7 @@ class ParallelExecutor(SceneLoader):
 
         stream_split_iter = stream_split() if _split_queue is not None else None
         for scene in ParallelExecutor._generate_scenes(args.loader, args.source):
-            _writer.write(scene, splits=stream_split_iter)
+            _ = _writer.write(scene, splits=stream_split_iter)
             processed_scenes += 1
 
         with _source_counter.get_lock():
@@ -366,7 +377,7 @@ class ParallelExecutor(SceneLoader):
         return processed_scenes
 
     @staticmethod
-    def _process_fn(args: _ProcessArgs[SourceT]) -> list[Scene]:
+    def _process_fn(args: _ProcessArgs[_S]) -> list[Scene]:
         """Worker process function that processes a single source and returns a list of Scenes.
 
         Parameters
@@ -386,7 +397,7 @@ class ParallelExecutor(SceneLoader):
         return scenes
 
     @staticmethod
-    def _process_fn_callback(args: _ProcessArgs[SourceT]) -> int:
+    def _process_fn_callback(args: _ProcessArgs[_S]) -> int:
         """Worker process function that applies a callback to each Scene.
 
         This function returns the number of processed scenes (used for keeping
@@ -411,7 +422,7 @@ class ParallelExecutor(SceneLoader):
             raise ValueError(msg)
 
         for scene in ParallelExecutor._generate_scenes(args.loader, args.source):
-            args.fn(scene)
+            _ = args.fn(scene)
             processed_scenes += 1
 
         with _source_counter.get_lock():
@@ -420,9 +431,7 @@ class ParallelExecutor(SceneLoader):
         return processed_scenes
 
     @staticmethod
-    def _generate_scenes(
-        loader: ProcessableLoader[SourceT], source: Source[SourceT]
-    ) -> Iterator[Scene]:
+    def _generate_scenes(loader: ProcessableLoader[_S], source: Source[_S]) -> Iterator[Scene]:
         """Core logic to process a source and yield properly numbered scenes."""
         for scene_data, map_resolver in loader.process_next(source):
             with _scene_counter.get_lock():
@@ -434,7 +443,7 @@ class ParallelExecutor(SceneLoader):
         self,
         process_fn: Callable[[PayloadT], ReturnT],
         payloads: Iterable[PayloadT],
-        initializer: Callable[P, Any],
+        initializer: Callable[P, object],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> Iterable[ReturnT]:
@@ -454,7 +463,7 @@ class ParallelExecutor(SceneLoader):
             pool.join()
 
     def _track_progress(
-        self, work_iter: Iterable[ReturnT], progress_bar: tqdm.tqdm
+        self, work_iter: Iterable[ReturnT], progress_bar: tqdm.tqdm[NoReturn]
     ) -> Iterable[ReturnT]:
         if self._progress_bar == ProgressBar.NONE:
             yield from work_iter
@@ -464,15 +473,15 @@ class ParallelExecutor(SceneLoader):
             self._update_progress_bar(progress_bar, result)
             yield result
 
-    def _update_progress_bar(self, progress_bar: tqdm.tqdm, result: ReturnT) -> None:
+    def _update_progress_bar(self, progress_bar: tqdm.tqdm[NoReturn], result: ReturnT) -> None:
         if self._progress_bar == ProgressBar.SOURCES:
-            progress_bar.set_postfix({"scenes": self._mp_scene_counter.value}, refresh=False)
-            progress_bar.update(1)
+            progress_bar.set_postfix_str(f"scenes: {self._mp_scene_counter.value}", refresh=False)
+            _ = progress_bar.update(1)
 
         elif self._progress_bar == ProgressBar.SCENES:
-            progress_bar.set_postfix({"sources": self._mp_source_counter.value}, refresh=False)
+            progress_bar.set_postfix_str(f"sources: {self._mp_source_counter.value}", refresh=False)
             processed_scenes = len(result) if isinstance(result, list) else result
-            progress_bar.update(processed_scenes)
+            _ = progress_bar.update(processed_scenes)
 
     @staticmethod
     def _feed_split_queue(
@@ -494,14 +503,14 @@ class ParallelExecutor(SceneLoader):
             return self._inner.num_scenes()
         return None
 
-    def _tqdm_args(self) -> dict[str, Any]:
+    def _tqdm_args(self) -> _TqdmArgs:
         return {
             "total": self._total(),
             "disable": self._progress_bar == ProgressBar.NONE,
             "unit": self._progress_bar.unit(),
             "desc": "Processing",
             "colour": "blue" if self._progress_bar == ProgressBar.SOURCES else "green",
-            "unit_scale": True if self._progress_bar == ProgressBar.SCENES else None,
+            "unit_scale": self._progress_bar == ProgressBar.SCENES,
         }
 
     @staticmethod
@@ -539,7 +548,7 @@ class _ProcessArgs(NamedTuple, Generic[SourceT]):
 
     source: Source[SourceT]
     loader: ProcessableLoader[SourceT]
-    fn: Callable[..., Any] | None = None
+    fn: Callable[..., object] | None = None
 
 
 # Worker initialization function to set up the global counter in each worker
@@ -604,9 +613,9 @@ def _init_write_worker(
 
     def cleanup() -> None:
         with _get_worker_info() as info:
-            if _writer is not None and finalize is not None:
+            if finalize is not None:
                 finalize(_writer)
-            elif _writer is not None:
+            else:
                 _writer.finish_local()
 
             if info.remaining_workers == 1:
@@ -614,4 +623,4 @@ def _init_write_worker(
 
             _worker_counter.value -= 1
 
-    Finalize(obj=None, callback=cleanup, exitpriority=10)
+    _ = Finalize(obj=None, callback=cleanup, exitpriority=10)

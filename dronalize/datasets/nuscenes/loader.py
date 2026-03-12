@@ -6,11 +6,11 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory
 from dronalize.config.loader import LoaderConfig
-from dronalize.core.base import BaseSceneLoader
-from dronalize.core.categories import AgentCategory
-from dronalize.core.loader import IngestOutput, Source
-from dronalize.core.map_resolver import no_map, shared_map
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
+from dronalize.maps.resolver import no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.config.map import MapConfig
-    from dronalize.core.interfaces import MapResolver
+    from dronalize.maps import MapResolver
 
 
 class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
@@ -48,7 +48,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config)
-        self._data_root = self._normalize_data_root(data_root)
+        self._data_root: Path = self._normalize_data_root(data_root)
         self._data_dirs: list[Path] = self._find_data_dir()
         self._dfs: list[dict[str, pl.LazyFrame]] = []
 
@@ -141,7 +141,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     def _load_tables(self) -> None:
         """Load all required tables using the generic loader."""
         for data_dir in self._data_dirs:
-            data_dict = {}
+            data_dict: dict[str, pl.LazyFrame] = {}
             for name, schema in self._schemas.items():
                 data_dict[name] = load_cached_table(
                     name=name,

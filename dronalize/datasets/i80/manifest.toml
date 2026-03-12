@@ -1,2 +1,0 @@
-module = "dronalize.datasets.i80"
-datasets = ["i80"]

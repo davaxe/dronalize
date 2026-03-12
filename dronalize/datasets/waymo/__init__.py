@@ -1,15 +1,24 @@
-from dronalize.datasets import registry
-from dronalize.datasets.waymo.loader import WaymoLoader
-from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
+__dronalize_builtin__ = {
+    "datasets": ["waymo"],
+    "optional_dependencies": ["google.protobuf"],
+    "extra": "waymo",
+}
 
-__all__ = ["WaymoLoader", "WaymoMapGraphBuilder"]
+from dronalize.datasets import _registry
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.ensure_builtin_dependencies(__name__, __dronalize_builtin__)
+
+from dronalize.datasets.waymo.loader import WaymoLoader  # noqa: E402
+from dronalize.datasets.waymo.map.builder import WaymoMapBuilder  # noqa: E402
+
+__all__ = ["WaymoLoader", "WaymoMapBuilder"]
+
+_registry.register(
+    _registry.DatasetDescriptor(
         name="waymo",
         loader_factory=WaymoLoader,
         default_config=WaymoLoader.default_config(),
         default_map_config=WaymoLoader.default_map_config(),
-        map_mode=registry.MapMode.INLINE,
+        map_mode=_registry.MapMode.INLINE,
     ).with_all_splits()
 )

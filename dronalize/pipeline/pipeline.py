@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, TypedDict, Unpack, cast, overload
+from typing import TYPE_CHECKING, Literal, TypedDict, cast, overload
 
 import polars as pl
-from typing_extensions import override
+from typing_extensions import Unpack, override
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from dronalize.core._types import T
+    from dronalize._internal._types import T
 
 
 Transform = Callable[[pl.LazyFrame], pl.LazyFrame]
@@ -662,8 +662,7 @@ class Pipeline:
                 parts.append(f"  .then({entry.name or _fn_name(entry.fn)})")
             elif isinstance(entry, _FlatMapEntry):
                 parts.append(f"  .then_flat_map({entry.name or _fn_name(entry.fn)})")
-            elif isinstance(entry, _ReduceEntry):
-                parts.append(f"  .then_reduce({entry.name or _fn_name(entry.fn)})")
+            parts.append(f"  .then_reduce({entry.name or _fn_name(entry.fn)})")
         body = "\n".join(parts) if parts else "  (empty)"
         return f"Pipeline(\n{body}\n)"
 

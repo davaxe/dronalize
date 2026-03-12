@@ -7,23 +7,24 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory
 from dronalize.config import LoaderConfig
 from dronalize.config.map import MapConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.loader import Source
-from dronalize.core.scene import Scene
-from dronalize.datasets.a43.graph_builder import A43GraphBuilder
+from dronalize.datasets.a43.map.builder import A43MapBuilder
 from dronalize.datasets.common import utils
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
+from dronalize.scene import Scene
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.interfaces import MapKey, MapResolver
-    from dronalize.core.loader import IngestOutput
-    from dronalize.core.map_graph import MapGraph
-    from dronalize.core.scene import Scene
+    from dronalize.loading.loader import IngestOutput
+    from dronalize.maps import MapKey, MapResolver
+    from dronalize.maps.graph import MapGraph
+    from dronalize.scene import Scene
 
 
 class A43Loader(BaseSceneLoader[Path]):
@@ -46,7 +47,7 @@ class A43Loader(BaseSceneLoader[Path]):
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config)
-        self._data_dir = self._normalize_data_root(data_root)
+        self._data_dir: Path = self._normalize_data_root(data_root)
 
     @override
     def all_sources(self) -> Iterable[Source[Path]]:
@@ -111,7 +112,7 @@ class A43Loader(BaseSceneLoader[Path]):
 
             min_x = scene.inner.select(pl.col("x")).min().item()
             max_x = scene.inner.select(pl.col("x")).max().item()
-            builder = A43GraphBuilder(key, min_x, max_x)
+            builder = A43MapBuilder(key, min_x, max_x)
             map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 

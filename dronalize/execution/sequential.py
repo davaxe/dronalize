@@ -5,16 +5,16 @@ from typing import TYPE_CHECKING, Any, Concatenate
 import tqdm
 from typing_extensions import override
 
-from dronalize.core.interfaces import ProcessableLoader, SceneLoader
 from dronalize.execution.common import ProgressBar
+from dronalize.loading import ProcessableLoader, SceneLoader
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from dronalize.core._types import P
-    from dronalize.core.interfaces import SceneWriter
-    from dronalize.core.scene import Scene
-    from dronalize.core.split import DatasetSplit
+    from dronalize._internal._types import P
+    from dronalize.categories import DatasetSplit
+    from dronalize.loading import SceneWriter
+    from dronalize.scene import Scene
 
 
 class SequentialExecutor(SceneLoader):
@@ -42,7 +42,7 @@ class SequentialExecutor(SceneLoader):
             Whether to show a progress bar and at what level (sources or scenes).
 
         """
-        self._inner = inner
+        self._inner: ProcessableLoader[Any] = inner
         self._progress_bar: ProgressBar = (
             ProgressBar(int(progress_bar)) if isinstance(progress_bar, bool) else progress_bar
         )
@@ -75,7 +75,7 @@ class SequentialExecutor(SceneLoader):
         split_iter = iter(split_generator) if split_generator is not None else None
 
         for scene in self._generate_and_track():
-            writer.write(scene, splits=split_iter)
+            _ = writer.write(scene, splits=split_iter)
         if finalize is not None:
             finalize(writer)
         else:
@@ -111,10 +111,10 @@ class SequentialExecutor(SceneLoader):
                     yield self._inner.create_scene(scene_data, source, map_resolver, scene_counter)
 
                     if self._progress_bar == ProgressBar.SCENES:
-                        progress_bar.set_postfix({"sources": source_counter}, refresh=False)
-                        progress_bar.update(1)
+                        progress_bar.set_postfix_str(f"sources: {source_counter}", refresh=False)
+                        _ = progress_bar.update(1)
 
                 source_counter += 1
                 if self._progress_bar == ProgressBar.SOURCES:
-                    progress_bar.set_postfix({"scenes": scene_counter}, refresh=False)
-                    progress_bar.update(1)
+                    progress_bar.set_postfix_str(f"scenes: {scene_counter}", refresh=False)
+                    _ = progress_bar.update(1)

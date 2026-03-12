@@ -6,7 +6,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from dronalize.core.categories import AgentCategory
+from dronalize.categories import AgentCategory
 
 # TODO: Update this when ready
 

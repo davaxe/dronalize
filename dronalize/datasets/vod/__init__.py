@@ -1,18 +1,20 @@
-from dronalize.datasets import registry
-from dronalize.datasets.vod import _lifecycle
-from dronalize.datasets.vod.graph_builder import VODMapGraphBuilder
+__dronalize_builtin__ = {"datasets": ["vod"]}
+
+from dronalize.datasets import _registry
+from dronalize.datasets.vod import _scope
 from dronalize.datasets.vod.loader import VodLoader
+from dronalize.datasets.vod.map.builder import VODMapBuilder
 
-__all__ = ["VODMapGraphBuilder", "VodLoader"]
+__all__ = ["VODMapBuilder", "VodLoader"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="vod",
         loader_factory=VodLoader,
         default_config=VodLoader.default_config(),
         default_map_config=VodLoader.default_map_config(),
-        map_mode=registry.MapMode.SHARED_SINGLE,
+        map_mode=_registry.MapMode.SHARED_SINGLE,
         predefined_splits=[],
-        lifecycle_context=_lifecycle.vod_lifecycle_context,
+        execution_scope_fn=_scope.vod_execution_scope,
     )
 )

@@ -1,16 +1,18 @@
-from dronalize.datasets import registry
-from dronalize.datasets.opendd.graph_builder import OpenDDMapGraphBuilder
+__dronalize_builtin__ = {"datasets": ["opendd"]}
+
+from dronalize.datasets import _registry
 from dronalize.datasets.opendd.loader import OpenDDLoader
+from dronalize.datasets.opendd.map.builder import OpenDDMapBuilder
 
-__all__ = ["OpenDDLoader", "OpenDDMapGraphBuilder"]
+__all__ = ["OpenDDLoader", "OpenDDMapBuilder"]
 
-registry.register(
-    registry.DatasetDescriptor(
+_registry.register(
+    _registry.DatasetDescriptor(
         name="opendd",
         loader_factory=OpenDDLoader,
         default_config=OpenDDLoader.default_config(),
         default_map_config=OpenDDLoader.default_map_config(),
-        map_mode=registry.MapMode.BUILDER_ONLY,
+        map_mode=_registry.MapMode.BUILDER_ONLY,
         predefined_splits=[],
     )
 )

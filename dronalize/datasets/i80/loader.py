@@ -7,9 +7,9 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory
 from dronalize.config import LoaderConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.interfaces import IngestOutput, Source
+from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -53,8 +53,8 @@ class I80Loader(BaseSceneLoader[Path]):
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config)
-        self._data_dir = self._normalize_data_root(data_root)
-        self._rebalance_ratio = lane_change_ratio
+        self._data_dir: Path = self._normalize_data_root(data_root)
+        self._rebalance_ratio: float | None = lane_change_ratio
 
     @override
     def all_sources(self) -> Iterable[Source[Path]]:

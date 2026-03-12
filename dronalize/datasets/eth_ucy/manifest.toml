@@ -1,2 +1,0 @@
-module = "dronalize.datasets.eth_ucy"
-datasets = ["eth", "hotel", "univ", "zara1", "zara2"]

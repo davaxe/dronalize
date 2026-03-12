@@ -10,10 +10,6 @@
 
 ::: dronalize.pipeline.pipeline
 
-## Split
-
-::: dronalize.pipeline.split
-
 ## Factories
 
 ::: dronalize.pipeline.factories

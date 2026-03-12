@@ -21,10 +21,10 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dronalize.core.categories import EdgeType
+from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:
-    from dronalize.core.graph_builder import Point
+    from dronalize.maps.builder import Point
 
 
 class Argoverse2Map:

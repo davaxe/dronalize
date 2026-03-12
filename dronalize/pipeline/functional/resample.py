@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 from fractions import Fraction
-from typing import TYPE_CHECKING, Literal, cast, overload
+from typing import TYPE_CHECKING, ClassVar, Literal, overload
 
 import numpy as np
 import numpy.typing as npt
@@ -15,10 +15,10 @@ from dronalize.pipeline.functional.derivative import derivative
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.core._types import DataFrameT
+    from dronalize._internal._types import DataFrameT
 
 
-class ResamplingMethod(StrEnum):
+class ResamplingMethod(str, Enum):
     """Enumeration of resampling methods for trajectory data."""
 
     FAST = "fast"
@@ -31,7 +31,7 @@ class ResamplingMethod(StrEnum):
 class Resampling(BaseModel):
     """Configuration for resampling trajectories."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     up: int = Field(gt=0, description="Upsampling factor.", default=1)
     down: int = Field(gt=0, description="Downsampling factor.", default=1)
@@ -117,7 +117,7 @@ def resample(
     method = resampling.method
     up, down = resampling.factors
     group_by = [group_by] if isinstance(group_by, str) else group_by
-    if method in {"fast", ResamplingMethod.FAST}:
+    if method is ResamplingMethod.FAST:
         resampled = _resample_dataframe(
             data=data,
             up=up,
@@ -468,8 +468,12 @@ def _upsample_dataframe(
     if factor < 0:
         msg = "upsampling factor must be positive"
         raise ValueError(msg)
-    is_eager = isinstance(data, pl.DataFrame)
-    lf: pl.LazyFrame = cast("pl.LazyFrame", data.lazy() if is_eager else data)
+    if isinstance(data, pl.DataFrame):
+        is_eager = True
+        lf = data.lazy()
+    else:
+        is_eager = False
+        lf = data
     data_scaled = lf.with_columns(pl.col(frame_column) * factor)
     upsampled = (
         data_scaled
@@ -499,7 +503,7 @@ def _upsample_dataframe(
         exprs.append(forward_fill_exp.forward_fill())
     result = upsampled.join(data_scaled, on=on, how="left").sort(on).with_columns(*exprs)
 
-    if isinstance(result, pl.LazyFrame) and is_eager:
+    if is_eager:
         return result.collect()
     return result
 

@@ -11,9 +11,9 @@ This section provides auto-generated reference documentation for all public modu
 
 | Module | Description |
 |--------|-------------|
-| [`core`](core.md) | Base classes, type definitions, scene representation, graph builders, and data I/O |
+| [`core`](core.md) | Domain models, scene/category types, map abstractions, data loading, and exceptions |
 | [`config`](config.md) | Configuration loading, dataset parameters, filtering, and map settings |
-| [`pipeline`](pipeline.md) | Preprocessing pipeline, transforms, split logic, and factory utilities |
+| [`pipeline`](pipeline.md) | Preprocessing pipeline, transforms, and factory utilities |
 | [`datasets`](datasets.md) | Dataset-specific preprocessing implementations and the dataset registry |
 | [`converters`](converters.md) | Format converters (NumPy, PyTorch) for preprocessed data |
 | [`execution`](execution.md) | Parallel and sequential execution runners and data writers |

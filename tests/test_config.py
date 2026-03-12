@@ -1,6 +1,9 @@
+# pyright: standard
+
 import pytest
 from pydantic import ValidationError
 
+from dronalize.categories import AgentCategory
 from dronalize.config.filtering import FilteringConfig
 
 # Adjust the import path based on your project structure
@@ -11,7 +14,6 @@ from dronalize.config.map import (
     RectangularExtraction,
     SquareExtraction,
 )
-from dronalize.core.categories import AgentCategory
 
 
 def test_radial_extraction_valid() -> None:

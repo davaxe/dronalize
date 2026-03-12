@@ -8,12 +8,12 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.loader import IngestOutput, MapKey, MapResolver, Source
-from dronalize.core.split import DatasetSplit
-from dronalize.datasets.waymo.map.graph_builder import WaymoMapGraphBuilder
+from dronalize.datasets.waymo.map.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -21,8 +21,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.config.map import MapConfig
-    from dronalize.core.map_graph import MapGraph
-    from dronalize.core.scene import Scene
+    from dronalize.maps.graph import MapGraph
+    from dronalize.maps.resolver import MapKey, MapResolver
+    from dronalize.scene import Scene
 
 
 class WaymoLoader(BaseSceneLoader[Path]):
@@ -63,7 +64,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config, split=split)
-        self._data_root = self._normalize_data_root(data_root)
+        self._data_root: Path = self._normalize_data_root(data_root)
         self._include_map: bool = self.map_config.include_map
 
     @staticmethod
@@ -118,7 +119,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
                 ) -> MapGraph:
                     _ = scene, key
                     map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
-                    return WaymoMapGraphBuilder.from_proto(map_data.map_features).build(
+                    return WaymoMapBuilder.from_proto(map_data.map_features).build(
                         min_distance=self.map_config.min_distance,
                         interp_distance=self.map_config.interp_distance,
                     )
@@ -173,14 +174,14 @@ def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFram
     cat_map = _OBJECT_TYPE_TO_CATEGORY
 
     # Pre-fetch lists to avoid dictionary lookups in the inner loop
-    l_frame = []
-    l_tid = []
-    l_x = []
-    l_y = []
-    l_vx = []
-    l_vy = []
-    l_yaw = []
-    l_cat = []
+    l_frame: list[int] = []
+    l_tid: list[int] = []
+    l_x: list[float] = []
+    l_y: list[float] = []
+    l_vx: list[float] = []
+    l_vy: list[float] = []
+    l_yaw: list[float] = []
+    l_cat: list[int] = []
 
     for i, track in enumerate(scenario.tracks):
         # Resolve track constants

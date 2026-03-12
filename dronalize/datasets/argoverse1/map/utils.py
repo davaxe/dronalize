@@ -1,17 +1,3 @@
-# Copyright 2024-2025, Theodor Westny. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -31,10 +17,10 @@ if TYPE_CHECKING:
 
 
 def swap_left_and_right(
-    condition: np.ndarray,
-    left_centerline: np.ndarray,
-    right_centerline: np.ndarray,
-) -> Iterable[np.ndarray]:
+    condition: npt.NDArray[np.bool_],
+    left_centerline: npt.NDArray[np.float64],
+    right_centerline: npt.NDArray[np.float64],
+) -> Iterable[npt.NDArray[np.float64]]:
     """Swap points in left and right centerline according to condition.
 
     Parameters
@@ -65,7 +51,7 @@ def swap_left_and_right(
 
 
 def edge_borders_from_centerline(
-    centerline: np.ndarray,
+    centerline: npt.NDArray[np.float64],
     width_scaling_factor: float = 1.0,
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """Convert a lane centerline polyline into a rough polygon of the lane's area.

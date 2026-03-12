@@ -1,0 +1,704 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Generic, Protocol
+
+import polars as pl
+from typing_extensions import override
+
+from dronalize._internal._types import P, SourceId, SourceT
+from dronalize.categories import DatasetSplit
+from dronalize.config.map import MapConfig
+from dronalize.exceptions import LoaderConfigError, SplitNotSupportedError
+from dronalize.maps.resolver import MapKey, MapResolver, no_map
+from dronalize.scene import Scene
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+
+    from dronalize.config.loader import LoaderConfig
+    from dronalize.loading.writer import SceneWriter
+    from dronalize.pipeline.pipeline import Pipeline
+
+
+MapContext = MapResolver | MapKey | None
+IngestOutput = tuple[pl.LazyFrame, MapContext]
+
+
+@dataclass(slots=True, frozen=True)
+class Source(Generic[SourceT]):
+    """Represents a raw data source for a scene, identified by a unique identifier."""
+
+    identifier: SourceId
+    """Generic identifier for the source, e.g., file name, URL, database key."""
+    inner: SourceT
+    """The actual source data, which can be of any type (e.g., file path, raw data)."""
+    map_key: MapKey = None
+    """Optional map key associated with this source."""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    """Additional metadata associated with the source."""
+
+
+class SceneLoader(Protocol):
+    """Minimal protocol for scene loading, used for type hinting."""
+
+    def scenes(self) -> Iterable[Scene]:
+        """Process scenes and yield them one by one.
+
+        This is the main method for processing scenes. It yields `Scene` objects
+        one at a time, allowing for memory-efficient processing of large datasets.
+
+        Yields
+        ------
+        Scene
+            Each processed scene, with its identifier and associated data.
+
+        """
+        ...
+
+    def scenes_callback(
+        self,
+        callback: Callable[Concatenate[Scene, P], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
+        """Process scenes and call the provided callback on each scene.
+
+        This is an alternative to `scenes()` that allows for more flexible
+        processing of scenes without needing to yield them. The callback will be
+        called with each processed scene, allowing for custom handling (e.g.,
+        saving to disk, feeding into a model) without needing to store all scenes
+        in memory at once.
+
+        Parameters
+        ----------
+        callback : Callable
+            A function that takes a Scene and additional arguments, and
+            processes it (e.g., saves to disk, feeds into a model).
+        *args : Any
+            Additional positional arguments to pass to the callback.
+        **kwargs : Any
+            Additional keyword arguments to pass to the callback.
+
+        """
+        ...
+
+    def write_scenes(
+        self,
+        writer_factory: Callable[..., SceneWriter],
+        finalize: Callable[[SceneWriter], None],
+    ) -> None:
+        """Process scenes and write them with a writer created by the factory.
+
+        This method provides a convenient way to process scenes and write them
+        using a `SceneWriter`. The `writer_factory` is called once to create a
+        `SceneWriter` instance, which is then used to write each processed scene.
+        After all scenes have been processed, the `finalize` function is called
+        with the writer instance to perform any necessary cleanup or finalization
+        steps.
+
+        Parameters
+        ----------
+        writer_factory : Callable
+            A factory function that takes additional arguments and returns a
+            `SceneWriter` instance for writing scenes.
+        finalize : Callable
+            A function that takes the `SceneWriter` instance and performs any
+            necessary finalization steps after all scenes have been written.
+
+        """
+
+
+class ProcessableLoader(Protocol, Generic[SourceT]):
+    """Minimal protocol required to work with a loader abstraction.
+
+    This protocol defines the essential interface for discovering data sources,
+    tracking dataset sizes, processing raw sources into tabular data, and
+    constructing final scene objects.
+
+    """
+
+    def sources(self) -> Iterable[Source[SourceT]]:
+        """Discover and yield the data sources to be processed.
+
+        Returns
+        -------
+        Iterable[Source[SourceT]]
+            An iterable containing the raw data sources to process.
+        """
+        ...
+
+    def num_sources(self) -> int | None:
+        """Get the total number of sources that will be processed.
+
+        Returns
+        -------
+        int or None
+            Total number of sources, or None if the count is unknown or
+            expensive to compute in advance.
+        """
+        ...
+
+    def num_scenes(self) -> int | None:
+        """Get the total number of scenes that will be generated.
+
+        Returns
+        -------
+        int or None
+            Total number of scenes, or None if the count is unknown or depends
+            on dynamic processing (e.g., sliding window extraction).
+        """
+        ...
+
+    def process_next(self, source: Source[SourceT]) -> Iterable[tuple[pl.DataFrame, MapContext]]:
+        """Process a single raw data source into data frames and map contexts.
+
+        Parameters
+        ----------
+        source : Source[SourceT]
+            The raw data source to process.
+
+        Yields
+        ------
+        tuple[pl.DataFrame, MapContext]
+            Processed Polars DataFrames paired with their corresponding map context.
+        """
+        ...
+
+    def create_scene(
+        self,
+        df: pl.DataFrame,
+        source: Source[SourceT],
+        resolver: MapContext | None = None,
+        scene_number: int | None = None,
+    ) -> Scene:
+        """Construct a Scene object from processed data.
+
+        Parameters
+        ----------
+        df : pl.DataFrame
+            The processed data frame containing the scene data.
+        source : Source[SourceT]
+            The originating raw data source.
+        resolver : MapContext | None, optional
+            The map context or resolver associated with the scene.
+        scene_number : int | None, optional
+            An optional numeric index or identifier for the generated scene.
+
+        Returns
+        -------
+        Scene
+            The fully constructed scene object.
+        """
+        ...
+
+
+class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
+    """ABC interface for processing raw data sources into a standardized format.
+
+    This class contains logic for orchestrating the loading and processing of
+    raw data sources into scenes, while allowing subclasses to implement the
+    specific details of how raw data is read and processed. The main processing
+    flow is as follows:
+
+    1. **Source discovery** — `sources()` dispatches to the appropriate source
+       method based on the `split` parameter:
+
+       - `DatasetSplit.ALL` (or `None`) → `all_sources()` *(abstract —
+         every subclass must implement this)*
+       - `DatasetSplit.TRAIN` → `train_sources()`
+       - `DatasetSplit.VALIDATE` → `validate_sources()`
+       - `DatasetSplit.TEST` → `test_sources()`
+
+       The `train_sources`, `test_sources`, and `validate_sources`
+       methods are **optionally overridable**.  Their default implementations
+       raise `SplitNotSupportedError`, so datasets that do not ship with
+       predefined splits need only implement `all_sources()`.  Datasets
+       that *do* have splits override the relevant methods and typically
+       implement `all_sources()` by chaining all three split methods.
+
+    2. **Ingestion** — `ingest()` reads each source into one or more
+       `(LazyFrame, MapContext)` pairs. The map context can be used to
+       attach map information to the scene without including it in the raw
+       data frame.
+
+    3. **Pipeline** — `pipeline()` returns a composable processing pipeline
+       that is applied to each `LazyFrame` produced by `ingest()`. The
+       pipeline consists of a chain of transformations that process the raw
+       data frame into the common schema.
+
+    Considerations
+    --------------
+    - The map context can be: 1) a string (map key) that is later passed to
+      the map resolver (if it exists), 2) an explicit resolver function that
+      is attached to the scene, or 3) `None` which means no map information
+      at this stage.
+
+    - When no map resolver is attached in the processing steps, the
+      `map_resolver()` method is used to provide a default resolver for the
+      scene. This allows for flexibility in how map information is associated
+      with scenes, and can accommodate datasets where map information is
+      stored in different ways (e.g., separate files, embedded in the raw
+      data, or not available at all). The default implementation is
+      `no_map()`, which indicates that no map is available for the scenes
+      produced by this loader.
+
+    - There are priorities when it comes to the map key (if used). If it is
+      directly attached to the source in the `all_sources()` step, that
+      takes highest priority since it is the most explicit. If not, then if
+      the map context returned by `ingest()` is a string, it is used as the
+      map key. Finally, if neither of those are available, the map key will be
+      `None` and the resolver (if any) will need to handle that case.
+
+    """
+
+    _shared_memory_name: ClassVar[dict[MapKey, str] | str | None] = None
+
+    def __init__(
+        self,
+        loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        *,
+        split: DatasetSplit | None = None,
+        enforce_schema: bool = True,
+    ) -> None:
+        """Initialize internal state.
+
+        Parameters
+        ----------
+        loader_config : LoaderConfig, optional
+            Configuration for the loader. If None, `default_config()` is used.
+        enforce_schema : bool, optional
+            Whether to enforce the scene schema on each created scene.
+            Defaults to True.
+        split : DatasetSplit, optional
+            The dataset split to load.  When `None` or
+            `DatasetSplit.ALL`, all data is loaded via `all_sources()`.
+            When set to `TRAIN`, `TEST`, or `VALIDATE`, the
+            corresponding `train_sources()`, `test_sources()`, or
+            `validate_sources()` method is called.  Loaders that do not
+            support splits will raise `SplitNotSupportedError` for any
+            value other than `None` / `ALL`.
+
+        """
+        self._count: int = 0
+        self._source_counter: int = 0
+        self._enforce_schema: bool = enforce_schema
+        self._loader_config: LoaderConfig = loader_config or self.default_config()
+        self._map_config: MapConfig = map_config or self.default_map_config()
+        self._pipeline: Pipeline | None = None
+        self._split: DatasetSplit = split if split is not None else DatasetSplit.ALL
+
+    # ===================================================================
+    # Abstract — every subclass must implement these
+    # ===================================================================
+
+    @abstractmethod
+    def all_sources(self) -> Iterable[Source[SourceT]]:
+        """Discover and yield identifiers for **all** scenes to process.
+
+        Every subclass must implement this method.  It is called when no
+        specific split is requested (i.e. `split` is `None` or
+        `DatasetSplit.ALL`).
+
+        Ideally, this should be lightweight and not do any heavy processing.
+
+        Yields
+        ------
+        Source[SourceT]
+            Each raw data source to be processed.
+
+        """
+
+    @abstractmethod
+    def ingest(self, source: Source[SourceT]) -> Iterable[IngestOutput]:
+        """Read a raw data source into one or more `(LazyFrame, MapResolver)` pairs.
+
+        Parameters
+        ----------
+        source : Source[SourceT]
+            The raw data source to read.
+
+        Yields
+        ------
+        tuple[pl.LazyFrame, MapResolver]
+            A raw data frame paired with the resolver that should be
+            attached to every scene derived from that frame.
+
+        """
+
+    @abstractmethod
+    def pipeline(self) -> Pipeline:
+        """Return the composable processing pipeline for this loader.
+
+        The pipeline is a chain of transform steps that are applied to every
+        `LazyFrame` produced by `ingest`.
+
+        Returns
+        -------
+        Pipeline
+            The processing pipeline.
+
+        """
+
+    @classmethod
+    @abstractmethod
+    def default_config(cls) -> LoaderConfig:
+        """Return the default loader configuration for this dataset.
+
+        This is a classmethod so that the default configuration can be inspected
+        without constructing a loader instance.
+
+        Returns
+        -------
+        LoaderConfig
+            Default configuration for this loader.
+
+        """
+
+    @classmethod
+    def default_map_config(cls) -> MapConfig:
+        """Return the default map configuration for this dataset.
+
+        Returns
+        -------
+        MapConfig
+            Default map configuration for this loader.
+
+        """
+        return MapConfig.default()
+
+    def train_sources(self) -> Iterable[Source[SourceT]]:
+        """Return sources belonging to the **training** split.
+
+        Override this method in subclasses whose underlying dataset provides
+        a predefined training split.  The default implementation raises
+        `SplitNotSupportedError`.
+
+        Raises
+        ------
+        SplitNotSupportedError
+            Always, unless overridden by a subclass that supports splits.
+
+        """
+        raise SplitNotSupportedError(type(self).__name__, DatasetSplit.TRAIN)
+
+    def test_sources(self) -> Iterable[Source[SourceT]]:
+        """Return sources belonging to the **test** split.
+
+        Override this method in subclasses whose underlying dataset provides
+        a predefined test split.  The default implementation raises
+        `SplitNotSupportedError`.
+
+        Raises
+        ------
+        SplitNotSupportedError
+            Always, unless overridden by a subclass that supports splits.
+
+        """
+        raise SplitNotSupportedError(type(self).__name__, DatasetSplit.TEST)
+
+    def validate_sources(self) -> Iterable[Source[SourceT]]:
+        """Return sources belonging to the **validation** split.
+
+        Override this method in subclasses whose underlying dataset provides
+        a predefined validation split.  The default implementation raises
+        `SplitNotSupportedError`.
+
+        Raises
+        ------
+        SplitNotSupportedError
+            Always, unless overridden by a subclass that supports splits.
+
+        """
+        raise SplitNotSupportedError(type(self).__name__, DatasetSplit.VAL)
+
+    @override
+    def sources(self) -> Iterable[Source[SourceT]]:
+        """Return sources for the currently configured split.
+
+        This method dispatches to `all_sources()`,
+        `train_sources()`, `test_sources()`, or
+        `validate_sources()` based on the `split` value passed at
+        construction time.
+
+        Returns
+        -------
+        Iterable[Source[SourceT]]
+            The sources for the active split.
+
+        """
+        if self._split is DatasetSplit.ALL:
+            return self.all_sources()
+        if self._split is DatasetSplit.TRAIN:
+            return self.train_sources()
+        if self._split is DatasetSplit.TEST:
+            return self.test_sources()
+        if self._split is DatasetSplit.VAL:
+            return self.validate_sources()
+        return self.all_sources()
+
+    def map_resolver(self) -> MapResolver:  # noqa: PLR6301
+        """Return a resolver for this dataset's map data.
+
+        If no resolver is attached during ingestion, this dataset-level resolver
+        is attached to created scenes and used to resolve their `map_key`.
+
+        Returns
+        -------
+        MapResolver
+            A callable that resolves map keys. The default returns `no_map`.
+
+        """
+        return no_map()
+
+    @staticmethod
+    def _normalize_data_root(data_root: Path | str) -> Path:
+        """Normalize a filesystem input into a `Path` instance."""
+        return Path(data_root)
+
+    @staticmethod
+    def _count_matching_files(
+        directories: Iterable[Path],
+        pattern: str,
+        *,
+        recursive: bool = False,
+    ) -> int:
+        """Count files matching a glob pattern across existing directories only."""
+        total = 0
+        for directory in directories:
+            if not directory.is_dir():
+                continue
+            matches = directory.rglob(pattern) if recursive else directory.glob(pattern)
+            total += sum(1 for _ in matches)
+        return total
+
+    def _invalid_loader_argument(self, detail: str) -> ValueError:
+        """Create a consistent loader configuration error."""
+        return LoaderConfigError(f"{type(self).__name__}: {detail}")
+
+    def set_loader_config(self, config: LoaderConfig) -> None:
+        """Set the loader configuration.
+
+        This can be used to update the loader's configuration after it has been
+        constructed.  Note that changing the configuration may not have any
+        effect if scenes have already been processed, since some configuration
+        values (e.g., input/output lengths) are determined at initialization
+        time.
+
+        Parameters
+        ----------
+        config : LoaderConfig
+            The new configuration to set.
+
+        """
+        self._loader_config = config
+
+    @override
+    def scenes_callback(
+        self,
+        callback: Callable[Concatenate[Scene, P], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
+        for scene in self.scenes():
+            callback(scene, *args, **kwargs)
+
+    @override
+    def scenes(self) -> Iterable[Scene]:
+        self._count = 0
+        self._source_counter = 0
+        for source in self.sources():
+            self._source_counter += 1
+            for scene_df, resolver in self.process_next(source):
+                yield self.create_scene(scene_df, source, resolver)
+
+    @override
+    def write_scenes(
+        self,
+        writer_factory: Callable[P, SceneWriter],
+        finalize: Callable[[SceneWriter], None],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
+        writer = writer_factory(*args, **kwargs)
+        try:
+            for scene in self.scenes():
+                _ = writer.write(scene)
+        finally:
+            finalize(writer)
+
+    @override
+    def create_scene(
+        self,
+        df: pl.DataFrame,
+        source: Source[SourceT],
+        resolver: MapContext | None = None,
+        scene_number: int | None = None,
+    ) -> Scene:
+        """Create a Scene object from the processed DataFrame and its source.
+
+        This method also calls `Scene.enforce_schema()` if
+        `self._enforce_schema` is True to ensure the scene follows the expected
+        schema. If overriding this method, make sure to follow the expected
+        behavior regarding schema enforcement.
+
+        Parameters
+        ----------
+        df : pl.DataFrame
+            Processed DataFrame for the scene, expected to follow the
+            common schema.
+        source : Source[SourceT]
+            The originating source.  The scene inherits
+            `source.identifier` and `source.map_key`.
+        resolver : MapResolver, optional
+            The resolver to attach to the scene.  When `None`, falls
+            back to `self.map_resolver()`.
+
+        Returns
+        -------
+        Scene
+            The created scene object.
+
+        """
+        map_key = source.map_key or (resolver if isinstance(resolver, str) else None)
+        resolver = resolver if not isinstance(resolver, str) else self.map_resolver()
+        scene = Scene(
+            inner=df,
+            scene_number=scene_number if scene_number is not None else self._count,
+            input_len=self.input_len,
+            output_len=self.output_len,
+            map_key=map_key,
+            map_resolver=resolver,
+        )
+        self._count += 1
+        return scene if not self._enforce_schema else scene.enforce_schema()
+
+    # ===================================================================
+    # Convenience / introspection
+    # ===================================================================
+
+    @override
+    def num_scenes(self) -> int | None:
+        return None
+
+    @override
+    def num_sources(self) -> int | None:
+        return None
+
+    @staticmethod
+    def derivative_names() -> dict[int, list[str]]:
+        """Return the names of the derivatives for velocity and acceleration.
+
+        Returns
+        -------
+        dict[int, list[str]]
+            Mapping of derivative order to column names.
+
+        """
+        return {
+            1: ["vx", "vy"],
+            2: ["ax", "ay"],
+        }
+
+    @property
+    def loader_config(self) -> LoaderConfig:
+        """Return the loader configuration."""
+        return self._loader_config
+
+    @property
+    def map_config(self) -> MapConfig:
+        """Return the map configuration."""
+        return self._map_config
+
+    @property
+    def original_input_len(self) -> int:
+        """Original observation length in frames (before resampling)."""
+        return self.loader_config.input_len
+
+    @property
+    def original_output_len(self) -> int:
+        """Original prediction length in frames (before resampling)."""
+        return self.loader_config.output_len
+
+    @property
+    def sequence_length(self) -> int:
+        """Total sequence length (observation + prediction) in frames."""
+        return self.loader_config.input_len + self.loader_config.output_len
+
+    @property
+    def input_len(self) -> int:
+        """Observation length in frames (resulting value in Scene)."""
+        up, down = (
+            self.loader_config.resampling.factors if self.loader_config.resampling else (1, 1)
+        )
+        ratio = up / down
+        return int((self.original_input_len - 1) * ratio + 1)
+
+    @property
+    def output_len(self) -> int:
+        """Prediction length in frames (resulting value in Scene)."""
+        up, down = (
+            self.loader_config.resampling.factors if self.loader_config.resampling else (1, 1)
+        )
+        ratio = up / down
+        total_len = int((self.sequence_length - 1) * ratio + 1)
+        return total_len - self.input_len
+
+    @property
+    def post_sample_time(self) -> float:
+        """Time interval between frames after resampling."""
+        if self.loader_config.resampling is None:
+            return self.loader_config.sample_time
+        up, down = self.loader_config.resampling.factors
+        ratio = up / down
+        return self.loader_config.sample_time / ratio
+
+    @override
+    def process_next(
+        self,
+        source: Source[SourceT],
+    ) -> Iterable[tuple[pl.DataFrame, MapContext]]:
+        if self._pipeline is None:
+            self._pipeline = self.pipeline()
+
+        for raw_lf, map_context in self.ingest(source):
+            for df in self._pipeline.execute(raw_lf, collect=True, filter_empty=True):
+                yield df, map_context
+
+    @classmethod
+    def set_shared_memory(
+        cls,
+        name: str | None = None,
+        mappings: dict[MapKey, str] | None = None,
+    ) -> None:
+        """Set the shared memory name or mapping for this loader class.
+
+        This is used to share data (e.g., map graphs) between processes when
+        using multiprocessing. The `name` parameter sets a single shared memory
+        name for all map keys, while the `mappings` parameter allows for
+        specifying different shared memory names for different map keys.
+
+        Parameters
+        ----------
+        name : str, optional
+            A single shared memory name to use for all map keys. If provided,
+            this will override any existing mappings.
+        mappings : dict[MapKey, str], optional
+            A dictionary mapping specific map keys to shared memory names. If
+            provided, this will override any existing mappings and the `name`
+            parameter. When both *name* and *mappings* are omitted, any
+            existing shared-memory configuration is cleared.
+
+        """
+        if mappings is not None and name is not None:
+            msg = "Cannot set both 'name' and 'mappings'. Please choose one."
+            raise ValueError(msg)
+        if mappings is not None:
+            cls._shared_memory_name = mappings
+        elif name is not None:
+            cls._shared_memory_name = name
+        else:
+            cls._shared_memory_name = None

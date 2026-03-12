@@ -8,9 +8,10 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory
 from dronalize.config import LoaderConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.loader import IngestOutput, Source
+from dronalize.loading import BaseSceneLoader
+from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -29,7 +30,7 @@ def _table_query(table_name: str) -> str:
         UTM_Y as y,
         CLASS
     FROM {table_name}
-    """  # noqa: S608
+    """
 
 
 class OpenDDLoader(BaseSceneLoader[str]):
@@ -53,7 +54,7 @@ class OpenDDLoader(BaseSceneLoader[str]):
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config)
-        self._db_path = self._normalize_data_root(data_root)
+        self._db_path: Path = self._normalize_data_root(data_root)
         self._conn: sqlite3.Connection | None = None
 
     def _connection(self) -> sqlite3.Connection:
@@ -101,7 +102,7 @@ class OpenDDLoader(BaseSceneLoader[str]):
     def ingest(self, source: Source[str]) -> Iterable[IngestOutput]:
         yield (
             pl
-            .read_database(_table_query(source.inner), self._connection())
+            .read_database(_table_query(source.inner), self._connection(), iter_batches=False)
             .lazy()
             .with_columns(
                 ((pl.col("TIMESTAMP") * 1000).round(4).rank(method="dense") - 1)
@@ -169,7 +170,7 @@ class MultiOpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
             map_config=map_config,
             enforce_schema=True,
         )
-        self._data_root = self._normalize_data_root(data_root)
+        self._data_root: Path = self._normalize_data_root(data_root)
 
     def _db_paths(self) -> Iterable[Path]:
         if self._data_root.is_file():

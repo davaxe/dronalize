@@ -7,10 +7,9 @@ import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
+from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
-from dronalize.core import AgentCategory, BaseSceneLoader
-from dronalize.core.interfaces import IngestOutput, Source
-from dronalize.core.split import DatasetSplit
+from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
@@ -60,7 +59,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
             raise self._invalid_loader_argument(msg)
 
         super().__init__(loader_config=loader_config, map_config=map_config, split=split)
-        self._data_root = self._normalize_data_root(data_root)
+        self._data_root: Path = self._normalize_data_root(data_root)
         self._file_batch_size: int | None = file_batch_size
 
     # ------------------------------------------------------------------

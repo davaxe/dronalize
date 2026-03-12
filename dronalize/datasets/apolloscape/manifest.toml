@@ -1,2 +1,0 @@
-module = "dronalize.datasets.apolloscape"
-datasets = ["apolloscape"]

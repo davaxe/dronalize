@@ -1,101 +1,90 @@
-# Core
+# Core API
 
-The `dronalize.core` module contains the foundational building blocks of the library, including base classes, type definitions, scene representations, graph builders, and data loading interfaces.
+The core API is split into four focused packages, each answering a single question about the system.
 
 ---
 
 ## Module Overview
 
-| Submodule | Description |
-|-----------|-------------|
-| `base` | Base classes for dataset processors |
-| `scene` | Scene representation and data containers |
-| `graph_builder` | Graph construction for agent interactions |
-| `map_graph` | Map/lane graph construction |
-| `map_resolver` | Map data resolution utilities |
-| `loader` | Data loading interfaces |
-| `writer` | Data writing interfaces |
-| `interfaces` | Abstract interfaces and protocols |
-| `categories` | Agent category definitions |
-| `split` | Dataset split utilities |
-| `exceptions` | Custom exception types |
+| Package | Description |
+|---------|-------------|
+| `models` | Domain objects — `Scene`, agent/edge categories, dataset splits |
+| `maps` | Map/road geometry — graph data structures, builders, and resolvers |
+| `loading` | Data ingestion — source discovery, scene loaders, and writers |
+| `exceptions` | Exception hierarchy |
 
 ---
 
-## `dronalize.core`
+### `dronalize.scene`
 
-::: dronalize.core
+::: dronalize.scene
+
+---
+
+### `dronalize.categories`
+
+::: dronalize.categories
+
+---
+
+## Maps
+
+Map handling: the `MapGraph` data structure, builder abstractions, and resolver protocols.
+
+### `dronalize.maps`
+
+::: dronalize.maps
     options:
       show_submodules: true
 
 ---
 
-## `dronalize.core.base`
+### `dronalize.maps.graph`
 
-::: dronalize.core.base
-
----
-
-## `dronalize.core.scene`
-
-::: dronalize.core.scene
+::: dronalize.maps.graph
 
 ---
 
-## `dronalize.core.graph_builder`
+### `dronalize.maps.builder`
 
-::: dronalize.core.graph_builder
-
----
-
-## `dronalize.core.map_graph`
-
-::: dronalize.core.map_graph
+::: dronalize.maps.builder
 
 ---
 
-## `dronalize.core.map_resolver`
+### `dronalize.maps.resolver`
 
-::: dronalize.core.map_resolver
-
----
-
-## `dronalize.core.loader`
-
-::: dronalize.core.loader
+::: dronalize.maps.resolver
 
 ---
 
-## `dronalize.core.writer`
+## Loading
 
-::: dronalize.core.writer
+Data loading: source discovery, scene loader protocols and base classes, and scene writers.
 
----
+### `dronalize.loading`
 
-## `dronalize.core.interfaces`
-
-::: dronalize.core.interfaces
-
----
-
-## `dronalize.core.categories`
-
-::: dronalize.core.categories
+::: dronalize.loading
+    options:
+      show_submodules: true
 
 ---
 
-## `dronalize.core.split`
+### `dronalize.loading.loader`
 
-::: dronalize.core.split
-
----
-
-## `dronalize.core.exceptions`
-
-::: dronalize.core.exceptions
+::: dronalize.loading.loader
 
 ---
 
-## `dronalize.core._types`
+### `dronalize.loading.writer`
 
-::: dronalize.core._types
+::: dronalize.loading.writer
+
+---
+
+## Exceptions
+
+Top-level exception hierarchy for the library.
+
+### `dronalize.exceptions`
+
+::: dronalize.exceptions

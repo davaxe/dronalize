@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Annotated, ClassVar
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
-from dronalize.core.categories import AgentCategory
+from dronalize.categories import AgentCategory
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

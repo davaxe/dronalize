@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 if TYPE_CHECKING:
-    from dronalize.core._types import DataFrameT
+    from dronalize._internal._types import DataFrameT
 
 
 def lazy(data: pl.DataFrame | pl.LazyFrame) -> pl.LazyFrame:
