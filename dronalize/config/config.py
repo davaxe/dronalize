@@ -47,10 +47,8 @@ class ConfigFile(RootModel[dict[str, ConfigSection]]):
 def load_config(config_path: Path) -> dict[str, ConfigSection]:
     """Load, validate, and parse the configuration overrides from the given path."""
     with config_path.open("rb") as f:
-        raw_data = tomllib.load(f)
-    config_file = ConfigFile.model_validate(raw_data).root
-    global_section: ConfigSection = config_file.get("global", {})
-    return {k: _deep_merge(global_section, v) for k, v in config_file.items() if k != "global"}
+        config_file = ConfigFile.model_validate(tomllib.load(f)).root
+    return _apply_global_section(config_file)
 
 
 def resolve_config(
@@ -69,11 +67,23 @@ def resolve_config(
     overrides : TModel | ConfigSection
         The configuration overrides. Deeply merged with the default config, taking priority.
     """
-    base_data = default.model_dump() if isinstance(default, BaseModel) else default
-    override_data = overrides.model_dump() if isinstance(overrides, BaseModel) else overrides
-
-    merged_data = _deep_merge(base_data, override_data)
+    merged_data = _deep_merge(_config_data(default), _config_data(overrides))
     return model_cls.model_validate(merged_data)
+
+
+def _config_data(value: TModel | ConfigSection) -> ConfigSection:
+    """Return plain mapping data from either a config model or a config section."""
+    return value.model_dump() if isinstance(value, BaseModel) else value
+
+
+def _apply_global_section(config_file: dict[str, ConfigSection]) -> dict[str, ConfigSection]:
+    """Merge the optional `global` section into each dataset-specific section."""
+    global_section: ConfigSection = config_file.get("global", {})
+    return {
+        dataset_name: _deep_merge(global_section, section)
+        for dataset_name, section in config_file.items()
+        if dataset_name != "global"
+    }
 
 
 def _is_config_section(value: object) -> TypeGuard[Mapping[str, object]]:
@@ -90,10 +100,3 @@ def _deep_merge(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> Config
         else:
             merged[key] = value
     return merged
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    path = Path("config.toml")
-    config = load_config(path)

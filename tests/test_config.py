@@ -1,12 +1,14 @@
 # pyright: standard
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from dronalize.categories import AgentCategory
+from dronalize.config import Config, load_config, resolve_config
 from dronalize.config.filtering import FilteringConfig
-
-# Adjust the import path based on your project structure
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import (
     MapConfig,
     NoneExtraction,
@@ -214,6 +216,67 @@ def test_filtering_config_full_dict_validation() -> None:
     assert config.filter_agent_category == frozenset([AgentCategory.STATIC_OBJECT])
     assert config.filter_slow_agents == pytest.approx(1.5)
     assert config.min_samples_per_agent == 5
+
+
+def test_loader_config_with_filtering_normalizes_negative_require_frames() -> None:
+    """Convert valid negative frame indices into offsets from the sequence end."""
+    config = LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filtering(
+        require_frames=[0, -1, -2]
+    )
+
+    assert config.filtering is not None
+    assert config.filtering.require_frames == frozenset([0, 3, 4])
+
+
+def test_loader_config_with_filtering_rejects_out_of_range_negative_frame() -> None:
+    """Keep the original invalid frame value in the error for easier debugging."""
+    with pytest.raises(ValueError, match=r"Invalid frame index: -6"):
+        LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filtering(require_frames=[-6])
+
+
+def test_resolve_config_deep_merges_partial_overrides() -> None:
+    """Deep merges should preserve unspecified nested fields from the default config."""
+    default = Config(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_resampling(2, 1),
+        map=MapConfig.default(),
+    )
+
+    resolved = resolve_config(
+        Config,
+        default=default,
+        overrides={
+            "execution": {"workers": 8},
+            "loader": {"window": {"window_size": 5, "step_size": 1}},
+        },
+    )
+
+    assert resolved.execution.workers == 8
+    assert resolved.execution.parallel is False
+    assert resolved.loader.window is not None
+    assert resolved.loader.window.window_size == 5
+    assert resolved.loader.resampling == default.loader.resampling
+
+
+def test_load_config_merges_global_section_into_each_dataset(tmp_path: Path) -> None:
+    """Global config blocks should be merged into every dataset-specific override block."""
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """[global.execution]
+workers = 4
+
+[a43.execution]
+parallel = true
+
+[waymo.execution]
+chunksize = 8
+""",
+        encoding="utf-8",
+    )
+
+    overrides = load_config(config_path)
+
+    assert overrides["a43"] == {"execution": {"workers": 4, "parallel": True}}
+    assert overrides["waymo"] == {"execution": {"workers": 4, "chunksize": 8}}
 
 
 def test_square_extraction_valid() -> None:

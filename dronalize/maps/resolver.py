@@ -1,55 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING
 
 from dronalize.maps.graph import MapGraph
+from dronalize.scene import MapKey, MapResolver, Scene
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.scene import Scene
-
-MapKey = str | None
-"""Lightweight map identifier stored on each scene.
-
-`None` means "no map" or "use the default/only map". A non-`None` string is
-resolved by a `MapResolver` to produce a `MapGraph`.
-
-"""
-
-
-@runtime_checkable
-class MapResolver(Protocol):
-    """Protocol for resolving a :data:`MapKey` into a `MapGraph`.
-
-    Implementations are expected to handle caching internally when
-    appropriate (e.g. via `functools.lru_cache`).
-
-    A resolver is typically obtained from the loader that produced the
-    scenes via its `map_resolver()` method.
-    """
-
-    def __call__(self, scene: Scene, key: MapKey) -> MapGraph | None:
-        """Resolve *key* into a `MapGraph`, or `None`.
-
-        Parameters
-        ----------
-        scene : Scene
-            The scene for which to resolve the map.  This is provided for
-            context and potential use in resolution, but resolvers are not
-            required to use it.
-        key : MapKey
-            The map key to resolve.  `None` may be used for datasets
-            that have a single shared map or no map at all.
-
-        Returns
-        -------
-        MapGraph or None
-            The resolved map graph, or `None` if no map is available
-            for the given key.
-
-        """
-        ...
+__all__ = ["MapKey", "MapResolver", "no_map", "shared_map"]
 
 
 def no_map() -> MapResolver:
@@ -62,11 +21,8 @@ def no_map() -> MapResolver:
 
     """
 
-    def _resolve(
-        scene: Scene,
-        key: MapKey = None,
-    ) -> None:
-        _ = scene, key  # Unused
+    def _resolve(scene: Scene) -> None:
+        _ = scene  # Unused
 
     _resolve.__name__ = "no_map"
     return _resolve
@@ -83,7 +39,7 @@ def shared_map(
     shared_name : dict[MapKey, str] | str
         The name of the shared memory block to use for the map.
         If a `dict`, the value is looked up by `map_key`.
-    f : Callable[[MapGraph], MapGraph] | None
+    f : Callable[[Scene, MapGraph], MapGraph] | None
         A function to apply to the map graph before returning it.
         If `None`, the map graph is returned as-is.
 
@@ -94,8 +50,8 @@ def shared_map(
 
     """
 
-    def _resolve(scene: Scene, key: MapKey) -> MapGraph | None:
-        name = shared_name.get(key) if isinstance(shared_name, dict) else shared_name
+    def _resolve(scene: Scene) -> MapGraph | None:
+        name = shared_name.get(scene.map_key) if isinstance(shared_name, dict) else shared_name
         if name is None:
             return None
 

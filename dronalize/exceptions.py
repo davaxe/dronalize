@@ -7,30 +7,92 @@ if TYPE_CHECKING:
 
 
 class DronalizeError(Exception):
-    """Base exception class for all dronalize errors."""
+    """Base class for package-specific exceptions."""
 
 
-class LoaderConfigError(DronalizeError, ValueError):
-    """Raised when there is an issue with the loader configuration."""
+class ConfigurationError(DronalizeError, ValueError):
+    """Raised when user-provided configuration is invalid or incomplete."""
 
 
-class SplitNotSupportedError(ValueError):
+class LoaderConfigError(ConfigurationError):
+    """Raised when there is an issue with a loader configuration."""
+
+
+class MissingOptionalDependencyError(ImportError):
+    """Raised when an optional dependency required by a feature is unavailable."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        dependencies: tuple[str, ...] = (),
+        install_target: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.dependencies: tuple[str, ...] = dependencies
+        self.install_target: str | None = install_target
+
+
+class DatasetRegistryError(DronalizeError, ValueError):
+    """Raised when dataset registry metadata is invalid or inconsistent."""
+
+
+class DatasetNotFoundError(DronalizeError):
+    """Raised when a dataset name cannot be resolved from the registry."""
+
+    def __init__(self, dataset_name: str, available_datasets: list[str]) -> None:
+        known = ", ".join(available_datasets) or "none"
+        super().__init__(f"Unknown dataset '{dataset_name}'. Available datasets: {known}.")
+        self.dataset_name: str = dataset_name
+        self.available_datasets: tuple[str, ...] = tuple(available_datasets)
+
+
+class SplitError(ValueError):
+    """Base class for dataset split validation errors."""
+
+
+class SplitConflictError(SplitError):
+    """Raised when mutually exclusive split options are combined."""
+
+
+class SplitNotSupportedError(SplitError):
     """Raised when a dataset does not support the requested split.
 
-    This error is raised when a specific split (e.g., `TRAIN`, `VAL`,
-    `TEST`) is requested from a dataset that does not provide predefined
-    splits.
+    This error is raised when one or more specific splits are requested from a
+    dataset or loader that does not provide them.
 
     Parameters
     ----------
     loader_name : str
-        The name of the loader class that does not support splits.
-    split : DatasetSplit
-        The split that was requested.
+        The name of the loader or dataset that does not support the split.
+    split : DatasetSplit or str or list[DatasetSplit | str]
+        The requested split or splits.
 
     """
 
-    def __init__(self, loader_name: str, split: DatasetSplit) -> None:
-        super().__init__(f"{loader_name} does not support split '{split}'. ")
+    def __init__(
+        self,
+        loader_name: str,
+        split: DatasetSplit | str | list[DatasetSplit] | list[str],
+    ) -> None:
+        if isinstance(split, list):
+            split_display = ", ".join(str(item) for item in split)
+        else:
+            split_display = str(split)
+        super().__init__(f"{loader_name} does not support split '{split_display}'.")
         self.loader_name: str = loader_name
-        self.split: DatasetSplit = split
+        self.split: list[str] = (
+            [str(item) for item in split] if isinstance(split, list) else [str(split)]
+        )
+
+
+class UnsupportedOutputFormatError(ValueError):
+    """Raised when an unknown writer/output format is requested."""
+
+    def __init__(self, output_format: str, supported_formats: tuple[str, ...]) -> None:
+        supported = ", ".join(supported_formats)
+        super().__init__(
+            f"Unsupported output format '{output_format}'. Supported formats: {supported}."
+        )
+        self.output_format: str = output_format
+        self.supported_formats: tuple[str, ...] = supported_formats

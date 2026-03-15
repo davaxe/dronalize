@@ -10,6 +10,7 @@ from streaming.base.util import merge_index
 from typing_extensions import Self, Unpack, override
 
 from dronalize.converters.numpy import map_graph_to_numpy, scene_to_numpy_dict
+from dronalize.exceptions import ConfigurationError
 from dronalize.loading import SceneWriter
 
 FLOAT_MDS_DTYPE = "float64"
@@ -30,6 +31,8 @@ class _MDSWriterArgs(TypedDict, total=False):
 
 
 class MDSSceneWriter(SceneWriter):
+    """Write processed scenes to MosaicML Streaming (MDS) shards."""
+
     def __init__(
         self,
         output_dir: Path,
@@ -40,6 +43,7 @@ class MDSSceneWriter(SceneWriter):
         parallel_group: int | str | None = None,
         **inner_args: Unpack[_MDSWriterArgs],
     ) -> None:
+        """Configure a lazily initialized MDS scene writer."""
         self._base_output_dir: Path = Path(output_dir)
         self._multiple_targets: int | bool = multiple_targets
         self._parallel: bool = parallel
@@ -139,9 +143,11 @@ class MDSSceneWriter(SceneWriter):
         samples = scene_to_numpy_dict(scene, multiple_targets=self._multiple_targets)
         for target_id, numpy_dict in samples.items():
             if effective_split not in self._writers:
-                msg = f"Scene {scene.scene_number} belongs to split {effective_split}"
-                ", but no writer is configured for this split."
-                raise ValueError(msg)
+                msg = (
+                    f"Scene {scene.scene_number} belongs to split {effective_split}, "
+                    "but no writer is configured for this split."
+                )
+                raise ConfigurationError(msg)
 
             sample: dict[str, Any] = {
                 # -- scalar metadata --

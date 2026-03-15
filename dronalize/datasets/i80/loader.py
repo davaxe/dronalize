@@ -9,14 +9,15 @@ from typing_extensions import override
 import dronalize.pipeline.transforms as tr
 from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
+from dronalize.config.map import MapConfig
+from dronalize.datasets.common import utils
 from dronalize.loading import BaseSceneLoader, IngestOutput, Source
+from dronalize.maps.resolver import MapResolver, no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-    from dronalize.config.map import MapConfig
 
 
 class I80Loader(BaseSceneLoader[Path]):
@@ -112,6 +113,17 @@ class I80Loader(BaseSceneLoader[Path]):
             .with_window(25)
             .with_filtering(require_frames=[19])
         )
+
+    @classmethod
+    @override
+    def default_map_config(cls) -> MapConfig:
+        return MapConfig.default()
+
+    @override
+    def map_resolver(self) -> MapResolver:
+        if self._shared_memory_name is None:
+            return no_map()
+        return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 
     @staticmethod
     def _lane_changes_expr(

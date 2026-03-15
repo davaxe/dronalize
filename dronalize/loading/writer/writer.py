@@ -1,45 +1,45 @@
+# ruff: noqa: TC001, TC003, PLR0402
+
 from __future__ import annotations
 
+import collections.abc as cabc
 import functools
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+import pathlib
+from typing import Any, Protocol, runtime_checkable
 
 from typing_extensions import Self
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-    from pathlib import Path
-
-    from dronalize.categories import DatasetSplit
-    from dronalize.scene import Scene
+import dronalize.categories as categories
+import dronalize.scene as scene_module
 
 
 @runtime_checkable
 class SceneWriter(Protocol):
-    """Protocol for writing processed scenes to disk."""
+    """Protocol for writing processed scenes to disk.
+
+    Writer implementations are expected to return `True` when a scene produced
+    one or more persisted samples and `False` otherwise.
+    """
 
     def write(
         self,
-        scene: Scene,
-        split: DatasetSplit | None = None,
-    ) -> int:
+        scene: scene_module.Scene,
+        split: categories.DatasetSplit | None = None,
+    ) -> bool:
         """Write a single processed scene.
 
         Parameters
         ----------
         scene : Scene
             The processed scene to write.
-        splits : Iterator[DatasetSplit] or None, optional
-            An optional iterator of dataset splits that the scene belongs to.
-            An iterator is primarily used to allow for multiple splits per write
-            call.
-        strict : bool, optional
-            Whether to raise an error if the `splits` iterator is longer than
-            the total written samples. Defaults to `False`.
+        split : DatasetSplit | None, optional
+            Explicit dataset split for the scene. When omitted, writers may use
+            `scene.split_assignment` instead.
 
         Returns
         -------
-        int
-            The number of samples written for the given scene.
+        bool
+            `True` if the scene produced output, otherwise `False`.
 
         """
         ...
@@ -55,7 +55,7 @@ class SceneWriter(Protocol):
         """
         ...
 
-    def set_output_dir(self, output_dir: Path) -> None:
+    def set_output_dir(self, output_dir: pathlib.Path) -> None:
         """Set the output directory for the writer.
 
         This method can be used to specify the directory where the writer should
@@ -65,19 +65,20 @@ class SceneWriter(Protocol):
 
         Parameters
         ----------
-        output_dir : Path
+        output_dir : pathlib.Path
             The path to the output directory where the writer should save its files.
 
         """
         ...
 
-    def get_output_dir(self) -> Path:
+    def get_output_dir(self) -> pathlib.Path:
         """Get the current output directory for the writer.
 
         Returns
         -------
-        Path
-            The path to the current output directory where the writer is saving its files.
+        pathlib.Path
+            The path to the current output directory where the writer is saving
+            its files.
 
         """
         ...
@@ -93,7 +94,7 @@ class SceneWriter(Protocol):
         ...
 
     @classmethod
-    def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int | None], Self]:  # noqa: ANN401
+    def as_factory(cls, *args: Any, **kwargs: Any) -> cabc.Callable[[int | None], Self]:  # noqa: ANN401
         """Create a factory function for this writer class.
 
         The returned factory should accept a worker identifier and return an
@@ -110,7 +111,7 @@ class SceneWriter(Protocol):
 
         Returns
         -------
-        Callable[[int | None], Self]
+        collections.abc.Callable[[int | None], Self]
             A factory function that takes a worker identifier and returns an
             instance of the writer class.
 

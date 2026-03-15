@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.maps.graph import MapGraph
-    from dronalize.maps.resolver import MapKey, MapResolver
+    from dronalize.maps.resolver import MapResolver
     from dronalize.scene import Scene
 
 
@@ -151,12 +151,16 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
 
     @override
     def map_resolver(self) -> MapResolver:
-        def _resolver(scene: Scene, key: MapKey = None) -> MapGraph | None:
-            if key is None:
+        def _resolver(scene: Scene) -> MapGraph | None:
+            if scene.map_key is None:
                 return None
 
             return utils.extract_based_on_scene(
-                self._get_map(key, self.map_config.min_distance, self.map_config.interp_distance),
+                self._get_map(
+                    scene.map_key,
+                    self.map_config.min_distance,
+                    self.map_config.interp_distance,
+                ),
                 scene,
                 self.map_config.extraction,
             )

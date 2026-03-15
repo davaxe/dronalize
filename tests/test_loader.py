@@ -94,18 +94,21 @@ class _UnsplitLoader(BaseSceneLoader[str]):
 
 
 def test_sources_leave_split_assignment_empty_when_none_requested() -> None:
+    """Test that if no splits are requested, the split assignment for sources is None."""
     loader = _SplitLoader()
 
     assert [source.split_assignment for source in loader.sources()] == [None, None, None]
 
 
 def test_scenes_leave_split_assignment_empty_when_none_requested() -> None:
+    """Test that if no splits are requested, the split assignment for scenes is None."""
     loader = _SplitLoader()
 
     assert [scene.split_assignment for scene in loader.scenes()] == [None, None, None]
 
 
 def test_single_split_selection_only_yields_requested_split() -> None:
+    """Test that a single split selection works."""
     loader = _SplitLoader(splits=DatasetSplit.VAL)
 
     assert [source.split_assignment for source in loader.sources()] == [DatasetSplit.VAL]
@@ -113,6 +116,7 @@ def test_single_split_selection_only_yields_requested_split() -> None:
 
 
 def test_unsplit_loader_leaves_split_assignment_empty() -> None:
+    """Test that split assingment is None when the loader does not support splits."""
     loader = _UnsplitLoader()
 
     assert [source.split_assignment for source in loader.sources()] == [None]
@@ -120,6 +124,7 @@ def test_unsplit_loader_leaves_split_assignment_empty() -> None:
 
 
 def test_unsplit_loader_rejects_predefined_split_selection() -> None:
+    """Test that splits that are not supported by the loader raise an exception."""
     loader = _UnsplitLoader(splits=DatasetSplit.TRAIN)
 
     with pytest.raises(SplitNotSupportedError):
@@ -127,6 +132,7 @@ def test_unsplit_loader_rejects_predefined_split_selection() -> None:
 
 
 def test_explicit_source_override_wins_over_inferred_split() -> None:
+    """Test override behavior."""
     loader = _OverrideSplitLoader(splits=DatasetSplit.TRAIN)
 
     assert [source.split_assignment for source in loader.sources()] == [DatasetSplit.TEST]
@@ -134,6 +140,7 @@ def test_explicit_source_override_wins_over_inferred_split() -> None:
 
 
 def test_inferred_split_wins_without_explicit_override() -> None:
+    """Test that if no explicit override is provided, the inferred split assignment is used."""
     loader = _ManualSplitLoader(splits=DatasetSplit.TRAIN)
 
     assert [source.split_assignment for source in loader.sources()] == [DatasetSplit.TRAIN]

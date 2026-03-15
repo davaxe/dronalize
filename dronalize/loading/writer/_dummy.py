@@ -3,9 +3,9 @@ from __future__ import annotations
 import functools
 from collections import Counter
 from pathlib import Path
+from pprint import pprint
 from typing import TYPE_CHECKING
 
-import rich
 from typing_extensions import override
 
 from dronalize.loading import SceneWriter
@@ -57,10 +57,10 @@ class DummyWriter(SceneWriter):
     @override
     def finish_local(self) -> None:
         if self._log:
-            rich.print(f"[{self._identifier}] Finished writing local.")
-            rich.print(f"[{self._identifier}] Scene counts: {dict(self._count)}")
+            pprint(f"[{self._identifier}] Finished writing local.")
+            pprint(f"[{self._identifier}] Scene counts: {dict(self._count)}")
 
     @override
     def finish_final(self) -> None:
         if self._log:
-            rich.print(f"[{self._identifier}] Finished writing final.")
+            pprint(f"[{self._identifier}] Finished writing final.")

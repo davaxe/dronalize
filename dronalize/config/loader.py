@@ -14,6 +14,22 @@ if TYPE_CHECKING:
     from dronalize.categories import AgentCategory
 
 
+def _normalize_frame_indices(
+    frames: Collection[int],
+    *,
+    total_frames: int,
+) -> frozenset[int]:
+    """Normalize frame indices while preserving the original invalid input in errors."""
+    normalized_frames: set[int] = set()
+    for frame in frames:
+        normalized_frame = frame if frame >= 0 else total_frames + frame
+        if normalized_frame < 0 or normalized_frame >= total_frames:
+            msg = f"Invalid frame index: {frame}"
+            raise ValueError(msg)
+        normalized_frames.add(normalized_frame)
+    return frozenset(normalized_frames)
+
+
 class WindowParams(BaseModel):
     """Configuration for sliding window sampling of scenes."""
 
@@ -60,13 +76,18 @@ class LoaderConfig(BaseModel):
     def _validate(self) -> LoaderConfig:
         if self.window is None:
             return self
-        if self.window.window_size != self.input_len + self.output_len:
+        sequence_length = self._sequence_length()
+        if self.window.window_size != sequence_length:
             msg = (
                 f"Window size ({self.window.window_size}) must equal input_len + output_len "
-                f"({self.input_len + self.output_len}) for consistent windowing."
+                f"({sequence_length}) for consistent windowing."
             )
             raise ValueError(msg)
         return self
+
+    def _sequence_length(self) -> int:
+        """Return the total number of frames in one input/output sequence."""
+        return self.input_len + self.output_len
 
     # -- builder helpers (return new frozen instances) -----------------------
 
@@ -87,9 +108,7 @@ class LoaderConfig(BaseModel):
             A **new** config instance with window parameters set.
         """
         new_window_params = WindowParams(
-            window_size=window_size
-            if window_size is not None
-            else self.input_len + self.output_len,
+            window_size=window_size if window_size is not None else self._sequence_length(),
             step_size=step_size,
         )
         return self.model_copy(update={"window": new_window_params})
@@ -134,23 +153,17 @@ class LoaderConfig(BaseModel):
         Self
             A **new** config instance with scene-filtering parameters set.
         """
-        if require_frames is not None:
-            total_frames = self.input_len + self.output_len
-            require_frames = {
-                frame if frame >= 0 else (total_frames + frame) for frame in require_frames
-            }
-            for frame in require_frames:
-                if frame < 0 or frame >= total_frames:
-                    msg = f"Invalid frame index: {frame}"
-                    raise ValueError(msg)
+        normalized_frames = (
+            _normalize_frame_indices(require_frames, total_frames=self._sequence_length())
+            if require_frames is not None
+            else None
+        )
 
         new_filtering = FilteringConfig.create(
             min_agents=min_agents,
             require_all_valid=require_all_valid,
-            require_frames=frozenset(require_frames) if require_frames is not None else None,
-            filter_agent_category=filter_agent_category
-            if filter_agent_category is not None
-            else None,
+            require_frames=normalized_frames,
+            filter_agent_category=filter_agent_category,
             filter_slow_agents=filter_slow_agents,
             min_samples_per_agent=min_samples_per_agent,
         )

@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from dronalize.config.map import MapConfig
     from dronalize.maps.graph import MapGraph
-    from dronalize.maps.resolver import MapKey, MapResolver
+    from dronalize.maps.resolver import MapResolver
     from dronalize.scene import Scene
 
 
@@ -99,10 +99,9 @@ class WaymoLoader(BaseSceneLoader[Path]):
 
                 def _resolver(
                     scene: Scene,
-                    key: MapKey | None = None,
                     _raw_data: bytes = raw_data,
                 ) -> MapGraph:
-                    _ = scene, key
+                    _ = scene
                     map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
                     return WaymoMapBuilder.from_proto(map_data.map_features).build(
                         min_distance=self.map_config.min_distance,

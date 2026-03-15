@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
 AnyEvent = Event | threading.Event
 
-WriterFactory = Callable[[int], SceneWriter]
-"""Factory that creates a worker-local writer for a stable integer worker ID."""
+WriterFactory = Callable[[int | None], SceneWriter]
+"""Factory that creates a worker-local writer for a stable worker ID."""
 
 
 class WritingExecutor(Protocol):

@@ -178,8 +178,8 @@ class SplitDispatchConfig:
     def assign(self, request: tuple[int | str, ...]) -> DatasetSplit:
         """Request the split for a given scene from the queue.
 
-        This method blocks until a split value is available. If the queue is
-        exhausted, it returns `None` as a sentinel value.
+        This method blocks until the dispatcher sends back one concrete split
+        assignment for the request.
 
         Parameters
         ----------
@@ -190,8 +190,8 @@ class SplitDispatchConfig:
 
         Returns
         -------
-        DatasetSplit | None
-            The assigned dataset split for the given scene, or `None` if the queue is exhausted.
+        DatasetSplit
+            The assigned dataset split for the given scene.
         """
         self.queue.put((request, self.tx))
         return self.rx.recv()
@@ -282,16 +282,14 @@ class SplitDispatcher:
                 item = request_queue.get()
                 if item is None:
                     break
-                v, conn = item
-                split = split_assigner.assign(*v)
+                request_values, conn = item
+                split = split_assigner.assign(*request_values)
                 conn.send(split)
 
         finally:
-            try:
+            with contextlib.suppress(queue.Full):
                 for _ in range(worker_count):
                     request_queue.put(None, timeout=0.1)
-            except queue.Full:
-                ...
 
 
 @dataclass(slots=True)

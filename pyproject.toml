@@ -87,7 +87,7 @@ addopts = ["--doctest-modules", "-ra"]
 
 [tool.ruff]
 # Exclude proto compiled files from linting and formatting
-extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*", "tests"]
+extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*"]
 line-length = 100
 preview = true
 
@@ -98,7 +98,7 @@ ignore = [
     "T201", "S101", "TRY003", "D100", "B008", "PLR0904",
     "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
     "DOC402", "CPY001", "D104", "TD005", "S405", "S314",
-    "RUF067", "PLC2801", "S608", "S311"
+    "RUF067", "PLC2801", "S608", "S311", "T203",
 ]
 pydocstyle = { convention = "numpy" }
 

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from dronalize.config import LoaderConfig
     from dronalize.maps.graph import MapGraph
-    from dronalize.maps.resolver import MapKey, MapResolver
+    from dronalize.maps.resolver import MapResolver
     from dronalize.scene import Scene
 
 
@@ -120,14 +120,14 @@ class HighDLoader(XLevelDataLoader):
 
     @override
     def map_resolver(self) -> MapResolver:
-        def _resolver(scene: Scene, key: MapKey) -> MapGraph | None:
-            if key is None:
+        def _resolver(scene: Scene) -> MapGraph | None:
+            if scene.map_key is None:
                 return None
 
             min_x = scene.inner.select(pl.col("x")).min().item()
             max_x = scene.inner.select(pl.col("x")).max().item()
             dist = max_x - min_x
-            builder = HighDMapBuilder(Path(key), min_x - dist * 0.1, max_x + dist * 0.1)
+            builder = HighDMapBuilder(Path(scene.map_key), min_x - dist * 0.1, max_x + dist * 0.1)
             map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 

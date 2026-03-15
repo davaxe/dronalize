@@ -25,7 +25,7 @@ def map_graph_to_torch(graph: MapGraph) -> dict[Any, Any]:
         Dictionary with node and edge data suitable for PyTorch Geometric.
 
     """
-    torch = require_optional("torch", extra="torch")
+    torch = require_optional("torch", extra="loader")
 
     return {
         "map_point": {

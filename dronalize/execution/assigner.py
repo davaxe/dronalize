@@ -39,6 +39,21 @@ SplitAssigner = Assigner[DatasetSplit]
 """A group assigner for dataset splits (train/val/test)."""
 
 
+class ConstantAssigner(Assigner[T_co]):
+    """A simple assigner that always assigns the same constant group."""
+
+    def __init__(self, group: T_co) -> None:
+        self._group: T_co = group
+
+    @override
+    def assign(self, *values: int | str) -> T_co:
+        """Assign the constant group, ignoring the input values."""
+        return self._group
+
+
+ConstantSplitAssigner = ConstantAssigner[DatasetSplit]
+
+
 class StatelessWeightedAssigner(Assigner[T_co]):
     """Stateless group assigner based on hashing.
 
@@ -81,49 +96,13 @@ class StatelessWeightedAssigner(Assigner[T_co]):
         seed : int, optional
             An optional random seed for deterministic group assignment. If None,
             a random seed will be generated internally.
-
-        Raises
-        ------
-        ValueError
-            If groups are not unique, if the number of weights does not
-            match the number of groups, if any weight is negative, or if all
-            weights are zero.
         """
         self._seed: int = (
-            seed if seed is not None else np.random.default_rng().integers(0, 2**31 - 1)
+            seed if seed is not None else int(np.random.default_rng().integers(0, 2**31 - 1))
         )
-
-        self._groups: list[T_co] = list(dict.fromkeys(groups))
-        if len(groups) != len(self._groups):
-            msg = (
-                f"Groups must be unique. Found {len(groups)} elements "
-                f"but only {len(self._groups)} unique groups."
-            )
-            raise ValueError(msg)
-        if weights is not None and len(weights) != len(self._groups):
-            msg = (
-                f"Number of weights must match number of groups. "
-                f"Found {len(weights)} weights but {len(self._groups)} groups."
-            )
-            raise ValueError(msg)
-
-        self._weights: npt.NDArray[np.float64] = (
-            np.array(weights, dtype=np.float64)
-            if weights is not None
-            else np.ones(len(self._groups), dtype=np.float64)
-        )
-
-        if np.any(self._weights < 0):
-            msg = "All weights must be non-negative."
-            raise ValueError(msg)
-
-        weights_sum = float(self._weights.sum())
-
-        if weights_sum == 0:
-            msg = f"At least one weight must be greater than zero got {self._weights}."
-            raise ValueError(msg)
-
-        self._weights /= weights_sum
+        self._groups: list[T_co]
+        self._weights: npt.NDArray[np.float64]
+        self._groups, self._weights = _prepare_groups_and_weights(groups, weights)
         self._cumulative_weights: npt.NDArray[np.float64] = np.cumsum(self._weights)
         self._cumulative_weights[-1] = 1.0
 
@@ -219,48 +198,10 @@ class DeckWeightedAssigner(Assigner[T_co]):
         rounds : int, optional
             The number of pre-generated rounds of shuffled group indices.
 
-        Raises
-        ------
-        ValueError
-            If groups are not unique, if the number of weights does not
-            match the number of groups, if any weight is negative, or if all
-            weights are zero.
-
         """
-        # fromkeys preserves order and removes duplicates
-        self._groups: list[T_co] = list(dict.fromkeys(groups))
-        if len(groups) != len(self._groups):
-            msg = (
-                f"Groups must be unique. Found {len(groups)} elements "
-                f"but only {len(self._groups)} unique groups."
-            )
-            raise ValueError(msg)
-        if weights is not None and len(weights) != len(self._groups):
-            msg = (
-                f"Number of weights must match number of groups. "
-                f"Found {len(weights)} weights but {len(self._groups)} groups."
-            )
-            raise ValueError(msg)
-
-        self._index_to_group: list[T_co] = list(self._groups)
-        self._weights: npt.NDArray[np.float64] = (
-            np.array(weights, dtype=np.float64)
-            if weights is not None
-            else np.ones(len(self._groups), dtype=np.float64)
-        )
-
-        if np.any(self._weights < 0):
-            msg = "All weights must be non-negative."
-            raise ValueError(msg)
-
-        weights_sum = float(self._weights.sum())
-
-        if weights_sum == 0:
-            msg = f"At least one weight must be greater than zero got {self._weights}."
-            raise ValueError(msg)
-
-        self._weights /= weights_sum
-
+        self._groups: list[T_co]
+        self._weights: npt.NDArray[np.float64]
+        self._groups, self._weights = _prepare_groups_and_weights(groups, weights)
         self._rng: np.random.Generator = np.random.default_rng(seed)
         self._deck: npt.NDArray[np.int32] = _generate_shuffled_deck(
             self._weights, round_size, rounds, self._rng
@@ -283,7 +224,7 @@ class DeckWeightedAssigner(Assigner[T_co]):
             A set of integer or string values that are ignored in this implementation.
 
         """
-        _ = values  # Unused since assignment is based on internal state
+        _ = values
         return self.next()
 
     def next(self) -> T_co:
@@ -302,10 +243,9 @@ class DeckWeightedAssigner(Assigner[T_co]):
         >>> assigner.next() # Second is guaranteed 1, since `round_size` is 2
         1
         """
-        index = self._index
-        value = int(self._deck[self._round_index, index])
+        value = int(self._deck[self._round_index, self._index])
         self._update()
-        return self._index_to_group[value]
+        return self._groups[value]
 
     def take(self, n: int) -> Iterator[T_co]:
         """Take the next `n` groups as an iterator.
@@ -325,21 +265,9 @@ class DeckWeightedAssigner(Assigner[T_co]):
         return (self.next() for _ in range(n))
 
     def __iter__(self) -> Iterator[T_co]:
-        """Return an infinite iterator that yields groups from the stream.
-
-        Returns
-        -------
-        Iterator[T]
-            An infinite iterator that yields groups based on the current round's
-            shuffled deck.
-
-        """
-
-        def infinite_generator() -> Iterator[T_co]:
-            while True:
-                yield self.next()
-
-        return infinite_generator()
+        """Yield an infinite stream of group assignments."""
+        while True:
+            yield self.next()
 
     def _update(self) -> None:
         self._index += 1
@@ -347,6 +275,44 @@ class DeckWeightedAssigner(Assigner[T_co]):
             self._index = 0
             # Random row selection for the next round
             self._round_index = int(self._rng.integers(0, int(self._deck.shape[0])))
+
+
+def _prepare_groups_and_weights(
+    groups: Sequence[T_co],
+    weights: Sequence[float] | None,
+) -> tuple[list[T_co], npt.NDArray[np.float64]]:
+    """Validate and normalize assigner groups and weights."""
+    normalized_groups = list(dict.fromkeys(groups))
+    if len(groups) != len(normalized_groups):
+        msg = (
+            f"Groups must be unique. Found {len(groups)} elements "
+            f"but only {len(normalized_groups)} unique groups."
+        )
+        raise ValueError(msg)
+
+    if weights is not None and len(weights) != len(normalized_groups):
+        msg = (
+            f"Number of weights must match number of groups. "
+            f"Found {len(weights)} weights but {len(normalized_groups)} groups."
+        )
+        raise ValueError(msg)
+
+    normalized_weights = (
+        np.array(weights, dtype=np.float64)
+        if weights is not None
+        else np.ones(len(normalized_groups), dtype=np.float64)
+    )
+    if np.any(normalized_weights < 0):
+        msg = "All weights must be non-negative."
+        raise ValueError(msg)
+
+    weights_sum = float(normalized_weights.sum())
+    if weights_sum == 0:
+        msg = f"At least one weight must be greater than zero got {normalized_weights}."
+        raise ValueError(msg)
+
+    normalized_weights /= weights_sum
+    return normalized_groups, normalized_weights
 
 
 def _generate_shuffled_deck(
@@ -377,18 +343,3 @@ def _generate_shuffled_deck(
     # Independently shuffle each row
     rng = rng or np.random.default_rng()
     return rng.permuted(deck, axis=1).astype(np.int32)
-
-
-class ConstantAssigner(Assigner[T_co]):
-    """A simple assigner that always assigns the same constant group."""
-
-    def __init__(self, group: T_co) -> None:
-        self._group: T_co = group
-
-    @override
-    def assign(self, *values: int | str) -> T_co:
-        """Assign the constant group, ignoring the input values."""
-        return self._group
-
-
-ConstantSplitAssigner = ConstantAssigner[DatasetSplit]

@@ -5,6 +5,8 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING
 
+from dronalize.exceptions import MissingOptionalDependencyError
+
 if TYPE_CHECKING:
     from types import ModuleType
 
@@ -27,7 +29,7 @@ def require_optional(module_name: str, *, extra: str | None = None) -> ModuleTyp
 
     Raises
     ------
-    ImportError
+    MissingOptionalDependencyError
         If the module is not installed.
 
     """
@@ -39,4 +41,8 @@ def require_optional(module_name: str, *, extra: str | None = None) -> ModuleTyp
             f"{module_name!r} is required for this functionality. "
             f"Install {install_target} to use it."
         )
-        raise ImportError(msg) from exc
+        raise MissingOptionalDependencyError(
+            msg,
+            dependencies=(module_name,),
+            install_target=install_target,
+        ) from exc

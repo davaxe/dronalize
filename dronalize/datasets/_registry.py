@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import ast
+import functools
 import importlib
 import importlib.util
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field, replace
 from enum import IntEnum, auto
-from functools import cache
 from pathlib import Path
 from typing import Any, Concatenate, Literal
 
@@ -19,6 +19,11 @@ from dronalize._internal._types import P
 from dronalize.categories import DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
+from dronalize.exceptions import (
+    DatasetNotFoundError,
+    DatasetRegistryError,
+    MissingOptionalDependencyError,
+)
 from dronalize.loading import BaseSceneLoader
 
 _BUILTIN_METADATA_NAME = "__dronalize_builtin__"
@@ -133,7 +138,7 @@ def register(descriptor: DatasetDescriptor) -> None:
     """Register a dataset descriptor."""
     if descriptor.name in _REGISTRY and _REGISTRY[descriptor.name] != descriptor:
         msg = f"Dataset '{descriptor.name}' is already registered."
-        raise ValueError(msg)
+        raise DatasetRegistryError(msg)
 
     _REGISTRY[descriptor.name] = descriptor
 
@@ -143,9 +148,7 @@ def get(name: str) -> DatasetDescriptor:
     _ensure_registered(name)
 
     if name not in _REGISTRY:
-        known_datasets = ", ".join(available()) or "none"
-        msg = f"Unknown dataset '{name}'. Available datasets: {known_datasets}."
-        raise KeyError(msg)
+        raise DatasetNotFoundError(name, available())
 
     return _REGISTRY[name]
 
@@ -195,7 +198,7 @@ def _ensure_registered(name: str) -> None:
     _ = importlib.import_module(spec.module)
 
 
-@cache
+@functools.lru_cache(maxsize=1)
 def _builtin_datasets() -> dict[str, _BuiltinDatasetSpec]:
     """Discover built-in dataset specs from dataset package metadata."""
     datasets_dir = Path(__file__).resolve().parent
@@ -212,7 +215,7 @@ def _builtin_datasets() -> dict[str, _BuiltinDatasetSpec]:
         for dataset_name, spec in _parse_builtin_package(package_init).items():
             if dataset_name in builtin_specs and builtin_specs[dataset_name] != spec:
                 msg = f"Dataset '{dataset_name}' is defined more than once across dataset packages."
-                raise ValueError(msg)
+                raise DatasetRegistryError(msg)
             builtin_specs[dataset_name] = spec
 
     return builtin_specs
@@ -232,23 +235,10 @@ def _extract_builtin_metadata(package_init: Path) -> _BuiltinModuleMetadata:
         module_ast = ast.parse(package_init.read_text(encoding="utf-8"))
     except SyntaxError as exc:
         msg = f"Could not parse dataset package metadata from '{package_init}'."
-        raise ValueError(msg) from exc
+        raise DatasetRegistryError(msg) from exc
 
     for node in module_ast.body:
-        target_value = None
-
-        # Extract value directly within the narrowed type blocks
-        if isinstance(node, ast.Assign):
-            if any(
-                isinstance(t, ast.Name) and t.id == _BUILTIN_METADATA_NAME for t in node.targets
-            ):
-                target_value = node.value
-        elif (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == _BUILTIN_METADATA_NAME
-        ):
-            target_value = node.value
+        target_value = _builtin_metadata_value(node)
 
         if target_value is not None:
             try:
@@ -260,10 +250,26 @@ def _extract_builtin_metadata(package_init: Path) -> _BuiltinModuleMetadata:
                     f"Ensure that the variable {_BUILTIN_METADATA_NAME!r} "
                     "is defined as a Python literal."
                 )
-                raise ValueError(msg) from exc
+                raise DatasetRegistryError(msg) from exc
 
     msg = f"Dataset package '{package_init.parent.name}' must define {_BUILTIN_METADATA_NAME!r}."
-    raise ValueError(msg)
+    raise DatasetRegistryError(msg)
+
+
+def _builtin_metadata_value(node: ast.stmt) -> ast.expr | None:
+    """Return the builtin metadata value assigned by one module-level statement."""
+    if isinstance(node, ast.Assign):
+        if any(
+            isinstance(target, ast.Name) and target.id == _BUILTIN_METADATA_NAME
+            for target in node.targets
+        ):
+            return node.value
+        return None
+
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        return node.value if node.target.id == _BUILTIN_METADATA_NAME else None
+
+    return None
 
 
 def _builtin_spec(module_name: str, metadata: _BuiltinModuleMetadata) -> _BuiltinDatasetSpec:
@@ -275,13 +281,15 @@ def _builtin_spec(module_name: str, metadata: _BuiltinModuleMetadata) -> _Builti
     )
 
 
-def _missing_optional_dependencies(spec: _BuiltinDatasetSpec) -> list[str]:
+@functools.lru_cache
+def _missing_optional_dependencies(spec: _BuiltinDatasetSpec) -> tuple[str, ...]:
     """List optional dependencies that are unavailable for a built-in dataset."""
-    return [
+    return tuple(
         module_name for module_name in spec.optional_dependencies if not _has_module(module_name)
-    ]
+    )
 
 
+@functools.lru_cache
 def _has_module(module_name: str) -> bool:
     """Return whether *module_name* can be imported in the current environment."""
     try:
@@ -294,17 +302,18 @@ def _missing_dependency_error(
     *,
     subject: str,
     spec: _BuiltinDatasetSpec,
-    missing: list[str],
-) -> ModuleNotFoundError:
+    missing: tuple[str, ...],
+) -> MissingOptionalDependencyError:
     """Build a consistent error for unavailable optional dataset dependencies."""
-    install_hint = (
-        f"Install the optional extra with `pip install dronalize[{spec.extra}]`."
-        if spec.extra
-        else ""
-    )
+    install_target = f"dronalize[{spec.extra}]" if spec.extra else None
+    install_hint = f"Install {install_target} to use it." if install_target else ""
     missing_str = ", ".join(missing)
     msg = (
         f"{subject} is unavailable because the following optional dependencies are missing: "
         f"{missing_str}. {install_hint}"
     )
-    return ModuleNotFoundError(msg)
+    return MissingOptionalDependencyError(
+        msg,
+        dependencies=tuple(missing),
+        install_target=install_target,
+    )

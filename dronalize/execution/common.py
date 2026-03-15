@@ -1,9 +1,13 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
 from dronalize.categories import DatasetSplit
+from dronalize.exceptions import SplitConflictError
+
+_STANDARD_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,10 +82,9 @@ class CustomSplit(BaseModel):
         return values
 
     def _active_groups(self) -> list[tuple[DatasetSplit, float]]:
-        order = [DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST]
         return [
             (group, weight)
-            for group, weight in zip(order, self.split_weights, strict=True)
+            for group, weight in zip(_STANDARD_SPLITS, self.split_weights, strict=True)
             if weight > 0
         ]
 
@@ -113,9 +116,11 @@ SplitMode = Annotated[
     SingleSplit | MultiSplit | PredefinedSplit | CustomSplit | NoSplit, Field(discriminator="mode")
 ]
 
+SplitType = str | DatasetSplit
+
 
 def resolve_split_mode(
-    single_split: DatasetSplit | str | list[DatasetSplit | str] | None,
+    single_split: SplitType | Sequence[SplitType] | None,
     custom_split_weights: tuple[float, float, float] | None,
 ) -> SplitMode:
     """Resolve the split mode based on the provided arguments.
@@ -134,29 +139,33 @@ def resolve_split_mode(
     SplitMode
         The resolved split mode based on the provided arguments.
     """
-    parsed_split: DatasetSplit | list[DatasetSplit] | None = None
+    parsed_split = _parse_requested_splits(single_split)
 
-    if isinstance(single_split, list) and len(single_split) == 1:
-        single_split = single_split[0]
-    if isinstance(single_split, str):
-        parsed_split = DatasetSplit(single_split)
-    elif isinstance(single_split, list):
-        # Strings are also sequences, so checking for str first is required
-        parsed_split = [DatasetSplit(s) for s in single_split]
-
-    # 2. Validate against custom_split_weights conflicts
     if custom_split_weights is not None:
-        # If a sequence or explicit predefined split is provided, raise an error.
-        is_invalid_for_custom = isinstance(parsed_split, list) or parsed_split is not None
-        if is_invalid_for_custom:
+        if parsed_split is not None:
             msg = "Custom split weights cannot be used with predefined splits."
-            raise ValueError(msg)
+            raise SplitConflictError(msg)
         return CustomSplit(split_weights=custom_split_weights)
 
-    # 3. Resolve and return the correct SplitMode
     if isinstance(parsed_split, list):
         return MultiSplit(split=parsed_split)
     if parsed_split is not None:
         return SingleSplit(split=parsed_split)
 
     return NoSplit()
+
+
+def _parse_requested_splits(
+    single_split: SplitType | Sequence[SplitType] | None,
+) -> DatasetSplit | list[DatasetSplit] | None:
+    """Normalize requested splits into a single value or a concrete list."""
+    if single_split is None:
+        return None
+
+    if isinstance(single_split, (str, DatasetSplit)):
+        return DatasetSplit(single_split)
+
+    parsed_splits = [DatasetSplit(split) for split in single_split]
+    if len(parsed_splits) == 1:
+        return parsed_splits[0]
+    return parsed_splits

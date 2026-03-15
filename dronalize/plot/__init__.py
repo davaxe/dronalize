@@ -2,7 +2,7 @@
 
 Requires the `plot` extra::
 
-    uv add dronalize[plot]
+    pip install dronalize[plot]
 """
 
 from dronalize._internal._compat import require_optional

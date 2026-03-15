@@ -9,13 +9,10 @@ from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 from typing_extensions import Self, override
 
+import dronalize.execution.parallel._state as _state  # noqa: PLR0402
 from dronalize._internal._types import P, SourceT
 from dronalize.execution.common import Progress
 from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
-from dronalize.execution.parallel._state import SharedResources as _SharedResources
-from dronalize.execution.parallel._state import SplitDispatchConfig as _SplitDispatchConfig
-from dronalize.execution.parallel._state import SplitDispatcher as _SplitDispatcher
-from dronalize.execution.parallel._state import WorkerRuntime as _WorkerRuntime
 from dronalize.scene import Scene
 
 if TYPE_CHECKING:
@@ -31,7 +28,7 @@ ReturnT = TypeVar("ReturnT", int, list[Scene])
 # Type var for static methods (they cannot inherit from a generic type)
 _S = TypeVar("_S")
 
-_ctx: _WorkerRuntime  # Global state for each worker process
+_ctx: _state.WorkerRuntime  # Global state for each worker process
 
 
 class _SceneProcessArgs(NamedTuple, Generic[SourceT]):
@@ -96,7 +93,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
             raise ValueError(msg)
 
         self._inner: ProcessableLoader[SourceT] = inner
-        self._shared: _SharedResources = _SharedResources.create()
+        self._shared: _state.SharedResources = _state.SharedResources.create()
         self._chunksize: int = chunksize or self._optimal_chunksize(
             inner.num_sources(),
             processes,
@@ -183,9 +180,12 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
         """
         worker_count = self._processes or mp.cpu_count()
-        dispatcher: _SplitDispatcher | None = None
+        dispatcher: _state.SplitDispatcher | None = None
         if split_assigner is not None:
-            dispatcher = _SplitDispatcher.create(split_assigner, worker_count=worker_count)
+            dispatcher = _state.SplitDispatcher.create(
+                split_assigner,
+                worker_count=worker_count,
+            )
 
         payloads = (_SceneProcessArgs(source, self._inner) for source in self._inner.sources())
         payloads_limited: Iterable[_SceneProcessArgs[SourceT]] = (
@@ -352,7 +352,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         return max(chunksize, 1)
 
 
-def _init_worker(shared: _SharedResources, *, with_finalize: bool = True) -> None:
+def _init_worker(shared: _state.SharedResources, *, with_finalize: bool = True) -> None:
     """Initialize process-local worker runtime.
 
     Parameters
@@ -368,7 +368,7 @@ def _init_worker(shared: _SharedResources, *, with_finalize: bool = True) -> Non
 
     worker_id = shared.registry.next_worker()
     shared.progress.worker_started()
-    _ctx = _WorkerRuntime(shared=shared, worker_id=worker_id)
+    _ctx = _state.WorkerRuntime(shared=shared, worker_id=worker_id)
 
     if with_finalize:
 
@@ -380,10 +380,10 @@ def _init_worker(shared: _SharedResources, *, with_finalize: bool = True) -> Non
 
 
 def _init_write_worker(
-    shared: _SharedResources,
+    shared: _state.SharedResources,
     writer_factory: Callable[[int], SceneWriter],
     finalize: Callable[[SceneWriter], None] | None,
-    split_dispatch: _SplitDispatchConfig | None,
+    split_dispatch: _state.SplitDispatchConfig | None,
 ) -> None:
     """Initialize a worker for `execute()` write mode.
 

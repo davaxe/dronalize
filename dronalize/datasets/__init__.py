@@ -1,3 +1,5 @@
+"""Built-in dataset registry and lazy dataset package exports."""
+
 from __future__ import annotations
 
 import importlib
@@ -11,7 +13,13 @@ from dronalize.datasets._registry import (
     register,
 )
 
-__all__ = ["DatasetDescriptor", "ExecutionScope", "available", "get", "register"]
+__all__ = [
+    "DatasetDescriptor",
+    "ExecutionScope",
+    "available",
+    "get",
+    "register",
+]
 
 _DATASET_MODULES = {
     module_info.name

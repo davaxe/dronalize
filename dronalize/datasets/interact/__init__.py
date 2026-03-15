@@ -6,12 +6,14 @@ from dronalize.datasets.interact.map.builder import InteractMapBuilder
 
 __all__ = ["InteractMapBuilder", "InteractionLoader"]
 
+# TOOD: Add map resolver for interact
+
 _registry.register(
     _registry.DatasetDescriptor(
         name="interact",
         loader_factory=InteractionLoader,
         default_config=InteractionLoader.default_config(),
         default_map_config=InteractionLoader.default_map_config(),
-        has_map=True,
+        has_map=False,
     ).with_all_splits()
 )

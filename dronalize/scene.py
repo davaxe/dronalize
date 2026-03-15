@@ -1,18 +1,25 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from dronalize.maps.graph import MapGraph
 
+if TYPE_CHECKING:
     from dronalize.categories import DatasetSplit
-    from dronalize.maps.graph import MapGraph
+
 
 MapKey = str | None
+"""Lightweight map identifier stored on each scene.
+
+`None` means "no map" or "use the default/only map". A non-`None` string is
+resolved by a `MapResolver` to produce a `MapGraph`.
+
+"""
 
 
 @dataclass(slots=True, frozen=True)
@@ -34,9 +41,7 @@ class Scene:
     """Number of predicted frames."""
     map_key: MapKey = None
     """Lightweight map identifier for the scene."""
-    map_resolver: Callable[[Scene, MapKey], MapGraph | None] | None = field(
-        default=None, compare=False, repr=False
-    )
+    map_resolver: MapResolver | None = field(default=None, compare=False, repr=False)
     """Resolver attached by the loader that produced this scene."""
     split_assignment: DatasetSplit | None = None
     """Split assignment for this scene (train/val/test)."""
@@ -57,7 +62,7 @@ class Scene:
         """
         if self.map_resolver is None:
             return None
-        return self.map_resolver(self, self.map_key)
+        return self.map_resolver(self)
 
     def has_map(self) -> bool:
         """Check if this scene has an attached map resolver and key."""
@@ -117,3 +122,14 @@ class Scene:
             "yaw": pl.Float64,
             "agent_category": pl.Int32(),
         })
+
+
+MapResolver = Callable[[Scene], MapGraph | None]
+"""Protocol for resolving a `MapKey` into a `MapGraph` for a given `Scene`.
+
+Parameters
+----------
+argument 1 (scene) : Scene
+    The scene for which to resolve the map. This is passed in case the resolver
+    needs to access other information about the scene.
+"""

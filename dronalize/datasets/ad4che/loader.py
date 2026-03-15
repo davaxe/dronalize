@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-    from dronalize.maps import MapKey, MapResolver
+    from dronalize.maps import MapResolver
     from dronalize.maps.graph import MapGraph
     from dronalize.scene import Scene
 
@@ -141,11 +141,10 @@ class AD4CHELoader(XLevelDataLoader):
 
     @override
     def map_resolver(self) -> MapResolver:
-        def _resolver(scene: Scene, key: MapKey) -> MapGraph | None:
-            _ = scene
-            if key is None:
+        def _resolver(scene: Scene) -> MapGraph | None:
+            if scene.map_key is None:
                 return None
-            path = self._data_dir / key
+            path = self._data_dir / scene.map_key
             map_graph = AD4CHEMapBuilder(path).build(
                 self.map_config.min_distance, self.map_config.interp_distance
             )
