@@ -47,14 +47,14 @@ class A43Loader(BaseSceneLoader[Path]):
             Loader configuration. If None, the default configuration is used.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
-            splits, so `None` or `DatasetSplit.ALL` process all sources.
+            splits, so `None` processes all sources.
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
         self._data_dir: Path = self._normalize_data_root(data_root)
 
     @override
-    def all_sources(self) -> Iterable[Source[Path]]:
+    def discover_sources(self) -> Iterable[Source[Path]]:
         for i, csv_file in enumerate(self._data_dir.glob("*.csv")):
             yield Source(identifier=i, inner=csv_file)
 

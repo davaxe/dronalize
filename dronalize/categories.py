@@ -47,6 +47,5 @@ class DatasetSplit(str, Enum):
     """Enum representing the available dataset splits."""
 
     TRAIN = "train"
-    TEST = "test"
     VAL = "val"
-    ALL = "all"
+    TEST = "test"

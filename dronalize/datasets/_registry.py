@@ -85,22 +85,17 @@ class DatasetDescriptor:
     execution_scope_fn: ExecutionScope | None = None
     """Optional runtime context for the dataset, which can manage resources like shared memory."""
 
-    map_mode: MapMode = MapMode.NONE
-    """How this dataset exposes map data at runtime."""
+    has_map: bool = False
+    """Whether the dataset have map data available."""
 
     predefined_splits: list[DatasetSplit] = field(default_factory=list)
     """Predefined splits for the dataset, if any."""
-
-    @property
-    def has_map(self) -> bool:
-        """Compatibility flag for code that only distinguishes map vs. no map."""
-        return self.map_mode is not MapMode.NONE
 
     def with_splits(
         self, *splits: DatasetSplit | Literal["train", "val", "test"]
     ) -> DatasetDescriptor:
         """Return a copy of this descriptor with the specified predefined splits."""
-        normalized_splits = [DatasetSplit(s) if isinstance(s, str) else s for s in splits]
+        normalized_splits = [DatasetSplit(s) for s in splits]
         return replace(self, predefined_splits=normalized_splits)
 
     def with_all_splits(self) -> DatasetDescriptor:

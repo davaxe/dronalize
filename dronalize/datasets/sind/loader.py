@@ -44,14 +44,14 @@ class SindLoader(BaseSceneLoader[Path]):
             Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
-            splits, so `None` or `DatasetSplit.ALL` process all sources.
+            splits, so `None` processes all sources.
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
         self._data_dir: Path = self._normalize_data_root(data_root) / "data"
 
     @override
-    def all_sources(self) -> Iterable[Source[Path]]:
+    def discover_sources(self) -> Iterable[Source[Path]]:
         for subdir in self._data_dir.iterdir():
             map_location = self._resolve_map_key(subdir.name)
             yield Source(
@@ -158,23 +158,23 @@ _VEHICLE_SCHEMA = pl.Schema({
     "track_id": pl.Int32,
     "frame_id": pl.Int32,
     "agent_type": pl.Utf8,
-    "heading_rad": pl.Float32,
-    "x": pl.Float32,
-    "y": pl.Float32,
-    "vx": pl.Float32,
-    "vy": pl.Float32,
-    "ax": pl.Float32,
-    "ay": pl.Float32,
+    "heading_rad": pl.Float64,
+    "x": pl.Float64,
+    "y": pl.Float64,
+    "vx": pl.Float64,
+    "vy": pl.Float64,
+    "ax": pl.Float64,
+    "ay": pl.Float64,
 })
 
 _PEDESTRIAN_SCHEMA = pl.Schema({
     "track_id": pl.Utf8,
     "frame_id": pl.Int32,
     "agent_type": pl.Utf8,
-    "x": pl.Float32,
-    "y": pl.Float32,
-    "vx": pl.Float32,
-    "vy": pl.Float32,
-    "ax": pl.Float32,
-    "ay": pl.Float32,
+    "x": pl.Float64,
+    "y": pl.Float64,
+    "vx": pl.Float64,
+    "vy": pl.Float64,
+    "ax": pl.Float64,
+    "ay": pl.Float64,
 })

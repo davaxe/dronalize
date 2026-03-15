@@ -12,7 +12,7 @@ _registry.register(
         loader_factory=HighDLoader,
         default_config=HighDLoader.default_config(),
         default_map_config=HighDLoader.default_map_config(),
-        map_mode=_registry.MapMode.LAZY_KEYED,
+        has_map=True,
         predefined_splits=[],
     )
 )

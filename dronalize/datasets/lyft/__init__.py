@@ -21,6 +21,6 @@ _registry.register(
         default_config=LyftLoader.default_config(),
         default_map_config=LyftLoader.default_map_config(),
         execution_scope_fn=_scope.lyft_execution_scope,
-        map_mode=_registry.MapMode.SHARED_SINGLE,
+        has_map=True,
     ).with_splits("train", "val")
 )

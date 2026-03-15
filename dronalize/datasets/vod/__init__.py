@@ -13,7 +13,7 @@ _registry.register(
         loader_factory=VodLoader,
         default_config=VodLoader.default_config(),
         default_map_config=VodLoader.default_map_config(),
-        map_mode=_registry.MapMode.SHARED_SINGLE,
+        has_map=True,
         predefined_splits=[],
         execution_scope_fn=_scope.vod_execution_scope,
     )

@@ -3,14 +3,13 @@ from __future__ import annotations
 import functools
 import itertools
 import multiprocessing as mp
-import threading
 from collections import deque
 from multiprocessing.util import Finalize
 from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 from typing_extensions import Self, override
 
-from dronalize._internal._types import P, PayloadT, SourceT
+from dronalize._internal._types import P, SourceT
 from dronalize.execution.common import Progress
 from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
 from dronalize.execution.parallel._state import SharedResources as _SharedResources
@@ -24,6 +23,7 @@ if TYPE_CHECKING:
     from multiprocessing.synchronize import Event
 
     from dronalize.categories import DatasetSplit
+    from dronalize.execution.assigner import SplitAssigner
     from dronalize.loading import ProcessableLoader, SceneWriter, Source
 
 
@@ -42,23 +42,15 @@ class _SceneProcessArgs(NamedTuple, Generic[SourceT]):
 
 
 class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
-    """Parallel scene processor that wraps a processable loader.
+    """Parallel writing executor backed by a processable loader.
 
     This executor uses Python's `multiprocessing` module to distribute source
     processing across multiple CPU cores. The number of processes and the task
     chunk size can be configured depending on workload.
 
-    By default the order of source results yielded by `scenes()` is not
-    deterministic, because `imap_unordered()` is used for better throughput. If
-    a deterministic source-result order is required, set `maintain_order=True`,
-    which uses `imap()` instead.
-
-    Important ordering note
-    -----------------------
-    The `maintain_order` flag only affects the order in which *per-source*
-    results are yielded back to the parent process. It does **not** make global
-    scene numbering deterministic, because scene numbers are assigned inside
-    worker processes as scenes are created.
+    By default source work is consumed with `imap_unordered()` for better
+    throughput. If a more stable source-completion order is required during
+    `execute()`, set `maintain_order=True` to use `imap()` instead.
 
     Practical considerations
     ------------------------
@@ -66,22 +58,13 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
        of multiprocessing can outweigh the benefits. Increasing `chunksize` may
        help in such cases.
 
-    2. If sources are large, for example large tfrecord files, memory usage and
-       inter-process transfer can become expensive. In such cases `write_scenes`
-       or `scenes_callback` is often a better fit than returning scenes to the
-       parent process.
-
-    3. If scenes contain a large amount of data, sending them between processes
-       can dominate runtime. Writing or otherwise consuming scenes inside the
-       worker is usually more efficient.
-
-    4. Since wrapped loaders may themselves use multi-threaded libraries such as
+    2. Since wrapped loaders may themselves use multi-threaded libraries such as
        Polars, resource contention can occur between multiprocessing and
        internal threading. In practice this may require reducing the number of
        worker processes or setting environment variables such as
        `POLARS_MAX_THREADS`.
 
-    5. The wrapped loader is sent to each worker process, so it should be
+    3. The wrapped loader is sent to each worker process, so it should be
        lightweight and picklable. Avoid eager loading of large resources in the
        loader constructor when possible.
     """
@@ -92,7 +75,6 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         *,
         chunksize: int | None = None,
         processes: int | None = None,
-        maintain_order: bool = False,
         limit: int | None = None,
     ) -> None:
         """Initialize the executor.
@@ -108,9 +90,6 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         processes : int, optional
             Number of worker processes. If omitted, the default multiprocessing
             process count is used.
-        maintain_order : bool, optional
-            If True, preserve the order of source results yielded by `scenes()`
-            using `imap()` instead of `imap_unordered()`.
         """
         if processes is not None and processes <= 1:
             msg = "number of processes must be greater than 1 for ParallelExecutor."
@@ -124,7 +103,6 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         )
         self._limit: int | None = limit
         self._processes: int | None = processes
-        self._maintain_order: bool = maintain_order
         self._num_sources: int | None = inner.num_sources()
         self._num_scenes: int | None = None
         self._running: bool = False
@@ -181,7 +159,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         self,
         writer_factory: WriterFactory,
         finalize: Callable[[SceneWriter], None] | None = None,
-        split_generator: Iterator[DatasetSplit] | None = None,
+        split_assigner: SplitAssigner | None = None,
     ) -> None:
         """Process scenes in parallel and write them inside worker processes.
 
@@ -199,22 +177,15 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         finalize : Callable[[SceneWriter], None], optional
             Optional custom per-worker finalization hook. If omitted,
             `writer.finish_local()` is called instead.
-        split_generator : Iterable[DatasetSplit], optional
-            Optional iterable that yields split values. These values are fed to
-            workers lazily through a multiprocessing queue and passed as the
-            `splits` argument to `SceneWriter.write`.
+        split_assigner : SplitAssigner, optional
+            Optional split assigner. If given, the executor uses it to determine
+            the split for each produced scene.
 
-        Notes
-        -----
-        If a split source is provided, it must yield at least as many split
-        values as are actually consumed by the writers. Exhaustion before all
-        required writes complete raises an error in the worker that observes it.
         """
         worker_count = self._processes or mp.cpu_count()
         dispatcher: _SplitDispatcher | None = None
-
-        if split_generator is not None:
-            dispatcher = _SplitDispatcher.create(split_generator, worker_count=worker_count)
+        if split_assigner is not None:
+            dispatcher = _SplitDispatcher.create(split_assigner, worker_count=worker_count)
 
         payloads = (_SceneProcessArgs(source, self._inner) for source in self._inner.sources())
         payloads_limited: Iterable[_SceneProcessArgs[SourceT]] = (
@@ -239,11 +210,13 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
             )
         finally:
             if dispatcher is not None:
+                dispatcher.stop_event.set()
+                dispatcher.request_queue.put(None)
                 dispatcher.close()
 
     @override
     def progress(self) -> Progress:
-        """Return a snapshot of the current executor progress.
+        """Return a snapshot of the current parallel execution progress.
 
         This method is intended to be called from the main process while the
         executor is running.
@@ -265,10 +238,12 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
     @override
     def progress_event(self) -> Event:
+        """Return the shared event used to signal progress changes."""
         return self._shared.progress.update_event
 
     @override
     def is_running(self) -> bool:
+        """Return whether the parallel executor is actively processing."""
         return self._running
 
     @staticmethod
@@ -284,11 +259,14 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
             msg = "SceneWriter was not initialized for this worker process."
             raise ValueError(msg)
 
-        processed_scenes = 0
-        split_iter = ParallelExecutor._split_stream() if _ctx.split_dispatch is not None else None
-
-        for scene in ParallelExecutor._generate_scenes(args.loader, args.source):
-            _ = _ctx.writer.write(scene, splits=split_iter)
+        processed_scenes: int = 0
+        for scene_i, scene in enumerate(
+            ParallelExecutor._generate_scenes(args.loader, args.source)
+        ):
+            split: DatasetSplit | None = None
+            if _ctx.split_dispatch is not None:
+                split = _ctx.split_dispatch.assign((args.source.identifier, scene_i))
+            _ = _ctx.writer.write(scene, split=split)
             processed_scenes += 1
 
         _ = _ctx.shared.progress.increment_source()
@@ -308,41 +286,18 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
             scene_number = _ctx.shared.progress.increment_scene()
             yield loader.create_scene(scene_data, source, map_resolver, scene_number)
 
-    @staticmethod
-    def _split_stream() -> Iterator[DatasetSplit]:
-        """Yield split values from the worker's split queue.
-
-        Raises
-        ------
-        ValueError
-            If split dispatch was not initialized for the worker.
-        RuntimeError
-            If the split iterator is exhausted before writing completed.
-        """
-        if _ctx.split_dispatch is None:
-            msg = "Split dispatch was not initialized for this worker process."
-            raise ValueError(msg)
-
-        q = _ctx.split_dispatch.queue
-        while True:
-            item = q.get()
-            if item is None:
-                msg = "split generator exhausted before writing completed."
-                raise RuntimeError(msg)
-            yield item
-
     def _execute_parallel(
         self,
-        process_fn: Callable[[PayloadT], ReturnT],
-        payloads: Iterable[PayloadT],
+        process_fn: Callable[[_SceneProcessArgs[SourceT]], ReturnT],
+        payloads: Iterable[_SceneProcessArgs[SourceT]],
         initializer: Callable[P, object],
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> Iterable[ReturnT]:
         """Run the pool and yield task results.
 
-        This is the central execution path used by all public processing modes.
-        It resets shared counters before creating the pool.
+        This is the central multiprocessing loop used by `execute()`. It
+        resets shared counters before creating the pool.
 
         Parameters
         ----------
@@ -368,8 +323,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         self._running = True
         self.progress_event().set()
         with mp.Pool(self._processes, initializer=pool_initializer) as pool:
-            map_fn = pool.imap if self._maintain_order else pool.imap_unordered
-            yield from map_fn(process_fn, payloads, self._chunksize)
+            yield from pool.imap_unordered(process_fn, payloads, self._chunksize)
 
             pool.close()
             pool.join()
@@ -431,7 +385,7 @@ def _init_write_worker(
     finalize: Callable[[SceneWriter], None] | None,
     split_dispatch: _SplitDispatchConfig | None,
 ) -> None:
-    """Initialize a worker for `write_scenes()` mode.
+    """Initialize a worker for `execute()` write mode.
 
     This creates a worker-local writer and installs a custom finalizer that
     performs local writer cleanup, optional custom finalization, and exactly one

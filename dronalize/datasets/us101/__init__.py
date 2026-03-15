@@ -13,7 +13,7 @@ _registry.register(
         loader_factory=US101Loader,
         default_config=US101Loader.default_config(),
         default_map_config=US101Loader.default_map_config(),
-        map_mode=_registry.MapMode.SHARED_SINGLE,
+        has_map=True,
         execution_scope_fn=_scope.us101_execution_scope,
         predefined_splits=[],
     )

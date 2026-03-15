@@ -138,7 +138,7 @@ class SharedMapGraph:
 class MapGraph:
     """Represents a graph structure for a map, including nodes and edges."""
 
-    node_positions: npt.NDArray[np.float32]
+    node_positions: npt.NDArray[np.float64]
     """Node positions, shape `(N, 2)`."""
 
     edge_indices: npt.NDArray[np.int32]
@@ -152,7 +152,7 @@ class MapGraph:
 
     def __init__(
         self,
-        node_positions: npt.NDArray[np.float32],
+        node_positions: npt.NDArray[np.float64],
         edge_indices: npt.NDArray[np.int32],
         node_types: npt.NDArray[np.int32] | None = None,
         edge_types: npt.NDArray[np.int32] | None = None,
@@ -163,7 +163,7 @@ class MapGraph:
 
         Parameters
         ----------
-        node_positions : ndarray of float32, shape (N, 2)
+        node_positions : ndarray of float64, shape (N, 2)
             Array of node positions.
         edge_indices : ndarray of int64, shape (2, M)
             Array of edge endpoint indices.
@@ -179,7 +179,7 @@ class MapGraph:
         """
         if node_positions.size == 0 and edge_indices.size == 0:
             if return_if_empty:
-                node_positions = np.zeros((0, 2), dtype=np.float32)
+                node_positions = np.zeros((0, 2), dtype=np.float64)
                 edge_indices = np.zeros((2, 0), dtype=np.int32)
                 node_types = np.zeros((0,), dtype=np.int32)
                 edge_types = np.zeros((0,), dtype=np.int32)
@@ -190,7 +190,7 @@ class MapGraph:
                 )
                 raise ValueError(msg)
 
-        self.node_positions = np.ascontiguousarray(node_positions, dtype=np.float32)
+        self.node_positions = np.ascontiguousarray(node_positions, dtype=np.float64)
         self.edge_indices = np.ascontiguousarray(edge_indices, dtype=np.int32)
 
         self.node_types = (
@@ -270,7 +270,7 @@ class MapGraph:
         n, m = int(header[0]), int(header[1])
         offset += header.nbytes
 
-        positions = np.frombuffer(buf, dtype=np.float32, count=n * 2, offset=offset).reshape((n, 2))
+        positions = np.frombuffer(buf, dtype=np.float64, count=n * 2, offset=offset).reshape((n, 2))
         offset += positions.nbytes
 
         indices = np.frombuffer(buf, dtype=np.int32, count=m * 2, offset=offset).reshape((2, m))
@@ -297,7 +297,7 @@ class MapGraph:
 
         This will clear the internal arrays and is not intended for general use.
         """
-        self.node_positions = np.array([], dtype=np.float32).reshape(0, 2)
+        self.node_positions = np.array([], dtype=np.float64).reshape(0, 2)
         self.edge_indices = np.array([], dtype=np.int32).reshape(2, 0)
         self.node_types = np.array([], dtype=np.int32)
         self.edge_types = np.array([], dtype=np.int32)
@@ -342,7 +342,7 @@ class MapGraph:
         if center is None:
             center = np.mean(self.node_positions, axis=0)
 
-        center_arr = np.asarray(center, dtype=np.float32)
+        center_arr = np.asarray(center, dtype=np.float64)
 
         # Squared-distance avoids the sqrt
         diff = self.node_positions - center_arr
@@ -378,7 +378,7 @@ class MapGraph:
         if center is None:
             center_arr = np.mean(self.node_positions, axis=0)
         else:
-            center_arr = np.asarray(center, dtype=np.float32)
+            center_arr = np.asarray(center, dtype=np.float64)
 
         half_w = width / 2.0
         half_h = height / 2.0

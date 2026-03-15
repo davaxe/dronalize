@@ -77,7 +77,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
             is used.
         """
         requested_splits = (
-            [DatasetSplit.ALL]
+            list(type(self).supported_splits())
             if splits is None
             else [splits]
             if isinstance(splits, DatasetSplit)
@@ -129,11 +129,6 @@ class LyftLoader(BaseSceneLoader[_Source]):
             current += batch_size
 
     @override
-    def all_sources(self) -> Iterable[Source[_Source]]:
-        yield from self.train_sources()
-        yield from self.validate_sources()
-
-    @override
     def train_sources(self) -> Iterable[Source[_Source]]:
         yield from self._generate_sources(DatasetSplit.TRAIN)
 
@@ -148,13 +143,10 @@ class LyftLoader(BaseSceneLoader[_Source]):
             return self._source_count(total_scenes, self._batch_size)
 
         total = 0
-        for split in self._splits:
+        for split in self.selected_splits:
             if split is DatasetSplit.TRAIN:
                 total += _count_sources(DatasetSplit.TRAIN)
-            elif split is DatasetSplit.VAL:
-                total += _count_sources(DatasetSplit.VAL)
             else:
-                total += _count_sources(DatasetSplit.TRAIN)
                 total += _count_sources(DatasetSplit.VAL)
         return total
 

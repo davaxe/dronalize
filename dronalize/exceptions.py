@@ -17,9 +17,9 @@ class LoaderConfigError(DronalizeError, ValueError):
 class SplitNotSupportedError(ValueError):
     """Raised when a dataset does not support the requested split.
 
-    This error is raised when a specific split (e.g., `TRAIN`, `TEST`,
-    `VALIDATE`) is requested from a dataset that does not provide predefined
-    splits. In such cases, only `DatasetSplit.ALL` is valid.
+    This error is raised when a specific split (e.g., `TRAIN`, `VAL`,
+    `TEST`) is requested from a dataset that does not provide predefined
+    splits.
 
     Parameters
     ----------

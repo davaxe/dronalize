@@ -48,7 +48,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
             Loader configuration. If None, the default configuration is used.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. X-level datasets do not define predefined
-            splits, so `None` or `DatasetSplit.ALL` process all sources.
+            splits, so `None` processes all sources.
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
@@ -107,7 +107,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
         return _TRACK_SCHEMA
 
     @override
-    def all_sources(self) -> Iterable[Source[Path]]:
+    def discover_sources(self) -> Iterable[Source[Path]]:
         for recording_id in self._recording_ids():
             recording_meta = self._data_dir / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
@@ -210,10 +210,10 @@ _META_SCHEMA: pl.Schema = pl.Schema({
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "frame": pl.Int32,
     "trackId": pl.Int32,
-    "xCenter": pl.Float32,
-    "yCenter": pl.Float32,
-    "xVelocity": pl.Float32,
-    "yVelocity": pl.Float32,
-    "xAcceleration": pl.Float32,
-    "yAcceleration": pl.Float32,
+    "xCenter": pl.Float64,
+    "yCenter": pl.Float64,
+    "xVelocity": pl.Float64,
+    "yVelocity": pl.Float64,
+    "xAcceleration": pl.Float64,
+    "yAcceleration": pl.Float64,
 })

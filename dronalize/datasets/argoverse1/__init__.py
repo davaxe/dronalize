@@ -13,7 +13,7 @@ _registry.register(
         loader_factory=Argoverse1Loader,
         default_config=Argoverse1Loader.default_config(),
         default_map_config=Argoverse1Loader.default_map_config(),
-        map_mode=_registry.MapMode.LAZY_KEYED,
+        has_map=True,
         execution_scope_fn=_scope.argoverse1_execution_scope,
     ).with_all_splits()
 )

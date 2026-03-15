@@ -87,7 +87,7 @@ class Scene:
             inner=self.inner.select([pl.col(name).cast(dtype) for name, dtype in schema.items()]),
         )
 
-    def override_split_assignment(self, split_assignment: str | None) -> Scene:
+    def override_split_assignment(self, split_assignment: DatasetSplit | None) -> Scene:
         """Override the split assignment for this scene."""
         return replace(self, split_assignment=split_assignment)
 
@@ -108,12 +108,12 @@ class Scene:
         return pl.Schema({
             "frame": pl.UInt32(),
             "id": pl.Int32(),
-            "x": pl.Float32(),
-            "y": pl.Float32(),
-            "vx": pl.Float32(),
-            "vy": pl.Float32(),
-            "ax": pl.Float32(),
-            "ay": pl.Float32(),
-            "yaw": pl.Float32(),
+            "x": pl.Float64,
+            "y": pl.Float64,
+            "vx": pl.Float64,
+            "vy": pl.Float64,
+            "ax": pl.Float64,
+            "ay": pl.Float64,
+            "yaw": pl.Float64,
             "agent_category": pl.Int32(),
         })

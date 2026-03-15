@@ -17,7 +17,7 @@ _registry.register(
         loader_factory=EthLoader,
         default_config=EthLoader.default_config(),
         default_map_config=EthLoader.default_map_config(),
-        map_mode=_registry.MapMode.NONE,
+        has_map=False,
     ).with_all_splits()
 )
 
@@ -27,7 +27,7 @@ _registry.register(
         loader_factory=HotelLoader,
         default_config=HotelLoader.default_config(),
         default_map_config=HotelLoader.default_map_config(),
-        map_mode=_registry.MapMode.NONE,
+        has_map=False,
     ).with_all_splits()
 )
 
@@ -37,7 +37,7 @@ _registry.register(
         loader_factory=UnivLoader,
         default_config=UnivLoader.default_config(),
         default_map_config=UnivLoader.default_map_config(),
-        map_mode=_registry.MapMode.NONE,
+        has_map=False,
     ).with_all_splits()
 )
 
@@ -47,7 +47,7 @@ _registry.register(
         loader_factory=Zara1Loader,
         default_config=Zara1Loader.default_config(),
         default_map_config=Zara1Loader.default_map_config(),
-        map_mode=_registry.MapMode.NONE,
+        has_map=False,
     ).with_all_splits()
 )
 
@@ -57,6 +57,6 @@ _registry.register(
         loader_factory=Zara2Loader,
         default_config=Zara2Loader.default_config(),
         default_map_config=Zara2Loader.default_map_config(),
-        map_mode=_registry.MapMode.NONE,
+        has_map=False,
     ).with_all_splits()
 )

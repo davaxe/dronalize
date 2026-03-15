@@ -11,6 +11,6 @@ _registry.register(
         loader_factory=Argoverse2Loader,
         default_config=Argoverse2Loader.default_config(),
         default_map_config=Argoverse2Loader.default_map_config(),
-        map_mode=_registry.MapMode.LAZY_KEYED,
+        has_map=True,
     ).with_all_splits()
 )

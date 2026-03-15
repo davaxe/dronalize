@@ -75,12 +75,6 @@ class WaymoLoader(BaseSceneLoader[Path]):
             yield Source(identifier=tfrecord_path.stem, inner=tfrecord_path)
 
     @override
-    def all_sources(self) -> Iterable[Source[Path]]:
-        yield from self.train_sources()
-        yield from self.validate_sources()
-        yield from self.test_sources()
-
-    @override
     def train_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "training")
 
@@ -94,7 +88,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
 
     @override
     def num_sources(self) -> int | None:
-        return sum(self._count_sources_for_split(split) for split in self._splits)
+        return sum(self._count_sources_for_split(split) for split in self.selected_splits)
 
     @override
     def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
@@ -159,7 +153,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
             require_frames=[9]
         )
 
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+    def _count_sources_for_split(self, split: DatasetSplit | None) -> int:
         if split is DatasetSplit.TRAIN:
             return self._count_matching_files([self._data_root / "training"], "*.tfrecord*")
         if split is DatasetSplit.VAL:
@@ -217,11 +211,11 @@ def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFram
         schema={
             "frame": pl.Int32,
             "id": pl.Int32,
-            "x": pl.Float32,
-            "y": pl.Float32,
-            "vx": pl.Float32,
-            "vy": pl.Float32,
-            "yaw": pl.Float32,
+            "x": pl.Float64,
+            "y": pl.Float64,
+            "vx": pl.Float64,
+            "vy": pl.Float64,
+            "yaw": pl.Float64,
             "agent_category": pl.Int32,
         },
     )

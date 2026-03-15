@@ -48,8 +48,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
             Configuration for the loader.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. NuScenes-style loaders do not define
-            predefined splits, so `None` or `DatasetSplit.ALL` process all
-            sources.
+            predefined splits, so `None` processes all sources.
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
@@ -81,7 +80,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
         return paths
 
     @override
-    def all_sources(self) -> Iterable[Source[tuple[int, str]]]:
+    def discover_sources(self) -> Iterable[Source[tuple[int, str]]]:
         for i, dfs in enumerate(self._scene_cache):
             for token, df in dfs.items():
                 scene_name: str = df.item(0, "scene_name")
@@ -434,9 +433,9 @@ _SCHEMAS: dict[str, pl.Schema | None] = {
         "instance_token": pl.String,
         "visibility_token": pl.String,
         "attribute_tokens": pl.List(pl.String),
-        "translation": pl.List(pl.Float32),
-        "size": pl.List(pl.Float32),
-        "rotation": pl.List(pl.Float32),
+        "translation": pl.List(pl.Float64),
+        "size": pl.List(pl.Float64),
+        "rotation": pl.List(pl.Float64),
         "prev": pl.String,
         "next": pl.String,
         "num_lidar_pts": pl.Int32,
@@ -462,8 +461,8 @@ _SCHEMAS: dict[str, pl.Schema | None] = {
     "ego_pose": pl.Schema({
         "token": pl.String,
         "timestamp": pl.Int64,
-        "translation": pl.List(pl.Float32),
-        "rotation": pl.List(pl.Float32),
+        "translation": pl.List(pl.Float64),
+        "rotation": pl.List(pl.Float64),
     }),
     "log": pl.Schema({
         "token": pl.String,

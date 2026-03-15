@@ -2,8 +2,6 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import typer
-from rich import print as rprint
-from rich.table import Table
 
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
 
@@ -23,21 +21,24 @@ def process(
         Path, typer.Option("--output", "-o", help="Directory to save the processed dataset.")
     ],
     split: Annotated[
-        list[str],
+        list[str] | None,
         typer.Option(
             "--split",
             "-s",
             help="The split of the dataset to process.",
-            default_factory=lambda: ["all"],
             show_default=False,
         ),
-    ],
+    ] = None,
     config: Annotated[
         Path | None, typer.Option("--config", "-c", help="Path to the optional configuration file.")
     ] = None,
     jobs: Annotated[
         int | None,
-        typer.Option("--jobs", "-j", help="Number of parallel jobs to run (-1 for all cores)."),
+        typer.Option(
+            "--jobs",
+            "-j",
+            help="Worker count override. Values greater than 1 enable parallel execution.",
+        ),
     ] = None,
     progress: Annotated[
         bool, typer.Option("--progress/--no-progress", help="Show progress bar during processing.")
@@ -63,22 +64,22 @@ def process(
 ) -> None:
     """[bold]Process a specified dataset[/bold].
 
-    Atleast requires the name of the dataset to process. Available datasets can
+    Requires the name of the dataset to process. Available datasets can
     be listed using the [bold cyan]available[/cyan bold] command.
 
     [bold underline]Configuration[/bold underline]
-    The per datastet can be customized using a TOML configuration file. This can
+    The dataset can be customized using a TOML configuration file. This can
     be specified using the `--config` option. This config can be used to
-    override defaults when it comes to thigs like filtering, resampling and map
+    override defaults when it comes to things like filtering, resampling and map
     processing. For more details on the configuration options, see the
     documentation.
 
     [bold underline]Splits[/bold underline]
     For dataset with predefined splits, the split argument can be used to
     specify which split to process. If not specified, the default is to process
-    all splits, without any distinction. If the dataset does have the specified
-    split, an error will be raised. The possible spits are "train", "val",
-    "test", and "all" (default).
+    all available data together without dividing the output into splits. If the
+    dataset does not have the specified split, an error will be raised. The
+    possible splits are "train", "val", and "test".
 
     Example usage:
         dronalize process my_dataset --split train
@@ -91,7 +92,8 @@ def process(
     option can be used to specify the split ratios for train/val/test splits.
     Three values must be provided, representing the ratios for train, val, and
     test splits. Putting a ratio to zero will exclude that split from the
-    dataset completely.
+    dataset completely. Custom split ratios override any predefined dataset
+    splits.
 
     Example usage:
         dronalize process my_dataset --custom-split 0.7 0.2 0.1
@@ -101,6 +103,9 @@ def process(
 
     """
     if not force:
+        from rich import print as rprint  # noqa: PLC0415
+        from rich.table import Table  # noqa: PLC0415
+
         summary_table = Table(title="Processing Configuration", show_header=False)
         summary_table.add_column("Parameter", style="cyan", justify="right")
         summary_table.add_column("Value", style="magenta")
@@ -125,7 +130,7 @@ def process(
 
     from dronalize.execution import runner  # noqa: PLC0415
 
-    runner.process_data_entry(
+    runner.entrypoint(
         dataset=dataset,
         input_dir=input_dir,
         output_dir=output_dir,
@@ -150,6 +155,9 @@ def available(
 ) -> None:
     """[bold]List available datasets[/bold]."""
     # Lazy import to make CLI more responsive.
+    from rich import print as rprint  # noqa: PLC0415
+    from rich.table import Table  # noqa: PLC0415
+
     from dronalize.datasets import available as _available  # noqa: PLC0415
     from dronalize.datasets import get as _get  # noqa: PLC0415
 

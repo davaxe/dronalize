@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 from typing_extensions import Self
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable
     from pathlib import Path
 
     from dronalize.categories import DatasetSplit
@@ -19,16 +19,14 @@ class SceneWriter(Protocol):
 
     def write(
         self,
-        processed: Scene,
-        splits: Iterator[DatasetSplit] | None = None,
-        *,
-        strict: bool = False,
-    ) -> bool:
+        scene: Scene,
+        split: DatasetSplit | None = None,
+    ) -> int:
         """Write a single processed scene.
 
         Parameters
         ----------
-        processed : Scene
+        scene : Scene
             The processed scene to write.
         splits : Iterator[DatasetSplit] or None, optional
             An optional iterator of dataset splits that the scene belongs to.
@@ -40,9 +38,8 @@ class SceneWriter(Protocol):
 
         Returns
         -------
-        bool
-            Returns `True` if anything was actually written (e.g. the scene
-            passed validation and was not skipped), otherwise `False`.
+        int
+            The number of samples written for the given scene.
 
         """
         ...
@@ -74,11 +71,22 @@ class SceneWriter(Protocol):
         """
         ...
 
+    def get_output_dir(self) -> Path:
+        """Get the current output directory for the writer.
+
+        Returns
+        -------
+        Path
+            The path to the current output directory where the writer is saving its files.
+
+        """
+        ...
+
     def finish_final(self) -> None:
         """Perform any final cleanup after all writing is complete.
 
         This will be called once in parallel context after all processes have
-        completed their writing and finalization steps. For non-paralell context
+        completed their writing and finalization steps. For non-parallel context
         this will be called immediately after `finish_local`.
 
         """
@@ -88,11 +96,10 @@ class SceneWriter(Protocol):
     def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int | None], Self]:  # noqa: ANN401
         """Create a factory function for this writer class.
 
-        This should return a factory function that takes an integer identifier
-        and return a instance of the class ready to be used independently
-        across multiple processes. Most commonly, the identifier can be used
-        to set an individual output directory for each process to make sure
-        there are no conflicts.
+        The returned factory should accept a worker identifier and return an
+        instance of the writer class ready to be used independently by that
+        worker. Most commonly, the identifier is used to shard output paths or
+        filenames to avoid write conflicts.
 
         Parameters
         ----------
@@ -104,7 +111,7 @@ class SceneWriter(Protocol):
         Returns
         -------
         Callable[[int | None], Self]
-            A factory function that takes an integer identifier and returns an
+            A factory function that takes a worker identifier and returns an
             instance of the writer class.
 
         """

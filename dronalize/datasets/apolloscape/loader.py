@@ -72,11 +72,6 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
             yield Source(identifier=data_file.stem, inner=data_file)
 
     @override
-    def all_sources(self) -> Iterable[Source[Path]]:
-        yield from self.train_sources()
-        yield from self.validate_sources()
-
-    @override
     def train_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_dir(self._data_root / "prediction_train")
 
@@ -107,7 +102,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
 
     @override
     def num_sources(self) -> int | None:
-        return sum(self._count_sources_for_split(split) for split in self._splits)
+        return sum(self._count_sources_for_split(split) for split in self.selected_splits)
 
     @override
     def pipeline(self) -> Pipeline:
@@ -139,11 +134,11 @@ _DATA_SCHEMA: pl.Schema = pl.Schema({
     "frame": pl.Int64,
     "id": pl.Int64,
     "agent_category": pl.Int64,
-    "x": pl.Float32,
-    "y": pl.Float32,
-    "z": pl.Float32,
-    "length": pl.Float32,
-    "width": pl.Float32,
-    "height": pl.Float32,
-    "yaw": pl.Float32,
+    "x": pl.Float64,
+    "y": pl.Float64,
+    "z": pl.Float64,
+    "length": pl.Float64,
+    "width": pl.Float64,
+    "height": pl.Float64,
+    "yaw": pl.Float64,
 })

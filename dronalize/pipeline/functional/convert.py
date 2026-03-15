@@ -17,18 +17,18 @@ class NumpySceneDict(TypedDict):
     num_nodes: int
     ta_index: int
     type: npt.NDArray[np.int32]
-    inp_pos: npt.NDArray[np.float32]
-    inp_vel: npt.NDArray[np.float32]
-    inp_acc: npt.NDArray[np.float32]
-    inp_yaw: npt.NDArray[np.float32]
-    trg_pos: npt.NDArray[np.float32]
-    trg_vel: npt.NDArray[np.float32]
-    trg_acc: npt.NDArray[np.float32]
-    trg_yaw: npt.NDArray[np.float32]
-    input_mask: npt.NDArray[np.bool]
-    valid_mask: npt.NDArray[np.bool]
-    ma_mask: npt.NDArray[np.bool]
-    sa_mask: npt.NDArray[np.bool]
+    inp_pos: npt.NDArray[np.float64]
+    inp_vel: npt.NDArray[np.float64]
+    inp_acc: npt.NDArray[np.float64]
+    inp_yaw: npt.NDArray[np.float64]
+    trg_pos: npt.NDArray[np.float64]
+    trg_vel: npt.NDArray[np.float64]
+    trg_acc: npt.NDArray[np.float64]
+    trg_yaw: npt.NDArray[np.float64]
+    input_mask: npt.NDArray[np.bool_]
+    valid_mask: npt.NDArray[np.bool_]
+    ma_mask: npt.NDArray[np.bool_]
+    sa_mask: npt.NDArray[np.bool_]
 
 
 def convert_to_numpy_dict(
@@ -91,7 +91,7 @@ def convert_to_numpy_dict(
     col_indices = df_indexed["col_idx"].to_numpy()
 
     pos, vel, acc = _full_zeros((num_agents, time_steps, 2), n=3)
-    yaw = np.zeros((num_agents, time_steps), dtype=np.float32)
+    yaw = np.zeros((num_agents, time_steps), dtype=np.float64)
     mask = np.zeros((num_agents, time_steps), dtype=bool)
 
     # Fill the arrays using the row and column indices
@@ -167,6 +167,6 @@ def target_candidates(
 def _full_zeros(
     shape: tuple[int, ...],
     n: int = 2,
-    dtype: npt.DTypeLike = np.float32,
-) -> tuple[npt.NDArray[np.float32], ...]:
+    dtype: npt.DTypeLike = np.float64,
+) -> tuple[npt.NDArray[np.float64], ...]:
     return tuple(np.zeros(shape, dtype=dtype) for _ in range(n))

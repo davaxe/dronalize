@@ -12,7 +12,7 @@ _registry.register(
         loader_factory=OpenDDLoader,
         default_config=OpenDDLoader.default_config(),
         default_map_config=OpenDDLoader.default_map_config(),
-        map_mode=_registry.MapMode.BUILDER_ONLY,
+        has_map=True,
         predefined_splits=[],
     )
 )

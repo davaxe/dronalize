@@ -87,7 +87,7 @@ addopts = ["--doctest-modules", "-ra"]
 
 [tool.ruff]
 # Exclude proto compiled files from linting and formatting
-extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*"]
+extend-exclude = ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*", "tests"]
 line-length = 100
 preview = true
 

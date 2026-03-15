@@ -13,7 +13,7 @@ _registry.register(
         loader_factory=ExiDLoader,
         default_config=ExiDLoader.default_config(),
         default_map_config=ExiDLoader.default_map_config(),
-        map_mode=_registry.MapMode.SHARED_KEYED,
+        has_map=True,
         predefined_splits=[],
         execution_scope_fn=_scope.exid_execution_scope,
     )

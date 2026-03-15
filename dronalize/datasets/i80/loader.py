@@ -53,7 +53,7 @@ class I80Loader(BaseSceneLoader[Path]):
             non-lane changes.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
-            splits, so `None` or `DatasetSplit.ALL` process all sources.
+            splits, so `None` processes all sources.
 
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
@@ -61,7 +61,7 @@ class I80Loader(BaseSceneLoader[Path]):
         self._rebalance_ratio: float | None = lane_change_ratio
 
     @override
-    def all_sources(self) -> Iterable[Source[Path]]:
+    def discover_sources(self) -> Iterable[Source[Path]]:
         for i, csv_file in enumerate(self._data_dir.rglob("trajectories*.csv")):
             yield Source(identifier=i, inner=csv_file)
 

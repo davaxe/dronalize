@@ -58,12 +58,6 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
                 yield Source(identifier=data_file.name, inner=data_file)
 
     @override
-    def all_sources(self) -> Iterable[Source[Path]]:
-        yield from self.train_sources()
-        yield from self.validate_sources()
-        yield from self.test_sources()
-
-    @override
     def train_sources(self) -> Iterable[Source[Path]]:
         return self._sources_from_split("train")
 
@@ -108,7 +102,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
 
     @override
     def num_sources(self) -> int | None:
-        return sum(self._count_sources_for_split(split) for split in self._splits)
+        return sum(self._count_sources_for_split(split) for split in self.selected_splits)
 
     @classmethod
     @override
@@ -130,16 +124,9 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
         return MapConfig.no_map()
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:
-        if split is DatasetSplit.ALL:
-            return (
-                self._count_sources_for_split(DatasetSplit.TRAIN)
-                + self._count_sources_for_split(DatasetSplit.VAL)
-                + self._count_sources_for_split(DatasetSplit.TEST)
-            )
-
         num_sources = 0
         for dataset in self._dataset:
-            data_dir = self._data_root / dataset / split.name
+            data_dir = self._data_root / dataset / split.value
             if data_dir.is_dir():
                 num_sources += sum(1 for _ in data_dir.iterdir())
         return num_sources

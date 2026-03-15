@@ -11,6 +11,6 @@ _registry.register(
         loader_factory=ApolloScapeLoader,
         default_config=ApolloScapeLoader.default_config(),
         default_map_config=ApolloScapeLoader.default_map_config(),
-        map_mode=_registry.MapMode.NONE,
+        has_map=True,
     ).with_splits("train", "val")
 )

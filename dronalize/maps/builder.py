@@ -597,8 +597,8 @@ class BaseMapBuilder(MapBuilder, ABC):
 
         """
         node_positions = np.column_stack([
-            np.array(self._x, dtype=np.float32),
-            np.array(self._y, dtype=np.float32),
+            np.array(self._x, dtype=np.float64),
+            np.array(self._y, dtype=np.float64),
         ])
 
         edge_indices = np.array([self._edge_src, self._edge_dst], dtype=np.int32)

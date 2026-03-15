@@ -59,26 +59,21 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
         self._data_root: Path = self._normalize_data_root(data_root)
         self._batch_size: int | None = file_batch_size
-
-    @override
-    def all_sources(self) -> Iterable[Source[list[Path]]]:
-        yield from self.train_sources()
-        yield from self.validate_sources()
-        yield from self.test_sources()
+        self._train_dir: Path = self._data_root / "forecasting_train_v1.1" / "train" / "data"
+        self._val_dir: Path = self._data_root / "forecasting_val_v1.1" / "val" / "data"
+        self._test_dir: Path = self._data_root / "forecasting_test_v1.1" / "test_obs" / "data"
 
     @override
     def train_sources(self) -> Iterable[Source[list[Path]]]:
-        return self._sources_from_dir(self._data_root / "forecasting_train_v1.1" / "train" / "data")
+        return self._sources_from_dir(self._train_dir)
 
     @override
     def validate_sources(self) -> Iterable[Source[list[Path]]]:
-        return self._sources_from_dir(self._data_root / "forecasting_val_v1.1" / "val" / "data")
+        return self._sources_from_dir(self._val_dir)
 
     @override
     def test_sources(self) -> Iterable[Source[list[Path]]]:
-        return self._sources_from_dir(
-            self._data_root / "forecasting_test_v1.1" / "test_obs" / "data"
-        )
+        return self._sources_from_dir(self._test_dir)
 
     @override
     def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
@@ -105,7 +100,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
 
     @override
     def num_sources(self) -> int | None:
-        return sum(self._count_sources_for_split(split) for split in self._splits)
+        return sum(self._count_sources_for_split(split) for split in self.selected_splits)
 
     @override
     def pipeline(self) -> Pipeline:
@@ -154,21 +149,17 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         batches, extra = divmod(num_files, batch_size)
         return batches + int(extra > 0)
 
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+    def _count_sources_for_split(self, split: DatasetSplit | None) -> int:
         if split is DatasetSplit.TRAIN:
-            return self._count_sources(
-                self._data_root / "forecasting_train_v1.1" / "train" / "data"
-            )
+            return self._count_sources(self._train_dir)
         if split is DatasetSplit.VAL:
-            return self._count_sources(self._data_root / "forecasting_val_v1.1" / "val" / "data")
+            return self._count_sources(self._val_dir)
         if split is DatasetSplit.TEST:
-            return self._count_sources(
-                self._data_root / "forecasting_test_v1.1" / "test_obs" / "data"
-            )
+            return self._count_sources(self._test_dir)
         return (
-            self._count_sources(self._data_root / "forecasting_train_v1.1" / "train" / "data")
-            + self._count_sources(self._data_root / "forecasting_val_v1.1" / "val" / "data")
-            + self._count_sources(self._data_root / "forecasting_test_v1.1" / "test_obs" / "data")
+            self._count_sources(self._train_dir)
+            + self._count_sources(self._val_dir)
+            + self._count_sources(self._test_dir)
         )
 
 
@@ -176,7 +167,7 @@ _SCHEMA: pl.Schema = pl.Schema({
     "TIMESTAMP": pl.Float64,
     "TRACK_ID": pl.String,
     "OBJECT_TYPE": pl.Categorical(pl.Categories("AV", "OTHERS")),
-    "X": pl.Float32,
-    "Y": pl.Float32,
+    "X": pl.Float64,
+    "Y": pl.Float64,
     "CITY_NAME": pl.String,
 })

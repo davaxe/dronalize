@@ -19,6 +19,6 @@ _registry.register(
         loader_factory=WaymoLoader,
         default_config=WaymoLoader.default_config(),
         default_map_config=WaymoLoader.default_map_config(),
-        map_mode=_registry.MapMode.INLINE,
+        has_map=True,
     ).with_all_splits()
 )

@@ -44,7 +44,7 @@ class InDLoader(XLevelDataLoader):
             Loader configuration. If None, the default configuration is used.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
-            splits, so `None` or `DatasetSplit.ALL` process all sources.
+            splits, so `None` processes all sources.
 
         """
         data_root = self._normalize_data_root(data_root)

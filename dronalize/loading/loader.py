@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Concatenate, Generic, Protocol
 
@@ -36,8 +36,28 @@ class Source(Generic[SourceT]):
     """The actual source data, which can be of any type (e.g., file path, raw data)."""
     map_key: MapKey = None
     """Optional map key associated with this source."""
+    split_assignment: DatasetSplit | None = None
+    """Optional concrete dataset split assignment for this source."""
+    split_assignment_override: bool = False
+    """Whether this split assignment should override BaseSceneLoader inference."""
     metadata: dict[str, Any] = field(default_factory=dict)
     """Additional metadata associated with the source."""
+
+    def with_split_assignment(self, split_assignment: DatasetSplit | None) -> Source[SourceT]:
+        """Return a copy with a concrete split assignment."""
+        return replace(
+            self,
+            split_assignment=split_assignment,
+            split_assignment_override=False,
+        )
+
+    def override_split_assignment(self, split_assignment: DatasetSplit | None) -> Source[SourceT]:
+        """Return a copy whose split assignment overrides inferred split routing."""
+        return replace(
+            self,
+            split_assignment=split_assignment,
+            split_assignment_override=True,
+        )
 
 
 class SceneLoader(Protocol):
@@ -180,21 +200,20 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     specific details of how raw data is read and processed. The main processing
     flow is as follows:
 
-    1. **Source discovery** — `sources()` dispatches to the appropriate source
-       method based on the `split` parameter:
+    1. **Source discovery** — `sources()` resolves the configured split
+       selection:
 
-       - `DatasetSplit.ALL` (or `None`) → `all_sources()` *(abstract —
-         every subclass must implement this)*
+       - `splits=None` → all available sources
        - `DatasetSplit.TRAIN` → `train_sources()`
-       - `DatasetSplit.VALIDATE` → `validate_sources()`
+       - `DatasetSplit.VAL` → `validate_sources()`
        - `DatasetSplit.TEST` → `test_sources()`
 
-       The `train_sources`, `test_sources`, and `validate_sources`
-       methods are **optionally overridable**.  Their default implementations
-       raise `SplitNotSupportedError`, so datasets that do not ship with
-       predefined splits need only implement `all_sources()`.  Datasets
-       that *do* have splits override the relevant methods and typically
-       implement `all_sources()` by chaining all three split methods.
+       Datasets without predefined splits implement `discover_sources()`.
+       Datasets with predefined splits override the relevant split-specific
+       source methods. When no split is requested, `BaseSceneLoader` yields all
+       available sources without assigning predefined split metadata. When
+       explicit splits are requested, the concrete split is attached to each
+       yielded source and scene.
 
     2. **Ingestion** — `ingest()` reads each source into one or more
        `(LazyFrame, MapContext)` pairs. The map context can be used to
@@ -232,6 +251,11 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     """
 
     _shared_memory_name: ClassVar[dict[MapKey, str] | str | None] = None
+    _split_methods: ClassVar[tuple[tuple[DatasetSplit, str], ...]] = (
+        (DatasetSplit.TRAIN, "train_sources"),
+        (DatasetSplit.VAL, "validate_sources"),
+        (DatasetSplit.TEST, "test_sources"),
+    )
 
     def __init__(
         self,
@@ -262,23 +286,20 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         self._loader_config: LoaderConfig = loader_config or self.default_config()
         self._map_config: MapConfig = map_config or self.default_map_config()
         self._pipeline: Pipeline | None = None
-        self._splits: list[DatasetSplit] = []
         if splits is None:
-            self._splits = [DatasetSplit.ALL]
+            self._splits: list[DatasetSplit] | None = None
         elif isinstance(splits, DatasetSplit):
             self._splits = [splits]
         else:
             self._splits = list(splits)
 
-    @abstractmethod
     def all_sources(self) -> Iterable[Source[SourceT]]:
-        """Discover and yield identifiers for **all** scenes to process.
+        """Discover and yield sources across all available dataset partitions.
 
-        Every subclass must implement this method.  It is called when no
-        specific split is requested (i.e. `split` is `None` or
-        `DatasetSplit.ALL`).
-
-        Ideally, this should be lightweight and not do any heavy processing.
+        For datasets with predefined splits this combines the implemented
+        split-specific discovery hooks without assigning train/val/test
+        metadata. Datasets without predefined splits should instead override
+        `discover_sources()`.
 
         Yields
         ------
@@ -286,6 +307,21 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             Each raw data source to be processed.
 
         """
+        supported_splits = self.supported_splits()
+        if supported_splits:
+            for split in supported_splits:
+                yield from self._normalize_sources(self._raw_sources_for_split(split))
+            return
+
+        yield from self._normalize_sources(self.discover_sources())
+
+    def discover_sources(self) -> Iterable[Source[SourceT]]:
+        """Discover sources for datasets that do not define predefined splits."""
+        msg = (
+            f"{type(self).__name__} must implement discover_sources() or one or more "
+            "split-specific source methods."
+        )
+        raise NotImplementedError(msg)
 
     @abstractmethod
     def ingest(self, source: Source[SourceT]) -> Iterable[IngestOutput]:
@@ -394,9 +430,10 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     def sources(self) -> Iterable[Source[SourceT]]:
         """Return sources for the currently configured split.
 
-        This method dispatches to `all_sources()`, `train_sources()`,
-        `test_sources()`, or `validate_sources()` based on the `split` value
-        passed at construction time.
+        When no split selection is configured, all available sources are
+        yielded without predefined split metadata. When explicit splits are
+        requested, split-aware loaders assign the concrete train/val/test split
+        to each source automatically.
 
         Yields
         ------
@@ -404,30 +441,69 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             Each raw data source to be processed for the configured split(s).
 
         """
+        if self._splits is None:
+            yield from self.all_sources()
+            return
+
         for split in self._splits:
             yield from self._get_sources_for_split(split)
 
-    def sources_with_split(self) -> Iterable[tuple[Source[SourceT], DatasetSplit]]:
-        """Yield pairs of (source, split) for the currently configured split(s).
+    @classmethod
+    def supported_splits(cls) -> tuple[DatasetSplit, ...]:
+        """Return the predefined splits explicitly implemented by this loader."""
+        return tuple(
+            split
+            for split, method_name in cls._split_methods
+            if getattr(cls, method_name) is not getattr(BaseSceneLoader, method_name)
+        )
 
-        Yields
-        ------
-        tuple[Source[SourceT], DatasetSplit]
-            Each raw data source paired with its corresponding split.
-        """
-        for split in self._splits:
-            for source in self._get_sources_for_split(split):
-                yield source, split
+    @property
+    def selected_splits(self) -> tuple[DatasetSplit, ...]:
+        """Return the requested splits, or all supported predefined splits."""
+        if self._splits is not None:
+            return tuple(self._splits)
+        return self.supported_splits()
 
     def _get_sources_for_split(self, split: DatasetSplit) -> Iterable[Source[SourceT]]:
-        """Dispatch to the correct source method based on a single split."""
+        """Dispatch to the correct source method and assign the concrete split."""
+        yield from self._normalize_sources(self._raw_sources_for_split(split), inferred_split=split)
+
+    def _raw_sources_for_split(self, split: DatasetSplit) -> Iterable[Source[SourceT]]:
+        """Dispatch to the correct raw source method based on a single split."""
         if split is DatasetSplit.TRAIN:
             return self.train_sources()
         if split is DatasetSplit.TEST:
             return self.test_sources()
-        if split is DatasetSplit.VAL:
-            return self.validate_sources()
-        return self.all_sources()
+        return self.validate_sources()
+
+    def _normalize_sources(
+        self,
+        sources: Iterable[Source[SourceT]],
+        *,
+        inferred_split: DatasetSplit | None = None,
+    ) -> Iterable[Source[SourceT]]:
+        """Apply inferred split metadata to yielded sources."""
+        for source in sources:
+            yield self._resolve_source_split(source, inferred_split)
+
+    @staticmethod
+    def _resolve_source_split(
+        source: Source[SourceT],
+        inferred_split: DatasetSplit | None,
+    ) -> Source[SourceT]:
+        """Resolve the effective split assignment for a discovered source."""
+        if inferred_split is None:
+            resolved_split = source.split_assignment
+        elif source.split_assignment is None:
+            resolved_split = inferred_split
+        elif source.split_assignment_override:
+            resolved_split = source.split_assignment
+        else:
+            resolved_split = inferred_split
+
+        if source.split_assignment == resolved_split:
+            return source
+        return source.with_split_assignment(resolved_split)
 
     def map_resolver(self) -> MapResolver:  # noqa: PLR6301
         """Return a resolver for this dataset's map data.
@@ -443,23 +519,6 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         """
         return no_map()
 
-    def set_loader_config(self, config: LoaderConfig) -> None:
-        """Set the loader configuration.
-
-        This can be used to update the loader's configuration after it has been
-        constructed.  Note that changing the configuration may not have any
-        effect if scenes have already been processed, since some configuration
-        values (e.g., input/output lengths) are determined at initialization
-        time.
-
-        Parameters
-        ----------
-        config : LoaderConfig
-            The new configuration to set.
-
-        """
-        self._loader_config = config
-
     @override
     def scenes_callback(
         self,
@@ -474,10 +533,10 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     def scenes(self) -> Iterable[Scene]:
         self._count = 0
         self._source_counter = 0
-        for source, split in self.sources_with_split():
+        for source in self.sources():
             self._source_counter += 1
             for scene_df, resolver in self.process_next(source):
-                yield self.create_scene(scene_df, source, resolver, split=split)
+                yield self.create_scene(scene_df, source, resolver)
 
     @override
     def create_scene(
@@ -522,6 +581,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             output_len=self.output_len,
             map_key=map_key,
             map_resolver=resolver,
+            split_assignment=split if split is not None else source.split_assignment,
         )
         self._count += 1
         return scene if not self._enforce_schema else scene.enforce_schema()

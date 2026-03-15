@@ -12,7 +12,7 @@ _registry.register(
         loader_factory=I80Loader,
         default_config=I80Loader.default_config(),
         default_map_config=I80Loader.default_map_config(),
-        map_mode=_registry.MapMode.BUILDER_ONLY,
+        has_map=True,
         predefined_splits=[],
     )
 )

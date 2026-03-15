@@ -53,7 +53,7 @@ class HighDLoader(XLevelDataLoader):
             Ratio to rebalance lane changing vs non-lane changing agents.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
-            splits, so `None` or `DatasetSplit.ALL` process all sources.
+            splits, so `None` processes all sources.
 
         """
         super().__init__(
@@ -142,12 +142,12 @@ _META_SCHEMA: pl.Schema = pl.Schema({
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "frame": pl.Int32,
     "id": pl.Int32,
-    "width": pl.Float32,
-    "height": pl.Float32,
-    "x": pl.Float32,
-    "y": pl.Float32,
-    "xVelocity": pl.Float32,
-    "yVelocity": pl.Float32,
-    "xAcceleration": pl.Float32,
-    "yAcceleration": pl.Float32,
+    "width": pl.Float64,
+    "height": pl.Float64,
+    "x": pl.Float64,
+    "y": pl.Float64,
+    "xVelocity": pl.Float64,
+    "yVelocity": pl.Float64,
+    "xAcceleration": pl.Float64,
+    "yAcceleration": pl.Float64,
 })

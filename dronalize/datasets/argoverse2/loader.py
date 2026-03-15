@@ -66,12 +66,6 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             yield Source(identifier=i, inner=batch_files)
 
     @override
-    def all_sources(self) -> Iterable[Source[list[Path]]]:
-        yield from self.train_sources()
-        yield from self.validate_sources()
-        yield from self.test_sources()
-
-    @override
     def train_sources(self) -> Iterable[Source[list[Path]]]:
         return self._sources_from_dir(self._data_root / "train")
 
@@ -112,7 +106,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
 
     @override
     def num_sources(self) -> int | None:
-        return sum(self._count_sources_for_spli(split) for split in self._splits)
+        return sum(self._count_sources_for_spli(split) for split in self.selected_splits)
 
     @override
     def pipeline(self) -> Pipeline:
@@ -196,7 +190,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         batches, extra = divmod(num_files, batch_size)
         return batches + int(extra > 0)
 
-    def _count_sources_for_spli(self, split: DatasetSplit) -> int:
+    def _count_sources_for_spli(self, split: DatasetSplit | None) -> int:
         if split is DatasetSplit.TRAIN:
             return self._count_sources(self._data_root / "train")
         if split is DatasetSplit.VAL:

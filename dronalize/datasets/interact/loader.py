@@ -76,12 +76,6 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
             yield Source(f"{data_dir.name}_b{start}", batch_files)
 
     @override
-    def all_sources(self) -> Iterable[Source[list[Path]]]:
-        yield from self.train_sources()
-        yield from self.validate_sources()
-        yield from self.test_sources()
-
-    @override
     def train_sources(self) -> Iterable[Source[list[Path]]]:
         return self._sources_from_dir(self._data_root / "train")
 
@@ -118,7 +112,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
 
     @override
     def num_sources(self) -> int | None:
-        return sum(self._count_sources_for_split(split) for split in self._splits)
+        return sum(self._count_sources_for_split(split) for split in self.selected_splits)
 
     @override
     def pipeline(self) -> Pipeline:
@@ -175,7 +169,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         batches, extra = divmod(num_files, batch_size)
         return batches + int(extra > 0)
 
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+    def _count_sources_for_split(self, split: DatasetSplit | None) -> int:
         if split is DatasetSplit.TRAIN:
             return self._count_sources(self._data_root / "train")
         if split is DatasetSplit.VAL:
@@ -193,18 +187,18 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
 
 
 _SCHEMA = pl.Schema({
-    "case_id": pl.Float32,
+    "case_id": pl.Float64,
     "track_id": pl.UInt32,
     "frame_id": pl.UInt32,
-    "timestamp_ms": pl.Float32,
+    "timestamp_ms": pl.Float64,
     "agent_type": pl.String,
-    "x": pl.Float32,
-    "y": pl.Float32,
-    "vx": pl.Float32,
-    "vy": pl.Float32,
-    "psi_rad": pl.Float32,
-    "length": pl.Float32,
-    "width": pl.Float32,
-    "track_to_predict": pl.Float32,
-    "interesting_agent": pl.Float32,
+    "x": pl.Float64,
+    "y": pl.Float64,
+    "vx": pl.Float64,
+    "vy": pl.Float64,
+    "psi_rad": pl.Float64,
+    "length": pl.Float64,
+    "width": pl.Float64,
+    "track_to_predict": pl.Float64,
+    "interesting_agent": pl.Float64,
 })

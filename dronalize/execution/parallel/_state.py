@@ -5,14 +5,16 @@ import multiprocessing as mp
 import queue
 import threading
 from dataclasses import dataclass
+from multiprocessing.connection import PipeConnection
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable, Iterator
+    from collections.abc import Generator
     from multiprocessing.sharedctypes import Synchronized
     from multiprocessing.synchronize import Event, Lock
 
     from dronalize.categories import DatasetSplit
+    from dronalize.execution.assigner import SplitAssigner
     from dronalize.loading import SceneWriter
 
 
@@ -156,6 +158,9 @@ class SharedResources:
         self.progress.reset()
 
 
+QueueItem = tuple[tuple[int | str, ...], PipeConnection] | None
+
+
 @dataclass(slots=True)
 class SplitDispatchConfig:
     """Worker-visible configuration for split consumption.
@@ -166,14 +171,37 @@ class SplitDispatchConfig:
         Queue from which workers consume split values.
     """
 
-    queue: mp.Queue[DatasetSplit | None]
+    queue: mp.Queue[QueueItem]
+    rx: PipeConnection[DatasetSplit, DatasetSplit]
+    tx: PipeConnection[DatasetSplit, DatasetSplit]
+
+    def assign(self, request: tuple[int | str, ...]) -> DatasetSplit:
+        """Request the split for a given scene from the queue.
+
+        This method blocks until a split value is available. If the queue is
+        exhausted, it returns `None` as a sentinel value.
+
+        Parameters
+        ----------
+        request : tuple[int, ...]
+            A tuple of integers representing the scene for which to request a split.
+            The exact meaning of these integers is determined by the split assigner
+            used in the main process.
+
+        Returns
+        -------
+        DatasetSplit | None
+            The assigned dataset split for the given scene, or `None` if the queue is exhausted.
+        """
+        self.queue.put((request, self.tx))
+        return self.rx.recv()
 
 
 @dataclass(slots=True)
 class SplitDispatcher:
     """Main-process helper that feeds dataset splits to worker processes.
 
-    This helper is used only by `write_scenes()` when a split generator is
+    This helper is used only by `execute()` when a split generator is
     provided. The main process runs a lightweight background thread that pulls
     values from the split generator and pushes them into a multiprocessing
     queue. Workers lazily consume from that queue only when a writer actually
@@ -188,47 +216,27 @@ class SplitDispatcher:
       operations by using timed `put()`.
     """
 
-    queue: mp.Queue[DatasetSplit | None]
-    worker_count: int
+    request_queue: mp.Queue[QueueItem]
     stop_event: threading.Event
     thread: threading.Thread
 
     @classmethod
     def create(
         cls,
-        split_source: Iterable[DatasetSplit],
+        split_assigner: SplitAssigner,
         worker_count: int,
         *,
         maxsize: int | None = None,
     ) -> SplitDispatcher:
-        """Create and start a split dispatcher.
-
-        Parameters
-        ----------
-        split_source : Iterable[DatasetSplit]
-            Source of split values. It will be converted to an iterator exactly
-            once when the dispatcher is created.
-        worker_count : int
-            Number of worker processes that may consume from the queue.
-        maxsize : int, optional
-            Queue size. If omitted, defaults to `worker_count * 2`.
-
-        Returns
-        -------
-        SplitDispatcher
-            A started dispatcher instance.
-        """
-        split_iter = iter(split_source)
-        q: mp.Queue[DatasetSplit | None] = mp.Queue(maxsize=maxsize or max(worker_count * 2, 1))
+        q: mp.Queue[QueueItem] = mp.Queue(maxsize=maxsize or max(worker_count * 2, 1))
         stop_event = threading.Event()
         thread = threading.Thread(
             target=cls._feed_queue,
-            args=(split_iter, q, worker_count, stop_event),
+            args=(split_assigner, q, stop_event, worker_count),
             daemon=True,
         )
         dispatcher = cls(
-            queue=q,
-            worker_count=worker_count,
+            request_queue=q,
             stop_event=stop_event,
             thread=thread,
         )
@@ -237,7 +245,8 @@ class SplitDispatcher:
 
     def config(self) -> SplitDispatchConfig:
         """Return the worker-visible queue configuration."""
-        return SplitDispatchConfig(queue=self.queue)
+        rx, tx = mp.Pipe()
+        return SplitDispatchConfig(self.request_queue, rx, tx)
 
     def close(self) -> None:
         """Stop the feeder thread and close the queue.
@@ -248,15 +257,15 @@ class SplitDispatcher:
         self.stop_event.set()
         self.thread.join()
 
-        self.queue.close()
-        self.queue.cancel_join_thread()
+        self.request_queue.close()
+        self.request_queue.cancel_join_thread()
 
     @staticmethod
     def _feed_queue(
-        split_iter: Iterator[DatasetSplit],
-        q: mp.Queue[DatasetSplit | None],
-        worker_count: int,
+        split_assigner: SplitAssigner,
+        request_queue: mp.Queue[QueueItem],
         stop_event: threading.Event,
+        worker_count: int,
     ) -> None:
         """Feed split values into the multiprocessing queue.
 
@@ -270,25 +279,19 @@ class SplitDispatcher:
         """
         try:
             while not stop_event.is_set():
-                split = next(split_iter)
+                item = request_queue.get()
+                if item is None:
+                    break
+                v, conn = item
+                split = split_assigner.assign(*v)
+                conn.send(split)
 
-                while not stop_event.is_set():
-                    try:
-                        q.put(split, timeout=0.1)
-                        break
-                    except queue.Full:
-                        continue
-
-        except StopIteration:
-            for _ in range(worker_count):
-                while True:
-                    try:
-                        q.put(None, timeout=0.1)
-                        break
-                    except queue.Full:
-                        if stop_event.is_set():
-                            return
-                        continue
+        finally:
+            try:
+                for _ in range(worker_count):
+                    request_queue.put(None, timeout=0.1)
+            except queue.Full:
+                ...
 
 
 @dataclass(slots=True)
@@ -302,9 +305,9 @@ class WorkerRuntime:
     worker_id : int
         Stable integer ID assigned once to this worker process.
     writer : SceneWriter | None
-        Optional writer used only by `write_scenes()`.
+        Optional writer used only by `execute()`.
     split_dispatch : SplitDispatchConfig | None
-        Optional split queue configuration used only by `write_scenes()`.
+        Optional split queue configuration used only by `execute()`.
     """
 
     shared: SharedResources

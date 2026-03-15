@@ -12,7 +12,7 @@ _registry.register(
         loader_factory=A43Loader,
         default_config=A43Loader.default_config(),
         default_map_config=A43Loader.default_map_config(),
-        map_mode=_registry.MapMode.LAZY_KEYED,
+        has_map=True,
         predefined_splits=[],
     )
 )

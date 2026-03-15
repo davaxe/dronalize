@@ -19,7 +19,7 @@ _registry.register(
         loader_factory=AD4CHELoader,
         default_config=AD4CHELoader.default_config(),
         default_map_config=AD4CHELoader.default_map_config(),
-        map_mode=_registry.MapMode.LAZY_KEYED,
+        has_map=True,
         predefined_splits=[],
     )
 )

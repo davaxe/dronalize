@@ -13,7 +13,7 @@ _registry.register(
         loader_factory=UniDLoader,
         default_config=UniDLoader.default_config(),
         default_map_config=UniDLoader.default_map_config(),
-        map_mode=_registry.MapMode.SHARED_KEYED,
+        has_map=True,
         predefined_splits=[],
         execution_scope_fn=_scope.unid_execution_scope,
     )

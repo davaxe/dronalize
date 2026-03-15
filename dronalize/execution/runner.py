@@ -1,36 +1,79 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Literal
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal, overload
 
-from dronalize.categories import DatasetSplit
 from dronalize.config.config import Config, ConfigSection, load_config, resolve_config
 from dronalize.datasets._registry import DatasetDescriptor, get
-from dronalize.execution.common import SplitMode, resolve_split_mode
-from dronalize.execution.executor import WriterFactory
-from dronalize.execution.parallel import ParallelExecutor
+from dronalize.execution.common import CustomSplit, NoSplit, SplitMode, resolve_split_mode
 from dronalize.execution.progress import ProgressReportingExecutor
-from dronalize.execution.sequential import SequentialExecutor
-from dronalize.loading.writer.mds import MDSSceneWriter
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from dronalize.categories import DatasetSplit
     from dronalize.config.loader import LoaderConfig
     from dronalize.config.map import MapConfig
+    from dronalize.execution.assigner import SplitAssigner
+    from dronalize.execution.executor import WriterFactory
     from dronalize.loading import BaseSceneLoader
 
 
-Split = Literal["train", "val", "test", "all"]
-OutputFormat = Literal["mds"]
+Split = Literal["train", "val", "test"]
+OutputFormat = Literal["mds", "dummy"]
 
 
-def process_data_entry(
+@dataclass
+class ProcessDatasetArgs:
+    """Arguments required for processing a dataset."""
+
+    descriptor: DatasetDescriptor
+    data_root: Path
+    config: Config
+    split_mode: SplitMode
+    parallel: bool
+    progress_bar: bool
+    limit: int | None
+    seed: int | None
+    writer: WriterFactory | None = None
+
+    def loader_splits(self) -> list[DatasetSplit] | None:
+        """Resolve which predefined splits, if any, the loader should read."""
+        if isinstance(self.split_mode, (CustomSplit, NoSplit)):
+            return None
+        return self.split_mode.splits(self.descriptor.predefined_splits)
+
+    def writer_splits(self) -> list[DatasetSplit] | None:
+        """Resolve which split directories, if any, the writer should create."""
+        if isinstance(self.split_mode, NoSplit):
+            return None
+        return self.split_mode.splits(self.descriptor.predefined_splits)
+
+    def split_assigner(self) -> SplitAssigner | None:
+        """Build a split assigner for modes that derive splits during writing."""
+        if not isinstance(self.split_mode, CustomSplit):
+            return None
+
+        from dronalize.execution.assigner import StatelessWeightedAssigner  # noqa: PLC0415
+
+        groups: list[DatasetSplit] | None = self.split_mode.splits()
+        if groups is None or len(groups) == 0:
+            return None
+
+        return StatelessWeightedAssigner(
+            groups=groups,
+            weights=self.split_mode.weights(),
+            seed=self.seed,
+        )
+
+
+@overload
+def entrypoint(
     *,
     dataset: str,
     input_dir: Path,
     output_dir: Path,
-    split: Split | None = None,
+    split: list[str] | None = None,
     output_format: OutputFormat = "mds",
     config_path: Path | None = None,
     jobs: int | None = None,
@@ -38,8 +81,44 @@ def process_data_entry(
     limit: int | None = None,
     custom_split: tuple[float, float, float] | None = None,
     seed: int | None = None,
-) -> None:
-    """Entrypoint for CLI.
+    run: Literal[True] = True,
+) -> None: ...
+
+
+@overload
+def entrypoint(
+    *,
+    dataset: str,
+    input_dir: Path,
+    output_dir: Path,
+    split: list[str] | None = None,
+    output_format: OutputFormat = "mds",
+    config_path: Path | None = None,
+    jobs: int | None = None,
+    progress: bool = True,
+    limit: int | None = None,
+    custom_split: tuple[float, float, float] | None = None,
+    seed: int | None = None,
+    run: Literal[False],
+) -> ProcessDatasetArgs: ...
+
+
+def entrypoint(
+    *,
+    dataset: str,
+    input_dir: Path,
+    output_dir: Path,
+    split: list[str] | None = None,
+    output_format: OutputFormat = "mds",
+    config_path: Path | None = None,
+    jobs: int | None = None,
+    progress: bool = True,
+    limit: int | None = None,
+    custom_split: tuple[float, float, float] | None = None,
+    seed: int | None = None,
+    run: bool = True,
+) -> ProcessDatasetArgs | None:
+    """Resolve dataset configuration and run the preprocessing entry point.
 
     Parameters
     ----------
@@ -57,8 +136,8 @@ def process_data_entry(
         Path to the optional configuration file. If `None`, the default config from
         the dataset descriptor is used without overrides.
     jobs : int or None, optional
-        Number of parallel jobs to run. If `None`, the value from the config is
-        used. 1 means no parallelism, -1 means using all available cores.
+        Explicit worker count override. Values greater than 1 enable parallel
+        execution; `None` defers to the dataset configuration.
     progress : bool, optional
         Show progress bar during processing. Default is `True`.
     limit : int or None, optional
@@ -75,6 +154,10 @@ def process_data_entry(
         `None`, no seed is set and the behavior is non-deterministic.
 
     """
+    if not input_dir.exists():
+        msg = f"Input directory {input_dir} does not exist."
+        raise ValueError(msg)
+
     split_mode = resolve_split_mode(split, custom_split)
     descriptor = get(dataset)
 
@@ -87,74 +170,72 @@ def process_data_entry(
     config = resolve_config(Config, default=config, overrides=config_section)
     parallel = jobs > 1 if jobs is not None else config.execution.parallel
 
-    writer_factory = _get_writer(
-        output_format,
-        output_dir,
-        parallel=parallel,
-        splits=split_mode.splits(descriptor.predefined_splits),
-    )
-
-    process_dataset(
-        descriptor,
+    args = ProcessDatasetArgs(
+        descriptor=descriptor,
         data_root=input_dir,
-        writer=writer_factory,
         config=config,
         split_mode=split_mode,
         parallel=parallel,
         progress_bar=progress,
+        limit=limit,
+        seed=seed,
     )
 
+    args.writer = _get_writer(
+        output_format,
+        output_dir,
+        parallel=args.parallel,
+        splits=args.writer_splits(),
+    )
 
-def process_dataset(
-    descriptor: DatasetDescriptor,
-    *,
-    data_root: Path,
-    writer: WriterFactory,
-    config: Config,
-    split_mode: SplitMode,
-    parallel: bool,
-    progress_bar: bool,
-) -> None:
+    if not run:
+        return args
+
+    return execute(args)
+
+
+def execute(args: ProcessDatasetArgs) -> None:
     """Process a single dataset end-to-end and write scenes via *writer*.
 
     Parameters
     ----------
-    descriptor : DatasetDescriptor or str
-        Either a `DatasetDescriptor` instance or the canonical dataset name
-        (e.g. `"a43"`, `"ind"`). When a string is given the descriptor is looked
-        up in the global registry.
-    data_root : Path
-        Root directory that contains the raw data for this dataset. Passed as
-        the first positional argument to the loader factory.
-    writer : SceneWriter
-        Any object satisfying the `SceneWriter` protocol. Each produced `Scene`
-        is handed to `writer.write()`. When processing completes, writers are
-        finalized via `finish_local()` and `finish_final()`, unless a custom
-        finalize callback is used by the underlying execution wrapper.
-    config : Config
-        The resolved configuration for this dataset. Contains all necessary
-        information to instantiate the loader and writer, as well as execution
-        parameters.
+    args : ProcessDatasetArgs
+        Dataclass containing all required arguments to execute the processing.
     """
-    with descriptor.execution_scope(data_root, config.loader, config.map):
+    if args.writer is None:
+        msg = "WriterFactory must be initialized before processing the dataset."
+        raise ValueError(msg)
+
+    loader_splits = args.loader_splits()
+    split_assigner = args.split_assigner()
+
+    with args.descriptor.execution_scope(args.data_root, args.config.loader, args.config.map):
         loader = _build_loader(
-            descriptor,
-            data_root=data_root,
-            loader_config=config.loader,
-            map_config=config.map,
-            splits=None,
+            args.descriptor,
+            data_root=args.data_root,
+            loader_config=args.config.loader,
+            map_config=args.config.map,
+            splits=loader_splits,
         )
-        if parallel:
+        if args.parallel:
+            from dronalize.execution.parallel import ParallelExecutor  # noqa: PLC0415
+
             ProgressReportingExecutor(
                 ParallelExecutor(
-                    loader, processes=config.execution.workers, chunksize=config.execution.chunksize
+                    loader,
+                    processes=args.config.execution.workers,
+                    chunksize=args.config.execution.chunksize,
+                    limit=args.limit,
                 ),
-                enable=progress_bar,
-            ).execute(writer_factory=writer)
+                enable=args.progress_bar,
+            ).execute(writer_factory=args.writer, split_assigner=split_assigner)
         else:
-            ProgressReportingExecutor(SequentialExecutor(loader), enable=progress_bar).execute(
-                writer_factory=writer
-            )
+            from dronalize.execution.sequential import SequentialExecutor  # noqa: PLC0415
+
+            ProgressReportingExecutor(
+                SequentialExecutor(loader, limit=args.limit),
+                enable=args.progress_bar,
+            ).execute(writer_factory=args.writer, split_assigner=split_assigner)
 
 
 def _build_loader(
@@ -168,9 +249,7 @@ def _build_loader(
     """Instantiate a loader from a descriptor and its resolved config."""
     kwargs: dict[str, object] = dict(loader_config.extra_kwargs)
     unsupported_splits = [
-        split
-        for split in splits or []
-        if split is not DatasetSplit.ALL and split not in descriptor.predefined_splits
+        split for split in splits or [] if split not in descriptor.predefined_splits
     ]
     if unsupported_splits:
         msg: str = (
@@ -191,10 +270,18 @@ def _get_writer(
     parallel: bool,
     splits: list[DatasetSplit] | None,
 ) -> WriterFactory:
+
     match output_format:
         case "mds":
+            # mds imports are quite heavy, lazy import help initial startup time
+            from dronalize.loading.writer.mds import MDSSceneWriter  # noqa: PLC0415
+
             return MDSSceneWriter.as_factory(
                 output_dir,
                 parallel=parallel,
                 splits=splits,
             )
+        case "dummy":
+            from dronalize.loading.writer._dummy import DummyWriter  # noqa: PLC0415
+
+            return DummyWriter.as_factory(log=True)

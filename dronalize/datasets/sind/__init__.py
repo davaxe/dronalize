@@ -11,7 +11,7 @@ _registry.register(
         loader_factory=SindLoader,
         default_config=SindLoader.default_config(),
         default_map_config=SindLoader.default_map_config(),
-        map_mode=_registry.MapMode.BUILDER_ONLY,
+        has_map=True,
         predefined_splits=[],
     )
 )

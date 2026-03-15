@@ -12,6 +12,6 @@ _registry.register(
         loader_factory=InteractionLoader,
         default_config=InteractionLoader.default_config(),
         default_map_config=InteractionLoader.default_map_config(),
-        map_mode=_registry.MapMode.BUILDER_ONLY,
+        has_map=True,
     ).with_all_splits()
 )
