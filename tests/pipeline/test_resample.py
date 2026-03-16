@@ -1,7 +1,7 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from dronalize.pipeline.functional.resample import Resampling, ResamplingMethod, resample
+from dronalize.pipeline.functional.resample import Resampling, resample
 
 
 def test_no_resampling() -> None:
@@ -76,53 +76,47 @@ def test_group_by_isolation() -> None:
     assert agent2["x"].to_list() == [10.0, 30.0]
 
 
-def test_add_first_derivative() -> None:
-    """add_derivative=True appends velocity columns with correct values."""
+def test_velocity_columns_use_zero_order_hold() -> None:
+    """Velocity columns are preserved piecewise-constantly during upsampling."""
     df = pl.DataFrame({
-        "frame": [0, 1, 2, 3],
-        "x": [0.0, 1.0, 2.0, 3.0],
-        "y": [0.0, 0.0, 0.0, 0.0],
+        "frame": [0, 1, 2],
+        "x": [0.0, 2.0, 4.0],
+        "y": [0.0, 0.0, 0.0],
+        "vx": [1.0, 5.0, 9.0],
+        "vy": [0.0, 0.0, 0.0],
     })
-    result = resample(df, Resampling(up=1, down=1), add_derivative=True, dt=1.0)
-    assert "d1_x" in result.columns
-    assert "d1_y" in result.columns
-    # Linear x with dt=1 -> dx/dt should be 1.0 everywhere
-    for val in result["d1_x"].to_list():
-        assert abs(val - 1.0) < 1e-5
-    # Constant y -> dy/dt should be 0
-    for val in result["d1_y"].to_list():
-        assert abs(val) < 1e-5
+    result = resample(df, Resampling(up=2, down=1), velocity_columns=("vx", "vy"))
+    assert result["x"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0]
+    assert result["vx"].to_list() == [1.0, 1.0, 5.0, 5.0, 9.0]
+    assert result["vy"].to_list() == [0.0, 0.0, 0.0, 0.0, 0.0]
 
 
-def test_add_second_derivative() -> None:
-    """add_second_derivative=True appends acceleration columns."""
+def test_acceleration_columns_use_zero_order_hold() -> None:
+    """Acceleration columns are preserved piecewise-constantly during upsampling."""
     df = pl.DataFrame({
-        "frame": [0, 1, 2, 3, 4],
-        "x": [0.0, 1.0, 2.0, 3.0, 4.0],
-        "y": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "frame": [0, 1, 2],
+        "x": [0.0, 2.0, 4.0],
+        "y": [0.0, 0.0, 0.0],
+        "ax": [1.0, 2.0, 3.0],
+        "ay": [0.0, 1.0, 2.0],
     })
-    result = resample(df, Resampling(up=1, down=1), add_second_derivative=True, dt=1.0)
-    assert "d2_x" in result.columns
-    assert "d2_y" in result.columns
-    # Linear signal -> second derivative should be ~0 at interior points
-    values = result["d2_x"].to_list()
-    assert abs(values[2]) < 1e-4
+    result = resample(df, Resampling(up=2, down=1), acceleration_columns=("ax", "ay"))
+    assert result["ax"].to_list() == [1.0, 1.0, 2.0, 2.0, 3.0]
+    assert result["ay"].to_list() == [0.0, 0.0, 1.0, 1.0, 2.0]
 
 
-def test_derivative_rename() -> None:
-    """Custom derivative column names are applied correctly."""
+def test_non_position_columns_default_to_zero_order_hold() -> None:
+    """Columns outside the position set default to piecewise-constant behavior."""
     df = pl.DataFrame({
-        "frame": [0, 1, 2, 3],
-        "x": [0.0, 1.0, 2.0, 3.0],
-        "y": [0.0, 0.0, 0.0, 0.0],
+        "frame": [0, 1, 2],
+        "x": [0.0, 2.0, 4.0],
+        "y": [0.0, 0.0, 0.0],
+        "yaw": [0.0, 1.0, 2.0],
+        "agent_category": [5, 5, 5],
     })
-    rename = {1: ["vx", "vy"]}
-    result = resample(
-        df, Resampling(up=1, down=1), add_derivative=True, dt=1.0, derivative_rename=rename
-    )
-    assert "vx" in result.columns
-    assert "vy" in result.columns
-    assert "d1_x" not in result.columns
+    result = resample(df, Resampling(up=2, down=1))
+    assert result["yaw"].to_list() == [0.0, 0.0, 1.0, 1.0, 2.0]
+    assert result["agent_category"].to_list() == [5, 5, 5, 5, 5]
 
 
 def test_forward_fill_column() -> None:
@@ -134,7 +128,7 @@ def test_forward_fill_column() -> None:
         "y": [0.0, 0.0, 0.0],
         "agent_category": [5, 5, 5],
     })
-    result = resample(df, Resampling(up=2, down=1), group_by="id", forward_fill=["agent_category"])
+    result = resample(df, Resampling(up=2, down=1), group_by="id")
     # All agent_category values should remain integer 5 (forward-filled, not interpolated)
     for val in result["agent_category"].to_list():
         assert val == 5
@@ -153,53 +147,23 @@ def test_lazyframe_input() -> None:
     assert len(collected) == 3
 
 
-def test_group_by_upsample_with_derivative() -> None:
-    """Upsampling with derivatives under group_by produces correct per-group results."""
+def test_group_by_upsample_with_velocity_columns() -> None:
+    """Velocity columns are preserved independently per group during upsampling."""
     df = pl.DataFrame({
         "id": [1, 1, 1, 2, 2, 2],
         "frame": [0, 1, 2, 0, 1, 2],
         "x": [0.0, 1.0, 2.0, 0.0, 10.0, 20.0],
         "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        "vx": [1.0, 2.0, 3.0, 10.0, 20.0, 30.0],
     })
-    result = resample(df, Resampling(up=2, down=1), group_by="id", add_derivative=True, dt=1.0)
+    result = resample(df, Resampling(up=2, down=1), group_by="id", velocity_columns=("vx",))
     agent1 = result.filter(pl.col("id") == 1).sort("frame")
     agent2 = result.filter(pl.col("id") == 2).sort("frame")
     # Each agent with 3 original points produces 5 upsampled points
     assert len(agent1) == 5
     assert len(agent2) == 5
-
-
-def test_spline_method_basic() -> None:
-    """Spline method produces a resampled result with the correct number of rows."""
-    df = pl.DataFrame({
-        "id": [1, 1, 1, 1, 1],
-        "frame": [0, 1, 2, 3, 4],
-        "x": [0.0, 1.0, 4.0, 9.0, 16.0],
-        "y": [0.0, 0.0, 0.0, 0.0, 0.0],
-    })
-    result = resample(df, Resampling(up=2, down=1, method=ResamplingMethod.SPLINE), group_by="id")
-    # 5 original -> (5-1)*2/1 + 1 = 9 new points
-    assert len(result) == 9
-
-
-def test_spline_method_with_derivative() -> None:
-    """Spline method with add_derivative produces velocity columns."""
-    df = pl.DataFrame({
-        "id": [1, 1, 1, 1, 1],
-        "frame": [0, 1, 2, 3, 4],
-        "x": [0.0, 1.0, 2.0, 3.0, 4.0],
-        "y": [0.0, 0.0, 0.0, 0.0, 0.0],
-    })
-    rename = {1: ["vx", "vy"]}
-    result = resample(
-        df,
-        Resampling(up=2, down=1, method=ResamplingMethod.SPLINE),
-        group_by="id",
-        add_derivative=True,
-        derivative_rename=rename,
-    )
-    assert "vx" in result.columns
-    assert "vy" in result.columns
+    assert agent1["vx"].to_list() == [1.0, 1.0, 2.0, 2.0, 3.0]
+    assert agent2["vx"].to_list() == [10.0, 10.0, 20.0, 20.0, 30.0]
 
 
 def test_downsample_preserves_frame_column_name() -> None:

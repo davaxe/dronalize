@@ -1,3 +1,5 @@
+# pyright: standard
+
 """Tests for the composable Pipeline infrastructure."""
 
 from __future__ import annotations
@@ -364,7 +366,7 @@ def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
 def test_transform_resample_identity(simple_lf: pl.LazyFrame) -> None:
     """Ensure resampling with identical rates accurately preserves the row count."""
     config = LoaderConfig(input_len=2, output_len=2, sample_time=1.0)
-    fn = transform.resample(config.resampling, config.sample_time, group_by="id")
+    fn = transform.resample(config.resampling, group_by="id")
     result = fn(simple_lf).collect()
     # 1:1 resampling should preserve row count
     assert result.shape[0] == simple_lf.collect().shape[0]
@@ -378,7 +380,7 @@ def test_transform_resample_downsample() -> None:
         "y": [0.0] * 10,
     }).lazy()
     config = LoaderConfig(input_len=5, output_len=5, sample_time=0.1).with_resampling(1, 2)
-    fn = transform.resample(config.resampling, config.sample_time)
+    fn = transform.resample(config.resampling)
     result = fn(lf).collect()
     assert result.shape[0] == 5
 

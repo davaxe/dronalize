@@ -22,7 +22,6 @@ dependencies = [
     "tomli>=2.0.1; python_version < '3.11'",
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
-    "mosaicml-streaming>=0.13.0",
 ]
 
 [project.scripts]
@@ -43,14 +42,14 @@ all_datasets = ["dronalize[lyft]", "dronalize[waymo]", "dronalize[ad4che]"]
 loader = ["torch>=2.0.0"]
 
 # Full ML stack for running the example training pipeline
-example = [
-    "dronalize[loader]",
-    "torchmetrics>=0.11.0",
-    "torch_geometric>=2.3.0",
-    "torch-cluster",
-    "lightning>=2.0.0",
-    "wandb>=0.15.0",
-]
+# example = [
+#     "dronalize[loader]",
+#     "torchmetrics>=0.11.0",
+#     "torch_geometric>=2.3.0",
+#     "torch-cluster",
+#     "lightning>=2.0.0",
+#     "wandb>=0.15.0",
+# ]
 
 cli = ["typer>=0.24.1", "rich>=14.3.3"]
 
@@ -71,7 +70,7 @@ tools = [
 
 [tool.uv.build-backend]
 module-name = "dronalize"
-module-root = ""
+module-root = "src"
 # Exclude
 exclude = ["tests*", "examples*"]
 
