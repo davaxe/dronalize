@@ -353,7 +353,7 @@ def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
     # Filter out agent_category == 1 -> should remove all
 
     config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filtering(
-        filter_agent_category=[AgentCategory.CAR]
+        exclude_agent_categories=[AgentCategory.CAR]
     )
     fn = transform.filter_scene(config.filtering)
     result = fn(trajectory_lf).collect()
@@ -598,20 +598,22 @@ def test_run_reduce_on_empty_stream() -> None:
     assert result.shape[0] == 0
 
 
-def test_run_lazy_reduce(simple_lf: pl.LazyFrame) -> None:
-    """Ensure then_lazy_reduce constructs and applies the reduce factory correctly."""
+def test_run_reduce_factory_can_be_applied_with_plain_python_control_flow(
+    simple_lf: pl.LazyFrame,
+) -> None:
+    """Reduce factories can be applied directly without pipeline-specific helpers."""
 
     def reduce_factory() -> ReduceTransform:
         return _concat_reduce
 
-    pipe = Pipeline().then_flat_map(_split_by_id).then_lazy_reduce(reduce_factory)
+    pipe = Pipeline().then_flat_map(_split_by_id).then_reduce(reduce_factory())
 
     result = pipe.execute_single(simple_lf).collect()
     assert result.shape[0] == 8
 
 
-def test_run_if_present_reduce(simple_lf: pl.LazyFrame) -> None:
-    """Verify then_if_present_reduce applies conditionally based on the argument."""
+def test_run_optional_reduce_uses_plain_python_control_flow(simple_lf: pl.LazyFrame) -> None:
+    """Optional reduce steps should be expressed with normal Python conditionals."""
 
     def reduce_factory(arg: str) -> ReduceTransform:
         # Return a custom reduce that adds a column to indicate the argument was passed
@@ -622,15 +624,12 @@ def test_run_if_present_reduce(simple_lf: pl.LazyFrame) -> None:
         return custom_reduce
 
     # Case 1: Arg is provided
-    pipe_with = (
-        Pipeline().then_flat_map(_split_by_id).then_if_present_reduce(reduce_factory, "test_arg")
-    )
+    pipe_with = Pipeline().then_flat_map(_split_by_id)
+    pipe_with = pipe_with.then_reduce(reduce_factory("test_arg"))
     result_with = pipe_with.execute_single(simple_lf).collect()
     assert "reduce_arg" in result_with.columns
 
-    pipe_without = (
-        Pipeline().then_flat_map(_split_by_id).then_if_present_reduce(reduce_factory, None)
-    )
+    pipe_without = Pipeline().then_flat_map(_split_by_id)
 
     with pytest.raises(ValueError, match="exactly 1 output"):
         pipe_without.execute_single(simple_lf)

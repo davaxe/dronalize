@@ -1,11 +1,8 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Annotated, Literal
-
-from pydantic import BaseModel, Field, field_validator
 
 from dronalize.categories import DatasetSplit
-from dronalize.exceptions import SplitConflictError
+from dronalize.exceptions import SplitConflictError, SplitNotSupportedError
 
 _STANDARD_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
@@ -22,137 +19,86 @@ class Progress:
     active_workers: int
 
 
-class SingleSplit(BaseModel):
-    """Use a single split."""
+@dataclass(frozen=True, slots=True)
+class SplitPlan:
+    """Resolved split routing for one processing request."""
 
-    mode: Literal["single"] = "single"
-    split: DatasetSplit
+    requested_splits: tuple[DatasetSplit, ...] | None = None
+    custom_weights: tuple[float, float, float] | None = None
 
-    def splits(
-        self, predefined_splits: list[DatasetSplit] | None = None
-    ) -> list[DatasetSplit] | None:
-        """Get splits for this mode."""
-        _ = predefined_splits
-        return [self.split]
-
-
-class MultiSplit(BaseModel):
-    """Use multiple splits."""
-
-    mode: Literal["multi"] = "multi"
-    split: list[DatasetSplit]
-
-    def splits(
-        self, predefined_splits: list[DatasetSplit] | None = None
-    ) -> list[DatasetSplit] | None:
-        """Get splits for this mode."""
-        _ = predefined_splits
-        return list(self.split)
-
-
-class PredefinedSplit(BaseModel):
-    """Use predefined splits defined by the dataset descriptor."""
-
-    mode: Literal["predefined"] = "predefined"
-
-    @staticmethod
-    def splits(predefined_splits: list[DatasetSplit] | None = None) -> list[DatasetSplit] | None:
-        """Get splits for this mode."""
-        if predefined_splits is None:
+    def loader_splits(self, predefined_splits: Sequence[DatasetSplit]) -> list[DatasetSplit] | None:
+        """Return dataset-defined splits that the loader should read."""
+        if self.custom_weights is not None or self.requested_splits is None:
             return None
-        return predefined_splits
+        if len(predefined_splits) == 0:
+            return None
+        return list(self.requested_splits)
 
+    def writer_splits(self) -> list[DatasetSplit] | None:
+        """Return split directories that the writer should create."""
+        if self.custom_weights is not None:
+            return [group for group, _ in self.active_custom_groups()]
+        if self.requested_splits is None:
+            return None
+        return list(self.requested_splits)
 
-class CustomSplit(BaseModel):
-    """Custom split with defined weights."""
-
-    mode: Literal["custom"] = "custom"
-    split_weights: tuple[float, float, float]
-
-    @field_validator("split_weights")
-    @classmethod
-    def _validate_weights(cls, values: tuple[float, float, float]) -> tuple[float, float, float]:
-        if any(v < 0 for v in values):
-            msg = "All split weights must be positive or zero."
-            raise ValueError(msg)
-        if sum(values) <= 0:
-            msg = "At least one custom split weight must be greater than zero."
-            raise ValueError(msg)
-
-        return values
-
-    def _active_groups(self) -> list[tuple[DatasetSplit, float]]:
+    def active_custom_groups(self) -> list[tuple[DatasetSplit, float]]:
+        """Return non-zero custom split groups and weights."""
+        if self.custom_weights is None:
+            return []
         return [
             (group, weight)
-            for group, weight in zip(_STANDARD_SPLITS, self.split_weights, strict=True)
+            for group, weight in zip(_STANDARD_SPLITS, self.custom_weights, strict=True)
             if weight > 0
         ]
 
     def weights(self) -> list[float]:
-        """Get split weights (proportions) for train, val, and test splits."""
-        return [weight for _, weight in self._active_groups()]
+        """Return active custom weights in split order."""
+        return [weight for _, weight in self.active_custom_groups()]
 
-    def splits(
-        self, predefined_splits: list[DatasetSplit] | None = None
-    ) -> list[DatasetSplit] | None:
-        """Get splits for this mode."""
-        _ = predefined_splits
-        return [group for group, _ in self._active_groups()]
-
-
-class NoSplit(BaseModel):
-    """No split, process all data together."""
-
-    mode: Literal["no_split"] = "no_split"
-
-    @staticmethod
-    def splits(predefined_splits: list[DatasetSplit] | None = None) -> list[DatasetSplit] | None:
-        """Get splits for this mode."""
-        _ = predefined_splits
-        return None
-
-
-SplitMode = Annotated[
-    SingleSplit | MultiSplit | PredefinedSplit | CustomSplit | NoSplit, Field(discriminator="mode")
-]
 
 SplitType = str | DatasetSplit
 
 
-def resolve_split_mode(
+def resolve_split_plan(
     single_split: SplitType | Sequence[SplitType] | None,
     custom_split_weights: tuple[float, float, float] | None,
-) -> SplitMode:
-    """Resolve the split mode based on the provided arguments.
-
-    Parameters
-    ----------
-    single_split : DatasetSplit | str | Sequence[DatasetSplit | str] | None
-        If specified, use a single split or multiple splits for processing.
-        Can be one of the predefined splits or a sequence of splits. `None`
-        processes all available data together.
-    custom_split_weights : tuple[float, float, float] | None
-        If specified, use custom split weights for train, val, and test splits.
-
-    Returns
-    -------
-    SplitMode
-        The resolved split mode based on the provided arguments.
-    """
+) -> SplitPlan:
+    """Resolve a split plan from the provided arguments."""
     parsed_split = _parse_requested_splits(single_split)
 
     if custom_split_weights is not None:
         if parsed_split is not None:
             msg = "Custom split weights cannot be used with predefined splits."
             raise SplitConflictError(msg)
-        return CustomSplit(split_weights=custom_split_weights)
+        _validate_split_weights(custom_split_weights)
+        return SplitPlan(custom_weights=custom_split_weights)
 
-    if isinstance(parsed_split, list):
-        return MultiSplit(split=parsed_split)
-    if parsed_split is not None:
-        return SingleSplit(split=parsed_split)
+    if parsed_split is None:
+        return SplitPlan()
 
-    return NoSplit()
+    requested_splits = parsed_split if isinstance(parsed_split, list) else [parsed_split]
+    return SplitPlan(requested_splits=tuple(requested_splits))
+
+
+def validate_split_plan(
+    plan: SplitPlan,
+    *,
+    dataset_name: str,
+    predefined_splits: Sequence[DatasetSplit],
+) -> None:
+    """Validate a split plan against the dataset's built-in split support."""
+    if plan.requested_splits is None:
+        return
+
+    if len(predefined_splits) == 0:
+        if len(plan.requested_splits) > 1:
+            raise SplitNotSupportedError(dataset_name, list(plan.requested_splits))
+        return
+
+    unsupported = [split for split in plan.requested_splits if split not in predefined_splits]
+    if unsupported:
+        raise SplitNotSupportedError(dataset_name, unsupported)
 
 
 def _parse_requested_splits(
@@ -169,3 +115,12 @@ def _parse_requested_splits(
     if len(parsed_splits) == 1:
         return parsed_splits[0]
     return parsed_splits
+
+
+def _validate_split_weights(values: tuple[float, float, float]) -> None:
+    if any(v < 0 for v in values):
+        msg = "All split weights must be positive or zero."
+        raise ValueError(msg)
+    if sum(values) <= 0:
+        msg = "At least one custom split weight must be greater than zero."
+        raise ValueError(msg)

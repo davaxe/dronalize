@@ -74,32 +74,33 @@ def trajectory_pipeline(
     has_window = config.window is not None
     group_by_filter: str | None = "window_index" if has_window else None
     group_by_resample: list[str] = ["window_index", agent_id] if has_window else [agent_id]
+    pipeline = Pipeline()
+    if config.window is not None:
+        pipeline = pipeline.then(tr.window(config.window.window_size, config.window.step_size))
 
-    return (
-        Pipeline()
-        .then_if_present(
-            lambda w: tr.window(w.window_size, w.step_size),
-            arg=config.window,
-        )
-        .then_if_present(
-            lambda c: tr.filter_scene(
-                c,
+    if config.filtering is not None:
+        pipeline = pipeline.then(
+            tr.filter_scene(
+                config.filtering,
                 group_by=group_by_filter,
                 agent_id=agent_id,
                 frame_column=frame_column,
                 category_column=category_column,
-            ),
-            arg=config.filtering,
-        )
-        .then(
-            tr.resample(
-                config.resampling,
-                frame_column=frame_column,
-                pos_columns=pos_columns,
-                velocity_columns=velocity_columns,
-                acceleration_columns=acceleration_columns,
-                group_by=group_by_resample,
             )
         )
-        .then_flat_map(tr.group_by_yield("window_index"), when=has_window)
+
+    pipeline = pipeline.then(
+        tr.resample(
+            config.resampling,
+            frame_column=frame_column,
+            pos_columns=pos_columns,
+            velocity_columns=velocity_columns,
+            acceleration_columns=acceleration_columns,
+            group_by=group_by_resample,
+        )
     )
+
+    if has_window:
+        pipeline = pipeline.then_flat_map(tr.group_by_yield("window_index"))
+
+    return pipeline

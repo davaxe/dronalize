@@ -112,9 +112,9 @@ def filter_scene_expr(
             agent_window,
         )
 
-    if filtering.filter_agent_category is not None and category_column is not None:
+    if filtering.exclude_agent_categories is not None and category_column is not None:
         agent_validity &= _check_agent_category(
-            set(filtering.filter_agent_category),
+            set(filtering.exclude_agent_categories),
             category_column,
         )
 

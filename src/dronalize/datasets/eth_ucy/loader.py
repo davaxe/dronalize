@@ -52,6 +52,11 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
         self._data_root: Path = Path(data_root)
         self._dataset: set[str] = {dataset} if isinstance(dataset, str) else set(dataset)
 
+    @classmethod
+    @override
+    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
+        return (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
+
     def _sources_from_split(self, split_name: str) -> Iterable[Source[Path]]:
         for dataset in sorted(self._dataset):
             data_dir = self._data_root / dataset / split_name
@@ -104,7 +109,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
         splits = (
             self.splits
             if self.splits is not None
-            else [DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST]
+            else self.predefined_splits()
         )
         return sum(self._count_sources_for_split(split) for split in splits)
 

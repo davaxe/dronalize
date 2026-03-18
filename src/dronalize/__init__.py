@@ -7,24 +7,26 @@ from dronalize.config import (
     LoaderConfig,
     MapConfig,
     WindowParams,
+    WriterConfig,
     load_config,
     resolve_config,
 )
-from dronalize.execution import ProcessDatasetArgs, prepare_dataset, process_dataset
+from dronalize.execution import DatasetJob, DatasetRun, prepare_dataset
 from dronalize.scene import Scene
 
 __all__ = [
     "AgentCategory",
     "Config",
+    "DatasetJob",
+    "DatasetRun",
     "DatasetSplit",
     "ExecutionConfig",
     "LoaderConfig",
     "MapConfig",
-    "ProcessDatasetArgs",
     "Scene",
     "WindowParams",
+    "WriterConfig",
     "load_config",
     "prepare_dataset",
-    "process_dataset",
     "resolve_config",
 ]

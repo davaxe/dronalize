@@ -2,21 +2,16 @@
 
 from __future__ import annotations
 
-import ast
 import functools
 import importlib
 import importlib.util
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass, field, replace
-from enum import IntEnum, auto
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Concatenate, Literal
-
-from pydantic import BaseModel
+from typing import TYPE_CHECKING, Any, Concatenate
 
 from dronalize._internal._types import P
-from dronalize.categories import DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.exceptions import (
@@ -26,45 +21,13 @@ from dronalize.exceptions import (
 )
 from dronalize.loading import BaseSceneLoader
 
-_BUILTIN_METADATA_NAME = "__dronalize_builtin__"
-_NON_DATASET_PACKAGES = frozenset({"common"})
+if TYPE_CHECKING:
+    from dronalize.categories import DatasetSplit
+
 _REGISTRY: dict[str, DatasetDescriptor] = {}
 
 ExecutionScope = Callable[[Path, LoaderConfig, MapConfig], AbstractContextManager[None]]
-"""Function for creating an execution context for a dataset.
-
-The context manager returned by this function can be used to manage resources
-that are needed during the execution of a dataset loader, such as shared memory
-for map data.
-
-"""
-
-
-class MapMode(IntEnum):
-    """How a dataset exposes map data at runtime."""
-
-    NONE = auto()
-    """The dataset does not include map data."""
-
-    BUILDER_ONLY = auto()
-    """No map data is included at runtime, but builder is available."""
-
-    INLINE = auto()
-    """Map data is included in the same files as the scene data."""
-
-    LAZY_KEYED = auto()
-    """Map data is stored separately from the scene data and accessed via keys.
-
-    These are accessed lazily, meaning that the map data for a scene is only
-    loaded when it is explicitly requested by the scene loader.
-    """
-
-    SHARED_SINGLE = auto()
-    """Map data is built once and stored in shared memory for access."""
-
-    SHARED_KEYED = auto()
-    """Similar to SHARED_SINGLE, but supports multiple maps distinguished by keys."""
-
+"""Function for creating an execution context for a dataset."""
 
 LoaderFactory = Callable[
     Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P], BaseSceneLoader[Any]
@@ -76,7 +39,7 @@ class DatasetDescriptor:
     """Everything needed to fully process a single dataset."""
 
     name: str
-    """Canonical slug, e.g. "ind", "argoverse2", "waymo"."""
+    """Canonical slug, e.g. "ind", "argoverse2", or "waymo"."""
 
     loader_factory: LoaderFactory[...]
     """Factory function that creates a scene loader for the dataset."""
@@ -88,24 +51,13 @@ class DatasetDescriptor:
     """Default map configuration for the dataset, if applicable."""
 
     execution_scope_fn: ExecutionScope | None = None
-    """Optional runtime context for the dataset, which can manage resources like shared memory."""
+    """Optional runtime context manager factory for dataset-specific resources."""
 
     has_map: bool = False
-    """Whether the dataset have map data available."""
+    """Whether the dataset exposes map data."""
 
     predefined_splits: list[DatasetSplit] = field(default_factory=list)
-    """Predefined splits for the dataset, if any."""
-
-    def with_splits(
-        self, *splits: DatasetSplit | Literal["train", "val", "test"]
-    ) -> DatasetDescriptor:
-        """Return a copy of this descriptor with the specified predefined splits."""
-        normalized_splits = [DatasetSplit(s) for s in splits]
-        return replace(self, predefined_splits=normalized_splits)
-
-    def with_all_splits(self) -> DatasetDescriptor:
-        """Indicate that this dataset has all three standard splits (train, val, test)."""
-        return self.with_splits(DatasetSplit.TEST, DatasetSplit.TRAIN, DatasetSplit.VAL)
+    """Predefined splits exposed by the dataset, if any."""
 
     @contextmanager
     def execution_scope(
@@ -124,14 +76,79 @@ class _BuiltinDatasetSpec:
     """Lazy import metadata for a built-in dataset."""
 
     module: str
+    export_name: str = "DESCRIPTOR"
+    export_key: str | None = None
     optional_dependencies: tuple[str, ...] = ()
     extra: str | None = None
 
 
-class _BuiltinModuleMetadata(BaseModel):
-    datasets: list[str]
-    optional_dependencies: list[str] | None = None
-    extra: str | None = None
+def _builtin(
+    module: str,
+    *,
+    export_name: str = "DESCRIPTOR",
+    export_key: str | None = None,
+    optional_dependencies: tuple[str, ...] = (),
+    extra: str | None = None,
+) -> _BuiltinDatasetSpec:
+    return _BuiltinDatasetSpec(
+        module=module,
+        export_name=export_name,
+        export_key=export_key,
+        optional_dependencies=optional_dependencies,
+        extra=extra,
+    )
+
+
+_BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
+    "a43": _builtin("dronalize.datasets.a43"),
+    "ad4che": _builtin(
+        "dronalize.datasets.ad4che",
+        optional_dependencies=("cv2",),
+        extra="ad4che",
+    ),
+    "apolloscape": _builtin("dronalize.datasets.apolloscape"),
+    "argoverse1": _builtin("dronalize.datasets.argoverse1"),
+    "argoverse2": _builtin("dronalize.datasets.argoverse2"),
+    "eth": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="eth"),
+    "hotel": _builtin(
+        "dronalize.datasets.eth_ucy",
+        export_name="DESCRIPTORS",
+        export_key="hotel",
+    ),
+    "univ": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="univ"),
+    "zara1": _builtin(
+        "dronalize.datasets.eth_ucy",
+        export_name="DESCRIPTORS",
+        export_key="zara1",
+    ),
+    "zara2": _builtin(
+        "dronalize.datasets.eth_ucy",
+        export_name="DESCRIPTORS",
+        export_key="zara2",
+    ),
+    "exid": _builtin("dronalize.datasets.exid"),
+    "highd": _builtin("dronalize.datasets.highd"),
+    "i80": _builtin("dronalize.datasets.i80"),
+    "ind": _builtin("dronalize.datasets.ind"),
+    "interact": _builtin("dronalize.datasets.interact"),
+    "lyft": _builtin(
+        "dronalize.datasets.lyft",
+        optional_dependencies=("zarr", "numcodecs", "google.protobuf"),
+        extra="lyft",
+    ),
+    "nuscenes": _builtin("dronalize.datasets.nuscenes"),
+    "opendd": _builtin("dronalize.datasets.opendd"),
+    "round": _builtin("dronalize.datasets.round"),
+    "sind": _builtin("dronalize.datasets.sind"),
+    "unid": _builtin("dronalize.datasets.unid"),
+    "us101": _builtin("dronalize.datasets.us101"),
+    "vod": _builtin("dronalize.datasets.vod"),
+    "waymo": _builtin(
+        "dronalize.datasets.waymo",
+        optional_dependencies=("google.protobuf",),
+        extra="waymo",
+    ),
+}
 
 
 def register(descriptor: DatasetDescriptor) -> None:
@@ -145,12 +162,19 @@ def register(descriptor: DatasetDescriptor) -> None:
 
 def get(name: str) -> DatasetDescriptor:
     """Get a dataset descriptor by name."""
-    _ensure_registered(name)
+    if name in _REGISTRY:
+        return _REGISTRY[name]
 
-    if name not in _REGISTRY:
+    builtin_specs = _builtin_datasets()
+    if name not in builtin_specs:
         raise DatasetNotFoundError(name, available())
 
-    return _REGISTRY[name]
+    spec = builtin_specs[name]
+    missing = _missing_optional_dependencies(spec)
+    if missing:
+        raise _missing_dependency_error(subject=f"Dataset '{name}'", spec=spec, missing=missing)
+
+    return _load_builtin_descriptor(name)
 
 
 def available() -> list[str]:
@@ -160,125 +184,55 @@ def available() -> list[str]:
         for name, spec in _builtin_datasets().items()
         if not _missing_optional_dependencies(spec)
     }
-    return sorted(set(_REGISTRY.keys()) | builtin_names)
+    return sorted(set(_REGISTRY) | builtin_names)
 
 
-def ensure_builtin_dependencies(module_name: str, metadata: dict[str, Any]) -> None:
-    """Validate optional dependencies before importing a built-in dataset package."""
-    normalized_metadata = _BuiltinModuleMetadata.model_validate(metadata)
-    spec = _builtin_spec(module_name, normalized_metadata)
-    missing = _missing_optional_dependencies(spec)
-
-    if not missing:
-        return
-
-    subject = (
-        f"Dataset '{normalized_metadata.datasets[0]}'"
-        if len(normalized_metadata.datasets) == 1
-        else f"Dataset module '{module_name}'"
-    )
-    raise _missing_dependency_error(subject=subject, spec=spec, missing=missing)
-
-
-def _ensure_registered(name: str) -> None:
-    """Import the built-in dataset module for *name* on first use."""
-    if name in _REGISTRY:
-        return
-
-    builtin_specs = _builtin_datasets()
-    if name not in builtin_specs:
-        return
-
-    spec = builtin_specs[name]
-    missing = _missing_optional_dependencies(spec)
-
-    if missing:
-        raise _missing_dependency_error(subject=f"Dataset '{name}'", spec=spec, missing=missing)
-
-    _ = importlib.import_module(spec.module)
-
-
-@functools.lru_cache(maxsize=1)
 def _builtin_datasets() -> dict[str, _BuiltinDatasetSpec]:
-    """Discover built-in dataset specs from dataset package metadata."""
-    datasets_dir = Path(__file__).resolve().parent
-    builtin_specs: dict[str, _BuiltinDatasetSpec] = {}
-
-    for package_dir in datasets_dir.iterdir():
-        if not package_dir.is_dir() or package_dir.name in _NON_DATASET_PACKAGES:
-            continue
-
-        package_init = package_dir / "__init__.py"
-        if not package_init.is_file():
-            continue
-
-        for dataset_name, spec in _parse_builtin_package(package_init).items():
-            if dataset_name in builtin_specs and builtin_specs[dataset_name] != spec:
-                msg = f"Dataset '{dataset_name}' is defined more than once across dataset packages."
-                raise DatasetRegistryError(msg)
-            builtin_specs[dataset_name] = spec
-
-    return builtin_specs
+    """Return the static built-in dataset table."""
+    return _BUILTIN_DATASETS
 
 
-def _parse_builtin_package(package_init: Path) -> dict[str, _BuiltinDatasetSpec]:
-    """Load one dataset package into per-dataset lazy import specs."""
-    metadata = _extract_builtin_metadata(package_init)
-    module_name = f"dronalize.datasets.{package_init.parent.name}"
-    spec = _builtin_spec(module_name, metadata)
-    return dict.fromkeys(metadata.datasets, spec)
+@functools.cache
+def _load_builtin_descriptor(name: str) -> DatasetDescriptor:
+    """Import and resolve a built-in descriptor by dataset name."""
+    spec = _builtin_datasets().get(name)
+    if spec is None:
+        raise DatasetNotFoundError(name, available())
 
+    module = importlib.import_module(spec.module)
 
-def _extract_builtin_metadata(package_init: Path) -> _BuiltinModuleMetadata:
-    """Read built-in dataset metadata from a package `__init__` module."""
     try:
-        module_ast = ast.parse(package_init.read_text(encoding="utf-8"))
-    except SyntaxError as exc:
-        msg = f"Could not parse dataset package metadata from '{package_init}'."
+        exported = getattr(module, spec.export_name)
+    except AttributeError as exc:
+        msg = (
+            f"Built-in dataset module '{spec.module}' does not export '{spec.export_name}' "
+            f"for dataset '{name}'."
+        )
         raise DatasetRegistryError(msg) from exc
 
-    for node in module_ast.body:
-        target_value = _builtin_metadata_value(node)
+    descriptor = exported
+    if spec.export_key is not None:
+        try:
+            descriptor = exported[spec.export_key]
+        except (KeyError, TypeError) as exc:
+            msg = (
+                f"Built-in dataset module '{spec.module}' does not define descriptor "
+                f"'{spec.export_key}' in '{spec.export_name}'."
+            )
+            raise DatasetRegistryError(msg) from exc
 
-        if target_value is not None:
-            try:
-                raw_metadata = ast.literal_eval(target_value)
-                return _BuiltinModuleMetadata.model_validate(raw_metadata)
-            except (ValueError, TypeError, SyntaxError) as exc:
-                msg = (
-                    f"Could not parse dataset package metadata from '{package_init}'. "
-                    f"Ensure that the variable {_BUILTIN_METADATA_NAME!r} "
-                    "is defined as a Python literal."
-                )
-                raise DatasetRegistryError(msg) from exc
+    if not isinstance(descriptor, DatasetDescriptor):
+        msg = f"Built-in dataset '{name}' did not resolve to a DatasetDescriptor."
+        raise DatasetRegistryError(msg)
 
-    msg = f"Dataset package '{package_init.parent.name}' must define {_BUILTIN_METADATA_NAME!r}."
-    raise DatasetRegistryError(msg)
+    if descriptor.name != name:
+        msg = (
+            f"Built-in dataset '{name}' resolved to descriptor '{descriptor.name}'. "
+            "Descriptor names must match builtin registry keys."
+        )
+        raise DatasetRegistryError(msg)
 
-
-def _builtin_metadata_value(node: ast.stmt) -> ast.expr | None:
-    """Return the builtin metadata value assigned by one module-level statement."""
-    if isinstance(node, ast.Assign):
-        if any(
-            isinstance(target, ast.Name) and target.id == _BUILTIN_METADATA_NAME
-            for target in node.targets
-        ):
-            return node.value
-        return None
-
-    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-        return node.value if node.target.id == _BUILTIN_METADATA_NAME else None
-
-    return None
-
-
-def _builtin_spec(module_name: str, metadata: _BuiltinModuleMetadata) -> _BuiltinDatasetSpec:
-    """Build a lazy import spec from normalized package metadata."""
-    return _BuiltinDatasetSpec(
-        module=module_name,
-        optional_dependencies=tuple(metadata.optional_dependencies or []),
-        extra=metadata.extra,
-    )
+    return descriptor
 
 
 @functools.lru_cache

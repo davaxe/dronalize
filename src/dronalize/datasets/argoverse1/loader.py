@@ -66,6 +66,11 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         self._val_dir: Path = self._data_root / "forecasting_val_v1.1" / "val" / "data"
         self._test_dir: Path = self._data_root / "forecasting_test_v1.1" / "test_obs" / "data"
 
+    @classmethod
+    @override
+    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
+        return (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
+
     @override
     def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
         if split is DatasetSplit.TRAIN:
@@ -104,7 +109,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         splits = (
             self.splits
             if self.splits is not None
-            else [DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST]
+            else self.predefined_splits()
         )
         return sum(self._count_sources_for_split(split) for split in splits)
 

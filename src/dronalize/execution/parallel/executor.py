@@ -71,7 +71,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         inner: ProcessableLoader[SourceT],
         *,
         chunksize: int | None = None,
-        processes: int | None = None,
+        workers: int | None = None,
         limit: int | None = None,
     ) -> None:
         """Initialize the executor.
@@ -84,11 +84,11 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
             Number of sources sent to each worker task batch. If omitted, an
             automatic value is chosen from the number of sources and processes
             when possible.
-        processes : int, optional
+        workers : int, optional
             Number of worker processes. If omitted, the default multiprocessing
             process count is used.
         """
-        if processes is not None and processes <= 1:
+        if workers is not None and workers <= 1:
             msg = "number of processes must be greater than 1 for ParallelExecutor."
             raise ValueError(msg)
 
@@ -96,10 +96,10 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         self._shared: _state.SharedResources = _state.SharedResources.create()
         self._chunksize: int = chunksize or self._optimal_chunksize(
             inner.num_sources(),
-            processes,
+            workers,
         )
         self._limit: int | None = limit
-        self._processes: int | None = processes
+        self._processes: int | None = workers
         self._num_sources: int | None = inner.num_sources()
         self._num_scenes: int | None = None
         self._running: bool = False
@@ -107,12 +107,12 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         if self._num_sources is not None and self._limit is not None:
             self._num_sources = min(self._num_sources, self._limit)
 
-    def processes(self, processes: int | None) -> Self:
+    def workers(self, workers: int | None) -> Self:
         """Set the number of worker processes.
 
         Parameters
         ----------
-        processes : int or None
+        workers : int or None
             Number of worker processes. If None, the default multiprocessing
             process count is used.
 
@@ -121,11 +121,11 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         Self
             The executor instance.
         """
-        if processes is not None and processes <= 1:
+        if workers is not None and workers <= 1:
             msg = "number of processes must be greater than 1 for ParallelExecutor."
             raise ValueError(msg)
 
-        self._processes = processes
+        self._processes = workers
         return self
 
     def chunksize(self, chunksize: int) -> Self:
@@ -284,7 +284,9 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         """
         for scene_data, map_resolver in loader.process_next(source):
             scene_number = _ctx.shared.progress.increment_scene()
-            yield loader.create_scene(scene_data, source, map_resolver, scene_number)
+            yield loader.create_scene(
+                scene_data, source, resolver=map_resolver, scene_number=scene_number - 1
+            )
 
     def _execute_parallel(
         self,

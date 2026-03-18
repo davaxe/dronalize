@@ -56,7 +56,6 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
         self._data_dir: Path = Path(data_dir)
-        print(f"Initialized {self.__class__.__name__} with data directory: {self._data_dir}")
         self._rebalance_ratio: float | None = None
 
     @staticmethod
@@ -162,18 +161,15 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return (
-            Pipeline()
-            .then_if_present(
-                tr.rebalance,
-                arg=self._rebalance_ratio,
-            )
-            .compose(
-                trajectory_pipeline(
-                    self.loader_config,
-                    velocity_columns=("vx", "vy"),
-                    acceleration_columns=("ax", "ay"),
-                )
+        pipeline = Pipeline()
+        if self._rebalance_ratio is not None:
+            pipeline = pipeline.then(tr.rebalance(self._rebalance_ratio))
+
+        return pipeline.compose(
+            trajectory_pipeline(
+                self.loader_config,
+                velocity_columns=("vx", "vy"),
+                acceleration_columns=("ax", "ay"),
             )
         )
 
@@ -191,7 +187,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
             .with_window(25)
             .with_filtering(
                 require_frames=[49],
-                filter_agent_category=[AgentCategory.TRAILER],
+                exclude_agent_categories=[AgentCategory.TRAILER],
             )
         )
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 from collections import Counter
-from pathlib import Path
 from pprint import pprint
 from typing import TYPE_CHECKING
 
@@ -35,13 +34,6 @@ class DummyWriter(SceneWriter):
         log: bool = False,
     ) -> Callable[[int | None], DummyWriter]:
         return functools.partial(cls, log=log)
-
-    @override
-    def set_output_dir(self, output_dir: Path) -> None: ...
-
-    @override
-    def get_output_dir(self) -> Path:
-        return Path("/dev/null")
 
     @override
     def write(

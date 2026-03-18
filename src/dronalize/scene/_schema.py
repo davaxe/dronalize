@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntFlag, auto
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 import polars as pl
 
@@ -11,7 +11,14 @@ if TYPE_CHECKING:
 
 
 class SceneField(IntFlag):
-    """Canonical semantic fields supported by scene schemas."""
+    """Canonical semantic fields supported by scene schemas.
+
+    The order of these fields defines the canonical column order for physical
+    dataframes, and the presence of a field in a SceneSchema is determined by
+    bitwise combination. The `to_str` method returns the canonical physical
+    column name for a given field.
+
+    """
 
     FRAME = auto()
     ID = auto()
@@ -44,8 +51,8 @@ class SceneField(IntFlag):
 
     def to_str(self) -> str:
         """Return the canonical physical column name for this SceneField."""
-        if self not in _FIELD_DTYPES:
-            msg = f"SceneField value {self.value} does not correspond to a valid field."
+        if self.name is None:
+            msg = f"Field combinations cannot be converted to strings: {self}"
             raise ValueError(msg)
         return self.name.lower()
 
@@ -62,6 +69,16 @@ _FIELD_DTYPES: Final[dict[SceneField, pl.DataType]] = {
     SceneField.YAW: pl.Float64(),
     SceneField.AGENT_CATEGORY: pl.Int32(),
 }
+_FEATURE_FIELDS: Final[SceneField] = (
+    SceneField.X
+    | SceneField.Y
+    | SceneField.VX
+    | SceneField.VY
+    | SceneField.AX
+    | SceneField.AY
+    | SceneField.YAW
+)
+
 
 _REQUIRED_FIELDS: Final[SceneField] = SceneField.FRAME | SceneField.ID | SceneField.X | SceneField.Y
 
@@ -134,12 +151,24 @@ class SceneSchema:
         """Return the semantic fields physically present in this schema."""
         return tuple(field.to_str() for field in self.ordered_fields())
 
-    def field_items(self) -> tuple[tuple[str, str, pl.DataType], ...]:
-        """Return semantic field, physical column, and dtype tuples."""
+    def feature_fields(self) -> tuple[SceneField, ...]:
+        """Return the per-agent tensor feature fields in canonical order."""
         return tuple(
-            (field.to_str(), field.to_str(), _FIELD_DTYPES[field])
-            for field in self.ordered_fields()
+            field for field in self.ordered_fields() if _contains_fields(_FEATURE_FIELDS, field)
         )
+
+    def feature_columns(self) -> tuple[str, ...]:
+        """Return the per-agent tensor feature column names in canonical order."""
+        return tuple(field.to_str() for field in self.feature_fields())
+
+    @property
+    def feature_dim(self) -> int:
+        """Return the number of per-agent tensor features."""
+        return len(self.feature_fields())
+
+    def field_items(self) -> tuple[tuple[str, pl.DataType], ...]:
+        """Return canonical field-name and dtype tuples."""
+        return tuple((field.to_str(), _FIELD_DTYPES[field]) for field in self.ordered_fields())
 
 
 def _as_scene_field(field: SceneField | str) -> SceneField:
@@ -194,4 +223,45 @@ CANONICAL_V1: Final[SceneSchema] = SceneSchema.define(
     | SceneField.AY
     | SceneField.YAW,
 )
-POSITIONS_VELOCITY_ACCELERATION_YAW_V1 = CANONICAL_V1
+
+SCENE_SCHEMAS: Final[dict[str, SceneSchema]] = {
+    schema.name: schema
+    for schema in (
+        POSITIONS_ONLY_V1,
+        POSITIONS_YAW_V1,
+        POSITIONS_VELOCITY_V1,
+        POSITIONS_VELOCITY_YAW_V1,
+        POSITIONS_VELOCITY_ACCELERATION_V1,
+        CANONICAL_V1,
+    )
+}
+
+
+def available_scene_schemas() -> tuple[SceneSchema, ...]:
+    """Return all registered built-in scene schemas in stable display order."""
+    return tuple(SCENE_SCHEMAS.values())
+
+
+def available_scene_schema_names() -> tuple[str, ...]:
+    """Return all registered built-in scene schema names."""
+    return tuple(SCENE_SCHEMAS)
+
+
+def get_scene_schema(schema: SceneSchema | str | dict[str, Any]) -> SceneSchema:
+    """Resolve a schema instance or registered schema name to a SceneSchema."""
+    if isinstance(schema, SceneSchema):
+        return schema
+
+    if isinstance(schema, dict):
+        return SceneSchema(
+            name=schema["name"],
+            version=schema.get("version", 1),
+            fields=schema["fields"],
+        )
+
+    try:
+        return SCENE_SCHEMAS[schema]
+    except KeyError as exc:
+        choices = ", ".join(available_scene_schema_names())
+        msg = f"Unknown scene schema '{schema}'. Available schemas: {choices}."
+        raise ValueError(msg) from exc

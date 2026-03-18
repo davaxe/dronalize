@@ -119,7 +119,7 @@ class LoaderConfig(BaseModel):
         *,
         require_all_valid: bool = False,
         require_frames: Collection[int] | None = None,
-        filter_agent_category: Collection[AgentCategory] | None = None,
+        exclude_agent_categories: Collection[AgentCategory] | None = None,
         filter_slow_agents: float | None = None,
         min_samples_per_agent: int | None = None,
     ) -> Self:
@@ -139,7 +139,7 @@ class LoaderConfig(BaseModel):
         require_frames : Collection[int], optional
             Specific frame offsets (relative to scene start) that must be
             present. Supports negative indices. Defaults to None.
-        filter_agent_category : Collection[AgentCategory], optional
+        exclude_agent_categories : Collection[AgentCategory], optional
             Agent categories to exclude from scenes. Defaults to None.
         filter_slow_agents : float, optional
             Remove agents whose average speed (m/s) is below this threshold.
@@ -163,7 +163,7 @@ class LoaderConfig(BaseModel):
             min_agents=min_agents,
             require_all_valid=require_all_valid,
             require_frames=normalized_frames,
-            filter_agent_category=filter_agent_category,
+            exclude_agent_categories=exclude_agent_categories,
             filter_slow_agents=filter_slow_agents,
             min_samples_per_agent=min_samples_per_agent,
         )

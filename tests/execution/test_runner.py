@@ -11,7 +11,7 @@ class _CommonArgs(TypedDict):
     dataset: str
     input_dir: Path
     output_dir: Path
-    output_format: Literal["mds", "dummy"]
+    output_format: Literal["dummy"]
 
 
 def _a43_args() -> _CommonArgs:
@@ -36,14 +36,14 @@ def test_splits_a43() -> None:
     args = runner.prepare_dataset(**common_args, split=["train"])
 
     assert args.descriptor.predefined_splits == []
-    assert args.loader_splits() == [DatasetSplit.TRAIN]
+    assert args.loader_splits() is None
     assert args.writer_splits() == [DatasetSplit.TRAIN]
 
-    args = runner.prepare_dataset(**common_args, split=["train", "val"])
-
-    assert args.descriptor.predefined_splits == []
-    assert args.loader_splits() == [DatasetSplit.TRAIN, DatasetSplit.VAL]
-    assert args.writer_splits() == [DatasetSplit.TRAIN, DatasetSplit.VAL]
+    with pytest.raises(
+        ValueError,
+        match=r"a43 does not support split 'train, val'\.",
+    ):
+        _ = runner.prepare_dataset(**common_args, split=["train", "val"])
 
     args = runner.prepare_dataset(**common_args, custom_split=(0.7, 0.2, 0.1))
 
@@ -61,10 +61,10 @@ def test_splits_a43() -> None:
 
 def test_prepare_dataset_accepts_sequence_splits() -> None:
     """Tuple-based split requests should behave the same as list-based ones."""
-    args = runner.prepare_dataset(**_a43_args(), split=("train", "val"))
+    args = runner.prepare_dataset(**_a43_args(), split=("train",))
 
-    assert args.loader_splits() == [DatasetSplit.TRAIN, DatasetSplit.VAL]
-    assert args.writer_splits() == [DatasetSplit.TRAIN, DatasetSplit.VAL]
+    assert args.loader_splits() is None
+    assert args.writer_splits() == [DatasetSplit.TRAIN]
 
 
 def test_prepare_dataset_overrides_worker_count() -> None:
@@ -81,6 +81,32 @@ def test_prepare_dataset_overrides_worker_count() -> None:
 
     with pytest.raises(ValueError, match=r"jobs must be at least 1\."):
         _ = runner.prepare_dataset(**_a43_args(), jobs=0)
+
+
+def test_prepare_dataset_overrides_scene_schema() -> None:
+    """An explicit scene schema override should update the resolved writer config."""
+    args = runner.prepare_dataset(**_a43_args(), scene_schema="positions_only")
+
+    assert args.config.writer.scene_schema.name == "positions_only"
+    assert args.config.writer.feature_dim == 2
+    assert args.config.writer.feature_columns == ("x", "y")
+
+
+def test_dataset_job_open_exposes_live_run() -> None:
+    """Prepared jobs should open into live runs with observable executors."""
+    job = runner.prepare_dataset(**_a43_args())
+
+    with job.open() as run:
+        assert run.job is job
+        assert callable(run.executor.progress)
+        assert callable(run.executor.progress_event)
+
+
+def test_dataset_job_run_executes_directly() -> None:
+    """Prepared jobs should be executable directly without helper wrappers."""
+    job = runner.prepare_dataset(**_a43_args())
+
+    job.run()
 
 
 def test_splits_waymo() -> None:

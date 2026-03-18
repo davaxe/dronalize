@@ -34,7 +34,7 @@ class Assigner(Protocol, Generic[T_co]):
         ...
 
 
-SplitAssigner = Assigner[DatasetSplit]
+SplitAssigner = Assigner[DatasetSplit | None]
 """A group assigner for dataset splits (train/val/test)."""
 
 

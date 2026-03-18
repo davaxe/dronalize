@@ -10,6 +10,7 @@ from dronalize.config.config import (
 from dronalize.config.filtering import FilteringConfig
 from dronalize.config.loader import LoaderConfig, WindowParams
 from dronalize.config.map import MapConfig
+from dronalize.config.writer import WriterConfig
 
 __all__ = [
     "Config",
@@ -19,6 +20,7 @@ __all__ = [
     "LoaderConfig",
     "MapConfig",
     "WindowParams",
+    "WriterConfig",
     "load_config",
     "resolve_config",
 ]

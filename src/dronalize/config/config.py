@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, RootModel
 
 from dronalize.config.loader import LoaderConfig  # noqa: TC001 (needed for pydantic)
 from dronalize.config.map import MapConfig
+from dronalize.config.writer import WriterConfig
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -38,6 +39,7 @@ class Config(BaseModel):
     loader: LoaderConfig
     map: MapConfig = Field(default_factory=MapConfig.default)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
+    writer: WriterConfig = Field(default_factory=WriterConfig)
 
 
 class ConfigFile(RootModel[dict[str, ConfigSection]]):

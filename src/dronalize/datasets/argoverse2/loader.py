@@ -59,6 +59,11 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         self._data_root: Path = Path(data_root)
         self._file_batch_size: int | None = file_batch_size
 
+    @classmethod
+    @override
+    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
+        return (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
+
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         if not data_dir.is_dir():
             return
@@ -110,7 +115,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         splits = (
             self.splits
             if self.splits is not None
-            else [DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST]
+            else self.predefined_splits()
         )
         return sum(self._count_sources_for_split(split) for split in splits)
 
@@ -133,7 +138,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=50, output_len=60, sample_time=0.1).with_filtering(
             require_frames=[49],
-            filter_agent_category=[
+            exclude_agent_categories=[
                 AgentCategory.STATIC_OBJECT,
                 AgentCategory.UNKNOWN,
                 AgentCategory.UNIMPORTANT,

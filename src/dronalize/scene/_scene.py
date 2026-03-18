@@ -67,7 +67,7 @@ class Scene:
 
         return cls(
             inner=inner,
-            scene_number=scene_number,
+            number=scene_number,
             input_len=input_len,
             output_len=output_len,
             schema=schema,
@@ -127,7 +127,6 @@ class Scene:
 
 
 MapResolver = Callable[[Scene], MapGraph | None]
-"""Protocol for resolving a `MapKey` into a `MapGraph` for a given `Scene`."""
 
 
 def convert_scene(scene: Scene, target: SceneSchema = CANONICAL_V1) -> Scene:
@@ -159,13 +158,11 @@ def convert_frame(
         target=target,
         sample_time=sample_time,
     )
-    return semantic.select([
-        pl.col(field).cast(dtype).alias(column) for field, column, dtype in target.field_items()
-    ])
+    return semantic.select([pl.col(field).cast(dtype) for field, dtype in target.field_items()])
 
 
 def _to_semantic_frame(data: pl.DataFrame, schema: SceneSchema) -> pl.DataFrame:
-    return data.select([pl.col(column).alias(field) for field, column, _ in schema.field_items()])
+    return data.select(schema.semantic_fields())
 
 
 def _derive_missing_fields(

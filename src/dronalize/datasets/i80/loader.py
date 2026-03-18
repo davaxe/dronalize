@@ -96,14 +96,10 @@ class I80Loader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return (
-            Pipeline()
-            .then_if_present(
-                tr.rebalance,
-                arg=self._rebalance_ratio,
-            )
-            .compose(trajectory_pipeline(self.loader_config))
-        )
+        pipeline = Pipeline()
+        if self._rebalance_ratio is not None:
+            pipeline = pipeline.then(tr.rebalance(self._rebalance_ratio))
+        return pipeline.compose(trajectory_pipeline(self.loader_config))
 
     @classmethod
     @override

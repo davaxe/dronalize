@@ -9,8 +9,7 @@ from typing import TYPE_CHECKING
 
 import rich.progress as rp
 
-from dronalize.execution import open_execution
-from dronalize.execution.runner import prepare_dataset
+from dronalize.execution import prepare_dataset
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -162,17 +161,17 @@ if __name__ == "__main__":
     if path is None:
         path = Path()
 
-    args = prepare_dataset(
+    job = prepare_dataset(
         dataset="hotel",
         input_dir=Path(path) / "data",
-        output_dir=Path(path) / "test",
+        output_dir=Path("test"),
         split=None,
-        output_format="dummy",
+        output_format="mds",
         config_path=None,
-        jobs=1,
+        jobs=4,
         limit=None,
         custom_split=None,
         seed=42,
     )
-    with open_execution(args) as session:
-        run_with_rich_progress(session.executor, session.run, enable=True)
+    with job.open() as run:
+        run_with_rich_progress(run.executor, run.run, enable=True)

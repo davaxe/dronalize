@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from enum import Enum
 from fractions import Fraction
-from typing import TYPE_CHECKING, ClassVar, overload
+from typing import TYPE_CHECKING, Annotated, ClassVar, overload
 
 import polars as pl
 import polars.selectors as cs
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -21,6 +21,17 @@ class ResamplingMethod(str, Enum):
     """Linear interpolation-based resampling."""
 
 
+def _map_resampling(v: str) -> str:
+    aliases = {
+        "linear": ResamplingMethod.FAST,
+        "fast": ResamplingMethod.FAST,
+    }
+    return aliases.get(v.lower(), v)
+
+
+AliasedResampling = Annotated[ResamplingMethod, BeforeValidator(_map_resampling)]
+
+
 class Resampling(BaseModel):
     """Configuration for resampling trajectories."""
 
@@ -28,7 +39,7 @@ class Resampling(BaseModel):
 
     up: int = Field(gt=0, description="Upsampling factor.", default=1)
     down: int = Field(gt=0, description="Downsampling factor.", default=1)
-    method: ResamplingMethod = Field(
+    method: AliasedResampling = Field(
         default=ResamplingMethod.FAST, description="Method used for resampling."
     )
 

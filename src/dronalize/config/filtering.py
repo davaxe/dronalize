@@ -69,7 +69,7 @@ class FilteringConfig(BaseModel):
         description="Specific frames offset required for the agent to be considered valid.",
     )
 
-    filter_agent_category: FrozenAgentSet = Field(
+    exclude_agent_categories: FrozenAgentSet = Field(
         default=None, description="Set of agent categories to filter out from scenes."
     )
 
@@ -95,7 +95,7 @@ class FilteringConfig(BaseModel):
         min_agents: int = 2,
         require_all_valid: bool = False,
         require_frames: int | Iterable[int] | None = None,
-        filter_agent_category: AgentTypeValue | Iterable[AgentTypeValue] | None = None,
+        exclude_agent_categories: AgentTypeValue | Iterable[AgentTypeValue] | None = None,
         filter_slow_agents: float | None = None,
         min_samples_per_agent: int | None = None,
     ) -> FilteringConfig:
@@ -104,7 +104,7 @@ class FilteringConfig(BaseModel):
         The inputs mirror the field types, but allow for some further
         flexibility in how the user can specify the values. For example,
         `require_frames` can be a single integer or an iterable of integers and
-        similarly for `filter_agent_category`.
+        similarly for `exclude_agent_categories`.
 
         Parameters
         ----------
@@ -118,7 +118,7 @@ class FilteringConfig(BaseModel):
             Specific frames offset required for the agent to be considered
             valid. Can be a single integer or an iterable of integers. Default
             is None (no specific frame requirement).
-        filter_agent_category : str, AgentCategory, or iterable of these, optional
+        exclude_agent_categories : str, AgentCategory, or iterable of these, optional
             Set of agent categories to filter out from scenes. Can be a single
             category or an iterable of categories, specified as either strings
             or AgentCategory enums. Default is None (no filtering).
@@ -137,7 +137,7 @@ class FilteringConfig(BaseModel):
             "min_agents": min_agents,
             "require_all_valid": require_all_valid,
             "require_frames": require_frames,
-            "filter_agent_category": filter_agent_category,
+            "exclude_agent_categories": exclude_agent_categories,
             "filter_slow_agents": filter_slow_agents,
             "min_samples_per_agent": min_samples_per_agent,
         }

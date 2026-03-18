@@ -45,7 +45,7 @@ def debug_visualize_scenes(
         title_parts: list[str] = []
         if title_prefix:
             title_parts.append(title_prefix)
-        title_parts.append(f"scene {scene.scene_number}")
+        title_parts.append(f"scene {scene.number}")
         if scene.map_key is not None:
             title_parts.append(f"map={scene.map_key}")
         title = " | ".join(title_parts)

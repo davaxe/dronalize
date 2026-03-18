@@ -39,6 +39,11 @@ def _positions_only_scene_frame() -> pl.LazyFrame:
 
 
 class _SplitLoader(BaseSceneLoader[str]):
+    @classmethod
+    @override
+    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
+        return (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
+
     @override
     def sources_for_split(self, split: DatasetSplit) -> list[Source[str]]:
         if split is DatasetSplit.TRAIN:
@@ -187,7 +192,8 @@ def test_inferred_split_wins_without_explicit_override() -> None:
 def test_positions_only_loader_keeps_native_schema_by_default() -> None:
     """Test that native positions-only loaders keep their native schema by default."""
     loader = _PositionsOnlyLoader(
-        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0)
+        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0),
+        output_schema=None,
     )
 
     scene = next(iter(loader.scenes()))

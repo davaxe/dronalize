@@ -94,13 +94,18 @@ class SequentialExecutor(ObservableWritingExecutor):
         self._update_event.set()
         for source in itertools.islice(inner.sources(), self._limit):
             for scene_i, (scene_data, map_resolver) in enumerate(inner.process_next(source)):
-                self._scene_counter += 1
                 self._update_event.set()
                 yield (
                     source.identifier,
                     scene_i,
-                    inner.create_scene(scene_data, source, map_resolver, self._scene_counter),
+                    inner.create_scene(
+                        scene_data,
+                        source,
+                        resolver=map_resolver,
+                        scene_number=self._scene_counter,
+                    ),
                 )
+                self._scene_counter += 1
             self._source_counter += 1
             self._update_event.set()
 

@@ -13,7 +13,7 @@ include_map = true
 [global.resampling]
 up = 1
 down = 1
-method = "fast"
+method = "linear"
 
 [global.map.extraction]
 mode = "none"
@@ -49,7 +49,7 @@ custom_flag = "active"
 [a43.loader.resampling]
 up = 2
 down = 1
-method = "linear"
+method = "fast"
 
 [a43.map]
 min_distance = 0.5
@@ -59,6 +59,9 @@ include_map = false
 [a43.map.extraction]
 mode = "radial"
 radius = 50.0
+
+[a43.writer]
+scene_form = "positions_only"
 
 # ------------------------------------------------------------------------------
 # Dataset 'b99' Overrides

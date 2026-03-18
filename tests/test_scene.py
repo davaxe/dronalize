@@ -1,8 +1,10 @@
 # pyright: standard
 
+import numpy as np
 import polars as pl
 import pytest
 
+from dronalize.loading.writer.common import scene_to_numpy_dict
 from dronalize.scene import (
     CANONICAL_V1,
     POSITIONS_ONLY_V1,
@@ -74,7 +76,7 @@ def test_scene_as_schema_derives_velocity_acceleration_and_yaw() -> None:
             "y": [0.0, 0.0, 0.0],
             "agent_category": [0, 0, 0],
         }),
-        scene_number=7,
+        number=7,
         input_len=2,
         output_len=1,
         schema=POSITIONS_ONLY_V1,
@@ -101,7 +103,7 @@ def test_scene_as_schema_derives_yaw_from_position_without_sample_time() -> None
             "y": [0.0, 0.0, 0.0],
             "agent_category": [0, 0, 0],
         }),
-        scene_number=9,
+        number=9,
         input_len=2,
         output_len=1,
         schema=POSITIONS_ONLY_V1,
@@ -123,7 +125,7 @@ def test_scene_as_schema_requires_sample_time_for_derivatives() -> None:
             "y": [0.0, 0.0],
             "agent_category": [0, 0],
         }),
-        scene_number=1,
+        number=1,
         input_len=1,
         output_len=1,
         schema=POSITIONS_ONLY_V1,
@@ -131,3 +133,36 @@ def test_scene_as_schema_requires_sample_time_for_derivatives() -> None:
 
     with pytest.raises(ValueError, match="sample_time"):
         scene.as_schema(CANONICAL_V1)
+
+
+def test_scene_schema_feature_columns_follow_canonical_tensor_order() -> None:
+    """Feature columns should reflect only persisted tensor fields in canonical order."""
+    assert POSITIONS_ONLY_V1.feature_columns() == ("x", "y")
+    assert POSITIONS_YAW_V1.feature_columns() == ("x", "y", "yaw")
+    assert CANONICAL_V1.feature_columns() == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
+
+
+def test_scene_to_numpy_dict_respects_requested_scene_schema() -> None:
+    """NumPy conversion should derive feature width from the requested scene schema."""
+    scene = Scene(
+        inner=pl.DataFrame({
+            "frame": [0, 1, 2],
+            "id": [1, 1, 1],
+            "x": [0.0, 1.0, 2.0],
+            "y": [0.0, 0.0, 0.0],
+            "agent_category": [0, 0, 0],
+        }),
+        number=3,
+        input_len=2,
+        output_len=1,
+        schema=POSITIONS_ONLY_V1,
+        sample_time=1.0,
+    )
+
+    canonical = scene_to_numpy_dict(scene, scene_schema=CANONICAL_V1, dtype=np.float64)
+    positions_only = scene_to_numpy_dict(scene, scene_schema=POSITIONS_ONLY_V1, dtype=np.float64)
+
+    assert canonical["input_features"].shape == (1, 2, 7)
+    assert canonical["target_features"].shape == (1, 1, 7)
+    assert positions_only["input_features"].shape == (1, 2, 2)
+    assert positions_only["target_features"].shape == (1, 1, 2)

@@ -63,6 +63,11 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
         self._data_root: Path = Path(data_root)
 
+    @classmethod
+    @override
+    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
+        return (DatasetSplit.TRAIN, DatasetSplit.VAL)
+
     @staticmethod
     def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
         if not data_dir.is_dir():
@@ -102,7 +107,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
     @override
     def num_sources(self) -> int | None:
         splits: Iterable[DatasetSplit] = (
-            self.splits if self.splits is not None else [DatasetSplit.TRAIN, DatasetSplit.VAL]
+            self.splits if self.splits is not None else self.predefined_splits()
         )
         return sum(self._count_sources_for_split(split) for split in splits)
 

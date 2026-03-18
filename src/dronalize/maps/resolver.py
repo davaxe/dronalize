@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from dronalize.maps.graph import MapGraph
-from dronalize.scene import MapKey, MapResolver, Scene
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from dronalize.scene._scene import Scene
+
+MapKey = str | None
+MapResolver = Callable[["Scene"], MapGraph | None]
 
 __all__ = ["MapKey", "MapResolver", "no_map", "shared_map"]
 

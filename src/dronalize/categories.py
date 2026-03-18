@@ -26,7 +26,7 @@ class AgentCategory(IntEnum):
     @classmethod
     def from_string(cls, s: str) -> AgentCategory:
         """Convert a string to an AgentCategory, case-insensitive."""
-        s = s.lower()
+        s: str = s.lower()
         for category in AgentCategory:
             if category.name.lower() == s:
                 return category
@@ -49,4 +49,3 @@ class DatasetSplit(str, Enum):
     TRAIN = "train"
     VAL = "val"
     TEST = "test"
-    _non_exhaustive = "non_exhaustive"

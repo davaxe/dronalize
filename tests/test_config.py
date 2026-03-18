@@ -16,6 +16,13 @@ from dronalize.config.map import (
     RectangularExtraction,
     SquareExtraction,
 )
+from dronalize.config.writer import WriterConfig
+from dronalize.scene import (
+    CANONICAL_V1,
+    POSITIONS_ONLY_V1,
+    POSITIONS_VELOCITY_ACCELERATION_V1,
+    POSITIONS_VELOCITY_YAW_V1,
+)
 
 
 def test_radial_extraction_valid() -> None:
@@ -147,29 +154,32 @@ def test_map_config_distance_validation_failure() -> None:
 
 def test_filtering_config_single_agent_category_string() -> None:
     """Parse a single string into a frozenset of AgentCategory."""
-    config = FilteringConfig.create(filter_agent_category="CAR")
+    config = FilteringConfig.create(exclude_agent_categories="CAR")
 
-    assert config.filter_agent_category == frozenset([AgentCategory.CAR])
+    assert config.exclude_agent_categories == frozenset([AgentCategory.CAR])
 
 
 def test_filtering_config_list_agent_category_strings() -> None:
     """Parse a list of strings into a frozenset of AgentCategory."""
-    config = FilteringConfig.create(filter_agent_category=["CAR", "PEDESTRIAN"])
+    config = FilteringConfig.create(exclude_agent_categories=["CAR", "PEDESTRIAN"])
 
-    assert config.filter_agent_category == frozenset([AgentCategory.CAR, AgentCategory.PEDESTRIAN])
+    assert config.exclude_agent_categories == frozenset([
+        AgentCategory.CAR,
+        AgentCategory.PEDESTRIAN,
+    ])
 
 
 def test_filtering_config_existing_enum_member() -> None:
     """Accept an existing Enum member directly and coerce it into a frozenset."""
-    config = FilteringConfig.create(filter_agent_category=AgentCategory.VAN)
+    config = FilteringConfig.create(exclude_agent_categories=AgentCategory.VAN)
 
-    assert config.filter_agent_category == frozenset([AgentCategory.VAN])
+    assert config.exclude_agent_categories == frozenset([AgentCategory.VAN])
 
 
 def test_filtering_config_invalid_agent_category() -> None:
     """Raise ValidationError when an invalid agent category string is provided."""
     with pytest.raises(ValidationError) as exc_info:
-        FilteringConfig.create(filter_agent_category=["CAR", "SPACESHIP"])
+        FilteringConfig.create(exclude_agent_categories=["CAR", "SPACESHIP"])
 
     error_msg = str(exc_info.value)
     assert "SPACESHIP" in error_msg
@@ -193,7 +203,7 @@ def test_filtering_config_none_values() -> None:
     """Retain None values when no explicit frames or categories are provided."""
     config = FilteringConfig()
 
-    assert config.filter_agent_category is None
+    assert config.exclude_agent_categories is None
     assert config.require_frames is None
 
 
@@ -203,7 +213,7 @@ def test_filtering_config_full_dict_validation() -> None:
         "min_agents": 3,
         "require_all_valid": True,
         "require_frames": [10, 15],
-        "filter_agent_category": "STATIC_OBJECT",
+        "exclude_agent_categories": "STATIC_OBJECT",
         "filter_slow_agents": 1.5,
         "min_samples_per_agent": 5,
     }
@@ -213,7 +223,7 @@ def test_filtering_config_full_dict_validation() -> None:
     assert config.min_agents == 3
     assert config.require_all_valid is True
     assert config.require_frames == frozenset([10, 15])
-    assert config.filter_agent_category == frozenset([AgentCategory.STATIC_OBJECT])
+    assert config.exclude_agent_categories == frozenset([AgentCategory.STATIC_OBJECT])
     assert config.filter_slow_agents == pytest.approx(1.5)
     assert config.min_samples_per_agent == 5
 
@@ -255,6 +265,55 @@ def test_resolve_config_deep_merges_partial_overrides() -> None:
     assert resolved.loader.window is not None
     assert resolved.loader.window.window_size == 5
     assert resolved.loader.resampling == default.loader.resampling
+
+
+def test_writer_config_scene_schema_drives_schema_and_feature_layout() -> None:
+    """Writer config should derive schema and feature layout from the selected schema."""
+    default_config = WriterConfig()
+    positions_only = WriterConfig.create(scene_schema="positions_only")
+    positions_velocity_acceleration = WriterConfig.create(
+        scene_schema="positions_velocity_acceleration"
+    )
+    positions_velocity_yaw = WriterConfig.create(scene_schema="positions_velocity_yaw")
+
+    assert default_config.scene_schema == CANONICAL_V1
+    assert default_config.feature_dim == 7
+    assert default_config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
+
+    assert positions_only.scene_schema == POSITIONS_ONLY_V1
+    assert positions_only.feature_dim == 2
+    assert positions_only.feature_columns == ("x", "y")
+
+    assert positions_velocity_acceleration.scene_schema == POSITIONS_VELOCITY_ACCELERATION_V1
+    assert positions_velocity_acceleration.feature_dim == 6
+    assert positions_velocity_acceleration.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
+
+    assert positions_velocity_yaw.scene_schema == POSITIONS_VELOCITY_YAW_V1
+    assert positions_velocity_yaw.feature_dim == 5
+    assert positions_velocity_yaw.feature_columns == ("x", "y", "vx", "vy", "yaw")
+
+
+def test_resolve_config_merges_writer_overrides() -> None:
+    """Writer overrides should merge into the default writer config."""
+    default = Config(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1),
+        map=MapConfig.default(),
+    )
+
+    resolved = resolve_config(
+        Config,
+        default=default,
+        overrides={
+            "writer": {
+                "scene_schema": "positions_only",
+                "precision": "float64",
+            }
+        },
+    )
+
+    assert resolved.writer.scene_schema == POSITIONS_ONLY_V1
+    assert resolved.writer.precision == "float64"
+    assert resolved.writer.offset_positions is True
 
 
 def test_load_config_merges_global_section_into_each_dataset(tmp_path: Path) -> None:

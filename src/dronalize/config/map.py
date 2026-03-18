@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class AutoExtraction(BaseModel):
     """Configuration for automatic map extraction mode."""
 
-    mode: Literal["auto", "automatic", "dynamic", "heurstic"] = "auto"
+    mode: Literal["auto", "automatic", "dynamic", "heuristic"] = "auto"
     padding_factor: float = Field(gt=1.0, default=1.2)
 
 

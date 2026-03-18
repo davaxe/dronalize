@@ -14,6 +14,7 @@ from dronalize.categories import DatasetSplit
 
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
 _ = DatasetSplit | Path
+OutputFormatLiteral = Literal["mds", "zarr", "dummy"]
 
 
 @app.command()
@@ -57,9 +58,13 @@ def process(
     ] = None,
     seed: Annotated[int | None, typer.Option("--seed", help="Random seed.")] = None,
     output_format: Annotated[
-        Literal["mds"],
+        OutputFormatLiteral,
         typer.Option("--output-format", help="Output format for processed data."),
     ] = "mds",
+    scene_schema: Annotated[
+        str | None,
+        typer.Option("--scene-schema", help="Scene schema to persist in writer output."),
+    ] = None,
     custom_split: Annotated[
         tuple[float, float, float] | None,
         typer.Option("--custom-split", help="Custom split ratios for train/val/test splits."),
@@ -77,6 +82,8 @@ def process(
         summary_table.add_row("Input directory", str(input_dir))
         summary_table.add_row("Output directory", str(output_dir))
         summary_table.add_row("Output format", str(output_format))
+        if scene_schema is not None:
+            summary_table.add_row("Scene schema", scene_schema)
 
         if split:
             summary_table.add_row("Split", ", ".join(item.value for item in split))
@@ -90,9 +97,9 @@ def process(
             raise typer.Abort
 
     from dronalize.cli.progress import run_with_rich_progress
-    from dronalize.execution import open_execution, prepare_dataset
+    from dronalize.execution import prepare_dataset
 
-    args = prepare_dataset(
+    job = prepare_dataset(
         dataset=dataset,
         input_dir=input_dir,
         output_dir=output_dir,
@@ -103,9 +110,10 @@ def process(
         custom_split=custom_split,
         seed=seed,
         output_format=output_format,
+        scene_schema=scene_schema,
     )
-    with open_execution(args) as session:
-        run_with_rich_progress(session.executor, session.run, enable=progress)
+    with job as run:
+        run_with_rich_progress(run.executor, run.run, enable=progress)
 
 
 @app.command()

@@ -83,6 +83,11 @@ class LyftLoader(BaseSceneLoader[_Source]):
         self._data: dict[DatasetSplit, _ArrayData] = {}
         self._batch_size: int | None = scene_batch_size
 
+    @classmethod
+    @override
+    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
+        return (DatasetSplit.TRAIN, DatasetSplit.VAL)
+
     def _get_arrays(self, split: DatasetSplit) -> _ArrayData:
         """Lazily load and return the arrays for a given split."""
         if split not in self._data:
@@ -125,7 +130,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
 
     @override
     def num_sources(self) -> int | None:
-        splits = self.splits if self.splits is not None else [DatasetSplit.TRAIN, DatasetSplit.VAL]
+        splits = self.splits if self.splits is not None else self.predefined_splits()
         return sum(self._count_sources_for_split(split) for split in splits)
 
     @staticmethod
@@ -186,7 +191,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
             .with_window(step_size=20)
             .with_filtering(
                 min_agents=1,
-                filter_agent_category={AgentCategory.UNIMPORTANT},
+                exclude_agent_categories={AgentCategory.UNIMPORTANT},
                 require_frames=[19, -1],
             )
         )

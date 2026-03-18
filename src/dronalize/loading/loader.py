@@ -231,6 +231,11 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         return CANONICAL_V1
 
     @classmethod
+    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
+        """Return predefined dataset partitions supported by this loader."""
+        return ()
+
+    @classmethod
     def default_map_config(cls) -> MapConfig:
         """Return the default map configuration for this dataset."""
         return MapConfig.default()
@@ -257,17 +262,13 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     def all_sources(self) -> Iterable[Source[SourceT]]:
         """Discover and yield sources across all available dataset partitions."""
-        found_any_split = False
-
-        for split in DatasetSplit:
-            try:
-                yield from self._assign_splits(self.sources_for_split(split), split)
-                found_any_split = True
-            except SplitNotSupportedError:  # noqa: PERF203
-                continue
-
-        if not found_any_split:
+        supported_splits = self.predefined_splits()
+        if len(supported_splits) == 0:
             yield from self._assign_splits(self.discover_sources(), None)
+            return
+
+        for split in supported_splits:
+            yield from self._assign_splits(self.sources_for_split(split), split)
 
     def map_resolver(self) -> MapResolver:  # noqa: PLR6301 (will be overriden)
         """Return a default resolver for this dataset's map data."""
@@ -280,7 +281,13 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             yield from self.all_sources()
             return
 
+        supported_splits = self.predefined_splits()
+        if len(supported_splits) == 0:
+            raise SplitNotSupportedError(type(self).__name__, self.splits)
+
         for split in self.splits:
+            if split not in supported_splits:
+                raise SplitNotSupportedError(type(self).__name__, split)
             yield from self._assign_splits(self.sources_for_split(split), split)
 
     @staticmethod
@@ -331,10 +338,14 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     ) -> Scene:
         """Create a Scene object from the processed DataFrame and its source."""
         map_key = source.map_key or (resolver if isinstance(resolver, str) else None)
-        resolver = resolver if not isinstance(resolver, str) else self.map_resolver()
+        if not self.map_config.include_map:
+            resolver = None
+            map_key = None
+        else:
+            resolver = resolver if not isinstance(resolver, str) else self.map_resolver()
         scene = Scene(
             inner=df,
-            number=number,
+            number=scene_number,
             input_len=self.loader_config.resampled_input_len,
             output_len=self.loader_config.resampled_output_len,
             schema=self.native_scene_schema(),

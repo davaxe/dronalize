@@ -4,15 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, TypedDict, cast, overload
+from typing import TYPE_CHECKING, Literal, cast, overload
 
 import polars as pl
-from typing_extensions import Unpack, override
+from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-
-    from dronalize._internal._types import T
 
 
 Transform = Callable[[pl.LazyFrame], pl.LazyFrame]
@@ -75,70 +73,6 @@ class Pipeline:
             transform = otherwise
         return Pipeline((*self._steps, _MapEntry(transform, name)))
 
-    def then_lazy(
-        self,
-        transform: Callable[..., Transform],
-        *,
-        when: bool = True,
-        otherwise: Callable[..., Transform] | None = None,
-        name: str | None = None,
-    ) -> Pipeline:
-        """Like `then` but the transform is produced by a factory at build time.
-
-        This is useful for deferring expensive setup until it's known to be needed.
-
-        Parameters
-        ----------
-        transform : Callable[..., Transform]
-            A factory that produces a Transform when called.
-        when : bool, optional
-            If False, skip this step and return the unchanged pipeline.
-        otherwise : Callable[..., Transform], optional
-            If provided and `when` is `False`, this factory will be used to
-            produce a transform instead of skipping the step.
-        name : str | None, optional
-            An optional name for this step, used in the pipeline's repr.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline with the transform appended if when is True, else the
-            unchanged pipeline.
-
-        """
-        if not when:
-            if otherwise is None:
-                return self
-            transform_ = otherwise()
-        else:
-            transform_ = transform()
-        return self.then(transform_, name=name)
-
-    def then_if_present(
-        self,
-        transform_factory: Callable[[T], Transform],
-        arg: T | None,
-    ) -> Pipeline:
-        """Like `then` but only append the transform if *arg* is not None.
-
-        Parameters
-        ----------
-        transform_factory : Callable[[T], Transform]
-            A factory that produces a Transform when given an argument.
-        arg : T or None
-            The argument to pass to the factory. If None, this step is skipped.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline with the transform appended if arg is not None, else
-            the unchanged pipeline.
-        """
-        if arg is None:
-            return self
-        transform = transform_factory(arg)
-        return self.then(transform)
-
     def then_flat_map(
         self,
         transform: FlatMapTransform,
@@ -177,70 +111,6 @@ class Pipeline:
             transform = otherwise
         return Pipeline((*self._steps, _FlatMapEntry(transform, name)))
 
-    def then_lazy_flat_map(
-        self,
-        transform: Callable[..., FlatMapTransform],
-        *,
-        when: bool = True,
-        otherwise: Callable[..., FlatMapTransform] | None = None,
-        name: str | None = None,
-    ) -> Pipeline:
-        """Like `then_flat_map` but the flat-map is produced by a factory at build time.
-
-        This is useful for deferring expensive setup until it's known to be needed.
-
-        Parameters
-        ----------
-        transform : Callable[..., FlatMapTransform]
-            A factory that produces a FlatMapTransform when called.
-        when : bool, optional
-            If False, skip this step and return the unchanged pipeline.
-        otherwise : Callable[..., FlatMapTransform], optional
-            If provided and `when` is `False`, this factory will be used to
-            produce a flat-map instead of skipping the step.
-        name : str | None, optional
-            An optional name for this step, used in the pipeline's repr.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline with the flat-map step appended if when is True, else the
-            unchanged pipeline.
-
-        """
-        if not when:
-            if otherwise is None:
-                return self
-            transform_ = otherwise()
-        else:
-            transform_ = transform()
-        return self.then_flat_map(transform_, name=name)
-
-    def then_if_present_flat_map(
-        self,
-        flat_map_factory: Callable[[T], FlatMapTransform],
-        arg: T | None,
-    ) -> Pipeline:
-        """Like `then_flat_map` but only append the flat-map if *arg* is not None.
-
-        Parameters
-        ----------
-        flat_map_factory : Callable[[T], FlatMapTransform]
-            A factory that produces a FlatMapTransform when given an argument.
-        arg : T or None
-            The argument to pass to the factory. If None, this step is skipped.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline with the flat-map step appended if arg is not None, else
-            the unchanged pipeline.
-        """
-        if arg is None:
-            return self
-        flat_map = flat_map_factory(arg)
-        return self.then_flat_map(flat_map)
-
     def then_reduce(
         self,
         transform: ReduceTransform,
@@ -278,70 +148,6 @@ class Pipeline:
             transform = otherwise
         return Pipeline((*self._steps, _ReduceEntry(transform, name)))
 
-    def then_lazy_reduce(
-        self,
-        transform: Callable[..., ReduceTransform],
-        *,
-        when: bool = True,
-        otherwise: Callable[..., ReduceTransform] | None = None,
-        name: str | None = None,
-    ) -> Pipeline:
-        """Like `then_reduce` but the reduce is produced by a factory at build time.
-
-        This is useful for deferring expensive setup until it's known to be needed.
-
-        Parameters
-        ----------
-        transform : Callable[..., ReduceTransform]
-            A factory that produces a ReduceTransform when called.
-        when : bool, optional
-            If False, skip this step and return the unchanged pipeline.
-        otherwise : Callable[..., ReduceTransform], optional
-            If provided and `when` is `False`, this factory will be used to
-            produce a reduce instead of skipping the step.
-        name : str | None, optional
-            An optional name for this step, used in the pipeline's repr.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline with the reduce step appended if when is True, else the
-            unchanged pipeline.
-
-        """
-        if not when:
-            if otherwise is None:
-                return self
-            transform_ = otherwise()
-        else:
-            transform_ = transform()
-        return self.then_reduce(transform_, name=name)
-
-    def then_if_present_reduce(
-        self,
-        reduce_factory: Callable[[T], ReduceTransform],
-        arg: T | None,
-    ) -> Pipeline:
-        """Like `then_reduce` but only append the reduce if *arg* is not None.
-
-        Parameters
-        ----------
-        reduce_factory : Callable[[T], ReduceTransform]
-            A factory that produces a ReduceTransform when given an argument.
-        arg : T or None
-            The argument to pass to the factory. If None, this step is skipped.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline with the reduce step appended if arg is not None, else
-            the unchanged pipeline.
-        """
-        if arg is None:
-            return self
-        reduce = reduce_factory(arg)
-        return self.then_reduce(reduce)
-
     def compose(
         self,
         other: Pipeline,
@@ -372,21 +178,6 @@ class Pipeline:
                 return self
             return otherwise
         return Pipeline((*self._steps, *other._steps))
-
-    def checkpoint(
-        self, name: str = "checkpoint", **collect_kwargs: Unpack[_CollectKwargs]
-    ) -> Pipeline:
-        """Append a checkpoint that collects the LazyFrame(s) at this point.
-
-        Parameters
-        ----------
-        name : str, optional
-            An optional name for this checkpoint, used in the pipeline's repr.
-        **collect_kwargs : _CollectKwargs
-            Keyword arguments to pass to `pl.LazyFrame.collect()` when executing
-            this checkpoint.
-        """
-        return self.then(lambda df: df.collect(**collect_kwargs).lazy(), name=name)
 
     # -- slicing ------------------------------------------------------------
 
@@ -686,7 +477,8 @@ class Pipeline:
                 parts.append(f"  .then({entry.name or _fn_name(entry.fn)})")
             elif isinstance(entry, _FlatMapEntry):
                 parts.append(f"  .then_flat_map({entry.name or _fn_name(entry.fn)})")
-            parts.append(f"  .then_reduce({entry.name or _fn_name(entry.fn)})")
+            else:
+                parts.append(f"  .then_reduce({entry.name or _fn_name(entry.fn)})")
         body = "\n".join(parts) if parts else "  (empty)"
         return f"Pipeline(\n{body}\n)"
 
@@ -741,21 +533,6 @@ class _ReduceEntry:
 
 
 _PipelineEntry = _MapEntry | _FlatMapEntry | _ReduceEntry
-
-
-class _CollectKwargs(TypedDict, total=False):
-    type_coercion: bool
-    predicate_pushdown: bool
-    projection_pushdown: bool
-    simplify_expression: bool
-    slice_pushdown: bool
-    comm_subplan_elim: bool
-    comm_subexpr_elim: bool
-    cluster_with_columns: bool
-    collapse_joins: bool
-    no_optimization: bool
-    engine: Literal["auto", "in-memory", "streaming", "gpu"]
-    background: Literal[False]
 
 
 def _fn_name(fn: object) -> str:

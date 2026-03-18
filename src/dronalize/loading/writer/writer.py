@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import collections.abc as cabc
 import functools
-import pathlib
+from collections.abc import Callable
 from typing import Any, Protocol, runtime_checkable
 
 from typing_extensions import Self
@@ -55,34 +54,6 @@ class SceneWriter(Protocol):
         """
         ...
 
-    def set_output_dir(self, output_dir: pathlib.Path) -> None:
-        """Set the output directory for the writer.
-
-        This method can be used to specify the directory where the writer should
-        save its output files. This is particularly useful in parallel processing
-        contexts, where each process may need to write to a separate directory
-        to avoid conflicts.
-
-        Parameters
-        ----------
-        output_dir : pathlib.Path
-            The path to the output directory where the writer should save its files.
-
-        """
-        ...
-
-    def get_output_dir(self) -> pathlib.Path:
-        """Get the current output directory for the writer.
-
-        Returns
-        -------
-        pathlib.Path
-            The path to the current output directory where the writer is saving
-            its files.
-
-        """
-        ...
-
     def finish_final(self) -> None:
         """Perform any final cleanup after all writing is complete.
 
@@ -94,7 +65,7 @@ class SceneWriter(Protocol):
         ...
 
     @classmethod
-    def as_factory(cls, *args: Any, **kwargs: Any) -> cabc.Callable[[int | None], Self]:  # noqa: ANN401
+    def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int | None], Self]:  # noqa: ANN401
         """Create a factory function for this writer class.
 
         The returned factory should accept a worker identifier and return an
