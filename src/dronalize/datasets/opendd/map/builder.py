@@ -17,9 +17,9 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, Self
 
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from dronalize.maps import BaseMapBuilder, EdgeType, Point
 

@@ -83,31 +83,20 @@ _FEATURE_FIELDS: Final[SceneField] = (
 _REQUIRED_FIELDS: Final[SceneField] = SceneField.FRAME | SceneField.ID | SceneField.X | SceneField.Y
 
 
-@dataclass(slots=True, frozen=True, init=False)
+@dataclass(slots=True, frozen=True)
 class SceneSchema:
     """Logical scene schema defined as a set of canonical semantic fields."""
 
     name: str
-    version: int
     fields: SceneField
 
-    def __init__(
-        self,
-        name: str,
-        *,
-        fields: SceneField | Iterable[SceneField | str],
-        version: int = 1,
-    ) -> None:
-        resolved_fields = _resolve_fields(fields)
+    def __post_init__(self) -> None:
+        resolved_fields = _resolve_fields(self.fields)
         missing_required = _REQUIRED_FIELDS & ~resolved_fields
         if missing_required:
             missing: str = ", ".join(field.to_str() for field in missing_required.fields())
             msg = f"Scene schemas must include the base fields: {missing}."
             raise ValueError(msg)
-
-        object.__setattr__(self, "name", name)
-        object.__setattr__(self, "version", version)
-        object.__setattr__(self, "fields", resolved_fields)
 
     @classmethod
     def define(
@@ -115,10 +104,10 @@ class SceneSchema:
         name: str,
         *,
         fields: SceneField | Iterable[SceneField | str],
-        version: int = 1,
     ) -> SceneSchema:
         """Construct a schema from semantic field identifiers."""
-        return cls(name=name, version=version, fields=fields)
+        fields = _resolve_fields(fields)
+        return cls(name=name, fields=fields)
 
     @property
     def physical(self) -> pl.Schema:
@@ -247,6 +236,19 @@ def available_scene_schema_names() -> tuple[str, ...]:
     return tuple(SCENE_SCHEMAS)
 
 
+_STR_TO_FIELD: Final[dict[str, SceneField]] = {
+    "vel": SceneField.VX | SceneField.VY,
+    "acc": SceneField.AX | SceneField.AY,
+    "velocity": SceneField.VX | SceneField.VY,
+    "acceleration": SceneField.AX | SceneField.AY,
+    "yaw": SceneField.YAW,
+    "vx": SceneField.VX,
+    "vy": SceneField.VY,
+    "ax": SceneField.AX,
+    "ay": SceneField.AY,
+}
+
+
 def get_scene_schema(schema: SceneSchema | str | dict[str, Any]) -> SceneSchema:
     """Resolve a schema instance or registered schema name to a SceneSchema."""
     if isinstance(schema, SceneSchema):
@@ -255,13 +257,17 @@ def get_scene_schema(schema: SceneSchema | str | dict[str, Any]) -> SceneSchema:
     if isinstance(schema, dict):
         return SceneSchema(
             name=schema["name"],
-            version=schema.get("version", 1),
             fields=schema["fields"],
         )
 
-    try:
+    if schema in SCENE_SCHEMAS:
         return SCENE_SCHEMAS[schema]
-    except KeyError as exc:
-        choices = ", ".join(available_scene_schema_names())
-        msg = f"Unknown scene schema '{schema}'. Available schemas: {choices}."
-        raise ValueError(msg) from exc
+
+    fields = _BASE_FIELDS
+    for field_str in schema.split(":"):
+        fields |= _STR_TO_FIELD.get(field_str.lower(), SceneField(0))
+    if fields != _BASE_FIELDS:
+        return SceneSchema(name=f"custom: {schema}", fields=fields)
+
+    msg = f"Unknown scene schema '{schema}'."
+    raise ValueError(msg)

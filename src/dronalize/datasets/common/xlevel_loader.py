@@ -15,6 +15,7 @@ from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.maps.resolver import MapResolver, no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import CANONICAL_V1
 
@@ -168,8 +169,6 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
         return pipeline.compose(
             trajectory_pipeline(
                 self.loader_config,
-                velocity_columns=("vx", "vy"),
-                acceleration_columns=("ax", "ay"),
             )
         )
 
@@ -183,7 +182,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=50, output_len=125, sample_time=0.04)
-            .with_resampling(2, 5)
+            .with_resampling(ResampleSpec(up=2, down=5))
             .with_window(25)
             .with_filtering(
                 require_frames=[49],

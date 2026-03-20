@@ -136,22 +136,21 @@ def _build_trajectory_layers(
     highlight_frame: int | Sequence[int] | None,
 ) -> list[alt.Chart]:
     """Build the layered Altair charts for trajectory plotting."""
+    sort_cols = [group_by, frame_col] if group_by else [frame_col]
+    data = data.sort(sort_cols)
+
+    gap_expr = pl.col(frame_col).diff().fill_null(1) > 1
+    segment_expr = gap_expr.cum_sum()
+    if group_by:
+        segment_expr = segment_expr.over(group_by)
+
+    data = data.with_columns(__segment=segment_expr)
     if group_by:
         start_df = data.group_by(group_by, maintain_order=True).head(1)
         end_df = data.group_by(group_by, maintain_order=True).tail(1)
     else:
         start_df = data.head(1)
         end_df = data.tail(1)
-
-    base = alt.Chart(data).encode(
-        x=alt.X(x_col, title=x_label or x_col, scale=alt.Scale(zero=False)),
-        y=alt.Y(y_col, title=y_label or y_col, scale=alt.Scale(zero=False)),
-        color=alt.Color(
-            group_by or alt.Undefined,
-            scale=alt.Scale(scheme="category20"),
-            legend=None,
-        ),
-    )
 
     tooltips: list[alt.Tooltip] = [
         alt.Tooltip(x_col, format=".2f"),
@@ -161,27 +160,43 @@ def _build_trajectory_layers(
     if group_by:
         tooltips.append(alt.Tooltip(group_by))
 
-    lines = base.mark_line(
+    base = alt.Chart(data).encode(
+        x=alt.X(x_col, title=x_label or x_col, scale=alt.Scale(zero=False)),
+        y=alt.Y(y_col, title=y_label or y_col, scale=alt.Scale(zero=False)),
+        color=alt.Color(
+            group_by or alt.Undefined,
+            scale=alt.Scale(scheme="category20"),
+            legend=None,
+        ),
+        order=alt.Order(field=frame_col),
+        tooltip=tooltips,
+    )
+
+    gap_lines = base.mark_line(
+        strokeDash=[4, 4],
+        strokeWidth=1.5,
+        opacity=0.4,
+    )
+
+    solid_lines = base.encode(detail="__segment").mark_line(
         point=alt.OverlayMarkDef(filled=True, size=15),
         strokeWidth=2,
         opacity=0.8,
-    ).encode(order=alt.Order(field=frame_col), tooltip=tooltips)
-
+    )
     start_markers = (
         alt
         .Chart(start_df)
         .mark_point(shape="circle", size=75, filled=True, fill="#2ecc71", stroke="black")
         .encode(x=x_col, y=y_col, tooltip=tooltips)
     )
-
     end_markers = (
         alt
         .Chart(end_df)
         .mark_point(shape="cross", size=75, filled=True, color="#e74c3c", stroke="black")
         .encode(x=x_col, y=y_col, tooltip=tooltips)
     )
+    layers = [gap_lines, solid_lines, start_markers, end_markers]
 
-    layers = [lines, start_markers, end_markers]
     if highlight_frame is not None:
         frames_to_highlight = (
             [highlight_frame] if isinstance(highlight_frame, int) else list(highlight_frame)

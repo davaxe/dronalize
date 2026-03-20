@@ -2,38 +2,18 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, overload
 
 import polars as pl
-from typing_extensions import overload
 
-from dronalize.pipeline.functional.basic import yaw_from_pos_expr as _yaw_from_pos_expr
-from dronalize.pipeline.functional.basic import yaw_from_vel_expr as _yaw_from_vel_expr
-from dronalize.pipeline.functional.derivative import derivative as _derivative_impl
-from dronalize.pipeline.functional.filter import filter_scene_expr
-from dronalize.pipeline.functional.rebalance import rebalance_highway_agents
-from dronalize.pipeline.functional.resample import Resampling
-from dronalize.pipeline.functional.resample import resample as resample_impl
-from dronalize.pipeline.functional.window import sliding_window
+from dronalize.pipeline import functional as f
+from dronalize.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from dronalize.config.filtering import FilteringConfig
     from dronalize.pipeline.pipeline import FlatMapTransform, Transform
-
-__all__ = [
-    "derivative",
-    "filter_scene",
-    "group_by_yield",
-    "rebalance",
-    "resample",
-    "select",
-    "window",
-    "with_columns",
-    "yaw_from_pos",
-    "yaw_from_vel",
-]
 
 
 def filter_scene(
@@ -66,16 +46,16 @@ def filter_scene(
     Transform
 
     """
-    expr = filter_scene_expr(
-        config=config,
-        group_by=group_by,
-        agent_id=agent_id,
-        frame_column=frame_column,
-        category_column=category_column,
-    )
 
     def _filter(df: pl.LazyFrame) -> pl.LazyFrame:
-        return df.filter(expr)
+        return f.filter_scene(
+            df,
+            config=config,
+            group_by=group_by,
+            agent_id=agent_id,
+            frame_column=frame_column,
+            category_column=category_column,
+        )
 
     _filter.__name__ = "filter"
     _filter.__qualname__ = "transforms.filter"
@@ -106,33 +86,19 @@ def require_min(group_by: str | Sequence[str], minimum: int = 2) -> Transform:
 
 
 def resample(
-    resampling: Resampling | None = None,
+    spec: ResampleSpec | None = None,
     *,
     frame_column: str = "frame",
-    pos_columns: Sequence[str] = ("x", "y"),
-    velocity_columns: Sequence[str] = (),
-    acceleration_columns: Sequence[str] = (),
     group_by: str | Sequence[str] | None = None,
 ) -> Transform:
     """Create a resampling transform.
 
-    Wraps `~dronalize.common.trajectory.resample.resample_tracks`.
-    If the resampling object specifies no resampling (ratio 1:1), the transform
-    is still applied so that the same interpolation and zero-order-hold rules
-    are used consistently across pipelines.
-
     Parameters
     ----------
-    resampling : Resampling, optional
-        Resampling parameters.
+    spec : ResampleSpec, optional
+        Resampling specification.
     frame_column : str, optional
         Column name for the frame index.
-    pos_columns : Sequence[str], optional
-        Position column names.
-    velocity_columns : Sequence[str], optional
-        Velocity columns preserved using zero-order hold.
-    acceleration_columns : Sequence[str], optional
-        Acceleration columns preserved using zero-order hold.
     group_by : str or Sequence[str], optional
         Columns to partition tracks by.
 
@@ -141,16 +107,13 @@ def resample(
     Transform
 
     """
-    resampling_obj = resampling or Resampling(up=1, down=1)
+    resample_spec = spec or ResampleSpec()
 
     def _resample(df: pl.LazyFrame) -> pl.LazyFrame:
-        return resample_impl(
+        return f.resample(
             df,
-            resampling_obj,
+            resample_spec,
             frame_column=frame_column,
-            pos_columns=pos_columns,
-            velocity_columns=velocity_columns,
-            acceleration_columns=acceleration_columns,
             group_by=group_by,
         )
 
@@ -193,7 +156,7 @@ def derivative(
     """
 
     def _derivative(df: pl.LazyFrame) -> pl.LazyFrame:
-        return _derivative_impl(
+        return f.derivative(
             df,
             *columns,
             dt=dt,
@@ -216,8 +179,6 @@ def yaw_from_vel(
     only_null: bool = False,
 ) -> Transform:
     """Create a yaw-from-velocity transform.
-
-    Wraps `~dronalize.common.trajectory.basic.yaw_from_vel`.
 
     Parameters
     ----------
@@ -242,7 +203,7 @@ def yaw_from_vel(
             return df.with_columns(
                 pl
                 .when(pl.col(yaw_col).is_null())
-                .then(_yaw_from_vel_expr(vx_col, vy_col, yaw_col))
+                .then(f.yaw_from_vel_expr(vx_col, vy_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
                 .alias(yaw_col),
             )
@@ -250,7 +211,7 @@ def yaw_from_vel(
     else:
 
         def _yaw_from_vel(df: pl.LazyFrame) -> pl.LazyFrame:
-            return df.with_columns(_yaw_from_vel_expr(vx_col, vy_col, yaw_col))
+            return df.with_columns(f.yaw_from_vel_expr(vx_col, vy_col, yaw_col))
 
     _yaw_from_vel.__name__ = "yaw_from_vel"
     _yaw_from_vel.__qualname__ = "transforms.yaw_from_vel"
@@ -291,7 +252,7 @@ def yaw_from_pos(
             return df.with_columns(
                 pl
                 .when(pl.col(yaw_col).is_null())
-                .then(_yaw_from_pos_expr(x_col, y_col, yaw_col))
+                .then(f.yaw_from_pos_expr(x_col, y_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
                 .alias(yaw_col),
             )
@@ -299,7 +260,7 @@ def yaw_from_pos(
     else:
 
         def _yaw_from_pos(df: pl.LazyFrame) -> pl.LazyFrame:
-            return df.with_columns(_yaw_from_pos_expr(x_col, y_col, yaw_col))
+            return df.with_columns(f.yaw_from_pos_expr(x_col, y_col, yaw_col))
 
     _yaw_from_pos.__name__ = "yaw_from_pos"
     _yaw_from_pos.__qualname__ = "transforms.yaw_from_pos"
@@ -363,7 +324,7 @@ def window(
     if return_iterable:
 
         def _window_iter(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-            for window_df in sliding_window(
+            for window_df in f.sliding_window(
                 df,
                 window_size=window_size,
                 step_size=step_size,
@@ -381,16 +342,14 @@ def window(
     else:
 
         def _window_single(df: pl.LazyFrame) -> pl.LazyFrame:
-            out = sliding_window(
+            return f.sliding_window(
                 df,
                 window_size=window_size,
                 step_size=step_size,
                 sliding_col=sliding_col,
+                offset_sliding_col=offset_sliding_col,
                 return_iterable=False,
             )
-            if offset_sliding_col:
-                out = out.with_columns(pl.col(sliding_col) - pl.col(sliding_col).min())
-            return out
 
         func_to_return = _window_single
 
@@ -436,7 +395,7 @@ def rebalance(
     """
 
     def _rebalance(df: pl.LazyFrame) -> pl.LazyFrame:
-        result = rebalance_highway_agents(
+        result = f.rebalance_highway_agents(
             df,
             ratio=ratio,
             req_lane_changes=req_lane_changes,
@@ -451,11 +410,6 @@ def rebalance(
     _rebalance.__name__ = "rebalance"
     _rebalance.__qualname__ = "transforms.rebalance"
     return _rebalance
-
-
-# -------------------------------------------------------------------
-# Group-then-yield (fan-out by column)
-# -------------------------------------------------------------------
 
 
 def group_by_yield(
@@ -493,11 +447,6 @@ def group_by_yield(
     _group_by_yield.__name__ = "group_by_yield"
     _group_by_yield.__qualname__ = "transforms.group_by_yield"
     return _group_by_yield
-
-
-# --------------------------------------------------------------------
-# Common polars expressions
-# --------------------------------------------------------------------
 
 
 def select(*expr: pl.Expr, **named_expr: pl.Expr) -> Transform:

@@ -14,7 +14,6 @@ from dronalize.loading.writer.format import OutputFormat
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
     from pathlib import Path
-    from types import TracebackType
 
     from dronalize.categories import DatasetSplit
     from dronalize.config.config import ExecutionConfig
@@ -24,6 +23,15 @@ if TYPE_CHECKING:
     from dronalize.execution.assigner import SplitAssigner
     from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
     from dronalize.loading import BaseSceneLoader
+    from dronalize.scene import SceneSchema
+
+
+@dataclass(slots=True, frozen=True)
+class ProcessingSummary:
+    """Display-ready summary of a prepared processing job."""
+
+    title: str
+    rows: tuple[tuple[str, str], ...]
 
 
 @dataclass(slots=True, frozen=True)
@@ -72,18 +80,60 @@ class DatasetJob:
 
         return None
 
-    def __enter__(self) -> DatasetRun:
-        """Open a live execution context for this job."""
-        return self.open().__enter__()
+    def summary(self) -> ProcessingSummary:
+        """Return a display-ready summary of this prepared job."""
+        loader, writer = self.config.loader, self.config.writer
+        splits = self.descriptor.predefined_splits
 
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_t: TracebackType | None,
-    ) -> None:
-        """Clean up any resources associated with this job."""
-        return
+        raw_rows = [
+            ("Dataset", self.descriptor.name),
+            ("Input directory", str(self.data_root)),
+            ("Output directory", str(self.output_dir)),
+            ("Output format", self.output_format.value),
+            ("Scene schema", f"{writer.scene_schema.name} ({writer.feature_dim} features)"),
+            (
+                "Horizon (in/out)",
+                f"{loader.resampled_input_len} / {loader.resampled_output_len} frames",
+            ),
+            ("Sample rate", f"{1 / loader.post_sample_time:.1f} Hz"),
+            ("Execution", self._execution_summary()),
+            ("Available splits", self._format_splits(splits)) if splits else None,
+            ("Read splits", self._loader_split_summary()),
+            ("Write outputs", self._writer_split_summary()),
+            ("Source limit", str(self.limit)) if self.limit is not None else None,
+            ("Random seed", str(self.seed)) if self.seed is not None else None,
+        ]
+
+        return ProcessingSummary(
+            title="Processing Plan", rows=tuple(row for row in raw_rows if row is not None)
+        )
+
+    def _execution_summary(self) -> str:
+        if not self.parallel:
+            return "sequential"
+        workers = self.config.execution.workers
+        return f"parallel ({workers} worker{'s' if workers != 1 else ''})"
+
+    def _loader_split_summary(self) -> str:
+        return self._format_splits(s) if (s := self.loader_splits()) else "all available data"
+
+    def _writer_split_summary(self) -> str:
+        if self.split_plan.custom_weights is not None:
+            return self._format_weighted_splits(self.split_plan.active_custom_groups())
+        return self._format_splits(s) if (s := self.writer_splits()) else "single output directory"
+
+    @staticmethod
+    def _format_splits(splits: list[DatasetSplit]) -> str:
+        return ", ".join(split.value for split in splits)
+
+    @staticmethod
+    def _format_weighted_splits(groups: list[tuple[DatasetSplit, float]]) -> str:
+        total_weight = sum(weight for _, weight in groups)
+        if total_weight <= 0:
+            return "single output directory"
+
+        formatted = [f"{split.value} ({weight / total_weight:.0%})" for split, weight in groups]
+        return ", ".join(formatted)
 
     @contextmanager
     def open(self) -> Iterator[DatasetRun]:
@@ -95,6 +145,7 @@ class DatasetJob:
                 loader_config=self.config.loader,
                 map_config=self.config.map,
                 splits=self.loader_splits(),
+                output_schema=self.config.writer.scene_schema,
             )
             executor = _build_executor(
                 loader,
@@ -105,7 +156,7 @@ class DatasetJob:
 
     def run(self) -> None:
         """Open this job and execute it immediately."""
-        with self as run:
+        with self.open() as run:
             run.run()
 
 
@@ -117,6 +168,10 @@ class DatasetRun:
     executor: ObservableWritingExecutor
     _writer_factory: WriterFactory | None = field(default=None, init=False, repr=False)
     _split_assigner: SplitAssigner | None = field(default=None, init=False, repr=False)
+
+    def summary(self) -> ProcessingSummary:
+        """Return the display-ready summary for the backing job."""
+        return self.job.summary()
 
     def run(self) -> None:
         """Execute the active run."""
@@ -229,12 +284,15 @@ def _build_loader(
     loader_config: LoaderConfig,
     map_config: MapConfig,
     splits: list[DatasetSplit] | None,
+    output_schema: SceneSchema | None,
 ) -> BaseSceneLoader[object]:
     """Instantiate a loader from a descriptor and its resolved config."""
     kwargs: dict[str, object] = dict(loader_config.extra_kwargs)
     if splits is not None:
         kwargs["splits"] = splits
-    return descriptor.loader_factory(data_root, loader_config, map_config, **kwargs)
+    loader = descriptor.loader_factory(data_root, loader_config, map_config, **kwargs)
+    loader.set_output_schema(output_schema)
+    return loader
 
 
 def _build_executor(

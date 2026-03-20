@@ -1,45 +1,43 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, TypeVar, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, overload
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from dronalize._internal._types import FloatDType, FloatScalarT
 from dronalize.categories import AgentCategory
 
 if TYPE_CHECKING:
     from dronalize.maps.graph import MapGraph
     from dronalize.scene import Scene, SceneSchema
 
-FloatScalar = TypeVar("FloatScalar", np.float32, np.float64)
-FloatDType = type[np.float32] | type[np.float64]
-
 
 PLACEHOLDER_FLOAT = np.zeros((1,), dtype=np.float64)
 PLACEHOLDER_I32 = np.zeros((1,), dtype=np.int32)
 
 
-class NumpyMapGraphDict(TypedDict, Generic[FloatScalar]):
+class NumpyMapGraphDict(TypedDict, Generic[FloatScalarT]):
     """TypedDict for the output of `map_graph_to_numpy`."""
 
     map_num_nodes: int
     map_num_edges: int
-    map_node_positions: npt.NDArray[FloatScalar]
+    map_node_positions: npt.NDArray[FloatScalarT]
     map_edge_indices: npt.NDArray[np.int32]
     map_node_types: npt.NDArray[np.int32]
     map_edge_types: npt.NDArray[np.int32]
 
 
-class NumpySceneDict(TypedDict, Generic[FloatScalar]):
+class NumpySceneDict(TypedDict, Generic[FloatScalarT]):
     """TypedDict for the output of `convert_to_numpy_dict`."""
 
     scene_number: int
     global_origin: npt.NDArray[np.float64]
     num_nodes: int
     type: npt.NDArray[np.int32]
-    input_features: npt.NDArray[FloatScalar]
-    target_features: npt.NDArray[FloatScalar]
+    input_features: npt.NDArray[FloatScalarT]
+    target_features: npt.NDArray[FloatScalarT]
     input_mask: npt.NDArray[np.bool_]
     target_mask: npt.NDArray[np.bool_]
 

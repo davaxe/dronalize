@@ -201,3 +201,16 @@ def test_positions_only_loader_keeps_native_schema_by_default() -> None:
     assert scene.schema == POSITIONS_ONLY_V1
     assert scene.inner.columns == ["frame", "id", "x", "y", "agent_category"]
     assert scene.inner["x"].to_list() == pytest.approx([0.0, 1.0, 2.0])
+
+
+def test_loader_exposes_effective_output_schema_helpers() -> None:
+    """Loaders should expose the effective output schema for optimization decisions."""
+    loader = _PositionsOnlyLoader(
+        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0),
+        output_schema=None,
+    )
+
+    assert loader.requested_scene_schema is None
+    assert loader.output_scene_schema == POSITIONS_ONLY_V1
+    assert loader.requires_scene_fields("x", "y") is True
+    assert loader.requires_scene_fields("vx") is False

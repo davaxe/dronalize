@@ -1,4 +1,5 @@
 # pyright: standard
+# ruff: noqa: PLC2701
 
 import numpy as np
 import polars as pl
@@ -13,11 +14,12 @@ from dronalize.scene import (
     SceneField,
     SceneSchema,
 )
+from dronalize.scene._derivations import ConversionContext, plan_derivations
 
 
 def test_scene_schema_define_uses_semantic_fields_in_canonical_order() -> None:
     """Test that field-based schema definitions normalize to canonical dataframe order."""
-    schema = SceneSchema(
+    schema = SceneSchema.define(
         name="custom",
         fields=(
             SceneField.Y,
@@ -60,10 +62,22 @@ def test_scene_schema_accepts_combined_intflag_fields() -> None:
     assert schema.semantic_fields() == ("frame", "id", "x", "y", "vx", "vy")
 
 
+def test_plan_derivations_accepts_scene_field_bitmasks() -> None:
+    """Derivation planning should operate directly on SceneField bitmasks."""
+    plan = plan_derivations(
+        SceneField.X | SceneField.Y,
+        SceneField.VX | SceneField.VY | SceneField.YAW,
+        ConversionContext(sample_time=1.0),
+    )
+
+    assert plan is not None
+    assert tuple(rule.name for rule in plan) == ("velocity_from_position", "yaw_from_velocity")
+
+
 def test_scene_schema_requires_base_fields() -> None:
     """Test that schemas must include the base frame, id, and position fields."""
     with pytest.raises(ValueError, match="base fields"):
-        SceneSchema(name="invalid", fields=(SceneField.FRAME, SceneField.ID, SceneField.X))
+        SceneSchema.define(name="invalid", fields=(SceneField.FRAME, SceneField.ID, SceneField.X))
 
 
 def test_scene_as_schema_derives_velocity_acceleration_and_yaw() -> None:

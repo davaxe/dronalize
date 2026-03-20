@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
-from typing import Any, Protocol, runtime_checkable
-
-from typing_extensions import Self
+from typing import Any, Protocol, Self, runtime_checkable
 
 import dronalize.categories as categories
 import dronalize.scene as scene_module

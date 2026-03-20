@@ -10,7 +10,6 @@ from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.common import utils
-from dronalize.exceptions import SplitNotSupportedError
 from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.maps import no_map
@@ -77,9 +76,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
             return self._sources_from_dir(self._train_dir)
         if split is DatasetSplit.VAL:
             return self._sources_from_dir(self._val_dir)
-        if split is DatasetSplit.TEST:
-            return self._sources_from_dir(self._test_dir)
-        raise SplitNotSupportedError(type(self).__name__, split)
+        return self._sources_from_dir(self._test_dir)
 
     @override
     def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
@@ -106,11 +103,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
 
     @override
     def num_sources(self) -> int | None:
-        splits = (
-            self.splits
-            if self.splits is not None
-            else self.predefined_splits()
-        )
+        splits = self.splits if self.splits is not None else self.predefined_splits()
         return sum(self._count_sources_for_split(split) for split in splits)
 
     @override
@@ -164,9 +157,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
             return self._count_sources(self._train_dir)
         if split is DatasetSplit.VAL:
             return self._count_sources(self._val_dir)
-        if split is DatasetSplit.TEST:
-            return self._count_sources(self._test_dir)
-        raise SplitNotSupportedError(type(self).__name__, split)
+        return self._count_sources(self._test_dir)
 
 
 _SCHEMA: pl.Schema = pl.Schema({

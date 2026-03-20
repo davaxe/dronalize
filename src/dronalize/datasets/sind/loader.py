@@ -119,13 +119,7 @@ class SindLoader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(
-            trajectory_pipeline(
-                self.loader_config,
-                velocity_columns=("vx", "vy"),
-                acceleration_columns=("ax", "ay"),
-            )
-        )
+        return Pipeline().compose(trajectory_pipeline(self.loader_config))
 
     @classmethod
     @override

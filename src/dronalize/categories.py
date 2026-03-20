@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum, IntEnum, auto
+from enum import IntEnum, StrEnum, auto
 
 
 class AgentCategory(IntEnum):
@@ -24,9 +24,9 @@ class AgentCategory(IntEnum):
     UNIMPORTANT = auto()
 
     @classmethod
-    def from_string(cls, s: str) -> AgentCategory:
+    def from_string(cls, value: str) -> AgentCategory:
         """Convert a string to an AgentCategory, case-insensitive."""
-        s: str = s.lower()
+        s: str = value.lower()
         for category in AgentCategory:
             if category.name.lower() == s:
                 return category
@@ -43,7 +43,7 @@ class AgentCategory(IntEnum):
         return cls.from_string(value)
 
 
-class DatasetSplit(str, Enum):
+class DatasetSplit(StrEnum):
     """Enum representing the available dataset splits."""
 
     TRAIN = "train"

@@ -13,6 +13,7 @@ from dronalize.datasets.ad4che.map.builder import AD4CHEMapBuilder
 from dronalize.datasets.common import utils
 from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
 from dronalize.loading import Source
+from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1
 
 if TYPE_CHECKING:
@@ -134,7 +135,7 @@ class AD4CHELoader(XLevelDataLoader):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
-            .with_resampling(1, 3)
+            .with_resampling(ResampleSpec(up=1, down=3))
             .with_filtering(require_frames=[59])
             .with_window(45)
         )

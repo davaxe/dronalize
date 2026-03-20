@@ -1,11 +1,4 @@
-"""Reusable composite pipeline factories for common trajectory processing.
-
-This module provides pre-built `~dronalize.pipeline.Pipeline`
-fragments that encapsulate recurring multi-step processing stages found
-across dataset loaders.  They are designed to be composed into a loader's
-`pipeline()` method via `Pipeline.compose` or the `>>` operator.
-
-"""
+"""Reusable composite pipeline factories for common trajectory processing."""
 
 from __future__ import annotations
 
@@ -15,8 +8,6 @@ import dronalize.pipeline.transforms as tr
 from dronalize.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from dronalize.config.loader import LoaderConfig
 
 
@@ -25,9 +16,6 @@ def trajectory_pipeline(
     *,
     agent_id: str = "id",
     frame_column: str = "frame",
-    pos_columns: Sequence[str] = ("x", "y"),
-    velocity_columns: Sequence[str] = (),
-    acceleration_columns: Sequence[str] = (),
     category_column: str | None = "agent_category",
 ) -> Pipeline:
     """Build the standard windowing → filtering → resampling → splitting pipeline.
@@ -56,12 +44,6 @@ def trajectory_pipeline(
         Agent identifier column.  Defaults to `"id"`.
     frame_column : str, optional
         Frame / timestep column.  Defaults to `"frame"`.
-    pos_columns : Sequence[str], optional
-        Position column names.  Defaults to `("x", "y")`.
-    velocity_columns : Sequence[str], optional
-        Velocity columns preserved using zero-order hold.
-    acceleration_columns : Sequence[str], optional
-        Acceleration columns preserved using zero-order hold.
     category_column : str or None, optional
         Agent-category column name.  Defaults to `"agent_category"`.
 
@@ -91,11 +73,8 @@ def trajectory_pipeline(
 
     pipeline = pipeline.then(
         tr.resample(
-            config.resampling,
+            spec=config.resampling,
             frame_column=frame_column,
-            pos_columns=pos_columns,
-            velocity_columns=velocity_columns,
-            acceleration_columns=acceleration_columns,
             group_by=group_by_resample,
         )
     )

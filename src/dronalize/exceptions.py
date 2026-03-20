@@ -15,7 +15,7 @@ class LoaderConfigError(ConfigurationError, DronalizeError):
     """Raised when there is an issue with a loader configuration."""
 
 
-class MissingOptionalDependencyError(ImportError, DronalizeError):
+class MissingOptionalDependencyError(DronalizeError):
     """Raised when an optional dependency required by a feature is unavailable."""
 
     def __init__(

@@ -14,6 +14,7 @@ from polars.testing import assert_frame_equal
 from dronalize.categories import AgentCategory
 from dronalize.config import LoaderConfig
 from dronalize.pipeline import transforms as transform
+from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.pipeline.pipeline import Pipeline, ReduceTransform
 
 if TYPE_CHECKING:
@@ -379,8 +380,10 @@ def test_transform_resample_downsample() -> None:
         "x": [float(i) for i in range(10)],
         "y": [0.0] * 10,
     }).lazy()
-    config = LoaderConfig(input_len=5, output_len=5, sample_time=0.1).with_resampling(1, 2)
-    fn = transform.resample(config.resampling)
+    config = LoaderConfig(input_len=5, output_len=5, sample_time=0.1).with_resampling(
+        ResampleSpec(up=1, down=2)
+    )
+    fn = transform.resample(spec=config.resampling)
     result = fn(lf).collect()
     assert result.shape[0] == 5
 

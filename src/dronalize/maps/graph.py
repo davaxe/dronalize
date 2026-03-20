@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import multiprocessing.shared_memory as shm
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
-from typing_extensions import Self, override
+from typing_extensions import override
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -72,14 +72,7 @@ class SharedMapGraph:
         self._shared.close()
 
     def __enter__(self) -> MapGraph:
-        """Access the `MapGraph` from shared memory.
-
-        Returns
-        -------
-        MapGraph
-            The `MapGraph` instance loaded from shared memory.
-
-        """
+        """Access the `MapGraph` from shared memory."""
         return self.open()
 
     def __exit__(
@@ -88,18 +81,7 @@ class SharedMapGraph:
         exc_val: BaseException | None,
         exc_t: TracebackType | None,
     ) -> None:
-        """Release resources when exiting the context.
-
-        Parameters
-        ----------
-        exc_type : type[BaseException] or None
-            The exception type, if any.
-        exc_val : BaseException or None
-            The exception value, if any.
-        exc_t : TracebackType or None
-            The traceback, if any.
-
-        """
+        """Release resources when exiting the context."""
         self.close()
 
     def __del__(self) -> None:

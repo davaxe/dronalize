@@ -5,9 +5,9 @@ import itertools
 import multiprocessing as mp
 from collections import deque
 from multiprocessing.util import Finalize
-from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Generic, NamedTuple, Self, TypeVar
 
-from typing_extensions import Self, override
+from typing_extensions import override
 
 import dronalize.execution.parallel._state as _state  # noqa: PLR0402
 from dronalize._internal._types import P, SourceT

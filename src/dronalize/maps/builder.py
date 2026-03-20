@@ -6,11 +6,11 @@ from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from itertools import starmap
 from math import ceil
-from typing import TYPE_CHECKING, Protocol, TypedDict
+from typing import TYPE_CHECKING, Protocol, Self, TypedDict
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from dronalize.maps.edge_type import EdgeType
 from dronalize.maps.graph import MapGraph
@@ -159,9 +159,6 @@ class BaseMapBuilder(MapBuilder, ABC):
         self._id_to_index[node_id] = idx
         self._x.append(x)
         self._y.append(y)
-
-        # Keep the auto-counter ahead of any manually-assigned ID so that
-        # future `add_node` calls never collide with it.
         if node_id >= self._node_id_counter:
             self._node_id_counter = node_id + 1
 

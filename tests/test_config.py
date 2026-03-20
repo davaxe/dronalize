@@ -17,6 +17,7 @@ from dronalize.config.map import (
     SquareExtraction,
 )
 from dronalize.config.writer import WriterConfig
+from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.scene import (
     CANONICAL_V1,
     POSITIONS_ONLY_V1,
@@ -247,7 +248,9 @@ def test_loader_config_with_filtering_rejects_out_of_range_negative_frame() -> N
 def test_resolve_config_deep_merges_partial_overrides() -> None:
     """Deep merges should preserve unspecified nested fields from the default config."""
     default = Config(
-        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_resampling(2, 1),
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_resampling(
+            ResampleSpec(up=2, down=1)
+        ),
         map=MapConfig.default(),
     )
 
@@ -426,3 +429,69 @@ def test_square_extraction_missing_size() -> None:
 
     assert "Field required" in str(exc_info.value)
     assert "size" in str(exc_info.value)
+
+
+def test_writer_config_positions_only_schema() -> None:
+    """Verify initialization with the 'positions_only' shorthand string."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({**base, "scene_schema": "positions_only"})
+
+    assert config.scene_schema == POSITIONS_ONLY_V1
+    assert config.feature_columns == ("x", "y")
+    assert config.feature_dim == 2
+
+
+def test_writer_config_predefined_object_schema() -> None:
+    """Ensure the config accepts a predefined schema object."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({
+        **base,
+        "scene_schema": POSITIONS_VELOCITY_ACCELERATION_V1,
+    })
+
+    assert config.scene_schema == POSITIONS_VELOCITY_ACCELERATION_V1
+    assert config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
+    assert config.feature_dim == 6
+
+
+def test_writer_config_single_field_custom_schema() -> None:
+    """Check that a single custom field is correctly appended to base fields."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({**base, "scene_schema": "vx"})
+
+    assert config.feature_columns == ("x", "y", "vx")
+    assert config.feature_dim == 3
+    assert config.scene_schema.name == "custom: vx"
+
+
+def test_writer_config_multi_field_custom_schema() -> None:
+    """Validate that multiple colon-separated fields generate a custom schema."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({**base, "scene_schema": "vx:vy:yaw"})
+
+    assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
+    assert config.feature_dim == 5
+    assert config.scene_schema.name == "custom: vx:vy:yaw"
+
+
+def test_writer_config_custom_schema_ordering() -> None:
+    """Confirm that the internal representation maintains consistent field ordering."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({**base, "scene_schema": "yaw:vx:vy"})
+
+    assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
+    assert config.feature_dim == 5
+    assert config.scene_schema.name == "custom: yaw:vx:vy"
+
+
+def test_writer_config_invalid_schema_validation() -> None:
+    """Raise ValidationError when required base fields are missing from a custom schema."""
+    base = {"precision": "float64", "offset_positions": False}
+    with pytest.raises(ValidationError, match=r"must include the base fields"):
+        WriterConfig.model_validate({
+            **base,
+            "scene_schema": {
+                "name": "custom_schema",
+                "fields": ["x", "y", "ax"],
+            },
+        })

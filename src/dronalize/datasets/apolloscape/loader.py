@@ -12,6 +12,7 @@ from dronalize.exceptions import SplitNotSupportedError
 from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_YAW_V1
 
@@ -125,7 +126,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=4, output_len=6, sample_time=0.5)
-            .with_resampling(5, 1)
+            .with_resampling(ResampleSpec(up=5, down=1))
             .with_filtering(require_frames=[3])
             .with_window(1)
         )

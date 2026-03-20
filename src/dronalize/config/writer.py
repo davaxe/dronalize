@@ -51,5 +51,5 @@ class WriterConfig(BaseModel):
 
     @property
     def float_dtype(self) -> FloatDType:
-        """Return the NumPy dtype implied by ``precision``."""
+        """Return the NumPy dtype implied by `precision`."""
         return np.float32 if self.precision == "float32" else np.float64

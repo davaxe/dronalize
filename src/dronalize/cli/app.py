@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
+from rich import box
 from rich import print as rprint
 from rich.table import Table
 
 from dronalize.categories import DatasetSplit
+
+if TYPE_CHECKING:
+    from dronalize.execution.runner import ProcessingSummary
 
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
 _ = DatasetSplit | Path
@@ -73,30 +77,7 @@ def process(
         bool, typer.Option("--force", "-f", help="Force processing without confirmation.")
     ] = False,
 ) -> None:
-    """Process a specified dataset."""
-    if not force:
-        summary_table = Table(title="Processing Configuration", show_header=False)
-        summary_table.add_column("Parameter", style="cyan", justify="right")
-        summary_table.add_column("Value", style="magenta")
-        summary_table.add_row("Dataset", dataset)
-        summary_table.add_row("Input directory", str(input_dir))
-        summary_table.add_row("Output directory", str(output_dir))
-        summary_table.add_row("Output format", str(output_format))
-        if scene_schema is not None:
-            summary_table.add_row("Scene schema", scene_schema)
-
-        if split:
-            summary_table.add_row("Split", ", ".join(item.value for item in split))
-        if custom_split:
-            summary_table.add_row("Custom Split", str(custom_split))
-        if limit:
-            summary_table.add_row("Limit", str(limit))
-
-        rprint(summary_table)
-        if not typer.confirm("Proceed with these settings?"):
-            raise typer.Abort
-
-    from dronalize.cli.progress import run_with_rich_progress
+    """[bold]Process a specified dataset[/bold]."""
     from dronalize.execution import prepare_dataset
 
     job = prepare_dataset(
@@ -112,7 +93,14 @@ def process(
         output_format=output_format,
         scene_schema=scene_schema,
     )
-    with job as run:
+
+    if not force:
+        rprint(_render_processing_summary(job.summary()))
+        _ = typer.confirm("Proceed with this processing plan?", abort=True)
+
+    from dronalize.cli.progress import run_with_rich_progress
+
+    with job.open() as run:
         run_with_rich_progress(run.executor, run.run, enable=progress)
 
 
@@ -164,3 +152,14 @@ def available(
 def main() -> None:
     """Run the Typer CLI application."""
     app()
+
+
+def _render_processing_summary(summary: ProcessingSummary) -> Table:
+    table = Table(title=summary.title, show_header=False, box=box.ROUNDED)
+    table.add_column(style="cyan", justify="left", no_wrap=True)
+    table.add_column(style="magenta")
+
+    for label, value in summary.rows:
+        table.add_row(label, value)
+
+    return table

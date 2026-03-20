@@ -39,8 +39,6 @@ def _ensure_frozenset_int(v: int | Iterable[int] | None) -> frozenset[int] | Non
 
 
 AgentTypeValue = int | str | AgentCategory
-
-# Type aliases for cleaner fields
 FrozenIntSet = Annotated[frozenset[int] | None, BeforeValidator(_ensure_frozenset_int)]
 FrozenAgentSet = Annotated[
     frozenset[AgentCategory] | None, BeforeValidator(_ensure_frozenset_agent)
@@ -51,42 +49,12 @@ class FilteringConfig(BaseModel):
     """Configuration for filtering scenes based on agent validity and scene composition."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    min_agents: int = Field(
-        default=2, ge=0, description="Minimum number of agents required in a scene to be valid."
-    )
-
-    require_all_valid: bool = Field(
-        default=False,
-        description=(
-            "If True, requires all agents in a scene to have valid positions "
-            "for all time-steps in the scene."
-        ),
-    )
-
-    require_frames: FrozenIntSet = Field(
-        default=None,
-        description="Specific frames offset required for the agent to be considered valid.",
-    )
-
-    exclude_agent_categories: FrozenAgentSet = Field(
-        default=None, description="Set of agent categories to filter out from scenes."
-    )
-
-    filter_slow_agents: float | None = Field(
-        default=None,
-        ge=0.0,
-        description="Filter out agents with an average distance per step below this threshold.",
-    )
-
-    min_samples_per_agent: int | None = Field(
-        default=None,
-        ge=1,
-        description=(
-            "Minimum number of data points (rows) required per agent. "
-            "Agents with fewer samples are removed before any other validity checks."
-        ),
-    )
+    min_agents: int = Field(default=2, ge=0)
+    require_all_valid: bool = Field(default=False)
+    require_frames: FrozenIntSet = Field(default=None)
+    exclude_agent_categories: FrozenAgentSet = Field(default=None)
+    filter_slow_agents: float | None = Field(default=None, ge=0.0)
+    min_samples_per_agent: int | None = Field(default=None, ge=1)
 
     @classmethod
     def create(

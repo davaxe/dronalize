@@ -16,6 +16,7 @@ from dronalize.datasets.opendd.map.builder import OpenDDMapBuilder
 from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
@@ -137,7 +138,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
-            .with_resampling(1, 3)
+            .with_resampling(ResampleSpec(up=1, down=3))
             .with_window(75)
             .with_filtering(require_frames=[59])
         )

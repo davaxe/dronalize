@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 MapKey = str | None
 """Lightweight map identifier stored on each scene."""
+MapResolver = Callable[["Scene"], MapGraph | None]
 
 
 @dataclass(slots=True, frozen=True)
@@ -120,13 +121,10 @@ class Scene:
             f"scene_number={self.number}, "
             f"input_len={self.input_len}, "
             f"output_len={self.output_len}, "
-            f"schema={self.schema.name}/v{self.schema.version}, "
+            f"schema={self.schema.name}"
             f"map_key={self.map_key!r}, "
             f"inner=DataFrame({rows} rows x {cols} cols))"
         )
-
-
-MapResolver = Callable[[Scene], MapGraph | None]
 
 
 def convert_scene(scene: Scene, target: SceneSchema = CANONICAL_V1) -> Scene:
@@ -178,14 +176,14 @@ def _derive_missing_fields(
         return data
 
     context = ConversionContext(sample_time=sample_time)
-    plan = plan_derivations(source.ordered_fields(), target.ordered_fields(), context)
+    plan = plan_derivations(available_fields, required_fields, context)
     if plan is None:
         missing_fields = required_fields & ~available_fields
-        if requires_sample_time(missing_fields.fields(), available_fields.fields(), context):
+        if requires_sample_time(missing_fields, available_fields, context):
             msg = "Scene schema conversion requires sample_time to derive kinematics."
             raise ValueError(msg)
         missing = ", ".join(field.to_str() for field in missing_fields.fields())
-        msg = f"Cannot materialize scene schema {target.name}/v{target.version}; missing {missing}."
+        msg = f"Cannot materialize scene schema {target.name}; missing {missing}."
         raise ValueError(msg)
 
     output = apply_derivation_plan(data.lazy(), plan, context).collect()
@@ -196,7 +194,7 @@ def _derive_missing_fields(
 
     if (output_fields & required_fields) != required_fields:
         missing = ", ".join(field.to_str() for field in (required_fields & ~output_fields).fields())
-        msg = f"Cannot materialize scene schema {target.name}/v{target.version}; missing {missing}."
+        msg = f"Cannot materialize scene schema {target.name}; missing {missing}."
         raise ValueError(msg)
     return output
 

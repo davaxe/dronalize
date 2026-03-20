@@ -61,21 +61,9 @@ class MapConfig(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    min_distance: float | None = Field(
-        gt=0,
-        description="Target minimum distance between two adjacent map nodes.",
-        default=1.75,
-    )
-    interp_distance: float | None = Field(
-        gt=0,
-        description="Distance between interpolated nodes when densifying the map graph.",
-        default=3.0,
-    )
-    include_map: bool = Field(
-        default=True,
-        description="Whether to include map data at all.",
-    )
-
+    min_distance: float | None = Field(gt=0, default=1.75)
+    interp_distance: float | None = Field(gt=0, default=3.0)
+    include_map: bool = True
     extraction: MapExtraction = Field(default_factory=NoneExtraction)
 
     @model_validator(mode="after")

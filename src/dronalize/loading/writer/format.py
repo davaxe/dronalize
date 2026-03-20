@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class OutputFormat(str, Enum):
+class OutputFormat(StrEnum):
     """Enum for output formats."""
 
     MDS = "mds"

@@ -8,7 +8,6 @@ from typing_extensions import override
 
 from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
-from dronalize.exceptions import SplitNotSupportedError
 from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
@@ -90,7 +89,6 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
             yield from self._sources_from_dir(self._data_root / "test_multi-agent")
             yield from self._sources_from_dir(self._data_root / "test_conditional-multi-agent")
             return
-        raise SplitNotSupportedError(type(self).__name__, split)
 
     @override
     def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
@@ -116,21 +114,12 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
 
     @override
     def num_sources(self) -> int | None:
-        splits = (
-            self.splits
-            if self.splits is not None
-            else self.predefined_splits()
-        )
+        splits = self.splits if self.splits is not None else self.predefined_splits()
         return sum(self._count_sources_for_split(split) for split in splits)
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(
-            trajectory_pipeline(
-                self.loader_config,
-                velocity_columns=("vx", "vy"),
-            )
-        )
+        return Pipeline().compose(trajectory_pipeline(self.loader_config))
 
     @classmethod
     @override
@@ -175,11 +164,9 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
             return self._count_sources(self._data_root / "train")
         if split is DatasetSplit.VAL:
             return self._count_sources(self._data_root / "val")
-        if split is DatasetSplit.TEST:
-            return self._count_sources(self._data_root / "test_multi-agent") + self._count_sources(
-                self._data_root / "test_conditional-multi-agent"
-            )
-        raise SplitNotSupportedError(type(self).__name__, split)
+        return self._count_sources(self._data_root / "test_multi-agent") + self._count_sources(
+            self._data_root / "test_conditional-multi-agent"
+        )
 
 
 _SCHEMA = pl.Schema({

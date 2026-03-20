@@ -12,6 +12,8 @@ from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.functional.resample import ResampleSpec
+from dronalize.pipeline.functional.resample._common import ResampleMethod
 from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
@@ -106,11 +108,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
 
     @override
     def num_sources(self) -> int | None:
-        splits = (
-            self.splits
-            if self.splits is not None
-            else self.predefined_splits()
-        )
+        splits = self.splits if self.splits is not None else self.predefined_splits()
         return sum(self._count_sources_for_split(split) for split in splits)
 
     @classmethod
@@ -123,8 +121,15 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
                 sample_time=0.4,
             )
             .with_window(step_size=1)
-            .with_filtering(require_all_valid=True, min_samples_per_agent=2)
-            .with_resampling(4, 1, method="fast")
+            .with_filtering(require_all_valid=False, min_samples_per_agent=2, require_frames=[7])
+            .with_resampling(
+                ResampleSpec(
+                    up=4,
+                    down=1,
+                    method=ResampleMethod.PCHIP,
+                    output_derivatives={1: {"vx": None, "vy": None}, 2: {"ax": None, "ay": None}},
+                )
+            )
         )
 
     @classmethod

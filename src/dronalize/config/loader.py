@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing_extensions import Self
 
 from dronalize.config.filtering import FilteringConfig
-from dronalize.pipeline.functional.resample import Resampling, ResamplingMethod
+from dronalize.pipeline.functional.resample import ResampleSpec  # noqa: TC001
 
 if TYPE_CHECKING:
     from collections.abc import Collection
@@ -47,35 +46,22 @@ class LoaderConfig(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    input_len: int = Field(gt=0, description="Observation length in frames.")
-    output_len: int = Field(gt=0, description="Prediction length in frames.")
-    sample_time: float = Field(gt=0, description="Time interval between frames in seconds.")
-
-    resampling: Resampling | None = Field(
-        default=None, description="Resampling config if applicable."
-    )
-    window: WindowParams | None = Field(
-        default=None,
-        description=(
-            "Used for datasets where multiple samples can be generated from a single "
-            "scene by using a sliding window approach. If None, it is assumed that each "
-            "scene corresponds to exactly one sample."
-        ),
-    )
-    filtering: FilteringConfig | None = Field(
-        default=None,
-        description=(
-            "Configuration for filtering scenes based on agent validity and scene composition."
-        ),
-    )
-    extra_kwargs: dict[str, Any] = Field(
-        default_factory=dict, description=("Extra keyword arguments to pass to the loader factory.")
-    )
+    input_len: int = Field(gt=0)
+    output_len: int = Field(gt=0)
+    sample_time: float = Field(gt=0)
+    resampling: ResampleSpec | None = Field(default=None)
+    window: WindowParams | None = Field(default=None)
+    filtering: FilteringConfig | None = Field(default=None)
+    extra_kwargs: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate(self) -> LoaderConfig:
+        self._validate_window()
+        return self
+
+    def _validate_window(self) -> None:
         if self.window is None:
-            return self
+            return
         sequence_length = self._sequence_length()
         if self.window.window_size != sequence_length:
             msg = (
@@ -83,7 +69,6 @@ class LoaderConfig(BaseModel):
                 f"({sequence_length}) for consistent windowing."
             )
             raise ValueError(msg)
-        return self
 
     def _sequence_length(self) -> int:
         """Return the total number of frames in one input/output sequence."""
@@ -171,32 +156,21 @@ class LoaderConfig(BaseModel):
 
     def with_resampling(
         self,
-        up: int,
-        down: int,
-        method: Literal["fast"] | ResamplingMethod = "fast",
+        spec: ResampleSpec,
     ) -> Self:
         """Return a copy with the given resampling parameters.
 
         Parameters
         ----------
-        up : int
-            Upsampling factor.
-        down : int
-            Downsampling factor.
-        method : {"fast"}, optional
-            Resampling method to use. Defaults to `"fast"`.
+        spec : ResampleSpec
+            Resampling specification.
 
         Returns
         -------
         Self
             A **new** config instance with resampling parameters set.
         """
-        new_resampling = Resampling(
-            up=up,
-            down=down,
-            method=method if isinstance(method, ResamplingMethod) else ResamplingMethod(method),
-        )
-        return self.model_copy(update={"resampling": new_resampling})
+        return self.model_copy(update={"resampling": spec})
 
     @property
     def resampled_input_len(self) -> int:

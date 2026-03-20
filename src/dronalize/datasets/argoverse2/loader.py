@@ -12,7 +12,6 @@ from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.argoverse2.map.builder import Argoverse2MapBuilder
 from dronalize.datasets.common import utils
-from dronalize.exceptions import SplitNotSupportedError
 from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.pipeline import Pipeline
@@ -79,9 +78,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             return self._sources_from_dir(self._data_root / "train")
         if split is DatasetSplit.VAL:
             return self._sources_from_dir(self._data_root / "val")
-        if split is DatasetSplit.TEST:
-            return self._sources_from_dir(self._data_root / "test")
-        raise SplitNotSupportedError(type(self).__name__, split)
+        return self._sources_from_dir(self._data_root / "test")
 
     @override
     def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
@@ -112,21 +109,12 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
 
     @override
     def num_sources(self) -> int | None:
-        splits = (
-            self.splits
-            if self.splits is not None
-            else self.predefined_splits()
-        )
+        splits = self.splits if self.splits is not None else self.predefined_splits()
         return sum(self._count_sources_for_split(split) for split in splits)
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(
-            trajectory_pipeline(
-                self.loader_config,
-                velocity_columns=("vx", "vy"),
-            )
-        )
+        return Pipeline().compose(trajectory_pipeline(self.loader_config))
 
     @classmethod
     @override
@@ -212,6 +200,4 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             return self._count_sources(self._data_root / "train")
         if split is DatasetSplit.VAL:
             return self._count_sources(self._data_root / "val")
-        if split is DatasetSplit.TEST:
-            return self._count_sources(self._data_root / "test")
-        raise SplitNotSupportedError(type(self).__name__, split)
+        return self._count_sources(self._data_root / "test")

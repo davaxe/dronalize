@@ -49,7 +49,8 @@ custom_flag = "active"
 [a43.loader.resampling]
 up = 2
 down = 1
-method = "fast"
+method = "spline"
+max_gap = 5
 
 [a43.map]
 min_distance = 0.5
@@ -61,7 +62,8 @@ mode = "radial"
 radius = 50.0
 
 [a43.writer]
-scene_form = "positions_only"
+scene_schema = "vx"
+precision = "float64"
 
 # ------------------------------------------------------------------------------
 # Dataset 'b99' Overrides

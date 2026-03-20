@@ -176,7 +176,13 @@ def from_latlon(
     force_zone_letter: str | None = None,
     force_northern: bool | None = None,
 ) -> tuple[float | FloatArray, float | FloatArray, int, str | None]:
-    """Convert latitude and longitude coordinates to UTM coordinates."""
+    """Convert latitude and longitude coordinates to UTM coordinates.
+
+    This function is ported from `utm.from_latlon` with modification for better
+    type hints. Reason for porting instead of depending on the library is to
+    avoid an extra dependency just for this function.
+
+    """
     latitude_array, longitude_array = np.broadcast_arrays(
         np.asarray(latitude, dtype=np.float64),
         np.asarray(longitude, dtype=np.float64),

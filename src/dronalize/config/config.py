@@ -1,24 +1,18 @@
 from __future__ import annotations
 
 import multiprocessing as mp
-import sys
+import tomllib
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeGuard, TypeVar
 
 from pydantic import BaseModel, Field, RootModel
 
-from dronalize.config.loader import LoaderConfig  # noqa: TC001 (needed for pydantic)
+from dronalize.config.loader import LoaderConfig  # noqa: TC001
 from dronalize.config.map import MapConfig
 from dronalize.config.writer import WriterConfig
 
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
-
 if TYPE_CHECKING:
     from pathlib import Path
-
 
 # Define a TypeVar bound to BaseModel for generic type hinting
 TModel = TypeVar("TModel", bound=BaseModel)

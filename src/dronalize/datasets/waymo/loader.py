@@ -12,7 +12,6 @@ from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
 from dronalize.datasets.waymo.map.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
-from dronalize.exceptions import SplitNotSupportedError
 from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
@@ -87,17 +86,11 @@ class WaymoLoader(BaseSceneLoader[Path]):
             return self._sources_from_dir(self._data_root / "training")
         if split is DatasetSplit.VAL:
             return self._sources_from_dir(self._data_root / "validation")
-        if split is DatasetSplit.TEST:
-            return self._sources_from_dir(self._data_root / "testing")
-        raise SplitNotSupportedError(type(self).__name__, split)
+        return self._sources_from_dir(self._data_root / "testing")
 
     @override
     def num_sources(self) -> int | None:
-        splits = (
-            self.splits
-            if self.splits is not None
-            else self.predefined_splits()
-        )
+        splits = self.splits if self.splits is not None else self.predefined_splits()
         return sum(self._count_sources_for_split(split) for split in splits)
 
     @override
@@ -128,12 +121,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
     def pipeline(self) -> Pipeline:
         return (
             Pipeline()
-            .compose(
-                trajectory_pipeline(
-                    self.loader_config,
-                    velocity_columns=("vx", "vy"),
-                )
-            )
+            .compose(trajectory_pipeline(self.loader_config))
             # Shift autonomous vehicle id from -1 to 0
             .then(tr.with_columns(pl.col("id") + 1))
         )
@@ -161,9 +149,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
             return self._count_sources(self._data_root / "training")
         if split is DatasetSplit.VAL:
             return self._count_sources(self._data_root / "validation")
-        if split is DatasetSplit.TEST:
-            return self._count_sources(self._data_root / "testing")
-        raise SplitNotSupportedError(type(self).__name__, split)
+        return self._count_sources(self._data_root / "testing")
 
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:

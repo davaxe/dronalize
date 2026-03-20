@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 import numpy as np
 from scipy.interpolate import BSpline
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from dronalize.datasets.nuscenes.map.builder import NuScenesMapBuilder
 from dronalize.datasets.nuscenes.map.parser import NuScenesMap

@@ -12,6 +12,7 @@ from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.maps.resolver import no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
@@ -131,7 +132,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=4, output_len=12, sample_time=0.5)
-            .with_resampling(up=5, down=1)
+            .with_resampling(ResampleSpec(up=5, down=1))
             .with_window(step_size=1)
             .with_filtering(require_frames=[3])
         )

@@ -1,6 +1,6 @@
 [build-system]
-requires = ["uv_build>=0.10,<0.11.0"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [project]
 name = "dronalize"
@@ -12,14 +12,13 @@ authors = [
 ]
 readme = "README.md"
 license = { text = "Apache-2.0" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 dependencies = [
     "numpy>=1.24.0",
     "polars>=1.0.0",
     "pyarrow>=14.0.0",
     "scipy>=1.10.0",
-    "tomli>=2.0.1; python_version < '3.11'",
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
     "mosaicml-streaming>=0.13.0",
@@ -60,7 +59,7 @@ dev = [
     "scipy-stubs",
     "ipython",
     "tomli>=2.0.1",
-    "dronalize[plot,lyft,ad4che, cli]",
+    "dronalize[plot,lyft,ad4che,cli]",
 ]
 tools = [
     "mkdocs-material>=9.6.0",
@@ -69,14 +68,14 @@ tools = [
     "ruff>=0.15.4",
 ]
 
-[tool.uv.build-backend]
-module-name = "dronalize"
-module-root = "src"
-# Exclude
-exclude = ["tests*", "examples*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/dronalize"]
 
-[tool.uv.extra-build-dependencies]
-torch-cluster = ["torch"]
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/tests",
+    "/examples",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "dronalize"]
@@ -118,8 +117,8 @@ project-excludes = [
     "**/*_pb2.pyi",
 ]
 
-[tool.pyright]
-pythonVersion = "3.10"
+[tool.basedpyright]
+pythonVersion = "3.11"
 pythonPlatform = "All"
 typeCheckingMode = "recommended"
 reportIgnoreCommentWithoutRule = true

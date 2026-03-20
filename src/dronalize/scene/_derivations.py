@@ -13,16 +13,13 @@ from dronalize.pipeline.functional.basic import yaw_from_vel
 from dronalize.pipeline.functional.derivative import derivative
 from dronalize.scene._schema import SceneField
 
-_POSITION_FIELDS: Final[frozenset[SceneField]] = frozenset({SceneField.X, SceneField.Y})
-_VELOCITY_FIELDS: Final[frozenset[SceneField]] = frozenset({SceneField.VX, SceneField.VY})
-_ACCELERATION_FIELDS: Final[frozenset[SceneField]] = frozenset({SceneField.AX, SceneField.AY})
-_YAW_FIELDS: Final[frozenset[SceneField]] = frozenset({SceneField.YAW})
-_KINEMATIC_FIELDS = _VELOCITY_FIELDS | _ACCELERATION_FIELDS
+_POSITION_FIELDS: Final[SceneField] = SceneField.X | SceneField.Y
+_VELOCITY_FIELDS: Final[SceneField] = SceneField.VX | SceneField.VY
+_ACCELERATION_FIELDS: Final[SceneField] = SceneField.AX | SceneField.AY
+_YAW_FIELDS: Final[SceneField] = SceneField.YAW
+_KINEMATIC_FIELDS: Final[SceneField] = _VELOCITY_FIELDS | _ACCELERATION_FIELDS
 
-_DERIVATIVE_RENAME: Final[dict[int, list[str]]] = {
-    1: ["vx", "vy"],
-    2: ["ax", "ay"],
-}
+_DERIVATIVE_RENAME: Final[dict[int, list[str]]] = {1: ["vx", "vy"], 2: ["ax", "ay"]}
 _TMP_YAW_VELOCITY: Final[tuple[str, str]] = ("__scene_tmp_vx", "__scene_tmp_vy")
 
 
@@ -43,9 +40,9 @@ class DerivationRule:
 
     name: str
     """Unique name for this rule."""
-    requires: frozenset[SceneField]
+    requires: SceneField
     """Fields required to apply this rule."""
-    outputs: frozenset[SceneField]
+    outputs: SceneField
     """Fields added by applying this rule."""
     cost: int
     """Relative cost of applying this rule, used for derivation planning."""
@@ -56,12 +53,12 @@ class DerivationRule:
 
     def is_applicable(
         self,
-        available: frozenset[SceneField],
+        available: SceneField,
         context: ConversionContext,
     ) -> bool:
         """Return True if the rule can be applied in the current state."""
-        has_inputs = self.requires.issubset(available)
-        adds_new_fields = not self.outputs.issubset(available)
+        has_inputs = (available & self.requires) == self.requires
+        adds_new_fields = (available & self.outputs) != self.outputs
         has_required_time = not self.needs_sample_time or context.sample_time is not None
         return has_inputs and adds_new_fields and has_required_time
 
@@ -77,10 +74,10 @@ def apply_derivation_plan(
     return data
 
 
-@functools.lru_cache(maxsize=128)
+@functools.cache
 def plan_derivations(
-    available_fields: Iterable[SceneField],
-    required_fields: Iterable[SceneField],
+    available_fields: SceneField,
+    required_fields: SceneField,
     context: ConversionContext,
 ) -> tuple[DerivationRule, ...] | None:
     """Find the optimal plan to derive the required fields.
@@ -91,24 +88,24 @@ def plan_derivations(
 
     Parameters
     ----------
-    available_fields : Iterable[SceneField]
-        The set of fields currently available.
-    required_fields : Iterable[SceneField]
-        The set of fields that need to be derived.
+    available_fields : SceneField
+        Bitmask of fields currently available.
+    required_fields : SceneField
+        Bitmask of fields that need to be derived.
     context : ConversionContext
         Additional information that may affect rule applicability, such as
         sample time.
 
     """
-    start = frozenset(available_fields)
-    goal = frozenset(required_fields)
+    start = available_fields
+    goal = required_fields
 
-    if goal.issubset(start):
+    if (start & goal) == goal:
         return ()
 
-    best_cost: dict[frozenset[SceneField], int] = {start: 0}
-    came_from: dict[frozenset[SceneField], tuple[frozenset[SceneField], DerivationRule]] = {}
-    queue: list[tuple[int, int, frozenset[SceneField]]] = []
+    best_cost: dict[SceneField, int] = {start: 0}
+    came_from: dict[SceneField, tuple[SceneField, DerivationRule]] = {}
+    queue: list[tuple[int, int, SceneField]] = []
     tie_breaker = count()
     heappush(queue, (0, next(tie_breaker), start))
 
@@ -116,7 +113,7 @@ def plan_derivations(
         cost, _, state = heappop(queue)
         if cost > best_cost.get(state, float("inf")):
             continue
-        if goal.issubset(state):
+        if (state & goal) == goal:
             plan: list[DerivationRule] = []
             curr_state = state
             while curr_state in came_from:
@@ -138,8 +135,8 @@ def plan_derivations(
 
 
 def can_plan_with_sample_time(
-    available_fields: Iterable[SceneField],
-    required_fields: Iterable[SceneField],
+    available_fields: SceneField,
+    required_fields: SceneField,
     context: ConversionContext,
 ) -> bool:
     """Return whether a derivation plan exists if sample time is available."""
@@ -151,21 +148,19 @@ def can_plan_with_sample_time(
 
 
 def requires_sample_time(
-    missing_fields: Iterable[SceneField],
-    available_fields: Iterable[SceneField],
+    missing_fields: SceneField,
+    available_fields: SceneField,
     context: ConversionContext,
 ) -> bool:
     """Return True if the missing fields become derivable only when sample_time is provided."""
-    missing: frozenset[SceneField] = frozenset(missing_fields)
-    available: frozenset[SceneField] = frozenset(available_fields)
-    if (context.sample_time is not None or not missing) or not missing.intersection(
-        _KINEMATIC_FIELDS
-    ):
+    missing = missing_fields
+    available = available_fields
+    if (context.sample_time is not None or not missing) or not (missing & _KINEMATIC_FIELDS):
         return False
 
-    has_source_for_kinematics: bool = _POSITION_FIELDS.issubset(
-        available
-    ) or _VELOCITY_FIELDS.issubset(available)
+    has_source_for_kinematics = ((available & _POSITION_FIELDS) == _POSITION_FIELDS) or (
+        (available & _VELOCITY_FIELDS) == _VELOCITY_FIELDS
+    )
     if not has_source_for_kinematics:
         return False
 

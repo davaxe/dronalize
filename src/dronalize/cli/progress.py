@@ -86,33 +86,28 @@ class _ProgressMonitor:
 
     def _wait_for_start(self, timeout: float | None) -> bool:
         """Wait for the executor to emit its first lifecycle update."""
-        deadline = None if timeout is None else time.monotonic() + timeout
-        if self._executor.progress_event().wait():
-            self._executor.progress_event().clear()
+        if not self._executor.progress_event().wait(timeout):
+            return False
 
-        if deadline is not None and time.monotonic() >= deadline:
-            msg = "Progress monitor timed out waiting for executor to start."
-            raise TimeoutError(msg)
+        self._executor.progress_event().clear()
 
         self._render(self._executor.progress())
         return True
 
     def _work(self, timeout: float | None = 20, sleep: float | None = 0.5) -> None:
-        try:
-            if not self._wait_for_start(timeout):
-                return
+        if not self._wait_for_start(timeout):
+            msg = "Timed out waiting for executor to start"
+            raise TimeoutError(msg)
 
-            while not self._stop_event.is_set():
-                if sleep is not None:
-                    time.sleep(sleep)
-                _ = self._executor.progress_event().wait()
-                self._executor.progress_event().clear()
-                progress = self._executor.progress()
-                self._render(progress)
-                if not progress.running:
-                    return
-        except TimeoutError as exc:
-            self._error = exc
+        while not self._stop_event.is_set():
+            if sleep is not None:
+                time.sleep(sleep)
+            _ = self._executor.progress_event().wait()
+            self._executor.progress_event().clear()
+            progress = self._executor.progress()
+            self._render(progress)
+            if not progress.running:
+                return
 
     def _render(self, progress: Progress) -> None:
         """Project a `Progress` snapshot onto the Rich task state."""
@@ -166,7 +161,7 @@ if __name__ == "__main__":
         input_dir=Path(path) / "data",
         output_dir=Path("test"),
         split=None,
-        output_format="mds",
+        output_format="dummy",
         config_path=None,
         jobs=4,
         limit=None,

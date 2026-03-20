@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 AnyEvent = Event | threading.Event
 
 WriterFactory = Callable[[int | None], SceneWriter]
-"""Factory that creates a worker-local writer for a stable worker ID."""
+"""Factory that creates a worker-local writer for a given worker ID."""
 
 
 class WritingExecutor(Protocol):
@@ -47,7 +47,7 @@ class WritingExecutor(Protocol):
 
 
 class ObservableWritingExecutor(WritingExecutor, Protocol):
-    """Writing executor that can be observed by a progress reporter."""
+    """Writing executor that can be observed."""
 
     def progress_event(self) -> AnyEvent:
         """Return an event set whenever execution state or progress may have changed."""

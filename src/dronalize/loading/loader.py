@@ -12,7 +12,7 @@ from dronalize.categories import DatasetSplit
 from dronalize.config.map import MapConfig
 from dronalize.exceptions import SplitNotSupportedError
 from dronalize.maps.resolver import MapKey, MapResolver, no_map
-from dronalize.scene import CANONICAL_V1, Scene, SceneSchema
+from dronalize.scene import CANONICAL_V1, Scene, SceneField, SceneSchema
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -25,7 +25,6 @@ MapContext = MapResolver | MapKey | None
 IngestOutput = tuple[pl.LazyFrame, MapContext]
 
 
-# TODO: Maybe remove metadata
 @dataclass(slots=True, frozen=True)
 class Source(Generic[SourceT]):
     """Represents a raw data source for a scene, identified by a unique identifier."""
@@ -218,6 +217,24 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             self.splits = [splits]
         else:
             self.splits = list(splits)
+
+    @property
+    def requested_scene_schema(self) -> SceneSchema | None:
+        """Return the schema requested by downstream consumers, if any."""
+        return self._output_schema
+
+    @property
+    def output_scene_schema(self) -> SceneSchema:
+        """Return the effective scene schema this loader should optimize for."""
+        return self.native_scene_schema() if self._output_schema is None else self._output_schema
+
+    def set_output_schema(self, schema: SceneSchema | None) -> None:
+        """Update the schema requested by downstream consumers."""
+        self._output_schema = schema
+
+    def requires_scene_fields(self, *fields: SceneField | str) -> bool:
+        """Return whether the effective output schema needs all requested fields."""
+        return self.output_scene_schema.has(*fields)
 
     @classmethod
     @abstractmethod
