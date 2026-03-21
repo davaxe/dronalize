@@ -1,6 +1,6 @@
 [build-system]
-requires = ["uv_build>=0.10,<0.11.0"]
-build-backend = "uv_build"
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
 
 [project]
 name = "dronalize"
@@ -12,19 +12,20 @@ authors = [
 ]
 readme = "README.md"
 license = { text = "Apache-2.0" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 dependencies = [
     "numpy>=1.24.0",
     "polars>=1.0.0",
     "pyarrow>=14.0.0",
     "scipy>=1.10.0",
-    "tomli>=2.0.1; python_version < '3.11'",
-    "tqdm>=4.65.0",
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
     "mosaicml-streaming>=0.13.0",
 ]
+
+[project.scripts]
+dronalize = "dronalize.__main__:main"
 
 [project.optional-dependencies]
 # Plotting (map graphs, trajectories)
@@ -41,22 +42,24 @@ all_datasets = ["dronalize[lyft]", "dronalize[waymo]", "dronalize[ad4che]"]
 loader = ["torch>=2.0.0"]
 
 # Full ML stack for running the example training pipeline
-example = [
-    "dronalize[loader]",
-    "torchmetrics>=0.11.0",
-    "torch_geometric>=2.3.0",
-    "torch-cluster",
-    "lightning>=2.0.0",
-    "wandb>=0.15.0",
-]
+# example = [
+#     "dronalize[loader]",
+#     "torchmetrics>=0.11.0",
+#     "torch_geometric>=2.3.0",
+#     "torch-cluster",
+#     "lightning>=2.0.0",
+#     "wandb>=0.15.0",
+# ]
+
+cli = ["typer>=0.24.1", "rich>=14.3.3"]
 
 [dependency-groups]
 dev = [
     "pytest>=7.0",
     "scipy-stubs",
     "ipython",
-    "dronalize[plot,lyft,ad4che]",
     "tomli>=2.0.1",
+    "dronalize[plot,lyft,ad4che,cli]",
 ]
 tools = [
     "mkdocs-material>=9.6.0",
@@ -65,14 +68,14 @@ tools = [
     "ruff>=0.15.4",
 ]
 
-[tool.uv.build-backend]
-module-name = "dronalize"
-module-root = ""
-# Exclude
-exclude = ["tests*", "examples*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/dronalize"]
 
-[tool.uv.extra-build-dependencies]
-torch-cluster = ["torch"]
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/tests",
+    "/examples",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "dronalize"]
@@ -94,7 +97,7 @@ ignore = [
     "T201", "S101", "TRY003", "D100", "B008", "PLR0904",
     "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
     "DOC402", "CPY001", "D104", "TD005", "S405", "S314",
-    "RUF067", "PLC2801", "S608"
+    "RUF067", "PLC2801", "S608", "S311", "T203",
 ]
 pydocstyle = { convention = "numpy" }
 
@@ -114,12 +117,12 @@ project-excludes = [
     "**/*_pb2.pyi",
 ]
 
-[tool.pyright]
-pythonVersion = "3.10"
+[tool.basedpyright]
+pythonVersion = "3.11"
 pythonPlatform = "All"
 typeCheckingMode = "recommended"
 reportIgnoreCommentWithoutRule = true
-include = ["dronalize", "tests"]
+include = ["src", "tests"]
 exclude = [
     "protos",
     "**/protos",
@@ -136,3 +139,4 @@ ignore = [
 ]
 reportAny = false
 reportExplicitAny = false
+reportMissingTypeStubs = false

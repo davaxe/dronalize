@@ -1,18 +1,28 @@
 # pyright: standard
 
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
 from dronalize.categories import AgentCategory
+from dronalize.config import Config, load_config, resolve_config
 from dronalize.config.filtering import FilteringConfig
-
-# Adjust the import path based on your project structure
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import (
     MapConfig,
     NoneExtraction,
     RadialExtraction,
     RectangularExtraction,
     SquareExtraction,
+)
+from dronalize.config.writer import WriterConfig
+from dronalize.pipeline.functional.resample import ResampleSpec
+from dronalize.scene import (
+    CANONICAL_V1,
+    POSITIONS_ONLY_V1,
+    POSITIONS_VELOCITY_ACCELERATION_V1,
+    POSITIONS_VELOCITY_YAW_V1,
 )
 
 
@@ -145,29 +155,32 @@ def test_map_config_distance_validation_failure() -> None:
 
 def test_filtering_config_single_agent_category_string() -> None:
     """Parse a single string into a frozenset of AgentCategory."""
-    config = FilteringConfig.create(filter_agent_category="CAR")
+    config = FilteringConfig.create(exclude_agent_categories="CAR")
 
-    assert config.filter_agent_category == frozenset([AgentCategory.CAR])
+    assert config.exclude_agent_categories == frozenset([AgentCategory.CAR])
 
 
 def test_filtering_config_list_agent_category_strings() -> None:
     """Parse a list of strings into a frozenset of AgentCategory."""
-    config = FilteringConfig.create(filter_agent_category=["CAR", "PEDESTRIAN"])
+    config = FilteringConfig.create(exclude_agent_categories=["CAR", "PEDESTRIAN"])
 
-    assert config.filter_agent_category == frozenset([AgentCategory.CAR, AgentCategory.PEDESTRIAN])
+    assert config.exclude_agent_categories == frozenset([
+        AgentCategory.CAR,
+        AgentCategory.PEDESTRIAN,
+    ])
 
 
 def test_filtering_config_existing_enum_member() -> None:
     """Accept an existing Enum member directly and coerce it into a frozenset."""
-    config = FilteringConfig.create(filter_agent_category=AgentCategory.VAN)
+    config = FilteringConfig.create(exclude_agent_categories=AgentCategory.VAN)
 
-    assert config.filter_agent_category == frozenset([AgentCategory.VAN])
+    assert config.exclude_agent_categories == frozenset([AgentCategory.VAN])
 
 
 def test_filtering_config_invalid_agent_category() -> None:
     """Raise ValidationError when an invalid agent category string is provided."""
     with pytest.raises(ValidationError) as exc_info:
-        FilteringConfig.create(filter_agent_category=["CAR", "SPACESHIP"])
+        FilteringConfig.create(exclude_agent_categories=["CAR", "SPACESHIP"])
 
     error_msg = str(exc_info.value)
     assert "SPACESHIP" in error_msg
@@ -191,7 +204,7 @@ def test_filtering_config_none_values() -> None:
     """Retain None values when no explicit frames or categories are provided."""
     config = FilteringConfig()
 
-    assert config.filter_agent_category is None
+    assert config.exclude_agent_categories is None
     assert config.require_frames is None
 
 
@@ -201,7 +214,7 @@ def test_filtering_config_full_dict_validation() -> None:
         "min_agents": 3,
         "require_all_valid": True,
         "require_frames": [10, 15],
-        "filter_agent_category": "STATIC_OBJECT",
+        "exclude_agent_categories": "STATIC_OBJECT",
         "filter_slow_agents": 1.5,
         "min_samples_per_agent": 5,
     }
@@ -211,9 +224,121 @@ def test_filtering_config_full_dict_validation() -> None:
     assert config.min_agents == 3
     assert config.require_all_valid is True
     assert config.require_frames == frozenset([10, 15])
-    assert config.filter_agent_category == frozenset([AgentCategory.STATIC_OBJECT])
+    assert config.exclude_agent_categories == frozenset([AgentCategory.STATIC_OBJECT])
     assert config.filter_slow_agents == pytest.approx(1.5)
     assert config.min_samples_per_agent == 5
+
+
+def test_loader_config_with_filtering_normalizes_negative_require_frames() -> None:
+    """Convert valid negative frame indices into offsets from the sequence end."""
+    config = LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filtering(
+        require_frames=[0, -1, -2]
+    )
+
+    assert config.filtering is not None
+    assert config.filtering.require_frames == frozenset([0, 3, 4])
+
+
+def test_loader_config_with_filtering_rejects_out_of_range_negative_frame() -> None:
+    """Keep the original invalid frame value in the error for easier debugging."""
+    with pytest.raises(ValueError, match=r"Invalid frame index: -6"):
+        LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filtering(require_frames=[-6])
+
+
+def test_resolve_config_deep_merges_partial_overrides() -> None:
+    """Deep merges should preserve unspecified nested fields from the default config."""
+    default = Config(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_resampling(
+            ResampleSpec(up=2, down=1)
+        ),
+        map=MapConfig.default(),
+    )
+
+    resolved = resolve_config(
+        Config,
+        default=default,
+        overrides={
+            "execution": {"workers": 8},
+            "loader": {"window": {"window_size": 5, "step_size": 1}},
+        },
+    )
+
+    assert resolved.execution.workers == 8
+    assert resolved.execution.parallel is False
+    assert resolved.loader.window is not None
+    assert resolved.loader.window.window_size == 5
+    assert resolved.loader.resampling == default.loader.resampling
+
+
+def test_writer_config_scene_schema_drives_schema_and_feature_layout() -> None:
+    """Writer config should derive schema and feature layout from the selected schema."""
+    default_config = WriterConfig()
+    positions_only = WriterConfig.create(scene_schema="positions_only")
+    positions_velocity_acceleration = WriterConfig.create(
+        scene_schema="positions_velocity_acceleration"
+    )
+    positions_velocity_yaw = WriterConfig.create(scene_schema="positions_velocity_yaw")
+
+    assert default_config.scene_schema == CANONICAL_V1
+    assert default_config.feature_dim == 7
+    assert default_config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
+
+    assert positions_only.scene_schema == POSITIONS_ONLY_V1
+    assert positions_only.feature_dim == 2
+    assert positions_only.feature_columns == ("x", "y")
+
+    assert positions_velocity_acceleration.scene_schema == POSITIONS_VELOCITY_ACCELERATION_V1
+    assert positions_velocity_acceleration.feature_dim == 6
+    assert positions_velocity_acceleration.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
+
+    assert positions_velocity_yaw.scene_schema == POSITIONS_VELOCITY_YAW_V1
+    assert positions_velocity_yaw.feature_dim == 5
+    assert positions_velocity_yaw.feature_columns == ("x", "y", "vx", "vy", "yaw")
+
+
+def test_resolve_config_merges_writer_overrides() -> None:
+    """Writer overrides should merge into the default writer config."""
+    default = Config(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1),
+        map=MapConfig.default(),
+    )
+
+    resolved = resolve_config(
+        Config,
+        default=default,
+        overrides={
+            "writer": {
+                "scene_schema": "positions_only",
+                "precision": "float64",
+            }
+        },
+    )
+
+    assert resolved.writer.scene_schema == POSITIONS_ONLY_V1
+    assert resolved.writer.precision == "float64"
+    assert resolved.writer.offset_positions is True
+
+
+def test_load_config_merges_global_section_into_each_dataset(tmp_path: Path) -> None:
+    """Global config blocks should be merged into every dataset-specific override block."""
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """[global.execution]
+workers = 4
+
+[a43.execution]
+parallel = true
+
+[waymo.execution]
+chunksize = 8
+""",
+        encoding="utf-8",
+    )
+
+    overrides = load_config(config_path)
+
+    assert overrides["a43"] == {"execution": {"workers": 4, "parallel": True}}
+    assert overrides["waymo"] == {"execution": {"workers": 4, "chunksize": 8}}
 
 
 def test_square_extraction_valid() -> None:
@@ -304,3 +429,69 @@ def test_square_extraction_missing_size() -> None:
 
     assert "Field required" in str(exc_info.value)
     assert "size" in str(exc_info.value)
+
+
+def test_writer_config_positions_only_schema() -> None:
+    """Verify initialization with the 'positions_only' shorthand string."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({**base, "scene_schema": "positions_only"})
+
+    assert config.scene_schema == POSITIONS_ONLY_V1
+    assert config.feature_columns == ("x", "y")
+    assert config.feature_dim == 2
+
+
+def test_writer_config_predefined_object_schema() -> None:
+    """Ensure the config accepts a predefined schema object."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({
+        **base,
+        "scene_schema": POSITIONS_VELOCITY_ACCELERATION_V1,
+    })
+
+    assert config.scene_schema == POSITIONS_VELOCITY_ACCELERATION_V1
+    assert config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
+    assert config.feature_dim == 6
+
+
+def test_writer_config_single_field_custom_schema() -> None:
+    """Check that a single custom field is correctly appended to base fields."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({**base, "scene_schema": "vx"})
+
+    assert config.feature_columns == ("x", "y", "vx")
+    assert config.feature_dim == 3
+    assert config.scene_schema.name == "custom: vx"
+
+
+def test_writer_config_multi_field_custom_schema() -> None:
+    """Validate that multiple colon-separated fields generate a custom schema."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({**base, "scene_schema": "vx:vy:yaw"})
+
+    assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
+    assert config.feature_dim == 5
+    assert config.scene_schema.name == "custom: vx:vy:yaw"
+
+
+def test_writer_config_custom_schema_ordering() -> None:
+    """Confirm that the internal representation maintains consistent field ordering."""
+    base = {"precision": "float64", "offset_positions": False}
+    config = WriterConfig.model_validate({**base, "scene_schema": "yaw:vx:vy"})
+
+    assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
+    assert config.feature_dim == 5
+    assert config.scene_schema.name == "custom: yaw:vx:vy"
+
+
+def test_writer_config_invalid_schema_validation() -> None:
+    """Raise ValidationError when required base fields are missing from a custom schema."""
+    base = {"precision": "float64", "offset_positions": False}
+    with pytest.raises(ValidationError, match=r"must include the base fields"):
+        WriterConfig.model_validate({
+            **base,
+            "scene_schema": {
+                "name": "custom_schema",
+                "fields": ["x", "y", "ax"],
+            },
+        })

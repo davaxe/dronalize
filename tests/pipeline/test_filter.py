@@ -18,7 +18,7 @@ def test_no_scene_filtering() -> None:
     assert_frame_equal(result, df)
 
 
-def test_filter_agent_category() -> None:
+def test_exclude_agent_categories() -> None:
     """Test that specific agent categories are filtered out correctly."""
     df = pl.DataFrame({
         "scene": [1, 1, 1],
@@ -37,7 +37,7 @@ def test_filter_agent_category() -> None:
         sample_time=0.1,
         filtering=FilteringConfig.create(
             min_agents=0,
-            filter_agent_category=[AgentCategory.UNIMPORTANT],
+            exclude_agent_categories=[AgentCategory.UNIMPORTANT],
         ),
     )
 
@@ -168,7 +168,7 @@ def test_complex_interaction() -> None:
         sample_time=0.1,
         filtering=FilteringConfig.create(
             min_agents=3,
-            filter_agent_category=[AgentCategory.UNIMPORTANT],
+            exclude_agent_categories=[AgentCategory.UNIMPORTANT],
         ),
     )
 
