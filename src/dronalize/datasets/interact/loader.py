@@ -130,7 +130,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=10, output_len=30, sample_time=0.1).with_filtering(
-            require_frames=[19]
+            require_frames=[19],
         )
 
     @staticmethod
@@ -165,7 +165,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         if split is DatasetSplit.VAL:
             return self._count_sources(self._data_root / "val")
         return self._count_sources(self._data_root / "test_multi-agent") + self._count_sources(
-            self._data_root / "test_conditional-multi-agent"
+            self._data_root / "test_conditional-multi-agent",
         )
 
 

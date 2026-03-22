@@ -1,19 +1,17 @@
-"""Data loading — source discovery, ingestion, and scene writing."""
+"""Data loading — source discovery, ingestion, and scene creation."""
 
+from dronalize.loading.base import BaseSceneLoader
 from dronalize.loading.loader import (
-    BaseSceneLoader,
     IngestOutput,
     ProcessableLoader,
     SceneLoader,
     Source,
 )
-from dronalize.loading.writer import SceneWriter
 
 __all__ = [
     "BaseSceneLoader",
     "IngestOutput",
     "ProcessableLoader",
     "SceneLoader",
-    "SceneWriter",
     "Source",
 ]

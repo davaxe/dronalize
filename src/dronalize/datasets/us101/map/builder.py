@@ -46,5 +46,5 @@ class US101MapBuilder(HighwayLaneMapBuilder):
             smoothing=3.0,
         )
         self._lane_description: LaneDescription | None = LaneDescription(
-            ids=list(range(1, 6)), direction=[True] * 5
+            ids=list(range(1, 6)), direction=[True] * 5,
         )

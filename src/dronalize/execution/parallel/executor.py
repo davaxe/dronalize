@@ -21,7 +21,8 @@ if TYPE_CHECKING:
 
     from dronalize.categories import DatasetSplit
     from dronalize.execution.assigner import SplitAssigner
-    from dronalize.loading import ProcessableLoader, SceneWriter, Source
+    from dronalize.loading import ProcessableLoader, Source
+    from dronalize.storage.writers.protocol import SceneWriter
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene])
@@ -261,7 +262,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
         processed_scenes: int = 0
         for scene_i, scene in enumerate(
-            ParallelExecutor._generate_scenes(args.loader, args.source)
+            ParallelExecutor._generate_scenes(args.loader, args.source),
         ):
             split: DatasetSplit | None = None
             if _ctx.split_dispatch is not None:
@@ -285,7 +286,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         for scene_data, map_resolver in loader.process_next(source):
             scene_number = _ctx.shared.progress.increment_scene()
             yield loader.create_scene(
-                scene_data, source, resolver=map_resolver, scene_number=scene_number - 1
+                scene_data, source, resolver=map_resolver, scene_number=scene_number - 1,
             )
 
     def _execute_parallel(

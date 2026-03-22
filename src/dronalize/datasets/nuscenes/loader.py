@@ -194,7 +194,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
                 cast(
                     "dict[str, pl.DataFrame]",
                     combined_df.partition_by("scene_token", as_dict=True),
-                )
+                ),
             )
 
         self._status_to_filter: list[str] = ["parked", "undefined"]

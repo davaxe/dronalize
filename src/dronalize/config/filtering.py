@@ -41,7 +41,7 @@ def _ensure_frozenset_int(v: int | Iterable[int] | None) -> frozenset[int] | Non
 AgentTypeValue = int | str | AgentCategory
 FrozenIntSet = Annotated[frozenset[int] | None, BeforeValidator(_ensure_frozenset_int)]
 FrozenAgentSet = Annotated[
-    frozenset[AgentCategory] | None, BeforeValidator(_ensure_frozenset_agent)
+    frozenset[AgentCategory] | None, BeforeValidator(_ensure_frozenset_agent),
 ]
 
 

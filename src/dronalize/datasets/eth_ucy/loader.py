@@ -128,7 +128,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
                     down=1,
                     method=ResampleMethod.PCHIP,
                     output_derivatives={1: {"vx": None, "vy": None}, 2: {"ax": None, "ay": None}},
-                )
+                ),
             )
         )
 

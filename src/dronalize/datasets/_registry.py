@@ -30,7 +30,7 @@ ExecutionScope = Callable[[Path, LoaderConfig, MapConfig], AbstractContextManage
 """Function for creating an execution context for a dataset."""
 
 LoaderFactory = Callable[
-    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P], BaseSceneLoader[Any]
+    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P], BaseSceneLoader[Any],
 ]
 
 
@@ -61,7 +61,7 @@ class DatasetDescriptor:
 
     @contextmanager
     def execution_scope(
-        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig
+        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig,
     ) -> Generator[None, None, None]:
         """Execute the lifecycle context manager, if defined."""
         if self.execution_scope_fn is not None:

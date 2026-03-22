@@ -1,51 +1,29 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypedDict, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from dronalize._internal._types import FloatDType, FloatScalarT
 from dronalize.categories import AgentCategory
 
 if TYPE_CHECKING:
+    from dronalize._internal._types import FloatDType
     from dronalize.maps.graph import MapGraph
     from dronalize.scene import Scene, SceneSchema
+    from dronalize.storage.spec import (
+        StorageMapSample,
+        StorageMapSampleF32,
+        StorageMapSampleF64,
+        StorageSceneSample,
+        StorageSceneSampleF32,
+        StorageSceneSampleF64,
+    )
 
-
-PLACEHOLDER_FLOAT = np.zeros((1,), dtype=np.float64)
+PLACEHOLDER_FLOAT64 = np.zeros((1,), dtype=np.float64)
+PLACEHOLDER_FLOAT32 = np.zeros((1,), dtype=np.float32)
 PLACEHOLDER_I32 = np.zeros((1,), dtype=np.int32)
-
-
-class NumpyMapGraphDict(TypedDict, Generic[FloatScalarT]):
-    """TypedDict for the output of `map_graph_to_numpy`."""
-
-    map_num_nodes: int
-    map_num_edges: int
-    map_node_positions: npt.NDArray[FloatScalarT]
-    map_edge_indices: npt.NDArray[np.int32]
-    map_node_types: npt.NDArray[np.int32]
-    map_edge_types: npt.NDArray[np.int32]
-
-
-class NumpySceneDict(TypedDict, Generic[FloatScalarT]):
-    """TypedDict for the output of `convert_to_numpy_dict`."""
-
-    scene_number: int
-    global_origin: npt.NDArray[np.float64]
-    num_nodes: int
-    type: npt.NDArray[np.int32]
-    input_features: npt.NDArray[FloatScalarT]
-    target_features: npt.NDArray[FloatScalarT]
-    input_mask: npt.NDArray[np.bool_]
-    target_mask: npt.NDArray[np.bool_]
-
-
-NumpySceneDictF32 = NumpySceneDict[np.float32]
-NumpySceneDictF64 = NumpySceneDict[np.float64]
-NumpyMapGraphDictF32 = NumpyMapGraphDict[np.float32]
-NumpyMapGraphDictF64 = NumpyMapGraphDict[np.float64]
 
 
 @overload
@@ -56,7 +34,7 @@ def scene_to_numpy_dict(
     offset_position: bool = True,
     scene_schema: SceneSchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> NumpySceneDictF32: ...
+) -> StorageSceneSampleF32: ...
 
 
 @overload
@@ -67,7 +45,7 @@ def scene_to_numpy_dict(
     offset_position: bool = True,
     scene_schema: SceneSchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> NumpySceneDictF64: ...
+) -> StorageSceneSampleF64: ...
 
 
 def scene_to_numpy_dict(
@@ -77,8 +55,8 @@ def scene_to_numpy_dict(
     offset_position: bool = True,
     scene_schema: SceneSchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> NumpySceneDictF32 | NumpySceneDictF64:
-    """Convert a Scene to a numpy representation compatible with Pytorch."""
+) -> StorageSceneSampleF32 | StorageSceneSampleF64:
+    """Convert a Scene to a persisted tensor representation."""
     if scene_schema is not None:
         scene = scene.as_schema(scene_schema)
 
@@ -123,18 +101,18 @@ def scene_to_numpy_dict(
 
     raw_categories = type_df["agent_category"].to_numpy()
     if category_mapping:
-        type_array = np.array(
+        agent_types = np.array(
             [category_mapping.get(AgentCategory(c), -1) for c in raw_categories],
             dtype=np.int32,
         )
     else:
-        type_array = raw_categories.astype(np.int32)
+        agent_types = raw_categories.astype(np.int32)
 
-    scene_dict: NumpySceneDict[Any] = {
+    scene_dict: StorageSceneSample[Any] = {
         "scene_number": scene.number,
         "global_origin": offset,
-        "num_nodes": num_agents,
-        "type": type_array,
+        "num_agents": num_agents,
+        "agent_types": agent_types,
         "input_features": features[:, :input_len, :],
         "target_features": features[:, input_len:, :],
         "input_mask": mask[:, :input_len],
@@ -150,7 +128,7 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: Literal[True],
-) -> NumpyMapGraphDictF32: ...
+) -> StorageMapSampleF32: ...
 
 
 @overload
@@ -160,7 +138,7 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: Literal[True],
-) -> NumpyMapGraphDictF64: ...
+) -> StorageMapSampleF64: ...
 
 
 @overload
@@ -170,7 +148,7 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: Literal[False] = False,
-) -> NumpyMapGraphDictF32 | None: ...
+) -> StorageMapSampleF32 | None: ...
 
 
 @overload
@@ -180,7 +158,7 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: Literal[False] = False,
-) -> NumpyMapGraphDictF64 | None: ...
+) -> StorageMapSampleF64 | None: ...
 
 
 def encode_map_from_scene(
@@ -189,37 +167,17 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: bool = False,
-) -> NumpyMapGraphDictF32 | NumpyMapGraphDictF64 | None:
-    """Resolve the map graph from the scene and convert to numpy.
-
-    Parameters
-    ----------
-    scene : Scene
-        The scene to resolve the map from.
-    dtype : FloatDType
-        The floating point dtype to use for the node positions.
-    offset : npt.NDArray[np.float64] | None
-        The offset to apply to the node positions, or `None` to keep original
-        positions.
-    return_empty : bool, optional
-        If `True`, return an empty map graph dictionary when the scene has no
-        map, instead of returning `None`.
-
-    Returns
-    -------
-    NumpyMapGraphDict[np.float32] | NumpyMapGraphDict[np.float64] | None
-        The converted map graph as a dictionary of NumPy arrays, or `None` if
-        the scene has no map.
-    """
+) -> StorageMapSampleF32 | StorageMapSampleF64 | None:
+    """Resolve the map graph from the scene and convert it to a persisted layout."""
     graph = scene.resolve_map()
     if graph is None:
         if not return_empty:
             return None
-        map_dict: NumpyMapGraphDict[Any] = {
+        map_dict: StorageMapSample[Any] = {
             "map_num_nodes": 0,
             "map_num_edges": 0,
             "map_node_positions": np.zeros((0, 2), dtype=dtype),
-            "map_edge_indices": np.zeros((2, 0), dtype=np.int32),
+            "map_edge_indices": np.zeros((0, 2), dtype=np.int32),
             "map_node_types": np.zeros((0,), dtype=np.int32),
             "map_edge_types": np.zeros((0,), dtype=np.int32),
         }
@@ -233,7 +191,7 @@ def map_graph_to_numpy(
     graph: MapGraph,
     dtype: type[np.float32],
     offset: npt.NDArray[np.float64] | None = None,
-) -> NumpyMapGraphDictF32: ...
+) -> StorageMapSampleF32: ...
 
 
 @overload
@@ -241,21 +199,21 @@ def map_graph_to_numpy(
     graph: MapGraph,
     dtype: type[np.float64],
     offset: npt.NDArray[np.float64] | None = None,
-) -> NumpyMapGraphDictF64: ...
+) -> StorageMapSampleF64: ...
 
 
 def map_graph_to_numpy(
     graph: MapGraph,
     dtype: FloatDType,
     offset: npt.NDArray[np.float64] | None = None,
-) -> NumpyMapGraphDictF32 | NumpyMapGraphDictF64:
-    """Convert the `MapGraph` to a dictionary of NumPy arrays."""
+) -> StorageMapSampleF32 | StorageMapSampleF64:
+    """Convert a MapGraph to a persisted dictionary of NumPy arrays."""
     node_positions = graph.node_positions - offset if offset is not None else graph.node_positions
-    map_dict: NumpyMapGraphDict[Any] = {
+    map_dict: StorageMapSample[Any] = {
         "map_num_nodes": graph.num_nodes,
         "map_num_edges": graph.num_edges,
         "map_node_positions": node_positions.astype(dtype, copy=False),
-        "map_edge_indices": graph.edge_indices,
+        "map_edge_indices": np.ascontiguousarray(graph.edge_indices.T, dtype=np.int32),
         "map_node_types": graph.node_types,
         "map_edge_types": graph.edge_types,
     }

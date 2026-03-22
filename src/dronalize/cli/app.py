@@ -55,10 +55,10 @@ def process(
         ),
     ] = None,
     progress: Annotated[
-        bool, typer.Option("--progress/--no-progress", help="Show progress during processing.")
+        bool, typer.Option("--progress/--no-progress", help="Show progress during processing."),
     ] = True,
     limit: Annotated[
-        int | None, typer.Option("--limit", "-l", help="Limit the number of samples to process.")
+        int | None, typer.Option("--limit", "-l", help="Limit the number of samples to process."),
     ] = None,
     seed: Annotated[int | None, typer.Option("--seed", help="Random seed.")] = None,
     output_format: Annotated[
@@ -74,7 +74,7 @@ def process(
         typer.Option("--custom-split", help="Custom split ratios for train/val/test splits."),
     ] = None,
     force: Annotated[
-        bool, typer.Option("--force", "-f", help="Force processing without confirmation.")
+        bool, typer.Option("--force", "-f", help="Force processing without confirmation."),
     ] = False,
 ) -> None:
     """[bold]Process a specified dataset[/bold]."""

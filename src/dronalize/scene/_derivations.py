@@ -259,7 +259,7 @@ def _yaw_from_position(data: pl.LazyFrame, context: ConversionContext) -> pl.Laz
         dt=1.0,
     )
     return yaw_from_vel(data, _TMP_YAW_VELOCITY[0], _TMP_YAW_VELOCITY[1], "yaw").drop(
-        list(_TMP_YAW_VELOCITY)
+        list(_TMP_YAW_VELOCITY),
     )
 
 

@@ -2,7 +2,7 @@ from enum import StrEnum
 
 
 class OutputFormat(StrEnum):
-    """Enum for output formats."""
+    """Supported persisted export formats."""
 
     MDS = "mds"
     ZARR = "zarr"

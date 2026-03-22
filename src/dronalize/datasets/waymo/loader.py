@@ -135,7 +135,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filtering(
-            require_frames=[9]
+            require_frames=[9],
         )
 
     @staticmethod

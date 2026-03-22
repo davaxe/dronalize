@@ -152,7 +152,7 @@ class AD4CHELoader(XLevelDataLoader):
                 return None
             path = self._data_dir / scene.map_key
             map_graph = AD4CHEMapBuilder(path).build(
-                self.map_config.min_distance, self.map_config.interp_distance
+                self.map_config.min_distance, self.map_config.interp_distance,
             )
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 

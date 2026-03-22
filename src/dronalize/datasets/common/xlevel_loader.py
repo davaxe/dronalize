@@ -169,7 +169,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
         return pipeline.compose(
             trajectory_pipeline(
                 self.loader_config,
-            )
+            ),
         )
 
     @classmethod

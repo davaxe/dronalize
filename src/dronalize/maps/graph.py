@@ -223,7 +223,7 @@ class MapGraph:
         offset = 0
         for arr in arrays_to_serialize:
             target_arr: npt.NDArray[Any] = np.ndarray(
-                arr.shape, dtype=arr.dtype, buffer=shared.buf, offset=offset
+                arr.shape, dtype=arr.dtype, buffer=shared.buf, offset=offset,
             )
             np.copyto(target_arr, arr)
             offset += arr.nbytes

@@ -5,7 +5,6 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dronalize.loading.writer.common import scene_to_numpy_dict
 from dronalize.scene import (
     CANONICAL_V1,
     POSITIONS_ONLY_V1,
@@ -15,6 +14,7 @@ from dronalize.scene import (
     SceneSchema,
 )
 from dronalize.scene._derivations import ConversionContext, plan_derivations
+from dronalize.storage.encoding import scene_to_numpy_dict
 
 
 def test_scene_schema_define_uses_semantic_fields_in_canonical_order() -> None:

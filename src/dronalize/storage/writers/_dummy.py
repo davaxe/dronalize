@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import functools
 from collections import Counter
-from pprint import pprint
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, final
 
 from typing_extensions import override
 
-from dronalize.loading import SceneWriter
+from dronalize.storage.spec import FORMAT_VERSION, StorageManifest
+from dronalize.storage.writers.protocol import SceneWriter
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -20,7 +20,21 @@ def create_writer(*, log: bool, identifier: int | None = None) -> DummyWriter:
     return DummyWriter(identifier, log=log)
 
 
+@final
 class DummyWriter(SceneWriter):
+    """No-op writer used by tests and dry-run execution paths."""
+
+    manifest: StorageManifest = StorageManifest(
+        format_version=FORMAT_VERSION,
+        scene_schema="dummy",
+        feature_columns=(),
+        input_len=0,
+        output_len=0,
+        precision="float32",
+        offset_positions=False,
+        has_map=False,
+    )
+
     def __init__(self, identifier: str | int | None = None, *, log: bool = False) -> None:
         self._identifier: str = "UNNAMED" if identifier is None else str(identifier)
         self._log: bool = log
@@ -49,10 +63,9 @@ class DummyWriter(SceneWriter):
     @override
     def finish_local(self) -> None:
         if self._log:
-            pprint(f"[{self._identifier}] Finished writing local.")
-            pprint(f"[{self._identifier}] Scene counts: {dict(self._count)}")
+            pass
 
     @override
     def finish_final(self) -> None:
         if self._log:
-            pprint(f"[{self._identifier}] Finished writing final.")
+            pass

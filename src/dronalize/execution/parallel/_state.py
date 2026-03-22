@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from dronalize.categories import DatasetSplit
     from dronalize.execution.assigner import SplitAssigner
-    from dronalize.loading import SceneWriter
+    from dronalize.storage.writers.protocol import SceneWriter
 
 
 @dataclass(slots=True)

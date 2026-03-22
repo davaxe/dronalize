@@ -92,7 +92,7 @@ class UnsupportedOutputFormatError(ValueError, DronalizeError):
     def __init__(self, output_format: str, supported_formats: tuple[str, ...]) -> None:
         supported = ", ".join(supported_formats)
         super().__init__(
-            f"Unsupported output format '{output_format}'. Supported formats: {supported}."
+            f"Unsupported output format '{output_format}'. Supported formats: {supported}.",
         )
         self.output_format: str = output_format
         self.supported_formats: tuple[str, ...] = supported_formats

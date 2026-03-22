@@ -119,7 +119,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=20, output_len=30, sample_time=0.1).with_filtering(
-            require_frames=[19]
+            require_frames=[19],
         )
 
     @classmethod

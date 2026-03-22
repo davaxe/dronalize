@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def vod_execution_scope(
-    root: Path, loader_config: LoaderConfig, map_config: MapConfig
+    root: Path, loader_config: LoaderConfig, map_config: MapConfig,
 ) -> Generator[None, None, None]:
     """Lifecycle context for the VOD dataset.
 

@@ -68,7 +68,7 @@ def trajectory_pipeline(
                 agent_id=agent_id,
                 frame_column=frame_column,
                 category_column=category_column,
-            )
+            ),
         )
 
     pipeline = pipeline.then(
@@ -76,7 +76,7 @@ def trajectory_pipeline(
             spec=config.resampling,
             frame_column=frame_column,
             group_by=group_by_resample,
-        )
+        ),
     )
 
     if has_window:

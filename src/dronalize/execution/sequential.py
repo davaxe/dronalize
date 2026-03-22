@@ -13,8 +13,9 @@ from dronalize.execution.executor import ObservableWritingExecutor, WriterFactor
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from dronalize.loading import ProcessableLoader, SceneWriter
+    from dronalize.loading import ProcessableLoader
     from dronalize.scene import Scene
+    from dronalize.storage.writers.protocol import SceneWriter
 
 
 class SequentialExecutor(ObservableWritingExecutor):

@@ -138,7 +138,7 @@ def _sliding_window_iterable(
             continue
         if offset_sliding_col:
             yield window.with_columns(
-                pl.col(sliding_col).sub(pl.col(sliding_col).min()).alias(sliding_col)
+                pl.col(sliding_col).sub(pl.col(sliding_col).min()).alias(sliding_col),
             )
 
         yield window

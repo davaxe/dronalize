@@ -9,7 +9,10 @@ import dronalize.exceptions as dronalize_exceptions
 import dronalize.execution.common as ex_common
 from dronalize.config.config import Config, ConfigSection, load_config, resolve_config
 from dronalize.datasets import DatasetDescriptor, get
-from dronalize.loading.writer.format import OutputFormat
+from dronalize.execution.assigner import ConstantAssigner, StatelessWeightedAssigner
+from dronalize.execution.parallel.executor import ParallelExecutor
+from dronalize.execution.sequential import SequentialExecutor
+from dronalize.storage.formats import OutputFormat
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -62,8 +65,6 @@ class DatasetJob:
 
     def split_assigner(self) -> SplitAssigner | None:
         """Build a split assigner for modes that derive splits during writing."""
-        from dronalize.execution.assigner import ConstantAssigner, StatelessWeightedAssigner
-
         groups = self.writer_splits()
         if groups is None or len(groups) == 0:
             return None
@@ -105,7 +106,7 @@ class DatasetJob:
         ]
 
         return ProcessingSummary(
-            title="Processing Plan", rows=tuple(row for row in raw_rows if row is not None)
+            title="Processing Plan", rows=tuple(row for row in raw_rows if row is not None),
         )
 
     def _execution_summary(self) -> str:
@@ -261,9 +262,9 @@ def _resolve_job_config(
         config = config.model_copy(
             update={
                 "execution": config.execution.model_copy(
-                    update={"parallel": jobs > 1, "workers": jobs}
-                )
-            }
+                    update={"parallel": jobs > 1, "workers": jobs},
+                ),
+            },
         )
 
     return config
@@ -303,16 +304,12 @@ def _build_executor(
 ) -> ObservableWritingExecutor:
     """Construct the runtime executor for one open job."""
     if execution_config.parallel:
-        from dronalize.execution.parallel import ParallelExecutor
-
         return ParallelExecutor(
             loader,
             workers=execution_config.workers,
             chunksize=execution_config.chunksize,
             limit=limit,
         )
-
-    from dronalize.execution.sequential import SequentialExecutor
 
     return SequentialExecutor(loader, limit=limit)
 
@@ -328,6 +325,7 @@ def _build_writer_factory(job: DatasetJob) -> WriterFactory:
         writer_config=job.config.writer,
         splits=splits,
         parallel=job.parallel,
+        has_map=job.config.map.include_map,
     )
 
 
@@ -339,11 +337,12 @@ def _get_writer(
     writer_config: WriterConfig,
     splits: tuple[DatasetSplit, ...] | None,
     parallel: bool,
+    has_map: bool,
 ) -> WriterFactory:
     """Resolve an output writer factory from a normalized format identifier."""
     match output_format:
         case OutputFormat.MDS:
-            from dronalize.loading.writer.mds import MDSSceneWriter
+            from dronalize.storage.writers.mds import MDSSceneWriter
 
             return MDSSceneWriter.as_factory(
                 output_dir,
@@ -351,9 +350,10 @@ def _get_writer(
                 loader_config=loader_config,
                 splits=splits,
                 parallel=parallel,
+                has_map=has_map,
             )
         case OutputFormat.ZARR:
-            from dronalize.loading.writer.zarr import ZarrSceneWriter
+            from dronalize.storage.writers.zarr import ZarrSceneWriter
 
             return ZarrSceneWriter.as_factory(
                 output_dir,
@@ -361,8 +361,9 @@ def _get_writer(
                 loader_config=loader_config,
                 splits=splits,
                 parallel=parallel,
+                has_map=has_map,
             )
         case OutputFormat.DUMMY:
-            from dronalize.loading.writer._dummy import DummyWriter
+            from dronalize.storage.writers._dummy import DummyWriter
 
             return DummyWriter.as_factory(log=False)
