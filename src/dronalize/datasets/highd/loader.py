@@ -9,7 +9,7 @@ from typing_extensions import override
 from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.map import MapConfig
 from dronalize.datasets.common import utils
-from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
+from dronalize.datasets.common.levelx_loader import LevelXDataLoader
 from dronalize.datasets.highd.map.builder import HighDMapBuilder
 from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1
 
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from dronalize.scene import Scene, SceneSchema
 
 
-class HighDLoader(XLevelDataLoader):
+class HighDLoader(LevelXDataLoader):
     """Loader for the highD dataset."""
 
     def __init__(
@@ -31,18 +31,8 @@ class HighDLoader(XLevelDataLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        *,
-        lane_change_ratio: float | None = None,
     ) -> None:
         """Initialize the trajectory data loader for the highD dataset.
-
-        It is possible to rebalance the dataset by adjusting the number of lane
-        changing agents compared to non-lane changing agents. This can be done
-        by setting the `lane_change_ratio` parameter. For example, a ratio of
-        0.5 would result in half as many lane changing agents as non-lane
-        changing agents. Typically highway datasets are heavily imbalanced
-        towards non-lane changing agents, which means that a high ratio con
-        result in way less total data.
 
         Parameters
         ----------
@@ -50,8 +40,6 @@ class HighDLoader(XLevelDataLoader):
             Path to the root directory of the highD dataset, which should contain a "data"
         loader_config : , optional
             Loader configuration. If None, the default configuration is used.
-        lane_change_ratio : float, optional
-            Ratio to rebalance lane changing vs non-lane changing agents.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
             splits, so `None` processes all sources.
@@ -63,8 +51,6 @@ class HighDLoader(XLevelDataLoader):
             map_config=map_config,
             splits=splits,
         )
-        # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
-        self._rebalance_ratio: float | None = lane_change_ratio
 
     @staticmethod
     @override

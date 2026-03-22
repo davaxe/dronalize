@@ -13,13 +13,13 @@ from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_YAW_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.config.map import MapConfig
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import SceneSchema
 
 
@@ -114,7 +114,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(trajectory_pipeline(self.loader_config))
+        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override

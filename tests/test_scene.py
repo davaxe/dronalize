@@ -5,7 +5,6 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dronalize.loading.writer.common import scene_to_numpy_dict
 from dronalize.scene import (
     CANONICAL_V1,
     POSITIONS_ONLY_V1,
@@ -15,6 +14,7 @@ from dronalize.scene import (
     SceneSchema,
 )
 from dronalize.scene._derivations import ConversionContext, plan_derivations
+from dronalize.storage.encoding import scene_to_numpy_dict
 
 
 def test_scene_schema_define_uses_semantic_fields_in_canonical_order() -> None:
@@ -145,7 +145,7 @@ def test_scene_as_schema_requires_sample_time_for_derivatives() -> None:
         schema=POSITIONS_ONLY_V1,
     )
 
-    with pytest.raises(ValueError, match="sample_time"):
+    with pytest.raises(ValueError, match="No derivation plan"):
         scene.as_schema(CANONICAL_V1)
 
 
@@ -176,7 +176,5 @@ def test_scene_to_numpy_dict_respects_requested_scene_schema() -> None:
     canonical = scene_to_numpy_dict(scene, scene_schema=CANONICAL_V1, dtype=np.float64)
     positions_only = scene_to_numpy_dict(scene, scene_schema=POSITIONS_ONLY_V1, dtype=np.float64)
 
-    assert canonical["input_features"].shape == (1, 2, 7)
-    assert canonical["target_features"].shape == (1, 1, 7)
-    assert positions_only["input_features"].shape == (1, 2, 2)
-    assert positions_only["target_features"].shape == (1, 1, 2)
+    assert canonical["features"].shape == (1, 3, 7)
+    assert positions_only["features"].shape == (1, 3, 2)

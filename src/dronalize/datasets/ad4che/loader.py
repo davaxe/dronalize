@@ -11,7 +11,7 @@ from dronalize.config import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.ad4che.map.builder import AD4CHEMapBuilder
 from dronalize.datasets.common import utils
-from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
+from dronalize.datasets.common.levelx_loader import LevelXDataLoader
 from dronalize.loading import Source
 from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from dronalize.scene import Scene, SceneSchema
 
 
-class AD4CHELoader(XLevelDataLoader):
+class AD4CHELoader(LevelXDataLoader):
     """Loader for the AD4CHE dataset."""
 
     def __init__(
@@ -32,19 +32,9 @@ class AD4CHELoader(XLevelDataLoader):
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
-        *,
-        lane_change_ratio: float | None = 1.0,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
     ) -> None:
         """Initialize the trajectory data loader for the AD4CHE dataset.
-
-        It is possible to rebalance the dataset by adjusting the number of lane
-        changing agents compared to non-lane changing agents. This can be done
-        by setting the `lane_change_ratio` parameter. For example, a ratio of
-        0.5 would result in half as many lane changing agents as non-lane
-        changing agents. Typically highway datasets are heavily imbalanced
-        towards non-lane changing agents, which means that a high ratio con
-        result in way less total data.
 
         Parameters
         ----------
@@ -52,8 +42,6 @@ class AD4CHELoader(XLevelDataLoader):
             Path to the directory containing the .csv data files.
         loader_config : LoaderConfig, optional
             Loader configuration. If None, the default configuration is used.
-        lane_change_ratio : float, optional
-            Ratio to rebalance lane changing vs non-lane changing agents.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
             splits, so `None` processes all sources.
@@ -65,8 +53,6 @@ class AD4CHELoader(XLevelDataLoader):
             map_config=map_config,
             splits=splits,
         )
-        # Update internal state to enable rebalancing of lane changing vs non-lane changing agents
-        self._rebalance_ratio: float | None = lane_change_ratio
 
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
@@ -152,7 +138,8 @@ class AD4CHELoader(XLevelDataLoader):
                 return None
             path = self._data_dir / scene.map_key
             map_graph = AD4CHEMapBuilder(path).build(
-                self.map_config.min_distance, self.map_config.interp_distance
+                self.map_config.min_distance,
+                self.map_config.interp_distance,
             )
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 

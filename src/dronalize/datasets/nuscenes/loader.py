@@ -13,7 +13,6 @@ from dronalize.loading.loader import IngestOutput, Source
 from dronalize.maps.resolver import no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
@@ -21,6 +20,7 @@ if TYPE_CHECKING:
 
     from dronalize.config.map import MapConfig
     from dronalize.maps import MapResolver
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import SceneSchema
 
 
@@ -120,7 +120,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(trajectory_pipeline(self.loader_config))
+        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override
@@ -194,7 +194,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
                 cast(
                     "dict[str, pl.DataFrame]",
                     combined_df.partition_by("scene_token", as_dict=True),
-                )
+                ),
             )
 
         self._status_to_filter: list[str] = ["parked", "undefined"]

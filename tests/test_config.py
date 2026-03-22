@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from dronalize.categories import AgentCategory
-from dronalize.config import Config, load_config, resolve_config
+from dronalize.config import Config, ConfigOverrides, load_config_overrides, resolve_runtime_config
 from dronalize.config.filtering import FilteringConfig
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import (
@@ -245,7 +245,7 @@ def test_loader_config_with_filtering_rejects_out_of_range_negative_frame() -> N
         LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filtering(require_frames=[-6])
 
 
-def test_resolve_config_deep_merges_partial_overrides() -> None:
+def test_resolve_runtime_config_deep_merges_partial_overrides() -> None:
     """Deep merges should preserve unspecified nested fields from the default config."""
     default = Config(
         loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_resampling(
@@ -254,8 +254,7 @@ def test_resolve_config_deep_merges_partial_overrides() -> None:
         map=MapConfig.default(),
     )
 
-    resolved = resolve_config(
-        Config,
+    resolved = resolve_runtime_config(
         default=default,
         overrides={
             "execution": {"workers": 8},
@@ -296,15 +295,14 @@ def test_writer_config_scene_schema_drives_schema_and_feature_layout() -> None:
     assert positions_velocity_yaw.feature_columns == ("x", "y", "vx", "vy", "yaw")
 
 
-def test_resolve_config_merges_writer_overrides() -> None:
+def test_resolve_runtime_config_merges_writer_overrides() -> None:
     """Writer overrides should merge into the default writer config."""
     default = Config(
         loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1),
         map=MapConfig.default(),
     )
 
-    resolved = resolve_config(
-        Config,
+    resolved = resolve_runtime_config(
         default=default,
         overrides={
             "writer": {
@@ -319,7 +317,7 @@ def test_resolve_config_merges_writer_overrides() -> None:
     assert resolved.writer.offset_positions is True
 
 
-def test_load_config_merges_global_section_into_each_dataset(tmp_path: Path) -> None:
+def test_load_config_overrides_merges_global_section_into_each_dataset(tmp_path: Path) -> None:
     """Global config blocks should be merged into every dataset-specific override block."""
     config_path = tmp_path / "config.toml"
     config_path.write_text(
@@ -335,10 +333,17 @@ chunksize = 8
         encoding="utf-8",
     )
 
-    overrides = load_config(config_path)
+    overrides = load_config_overrides(config_path)
 
-    assert overrides["a43"] == {"execution": {"workers": 4, "parallel": True}}
-    assert overrides["waymo"] == {"execution": {"workers": 4, "chunksize": 8}}
+    assert overrides == ConfigOverrides(
+        datasets={
+            "a43": {"execution": {"workers": 4, "parallel": True}},
+            "waymo": {"execution": {"workers": 4, "chunksize": 8}},
+        },
+    )
+    assert overrides.for_dataset("a43") == {"execution": {"workers": 4, "parallel": True}}
+    assert overrides.for_dataset("waymo") == {"execution": {"workers": 4, "chunksize": 8}}
+    assert overrides.for_dataset("nuscenes") == {}
 
 
 def test_square_extraction_valid() -> None:

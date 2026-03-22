@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass, replace
-from heapq import heappop, heappush
-from itertools import count
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from typing import Final
 
 import polars as pl
 
-from dronalize.pipeline.functional.basic import yaw_from_vel
+from dronalize.pipeline.functional.basic import yaw_from_pos, yaw_from_vel
 from dronalize.pipeline.functional.derivative import derivative
 from dronalize.scene._schema import SceneField
 
@@ -28,7 +26,7 @@ class ConversionContext:
     """Runtime information needed to derive scene fields."""
 
     sample_time: float | None
-    group_by: str | Sequence[str] | None = "id"
+    group_by: str | tuple[str] | None = "id"
 
 
 DerivationApply = Callable[[pl.LazyFrame, ConversionContext], pl.LazyFrame]
@@ -64,107 +62,69 @@ class DerivationRule:
 
 
 def apply_derivation_plan(
-    data: pl.LazyFrame,
+    data: pl.DataFrame,
     plan: Iterable[DerivationRule],
     context: ConversionContext,
-) -> pl.LazyFrame:
+    input_fields: SceneField,
+) -> tuple[pl.DataFrame, SceneField]:
     """Apply a derivation plan in order."""
+    lf = data.lazy()
+    output_fields = input_fields
     for rule in plan:
-        data = rule.apply(data, context)
-    return data
+        lf = rule.apply(lf, context)
+        output_fields |= rule.outputs
+
+    data = lf.collect()
+    return data, output_fields
 
 
-@functools.cache
+def _rules_for_context(context: ConversionContext) -> tuple[DerivationRule, ...]:
+    if context.sample_time is None:
+        return tuple(rule for rule in DERIVATION_RULES if not rule.needs_sample_time)
+    return DERIVATION_RULES
+
+
+@functools.lru_cache(maxsize=32)
 def plan_derivations(
     available_fields: SceneField,
     required_fields: SceneField,
     context: ConversionContext,
 ) -> tuple[DerivationRule, ...] | None:
-    """Find the optimal plan to derive the required fields.
+    context = ConversionContext(context.sample_time, context.group_by)
 
-    Uses Dijkstra's algorithm to find the lowest-cost sequence of derivation
-    rules that can produce the required fields from the available fields, given
-    the constraints of the conversion context.
-
-    Parameters
-    ----------
-    available_fields : SceneField
-        Bitmask of fields currently available.
-    required_fields : SceneField
-        Bitmask of fields that need to be derived.
-    context : ConversionContext
-        Additional information that may affect rule applicability, such as
-        sample time.
-
-    """
-    start = available_fields
-    goal = required_fields
-
-    if (start & goal) == goal:
+    if (available_fields & required_fields) == required_fields:
         return ()
 
-    best_cost: dict[SceneField, int] = {start: 0}
-    came_from: dict[SceneField, tuple[SceneField, DerivationRule]] = {}
-    queue: list[tuple[int, int, SceneField]] = []
-    tie_breaker = count()
-    heappush(queue, (0, next(tie_breaker), start))
+    rules = _rules_for_context(context)
 
-    while queue:
-        cost, _, state = heappop(queue)
-        if cost > best_cost.get(state, float("inf")):
-            continue
-        if (state & goal) == goal:
-            plan: list[DerivationRule] = []
-            curr_state = state
-            while curr_state in came_from:
-                curr_state, rule = came_from[curr_state]
-                plan.append(rule)
-            return tuple(reversed(plan))
+    @functools.cache
+    def solve(state: SceneField) -> tuple[int, tuple[DerivationRule, ...] | None]:
+        if (state & required_fields) == required_fields:
+            return 0, ()
 
-        for rule in DERIVATION_RULES:
-            if not rule.is_applicable(state, context):
+        best_cost = 2**31 - 1
+        best_plan: tuple[DerivationRule, ...] | None = None
+
+        for rule in rules:
+            if (state & rule.requires) != rule.requires:
                 continue
+            if (state & rule.outputs) == rule.outputs:
+                continue
+
             next_state = state | rule.outputs
-            next_cost = cost + rule.cost
-            if next_cost < best_cost.get(next_state, float("inf")):
-                best_cost[next_state] = next_cost
-                came_from[next_state] = (state, rule)
-                heappush(queue, (next_cost, next(tie_breaker), next_state))
+            tail_cost, tail_plan = solve(next_state)
+            if tail_plan is None:
+                continue
 
-    return None
+            total_cost = rule.cost + tail_cost
+            if total_cost < best_cost:
+                best_cost = total_cost
+                best_plan = (rule, *tail_plan)
 
+        return int(best_cost), best_plan
 
-def can_plan_with_sample_time(
-    available_fields: SceneField,
-    required_fields: SceneField,
-    context: ConversionContext,
-) -> bool:
-    """Return whether a derivation plan exists if sample time is available."""
-    trial_context: ConversionContext = context
-    if context.sample_time is None:
-        trial_context = replace(context, sample_time=1.0)
-
-    return plan_derivations(available_fields, required_fields, trial_context) is not None
-
-
-def requires_sample_time(
-    missing_fields: SceneField,
-    available_fields: SceneField,
-    context: ConversionContext,
-) -> bool:
-    """Return True if the missing fields become derivable only when sample_time is provided."""
-    missing = missing_fields
-    available = available_fields
-    if (context.sample_time is not None or not missing) or not (missing & _KINEMATIC_FIELDS):
-        return False
-
-    has_source_for_kinematics = ((available & _POSITION_FIELDS) == _POSITION_FIELDS) or (
-        (available & _VELOCITY_FIELDS) == _VELOCITY_FIELDS
-    )
-    if not has_source_for_kinematics:
-        return False
-
-    return can_plan_with_sample_time(available, available | missing, context)
+    _, plan = solve(available_fields)
+    return plan
 
 
 def _require_sample_time(sample_time: float | None) -> float:
@@ -243,24 +203,12 @@ def _kinematics_from_position(data: pl.LazyFrame, context: ConversionContext) ->
     )
 
 
-def _yaw_from_velocity(data: pl.LazyFrame, context: ConversionContext) -> pl.LazyFrame:
-    _ = context
+def _yaw_from_velocity(data: pl.LazyFrame, _context: ConversionContext) -> pl.LazyFrame:
     return yaw_from_vel(data, "vx", "vy", "yaw")
 
 
-def _yaw_from_position(data: pl.LazyFrame, context: ConversionContext) -> pl.LazyFrame:
-    data = _apply_derivative(
-        data,
-        context,
-        x_col="x",
-        y_col="y",
-        order=1,
-        rename={1: list(_TMP_YAW_VELOCITY)},
-        dt=1.0,
-    )
-    return yaw_from_vel(data, _TMP_YAW_VELOCITY[0], _TMP_YAW_VELOCITY[1], "yaw").drop(
-        list(_TMP_YAW_VELOCITY)
-    )
+def _yaw_from_position(data: pl.LazyFrame, _context: ConversionContext) -> pl.LazyFrame:
+    return yaw_from_pos(data, "x", "y", "yaw")
 
 
 DERIVATION_RULES: Final[tuple[DerivationRule, ...]] = (
@@ -307,7 +255,7 @@ DERIVATION_RULES: Final[tuple[DerivationRule, ...]] = (
         name="yaw_from_position",
         requires=_POSITION_FIELDS,
         outputs=_YAW_FIELDS,
-        cost=8,
+        cost=6,
         apply=_yaw_from_position,
     ),
 )

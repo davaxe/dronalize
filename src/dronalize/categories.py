@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import IntEnum, StrEnum, auto
+from enum import Enum, IntEnum, auto
 
 
 class AgentCategory(IntEnum):
@@ -43,7 +43,7 @@ class AgentCategory(IntEnum):
         return cls.from_string(value)
 
 
-class DatasetSplit(StrEnum):
+class DatasetSplit(str, Enum):
     """Enum representing the available dataset splits."""
 
     TRAIN = "train"

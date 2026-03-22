@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from dronalize._internal._types import T_co
+from dronalize._internal._typing import T_co
 from dronalize.categories import DatasetSplit
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ class Assigner(Protocol, Generic[T_co]):
 
         Returns
         -------
-        T
+        T_co
             The assigned group for the provided values.
         """
         ...
@@ -63,16 +63,16 @@ class StatelessWeightedAssigner(Assigner[T_co]):
     the groups.
 
     The advantage of this approach is that it does not require maintaining any
-    internal, which allows for deterministic group assignment for the same set
-    of input values and seed. However, the downside is that it will only
-    converge to the specified distribution in the limit of infinite assignment,
-    and could differ significantly from the specified distribution for small
-    numbers of assignments.
+    internal state, which allows deterministic group assignment for the same
+    set of input values and seed. However, the downside is that it will only
+    converge to the specified distribution in the limit of infinitely many
+    assignments, and could differ significantly from the specified distribution
+    for small numbers of assignments.
 
-    In contrast, the `WeightedAssigner` class maintains internal state to ensure
-    that the distrubtion is always close, at the cost of requirng the order of
-    assignment to be identical to get deterministic results across independent
-    runs.
+    In contrast, the `DeckWeightedAssigner` class maintains internal state to
+    keep the distribution close to the requested weights, at the cost of
+    requiring the assignment order to be identical to get deterministic results
+    across independent runs.
 
     """
 
@@ -119,12 +119,12 @@ class StatelessWeightedAssigner(Assigner[T_co]):
             group assignment.
 
         """
-        hash_float = _uniform_u64(self._seed, *values)
-        idx = int(np.searchsorted(self._cumulative_weights, hash_float, side="right"))
-        return self._groups[idx]
+        hash_float = _hash_to_unit_interval(self._seed, *values)
+        group_index = int(np.searchsorted(self._cumulative_weights, hash_float, side="right"))
+        return self._groups[group_index]
 
 
-def _uniform_u64(seed: int, *values: int | str) -> float:
+def _hash_to_unit_interval(seed: int, *values: int | str) -> float:
     h = hashlib.blake2b(digest_size=16)
     h.update(str(seed).encode("utf-8"))
     h.update(b"|")
@@ -139,11 +139,11 @@ def _uniform_u64(seed: int, *values: int | str) -> float:
 class DeckWeightedAssigner(Assigner[T_co]):
     """A class for assigning a stream of data into groups.
 
-    The `DeckWeightedAssigner takes a sequence of unique groups and optional
+    The `DeckWeightedAssigner` takes a sequence of unique groups and optional
     weights, and provides an infinite stream of group assignments. The groups
     are shuffled in rounds, where each round consists of a fixed number of
     samples (`round_size`) before reshuffling. The number of pre-generated
-    rounds can be specified with `rounds` parameter.
+    rounds can be specified with the `rounds` parameter.
 
     It works in the following steps:
     1. Create a 2D array (deck) where each row is a shuffled sequence of
@@ -161,16 +161,16 @@ class DeckWeightedAssigner(Assigner[T_co]):
     This implementation will guarantee that the distribution of groups will
     exactly follow the specified weights if:
     1. The number of groups assigned is a multiple of the `round_size`.
-    2. The `round_size` is sufficiently large to allow for a exact integer count
+    2. The `round_size` is sufficiently large to allow for an exact integer count
     of each group based on the weights. For example if `round_size` is 4 only
     the weights that are multiples of 0,25 can be represented exactly. If the
     `round_size` is 100, then weights that are multiples of 0.01 can be
     represented exactly.
 
     In all other cases the implementation will be as close as possible to the
-    specified weights and in the limit when number of distributed groups goes to
-    infinity the distribution will converge to the uniform distribution defined
-    by the weights.
+    specified weights and, in the limit as the number of assigned groups goes
+    to infinity, the distribution will converge to the requested weighted
+    distribution.
 
     """
 
@@ -182,7 +182,7 @@ class DeckWeightedAssigner(Assigner[T_co]):
         rounds: int = 10,
         seed: int | None = None,
     ) -> None:
-        """Initialize and construct the WeightedAssigner.
+        """Initialize and construct the DeckWeightedAssigner.
 
         Parameters
         ----------
@@ -203,7 +203,10 @@ class DeckWeightedAssigner(Assigner[T_co]):
         self._groups, self._weights = _prepare_groups_and_weights(groups, weights)
         self._rng: np.random.Generator = np.random.default_rng(seed)
         self._deck: npt.NDArray[np.int32] = _generate_shuffled_deck(
-            self._weights, round_size, rounds, self._rng
+            self._weights,
+            round_size,
+            rounds,
+            self._rng,
         )
         self._index: int = 0
         self._round_index: int = 0
@@ -243,7 +246,7 @@ class DeckWeightedAssigner(Assigner[T_co]):
         1
         """
         value = int(self._deck[self._round_index, self._index])
-        self._update()
+        self._advance()
         return self._groups[value]
 
     def take(self, n: int) -> Iterator[T_co]:
@@ -268,7 +271,7 @@ class DeckWeightedAssigner(Assigner[T_co]):
         while True:
             yield self.next()
 
-    def _update(self) -> None:
+    def _advance(self) -> None:
         self._index += 1
         if self._index >= self._deck.shape[1]:
             self._index = 0

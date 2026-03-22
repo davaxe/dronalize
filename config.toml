@@ -43,7 +43,6 @@ window_size = 80
 step_size = 1
 
 [a43.loader.extra_kwargs]
-rebalance = true
 custom_flag = "active"
 
 [a43.loader.resampling]

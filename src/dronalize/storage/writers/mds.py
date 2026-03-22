@@ -2,37 +2,38 @@ from __future__ import annotations
 
 import functools
 import multiprocessing as mp
+import os
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 import numpy as np
-from streaming import MDSWriter
-from streaming.base.util import merge_index
-from typing_extensions import Unpack, override
+from typing_extensions import override
 
+from dronalize._internal._optional import raise_missing_optional_dependency
 from dronalize.exceptions import ConfigurationError
-from dronalize.loading import SceneWriter
-from dronalize.loading.writer.common import (
-    encode_map_from_scene,
-    scene_to_numpy_dict,
-)
+from dronalize.storage.encoding import encode_map_from_scene, scene_to_numpy_dict
+from dronalize.storage.spec import StorageManifest, write_manifest
+from dronalize.storage.writers.protocol import SceneWriter
 
-FLOAT_MDS_DTYPE = "float64"
+try:
+    from streaming import MDSWriter
+    from streaming.base.util import merge_index
+except ModuleNotFoundError as error:
+    raise_missing_optional_dependency(
+        error,
+        feature="The MDS scene writer",
+        extra="storage-mds",
+    )
+
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Generator, Iterable
 
     from dronalize.categories import DatasetSplit
     from dronalize.config.loader import LoaderConfig
-    from dronalize.config.writer import WriterConfig, WriterPrecision
-    from dronalize.scene import Scene
-
-
-class _MDSWriterArgs(TypedDict, total=False):
-    compression: str | None
-    hashes: list[str] | None
-    size_limit: str | int
-    exist_ok: bool
+    from dronalize.config.writer import WriterConfig
+    from dronalize.scene import Scene, SceneSchema
 
 
 def _create_writer(
@@ -41,23 +42,25 @@ def _create_writer(
     output_dir: Path,
     config: WriterConfig,
     loader_config: LoaderConfig,
-    splits: tuple[DatasetSplit, ...] | None,
+    source_scene_schema: SceneSchema,
+    splits: Iterable[DatasetSplit] | None,
     parallel: bool,
-    **inner_args: Unpack[_MDSWriterArgs],
+    has_map: bool,
 ) -> MDSSceneWriter:
     return MDSSceneWriter(
         output_dir=output_dir,
         config=config,
         loader_config=loader_config,
+        source_scene_schema=source_scene_schema,
         splits=splits,
         parallel=parallel,
         parallel_group=parallel_group,
-        **inner_args,
+        has_map=has_map,
     )
 
 
 class MDSSceneWriter(SceneWriter):
-    """Write processed scenes to MosaicML Streaming (MDS) shards."""
+    """Write processed scenes to MosaicML Streaming shards."""
 
     def __init__(
         self,
@@ -65,22 +68,27 @@ class MDSSceneWriter(SceneWriter):
         *,
         config: WriterConfig,
         loader_config: LoaderConfig,
-        splits: tuple[DatasetSplit, ...] | None,
+        source_scene_schema: SceneSchema,
+        splits: Iterable[DatasetSplit] | None,
         parallel: bool,
+        has_map: bool,
         parallel_group: int | str | None = None,
-        **inner_args: Unpack[_MDSWriterArgs],
     ) -> None:
-        """Configure a lazily initialized MDS scene writer."""
         self._base_output_dir: Path = Path(output_dir)
         self._config: WriterConfig = config
         self._loader_config: LoaderConfig = loader_config
-        self._splits: tuple[DatasetSplit, ...] | None = splits
+        self._splits: tuple[DatasetSplit, ...] | None = (
+            tuple(dict.fromkeys(splits)) if splits is not None else None
+        )
         self._parallel: bool = parallel
-        self._parallel_group: int | str | None = parallel_group
-        # Defer writer initialization until the first write call.
+        self._parallel_group: str | int | None = parallel_group
         self._writers: dict[DatasetSplit | None, MDSWriter] | None = None
-        # Save inner writer args for later use during deferred initialization.
-        self._inner_args: _MDSWriterArgs = inner_args
+        self.manifest: StorageManifest = StorageManifest.from_configs(
+            loader_config=loader_config,
+            source_scene_schema=source_scene_schema,
+            writer_config=config,
+            has_map=has_map,
+        )
 
     @override
     @classmethod
@@ -89,18 +97,20 @@ class MDSSceneWriter(SceneWriter):
         output_dir: Path,
         config: WriterConfig,
         loader_config: LoaderConfig,
-        splits: tuple[DatasetSplit, ...] | None,
+        source_scene_schema: SceneSchema,
+        splits: Iterable[DatasetSplit] | None,
         parallel: bool,
-        **inner_args: Unpack[_MDSWriterArgs],
+        has_map: bool,
     ) -> Callable[[int | None], MDSSceneWriter]:
         return functools.partial(
             _create_writer,
             output_dir=output_dir,
             config=config,
             loader_config=loader_config,
+            source_scene_schema=source_scene_schema,
             splits=splits,
             parallel=parallel,
-            **inner_args,
+            has_map=has_map,
         )
 
     @staticmethod
@@ -110,23 +120,25 @@ class MDSSceneWriter(SceneWriter):
         splits: tuple[DatasetSplit, ...] | None,
         parallel: bool,
         parallel_group: int | str | None,
-        precision: WriterPrecision,
-        **inner_args: Unpack[_MDSWriterArgs],
+        manifest: StorageManifest,
+        config: WriterConfig,
     ) -> dict[DatasetSplit | None, MDSWriter]:
-        """Initialize MDSWriters for the given splits and output directory."""
         writers: dict[DatasetSplit | None, MDSWriter] = {}
         for split in splits or [None]:
-            split_dir = output_dir / split.value if split else output_dir
-            final_dir = (
-                split_dir
-                if not parallel
-                else split_dir
-                / str(parallel_group if parallel_group is not None else mp.current_process().name)
+            split_dir = output_dir / split.value if split else output_dir / "all"
+            group_name = (
+                parallel_group if parallel_group not in {None, ""} else mp.current_process().name
             )
+            final_dir = split_dir if not parallel else split_dir / str(group_name)
             writers[split] = MDSWriter(
-                out=str(final_dir), columns=_mds_columns(precision), **inner_args
+                out=str(final_dir),
+                columns=_mds_columns(config.precision),
+                compression=config.mds.compression,
+                hashes=list(config.mds.hashes) if config.mds.hashes is not None else None,
+                size_limit=config.mds.size_limit,
+                exist_ok=config.mds.exist_ok,
             )
-
+            write_manifest(split_dir, manifest)
         return writers
 
     @override
@@ -135,15 +147,14 @@ class MDSSceneWriter(SceneWriter):
         scene: Scene,
         split: DatasetSplit | None = None,
     ) -> bool:
-        # Resolve the map once per scene (shared across target-agent samples)
         if self._writers is None:
             self._writers = self._init_writers(
                 self._base_output_dir,
                 splits=self._splits,
                 parallel=self._parallel,
                 parallel_group=self._parallel_group,
-                precision=self._config.precision,
-                **self._inner_args,
+                manifest=self.manifest,
+                config=self._config,
             )
 
         np_dtype = self._config.float_dtype
@@ -166,7 +177,7 @@ class MDSSceneWriter(SceneWriter):
             if effective_split is not None
             else scene
         )
-        numpy_dict = scene_to_numpy_dict(
+        scene_sample = scene_to_numpy_dict(
             scene,
             dtype=np_dtype,
             offset_position=self._config.offset_positions,
@@ -175,30 +186,19 @@ class MDSSceneWriter(SceneWriter):
         map_sample = encode_map_from_scene(
             scene,
             dtype=np_dtype,
-            offset=numpy_dict["global_origin"] if self._config.offset_positions else None,
+            offset=scene_sample["global_origin"] if self._config.offset_positions else None,
             return_empty=True,
         )
 
         self._writers[effective_split].write({
-            # -- scalar metadata --
-            "scene_number": int(numpy_dict["scene_number"]),
-            "num_nodes": int(numpy_dict["num_nodes"]),
-            "input_len": self._loader_config.resampled_input_len,
-            "output_len": self._loader_config.resampled_output_len,
-            "global_origin": numpy_dict["global_origin"],
-            # -- agent arrays --
-            "type": numpy_dict["type"],
-            "input_features": numpy_dict["input_features"],
-            "target_features": numpy_dict["target_features"],
-            # Cast bool → uint8 (MDS does not support bool arrays)
-            "input_mask": numpy_dict["input_mask"].astype(np.uint8),
-            "target_mask": numpy_dict["target_mask"].astype(np.uint8),
-            "map_num_nodes": map_sample["map_num_nodes"],
-            "map_num_edges": map_sample["map_num_edges"],
-            "map_node_positions": map_sample["map_node_positions"],
-            "map_edge_indices": map_sample["map_edge_indices"],
-            "map_node_types": map_sample["map_node_types"],
-            "map_edge_types": map_sample["map_edge_types"],
+            "scene_number": int(scene_sample["scene_number"]),
+            "input_len": scene.input_len,
+            "output_len": scene.output_len,
+            "global_origin": scene_sample["global_origin"],
+            "agent_types": scene_sample["agent_types"],
+            "features": scene_sample["features"],
+            "mask": scene_sample["mask"].astype(np.uint8),
+            **map_sample,
         })
         return True
 
@@ -216,33 +216,35 @@ class MDSSceneWriter(SceneWriter):
             return
         if self._splits:
             for split in self._splits:
-                merge_index(str(self._base_output_dir / split.value), keep_local=True)
+                with _suppress_output():
+                    merge_index(str(self._base_output_dir / split.value), keep_local=True)
             return
+        with _suppress_output():
+            merge_index(str(self._base_output_dir / "all"), keep_local=True)
 
-        merge_index(str(self._base_output_dir), keep_local=True)
 
-
-def _mds_columns(dtype: WriterPrecision = FLOAT_MDS_DTYPE) -> dict[str, str]:
-    """Define the column schema for MDS samples."""
+def _mds_columns(dtype: str) -> dict[str, str]:
+    """Define the MDS sample schema."""
     return {
-        # -- scalar metadata --
         "scene_number": "int",
-        "num_nodes": "int",
         "input_len": "int",
         "output_len": "int",
-        # -- agent arrays (dynamic shape, fixed dtype) --
         "global_origin": "ndarray:float64:2",
-        "type": "ndarray:int32",
-        "input_features": f"ndarray:{dtype}",
-        "target_features": f"ndarray:{dtype}",
-        # MDS does not support ndarray:bool — store masks as uint8 (0/1)
-        "input_mask": "ndarray:uint8",
-        "target_mask": "ndarray:uint8",
-        # -- map arrays (dynamic shape, fixed dtype) --
-        "map_num_nodes": "int",
-        "map_num_edges": "int",
+        "agent_types": "ndarray:int32",
+        "features": f"ndarray:{dtype}",
+        "mask": "ndarray:uint8",
         "map_node_positions": f"ndarray:{dtype}",
         "map_edge_indices": "ndarray:int32",
         "map_node_types": "ndarray:int32",
         "map_edge_types": "ndarray:int32",
     }
+
+
+@contextmanager
+def _suppress_output() -> Generator[None, None, None]:
+    with (
+        Path(os.devnull).open("w", encoding="utf-8") as devnull,
+        redirect_stdout(devnull),
+        redirect_stderr(devnull),
+    ):
+        yield

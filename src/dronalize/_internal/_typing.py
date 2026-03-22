@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from typing import ParamSpec, TypeVar
+from typing import TYPE_CHECKING, ParamSpec, TypeVar
 
 import numpy as np
-import polars as pl
 
-DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
+if TYPE_CHECKING:
+    import polars as pl
+
+    DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
+else:
+    DataFrameT = TypeVar("DataFrameT")
+
 SourceId = str | int
 SourceT = TypeVar("SourceT")
 P = ParamSpec("P")

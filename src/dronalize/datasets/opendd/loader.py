@@ -17,7 +17,6 @@ from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
@@ -25,6 +24,7 @@ if TYPE_CHECKING:
 
     from dronalize.maps.graph import MapGraph
     from dronalize.maps.resolver import MapResolver
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import Scene, SceneSchema
 
 
@@ -126,7 +126,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(trajectory_pipeline(self.loader_config))
+        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override
@@ -174,7 +174,6 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         interp_distance: float | None,
     ) -> MapGraph:
         database: str = Path(key).name
-        print(database)
         map_path = Path(key) / f"map_{database}" / f"map_{database}.sqlite"
         return OpenDDMapBuilder.from_sqlite_file(map_path).build(min_distance, interp_distance)
 
@@ -188,6 +187,6 @@ def _list_table_names(db_path: Path) -> list[str]:
 def _count_tables(db_path: Path) -> int:
     with sqlite3.connect(db_path) as connection:
         row = connection.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table';"
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table';",
         ).fetchone()
     return row[0] if row is not None else 0

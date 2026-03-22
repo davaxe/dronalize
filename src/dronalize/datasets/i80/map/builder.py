@@ -46,5 +46,5 @@ class I80MapBuilder(HighwayLaneMapBuilder):
             smoothing=3.0,
         )
         self._lane_description: LaneDescription | None = LaneDescription(
-            ids=list(range(1, 7)), direction=[True] * 6
+            ids=list(range(1, 7)), direction=[True] * 6,
         )

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sys
-
 _CLI_INSTALL_HINT = "Install dronalize[cli] to use the dronalize command line interface."
 _CLI_DEPENDENCIES = ("typer", "rich")
 
@@ -18,8 +16,7 @@ def main() -> None:
         from dronalize.cli.app import main as cli_main  # noqa: PLC0415
     except ModuleNotFoundError as exc:
         if _is_missing_cli_dependency(exc):
-            print(_CLI_INSTALL_HINT, file=sys.stderr)
-            raise SystemExit(1) from exc
+            raise ModuleNotFoundError(_CLI_INSTALL_HINT) from exc
         raise
 
     cli_main()

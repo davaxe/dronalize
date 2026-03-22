@@ -360,58 +360,6 @@ def window(
     return func_to_return
 
 
-def rebalance(
-    ratio: float,
-    *,
-    req_lane_changes: int = 1,
-    agent_id: str = "id",
-    lane_changes_col: str = "lane_changes",
-    seed: int | None = None,
-    drop_lanechange_col: bool = True,
-) -> Transform:
-    """Create a highway agent rebalancing transform.
-
-    Wraps `~dronalize.common.trajectory.rebalance.rebalance_highway_agents`.
-
-    Parameters
-    ----------
-    ratio : float
-        Target LC/LK ratio.
-    req_lane_changes : int, optional
-        Minimum lane changes to count as LC agent.
-    agent_id : str, optional
-        Agent ID column.
-    lane_changes_col : str, optional
-        Lane-change count column.
-    seed : int, optional
-        Random seed for reproducibility.
-    drop_lanechange_col : bool, optional
-        Whether to drop the lane-change column after rebalancing.
-
-    Returns
-    -------
-    Transform
-
-    """
-
-    def _rebalance(df: pl.LazyFrame) -> pl.LazyFrame:
-        result = f.rebalance_highway_agents(
-            df,
-            ratio=ratio,
-            req_lane_changes=req_lane_changes,
-            agent_id=agent_id,
-            lane_changes_col=lane_changes_col,
-            seed=seed,
-        )
-        if drop_lanechange_col:
-            result = result.drop(lane_changes_col)
-        return result
-
-    _rebalance.__name__ = "rebalance"
-    _rebalance.__qualname__ = "transforms.rebalance"
-    return _rebalance
-
-
 def group_by_yield(
     *by: str,
     drop_group_cols: bool = True,

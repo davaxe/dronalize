@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import rich.progress as rp
 
+from dronalize.categories import DatasetSplit
 from dronalize.execution import prepare_dataset
 
 if TYPE_CHECKING:
@@ -158,9 +159,9 @@ if __name__ == "__main__":
 
     job = prepare_dataset(
         dataset="hotel",
-        input_dir=Path(path) / "data",
-        output_dir=Path("test"),
-        split=None,
+        input_dir=Path(path) / "ethucy" / "hotel",
+        output_dir=Path("test2"),
+        split=[DatasetSplit.VAL],
         output_format="dummy",
         config_path=None,
         jobs=4,

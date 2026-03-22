@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import multiprocessing.shared_memory as shm
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from typing_extensions import override
+from typing_extensions import Self, override
 
 if TYPE_CHECKING:
     from types import TracebackType
@@ -223,7 +223,10 @@ class MapGraph:
         offset = 0
         for arr in arrays_to_serialize:
             target_arr: npt.NDArray[Any] = np.ndarray(
-                arr.shape, dtype=arr.dtype, buffer=shared.buf, offset=offset
+                arr.shape,
+                dtype=arr.dtype,
+                buffer=shared.buf,
+                offset=offset,
             )
             np.copyto(target_arr, arr)
             offset += arr.nbytes

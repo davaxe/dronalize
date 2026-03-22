@@ -7,18 +7,19 @@ from typing import TYPE_CHECKING
 
 import dronalize.exceptions as dronalize_exceptions
 import dronalize.execution.common as ex_common
-from dronalize.config.config import Config, ConfigSection, load_config, resolve_config
+from dronalize.config.config import Config, load_config_overrides, resolve_runtime_config
 from dronalize.datasets import DatasetDescriptor, get
-from dronalize.loading.writer.format import OutputFormat
+from dronalize.execution.assigner import ConstantAssigner, StatelessWeightedAssigner
+from dronalize.execution.parallel.executor import ParallelExecutor
+from dronalize.execution.sequential import SequentialExecutor
+from dronalize.storage.formats import OutputFormat
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Sequence
+    from collections.abc import Generator, Sequence
     from pathlib import Path
 
     from dronalize.categories import DatasetSplit
-    from dronalize.config.config import ExecutionConfig
     from dronalize.config.loader import LoaderConfig
-    from dronalize.config.map import MapConfig
     from dronalize.config.writer import SceneSchemaLike, WriterConfig
     from dronalize.execution.assigner import SplitAssigner
     from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
@@ -62,8 +63,6 @@ class DatasetJob:
 
     def split_assigner(self) -> SplitAssigner | None:
         """Build a split assigner for modes that derive splits during writing."""
-        from dronalize.execution.assigner import ConstantAssigner, StatelessWeightedAssigner
-
         groups = self.writer_splits()
         if groups is None or len(groups) == 0:
             return None
@@ -79,6 +78,43 @@ class DatasetJob:
             return ConstantAssigner(groups[0])
 
         return None
+
+    def build_loader(self) -> BaseSceneLoader[object]:
+        """Instantiate the dataset loader for this job."""
+        return self.descriptor.build_loader(
+            self.data_root,
+            loader_config=self.config.loader,
+            map_config=self.config.map,
+            splits=self.loader_splits(),
+            output_schema=self.config.writer.scene_schema,
+        )
+
+    def build_executor(self, loader: BaseSceneLoader[object]) -> ObservableWritingExecutor:
+        """Construct the runtime executor for this job."""
+        if self.parallel:
+            return ParallelExecutor(
+                loader,
+                workers=self.config.execution.workers,
+                chunksize=self.config.execution.chunksize,
+                limit=self.limit,
+            )
+
+        return SequentialExecutor(loader, limit=self.limit)
+
+    def build_writer_factory(self) -> WriterFactory:
+        """Build the worker-local writer factory for this job."""
+        writer_splits = self.writer_splits()
+        splits = None if writer_splits is None else tuple(dict.fromkeys(writer_splits))
+        return _get_writer(
+            self.output_format,
+            self.output_dir,
+            loader_config=self.config.loader,
+            writer_config=self.config.writer,
+            source_scene_schema=self.descriptor.native_schema,
+            splits=splits,
+            parallel=self.parallel,
+            has_map=self.config.map.include_map,
+        )
 
     def summary(self) -> ProcessingSummary:
         """Return a display-ready summary of this prepared job."""
@@ -105,7 +141,8 @@ class DatasetJob:
         ]
 
         return ProcessingSummary(
-            title="Processing Plan", rows=tuple(row for row in raw_rows if row is not None)
+            title="Processing Plan",
+            rows=tuple(row for row in raw_rows if row is not None),
         )
 
     def _execution_summary(self) -> str:
@@ -136,22 +173,11 @@ class DatasetJob:
         return ", ".join(formatted)
 
     @contextmanager
-    def open(self) -> Iterator[DatasetRun]:
+    def open(self) -> Generator[DatasetRun]:
         """Open a live execution context for this job."""
         with self.descriptor.execution_scope(self.data_root, self.config.loader, self.config.map):
-            loader = _build_loader(
-                self.descriptor,
-                data_root=self.data_root,
-                loader_config=self.config.loader,
-                map_config=self.config.map,
-                splits=self.loader_splits(),
-                output_schema=self.config.writer.scene_schema,
-            )
-            executor = _build_executor(
-                loader,
-                execution_config=self.config.execution,
-                limit=self.limit,
-            )
+            loader = self.build_loader()
+            executor = self.build_executor(loader)
             yield DatasetRun(job=self, executor=executor)
 
     def run(self) -> None:
@@ -176,7 +202,7 @@ class DatasetRun:
     def run(self) -> None:
         """Execute the active run."""
         if self._writer_factory is None:
-            self._writer_factory = _build_writer_factory(self.job)
+            self._writer_factory = self.job.build_writer_factory()
         if self._split_assigner is None:
             self._split_assigner = self.job.split_assigner()
 
@@ -239,13 +265,12 @@ def _resolve_job_config(
     scene_schema: SceneSchemaLike | None,
     jobs: int | None,
 ) -> Config:
-    config_section: ConfigSection = {}
+    config_overrides: dict[str, object] = {}
     if config_path is not None:
-        all_overrides = load_config(config_path)
-        config_section = all_overrides.get(descriptor.name, {})
+        config_overrides = load_config_overrides(config_path).for_dataset(descriptor.name)
 
-    config: Config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
-    config = resolve_config(Config, default=config, overrides=config_section)
+    default_config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
+    config = resolve_runtime_config(default=default_config, overrides=config_overrides)
 
     if scene_schema is not None:
         writer_config = type(config.writer).model_validate({
@@ -255,15 +280,19 @@ def _resolve_job_config(
         config = config.model_copy(update={"writer": writer_config})
 
     if jobs is not None:
-        if jobs < 1:
+        parallel = jobs > 1
+        if jobs == -1:
+            jobs = None
+            parallel = True
+        elif jobs < 1:
             msg = "jobs must be at least 1."
             raise ValueError(msg)
         config = config.model_copy(
             update={
                 "execution": config.execution.model_copy(
-                    update={"parallel": jobs > 1, "workers": jobs}
-                )
-            }
+                    update={"parallel": parallel, "workers": jobs},
+                ),
+            },
         )
 
     return config
@@ -277,92 +306,32 @@ def _resolve_output_format(output_format: str) -> OutputFormat:
         raise dronalize_exceptions.ConfigurationError(msg) from exc
 
 
-def _build_loader(
-    descriptor: DatasetDescriptor,
-    *,
-    data_root: Path,
-    loader_config: LoaderConfig,
-    map_config: MapConfig,
-    splits: list[DatasetSplit] | None,
-    output_schema: SceneSchema | None,
-) -> BaseSceneLoader[object]:
-    """Instantiate a loader from a descriptor and its resolved config."""
-    kwargs: dict[str, object] = dict(loader_config.extra_kwargs)
-    if splits is not None:
-        kwargs["splits"] = splits
-    loader = descriptor.loader_factory(data_root, loader_config, map_config, **kwargs)
-    loader.set_output_schema(output_schema)
-    return loader
-
-
-def _build_executor(
-    loader: BaseSceneLoader[object],
-    *,
-    execution_config: ExecutionConfig,
-    limit: int | None,
-) -> ObservableWritingExecutor:
-    """Construct the runtime executor for one open job."""
-    if execution_config.parallel:
-        from dronalize.execution.parallel import ParallelExecutor
-
-        return ParallelExecutor(
-            loader,
-            workers=execution_config.workers,
-            chunksize=execution_config.chunksize,
-            limit=limit,
-        )
-
-    from dronalize.execution.sequential import SequentialExecutor
-
-    return SequentialExecutor(loader, limit=limit)
-
-
-def _build_writer_factory(job: DatasetJob) -> WriterFactory:
-    """Build the worker-local writer factory for one open job."""
-    writer_splits = job.writer_splits()
-    splits = None if writer_splits is None else tuple(dict.fromkeys(writer_splits))
-    return _get_writer(
-        job.output_format,
-        job.output_dir,
-        loader_config=job.config.loader,
-        writer_config=job.config.writer,
-        splits=splits,
-        parallel=job.parallel,
-    )
-
-
 def _get_writer(
     output_format: OutputFormat,
     output_dir: Path,
     *,
     loader_config: LoaderConfig,
     writer_config: WriterConfig,
+    source_scene_schema: SceneSchema,
     splits: tuple[DatasetSplit, ...] | None,
     parallel: bool,
+    has_map: bool,
 ) -> WriterFactory:
     """Resolve an output writer factory from a normalized format identifier."""
     match output_format:
         case OutputFormat.MDS:
-            from dronalize.loading.writer.mds import MDSSceneWriter
+            from dronalize.storage.writers.mds import MDSSceneWriter
 
             return MDSSceneWriter.as_factory(
                 output_dir,
                 config=writer_config,
                 loader_config=loader_config,
+                source_scene_schema=source_scene_schema,
                 splits=splits,
                 parallel=parallel,
-            )
-        case OutputFormat.ZARR:
-            from dronalize.loading.writer.zarr import ZarrSceneWriter
-
-            return ZarrSceneWriter.as_factory(
-                output_dir,
-                config=writer_config,
-                loader_config=loader_config,
-                splits=splits,
-                parallel=parallel,
+                has_map=has_map,
             )
         case OutputFormat.DUMMY:
-            from dronalize.loading.writer._dummy import DummyWriter
+            from dronalize.storage.writers._dummy import DummyWriter
 
             return DummyWriter.as_factory(log=False)

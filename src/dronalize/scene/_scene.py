@@ -8,12 +8,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.maps.graph import MapGraph
-from dronalize.scene._derivations import (
-    ConversionContext,
-    apply_derivation_plan,
-    plan_derivations,
-    requires_sample_time,
-)
+from dronalize.scene._derivations import ConversionContext, apply_derivation_plan, plan_derivations
 from dronalize.scene._schema import CANONICAL_V1, SceneField, SceneSchema
 
 if TYPE_CHECKING:
@@ -99,7 +94,7 @@ class Scene:
         return self.map_resolver(self)
 
     def has_map(self) -> bool:
-        """Check if this scene has an attached map resolver and key."""
+        """Check if this scene has an attached map resolver."""
         return self.map_resolver is not None
 
     def as_schema(self, schema: SceneSchema = CANONICAL_V1) -> Scene:
@@ -118,12 +113,14 @@ class Scene:
         """Return a compact representation with metadata and DataFrame shape."""
         rows, cols = self.inner.shape
         return (
-            f"scene_number={self.number}, "
+            "Scene("
+            f"number={self.number}, "
             f"input_len={self.input_len}, "
             f"output_len={self.output_len}, "
-            f"schema={self.schema.name}"
+            f"schema={self.schema.name}, "
             f"map_key={self.map_key!r}, "
-            f"inner=DataFrame({rows} rows x {cols} cols))"
+            f"inner=DataFrame({rows} rows x {cols} cols)"
+            ")"
         )
 
 
@@ -131,7 +128,7 @@ def convert_scene(scene: Scene, target: SceneSchema = CANONICAL_V1) -> Scene:
     """Convert a scene to the requested schema."""
     return replace(
         scene,
-        inner=convert_frame(
+        inner=_convert_frame(
             scene.inner,
             source=scene.schema,
             target=target,
@@ -141,7 +138,33 @@ def convert_scene(scene: Scene, target: SceneSchema = CANONICAL_V1) -> Scene:
     )
 
 
-def convert_frame(
+def derived_scene_fields(
+    source: SceneSchema,
+    target: SceneSchema,
+    *,
+    sample_time: float | None,
+) -> tuple[SceneField, ...]:
+    """Return target schema fields that would be materialized by conversion.
+
+    The result is ordered according to the target schema. A `ValueError` is
+    raised when the requested conversion cannot be planned with the available
+    source fields and sampling metadata.
+
+    """
+    missing_fields = target.fields & ~source.fields
+    if not missing_fields:
+        return ()
+
+    context = ConversionContext(sample_time=sample_time)
+    plan = plan_derivations(source.fields, target.fields, context)
+    if plan is None:
+        msg = f"No derivation plan found to convert from schema {source.name} to {target.name} "
+        raise ValueError(msg)
+
+    return tuple(field for field in target.ordered_fields() if (missing_fields & field) == field)
+
+
+def _convert_frame(
     data: pl.DataFrame,
     *,
     source: SceneSchema,
@@ -170,30 +193,18 @@ def _derive_missing_fields(
     target: SceneSchema,
     sample_time: float | None,
 ) -> pl.DataFrame:
-    available_fields = source.fields
-    required_fields = target.fields
-    if (available_fields & required_fields) == required_fields:
+    if (source.fields & target.fields) == target.fields:
         return data
 
     context = ConversionContext(sample_time=sample_time)
-    plan = plan_derivations(available_fields, required_fields, context)
+    plan = plan_derivations(source.fields, target.fields, context)
     if plan is None:
-        missing_fields = required_fields & ~available_fields
-        if requires_sample_time(missing_fields, available_fields, context):
-            msg = "Scene schema conversion requires sample_time to derive kinematics."
-            raise ValueError(msg)
-        missing = ", ".join(field.to_str() for field in missing_fields.fields())
-        msg = f"Cannot materialize scene schema {target.name}; missing {missing}."
+        msg = f"No derivation plan found to convert from schema {source.name} to {target.name} "
         raise ValueError(msg)
 
-    output = apply_derivation_plan(data.lazy(), plan, context).collect()
-    output_fields = SceneField(0)
-    for column in output.columns:
-        if SceneField.check(column):
-            output_fields |= SceneField.from_str(column)
-
-    if (output_fields & required_fields) != required_fields:
-        missing = ", ".join(field.to_str() for field in (required_fields & ~output_fields).fields())
+    output, output_fields = apply_derivation_plan(data, plan, context, source.fields)
+    if output_fields != target.fields:
+        missing = ", ".join(field.to_str() for field in (target.fields & ~output_fields).fields())
         msg = f"Cannot materialize scene schema {target.name}; missing {missing}."
         raise ValueError(msg)
     return output
@@ -202,7 +213,6 @@ def _derive_missing_fields(
 def _cast_to_schema(data: pl.DataFrame, schema: pl.Schema) -> pl.DataFrame:
     if not _matches_physical_schema_name(data.schema, schema):
         return data
-
     casts = [pl.col(col).cast(dtype) for col, dtype in schema.items() if data.schema[col] != dtype]
     return data if not casts else data.with_columns(casts)
 
@@ -237,4 +247,5 @@ def _get_schema_mismatch_message(
     if not errors:
         return ""
 
-    return f"Schema mismatch for {schema_name or ''} - {'; '.join(errors)}"
+    prefix = f"Schema mismatch for {schema_name}" if schema_name else "Schema mismatch"
+    return f"{prefix}: {'; '.join(errors)}"

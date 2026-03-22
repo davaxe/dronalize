@@ -6,20 +6,19 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-import dronalize.pipeline.transforms as tr
 from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.common import utils
 from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.maps.resolver import MapResolver, no_map, shared_map
-from dronalize.pipeline.factories import trajectory_pipeline
-from dronalize.pipeline.pipeline import Pipeline
+from dronalize.pipeline.factories import highway_trajectory_pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import SceneSchema
 
 
@@ -32,18 +31,8 @@ class I80Loader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        *,
-        lane_change_ratio: float | None = 1.0,
     ) -> None:
         """Initialize the I80 dataset loader.
-
-        It is possible to rebalance the dataset by adjusting the number of lane
-        changing agents compared to non-lane changing agents. This can be done
-        by setting the `lane_change_ratio` parameter. For example, a ratio of
-        0.5 would result in half as many lane changing agents as non-lane
-        changing agents. Typically highway datasets are heavily imbalanced
-        towards non-lane changing agents, which means that a high ratio con
-        result in way less total data.
 
         Parameters
         ----------
@@ -51,10 +40,6 @@ class I80Loader(BaseSceneLoader[Path]):
             Path to root of the I80 dataset, containing subdirectories of data files.
         loader_config : , optional
             Loader configuration. If None, the default configuration is used.
-        lane_change_ratio : float, optional
-            Ratio for rebalancing highway agents. If None, no rebalancing will
-            be applied. Default is 1.0, i.e. same number of lane changes as
-            non-lane changes.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
             splits, so `None` processes all sources.
@@ -62,7 +47,6 @@ class I80Loader(BaseSceneLoader[Path]):
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
         self._data_dir: Path = Path(data_root)
-        self._rebalance_ratio: float | None = lane_change_ratio
 
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
@@ -96,10 +80,7 @@ class I80Loader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        pipeline = Pipeline()
-        if self._rebalance_ratio is not None:
-            pipeline = pipeline.then(tr.rebalance(self._rebalance_ratio))
-        return pipeline.compose(trajectory_pipeline(self.loader_config))
+        return highway_trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override

@@ -19,9 +19,6 @@ Transform = Callable[[pl.LazyFrame], pl.LazyFrame]
 FlatMapTransform = Callable[[pl.LazyFrame], Iterable[pl.LazyFrame]]
 """A 1:N transformation that maps one LazyFrame to an iterable of LazyFrames."""
 
-ReduceTransform = Callable[[Iterable[pl.LazyFrame]], pl.LazyFrame]
-"""An N:1 transformation that reduces an iterable of LazyFrames to a single LazyFrame."""
-
 
 @dataclass(frozen=True, slots=True)
 class Pipeline:
@@ -111,43 +108,6 @@ class Pipeline:
             transform = otherwise
         return Pipeline((*self._steps, _FlatMapEntry(transform, name)))
 
-    def then_reduce(
-        self,
-        transform: ReduceTransform,
-        *,
-        when: bool = True,
-        otherwise: ReduceTransform | None = None,
-        name: str | None = None,
-    ) -> Pipeline:
-        """Append an N:1 reduce step and return a *new* pipeline.
-
-        This step will consume **all** LazyFrames produced by the previous steps
-        and yield a single output LazyFrame.
-
-        Parameters
-        ----------
-        transform : ReduceTransform
-            A callable that maps an iterable of LazyFrames to a single LazyFrame.
-        when : bool, optional
-            If False, skip this step and return the unchanged pipeline.
-        otherwise : ReduceTransform, optional
-            If provided and `when` is `False`, this reduce will be used instead
-            of skipping the step.
-        name : str | None, optional
-            An optional name for this step, used in the pipeline's repr.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline with the reduce step appended.
-
-        """
-        if not when:
-            if otherwise is None:
-                return self
-            transform = otherwise
-        return Pipeline((*self._steps, _ReduceEntry(transform, name)))
-
     def compose(
         self,
         other: Pipeline,
@@ -178,34 +138,6 @@ class Pipeline:
                 return self
             return otherwise
         return Pipeline((*self._steps, *other._steps))
-
-    # -- slicing ------------------------------------------------------------
-
-    def take(self, n: int) -> Pipeline:
-        """Take only the first n steps of the pipeline.
-
-        Parameters
-        ----------
-        n : int
-            Number of steps to take. Must be less than the total number of
-            steps.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline containing only the first n steps.
-
-        Raises
-        ------
-        ValueError
-            If n is greater than or equal to the total number of steps in the
-            pipeline.
-        """
-        if len(self._steps) <= n:
-            msg = f"Pipeline.take({n}) called on pipeline with only {len(self._steps)} steps"
-            raise ValueError(msg)
-
-        return Pipeline(self._steps[:n])
 
     # -- execution ----------------------------------------------------------
 
@@ -428,30 +360,6 @@ class Pipeline:
 
     # -- introspection ------------------------------------------------------
 
-    def inspect(self, f: Callable[[pl.LazyFrame], None]) -> Pipeline:
-        """Append an inspection step that applies f to each intermediate LazyFrame.
-
-        This is useful for debugging or logging the pipeline's behavior without
-        affecting the data flow.
-
-        Parameters
-        ----------
-        f : Callable[[pl.LazyFrame], None]
-            A function that takes a LazyFrame and returns None. It will be called
-            with each intermediate LazyFrame during execution.
-
-        Returns
-        -------
-        Pipeline
-            New pipeline with the inspection step appended.
-        """
-
-        def transform(df: pl.LazyFrame) -> pl.LazyFrame:
-            f(df)
-            return df
-
-        return self.then(transform, name=f"inspect({f.__name__})")
-
     def is_empty(self) -> bool:
         """Return True if the pipeline contains no steps."""
         return len(self._steps) == 0
@@ -475,10 +383,8 @@ class Pipeline:
         for entry in self._steps:
             if isinstance(entry, _MapEntry):
                 parts.append(f"  .then({entry.name or _fn_name(entry.fn)})")
-            elif isinstance(entry, _FlatMapEntry):
-                parts.append(f"  .then_flat_map({entry.name or _fn_name(entry.fn)})")
             else:
-                parts.append(f"  .then_reduce({entry.name or _fn_name(entry.fn)})")
+                parts.append(f"  .then_flat_map({entry.name or _fn_name(entry.fn)})")
         body = "\n".join(parts) if parts else "  (empty)"
         return f"Pipeline(\n{body}\n)"
 
@@ -518,21 +424,7 @@ class _FlatMapEntry:
             yield from self.fn(df)
 
 
-@dataclass(slots=True, frozen=True)
-class _ReduceEntry:
-    """Wraps an N:1 ReduceTransform."""
-
-    fn: ReduceTransform
-    name: str | None = None
-
-    def apply(self, inputs: Iterable[pl.LazyFrame]) -> Iterable[pl.LazyFrame]:
-        """Consume all inputs, apply reduction, and yield the single output."""
-        # Note: This materializes the iterable in memory, but the
-        # actual data inside the Polars frames remains lazy.
-        yield self.fn(inputs)
-
-
-_PipelineEntry = _MapEntry | _FlatMapEntry | _ReduceEntry
+_PipelineEntry = _MapEntry | _FlatMapEntry
 
 
 def _fn_name(fn: object) -> str:

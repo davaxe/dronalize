@@ -22,7 +22,9 @@ from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
+
+from typing_extensions import Self
 
 from dronalize.maps.edge_type import EdgeType
 

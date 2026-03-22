@@ -5,12 +5,12 @@ import itertools
 import multiprocessing as mp
 from collections import deque
 from multiprocessing.util import Finalize
-from typing import TYPE_CHECKING, Generic, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
-from typing_extensions import override
+from typing_extensions import Self, override
 
 import dronalize.execution.parallel._state as _state  # noqa: PLR0402
-from dronalize._internal._types import P, SourceT
+from dronalize._internal._typing import P, SourceT
 from dronalize.execution.common import Progress
 from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
 from dronalize.scene import Scene
@@ -21,7 +21,8 @@ if TYPE_CHECKING:
 
     from dronalize.categories import DatasetSplit
     from dronalize.execution.assigner import SplitAssigner
-    from dronalize.loading import ProcessableLoader, SceneWriter, Source
+    from dronalize.loading import ProcessableLoader, Source
+    from dronalize.storage.writers.protocol import SceneWriter
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene])
@@ -261,7 +262,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
         processed_scenes: int = 0
         for scene_i, scene in enumerate(
-            ParallelExecutor._generate_scenes(args.loader, args.source)
+            ParallelExecutor._generate_scenes(args.loader, args.source),
         ):
             split: DatasetSplit | None = None
             if _ctx.split_dispatch is not None:
@@ -282,10 +283,13 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         Scene numbers are assigned from a shared global counter when scenes are
         created inside worker processes.
         """
-        for scene_data, map_resolver in loader.process_next(source):
+        for scene_data, map_context in loader.process_next(source):
             scene_number = _ctx.shared.progress.increment_scene()
             yield loader.create_scene(
-                scene_data, source, resolver=map_resolver, scene_number=scene_number - 1
+                scene_data,
+                source,
+                map_context=map_context,
+                scene_number=scene_number - 1,
             )
 
     def _execute_parallel(

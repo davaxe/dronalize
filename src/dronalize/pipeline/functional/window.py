@@ -10,7 +10,7 @@ from dronalize.pipeline.functional.basic import collect
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize._internal._types import DataFrameT
+    from dronalize._internal._typing import DataFrameT
 
 
 @overload
@@ -138,7 +138,7 @@ def _sliding_window_iterable(
             continue
         if offset_sliding_col:
             yield window.with_columns(
-                pl.col(sliding_col).sub(pl.col(sliding_col).min()).alias(sliding_col)
+                pl.col(sliding_col).sub(pl.col(sliding_col).min()).alias(sliding_col),
             )
 
         yield window

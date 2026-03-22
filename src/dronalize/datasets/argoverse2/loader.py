@@ -14,7 +14,6 @@ from dronalize.datasets.argoverse2.map.builder import Argoverse2MapBuilder
 from dronalize.datasets.common import utils
 from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
-from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_VELOCITY_YAW_V1
 
 if TYPE_CHECKING:
@@ -22,6 +21,7 @@ if TYPE_CHECKING:
 
     from dronalize.maps.graph import MapGraph
     from dronalize.maps.resolver import MapResolver
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import Scene, SceneSchema
 
 
@@ -114,7 +114,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(trajectory_pipeline(self.loader_config))
+        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override

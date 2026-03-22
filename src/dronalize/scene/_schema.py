@@ -47,7 +47,7 @@ class SceneField(IntFlag):
 
     def fields(self) -> Iterable[SceneField]:
         """Yield individual SceneField members present in this combination."""
-        return _ordered_fields(self)
+        return (field for field in SceneField if _contains_fields(self, field))
 
     def to_str(self) -> str:
         """Return the canonical physical column name for this SceneField."""
@@ -116,7 +116,7 @@ class SceneSchema:
 
     def ordered_fields(self) -> tuple[SceneField, ...]:
         """Return semantic fields in canonical dataframe order."""
-        return _ordered_fields(self.fields)
+        return tuple(self.fields.fields())
 
     def has(self, *fields: SceneField | str) -> bool:
         """Return whether all requested semantic fields are present."""
@@ -156,7 +156,7 @@ class SceneSchema:
         return len(self.feature_fields())
 
     def field_items(self) -> tuple[tuple[str, pl.DataType], ...]:
-        """Return canonical field-name and dtype tuples."""
+        """Return the field-name and dtype tuples."""
         return tuple((field.to_str(), _FIELD_DTYPES[field]) for field in self.ordered_fields())
 
 
@@ -176,10 +176,6 @@ def _resolve_fields(fields: SceneField | Iterable[SceneField | str]) -> SceneFie
 
 def _contains_fields(fields: SceneField, required: SceneField) -> bool:
     return (fields & required) == required
-
-
-def _ordered_fields(fields: SceneField) -> tuple[SceneField, ...]:
-    return tuple(field for field in SceneField if _contains_fields(fields, field))
 
 
 _BASE_FIELDS: Final[SceneField] = (

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-import dronalize.pipeline.transforms as tr
 from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
@@ -16,16 +15,16 @@ from dronalize.loading.loader import IngestOutput, Source
 from dronalize.maps.resolver import MapResolver, no_map, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import CANONICAL_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import SceneSchema
 
 
-class XLevelDataLoader(BaseSceneLoader[Path]):
+class LevelXDataLoader(BaseSceneLoader[Path]):
     """Common trajectory data loader for X-level datasets.
 
     This class is meant as a base class for the datasets, since some of the
@@ -57,7 +56,6 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
         self._data_dir: Path = Path(data_dir)
-        self._rebalance_ratio: float | None = None
 
     @staticmethod
     def meta_data_select() -> list[pl.Expr]:
@@ -162,15 +160,7 @@ class XLevelDataLoader(BaseSceneLoader[Path]):
 
     @override
     def pipeline(self) -> Pipeline:
-        pipeline = Pipeline()
-        if self._rebalance_ratio is not None:
-            pipeline = pipeline.then(tr.rebalance(self._rebalance_ratio))
-
-        return pipeline.compose(
-            trajectory_pipeline(
-                self.loader_config,
-            )
-        )
+        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override

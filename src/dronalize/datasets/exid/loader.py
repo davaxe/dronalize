@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
+from dronalize.datasets.common.levelx_loader import LevelXDataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from dronalize.config.map import MapConfig
 
 
-class ExiDLoader(XLevelDataLoader):
+class ExiDLoader(LevelXDataLoader):
     """Trajectory data loader for the exiD dataset.
 
     The exiD (extracted from Drone) dataset was recorded at highway exits and

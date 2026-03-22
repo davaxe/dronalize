@@ -10,13 +10,13 @@ from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config import LoaderConfig
 from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
-from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_VELOCITY_YAW_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.config.map import MapConfig
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import SceneSchema
 
 
@@ -119,7 +119,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(trajectory_pipeline(self.loader_config))
+        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override
@@ -130,7 +130,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=10, output_len=30, sample_time=0.1).with_filtering(
-            require_frames=[19]
+            require_frames=[19],
         )
 
     @staticmethod
@@ -165,7 +165,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         if split is DatasetSplit.VAL:
             return self._count_sources(self._data_root / "val")
         return self._count_sources(self._data_root / "test_multi-agent") + self._count_sources(
-            self._data_root / "test_conditional-multi-agent"
+            self._data_root / "test_conditional-multi-agent",
         )
 
 

@@ -11,37 +11,28 @@ if TYPE_CHECKING:
 
 
 def _ensure_frozenset_agent(
-    v: AgentTypeValue | Iterable[AgentTypeValue] | None,
+    value: AgentTypeValue | Iterable[AgentTypeValue] | None,
 ) -> frozenset[AgentCategory] | None:
-    if v is None:
+    if value is None:
         return None
 
-    # If it's a single item, wrap it in a list first
-    if isinstance(v, (str, int, AgentCategory)):
-        v = [AgentCategory.from_value(v)]
-
-    normalized_items = [AgentCategory.from_value(item) for item in v]
-
-    return frozenset(normalized_items)
+    values = [value] if isinstance(value, (str, int, AgentCategory)) else value
+    return frozenset(AgentCategory.from_value(item) for item in values)
 
 
-def _ensure_frozenset_int(v: int | Iterable[int] | None) -> frozenset[int] | None:
-    if v is None:
+def _ensure_frozenset_int(value: int | Iterable[int] | None) -> frozenset[int] | None:
+    if value is None:
         return None
 
-    # If it's a single item, wrap it in a list first
-    if isinstance(v, int):
-        v = [v]
-
-    normalized_items = [int(item) for item in v]
-
-    return frozenset(normalized_items)
+    values = [value] if isinstance(value, int) else value
+    return frozenset(int(item) for item in values)
 
 
 AgentTypeValue = int | str | AgentCategory
 FrozenIntSet = Annotated[frozenset[int] | None, BeforeValidator(_ensure_frozenset_int)]
 FrozenAgentSet = Annotated[
-    frozenset[AgentCategory] | None, BeforeValidator(_ensure_frozenset_agent)
+    frozenset[AgentCategory] | None,
+    BeforeValidator(_ensure_frozenset_agent),
 ]
 
 
@@ -99,15 +90,11 @@ class FilteringConfig(BaseModel):
             is None (no minimum sample requirement).
 
         """
-        # Pack arguments into a dictionary and pass to model_validate.
-        # This safely triggers the BeforeValidator logic without static type errors.
-        config_dict = {
+        return cls.model_validate({
             "min_agents": min_agents,
             "require_all_valid": require_all_valid,
             "require_frames": require_frames,
             "exclude_agent_categories": exclude_agent_categories,
             "filter_slow_agents": filter_slow_agents,
             "min_samples_per_agent": min_samples_per_agent,
-        }
-
-        return cls.model_validate(config_dict)
+        })

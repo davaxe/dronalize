@@ -3,14 +3,12 @@ from dronalize.datasets.ind import _scope
 from dronalize.datasets.ind.loader import InDLoader
 from dronalize.datasets.ind.map.builder import InDMapBuilder
 
-DESCRIPTOR = DatasetDescriptor(
-    name="ind",
-    loader_factory=InDLoader,
-    default_config=InDLoader.default_config(),
-    default_map_config=InDLoader.default_map_config(),
-    has_map=True,
-    predefined_splits=list(InDLoader.predefined_splits()),
+DESCRIPTOR = DatasetDescriptor.from_loader(
+    "ind",
+    InDLoader,
+    InDLoader,
     execution_scope_fn=_scope.ind_execution_scope,
+    has_map=True,
 )
 
 __all__ = ["DESCRIPTOR", "InDLoader", "InDMapBuilder"]

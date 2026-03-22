@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
+from dronalize.datasets.common.levelx_loader import LevelXDataLoader
 
 
-class UniDLoader(XLevelDataLoader):
+class UniDLoader(LevelXDataLoader):
     """Trajectory data loader for the uniD dataset.
 
     The uniD (urban intersections Drone) dataset was recorded at urban

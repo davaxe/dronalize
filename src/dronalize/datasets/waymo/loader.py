@@ -15,7 +15,6 @@ from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
 from dronalize.loading import BaseSceneLoader
 from dronalize.loading.loader import IngestOutput, Source
 from dronalize.pipeline.factories import trajectory_pipeline
-from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_VELOCITY_YAW_V1
 
 if TYPE_CHECKING:
@@ -24,6 +23,7 @@ if TYPE_CHECKING:
     from dronalize.config.map import MapConfig
     from dronalize.maps.graph import MapGraph
     from dronalize.maps.resolver import MapResolver
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import Scene, SceneSchema
 
 
@@ -120,8 +120,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
     @override
     def pipeline(self) -> Pipeline:
         return (
-            Pipeline()
-            .compose(trajectory_pipeline(self.loader_config))
+            trajectory_pipeline(self.loader_config)
             # Shift autonomous vehicle id from -1 to 0
             .then(tr.with_columns(pl.col("id") + 1))
         )
@@ -135,7 +134,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filtering(
-            require_frames=[9]
+            require_frames=[9],
         )
 
     @staticmethod

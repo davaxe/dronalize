@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.datasets.common.xlevel_loader import XLevelDataLoader
+from dronalize.datasets.common.levelx_loader import LevelXDataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from dronalize.config.map import MapConfig
 
 
-class RounDLoader(XLevelDataLoader):
+class RounDLoader(LevelXDataLoader):
     """Trajectory data loader for the rounD dataset.
 
     The rounD (roundabouts Drone) dataset was recorded at roundabouts in Germany

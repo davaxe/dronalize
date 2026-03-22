@@ -132,8 +132,8 @@ def test_weight_length_mismatch_raises_error() -> None:
         _ = DeckWeightedAssigner(["A", "B"], weights=[0.5, 0.3, 0.2])
 
 
-def test_determinstic_assigner_distribution_matches_weights() -> None:
-    """Verify that the DeterminsticWeightedAssigner produces the expected distribution."""
+def test_deterministic_assigner_distribution_matches_weights() -> None:
+    """Verify that the stateless assigner produces the expected distribution."""
     groups = ["A", "B", "C"]
     weights = [0.5, 0.3, 0.2]
     assigner = StatelessWeightedAssigner(groups=groups, weights=weights, seed=100)
@@ -147,7 +147,7 @@ def test_determinstic_assigner_distribution_matches_weights() -> None:
     assert pytest.approx(counts["C"] / total, abs=0.02) == 0.2
 
 
-def test_determinstic_assigner_multiple_keys() -> None:
+def test_deterministic_assigner_multiple_keys() -> None:
     """Verify that different keys produce different assignments."""
     groups = ["A", "B", "C"]
     weights = [0.5, 0.3, 0.2]
@@ -162,7 +162,7 @@ def test_determinstic_assigner_multiple_keys() -> None:
     assert pytest.approx(counts["C"] / total, abs=0.01) == 0.2
 
 
-def test_determinstic_assigner_same_assignments() -> None:
+def test_deterministic_assigner_same_assignments() -> None:
     """Verify that the same key produces the same assignment across same seed."""
     groups = ["A", "B", "C"]
     weights = [0.5, 0.3, 0.2]
@@ -171,13 +171,13 @@ def test_determinstic_assigner_same_assignments() -> None:
     assigner2 = StatelessWeightedAssigner(groups=groups, weights=weights, seed=42)
     rng = random.Random(0)
     values = [rng.randint(0, 10000000) for _ in range(100)]
-    assingmets1 = [assigner1.assign(value) for value in values]
-    assingmets2 = [assigner2.assign(value) for value in values]
+    assignments1 = [assigner1.assign(value) for value in values]
+    assignments2 = [assigner2.assign(value) for value in values]
 
-    assert assingmets1 == assingmets2
+    assert assignments1 == assignments2
 
 
-def test_determinstic_assigner_different_assignments() -> None:
+def test_deterministic_assigner_different_assignments() -> None:
     """Verify that different seeds produce different assignments for the same values."""
     groups = ["A", "B", "C"]
     weights = [0.5, 0.3, 0.2]
@@ -186,7 +186,7 @@ def test_determinstic_assigner_different_assignments() -> None:
     assigner2 = StatelessWeightedAssigner(groups=groups, weights=weights, seed=43)
     rng = random.Random(0)
     values = [rng.randint(0, 10000000) for _ in range(100)]
-    assingmets1 = [assigner1.assign(value) for value in values]
-    assingmets2 = [assigner2.assign(value) for value in values]
+    assignments1 = [assigner1.assign(value) for value in values]
+    assignments2 = [assigner2.assign(value) for value in values]
 
-    assert assingmets1 != assingmets2
+    assert assignments1 != assignments2

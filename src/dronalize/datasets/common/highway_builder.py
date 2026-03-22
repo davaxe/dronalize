@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Self
+from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 from scipy.interpolate import UnivariateSpline
-from typing_extensions import override
+from typing_extensions import Self, override
 
 from dronalize.maps import BaseMapBuilder
 from dronalize.maps.edge_type import EdgeType

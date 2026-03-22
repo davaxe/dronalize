@@ -68,7 +68,7 @@ def trajectory_pipeline(
                 agent_id=agent_id,
                 frame_column=frame_column,
                 category_column=category_column,
-            )
+            ),
         )
 
     pipeline = pipeline.then(
@@ -76,10 +76,26 @@ def trajectory_pipeline(
             spec=config.resampling,
             frame_column=frame_column,
             group_by=group_by_resample,
-        )
+        ),
     )
 
     if has_window:
         pipeline = pipeline.then_flat_map(tr.group_by_yield("window_index"))
 
     return pipeline
+
+
+def highway_trajectory_pipeline(
+    config: LoaderConfig,
+    *,
+    agent_id: str = "id",
+    frame_column: str = "frame",
+    category_column: str | None = "agent_category",
+) -> Pipeline:
+    """Build a trajectory pipeline specialized for highway datasets."""
+    return trajectory_pipeline(
+        config,
+        agent_id=agent_id,
+        frame_column=frame_column,
+        category_column=category_column,
+    )

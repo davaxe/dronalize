@@ -87,7 +87,7 @@ def test_yaw_from_pos_known_direction() -> None:
     """Position moving east gives yaw ≈ 0 (after the first null from diff)."""
     df = pl.DataFrame({"x": [0.0, 1.0, 2.0], "y": [0.0, 0.0, 0.0]})
     result = yaw_from_pos(df)
-    assert result["yaw"][0] is None
+    assert abs(result["yaw"][0]) < 1e-6
     assert abs(result["yaw"][1]) < 1e-6
     assert abs(result["yaw"][2]) < 1e-6
 
@@ -96,7 +96,7 @@ def test_yaw_from_pos_diagonal() -> None:
     """Moving diagonally northeast gives yaw ≈ π/4."""
     df = pl.DataFrame({"x": [0.0, 1.0], "y": [0.0, 1.0]})
     result = yaw_from_pos(df)
-    assert result["yaw"][0] is None
+    assert abs(result["yaw"][0] - math.pi / 4) < 1e-6
     assert abs(result["yaw"][1] - math.pi / 4) < 1e-6
 
 
@@ -105,7 +105,7 @@ def test_yaw_from_pos_custom_columns() -> None:
     df = pl.DataFrame({"px": [0.0, 0.0], "py": [0.0, 1.0]})
     result = yaw_from_pos(df, x_col="px", y_col="py", yaw_col="heading")
     assert "heading" in result.columns
-    assert result["heading"][0] is None
+    assert abs(result["heading"][0] - math.pi / 2) < 1e-6
     assert abs(result["heading"][1] - math.pi / 2) < 1e-6
 
 
@@ -115,5 +115,5 @@ def test_yaw_from_pos_on_lazyframe() -> None:
     result = yaw_from_pos(lf)
     assert isinstance(result, pl.LazyFrame)
     collected = result.collect()
-    assert collected["yaw"][0] is None
+    assert abs(collected["yaw"][0]) < 1e-6
     assert abs(collected["yaw"][1]) < 1e-6

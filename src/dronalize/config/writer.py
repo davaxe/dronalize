@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Annotated, ClassVar, Literal
 
 import numpy as np
-from pydantic import BaseModel, BeforeValidator, ConfigDict
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from dronalize.scene import CANONICAL_V1, SceneSchema, get_scene_schema
 
@@ -11,6 +11,17 @@ FloatDType = type[np.float32] | type[np.float64]
 WriterPrecision = Literal["float32", "float64"]
 SceneSchemaLike = SceneSchema | str | dict[str, object]
 ResolvedSceneSchema = Annotated[SceneSchema, BeforeValidator(get_scene_schema)]
+
+
+class MDSFormatConfig(BaseModel):
+    """Backend-specific tuning for the Mosaic Streaming format."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    compression: str | None = None
+    hashes: tuple[str, ...] | None = None
+    size_limit: str | int = 67_108_864
+    exist_ok: bool = False
 
 
 class WriterConfig(BaseModel):
@@ -24,6 +35,7 @@ class WriterConfig(BaseModel):
     scene_schema: ResolvedSceneSchema = CANONICAL_V1
     precision: WriterPrecision = "float32"
     offset_positions: bool = True
+    mds: MDSFormatConfig = Field(default_factory=MDSFormatConfig)
 
     @classmethod
     def create(
@@ -36,7 +48,9 @@ class WriterConfig(BaseModel):
         """Flexible constructor for WriterConfig."""
         resolved_schema = get_scene_schema(scene_schema)
         return cls(
-            scene_schema=resolved_schema, precision=precision, offset_positions=offset_positions
+            scene_schema=resolved_schema,
+            precision=precision,
+            offset_positions=offset_positions,
         )
 
     @property

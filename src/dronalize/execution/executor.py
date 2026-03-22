@@ -5,7 +5,7 @@ from collections.abc import Callable
 from multiprocessing.synchronize import Event
 from typing import TYPE_CHECKING, Protocol
 
-from dronalize.loading import SceneWriter
+from dronalize.storage.writers.protocol import SceneWriter
 
 if TYPE_CHECKING:
     from dronalize.execution.assigner import SplitAssigner

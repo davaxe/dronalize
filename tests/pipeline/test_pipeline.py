@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
 
 import polars as pl
 import pytest
@@ -15,10 +14,7 @@ from dronalize.categories import AgentCategory
 from dronalize.config import LoaderConfig
 from dronalize.pipeline import transforms as transform
 from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.pipeline.pipeline import Pipeline, ReduceTransform
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
+from dronalize.pipeline.pipeline import Pipeline
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Helpers / fixtures
@@ -388,33 +384,6 @@ def test_transform_resample_downsample() -> None:
     assert result.shape[0] == 5
 
 
-def test_transform_rebalance_basic() -> None:
-    """Rebalance the dataset based on lane changes and check the final row counts."""
-    lf = pl.DataFrame({
-        "id": [0, 1, 2, 3, 4, 5],
-        "lane_changes": [0, 0, 0, 0, 2, 2],
-        "x": [0.0] * 6,
-    }).lazy()
-    fn = transform.rebalance(2.0, seed=42)
-    result = fn(lf).collect()
-    # 2 LC agents + 1 LK agent = 3
-    assert result.shape[0] == 3
-    # lane_changes column should be dropped by default
-    assert "lane_changes" not in result.columns
-
-
-def test_transform_rebalance_keep_column() -> None:
-    """Rebalance the dataset and ensure the lane changes column is retained."""
-    lf = pl.DataFrame({
-        "id": [0, 1, 2, 3],
-        "lane_changes": [0, 0, 2, 2],
-        "x": [0.0] * 4,
-    }).lazy()
-    fn = transform.rebalance(1.0, seed=42, drop_lanechange_col=False)
-    result = fn(lf).collect()
-    assert "lane_changes" in result.columns
-
-
 def test_transform_window_produces_multiple() -> None:
     """Ensure the window transform properly produces multiple windowed frames."""
     lf = pl.DataFrame({
@@ -515,36 +484,8 @@ def test_pipeline_integration_complex() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Additional Helpers / fixtures for Reduce
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def _concat_reduce(dfs: Iterable[pl.LazyFrame]) -> pl.LazyFrame:
-    """Reduce by concatination."""
-    frames = list(dfs)
-    if not frames:
-        return pl.LazyFrame()
-    return pl.concat(frames)
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 # Pipeline construction & immutability (Add to existing section)
 # ═══════════════════════════════════════════════════════════════════════════
-
-
-def test_pipeline_then_reduce_returns_new() -> None:
-    """Ensure that calling then_reduce() returns a completely new Pipeline instance."""
-    p1 = Pipeline()
-    p2 = p1.then_reduce(_concat_reduce)
-    assert len(p1) == 0, "Original must be unchanged"
-    assert len(p2) == 1
-
-
-def test_pipeline_repr_reduce() -> None:
-    """Check the string representation of a Pipeline containing a reduce step."""
-    pipe = Pipeline().then_reduce(_concat_reduce)
-    r = repr(pipe)
-    assert ".then_reduce(" in r
 
 
 def test_pipeline_rshift_operator() -> None:
@@ -556,83 +497,3 @@ def test_pipeline_rshift_operator() -> None:
     # Originals unchanged
     assert len(p1) == 1
     assert len(p2) == 1
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Pipeline execution (Add to existing section)
-# ═══════════════════════════════════════════════════════════════════════════
-
-
-def test_run_reduce_combines_multiple_streams(simple_lf: pl.LazyFrame) -> None:
-    """Verify that a reduce step correctly combines multiple frames into one."""
-    pipe = Pipeline().then_flat_map(_split_by_id).then(_add_one_to_x).then_reduce(_concat_reduce)
-    result = pipe.execute_single(simple_lf).collect()
-
-    # The expected frame is the original but with x + 1.
-    # Because group_by and concat might alter row order, sort before comparing.
-    expected = simple_lf.with_columns(pl.col("x") + 1).collect()
-
-    result_sorted = result.sort(["id", "frame"])
-    expected_sorted = expected.sort(["id", "frame"])
-
-    assert_frame_equal(result_sorted, expected_sorted)
-
-
-def test_run_single_succeeds_after_reduce(simple_lf: pl.LazyFrame) -> None:
-    """Ensure run_single succeeds seamlessly when a flat-map is followed by a reduce."""
-    # A flat-map normally causes execute_single to raise an error.
-    # Reducing it back down to a single frame should allow it to pass.
-    pipe = Pipeline().then_flat_map(_split_by_id).then_reduce(_concat_reduce)
-    result = pipe.execute_single(simple_lf).collect()
-
-    # Original frame had 8 rows, splitting into 2x4 and recombining should equal 8
-    assert result.shape[0] == 8
-    assert "id" in result.columns
-
-
-def test_run_reduce_on_empty_stream() -> None:
-    """Verify the reduce step handles an empty iterable of LazyFrames gracefully."""
-    # Simulate an empty stream by filtering out everything before flat-mapping
-    empty_lf = pl.DataFrame({"id": [], "x": []}).lazy()
-
-    pipe = Pipeline().then_flat_map(_split_by_id).then_reduce(_concat_reduce)
-
-    result = pipe.execute_single(empty_lf).collect()
-    assert result.shape[0] == 0
-
-
-def test_run_reduce_factory_can_be_applied_with_plain_python_control_flow(
-    simple_lf: pl.LazyFrame,
-) -> None:
-    """Reduce factories can be applied directly without pipeline-specific helpers."""
-
-    def reduce_factory() -> ReduceTransform:
-        return _concat_reduce
-
-    pipe = Pipeline().then_flat_map(_split_by_id).then_reduce(reduce_factory())
-
-    result = pipe.execute_single(simple_lf).collect()
-    assert result.shape[0] == 8
-
-
-def test_run_optional_reduce_uses_plain_python_control_flow(simple_lf: pl.LazyFrame) -> None:
-    """Optional reduce steps should be expressed with normal Python conditionals."""
-
-    def reduce_factory(arg: str) -> ReduceTransform:
-        # Return a custom reduce that adds a column to indicate the argument was passed
-        def custom_reduce(dfs: Iterable[pl.LazyFrame]) -> pl.LazyFrame:
-            frames = list(dfs)
-            return pl.concat(frames).with_columns(pl.lit(arg).alias("reduce_arg"))
-
-        return custom_reduce
-
-    # Case 1: Arg is provided
-    pipe_with = Pipeline().then_flat_map(_split_by_id)
-    pipe_with = pipe_with.then_reduce(reduce_factory("test_arg"))
-    result_with = pipe_with.execute_single(simple_lf).collect()
-    assert "reduce_arg" in result_with.columns
-
-    pipe_without = Pipeline().then_flat_map(_split_by_id)
-
-    with pytest.raises(ValueError, match="exactly 1 output"):
-        pipe_without.execute_single(simple_lf)

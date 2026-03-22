@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Concatenate
 
-from dronalize._internal._types import P
+from dronalize._internal._typing import P
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.exceptions import (
@@ -23,6 +23,7 @@ from dronalize.loading import BaseSceneLoader
 
 if TYPE_CHECKING:
     from dronalize.categories import DatasetSplit
+    from dronalize.scene._schema import SceneSchema
 
 _REGISTRY: dict[str, DatasetDescriptor] = {}
 
@@ -30,7 +31,8 @@ ExecutionScope = Callable[[Path, LoaderConfig, MapConfig], AbstractContextManage
 """Function for creating an execution context for a dataset."""
 
 LoaderFactory = Callable[
-    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P], BaseSceneLoader[Any]
+    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P],
+    BaseSceneLoader[Any],
 ]
 
 
@@ -48,7 +50,10 @@ class DatasetDescriptor:
     """Default loader configuration for the dataset."""
 
     default_map_config: MapConfig
-    """Default map configuration for the dataset, if applicable."""
+    """Default map configuration for the dataset."""
+
+    native_schema: SceneSchema
+    """Native scene schema for the dataset."""
 
     execution_scope_fn: ExecutionScope | None = None
     """Optional runtime context manager factory for dataset-specific resources."""
@@ -59,9 +64,34 @@ class DatasetDescriptor:
     predefined_splits: list[DatasetSplit] = field(default_factory=list)
     """Predefined splits exposed by the dataset, if any."""
 
+    @classmethod
+    def from_loader(
+        cls,
+        name: str,
+        loader_cls: type[BaseSceneLoader[Any]],
+        loader_factory: LoaderFactory[...],
+        *,
+        execution_scope_fn: ExecutionScope | None = None,
+        has_map: bool = False,
+    ) -> DatasetDescriptor:
+        """Create a descriptor directly from a loader class."""
+        return cls(
+            name=name,
+            loader_factory=loader_factory,
+            default_config=loader_cls.default_config(),
+            default_map_config=loader_cls.default_map_config(),
+            native_schema=loader_cls.native_scene_schema(),
+            execution_scope_fn=execution_scope_fn,
+            has_map=has_map,
+            predefined_splits=list(loader_cls.predefined_splits()),
+        )
+
     @contextmanager
     def execution_scope(
-        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig
+        self,
+        root: Path,
+        loader_config: LoaderConfig,
+        map_config: MapConfig,
     ) -> Generator[None, None, None]:
         """Execute the lifecycle context manager, if defined."""
         if self.execution_scope_fn is not None:
@@ -69,6 +99,24 @@ class DatasetDescriptor:
                 yield
         else:
             yield
+
+    def build_loader(
+        self,
+        root: Path,
+        *,
+        loader_config: LoaderConfig,
+        map_config: MapConfig,
+        output_schema: SceneSchema | None,
+        splits: list[DatasetSplit] | None = None,
+    ) -> BaseSceneLoader[Any]:
+        """Instantiate the dataset loader with the resolved runtime configuration."""
+        kwargs: dict[str, object] = dict(loader_config.extra_kwargs)
+        if splits is not None:
+            kwargs["splits"] = splits
+
+        loader = self.loader_factory(root, loader_config, map_config, **kwargs)
+        loader.set_output_schema(output_schema)
+        return loader
 
 
 @dataclass(frozen=True, slots=True)

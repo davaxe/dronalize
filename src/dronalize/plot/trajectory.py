@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from dronalize._internal._compat import require_optional
+from dronalize._internal._optional import require_optional
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

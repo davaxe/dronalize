@@ -15,12 +15,12 @@ from dronalize.loading.loader import IngestOutput, Source
 from dronalize.maps import no_map
 from dronalize.maps.resolver import MapResolver, shared_map
 from dronalize.pipeline.factories import trajectory_pipeline
-from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import SceneSchema
 
 
@@ -34,7 +34,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         *,
-        file_batch_size: int | None = 100,
+        file_batch_size: int | None = 10,
     ) -> None:
         """Initialize the dataset loader.
 
@@ -89,8 +89,20 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
                 .then(AgentCategory.CAR)
                 .otherwise(AgentCategory.UNKNOWN)
                 .alias("agent_category"),
-                pl.col("TRACK_ID").rank(method="dense").sub(1).cast(pl.Int64).alias("id"),
-                pl.col("TIMESTAMP").rank(method="dense").sub(1).cast(pl.Int64).alias("frame"),
+                pl
+                .col("TRACK_ID")
+                .rank(method="dense")
+                .over("file_id")
+                .sub(1)
+                .cast(pl.Int64)
+                .alias("id"),
+                pl
+                .col("TIMESTAMP")
+                .rank(method="dense")
+                .over("file_id")
+                .sub(1)
+                .cast(pl.Int64)
+                .alias("frame"),
                 pl.col("file_id").cast(pl.Categorical).to_physical(),
             )
             .drop("OBJECT_TYPE", "TRACK_ID", "TIMESTAMP")
@@ -108,7 +120,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(trajectory_pipeline(self.loader_config))
+        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override
@@ -119,7 +131,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=20, output_len=30, sample_time=0.1).with_filtering(
-            require_frames=[19]
+            require_frames=[19],
         )
 
     @classmethod

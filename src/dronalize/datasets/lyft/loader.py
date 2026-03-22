@@ -17,16 +17,16 @@ from dronalize.datasets.common import utils
 from dronalize.exceptions import SplitNotSupportedError
 from dronalize.loading import BaseSceneLoader, IngestOutput, Source
 from dronalize.maps.resolver import no_map, shared_map
-from dronalize.pipeline import Pipeline
 from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from zarr.core import Array
+    from zarr import Array
 
     from dronalize.maps import MapResolver
+    from dronalize.pipeline import Pipeline
     from dronalize.scene import SceneSchema
 
 
@@ -144,18 +144,19 @@ class LyftLoader(BaseSceneLoader[_Source]):
         return self._source_count(total_scenes, self._batch_size)
 
     @override
-    def ingest(self, source: Source[_Source]) -> Iterable[IngestOutput]:  # type: ignore[override]
+    def ingest(self, source: Source[_Source]) -> Iterable[IngestOutput]:
         start, end = source.inner.interval
 
         # Now uses the lazy loader directly to ensure availability
         arrays = self._get_arrays(source.inner.split)
-
-        scenes_np = cast("npt.NDArray[np.void]", arrays.scenes[start:end])
+        scenes_np: npt.NDArray[np.void] = cast("npt.NDArray[np.void]", arrays.scenes[start:end])
 
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
         frame_end = np.max(scenes_np[:]["frame_index_interval"])
-        frames_np = cast("npt.NDArray[np.void]", arrays.frames[frame_start:frame_end])
 
+        frames_np: npt.NDArray[np.void] = cast(
+            "npt.NDArray[np.void]", arrays.frames[frame_start:frame_end]
+        )
         agent_start = np.min(frames_np[:]["agent_index_interval"])
         agent_end = np.max(frames_np[:]["agent_index_interval"])
         agents_np = cast("npt.NDArray[np.void]", arrays.agents[agent_start:agent_end])
@@ -172,7 +173,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
 
     @override
     def pipeline(self) -> Pipeline:
-        return Pipeline().compose(trajectory_pipeline(self.loader_config))
+        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override

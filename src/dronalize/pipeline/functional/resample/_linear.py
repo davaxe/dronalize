@@ -15,7 +15,7 @@ from dronalize.pipeline.functional.resample._common import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal._types import DataFrameT
+    from dronalize._internal._typing import DataFrameT
     from dronalize.pipeline.functional.resample._common import ResampleSpec
 
 
@@ -67,7 +67,7 @@ def _downsample_dataframe(
     frame_column: str,
 ) -> pl.LazyFrame:
     return data.filter(pl.col(frame_column) % factor == 0).with_columns(
-        (pl.col(frame_column) // factor).alias(frame_column)
+        (pl.col(frame_column) // factor).alias(frame_column),
     )
 
 

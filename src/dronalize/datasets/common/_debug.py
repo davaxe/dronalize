@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from itertools import islice
 from typing import TYPE_CHECKING, Any
 
@@ -38,9 +37,8 @@ def debug_visualize_scenes(
     overlay_kwargs = {} if overlay_kwargs is None else dict(overlay_kwargs)
 
     charts: list[alt.TopLevelMixin] = []
-    start = time.perf_counter()
 
-    scenes: Iterator[Scene] = source.scenes().__iter__()
+    scenes: Iterator[Scene] = iter(source.scenes())
     for scene in islice(scenes, skip_scenes, skip_scenes + max_scenes * step, step):
         title_parts: list[str] = []
         if title_prefix:
@@ -81,6 +79,4 @@ def debug_visualize_scenes(
             chart.show()
         charts.append(chart)
 
-    elapsed = time.perf_counter() - start
-    print(f"Rendered {len(charts)} scene(s) in {elapsed:.2f} seconds")
     return charts

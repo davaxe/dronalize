@@ -13,8 +13,9 @@ from dronalize.execution.executor import ObservableWritingExecutor, WriterFactor
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from dronalize.loading import ProcessableLoader, SceneWriter
+    from dronalize.loading import ProcessableLoader
     from dronalize.scene import Scene
+    from dronalize.storage.writers.protocol import SceneWriter
 
 
 class SequentialExecutor(ObservableWritingExecutor):
@@ -93,7 +94,7 @@ class SequentialExecutor(ObservableWritingExecutor):
         self._running = True
         self._update_event.set()
         for source in itertools.islice(inner.sources(), self._limit):
-            for scene_i, (scene_data, map_resolver) in enumerate(inner.process_next(source)):
+            for scene_i, (scene_data, map_context) in enumerate(inner.process_next(source)):
                 self._update_event.set()
                 yield (
                     source.identifier,
@@ -101,7 +102,7 @@ class SequentialExecutor(ObservableWritingExecutor):
                     inner.create_scene(
                         scene_data,
                         source,
-                        resolver=map_resolver,
+                        map_context=map_context,
                         scene_number=self._scene_counter,
                     ),
                 )
