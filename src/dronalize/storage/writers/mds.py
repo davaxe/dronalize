@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import functools
 import multiprocessing as mp
+import os
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,7 +18,7 @@ from dronalize.storage.spec import StorageManifest, write_manifest
 from dronalize.storage.writers.protocol import SceneWriter
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Generator, Iterable
 
     from dronalize.categories import DatasetSplit
     from dronalize.config.loader import LoaderConfig
@@ -108,14 +110,12 @@ class MDSSceneWriter(SceneWriter):
         writers: dict[DatasetSplit | None, MDSWriter] = {}
         for split in splits or [None]:
             split_dir = output_dir / split.value if split else output_dir / "all"
-            final_dir = (
-                split_dir
-                if not parallel
-                else split_dir
-                / str(parallel_group if parallel_group is not None else mp.current_process().name)
+            group_name = (
+                parallel_group if parallel_group not in {None, ""} else mp.current_process().name
             )
+            final_dir = split_dir if not parallel else split_dir / str(group_name)
             writers[split] = MDSWriter(
-                out=(str(final_dir), ""),
+                out=str(final_dir),
                 columns=_mds_columns(config.precision),
                 compression=config.mds.compression,
                 hashes=list(config.mds.hashes) if config.mds.hashes is not None else None,
@@ -177,14 +177,10 @@ class MDSSceneWriter(SceneWriter):
         self._writers[effective_split].write({
             "scene_number": int(scene_sample["scene_number"]),
             "num_agents": int(scene_sample["num_agents"]),
-            "input_len": self._loader_config.resampled_input_len,
-            "output_len": self._loader_config.resampled_output_len,
             "global_origin": scene_sample["global_origin"],
             "agent_types": scene_sample["agent_types"],
-            "input_features": scene_sample["input_features"],
-            "target_features": scene_sample["target_features"],
-            "input_mask": scene_sample["input_mask"].astype(np.uint8),
-            "target_mask": scene_sample["target_mask"].astype(np.uint8),
+            "features": scene_sample["features"],
+            "mask": scene_sample["mask"].astype(np.uint8),
             **map_sample,
         })
         return True
@@ -203,9 +199,11 @@ class MDSSceneWriter(SceneWriter):
             return
         if self._splits:
             for split in self._splits:
-                merge_index((str(self._base_output_dir / split.value), ""), keep_local=True)
+                with _suppress_output():
+                    merge_index((str(self._base_output_dir / split.value), ""), keep_local=True)
             return
-        merge_index((str(self._base_output_dir), ""), keep_local=True)
+        with _suppress_output():
+            merge_index(str(self._base_output_dir / "all"), keep_local=True)
 
 
 def _mds_columns(dtype: str) -> dict[str, str]:
@@ -213,14 +211,10 @@ def _mds_columns(dtype: str) -> dict[str, str]:
     return {
         "scene_number": "int",
         "num_agents": "int",
-        "input_len": "int",
-        "output_len": "int",
         "global_origin": "ndarray:float64:2",
         "agent_types": "ndarray:int32",
-        "input_features": f"ndarray:{dtype}",
-        "target_features": f"ndarray:{dtype}",
-        "input_mask": "ndarray:uint8",
-        "target_mask": "ndarray:uint8",
+        "features": f"ndarray:{dtype}",
+        "mask": "ndarray:uint8",
         "map_num_nodes": "int",
         "map_num_edges": "int",
         "map_node_positions": f"ndarray:{dtype}",
@@ -228,3 +222,13 @@ def _mds_columns(dtype: str) -> dict[str, str]:
         "map_node_types": "ndarray:int32",
         "map_edge_types": "ndarray:int32",
     }
+
+
+@contextmanager
+def _suppress_output() -> Generator[None, None, None]:
+    with (
+        Path(os.devnull).open("w", encoding="utf-8") as devnull,
+        redirect_stdout(devnull),
+        redirect_stderr(devnull),
+    ):
+        yield

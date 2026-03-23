@@ -115,10 +115,8 @@ def scene_to_numpy_dict(
         "global_origin": offset,
         "num_agents": num_agents,
         "agent_types": agent_types,
-        "input_features": features[:, :input_len, :],
-        "target_features": features[:, input_len:, :],
-        "input_mask": mask[:, :input_len],
-        "target_mask": mask[:, input_len:],
+        "features": features,
+        "mask": mask,
     }
     return scene_dict
 
@@ -227,7 +225,7 @@ def scene_sample_to_parts(
     *,
     feature_columns: Sequence[str],
     start_frame: int = 0,
-) -> tuple[pl.DataFrame, int, int]:
+) -> pl.DataFrame:
     """Convert a persisted scene sample back into a Polars DataFrame.
 
     Parameters
@@ -248,18 +246,10 @@ def scene_sample_to_parts(
         lengths.
 
     """
-    input_features = sample["input_features"]
-    target_features = sample["target_features"]
-    input_mask = sample["input_mask"]
-    target_mask = sample["target_mask"]
+    features = sample["features"]
+    mask = sample["mask"]
     agent_types = sample["agent_types"]
     offset = sample["global_origin"]
-
-    input_len = input_features.shape[1]
-    output_len = target_features.shape[1]
-
-    features = np.concatenate([input_features, target_features], axis=1)
-    mask = np.concatenate([input_mask, target_mask], axis=1)
 
     rows: list[dict[str, int | float]] = []
     for i in range(features.shape[0]):
@@ -283,8 +273,4 @@ def scene_sample_to_parts(
 
             rows.append(row)
 
-    return (
-        pl.DataFrame(rows, schema_overrides={"agent_category": pl.Int32}).sort(["frame", "id"]),
-        input_len,
-        output_len,
-    )
+    return pl.DataFrame(rows, schema_overrides={"agent_category": pl.Int32}).sort(["frame", "id"])

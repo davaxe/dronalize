@@ -72,8 +72,7 @@ def test_scene_encoding_uses_new_logical_field_names() -> None:
 
     assert sample["num_agents"] == 2
     assert sample["agent_types"].tolist() == [1, 2]
-    assert sample["input_features"].shape == (2, 2, 7)
-    assert sample["target_features"].shape == (2, 1, 7)
+    assert sample["features"].shape == (2, 3, 7)
 
 
 def test_map_encoding_can_return_empty_payloads() -> None:
@@ -92,13 +91,11 @@ def test_inverse() -> None:
     """Test that the inverse of encoding a scene sample is the original scene data."""
     scene = _scene()
     sample = scene_to_numpy_dict(scene, dtype=np.float32)
-    reconstructed_scene, input_len, output_len = scene_sample_to_parts(
+    reconstructed_scene = scene_sample_to_parts(
         sample,
         feature_columns=scene.schema.feature_columns(),
     )
     inner = scene.inner.sort(by=["frame", "id"])
-    assert input_len == scene.input_len
-    assert output_len == scene.output_len
     for feature in scene.schema.feature_columns():
         assert feature in reconstructed_scene.columns
         assert_series_equal(inner[feature], reconstructed_scene[feature])

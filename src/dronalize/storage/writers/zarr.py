@@ -369,10 +369,8 @@ class _PendingBuffers:
             self.buffers["agent"].add(
                 {
                     "agent_types": scene["agent_types"],
-                    "input_features": scene["input_features"],
-                    "target_features": scene["target_features"],
-                    "input_mask": scene["input_mask"],
-                    "target_mask": scene["target_mask"],
+                    "features": scene["features"],
+                    "mask": scene["mask"],
                 },
                 length=n_agents,
             )
@@ -403,6 +401,7 @@ class _PendingBuffers:
 
 
 def _schemas(config: WriterConfig, manifest: StorageManifest) -> dict[str, dict[str, _ArrayArgs]]:
+    sequence_length = manifest.input_len + manifest.output_len
     return {
         "meta": {
             "pointers": {
@@ -427,29 +426,15 @@ def _schemas(config: WriterConfig, manifest: StorageManifest) -> dict[str, dict[
                 "dtype": np.int32,
                 "chunks": (config.zarr.agent_chunk,),
             },
-            "input_features": {
-                "shape": (0, manifest.input_len, config.feature_dim),
+            "features": {
+                "shape": (0, sequence_length, config.feature_dim),
                 "dtype": config.float_dtype,
                 "chunks": (config.zarr.agent_chunk, manifest.input_len, config.feature_dim),
             },
-            "target_features": {
-                "shape": (0, manifest.output_len, config.feature_dim),
-                "dtype": config.float_dtype,
-                "chunks": (
-                    config.zarr.agent_chunk,
-                    manifest.output_len,
-                    config.feature_dim,
-                ),
-            },
-            "input_mask": {
-                "shape": (0, manifest.input_len),
+            "mask": {
+                "shape": (0, sequence_length),
                 "dtype": np.bool_,
                 "chunks": (config.zarr.agent_chunk, manifest.input_len),
-            },
-            "target_mask": {
-                "shape": (0, manifest.output_len),
-                "dtype": np.bool_,
-                "chunks": (config.zarr.agent_chunk, manifest.output_len),
             },
         },
         "map": {

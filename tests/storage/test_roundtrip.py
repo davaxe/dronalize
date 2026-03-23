@@ -75,10 +75,8 @@ def _expected_sample() -> dict[str, Any]:
         "num_agents": int(scene_sample["num_agents"]),
         "global_origin": scene_sample["global_origin"],
         "agent_types": scene_sample["agent_types"],
-        "input_features": scene_sample["input_features"],
-        "target_features": scene_sample["target_features"],
-        "input_mask": scene_sample["input_mask"],
-        "target_mask": scene_sample["target_mask"],
+        "features": scene_sample["features"],
+        "mask": scene_sample["mask"],
         "map_num_nodes": int(map_sample["map_num_nodes"]),
         "map_num_edges": int(map_sample["map_num_edges"]),
         "map_node_positions": map_sample["map_node_positions"],
@@ -111,10 +109,8 @@ def _read_mds_sample(output_dir: Path) -> dict[str, Any]:
         "num_agents": int(sample["num_agents"]),
         "global_origin": np.asarray(sample["global_origin"], dtype=np.float64),
         "agent_types": np.asarray(sample["agent_types"], dtype=np.int32),
-        "input_features": np.asarray(sample["input_features"], dtype=np.float32),
-        "target_features": np.asarray(sample["target_features"], dtype=np.float32),
-        "input_mask": np.asarray(sample["input_mask"], dtype=bool),
-        "target_mask": np.asarray(sample["target_mask"], dtype=bool),
+        "features": np.asarray(sample["features"], dtype=np.float32),
+        "mask": np.asarray(sample["mask"], dtype=bool),
         "map_num_nodes": int(sample["map_num_nodes"]),
         "map_num_edges": int(sample["map_num_edges"]),
         "map_node_positions": np.asarray(sample["map_node_positions"], dtype=np.float32),
@@ -138,10 +134,8 @@ def _read_zarr_sample(output_dir: Path) -> dict[str, Any]:
     num_agents, num_nodes, num_edges = counts[0]
 
     agent_types_array = require_array(root, "agent/agent_types")
-    input_features_array = require_array(root, "agent/input_features")
-    target_features_array = require_array(root, "agent/target_features")
-    input_mask_array = require_array(root, "agent/input_mask")
-    target_mask_array = require_array(root, "agent/target_mask")
+    features_array = require_array(root, "agent/features")
+    mask_array = require_array(root, "agent/mask")
     map_node_positions_array = require_array(root, "map/node_positions")
     map_edge_indices_array = require_array(root, "map/edge_indices")
     map_node_types_array = require_array(root, "map/node_types")
@@ -152,10 +146,8 @@ def _read_zarr_sample(output_dir: Path) -> dict[str, Any]:
         "num_agents": num_agents,
         "global_origin": origins[0],
         "agent_types": agent_types_array[agent_offset : agent_offset + num_agents],
-        "input_features": input_features_array[agent_offset : agent_offset + num_agents],
-        "target_features": target_features_array[agent_offset : agent_offset + num_agents],
-        "input_mask": input_mask_array[agent_offset : agent_offset + num_agents],
-        "target_mask": target_mask_array[agent_offset : agent_offset + num_agents],
+        "features": features_array[agent_offset : agent_offset + num_agents],
+        "mask": mask_array[agent_offset : agent_offset + num_agents],
         "map_num_nodes": num_nodes,
         "map_num_edges": num_edges,
         "map_node_positions": map_node_positions_array[node_offset : node_offset + num_nodes],

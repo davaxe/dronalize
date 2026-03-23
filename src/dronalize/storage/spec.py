@@ -38,10 +38,8 @@ class SceneSample(TypedDict, Generic[FloatScalarT]):
     global_origin: npt.NDArray[np.float64]
     num_agents: int
     agent_types: npt.NDArray[np.int32]
-    input_features: npt.NDArray[FloatScalarT]
-    target_features: npt.NDArray[FloatScalarT]
-    input_mask: npt.NDArray[np.bool_]
-    target_mask: npt.NDArray[np.bool_]
+    features: npt.NDArray[FloatScalarT]
+    mask: npt.NDArray[np.bool_]
 
 
 SceneSampleF32 = SceneSample[np.float32]

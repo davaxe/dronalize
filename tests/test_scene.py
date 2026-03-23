@@ -176,7 +176,5 @@ def test_scene_to_numpy_dict_respects_requested_scene_schema() -> None:
     canonical = scene_to_numpy_dict(scene, scene_schema=CANONICAL_V1, dtype=np.float64)
     positions_only = scene_to_numpy_dict(scene, scene_schema=POSITIONS_ONLY_V1, dtype=np.float64)
 
-    assert canonical["input_features"].shape == (1, 2, 7)
-    assert canonical["target_features"].shape == (1, 1, 7)
-    assert positions_only["input_features"].shape == (1, 2, 2)
-    assert positions_only["target_features"].shape == (1, 1, 2)
+    assert canonical["features"].shape == (1, 3, 7)
+    assert positions_only["features"].shape == (1, 3, 2)
