@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, ClassVar, Concatenate
 import polars as pl
 from typing_extensions import override
 
-from dronalize._internal._types import P, SourceT
+from dronalize._internal._typing import P, SourceT
 from dronalize.categories import DatasetSplit
 from dronalize.config.map import MapConfig
 from dronalize.exceptions import SplitNotSupportedError
@@ -142,7 +142,8 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     @staticmethod
     def _assign_splits(
-        sources: Iterable[Source[SourceT]], split: DatasetSplit | None,
+        sources: Iterable[Source[SourceT]],
+        split: DatasetSplit | None,
     ) -> Iterable[Source[SourceT]]:
         """Apply effective split metadata to yielded sources."""
         for source in sources:
@@ -172,7 +173,10 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         for source in self.sources():
             for scene_df, resolver in self.process_next(source):
                 yield self.create_scene(
-                    scene_df, source, scene_number=self._scene_counter, resolver=resolver,
+                    scene_df,
+                    source,
+                    scene_number=self._scene_counter,
+                    resolver=resolver,
                 )
                 self._scene_counter += 1
 

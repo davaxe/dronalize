@@ -9,16 +9,18 @@ import polars as pl
 from dronalize.categories import AgentCategory
 
 if TYPE_CHECKING:
-    from dronalize._internal._types import FloatDType
+    from collections.abc import Sequence
+
+    from dronalize._internal._typing import FloatDType
     from dronalize.maps.graph import MapGraph
     from dronalize.scene import Scene, SceneSchema
     from dronalize.storage.spec import (
-        StorageMapSample,
-        StorageMapSampleF32,
-        StorageMapSampleF64,
-        StorageSceneSample,
-        StorageSceneSampleF32,
-        StorageSceneSampleF64,
+        MapSample,
+        MapSampleF32,
+        MapSampleF64,
+        SceneSample,
+        SceneSampleF32,
+        SceneSampleF64,
     )
 
 PLACEHOLDER_FLOAT64 = np.zeros((1,), dtype=np.float64)
@@ -34,7 +36,7 @@ def scene_to_numpy_dict(
     offset_position: bool = True,
     scene_schema: SceneSchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> StorageSceneSampleF32: ...
+) -> SceneSampleF32: ...
 
 
 @overload
@@ -45,7 +47,7 @@ def scene_to_numpy_dict(
     offset_position: bool = True,
     scene_schema: SceneSchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> StorageSceneSampleF64: ...
+) -> SceneSampleF64: ...
 
 
 def scene_to_numpy_dict(
@@ -55,7 +57,7 @@ def scene_to_numpy_dict(
     offset_position: bool = True,
     scene_schema: SceneSchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> StorageSceneSampleF32 | StorageSceneSampleF64:
+) -> SceneSampleF32 | SceneSampleF64:
     """Convert a Scene to a persisted tensor representation."""
     if scene_schema is not None:
         scene = scene.as_schema(scene_schema)
@@ -108,7 +110,7 @@ def scene_to_numpy_dict(
     else:
         agent_types = raw_categories.astype(np.int32)
 
-    scene_dict: StorageSceneSample[Any] = {
+    scene_dict: SceneSample[Any] = {
         "scene_number": scene.number,
         "global_origin": offset,
         "num_agents": num_agents,
@@ -128,7 +130,7 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: Literal[True],
-) -> StorageMapSampleF32: ...
+) -> MapSampleF32: ...
 
 
 @overload
@@ -138,7 +140,7 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: Literal[True],
-) -> StorageMapSampleF64: ...
+) -> MapSampleF64: ...
 
 
 @overload
@@ -148,7 +150,7 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: Literal[False] = False,
-) -> StorageMapSampleF32 | None: ...
+) -> MapSampleF32 | None: ...
 
 
 @overload
@@ -158,7 +160,7 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: Literal[False] = False,
-) -> StorageMapSampleF64 | None: ...
+) -> MapSampleF64 | None: ...
 
 
 def encode_map_from_scene(
@@ -167,49 +169,49 @@ def encode_map_from_scene(
     offset: npt.NDArray[np.float64] | None,
     *,
     return_empty: bool = False,
-) -> StorageMapSampleF32 | StorageMapSampleF64 | None:
+) -> MapSampleF32 | MapSampleF64 | None:
     """Resolve the map graph from the scene and convert it to a persisted layout."""
     graph = scene.resolve_map()
     if graph is None:
         if not return_empty:
             return None
-        map_dict: StorageMapSample[Any] = {
+        map_dict: MapSample[Any] = {
             "map_num_nodes": 0,
             "map_num_edges": 0,
-            "map_node_positions": np.zeros((0, 2), dtype=dtype),
-            "map_edge_indices": np.zeros((0, 2), dtype=np.int32),
-            "map_node_types": np.zeros((0,), dtype=np.int32),
-            "map_edge_types": np.zeros((0,), dtype=np.int32),
+            "map_node_positions": np.zeros((1,), dtype=dtype),
+            "map_edge_indices": np.zeros((1,), dtype=np.int32),
+            "map_node_types": np.zeros((1,), dtype=np.int32),
+            "map_edge_types": np.zeros((1,), dtype=np.int32),
         }
         return map_dict
 
-    return map_graph_to_numpy(graph, dtype=dtype, offset=offset)
+    return _map_graph_to_numpy(graph, dtype=dtype, offset=offset)
 
 
 @overload
-def map_graph_to_numpy(
+def _map_graph_to_numpy(
     graph: MapGraph,
     dtype: type[np.float32],
     offset: npt.NDArray[np.float64] | None = None,
-) -> StorageMapSampleF32: ...
+) -> MapSampleF32: ...
 
 
 @overload
-def map_graph_to_numpy(
+def _map_graph_to_numpy(
     graph: MapGraph,
     dtype: type[np.float64],
     offset: npt.NDArray[np.float64] | None = None,
-) -> StorageMapSampleF64: ...
+) -> MapSampleF64: ...
 
 
-def map_graph_to_numpy(
+def _map_graph_to_numpy(
     graph: MapGraph,
     dtype: FloatDType,
     offset: npt.NDArray[np.float64] | None = None,
-) -> StorageMapSampleF32 | StorageMapSampleF64:
+) -> MapSampleF32 | MapSampleF64:
     """Convert a MapGraph to a persisted dictionary of NumPy arrays."""
     node_positions = graph.node_positions - offset if offset is not None else graph.node_positions
-    map_dict: StorageMapSample[Any] = {
+    map_dict: MapSample[Any] = {
         "map_num_nodes": graph.num_nodes,
         "map_num_edges": graph.num_edges,
         "map_node_positions": node_positions.astype(dtype, copy=False),
@@ -218,3 +220,72 @@ def map_graph_to_numpy(
         "map_edge_types": graph.edge_types,
     }
     return map_dict
+
+
+def scene_sample_to_parts(
+    sample: SceneSample[Any],
+    *,
+    feature_columns: Sequence[str],
+    start_frame: int = 0,
+) -> tuple[pl.DataFrame, int, int]:
+    """Convert a persisted scene sample back into a Polars DataFrame.
+
+    Parameters
+    ----------
+    sample : SceneSample[Any]
+        The persisted scene data from `scene_to_numpy_dict`.
+    feature_columns : Sequence[str]
+        The list of feature column names in the order they appear in the input
+        and target features.
+    start_frame : int, optional
+        The frame number corresponding to the first column of the input features,
+        by default 0.
+
+    Returns
+    -------
+    tuple[pl.DataFrame, int, int]
+        Reconstructed DataFrame of agent states, and horzontal lengths of the
+        input and target feature sequences.
+
+    """
+    input_features = sample["input_features"]
+    target_features = sample["target_features"]
+    input_mask = sample["input_mask"]
+    target_mask = sample["target_mask"]
+    agent_types = sample["agent_types"]
+    offset = sample["global_origin"]
+
+    input_len = input_features.shape[1]
+    output_len = target_features.shape[1]
+
+    features = np.concatenate([input_features, target_features], axis=1)
+    mask = np.concatenate([input_mask, target_mask], axis=1)
+
+    rows = []
+
+    for i in range(features.shape[0]):
+        for t in range(features.shape[1]):
+            if not mask[i, t]:
+                continue
+
+            row = {
+                "frame": start_frame + t,
+                "id": i,
+                "agent_category": int(agent_types[i]),
+            }
+
+            for j, name in enumerate(feature_columns):
+                v = features[i, t, j]
+                if name == "x":
+                    v += offset[0]
+                elif name == "y":
+                    v += offset[1]
+                row[name] = v.item() if isinstance(v, np.generic) else v
+
+            rows.append(row)
+
+    return (
+        pl.DataFrame(rows, schema_overrides={"agent_category": pl.Int32}).sort(["frame", "id"]),
+        input_len,
+        output_len,
+    )

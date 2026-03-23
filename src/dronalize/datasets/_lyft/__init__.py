@@ -1,7 +1,7 @@
+from dronalize.datasets._lyft import _scope
+from dronalize.datasets._lyft.loader import LyftLoader
+from dronalize.datasets._lyft.map.builder import LyftMapBuilder
 from dronalize.datasets._registry import DatasetDescriptor
-from dronalize.datasets.lyft import _scope
-from dronalize.datasets.lyft.loader import LyftLoader
-from dronalize.datasets.lyft.map.builder import LyftMapBuilder
 
 DESCRIPTOR = DatasetDescriptor(
     name="lyft",

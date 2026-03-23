@@ -34,7 +34,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         *,
-        file_batch_size: int | None = 100,
+        file_batch_size: int | None = 10,
     ) -> None:
         """Initialize the dataset loader.
 
@@ -89,8 +89,20 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
                 .then(AgentCategory.CAR)
                 .otherwise(AgentCategory.UNKNOWN)
                 .alias("agent_category"),
-                pl.col("TRACK_ID").rank(method="dense").sub(1).cast(pl.Int64).alias("id"),
-                pl.col("TIMESTAMP").rank(method="dense").sub(1).cast(pl.Int64).alias("frame"),
+                pl
+                .col("TRACK_ID")
+                .rank(method="dense")
+                .over("file_id")
+                .sub(1)
+                .cast(pl.Int64)
+                .alias("id"),
+                pl
+                .col("TIMESTAMP")
+                .rank(method="dense")
+                .over("file_id")
+                .sub(1)
+                .cast(pl.Int64)
+                .alias("frame"),
                 pl.col("file_id").cast(pl.Categorical).to_physical(),
             )
             .drop("OBJECT_TYPE", "TRACK_ID", "TIMESTAMP")

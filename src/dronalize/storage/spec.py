@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict
 import numpy as np
 import numpy.typing as npt
 
-from dronalize._internal._types import FloatScalarT
+from dronalize._internal._typing import FloatScalarT
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,7 +20,7 @@ FORMAT_VERSION = 1
 MANIFEST_FILENAME = "manifest.json"
 
 
-class StorageMapSample(TypedDict, Generic[FloatScalarT]):
+class MapSample(TypedDict, Generic[FloatScalarT]):
     """Logical persisted representation of one scene's map payload."""
 
     map_num_nodes: int
@@ -31,7 +31,7 @@ class StorageMapSample(TypedDict, Generic[FloatScalarT]):
     map_edge_types: npt.NDArray[np.int32]
 
 
-class StorageSceneSample(TypedDict, Generic[FloatScalarT]):
+class SceneSample(TypedDict, Generic[FloatScalarT]):
     """Logical persisted representation of one scene sample."""
 
     scene_number: int
@@ -44,10 +44,12 @@ class StorageSceneSample(TypedDict, Generic[FloatScalarT]):
     target_mask: npt.NDArray[np.bool_]
 
 
-StorageSceneSampleF32 = StorageSceneSample[np.float32]
-StorageSceneSampleF64 = StorageSceneSample[np.float64]
-StorageMapSampleF32 = StorageMapSample[np.float32]
-StorageMapSampleF64 = StorageMapSample[np.float64]
+SceneSampleF32 = SceneSample[np.float32]
+SceneSampleF64 = SceneSample[np.float64]
+AnySceneSample = SceneSample[np.float32] | SceneSample[np.float64]
+MapSampleF32 = MapSample[np.float32]
+MapSampleF64 = MapSample[np.float64]
+AnyMapSample = MapSample[np.float32] | MapSample[np.float64]
 
 
 @dataclass(slots=True, frozen=True)
@@ -83,11 +85,9 @@ class StorageManifest:
             has_map=has_map,
         )
 
-    def as_dict(self) -> dict[str, object]:
-        """Return a JSON-serializable representation."""
-        data = asdict(self)
-        data["feature_columns"] = list(self.feature_columns)
-        return data
+    def json_dict(self) -> dict[str, Any]:
+        """Return a JSON-serializable dict representation of the manifest."""
+        return asdict(self)
 
 
 def manifest_path(root: Path) -> Path:
@@ -98,7 +98,7 @@ def manifest_path(root: Path) -> Path:
 def write_manifest(root: Path, manifest: StorageManifest) -> None:
     """Write the storage manifest for one output root."""
     root.mkdir(parents=True, exist_ok=True)
-    _ = manifest_path(root).write_text(json.dumps(manifest.as_dict(), indent=2), encoding="utf-8")
+    _ = manifest_path(root).write_text(json.dumps(manifest.json_dict(), indent=2), encoding="utf-8")
 
 
 def read_manifest(root: Path) -> dict[str, Any]:

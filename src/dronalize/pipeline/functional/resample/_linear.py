@@ -15,7 +15,7 @@ from dronalize.pipeline.functional.resample._common import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal._types import DataFrameT
+    from dronalize._internal._typing import DataFrameT
     from dronalize.pipeline.functional.resample._common import ResampleSpec
 
 

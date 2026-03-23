@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
@@ -24,7 +24,7 @@ from dronalize.scene import POSITIONS_ONLY_V1
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from zarr.core import Array
+    from zarr import Array
 
     from dronalize.maps import MapResolver
     from dronalize.scene import SceneSchema
@@ -42,9 +42,9 @@ class _Source:
 class _ArrayData:
     """Helper class to hold the Zarr arrays for a dataset split."""
 
-    scenes: Array
-    frames: Array
-    agents: Array
+    scenes: Array[Any]
+    frames: Array[Any]
+    agents: Array[Any]
 
     @property
     def total_scenes(self) -> int:
@@ -149,22 +149,21 @@ class LyftLoader(BaseSceneLoader[_Source]):
 
         # Now uses the lazy loader directly to ensure availability
         arrays = self._get_arrays(source.inner.split)
-
-        scenes_np = cast("npt.NDArray[np.void]", arrays.scenes[start:end])
+        scenes_np: npt.NDArray[np.void] = arrays.scenes[start:end]  # pyright: ignore[reportAssignmentType]
 
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
         frame_end = np.max(scenes_np[:]["frame_index_interval"])
-        frames_np = cast("npt.NDArray[np.void]", arrays.frames[frame_start:frame_end])
 
+        frames_np: npt.NDArray[np.void] = arrays.frames[frame_start:frame_end]  # pyright: ignore[reportAssignmentType]
         agent_start = np.min(frames_np[:]["agent_index_interval"])
         agent_end = np.max(frames_np[:]["agent_index_interval"])
-        agents_np = cast("npt.NDArray[np.void]", arrays.agents[agent_start:agent_end])
+        agents_np = arrays.agents[agent_start:agent_end]
 
         for scene_data in scenes_np:
             df = _scene_to_polars(
                 scene_data,
                 frames=frames_np,
-                agents=agents_np,
+                agents=agents_np,  # pyright: ignore[reportArgumentType]
                 frame_offset=frame_start,
                 agent_offset=agent_start,
             )

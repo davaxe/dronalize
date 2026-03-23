@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Concatenate, Generic, Protocol
 
 import polars as pl
 
-from dronalize._internal._types import P, SourceId, SourceT
+from dronalize._internal._typing import P, SourceId, SourceT
 from dronalize.maps.resolver import MapKey, MapResolver
 
 if TYPE_CHECKING:

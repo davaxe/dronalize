@@ -18,8 +18,8 @@ class ZarrFormatConfig(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    scene_chunk: int = Field(default=4096, gt=0)
-    agent_chunk: int = Field(default=512, gt=0)
+    scene_chunk: int = Field(default=128, gt=0)
+    agent_chunk: int = Field(default=4096, gt=0)
     map_node_chunk: int = Field(default=4096, gt=0)
     map_edge_chunk: int = Field(default=4096, gt=0)
 

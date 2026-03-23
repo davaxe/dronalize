@@ -14,7 +14,7 @@ from typing_extensions import override
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize._internal._types import DataFrameT
+    from dronalize._internal._typing import DataFrameT
 
 SEGMENT_COLUMN: Final = "_resample_segment"
 

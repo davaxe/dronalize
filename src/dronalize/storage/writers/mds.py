@@ -24,9 +24,6 @@ if TYPE_CHECKING:
     from dronalize.scene import Scene
 
 
-FLOAT_MDS_DTYPE = "float64"
-
-
 def _create_writer(
     parallel_group: int | None,
     *,
@@ -110,7 +107,7 @@ class MDSSceneWriter(SceneWriter):
     ) -> dict[DatasetSplit | None, MDSWriter]:
         writers: dict[DatasetSplit | None, MDSWriter] = {}
         for split in splits or [None]:
-            split_dir = output_dir / split.value if split else output_dir
+            split_dir = output_dir / split.value if split else output_dir / "all"
             final_dir = (
                 split_dir
                 if not parallel
@@ -188,12 +185,7 @@ class MDSSceneWriter(SceneWriter):
             "target_features": scene_sample["target_features"],
             "input_mask": scene_sample["input_mask"].astype(np.uint8),
             "target_mask": scene_sample["target_mask"].astype(np.uint8),
-            "map_num_nodes": map_sample["map_num_nodes"],
-            "map_num_edges": map_sample["map_num_edges"],
-            "map_node_positions": map_sample["map_node_positions"],
-            "map_edge_indices": map_sample["map_edge_indices"],
-            "map_node_types": map_sample["map_node_types"],
-            "map_edge_types": map_sample["map_edge_types"],
+            **map_sample,
         })
         return True
 
@@ -216,7 +208,7 @@ class MDSSceneWriter(SceneWriter):
         merge_index((str(self._base_output_dir), ""), keep_local=True)
 
 
-def _mds_columns(dtype: str = FLOAT_MDS_DTYPE) -> dict[str, str]:
+def _mds_columns(dtype: str) -> dict[str, str]:
     """Define the MDS sample schema."""
     return {
         "scene_number": "int",

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from typing_extensions import override
 
-from dronalize.datasets.lyft.map import parser
+from dronalize.datasets._lyft.map import parser
 from dronalize.maps import BaseMapBuilder
 from dronalize.maps.edge_type import EdgeType
 

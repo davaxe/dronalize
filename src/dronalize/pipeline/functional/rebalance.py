@@ -7,7 +7,7 @@ import polars as pl
 from dronalize.pipeline.functional.basic import lazy
 
 if TYPE_CHECKING:
-    from dronalize._internal._types import DataFrameT
+    from dronalize._internal._typing import DataFrameT
 
 
 def rebalance_highway_agents(

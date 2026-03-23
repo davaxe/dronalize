@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from dronalize._internal._types import T_co
+from dronalize._internal._typing import T_co
 from dronalize.categories import DatasetSplit
 
 if TYPE_CHECKING:
@@ -203,7 +203,10 @@ class DeckWeightedAssigner(Assigner[T_co]):
         self._groups, self._weights = _prepare_groups_and_weights(groups, weights)
         self._rng: np.random.Generator = np.random.default_rng(seed)
         self._deck: npt.NDArray[np.int32] = _generate_shuffled_deck(
-            self._weights, round_size, rounds, self._rng,
+            self._weights,
+            round_size,
+            rounds,
+            self._rng,
         )
         self._index: int = 0
         self._round_index: int = 0

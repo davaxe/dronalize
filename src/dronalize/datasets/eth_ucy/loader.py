@@ -18,7 +18,7 @@ from dronalize.pipeline.pipeline import Pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable
 
     from dronalize.scene import SceneSchema
 
@@ -29,7 +29,6 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
     def __init__(
         self,
         data_root: Path | str,
-        dataset: str | Sequence[str],
         *,
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
@@ -41,8 +40,6 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
         ----------
         data_root : Path or str
             Path to the root directory containing the ETH/UCY data.
-        dataset : str or Sequence[str]
-            Name(s) of the dataset(s) to load (e.g., "hotel", "eth").
         loader_config : , optional
             Loader configuration override. If None, the default configuration is used.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
@@ -52,7 +49,6 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
         """
         super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
         self._data_root: Path = Path(data_root)
-        self._dataset: set[str] = {dataset} if isinstance(dataset, str) else set(dataset)
 
     @classmethod
     @override
@@ -60,12 +56,9 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
         return (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
     def _sources_from_split(self, split_name: str) -> Iterable[Source[Path]]:
-        for dataset in sorted(self._dataset):
-            data_dir = self._data_root / dataset / split_name
-            if not data_dir.is_dir():
-                continue
-            for data_file in sorted(data_dir.iterdir()):
-                yield Source(identifier=data_file.name, inner=data_file)
+        data_dir = self._data_root / split_name
+        for data_file in sorted(data_dir.iterdir()):
+            yield Source(identifier=data_file.name, inner=data_file)
 
     @override
     def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Path]]:
@@ -121,7 +114,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
                 sample_time=0.4,
             )
             .with_window(step_size=1)
-            .with_filtering(require_all_valid=False, min_samples_per_agent=2, require_frames=[7])
+            .with_filtering(require_all_valid=True, min_samples_per_agent=2, require_frames=None)
             .with_resampling(
                 ResampleSpec(
                     up=4,
@@ -139,10 +132,9 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:
         num_sources = 0
-        for dataset in self._dataset:
-            data_dir = self._data_root / dataset / split.value
-            if data_dir.is_dir():
-                num_sources += sum(1 for _ in data_dir.iterdir())
+        data_dir = self._data_root / split.value
+        if data_dir.is_dir():
+            num_sources += sum(1 for _ in data_dir.iterdir())
         return num_sources
 
 
@@ -158,7 +150,6 @@ class HotelLoader(_EthUcyLoader):
     ) -> None:
         super().__init__(
             data_root=data_root,
-            dataset="hotel",
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
@@ -177,7 +168,6 @@ class EthLoader(_EthUcyLoader):
     ) -> None:
         super().__init__(
             data_root=data_root,
-            dataset="eth",
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
@@ -196,7 +186,6 @@ class UnivLoader(_EthUcyLoader):
     ) -> None:
         super().__init__(
             data_root=data_root,
-            dataset="univ",
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
@@ -215,7 +204,6 @@ class Zara1Loader(_EthUcyLoader):
     ) -> None:
         super().__init__(
             data_root=data_root,
-            dataset="zara1",
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
@@ -234,7 +222,6 @@ class Zara2Loader(_EthUcyLoader):
     ) -> None:
         super().__init__(
             data_root=data_root,
-            dataset="zara2",
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,

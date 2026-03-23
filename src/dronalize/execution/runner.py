@@ -106,7 +106,8 @@ class DatasetJob:
         ]
 
         return ProcessingSummary(
-            title="Processing Plan", rows=tuple(row for row in raw_rows if row is not None),
+            title="Processing Plan",
+            rows=tuple(row for row in raw_rows if row is not None),
         )
 
     def _execution_summary(self) -> str:
@@ -256,13 +257,17 @@ def _resolve_job_config(
         config = config.model_copy(update={"writer": writer_config})
 
     if jobs is not None:
-        if jobs < 1:
+        parallel = jobs > 1
+        if jobs == -1:
+            jobs = None
+            parallel = True
+        elif jobs < 1:
             msg = "jobs must be at least 1."
             raise ValueError(msg)
         config = config.model_copy(
             update={
                 "execution": config.execution.model_copy(
-                    update={"parallel": jobs > 1, "workers": jobs},
+                    update={"parallel": parallel, "workers": jobs},
                 ),
             },
         )

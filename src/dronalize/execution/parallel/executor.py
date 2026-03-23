@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Generic, NamedTuple, Self, TypeVar
 from typing_extensions import override
 
 import dronalize.execution.parallel._state as _state  # noqa: PLR0402
-from dronalize._internal._types import P, SourceT
+from dronalize._internal._typing import P, SourceT
 from dronalize.execution.common import Progress
 from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
 from dronalize.scene import Scene
@@ -286,7 +286,10 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         for scene_data, map_resolver in loader.process_next(source):
             scene_number = _ctx.shared.progress.increment_scene()
             yield loader.create_scene(
-                scene_data, source, resolver=map_resolver, scene_number=scene_number - 1,
+                scene_data,
+                source,
+                resolver=map_resolver,
+                scene_number=scene_number - 1,
             )
 
     def _execute_parallel(

@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.datasets.lyft.protos import road_network_pb2 as proto
+from dronalize.datasets._lyft.protos import road_network_pb2 as proto
 from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:

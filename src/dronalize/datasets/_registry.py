@@ -1,3 +1,4 @@
+# ruff: noqa: ERA001
 """Registry for dataset descriptors."""
 
 from __future__ import annotations
@@ -11,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Concatenate
 
-from dronalize._internal._types import P
+from dronalize._internal._typing import P
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.exceptions import (
@@ -30,7 +31,8 @@ ExecutionScope = Callable[[Path, LoaderConfig, MapConfig], AbstractContextManage
 """Function for creating an execution context for a dataset."""
 
 LoaderFactory = Callable[
-    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P], BaseSceneLoader[Any],
+    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P],
+    BaseSceneLoader[Any],
 ]
 
 
@@ -61,7 +63,10 @@ class DatasetDescriptor:
 
     @contextmanager
     def execution_scope(
-        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig,
+        self,
+        root: Path,
+        loader_config: LoaderConfig,
+        map_config: MapConfig,
     ) -> Generator[None, None, None]:
         """Execute the lifecycle context manager, if defined."""
         if self.execution_scope_fn is not None:
@@ -131,11 +136,11 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     "i80": _builtin("dronalize.datasets.i80"),
     "ind": _builtin("dronalize.datasets.ind"),
     "interact": _builtin("dronalize.datasets.interact"),
-    "lyft": _builtin(
-        "dronalize.datasets.lyft",
-        optional_dependencies=("zarr", "numcodecs", "google.protobuf"),
-        extra="lyft",
-    ),
+    # "lyft": _builtin(
+    #     "dronalize.datasets.lyft",
+    #     optional_dependencies=("zarr", "numcodecs", "google.protobuf"),
+    #     extra="lyft",
+    # ),
     "nuscenes": _builtin("dronalize.datasets.nuscenes"),
     "opendd": _builtin("dronalize.datasets.opendd"),
     "round": _builtin("dronalize.datasets.round"),
