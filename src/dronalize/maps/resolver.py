@@ -24,8 +24,8 @@ def no_map() -> MapResolver:
 
     """
 
-    def _resolve(scene: Scene) -> None:
-        _ = scene  # Unused
+    def _resolve(_scene: Scene) -> None:
+        return None
 
     _resolve.__name__ = "no_map"
     return _resolve

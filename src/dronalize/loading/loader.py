@@ -16,12 +16,14 @@ if TYPE_CHECKING:
 
 
 MapContext = MapResolver | MapKey | None
+"""Map payload produced during ingestion: resolver, lookup key, or no map."""
+
 IngestOutput = tuple[pl.LazyFrame, MapContext]
 
 
 @dataclass(slots=True, frozen=True)
 class Source(Generic[SourceT]):
-    """Represents a raw data source for a scene, identified by a unique identifier."""
+    """Represent a raw data source identified by a stable unique identifier."""
 
     identifier: SourceId
     """Generic identifier for the source, e.g., file name, URL, database key."""
@@ -160,7 +162,7 @@ class ProcessableLoader(Protocol, Generic[SourceT]):
         source: Source[SourceT],
         *,
         scene_number: int,
-        resolver: MapContext | None = None,
+        map_context: MapContext | None = None,
         split: DatasetSplit | None = None,
     ) -> Scene:
         """Construct a Scene object from processed data.
@@ -171,10 +173,11 @@ class ProcessableLoader(Protocol, Generic[SourceT]):
             The processed data frame containing the scene data.
         source : Source[SourceT]
             The originating raw data source.
-        resolver : MapContext | None, optional
-            The map context or resolver associated with the scene.
-        scene_number : int | None, optional
-            An optional numeric index or identifier for the generated scene.
+        scene_number : int
+            Numeric index assigned to the generated scene.
+        map_context : MapContext | None, optional
+            Optional map payload associated with the scene. This may already be
+            a resolver, a loader-specific `MapKey`, or `None`.
         split : DatasetSplit | None, optional
             The dataset split (train/val/test) that this scene belongs to.
 

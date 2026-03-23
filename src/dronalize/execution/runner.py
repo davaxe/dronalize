@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import dronalize.exceptions as dronalize_exceptions
 import dronalize.execution.common as ex_common
-from dronalize.config.config import Config, ConfigSection, load_config, resolve_config
+from dronalize.config.config import Config, load_config_overrides, resolve_runtime_config
 from dronalize.datasets import DatasetDescriptor, get
 from dronalize.execution.assigner import ConstantAssigner, StatelessWeightedAssigner
 from dronalize.execution.parallel.executor import ParallelExecutor
@@ -241,13 +241,12 @@ def _resolve_job_config(
     scene_schema: SceneSchemaLike | None,
     jobs: int | None,
 ) -> Config:
-    config_section: ConfigSection = {}
+    config_overrides: dict[str, object] = {}
     if config_path is not None:
-        all_overrides = load_config(config_path)
-        config_section = all_overrides.get(descriptor.name, {})
+        config_overrides = load_config_overrides(config_path).for_dataset(descriptor.name)
 
-    config: Config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
-    config = resolve_config(Config, default=config, overrides=config_section)
+    default_config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
+    config = resolve_runtime_config(default=default_config, overrides=config_overrides)
 
     if scene_schema is not None:
         writer_config = type(config.writer).model_validate({

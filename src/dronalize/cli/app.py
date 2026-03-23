@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import Annotated, Literal
 
 import typer
 from rich import box
@@ -13,11 +13,9 @@ from rich.table import Table
 
 from dronalize.categories import DatasetSplit
 
-if TYPE_CHECKING:
-    from dronalize.execution.runner import ProcessingSummary
-
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
-_ = DatasetSplit | Path
+# Typer resolves these annotation types at runtime when building the CLI.
+_RUNTIME_OPTION_TYPES = (DatasetSplit, Path)
 OutputFormatLiteral = Literal["mds", "zarr", "dummy"]
 
 
@@ -55,10 +53,12 @@ def process(
         ),
     ] = None,
     progress: Annotated[
-        bool, typer.Option("--progress/--no-progress", help="Show progress during processing."),
+        bool,
+        typer.Option("--progress/--no-progress", help="Show progress during processing."),
     ] = True,
     limit: Annotated[
-        int | None, typer.Option("--limit", "-l", help="Limit the number of samples to process."),
+        int | None,
+        typer.Option("--limit", "-l", help="Limit the number of samples to process."),
     ] = None,
     seed: Annotated[int | None, typer.Option("--seed", help="Random seed.")] = None,
     output_format: Annotated[
@@ -74,7 +74,8 @@ def process(
         typer.Option("--custom-split", help="Custom split ratios for train/val/test splits."),
     ] = None,
     force: Annotated[
-        bool, typer.Option("--force", "-f", help="Force processing without confirmation."),
+        bool,
+        typer.Option("--force", "-f", help="Force processing without confirmation."),
     ] = False,
 ) -> None:
     """[bold]Process a specified dataset[/bold]."""
@@ -95,7 +96,15 @@ def process(
     )
 
     if not force:
-        rprint(_render_processing_summary(job.summary()))
+        summary = job.summary()
+        table = Table(title=summary.title, show_header=False, box=box.ROUNDED)
+        table.add_column(style="cyan", justify="left", no_wrap=True)
+        table.add_column(style="magenta")
+
+        for label, value in summary.rows:
+            table.add_row(label, value)
+
+        rprint(table)
         _ = typer.confirm("Proceed with this processing plan?", abort=True)
 
     from dronalize.cli.progress import run_with_rich_progress
@@ -152,14 +161,3 @@ def available(
 def main() -> None:
     """Run the Typer CLI application."""
     app()
-
-
-def _render_processing_summary(summary: ProcessingSummary) -> Table:
-    table = Table(title=summary.title, show_header=False, box=box.ROUNDED)
-    table.add_column(style="cyan", justify="left", no_wrap=True)
-    table.add_column(style="magenta")
-
-    for label, value in summary.rows:
-        table.add_row(label, value)
-
-    return table

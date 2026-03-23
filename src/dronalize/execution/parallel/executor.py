@@ -283,12 +283,12 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         Scene numbers are assigned from a shared global counter when scenes are
         created inside worker processes.
         """
-        for scene_data, map_resolver in loader.process_next(source):
+        for scene_data, map_context in loader.process_next(source):
             scene_number = _ctx.shared.progress.increment_scene()
             yield loader.create_scene(
                 scene_data,
                 source,
-                resolver=map_resolver,
+                map_context=map_context,
                 scene_number=scene_number - 1,
             )
 

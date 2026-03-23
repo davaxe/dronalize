@@ -1,4 +1,4 @@
-"""Plot package — optional visualisation utilities for trajectories and map graphs.
+"""Plot package: optional visualization utilities for trajectories and map graphs.
 
 Requires the `plot` extra::
 
@@ -7,9 +7,7 @@ Requires the `plot` extra::
 
 from dronalize._internal._compat import require_optional
 
-# Since this whole package is optional and require the altair dependency (from
-# "plot" extra), it is validated at the package level so all modules can assume
-# it is present.
+# Validate the optional plotting dependency once at package import time.
 _ = require_optional("altair", extra="plot")
 
 from dronalize.plot.map import plot_map_graph  # noqa: E402

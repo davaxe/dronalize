@@ -3,6 +3,7 @@
 from dronalize.loading.base import BaseSceneLoader
 from dronalize.loading.loader import (
     IngestOutput,
+    MapContext,
     ProcessableLoader,
     SceneLoader,
     Source,
@@ -11,6 +12,7 @@ from dronalize.loading.loader import (
 __all__ = [
     "BaseSceneLoader",
     "IngestOutput",
+    "MapContext",
     "ProcessableLoader",
     "SceneLoader",
     "Source",

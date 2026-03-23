@@ -99,7 +99,7 @@ class Scene:
         return self.map_resolver(self)
 
     def has_map(self) -> bool:
-        """Check if this scene has an attached map resolver and key."""
+        """Check if this scene has an attached map resolver."""
         return self.map_resolver is not None
 
     def as_schema(self, schema: SceneSchema = CANONICAL_V1) -> Scene:
@@ -118,12 +118,14 @@ class Scene:
         """Return a compact representation with metadata and DataFrame shape."""
         rows, cols = self.inner.shape
         return (
-            f"scene_number={self.number}, "
+            "Scene("
+            f"number={self.number}, "
             f"input_len={self.input_len}, "
             f"output_len={self.output_len}, "
-            f"schema={self.schema.name}"
+            f"schema={self.schema.name}, "
             f"map_key={self.map_key!r}, "
-            f"inner=DataFrame({rows} rows x {cols} cols))"
+            f"inner=DataFrame({rows} rows x {cols} cols)"
+            ")"
         )
 
 
@@ -237,4 +239,5 @@ def _get_schema_mismatch_message(
     if not errors:
         return ""
 
-    return f"Schema mismatch for {schema_name or ''} - {'; '.join(errors)}"
+    prefix = f"Schema mismatch for {schema_name}" if schema_name else "Schema mismatch"
+    return f"{prefix}: {'; '.join(errors)}"

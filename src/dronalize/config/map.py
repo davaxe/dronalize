@@ -72,7 +72,6 @@ class MapConfig(BaseModel):
             return self
 
         if self.interp_distance < self.min_distance:
-            # Fixed the string concatenation and variable name bugs here
             msg = (
                 f"interp_distance ({self.interp_distance}) must be greater "
                 f"than or equal to min_distance ({self.min_distance})."

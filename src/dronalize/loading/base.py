@@ -3,26 +3,29 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, Concatenate
 
-import polars as pl
 from typing_extensions import override
 
 from dronalize._internal._typing import P, SourceT
 from dronalize.categories import DatasetSplit
 from dronalize.config.map import MapConfig
 from dronalize.exceptions import SplitNotSupportedError
-from dronalize.loading.loader import ProcessableLoader, SceneLoader, Source
+from dronalize.loading.loader import (
+    IngestOutput,
+    MapContext,
+    ProcessableLoader,
+    SceneLoader,
+    Source,
+)
 from dronalize.maps.resolver import MapKey, MapResolver, no_map
 from dronalize.scene import CANONICAL_V1, Scene, SceneField, SceneSchema
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    import polars as pl
+
     from dronalize.config.loader import LoaderConfig
     from dronalize.pipeline.pipeline import Pipeline
-
-
-MapContext = MapResolver | MapKey | None
-IngestOutput = tuple[pl.LazyFrame, MapContext]
 
 
 class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
@@ -92,7 +95,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     @abstractmethod
     def ingest(self, source: Source[SourceT]) -> Iterable[IngestOutput]:
-        """Read a raw data source into one or more `(LazyFrame, MapResolver)` pairs."""
+        """Read a raw data source into one or more `(LazyFrame, MapContext)` pairs."""
 
     @abstractmethod
     def pipeline(self) -> Pipeline:
@@ -120,7 +123,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         for split in supported_splits:
             yield from self._assign_splits(self.sources_for_split(split), split)
 
-    def map_resolver(self) -> MapResolver:  # noqa: PLR6301 (will be overriden)
+    def map_resolver(self) -> MapResolver:  # noqa: PLR6301 (will be overridden)
         """Return a default resolver for this dataset's map data."""
         return no_map()
 
@@ -171,12 +174,12 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     @override
     def scenes(self) -> Iterable[Scene]:
         for source in self.sources():
-            for scene_df, resolver in self.process_next(source):
+            for scene_df, map_context in self.process_next(source):
                 yield self.create_scene(
                     scene_df,
                     source,
                     scene_number=self._scene_counter,
-                    resolver=resolver,
+                    map_context=map_context,
                 )
                 self._scene_counter += 1
 
@@ -187,16 +190,16 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         source: Source[SourceT],
         *,
         scene_number: int,
-        resolver: MapContext | None = None,
+        map_context: MapContext | None = None,
         split: DatasetSplit | None = None,
     ) -> Scene:
         """Create a Scene object from the processed DataFrame and its source."""
-        map_key = source.map_key or (resolver if isinstance(resolver, str) else None)
+        map_key = source.map_key or (map_context if isinstance(map_context, str) else None)
         if not self.map_config.include_map:
-            resolver = None
+            map_resolver = None
             map_key = None
         else:
-            resolver = resolver if not isinstance(resolver, str) else self.map_resolver()
+            map_resolver = map_context if not isinstance(map_context, str) else self.map_resolver()
         scene = Scene(
             inner=df,
             number=scene_number,
@@ -205,7 +208,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             schema=self.native_scene_schema(),
             sample_time=self.loader_config.post_sample_time,
             map_key=map_key,
-            map_resolver=resolver,
+            map_resolver=map_resolver,
             split_assignment=split if split is not None else source.split_assignment,
         )
         return scene if self._output_schema is None else scene.as_schema(self._output_schema)
@@ -218,8 +221,8 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         if self._pipeline is None:
             self._pipeline = self.pipeline()
 
-        for raw_lf, map_context in self.ingest(source):
-            for df in self._pipeline.execute(raw_lf, collect=True, filter_empty=True):
+        for raw_lazy_frame, map_context in self.ingest(source):
+            for df in self._pipeline.execute(raw_lazy_frame, collect=True, filter_empty=True):
                 yield df, map_context
 
     @override

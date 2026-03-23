@@ -244,8 +244,8 @@ def scene_sample_to_parts(
     Returns
     -------
     tuple[pl.DataFrame, int, int]
-        Reconstructed DataFrame of agent states, and horzontal lengths of the
-        input and target feature sequences.
+        Reconstructed DataFrame of agent states, along with input and output
+        lengths.
 
     """
     input_features = sample["input_features"]
@@ -261,14 +261,13 @@ def scene_sample_to_parts(
     features = np.concatenate([input_features, target_features], axis=1)
     mask = np.concatenate([input_mask, target_mask], axis=1)
 
-    rows = []
-
+    rows: list[dict[str, int | float]] = []
     for i in range(features.shape[0]):
         for t in range(features.shape[1]):
             if not mask[i, t]:
                 continue
 
-            row = {
+            row: dict[str, int | float] = {
                 "frame": start_frame + t,
                 "id": i,
                 "agent_category": int(agent_types[i]),

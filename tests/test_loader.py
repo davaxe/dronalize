@@ -138,8 +138,8 @@ class _PositionsOnlyLoader(_UnsplitLoader):
         return POSITIONS_ONLY_V1
 
 
-def test_sources_leave_split_assignment_empty_when_none_requested() -> None:
-    """Test that if no splits are requested, the split assignment for sources is None."""
+def test_sources_use_predefined_split_assignment_when_none_requested() -> None:
+    """Test that predefined-split loaders keep their dataset split assignments."""
     loader = _SplitLoader()
 
     assert [source.split_assignment for source in loader.sources()] == [
@@ -158,7 +158,7 @@ def test_single_split_selection_only_yields_requested_split() -> None:
 
 
 def test_unsplit_loader_leaves_split_assignment_empty() -> None:
-    """Test that split assingment is None when the loader does not support splits."""
+    """Test that split assignment is None when the loader does not support splits."""
     loader = _UnsplitLoader()
 
     assert [source.split_assignment for source in loader.sources()] == [None]
@@ -181,8 +181,8 @@ def test_explicit_source_override_wins_over_inferred_split() -> None:
     assert [scene.split_assignment for scene in loader.scenes()] == [DatasetSplit.TEST]
 
 
-def test_inferred_split_wins_without_explicit_override() -> None:
-    """Test that if no explicit override is provided, the inferred split assignment is used."""
+def test_source_split_assignment_is_preserved_without_override_flag() -> None:
+    """Test that an existing source split assignment is preserved without override metadata."""
     loader = _ManualSplitLoader(splits=DatasetSplit.TRAIN)
 
     assert [source.split_assignment for source in loader.sources()] == [DatasetSplit.TEST]
