@@ -11,17 +11,14 @@ from typing_extensions import Self, override
 
 import dronalize.execution.parallel._state as _state  # noqa: PLR0402
 from dronalize._internal._typing import P, SourceT
-from dronalize.execution.common import Progress
-from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
+from dronalize.execution.executor import ObservableWritingExecutor, Progress, WriterFactory
 from dronalize.scene import Scene
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
     from multiprocessing.synchronize import Event
 
-    from dronalize.categories import DatasetSplit
-    from dronalize.execution.assigner import SplitAssigner
-    from dronalize.loading import ProcessableLoader, Source
+    from dronalize.loading.loader import ProcessableLoader, Source
     from dronalize.storage.writers.protocol import SceneWriter
 
 
@@ -46,12 +43,10 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
     processing across multiple CPU cores. The number of processes and the task
     chunk size can be configured depending on workload.
 
-    By default source work is consumed with `imap_unordered()` for better
-    throughput. If a more stable source-completion order is required during
-    `execute()`, set `maintain_order=True` to use `imap()` instead.
+    Notes
+    -----
+    Some practical considerations when using this executor:
 
-    Practical considerations
-    ------------------------
     1. If underlying sources are very small and quick to process, the overhead
        of multiprocessing can outweigh the benefits. Increasing `chunksize` may
        help in such cases.
@@ -157,7 +152,6 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         self,
         writer_factory: WriterFactory,
         finalize: Callable[[SceneWriter], None] | None = None,
-        split_assigner: SplitAssigner | None = None,
     ) -> None:
         """Process scenes in parallel and write them inside worker processes.
 
@@ -175,45 +169,24 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         finalize : Callable[[SceneWriter], None], optional
             Optional custom per-worker finalization hook. If omitted,
             `writer.finish_local()` is called instead.
-        split_assigner : SplitAssigner, optional
-            Optional split assigner. If given, the executor uses it to determine
-            the split for each produced scene.
 
         """
-        worker_count = self._processes or mp.cpu_count()
-        dispatcher: _state.SplitDispatcher | None = None
-        if split_assigner is not None:
-            dispatcher = _state.SplitDispatcher.create(
-                split_assigner,
-                worker_count=worker_count,
-            )
-
         payloads = (_SceneProcessArgs(source, self._inner) for source in self._inner.sources())
         payloads_limited: Iterable[_SceneProcessArgs[SourceT]] = (
             itertools.islice(payloads, self._limit) if self._limit is not None else payloads
         )
-        initargs = (
-            self._shared,
-            writer_factory,
-            finalize,
-            dispatcher.config() if dispatcher is not None else None,
-        )
-
         try:
             _ = deque(
                 self._execute_parallel(
                     self._process_fn_write,
                     payloads_limited,
                     _init_write_worker,
-                    *initargs,
+                    *(self._shared, writer_factory, finalize),
                 ),
                 maxlen=0,
             )
         finally:
-            if dispatcher is not None:
-                dispatcher.stop_event.set()
-                dispatcher.request_queue.put(None)
-                dispatcher.close()
+            ...
 
     @override
     def progress(self) -> Progress:
@@ -261,13 +234,8 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
             raise ValueError(msg)
 
         processed_scenes: int = 0
-        for scene_i, scene in enumerate(
-            ParallelExecutor._generate_scenes(args.loader, args.source),
-        ):
-            split: DatasetSplit | None = None
-            if _ctx.split_dispatch is not None:
-                split = _ctx.split_dispatch.assign((args.source.identifier, scene_i))
-            _ = _ctx.writer.write(scene, split=split)
+        for scene in ParallelExecutor._generate_scenes(args.loader, args.source):
+            _ = _ctx.writer.write(scene)
             processed_scenes += 1
 
         _ = _ctx.shared.progress.increment_source()
@@ -283,14 +251,9 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         Scene numbers are assigned from a shared global counter when scenes are
         created inside worker processes.
         """
-        for scene_data, map_context in loader.process_next(source):
+        for processed in loader.process_next(source):
             scene_number = _ctx.shared.progress.increment_scene()
-            yield loader.create_scene(
-                scene_data,
-                source,
-                map_context=map_context,
-                scene_number=scene_number - 1,
-            )
+            yield loader.create_scene(processed, source, scene_number)
 
     def _execute_parallel(
         self,
@@ -389,7 +352,6 @@ def _init_write_worker(
     shared: _state.SharedResources,
     writer_factory: Callable[[int], SceneWriter],
     finalize: Callable[[SceneWriter], None] | None,
-    split_dispatch: _state.SplitDispatchConfig | None,
 ) -> None:
     """Initialize a worker for `execute()` write mode.
 
@@ -407,7 +369,6 @@ def _init_write_worker(
     try:
         writer = writer_factory(_ctx.worker_id)
         _ctx.writer = writer
-        _ctx.split_dispatch = split_dispatch
     except Exception:
         _ = _ctx.shared.progress.worker_stopped()
         raise

@@ -1,33 +1,38 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
 
 from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config import LoaderConfig
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.a43.map.builder import A43MapBuilder
 from dronalize.datasets.common import utils
-from dronalize.loading import BaseSceneLoader
-from dronalize.loading.loader import Source
-from dronalize.pipeline.factories import trajectory_pipeline
-from dronalize.pipeline.pipeline import Pipeline
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, Source
+from dronalize.maps.resolver import MapResolver
 from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1, Scene
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.loading.loader import IngestOutput
-    from dronalize.maps import MapResolver
+    from dronalize.config.split import (
+        SplitRequest,
+    )
     from dronalize.maps.graph import MapGraph
+    from dronalize.maps.resolver import MapResolver
     from dronalize.scene import SceneSchema
 
 
 class A43Loader(BaseSceneLoader[Path]):
     """Scene loader for the A43 dataset."""
+
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        block_split_enabled=True,
+    )
 
     def __init__(
         self,
@@ -35,32 +40,38 @@ class A43Loader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
         """Initialize the A43 dataset loader.
 
         Parameters
         ----------
         data_root : Path or str
-            Path to root of the A43 dataset, data files.
+            Root directory containing the extracted A43 CSV files.
         loader_config : LoaderConfig, optional
-            Loader configuration. If None, the default configuration is used.
+            Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
             splits, so `None` processes all sources.
 
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
-        self._data_dir: Path = Path(data_root)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
+        self._data_root: Path = Path(data_root)
 
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
-        for i, csv_file in enumerate(self._data_dir.glob("*.csv")):
-            yield Source(identifier=i, inner=csv_file)
+        for i, csv_file in enumerate(self._data_root.glob("*.csv")):
+            yield Source(identifier=i, data=csv_file, map_key=csv_file.stem)
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
-        yield (
-            pl.scan_csv(source.inner).select(
+    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
+        yield IngestedData(
+            pl.scan_csv(source.data).select(
                 pl.col("ID").alias("id"),
                 pl.col("tseconds").round(1).rank("dense").sub(1).alias("frame").cast(pl.Int64),
                 *("x", "y", "vy", "vx", "ax", "ay"),
@@ -76,16 +87,11 @@ class A43Loader(BaseSceneLoader[Path]):
                 })
                 .alias("agent_category"),
             ),
-            source.inner.stem,
         )
 
     @override
     def num_sources(self) -> int | None:
-        return sum(1 for f in self._data_dir.rglob("*.csv") if f.is_file())
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return Pipeline().compose(trajectory_pipeline(self.loader_config))
+        return sum(1 for f in self._data_root.rglob("*.csv") if f.is_file())
 
     @classmethod
     @override

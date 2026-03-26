@@ -6,7 +6,6 @@ from dronalize.datasets.exid.map.builder import ExiDMapBuilder
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "exid",
     ExiDLoader,
-    ExiDLoader,
     execution_scope_fn=_scope.exid_execution_scope,
     has_map=True,
 )

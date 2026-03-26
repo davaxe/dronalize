@@ -1,60 +1,27 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING
 
 import polars as pl
 import polars.selectors as cs
 
-from dronalize.pipeline.functional.basic import collect
-
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Sequence
 
     from dronalize._internal._typing import DataFrameT
 
 
-@overload
 def sliding_window(
     data: DataFrameT,
     window_size: int,
     step_size: int,
     sliding_col: str = "frame",
     *,
-    group_by: str | None = None,
+    group_by: str | Sequence[str] | None = None,
     is_sorted: bool = False,
     include_boundaries: bool = False,
-    return_iterable: Literal[True] = True,
     offset_sliding_col: bool = False,
-) -> Iterable[pl.DataFrame]: ...
-
-
-@overload
-def sliding_window(
-    data: DataFrameT,
-    window_size: int,
-    step_size: int,
-    sliding_col: str = "frame",
-    *,
-    group_by: str | None = None,
-    is_sorted: bool = False,
-    include_boundaries: bool = False,
-    return_iterable: Literal[False],
-    offset_sliding_col: bool = False,
-) -> DataFrameT: ...
-
-
-def sliding_window(
-    data: DataFrameT,
-    window_size: int,
-    step_size: int,
-    sliding_col: str = "frame",
-    *,
-    group_by: str | None = None,
-    is_sorted: bool = False,
-    include_boundaries: bool = False,
-    return_iterable: bool = True,
-    offset_sliding_col: bool = False,
-) -> Iterable[pl.DataFrame] | DataFrameT:
+) -> DataFrameT:
     """Generate sliding windows from a DataFrame.
 
     When returning as an iterable, the function yields DataFrames for each
@@ -82,78 +49,18 @@ def sliding_window(
     include_boundaries : bool, optional
         Passed to `group_by_dynamic` to include window boundaries in the
         output. Defaults to False.
-    return_iterable : bool, optional
-        Whether to return an iterable of DataFrames or a single DataFrame
-        containing all windows. Defaults to True.
 
     Returns
     -------
-    Iterable[pl.DataFrame] or T_DataFrame
-        DataFrames corresponding to each sliding window. Either as an
-        iterable of DataFrames or a single DataFrame with all windows,
-        depending on the `return_iterable` flag.
-
+    T_DataFrame
+        Adds a `window_index` column to the input DataFrame indicating the window
+        each row belongs to.
     """
+    group_keys = [group_by] if isinstance(group_by, str) else list(group_by or [])
+
     if not is_sorted:
-        data = data.sort([sliding_col, group_by] if group_by else sliding_col)
+        data = data.sort([sliding_col, *group_keys] if group_keys else sliding_col)
 
-    if return_iterable:
-        return _sliding_window_iterable(
-            collect(data),
-            window_size,
-            step_size,
-            sliding_col,
-            include_boundaries=include_boundaries,
-            offset_sliding_col=offset_sliding_col,
-        )
-
-    return _sliding_window(
-        data,
-        window_size,
-        step_size,
-        sliding_col,
-        include_boundaries=include_boundaries,
-        offset_sliding_col=offset_sliding_col,
-    )
-
-
-def _sliding_window_iterable(
-    data: pl.DataFrame,
-    window_size: int,
-    step_size: int,
-    sliding_col: str = "frame",
-    *,
-    group_by: str | None = None,
-    include_boundaries: bool = False,
-    offset_sliding_col: bool = False,
-) -> Iterable[pl.DataFrame]:
-    for _, window in data.group_by_dynamic(
-        sliding_col,
-        every=f"{step_size}i",
-        period=f"{window_size}i",
-        include_boundaries=include_boundaries,
-        group_by=group_by,
-    ):
-        if window.is_empty():
-            continue
-        if offset_sliding_col:
-            yield window.with_columns(
-                pl.col(sliding_col).sub(pl.col(sliding_col).min()).alias(sliding_col),
-            )
-
-        yield window
-
-
-def _sliding_window(
-    data: DataFrameT,
-    window_size: int,
-    step_size: int,
-    sliding_col: str = "frame",
-    *,
-    group_by: str | None = None,
-    include_boundaries: bool = False,
-    offset_sliding_col: bool = False,
-) -> DataFrameT:
     sliding_col_expr = pl.col(sliding_col)
     if offset_sliding_col:
         sliding_col_expr = sliding_col_expr.sub(sliding_col_expr.first())
@@ -165,14 +72,14 @@ def _sliding_window(
             every=f"{step_size}i",
             period=f"{window_size}i",
             include_boundaries=include_boundaries,
-            group_by=group_by,
+            group_by=group_keys or None,
         )
         .agg(
             sliding_col_expr.alias(f"{sliding_col}_actual"),
             pl.all().exclude(sliding_col),
         )
         .with_row_index("window_index")
-        .explode(cs.all().exclude("window_index", sliding_col))
+        .explode(cs.all().exclude("window_index", sliding_col, *group_keys))
         .drop(sliding_col)
         .rename({f"{sliding_col}_actual": sliding_col})
     )

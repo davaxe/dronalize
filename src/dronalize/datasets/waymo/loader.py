@@ -2,25 +2,25 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
 
 import dronalize.pipeline.transforms as tr
 from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config import LoaderConfig
+from dronalize.config.loader import LoaderConfig
 from dronalize.datasets.waymo.map.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
-from dronalize.loading import BaseSceneLoader
-from dronalize.loading.loader import IngestOutput, Source
-from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, MapBinding, Source
 from dronalize.scene import POSITIONS_VELOCITY_YAW_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.config.map import MapConfig
+    from dronalize.config.split import SplitRequest
     from dronalize.maps.graph import MapGraph
     from dronalize.maps.resolver import MapResolver
     from dronalize.pipeline.pipeline import Pipeline
@@ -30,41 +30,44 @@ if TYPE_CHECKING:
 class WaymoLoader(BaseSceneLoader[Path]):
     """Loader for Waymo Open Dataset scenarios stored in TFRecord format."""
 
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        scene_split_enabled=True,
+    )
+
     def __init__(
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
-        """Initialize.
+        """Initialize the Waymo loader.
 
-        The WAYMO dataset stores map and scenario data together in TFRecord
-        files, in a protobuf format. That is why it is possible to include map
-        data in the processing pipeline without a separate map file. However,
-        including map decreases the total processing speed, but is faster than
-        loading map data separately for each scenario. The map data
-
-        `interp_distance` and `min_distance` parameters control the density of
-        map points after processing, and do not do anything if map inclusion is
-        disabled.
+        Waymo stores scenario and map data together in TFRecord files, so map
+        extraction can happen during ingestion without a separate map source.
+        Enabling maps is still more expensive than trajectory-only loading.
 
         Parameters
         ----------
         data_root : Path or str
-            Root directory of the Waymo dataset.  This directory should
-            contain `training/`, `validation/`, and `testing/`
-            subdirectories with TFRecord files.
-        loader_config : , optional
-            Loader configuration override. If None, the default configuration is used.
+            Root directory of the Waymo dataset. It should contain
+            `training/`, `validation/`, and `testing/` subdirectories with
+            TFRecord files.
+        loader_config : LoaderConfig, optional
+            Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. Can contain one or more predefined splits,
-            or `None` to process all sources.
+            Optional selection of predefined dataset splits. `None` processes
+            all available sources.
         map_config : MapConfig, optional
-            Map configuration. If None, the default configuration is used.
-
+            Map configuration override.
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
         self._data_root: Path = Path(data_root)
         self._include_map: bool = self.map_config.include_map
 
@@ -78,7 +81,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
         if not data_dir.is_dir():
             return
         for tfrecord_path in sorted(data_dir.glob("*.tfrecord*")):
-            yield Source(identifier=tfrecord_path.stem, inner=tfrecord_path)
+            yield Source(identifier=tfrecord_path.stem, data=tfrecord_path)
 
     @override
     def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Path]]:
@@ -94,8 +97,8 @@ class WaymoLoader(BaseSceneLoader[Path]):
         return sum(self._count_sources_for_split(split) for split in splits)
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
-        for raw_data in _read_tfrecord(source.inner):
+    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
+        for _scenario_index, raw_data in enumerate(_read_tfrecord(source.data)):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
             resolver: MapResolver | None
             if self._include_map:
@@ -115,15 +118,14 @@ class WaymoLoader(BaseSceneLoader[Path]):
             else:
                 resolver = None
 
-            yield _scenario_to_polars(scenario).lazy(), resolver
+            yield IngestedData(
+                frame=_scenario_to_polars(scenario).lazy(),
+                map_binding=MapBinding(resolver=resolver),
+            )
 
     @override
     def pipeline(self) -> Pipeline:
-        return (
-            trajectory_pipeline(self.loader_config)
-            # Shift autonomous vehicle id from -1 to 0
-            .then(tr.with_columns(pl.col("id") + 1))
-        )
+        return super().pipeline().then(tr.with_columns(pl.col("id") + 1))
 
     @classmethod
     @override

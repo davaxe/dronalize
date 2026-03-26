@@ -67,8 +67,9 @@ def filter_scene_expr(
 
     Parameters
     ----------
-    config : LoaderConfig
-        LoaderConfig object with filtering criteria.
+    config : FilteringConfig | None
+        FilteringConfig object with criteria for scene filtering. If None, no
+        filtering is applied and the expression will evaluate to True for all rows.
     group_by : str or Sequence[str], optional
         Column name to group by.
     agent_id : str, optional

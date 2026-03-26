@@ -9,8 +9,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.categories import DatasetSplit
-    from dronalize.config import LoaderConfig
+    from dronalize.config.loader import LoaderConfig
     from dronalize.config.map import MapConfig
+    from dronalize.config.split import SplitRequest
 
 
 class US101Loader(I80Loader):
@@ -27,23 +28,13 @@ class US101Loader(I80Loader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
-        """Initialize the US101 dataset loader.
-
-        Parameters
-        ----------
-        data_root : Path
-            Path to root of the US101 dataset, containing subdirectories of data files.
-        loader_config : , optional
-            Loader configuration. If None, the default configuration is used.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. This dataset does not define predefined
-            splits, so `None` processes all sources.
-
-        """
+        """Initialize the US-101 loader."""
         super().__init__(
             data_root,
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
+            split_request=split_request,
         )

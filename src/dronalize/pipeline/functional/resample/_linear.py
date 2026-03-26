@@ -32,18 +32,13 @@ def linear_resample(
         group_by=group_by,
     )
 
-    is_eager = isinstance(data, pl.DataFrame)
-    lf = data.lazy() if is_eager else data
-
     if spec.no_resampling:
-        return cast("DataFrameT", lf.collect() if is_eager else lf)
-
+        return data
     if spec.sort:
-        lf = lf.sort([*plan.group_by, frame_column])
-        _ = lf.set_sorted([*plan.group_by, frame_column])
+        data = data.sort([*plan.group_by, frame_column])
 
-    lf = segment_data(
-        lf,
+    data = segment_data(
+        data,
         frame_column=frame_column,
         group_by=plan.group_by,
         max_gap=spec.max_gap,
@@ -51,32 +46,30 @@ def linear_resample(
     )
 
     if spec.up > 1:
-        lf = _upsample_dataframe(lf, factor=spec.up, plan=plan)
-
+        data = _upsample_dataframe(data, factor=spec.up, plan=plan)
     if spec.down > 1:
-        lf = _downsample_dataframe(lf, factor=spec.down, frame_column=frame_column)
+        data = _downsample_dataframe(data, factor=spec.down, frame_column=frame_column)
 
-    result = lf.drop(SEGMENT_COLUMN, strict=False)
-    return cast("DataFrameT", result.collect() if is_eager else result)
+    return data.drop(SEGMENT_COLUMN, strict=False)
 
 
 def _downsample_dataframe(
-    data: pl.LazyFrame,
+    data: DataFrameT,
     *,
     factor: int,
     frame_column: str,
-) -> pl.LazyFrame:
+) -> DataFrameT:
     return data.filter(pl.col(frame_column) % factor == 0).with_columns(
         (pl.col(frame_column) // factor).alias(frame_column),
     )
 
 
 def _upsample_dataframe(
-    data: pl.LazyFrame,
+    data: DataFrameT,
     *,
     factor: int,
     plan: ResamplePlan,
-) -> pl.LazyFrame:
+) -> DataFrameT:
     scaled = data.with_columns((pl.col(plan.frame_column) * factor).alias(plan.frame_column))
     frame_range = pl.int_range(
         pl.col(plan.frame_column).min(),
@@ -104,4 +97,6 @@ def _upsample_dataframe(
 
     carried = pl.exclude(*on, *plan.position_columns).forward_fill()
     exprs.append(carried.over(plan.segment_keys) if plan.segment_keys else carried)
-    return upsampled.join(scaled, on=on, how="left").sort(on).with_columns(exprs)
+    return (
+        upsampled.join(cast("DataFrameT", scaled), on=on, how="left").sort(on).with_columns(exprs)
+    )

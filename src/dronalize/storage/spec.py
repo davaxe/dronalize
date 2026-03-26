@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Self
 
 from dronalize._internal._typing import FloatScalarT
 from dronalize.scene._scene import derived_scene_fields
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
     from dronalize.scene import SceneSchema
 
 
-FORMAT_VERSION: int = 2
+FORMAT_VERSION: int = 1
 MANIFEST_FILENAME: str = "manifest.json"
 
 
@@ -64,6 +63,8 @@ class StorageManifest:
     precision: str
     offset_positions: bool
     has_map: bool
+    sample_time: float
+    original_sample_time: float
 
     @classmethod
     def from_configs(
@@ -93,6 +94,8 @@ class StorageManifest:
             precision=writer_config.precision,
             offset_positions=writer_config.offset_positions,
             has_map=has_map,
+            sample_time=loader_config.post_sample_time,
+            original_sample_time=loader_config.sample_time,
         )
 
     def json_dict(self) -> dict[str, Any]:
@@ -100,7 +103,7 @@ class StorageManifest:
         return asdict(self)
 
     @classmethod
-    def from_json_dict(cls, payload: dict[str, Any]) -> Self:
+    def from_json_dict(cls, payload: dict[str, Any]) -> StorageManifest:
         """Create a manifest from JSON data."""
         return cls(
             format_version=int(payload["format_version"]),
@@ -113,6 +116,8 @@ class StorageManifest:
             precision=str(payload["precision"]),
             offset_positions=bool(payload["offset_positions"]),
             has_map=bool(payload["has_map"]),
+            sample_time=float(payload["sample_time"]),
+            original_sample_time=float(payload.get("original_sample_time", payload["sample_time"])),
         )
 
 

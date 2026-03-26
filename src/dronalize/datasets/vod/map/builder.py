@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from dronalize.maps import Point
+    from dronalize.maps.builder import Point
 
 
 class VODMapBuilder(NuScenesMapBuilder):

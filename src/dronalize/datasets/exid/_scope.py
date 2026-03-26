@@ -17,20 +17,21 @@ if TYPE_CHECKING:
 
 @contextmanager
 def exid_execution_scope(
-    root: Path, loader_config: LoaderConfig, map_config: MapConfig,
+    root: Path,
+    loader_config: LoaderConfig,
+    map_config: MapConfig,
 ) -> Generator[None, None, None]:
-    """Lifecycle context for the exiD dataset.
+    """Prepare shared map state for an exiD processing run.
 
     Parameters
     ----------
     root : Path
-        Root directory of the dataset.
+        Root directory of the extracted exiD dataset.
     loader_config : LoaderConfig
-        The loader configuration for this dataset. Not used in this startup hook,
-        but included in the signature for consistency with other datasets.
+        Unused by this hook. Included to match the standard dataset scope signature.
     map_config : MapConfig
-        The map configuration for this dataset, which specifies parameters for
-        building the map graph.
+        Map-building configuration. If maps are disabled, this scope only clears
+        any previous shared-memory state.
 
     """
     _loader_config = loader_config

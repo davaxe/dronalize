@@ -64,6 +64,14 @@ radius = 50.0
 scene_schema = "vx"
 precision = "float64"
 
+[a43.split]
+weights = {"train" = 0.7, "val" = 0.2, "test" = 0.1}
+
+[a43.split.strategy]
+type = "shuffled_time_blocks"
+segments = 10
+
+
 # ------------------------------------------------------------------------------
 # Dataset 'b99' Overrides
 # Demonstrates partial overrides and rectangular map extraction

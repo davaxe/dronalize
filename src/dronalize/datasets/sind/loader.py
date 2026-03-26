@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
@@ -9,16 +9,15 @@ from typing_extensions import override
 from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
-from dronalize.loading import BaseSceneLoader
-from dronalize.loading.loader import IngestOutput, Source
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, Source
 from dronalize.maps.resolver import MapResolver, no_map, shared_map
-from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.scene import CANONICAL_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.pipeline.pipeline import Pipeline
+    from dronalize.config.split import SplitRequest
     from dronalize.scene import SceneSchema
 
 
@@ -29,12 +28,17 @@ if TYPE_CHECKING:
 class SindLoader(BaseSceneLoader[Path]):
     """Loader for the SIND dataset."""
 
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        source_split_enabled=True,
+    )
+
     def __init__(
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
         """Initialize the SindLoader.
 
@@ -49,24 +53,29 @@ class SindLoader(BaseSceneLoader[Path]):
             splits, so `None` processes all sources.
 
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
-        self._data_dir: Path = Path(data_root) / "data"
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
+        self._data_root: Path = Path(data_root) / "data"
 
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
-        if not self._data_dir.is_dir():
+        if not self._data_root.is_dir():
             return
-        for subdir in sorted(path for path in self._data_dir.iterdir() if path.is_dir()):
+        for subdir in sorted(path for path in self._data_root.iterdir() if path.is_dir()):
             map_location = self._resolve_map_key(subdir.name)
             yield Source(
                 identifier=subdir.name,
-                inner=subdir,
+                data=subdir,
                 map_key=str(map_location),
             )
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
-        subdir = source.inner
+    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
+        subdir = source.data
         pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
         vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
         vehicle_df = pl.scan_csv(vehicle_data_path, schema_overrides=_VEHICLE_SCHEMA).select(
@@ -109,17 +118,13 @@ class SindLoader(BaseSceneLoader[Path]):
             *("x", "y", "vx", "vy", "ax", "ay"),
         )
 
-        yield pl.concat([vehicle_df, pedestrian_df]), source.map_key
+        yield IngestedData(pl.concat([vehicle_df, pedestrian_df]))
 
     @override
     def num_sources(self) -> int | None:
-        if not self._data_dir.is_dir():
+        if not self._data_root.is_dir():
             return 0
-        return sum(1 for path in self._data_dir.iterdir() if path.is_dir())
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return trajectory_pipeline(self.loader_config)
+        return sum(1 for path in self._data_root.iterdir() if path.is_dir())
 
     @classmethod
     @override

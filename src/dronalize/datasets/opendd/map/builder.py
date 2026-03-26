@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from typing_extensions import Self, override
 
-from dronalize.maps import BaseMapBuilder, EdgeType, Point
+from dronalize.maps.builder import BaseMapBuilder, Point
+from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

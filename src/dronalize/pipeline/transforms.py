@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING
 
 import polars as pl
 
@@ -267,36 +267,14 @@ def yaw_from_pos(
     return _yaw_from_pos
 
 
-@overload
 def window(
     window_size: int,
     step_size: int,
     *,
     sliding_col: str = "frame",
+    group_by: str | Sequence[str] | None = None,
     offset_sliding_col: bool = True,
-    return_iterable: Literal[False] = False,
-) -> Transform: ...
-
-
-@overload
-def window(
-    window_size: int,
-    step_size: int,
-    *,
-    sliding_col: str = "frame",
-    offset_sliding_col: bool = True,
-    return_iterable: Literal[True],
-) -> FlatMapTransform: ...
-
-
-def window(
-    window_size: int,
-    step_size: int,
-    *,
-    sliding_col: str = "frame",
-    offset_sliding_col: bool = True,
-    return_iterable: bool = False,
-) -> FlatMapTransform | Transform:
+) -> Transform:
     """Create a sliding-window fan-out transform.
 
     This is a 1:N step: a single LazyFrame is split into many overlapping
@@ -315,49 +293,152 @@ def window(
 
     Returns
     -------
-    FlatMapTransform or Transform
-        Depending on `return_iterable`, either a transform that returns a single
-        frame with a window index column, or a flat-map transform that yields
-        each window as a separate frame.
+    Transform
 
     """
-    if return_iterable:
 
-        def _window_iter(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-            for window_df in f.sliding_window(
-                df,
-                window_size=window_size,
-                step_size=step_size,
-                sliding_col=sliding_col,
-                return_iterable=True,
-            ):
-                if offset_sliding_col:
-                    window_df = window_df.with_columns(  # noqa: PLW2901
-                        pl.col(sliding_col) - pl.col(sliding_col).min(),
-                    )
-                yield window_df.lazy()
+    def _window_single(df: pl.LazyFrame) -> pl.LazyFrame:
+        return f.sliding_window(
+            df,
+            window_size=window_size,
+            step_size=step_size,
+            sliding_col=sliding_col,
+            group_by=group_by,
+            offset_sliding_col=offset_sliding_col,
+        )
 
-        func_to_return = _window_iter
-
-    else:
-
-        def _window_single(df: pl.LazyFrame) -> pl.LazyFrame:
-            return f.sliding_window(
-                df,
-                window_size=window_size,
-                step_size=step_size,
-                sliding_col=sliding_col,
-                offset_sliding_col=offset_sliding_col,
-                return_iterable=False,
-            )
-
-        func_to_return = _window_single
+    func_to_return = _window_single
 
     # Reassign names dynamically to the chosen function
     func_to_return.__name__ = "window"
     func_to_return.__qualname__ = "transforms.window"
 
     return func_to_return
+
+
+def block_partition_cumulative(
+    weights: Sequence[float],
+    *,
+    time_column: str = "frame",
+    group_by: str | Sequence[str] | None = None,
+    gap: int = 0,
+    remove_gap: bool = True,
+    offset_time_column: bool = True,
+    partition_column: str = "block",
+) -> Transform:
+    """Partition the time dimension into contiguous temporal partitions.
+
+    This assigns a partition id to each row based on cumulative time and the
+    provided weights. Optionally, a gap can be inserted between partitions, and
+    the original time column can be offset to start from zero inside each
+    partition.
+
+    Parameters
+    ----------
+    weights : Sequence[float]
+        Relative weights for each partition. The number of partitions is determined by
+        the length of this sequence.
+    time_column : str, optional
+        Name of the time column used for temporal partitioning.
+    group_by : str or Sequence[str] or None, optional
+        Column name(s) used to partition each group independently.
+    gap : int, optional
+        Number of excluded timesteps inserted between adjacent partitions.
+    remove_gap : bool, optional
+        Whether to remove rows that fall into the excluded gap. Default is
+        True.
+    offset_time_column : bool, optional
+        Whether to offset the time column to start from zero inside each
+        partition.
+        Default is True.
+    partition_column : str, optional
+        Name of the output partition column. Default is `"block"`.
+
+    Returns
+    -------
+    Transform
+
+    """
+
+    def _block_partition_cumulative(df: pl.LazyFrame) -> pl.LazyFrame:
+        return f.cumulative_blocks(
+            df,
+            weights=weights,
+            time_column=time_column,
+            group_by=group_by,
+            gap=gap,
+            remove_gap=remove_gap,
+            offset_time_column=offset_time_column,
+            partition_column=partition_column,
+        )
+
+    _block_partition_cumulative.__name__ = "block_partition_cumulative"
+    _block_partition_cumulative.__qualname__ = "transforms.block_partition_cumulative"
+    return _block_partition_cumulative
+
+
+def block_partition_shuffle(
+    weights: Sequence[float],
+    segments: int,
+    *,
+    time_column: str = "frame",
+    group_by: str | Sequence[str] | None = None,
+    gap: int = 0,
+    seed: int | None = None,
+    offset_time_column: bool = True,
+    assignment_column: str = "block",
+    segment_column: str = "unit",
+) -> Transform:
+    """Partition the time dimension into shuffled temporal segments.
+
+    Parameters
+    ----------
+    weights : Sequence[float]
+        Relative weights for each output assignment. The number of assignments is determined by
+        the length of this sequence.
+    segments : int
+        Number of contiguous temporal segments to create before routing them to
+        shuffled assignments.
+    time_column : str, optional
+        Name of the time column used for temporal partitioning.
+    group_by : str or Sequence[str] or None, optional
+        Column name(s) used to partition each group independently.
+    gap : int, optional
+        Number of excluded timesteps inserted between adjacent segments.
+    seed : int or None, optional
+        Random seed used for the deterministic weighted assignment.
+    offset_time_column : bool, optional
+        Whether to offset the time column to start from zero inside each
+        segment.
+        Default is True.
+    assignment_column : str, optional
+        Name of the output assignment column. Default is `"block"`.
+    segment_column : str, optional
+        Name of the intermediate contiguous segment column. Default is `"unit"`.
+
+    Returns
+    -------
+    Transform
+
+    """
+
+    def _block_partition_shuffle(df: pl.LazyFrame) -> pl.LazyFrame:
+        return f.shuffled_blocks(
+            df,
+            weights=weights,
+            n_segments=segments,
+            time_column=time_column,
+            group_by=group_by,
+            gap=gap,
+            seed=seed,
+            offset_time_column=offset_time_column,
+            assignment_column=assignment_column,
+            segment_column=segment_column,
+        )
+
+    _block_partition_shuffle.__name__ = "block_partition_shuffle"
+    _block_partition_shuffle.__qualname__ = "transforms.block_partition_shuffle"
+    return _block_partition_shuffle
 
 
 def group_by_yield(
@@ -382,15 +463,20 @@ def group_by_yield(
     FlatMapTransform
 
     """
-    by_list = list(by)
+    by_tuple = tuple(by)
 
     def _group_by_yield(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
         collected = df.collect()
-        for _, group in collected.group_by(by_list):
-            out = group.lazy()
-            if drop_group_cols:
-                out = out.drop(*by_list)
-            yield out
+
+        parts = collected.partition_by(
+            *by_tuple,
+            maintain_order=False,
+            as_dict=False,
+            include_key=not drop_group_cols,
+        )
+
+        for part in parts:
+            yield part.lazy()
 
     _group_by_yield.__name__ = "group_by_yield"
     _group_by_yield.__qualname__ = "transforms.group_by_yield"

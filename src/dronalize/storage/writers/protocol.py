@@ -8,7 +8,6 @@ from typing_extensions import Self
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.categories import DatasetSplit
     from dronalize.scene import Scene
     from dronalize.storage.spec import StorageManifest
 
@@ -22,7 +21,6 @@ class StorageWriter(Protocol):
     def write(
         self,
         scene: Scene,
-        split: DatasetSplit | None = None,
     ) -> bool:
         """Write a single processed scene."""
         ...

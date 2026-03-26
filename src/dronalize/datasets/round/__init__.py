@@ -6,7 +6,6 @@ from dronalize.datasets.round.map.builder import RounDMapBuilder
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "round",
     RounDLoader,
-    RounDLoader,
     execution_scope_fn=_scope.round_execution_scope,
     has_map=True,
 )

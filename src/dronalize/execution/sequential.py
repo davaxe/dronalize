@@ -6,14 +6,12 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dronalize.execution.assigner import ConstantAssigner, SplitAssigner
-from dronalize.execution.common import Progress
-from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
+from dronalize.execution.executor import ObservableWritingExecutor, Progress, WriterFactory
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from dronalize.loading import ProcessableLoader
+    from dronalize.loading.loader import ProcessableLoader
     from dronalize.scene import Scene
     from dronalize.storage.writers.protocol import SceneWriter
 
@@ -52,14 +50,12 @@ class SequentialExecutor(ObservableWritingExecutor):
         self,
         writer_factory: WriterFactory,
         finalize: Callable[[SceneWriter], None] | None = None,
-        split_assigner: SplitAssigner | None = None,
     ) -> None:
         """Process all scenes sequentially and write them with worker ID `0`."""
         writer = writer_factory(0)
-        assigner = split_assigner or ConstantAssigner(None)
 
-        for source_i, scene_i, scene in self._generate_and_track():
-            _ = writer.write(scene, assigner.assign(source_i, scene_i))
+        for scene in self._generate_and_track():
+            _ = writer.write(scene)
         if finalize is not None:
             finalize(writer)
         else:
@@ -88,24 +84,15 @@ class SequentialExecutor(ObservableWritingExecutor):
         """Return whether the sequential executor is actively processing."""
         return self._running
 
-    def _generate_and_track(self) -> Iterable[tuple[int | str, int, Scene]]:
+    def _generate_and_track(self) -> Iterable[Scene]:
         """Yield scenes while maintaining counters and progress notifications."""
         inner: ProcessableLoader[Any] = self._inner
         self._running = True
         self._update_event.set()
         for source in itertools.islice(inner.sources(), self._limit):
-            for scene_i, (scene_data, map_context) in enumerate(inner.process_next(source)):
+            for processed in inner.process_next(source):
                 self._update_event.set()
-                yield (
-                    source.identifier,
-                    scene_i,
-                    inner.create_scene(
-                        scene_data,
-                        source,
-                        map_context=map_context,
-                        scene_number=self._scene_counter,
-                    ),
-                )
+                yield (inner.create_scene(processed, source, self._scene_counter))
                 self._scene_counter += 1
             self._source_counter += 1
             self._update_event.set()

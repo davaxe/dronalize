@@ -6,7 +6,6 @@ from dronalize.datasets.nuscenes.map.builder import NuScenesMapBuilder
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "nuscenes",
     NuScenesLoader,
-    NuScenesLoader,
     execution_scope_fn=_scope.nuscenes_execution_scope,
     has_map=True,
 )

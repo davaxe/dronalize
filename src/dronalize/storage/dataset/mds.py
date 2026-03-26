@@ -73,7 +73,7 @@ class _MDSDatasetBackend(StreamingDataset):
             raise ValueError(msg)
 
         if path is not None:
-            super().__init__(local=str(path), split=split, **args)
+            super().__init__(local=path.as_posix(), split=split, **args)
         elif streams is not None:
             super().__init__(streams=streams, **args)
 

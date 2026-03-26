@@ -2,19 +2,28 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from multiprocessing.synchronize import Event
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from dronalize.storage.writers.protocol import SceneWriter
 
-if TYPE_CHECKING:
-    from dronalize.execution.assigner import SplitAssigner
-    from dronalize.execution.common import Progress
-
 AnyEvent = Event | threading.Event
 
-WriterFactory = Callable[[int | None], SceneWriter]
+WriterFactory = Callable[[int], SceneWriter]
 """Factory that creates a worker-local writer for a given worker ID."""
+
+
+@dataclass(frozen=True, slots=True)
+class Progress:
+    """Snapshot of the executor's current progress."""
+
+    running: bool
+    processed_sources: int
+    processed_scenes: int
+    total_sources: int | None
+    total_scenes: int | None
+    active_workers: int
 
 
 class WritingExecutor(Protocol):
@@ -28,7 +37,6 @@ class WritingExecutor(Protocol):
         self,
         writer_factory: WriterFactory,
         finalize: Callable[[SceneWriter], None] | None = None,
-        split_assigner: SplitAssigner | None = None,
     ) -> None:
         """Run the executor and write all produced scenes.
 
@@ -39,9 +47,6 @@ class WritingExecutor(Protocol):
         finalize : Callable[[SceneWriter], None] | None, optional
             Optional writer finalization hook. When omitted, the executor uses
             the writer's default `finish_local()` and `finish_final()` methods.
-        split_assigner : SplitAssigner | None, optional
-            Optional split assigner. If given, the executor uses it to determine
-            the split for each produced scene.
         """
         ...
 

@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import polars as pl
 from typing_extensions import override
 
 from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
-from dronalize.loading import BaseSceneLoader
-from dronalize.loading.loader import IngestOutput, Source
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, Source
 from dronalize.maps.resolver import no_map, shared_map
-from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.scene import POSITIONS_ONLY_V1
 
@@ -19,19 +18,22 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.config.map import MapConfig
-    from dronalize.maps import MapResolver
-    from dronalize.pipeline.pipeline import Pipeline
+    from dronalize.config.split import SplitRequest
+    from dronalize.maps.resolver import MapResolver
     from dronalize.scene import SceneSchema
 
 
 class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     """Loader for nuScenes trajectories.
 
-    Strategy:
-    1. Load all tables globally (cached).
-    2. Perform one massive join to process all tracks from all scenes.
-    3. Partition result into a Dict[scene_token, DataFrame] for O(1) access.
+    The loader preprocesses the global nuScenes tables once, joins them into a
+    scene-level trajectory table, and then caches one DataFrame per scene for
+    efficient access during ingestion.
     """
+
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        source_split_enabled=True,
+    )
 
     def __init__(
         self,
@@ -39,21 +41,26 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
-        """Initialize the dataset loader.
+        """Initialize the nuScenes loader.
 
         Parameters
         ----------
         data_root : Path or str
-            Root directory of the dataset.
+            Root directory of the extracted nuScenes dataset.
         loader_config : LoaderConfig, optional
-            Configuration for the loader.
+            Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. NuScenes-style loaders do not define
-            predefined splits, so `None` processes all sources.
-
+            Optional selection of predefined dataset splits. This loader does
+            not expose predefined splits, so `None` processes all sources.
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
         self._data_root: Path = Path(data_root)
         self._data_dirs: list[Path] = self._find_data_dir()
         self._dfs: list[dict[str, pl.LazyFrame]] = []
@@ -87,16 +94,15 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
             for token, df in dfs.items():
                 scene_name: str = df.item(0, "scene_name")
                 map_name: str = df.item(0, "map")
-                yield Source(identifier=scene_name, inner=(i, token), map_key=map_name)
+                yield Source(identifier=scene_name, data=(i, token), map_key=map_name)
 
     @override
     def num_sources(self) -> int | None:
         return sum(len(dfs) for dfs in self._scene_cache)
 
     @override
-    def ingest(self, source: Source[tuple[int, str]]) -> Iterable[IngestOutput]:
-        map_key = source.map_key
-        index, token = source.inner
+    def ingest(self, source: Source[tuple[int, str]]) -> Iterable[IngestedData]:
+        index, token = source.data
         scenes = (
             self
             ._scene_cache[index][token]
@@ -107,7 +113,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
             ])
             .lazy()
         )
-        yield (
+        yield IngestedData(
             scenes.filter(
                 ~pl.col("status").is_in(self._status_to_filter),
                 *[
@@ -115,12 +121,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
                     for category in self._full_category_contains
                 ],
             ).drop(["status", "full_category", "full_status"]),
-            map_key,
         )
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override
@@ -235,7 +236,7 @@ def build_scene_timeline(
     scene_lf: pl.LazyFrame,
     log_lf: pl.LazyFrame,
 ) -> pl.LazyFrame:
-    """Build scene timeline.
+    """Build a frame-indexed scene timeline table.
 
     Parameters
     ----------
@@ -249,8 +250,7 @@ def build_scene_timeline(
     Returns
     -------
     pl.LazyFrame
-        Timeline LazyFrame for a scene.
-
+        Timeline table containing scene, sample, and log metadata.
     """
     return (
         sample_lf

@@ -9,13 +9,15 @@ if TYPE_CHECKING:
     from dronalize.scene._scene import Scene
 
 MapKey = str | None
+"""Stable identifier for a map associated with a scene or source."""
 MapResolver = Callable[["Scene"], MapGraph | None]
+"""Callable that materializes a `MapGraph` for a scene on demand."""
 
 __all__ = ["MapKey", "MapResolver", "no_map", "shared_map"]
 
 
 def no_map() -> MapResolver:
-    """Create a resolver for datasets that have no map data.
+    """Create a resolver for datasets that do not expose map data.
 
     Returns
     -------
@@ -35,13 +37,12 @@ def shared_map(
     shared_name: dict[MapKey, str] | str,
     f: Callable[[Scene, MapGraph], MapGraph] | None = None,
 ) -> MapResolver:
-    """Create a resolver that resolves a map from shared memory.
+    """Create a resolver that materializes a scene map from shared memory.
 
     Parameters
     ----------
     shared_name : dict[MapKey, str] | str
-        The name of the shared memory block to use for the map.
-        If a `dict`, the value is looked up by `map_key`.
+        Shared-memory name or lookup table keyed by `scene.map_key`.
     f : Callable[[Scene, MapGraph], MapGraph] | None
         A function to apply to the map graph before returning it.
         If `None`, the map graph is returned as-is.

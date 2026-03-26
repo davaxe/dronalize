@@ -7,7 +7,7 @@ import polars as pl
 from scipy.interpolate import UnivariateSpline
 from typing_extensions import Self, override
 
-from dronalize.maps import BaseMapBuilder
+from dronalize.maps.builder import BaseMapBuilder
 from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:

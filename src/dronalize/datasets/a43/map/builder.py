@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing_extensions import override
 
-from dronalize.maps import BaseMapBuilder, EdgeType
+from dronalize.maps.builder import BaseMapBuilder
+from dronalize.maps.edge_type import EdgeType
 
 
 class A43MapBuilder(BaseMapBuilder):

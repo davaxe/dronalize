@@ -3,7 +3,7 @@ import polars as pl
 from polars.testing import assert_series_equal
 
 from dronalize.config import LoaderConfig, WriterConfig
-from dronalize.maps.graph import MapGraph
+from dronalize.maps import MapGraph
 from dronalize.scene import CANONICAL_V1, POSITIONS_ONLY_V1, Scene
 from dronalize.storage.encoding import (
     encode_map_from_scene,

@@ -53,6 +53,10 @@ class WriterConfig(BaseModel):
             offset_positions=offset_positions,
         )
 
+    def with_scene_schema(self, scene_schema: SceneSchemaLike) -> WriterConfig:
+        """Return a copy with a different persisted scene schema."""
+        return self.model_copy(update={"scene_schema": get_scene_schema(scene_schema)})
+
     @property
     def feature_columns(self) -> tuple[str, ...]:
         """Return the persisted feature columns in tensor order."""

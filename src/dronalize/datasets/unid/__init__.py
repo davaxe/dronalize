@@ -6,7 +6,6 @@ from dronalize.datasets.unid.map.builder import UniDMapBuilder
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "unid",
     UniDLoader,
-    UniDLoader,
     execution_scope_fn=_scope.unid_execution_scope,
     has_map=True,
 )

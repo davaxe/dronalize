@@ -5,11 +5,11 @@ from __future__ import annotations
 import functools
 import importlib
 import importlib.util
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Concatenate
+from typing import TYPE_CHECKING, Any, Concatenate, cast
 
 from dronalize._internal._typing import P
 from dronalize.config.loader import LoaderConfig
@@ -19,10 +19,11 @@ from dronalize.exceptions import (
     DatasetRegistryError,
     MissingOptionalDependencyError,
 )
-from dronalize.loading import BaseSceneLoader
+from dronalize.loading.base import BaseSceneLoader
 
 if TYPE_CHECKING:
     from dronalize.categories import DatasetSplit
+    from dronalize.config.split import SplitRequest, SplitStrategyName
     from dronalize.scene._schema import SceneSchema
 
 _REGISTRY: dict[str, DatasetDescriptor] = {}
@@ -64,26 +65,35 @@ class DatasetDescriptor:
     predefined_splits: list[DatasetSplit] = field(default_factory=list)
     """Predefined splits exposed by the dataset, if any."""
 
+    supported_split_methods: list[SplitStrategyName] = field(default_factory=list)
+    """Custom split methods exposed by the loader, if any."""
+
+    recommended_split_method: SplitStrategyName | None = None
+    """Preferred custom split method for automatic selection, if any."""
+
     @classmethod
     def from_loader(
         cls,
         name: str,
         loader_cls: type[BaseSceneLoader[Any]],
-        loader_factory: LoaderFactory[...],
+        loader_factory: LoaderFactory[...] | None = None,
         *,
         execution_scope_fn: ExecutionScope | None = None,
         has_map: bool = False,
     ) -> DatasetDescriptor:
         """Create a descriptor directly from a loader class."""
+        resolved_factory = loader_cls if loader_factory is None else loader_factory
         return cls(
             name=name,
-            loader_factory=loader_factory,
+            loader_factory=cast("LoaderFactory[...]", resolved_factory),
             default_config=loader_cls.default_config(),
             default_map_config=loader_cls.default_map_config(),
             native_schema=loader_cls.native_scene_schema(),
             execution_scope_fn=execution_scope_fn,
             has_map=has_map,
             predefined_splits=list(loader_cls.predefined_splits()),
+            supported_split_methods=list(loader_cls.supported_split_methods()),
+            recommended_split_method=loader_cls.recommended_split_method(),
         )
 
     @contextmanager
@@ -107,12 +117,15 @@ class DatasetDescriptor:
         loader_config: LoaderConfig,
         map_config: MapConfig,
         output_schema: SceneSchema | None,
-        splits: list[DatasetSplit] | None = None,
+        splits: Sequence[DatasetSplit] | None = None,
+        split_request: SplitRequest | None = None,
     ) -> BaseSceneLoader[Any]:
         """Instantiate the dataset loader with the resolved runtime configuration."""
         kwargs: dict[str, object] = dict(loader_config.extra_kwargs)
         if splits is not None:
             kwargs["splits"] = splits
+        if split_request is not None:
+            kwargs["split_request"] = split_request
 
         loader = self.loader_factory(root, loader_config, map_config, **kwargs)
         loader.set_output_schema(output_schema)

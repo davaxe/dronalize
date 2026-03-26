@@ -5,26 +5,37 @@ import pytest
 from typing_extensions import override
 
 from dronalize.categories import DatasetSplit
-from dronalize.config import LoaderConfig
-from dronalize.exceptions import SplitNotSupportedError
-from dronalize.loading import BaseSceneLoader
-from dronalize.loading.loader import IngestOutput, Source
-from dronalize.pipeline.pipeline import Pipeline
+from dronalize.config import (
+    BySourceSplit,
+    LoaderConfig,
+    SplitRequest,
+    SplitWeights,
+    TimeBlockSplit,
+)
+from dronalize.exceptions import SplitMethodNotSupportedError, SplitNotSupportedError
+from dronalize.loading import (
+    BaseSceneLoader,
+    BaseSceneLoaderConfig,
+    IngestedData,
+    Source,
+)
+from dronalize.pipeline import Pipeline
 from dronalize.scene import CANONICAL_V1, POSITIONS_ONLY_V1, SceneSchema
 
 
-def _scene_frame() -> pl.LazyFrame:
+def _canonical_frame(n_frames: int = 1) -> pl.LazyFrame:
+    frames = list(range(n_frames))
     return pl.DataFrame({
-        "frame": [0],
-        "id": [1],
-        "x": [0.0],
-        "y": [0.0],
-        "vx": [0.0],
-        "vy": [0.0],
-        "ax": [0.0],
-        "ay": [0.0],
-        "yaw": [0.0],
-        "agent_category": [0],
+        "frame": frames,
+        "id": [1] * n_frames,
+        "x": [float(frame) for frame in frames],
+        "y": [0.0] * n_frames,
+        "vx": [0.0] * n_frames,
+        "vy": [0.0] * n_frames,
+        "ax": [0.0] * n_frames,
+        "ay": [0.0] * n_frames,
+        "yaw": [0.0] * n_frames,
+        "agent_category": [0] * n_frames,
     }).lazy()
 
 
@@ -38,7 +49,7 @@ def _positions_only_scene_frame() -> pl.LazyFrame:
     }).lazy()
 
 
-class _SplitLoader(BaseSceneLoader[str]):
+class _NativeSplitLoader(BaseSceneLoader[str]):
     @classmethod
     @override
     def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
@@ -47,17 +58,17 @@ class _SplitLoader(BaseSceneLoader[str]):
     @override
     def sources_for_split(self, split: DatasetSplit) -> list[Source[str]]:
         if split is DatasetSplit.TRAIN:
-            return [Source(identifier="train", inner="train")]
+            return [Source(identifier="train", data="train")]
         if split is DatasetSplit.VAL:
-            return [Source(identifier="val", inner="val")]
+            return [Source(identifier="val", data="val")]
         if split is DatasetSplit.TEST:
-            return [Source(identifier="test", inner="test")]
+            return [Source(identifier="test", data="test")]
         raise SplitNotSupportedError(type(self).__name__, split)
 
     @override
-    def ingest(self, source: Source[str]) -> list[IngestOutput]:
+    def ingest(self, source: Source[str]) -> list[IngestedData]:
         _ = source
-        return [(_scene_frame(), None)]
+        return [IngestedData(_canonical_frame())]
 
     @override
     def pipeline(self) -> Pipeline:
@@ -74,42 +85,15 @@ class _SplitLoader(BaseSceneLoader[str]):
         return CANONICAL_V1
 
 
-class _ManualSplitLoader(_SplitLoader):
-    @override
-    def sources_for_split(self, split: DatasetSplit) -> list[Source[str]]:
-        if split is DatasetSplit.TRAIN:
-            return [
-                Source(
-                    identifier="train",
-                    inner="train",
-                    split_assignment=DatasetSplit.TEST,
-                )
-            ]
-        return super().sources_for_split(split)
-
-
-class _OverrideSplitLoader(_SplitLoader):
-    @override
-    def sources_for_split(self, split: DatasetSplit) -> list[Source[str]]:
-        if split is DatasetSplit.TRAIN:
-            return [
-                Source(
-                    identifier="train",
-                    inner="train",
-                ).override_split_assignment(DatasetSplit.TEST)
-            ]
-        return super().sources_for_split(split)
-
-
 class _UnsplitLoader(BaseSceneLoader[str]):
     @override
     def discover_sources(self) -> list[Source[str]]:
-        return [Source(identifier="only", inner="only")]
+        return [Source(identifier="only", data="only")]
 
     @override
-    def ingest(self, source: Source[str]) -> list[IngestOutput]:
+    def ingest(self, source: Source[str]) -> list[IngestedData]:
         _ = source
-        return [(_scene_frame(), None)]
+        return [IngestedData(_canonical_frame())]
 
     @override
     def pipeline(self) -> Pipeline:
@@ -128,9 +112,9 @@ class _UnsplitLoader(BaseSceneLoader[str]):
 
 class _PositionsOnlyLoader(_UnsplitLoader):
     @override
-    def ingest(self, source: Source[str]) -> list[IngestOutput]:
+    def ingest(self, source: Source[str]) -> list[IngestedData]:
         _ = source
-        return [(_positions_only_scene_frame(), None)]
+        return [IngestedData(_positions_only_scene_frame())]
 
     @classmethod
     @override
@@ -138,59 +122,73 @@ class _PositionsOnlyLoader(_UnsplitLoader):
         return POSITIONS_ONLY_V1
 
 
-def test_sources_use_predefined_split_assignment_when_none_requested() -> None:
-    """Test that predefined-split loaders keep their dataset split assignments."""
-    loader = _SplitLoader()
+class _DefaultPipelineBlockSplitLoader(BaseSceneLoader[str]):
+    config = BaseSceneLoaderConfig(block_split_enabled=True)
 
-    assert [source.split_assignment for source in loader.sources()] == [
-        DatasetSplit.TRAIN,
-        DatasetSplit.VAL,
-        DatasetSplit.TEST,
-    ]
+    @override
+    def discover_sources(self) -> list[Source[str]]:
+        return [Source(identifier="only", data="only")]
 
+    @override
+    def ingest(self, source: Source[str]) -> list[IngestedData]:
+        _ = source
+        return [IngestedData(_canonical_frame(n_frames=6))]
 
-def test_single_split_selection_only_yields_requested_split() -> None:
-    """Test that a single split selection works."""
-    loader = _SplitLoader(splits=DatasetSplit.VAL)
+    @classmethod
+    @override
+    def default_config(cls) -> LoaderConfig:
+        return LoaderConfig(input_len=1, output_len=1, sample_time=1.0)
 
-    assert [source.split_assignment for source in loader.sources()] == [DatasetSplit.VAL]
-    assert [scene.split_assignment for scene in loader.scenes()] == [DatasetSplit.VAL]
-
-
-def test_unsplit_loader_leaves_split_assignment_empty() -> None:
-    """Test that split assignment is None when the loader does not support splits."""
-    loader = _UnsplitLoader()
-
-    assert [source.split_assignment for source in loader.sources()] == [None]
-    assert [scene.split_assignment for scene in loader.scenes()] == [None]
+    @classmethod
+    @override
+    def native_scene_schema(cls) -> SceneSchema:
+        return CANONICAL_V1
 
 
-def test_unsplit_loader_rejects_predefined_split_selection() -> None:
-    """Test that splits that are not supported by the loader raise an exception."""
+def test_unsplit_loader_rejects_native_split_selection() -> None:
+    """Loaders without native dataset partitions should reject split filtering."""
     loader = _UnsplitLoader(splits=DatasetSplit.TRAIN)
 
     with pytest.raises(SplitNotSupportedError):
         _ = list(loader.sources())
 
 
-def test_explicit_source_override_wins_over_inferred_split() -> None:
-    """Test override behavior."""
-    loader = _OverrideSplitLoader(splits=DatasetSplit.TRAIN)
+def test_default_pipeline_applies_block_split_request() -> None:
+    """The base loader pipeline should forward block split requests to the factory."""
+    unsplit_loader = _DefaultPipelineBlockSplitLoader(
+        loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
+    )
+    split_loader = _DefaultPipelineBlockSplitLoader(
+        loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
+        split_request=SplitRequest(
+            strategy=TimeBlockSplit(gap=0),
+            weights=SplitWeights(train=0.5, val=0.5, test=0.0),
+        ),
+    )
 
-    assert [source.split_assignment for source in loader.sources()] == [DatasetSplit.TEST]
-    assert [scene.split_assignment for scene in loader.scenes()] == [DatasetSplit.TEST]
+    unsplit_processed = list(unsplit_loader.process_next(next(iter(unsplit_loader.sources()))))
+    split_processed = list(split_loader.process_next(next(iter(split_loader.sources()))))
+
+    assert len(unsplit_processed) == 1
+    assert unsplit_processed[0].frame.height == 6
+    assert len(split_processed) == 2
+    assert [frame.frame.height for frame in split_processed] == [3, 3]
 
 
-def test_source_split_assignment_is_preserved_without_override_flag() -> None:
-    """Test that an existing source split assignment is preserved without override metadata."""
-    loader = _ManualSplitLoader(splits=DatasetSplit.TRAIN)
-
-    assert [source.split_assignment for source in loader.sources()] == [DatasetSplit.TEST]
-    assert [scene.split_assignment for scene in loader.scenes()] == [DatasetSplit.TEST]
+def test_loader_rejects_direct_unsupported_split_request() -> None:
+    """Direct loader construction should validate unsupported custom split methods."""
+    with pytest.raises(SplitMethodNotSupportedError):
+        _UnsplitLoader(
+            loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
+            split_request=SplitRequest(
+                strategy=BySourceSplit(),
+                weights=SplitWeights(train=1.0, val=0.0, test=0.0),
+            ),
+        )
 
 
 def test_positions_only_loader_keeps_native_schema_by_default() -> None:
-    """Test that native positions-only loaders keep their native schema by default."""
+    """Native schemas should be preserved when no output schema is requested."""
     loader = _PositionsOnlyLoader(
         loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0),
         output_schema=None,
@@ -204,7 +202,7 @@ def test_positions_only_loader_keeps_native_schema_by_default() -> None:
 
 
 def test_loader_exposes_effective_output_schema_helpers() -> None:
-    """Loaders should expose the effective output schema for optimization decisions."""
+    """Schema helpers should reflect the effective requested output schema."""
     loader = _PositionsOnlyLoader(
         loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0),
         output_schema=None,

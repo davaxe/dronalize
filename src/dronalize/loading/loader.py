@@ -1,75 +1,106 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any, Concatenate, Generic, Protocol
-
-import polars as pl
+from typing import TYPE_CHECKING, Any, Concatenate, Generic, Protocol, TypeAlias
 
 from dronalize._internal._typing import P, SourceId, SourceT
-from dronalize.maps.resolver import MapKey, MapResolver
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    import polars as pl
+
     from dronalize.categories import DatasetSplit
+    from dronalize.maps.resolver import MapKey, MapResolver
     from dronalize.scene import Scene
 
 
-MapContext = MapResolver | MapKey | None
-"""Map payload produced during ingestion: resolver, lookup key, or no map."""
+SplitKeyPart: TypeAlias = int | str
+SplitKey: TypeAlias = SplitKeyPart | tuple[SplitKeyPart, ...]
 
-IngestOutput = tuple[pl.LazyFrame, MapContext]
+
+@dataclass(slots=True)
+class StableSceneIdentifier:
+    """Stable identifier for a scene.
+
+    The identifier should remain consistent across runs as long as the raw
+    sources and their organization remain unchanged. That makes scene-level and
+    source-level split assignment reproducible even if the internal loader
+    implementation changes.
+    """
+
+    source_identifier: SourceId
+    """Stable identifier for the source, e.g., file name, URL, database key."""
+    local_scene_number: int
+    """Numeric index for the scene within its source, should be stable across runs."""
+
+
+@dataclass(slots=True, frozen=True)
+class MapBinding:
+    """Loader-side map attachment carried alongside ingested or processed data.
+
+    A binding can provide a stable map key, a resolver, or both. The base
+    loader combines this with any source-level map key before constructing the
+    final `Scene`.
+    """
+
+    key: MapKey = None
+    """Stable map identifier for the scene, if one is known at ingest time."""
+    resolver: MapResolver | None = None
+    """Resolver that can materialize the map graph for the scene."""
+
+
+@dataclass(slots=True, frozen=True)
+class IngestedData:
+    """One source-derived lazy frame plus any scene-level map binding."""
+
+    frame: pl.LazyFrame
+    map_binding: MapBinding = field(default_factory=MapBinding)
+
+
+@dataclass(slots=True, frozen=True)
+class ProcessedSceneData:
+    """Final scene payload produced just before `Scene` construction."""
+
+    frame: pl.DataFrame
+    stable_identifier: StableSceneIdentifier
+    map_binding: MapBinding = field(default_factory=MapBinding)
+    predefined_split: DatasetSplit | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class BlockSplitSupport:
+    """Loader metadata required to apply block-based split strategies."""
+
+    time_column: str = "frame"
+    group_by: str | tuple[str, ...] | None = None
 
 
 @dataclass(slots=True, frozen=True)
 class Source(Generic[SourceT]):
-    """Represent a raw data source identified by a stable unique identifier."""
+    """Lightweight unit of raw input that yields one or more scenes."""
 
     identifier: SourceId
-    """Generic identifier for the source, e.g., file name, URL, database key."""
-    inner: SourceT
-    """The actual source data, which can be of any type (e.g., file path, raw data)."""
+    """Stable identifier for the source, e.g., file name, URL, database key."""
+    data: SourceT
+    """Lightweight source payload, usually a path or small tuple of lookup values."""
+    predefined_split: DatasetSplit | None = None
+    """Predefined split, if any."""
     map_key: MapKey = None
     """Optional map key associated with this source."""
-    split_assignment: DatasetSplit | None = None
-    """Optional concrete dataset split assignment for this source."""
-    split_assignment_override: bool = False
-    """Whether this split assignment should override BaseSceneLoader inference."""
     metadata: dict[str, Any] = field(default_factory=dict)
     """Additional metadata associated with the source."""
 
-    def with_split_assignment(self, split_assignment: DatasetSplit | None) -> Source[SourceT]:
+    def with_predefined_split(self, split_assignment: DatasetSplit | None) -> Source[SourceT]:
         """Return a copy with a concrete split assignment."""
-        return replace(
-            self,
-            split_assignment=split_assignment,
-            split_assignment_override=False,
-        )
-
-    def override_split_assignment(self, split_assignment: DatasetSplit | None) -> Source[SourceT]:
-        """Return a copy whose split assignment overrides inferred split routing."""
-        return replace(
-            self,
-            split_assignment=split_assignment,
-            split_assignment_override=True,
-        )
+        return replace(self, predefined_split=split_assignment)
 
 
 class SceneLoader(Protocol):
     """Minimal protocol for scene loading, used for type hinting."""
 
     def scenes(self) -> Iterable[Scene]:
-        """Process scenes and yield them one by one.
-
-        This is the main method for processing scenes. It yields `Scene` objects
-        one at a time, allowing for memory-efficient processing of large datasets.
-
-        Yields
-        ------
-        Scene
-            Each processed scene, with its identifier and associated data.
-
-        """
+        """Yield processed scenes one by one."""
         ...
 
     def scenes_callback(
@@ -78,44 +109,30 @@ class SceneLoader(Protocol):
         *args: P.args,
         **kwargs: P.kwargs,
     ) -> None:
-        """Process scenes and call the provided callback on each scene.
-
-        This is an alternative to `scenes()` that allows for more flexible
-        processing of scenes without needing to yield them. The callback will be
-        called with each processed scene, allowing for custom handling (e.g.,
-        saving to disk, feeding into a model) without needing to store all scenes
-        in memory at once.
+        """Call `callback` for each processed scene.
 
         Parameters
         ----------
         callback : Callable
-            A function that takes a Scene and additional arguments, and
-            processes it (e.g., saves to disk, feeds into a model).
+            Function called with each scene and any extra arguments.
         *args : Any
             Additional positional arguments to pass to the callback.
         **kwargs : Any
             Additional keyword arguments to pass to the callback.
-
         """
         ...
 
 
 class ProcessableLoader(Protocol, Generic[SourceT]):
-    """Minimal protocol required to work with a loader abstraction.
-
-    This protocol defines the essential interface for discovering data sources,
-    tracking dataset sizes, processing raw sources into tabular data, and
-    constructing final scene objects.
-
-    """
+    """Minimal protocol required to work with a loader abstraction."""
 
     def sources(self) -> Iterable[Source[SourceT]]:
-        """Discover and yield the data sources to be processed.
+        """Discover and yield lightweight sources to be processed.
 
         Returns
         -------
         Iterable[Source[SourceT]]
-            An iterable containing the raw data sources to process.
+            An iterable containing the raw sources to process.
         """
         ...
 
@@ -141,49 +158,41 @@ class ProcessableLoader(Protocol, Generic[SourceT]):
         """
         ...
 
-    def process_next(self, source: Source[SourceT]) -> Iterable[tuple[pl.DataFrame, MapContext]]:
-        """Process a single raw data source into data frames and map contexts.
+    def process_next(self, source: Source[SourceT]) -> Iterable[ProcessedSceneData]:
+        """Process one source into finalized scene payloads.
 
         Parameters
         ----------
         source : Source[SourceT]
-            The raw data source to process.
+            The source to process.
 
         Yields
         ------
-        tuple[pl.DataFrame, MapContext]
-            Processed Polars DataFrames paired with their corresponding map context.
+        ProcessedSceneData
+            Processed scene payloads with their split metadata resolved.
         """
         ...
 
     def create_scene(
         self,
-        df: pl.DataFrame,
+        data: ProcessedSceneData,
         source: Source[SourceT],
-        *,
         scene_number: int,
-        map_context: MapContext | None = None,
-        split: DatasetSplit | None = None,
     ) -> Scene:
         """Construct a Scene object from processed data.
 
         Parameters
         ----------
-        df : pl.DataFrame
-            The processed data frame containing the scene data.
+        data : ProcessedSceneData
+            Processed scene payload.
         source : Source[SourceT]
-            The originating raw data source.
+            Originating source.
         scene_number : int
-            Numeric index assigned to the generated scene.
-        map_context : MapContext | None, optional
-            Optional map payload associated with the scene. This may already be
-            a resolver, a loader-specific `MapKey`, or `None`.
-        split : DatasetSplit | None, optional
-            The dataset split (train/val/test) that this scene belongs to.
+            Monotonic scene number assigned by the loader.
 
         Returns
         -------
         Scene
-            The fully constructed scene object.
+            Fully constructed scene object.
         """
         ...

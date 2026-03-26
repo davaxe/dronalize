@@ -6,7 +6,6 @@ from dronalize.datasets.us101.map.builder import US101MapBuilder
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "us101",
     US101Loader,
-    US101Loader,
     execution_scope_fn=_scope.us101_execution_scope,
     has_map=True,
 )

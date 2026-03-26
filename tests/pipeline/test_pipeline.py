@@ -5,16 +5,24 @@
 from __future__ import annotations
 
 import math
+from collections import Counter
 
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
 from dronalize.categories import AgentCategory
-from dronalize.config import LoaderConfig
+from dronalize.config import (
+    LoaderConfig,
+    ShuffledTimeBlockSplit,
+    SplitRequest,
+    SplitWeights,
+    TimeBlockSplit,
+)
+from dronalize.pipeline import Pipeline
 from dronalize.pipeline import transforms as transform
+from dronalize.pipeline.factories import split_partition_pipeline, trajectory_pipeline
 from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.pipeline.pipeline import Pipeline
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Helpers / fixtures
@@ -384,44 +392,6 @@ def test_transform_resample_downsample() -> None:
     assert result.shape[0] == 5
 
 
-def test_transform_window_produces_multiple() -> None:
-    """Ensure the window transform properly produces multiple windowed frames."""
-    lf = pl.DataFrame({
-        "frame": list(range(10)),
-        "x": [float(i) for i in range(10)],
-    }).lazy()
-    fan = transform.window(window_size=5, step_size=2, return_iterable=True)
-    results = list(fan(lf))
-    assert len(results) >= 2
-
-
-def test_transform_window_offsets_frame() -> None:
-    """Verify the window transform completely resets the starting frame offset to zero."""
-    lf = pl.DataFrame({
-        "frame": list(range(10)),
-        "x": [float(i) for i in range(10)],
-    }).lazy()
-    fan = transform.window(window_size=5, step_size=3, return_iterable=True)
-    for result_lf in fan(lf):
-        result = result_lf.collect()
-        # Frame should be zero-offset
-        assert result["frame"].min() == 0
-
-
-def test_transform_window_no_offset() -> None:
-    """Verify the window transform retains the original frame offset."""
-    lf = pl.DataFrame({
-        "frame": list(range(6)),
-        "x": [float(i) for i in range(6)],
-    }).lazy()
-    fan = transform.window(
-        window_size=5, step_size=3, offset_sliding_col=False, return_iterable=True
-    )
-    results = [r.collect() for r in fan(lf)]
-    # At least first window should start at frame 0
-    assert results[0]["frame"].min() == 0
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # Pipeline with transforms integration
 # ═══════════════════════════════════════════════════════════════════════════
@@ -438,25 +408,6 @@ def test_pipeline_integration_filter_then_yaw() -> None:
     result = pipe.execute_single(lf).collect()
     assert result.shape[0] == 2
     assert result["yaw"][0] == pytest.approx(0.0)
-
-
-def test_pipeline_integration_window_then_transform() -> None:
-    """Apply a windowing fan-out followed immediately by a custom transform on each window."""
-    lf = pl.DataFrame({
-        "frame": list(range(10)),
-        "x": [float(i) for i in range(10)],
-        "y": [0.0] * 10,
-    }).lazy()
-    pipe = (
-        Pipeline()
-        .then_flat_map(transform.window(window_size=5, step_size=3, return_iterable=True))
-        .then(lambda df: df.with_columns(pl.lit(99).alias("marker")))
-    )
-    results = [r.collect() for r in pipe.execute(lf)]
-    assert len(results) >= 2
-    for r in results:
-        assert "marker" in r.columns
-        assert r["marker"].unique().to_list() == [99]
 
 
 def test_pipeline_integration_complex() -> None:
@@ -497,3 +448,183 @@ def test_pipeline_rshift_operator() -> None:
     # Originals unchanged
     assert len(p1) == 1
     assert len(p2) == 1
+
+
+# =══════════════════════════════════════════════════════════════════════════
+# Split partitioning pipeline
+# ══════════════════════════════════════════════════════════════════════════=
+
+
+def test_block_partition_cumulative() -> None:
+    """Test cumulative block partitioning."""
+    lf = pl.DataFrame({
+        "frame": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "id": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2],
+        "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
+    }).lazy()
+
+    split_request = SplitRequest(
+        strategy=TimeBlockSplit(gap=0), weights=SplitWeights.from_tuple((0.6, 0.2, 0.2))
+    )
+    fn = split_partition_pipeline(
+        request=split_request,
+        time_column="frame",
+    )
+    result = fn.execute_single(lf).collect()
+    assert "split" in result.columns
+    splits = result["split"]
+    assert splits.n_unique() == 3
+    assert "train" in splits
+    assert "val" in splits
+    assert "test" in splits
+
+    splits_list = splits.to_list()
+    assert splits_list[:6] == ["train"] * 6
+    assert splits_list[6:8] == ["val"] * 2
+    assert splits_list[8:] == ["test"] * 2
+
+
+def test_block_partition_cumulative_gap() -> None:
+    """Test that gap and only two splits works."""
+    lf = pl.DataFrame({
+        "frame": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "id": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2],
+        "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
+    }).lazy()
+
+    split_request = SplitRequest(
+        strategy=TimeBlockSplit(gap=2), weights=SplitWeights.from_tuple((0.5, 0.5, 0.0))
+    )
+    fn = split_partition_pipeline(
+        request=split_request,
+        time_column="frame",
+    )
+    result = fn.execute_single(lf).collect()
+    assert "split" in result.columns
+    assert result.height == 8
+    splits = result["split"]
+    assert splits.n_unique() == 2
+    assert "train" in splits
+    assert "val" in splits
+    splits_list = splits.to_list()
+    # 2 gap means that 8 frames remains; first 4 should be train
+    assert splits_list[:4] == ["train"] * 4
+    # 2 gap is removed from the middle, so last 4 should be val
+    assert splits_list[4:] == ["val"] * 4
+
+
+def test_block_partition_shuffled() -> None:
+    """Test shuffled block partitioning."""
+    lf = pl.DataFrame({
+        "frame": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "id": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2],
+        "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
+    }).lazy()
+
+    split_request = SplitRequest(
+        strategy=ShuffledTimeBlockSplit(segments=5),
+        weights=SplitWeights.from_tuple((0.6, 0.2, 0.2)),
+        seed=0,
+    )
+    fn = split_partition_pipeline(
+        request=split_request,
+        time_column="frame",
+    )
+    result = fn.execute_single(lf).collect()
+    assert "split" in result.columns
+    splits = result["split"]
+    assert splits.n_unique() == 3
+    assert "train" in splits
+    assert "val" in splits
+    assert "test" in splits
+
+    counts = Counter(splits.to_list())
+    assert counts["train"] == 6
+    assert counts["val"] == 2
+    assert counts["test"] == 2
+    # fmt: off
+    # The order is shuffled by segment, but with seed 0 it is deterministic.
+    assert splits.to_list() == [
+        "train", "train", "val", "val", "test",
+        "test", "train", "train", "train", "train"
+    ]
+    # fmt: on
+
+
+def test_block_partition_shuffled_gap() -> None:
+    """Test that gap and only two splits works for shuffled block partitioning."""
+    lf = pl.DataFrame({
+        "frame": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        "id": [1, 1, 1, 1, 2, 2, 2, 2, 2, 2],
+        "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
+    }).lazy()
+
+    split_request = SplitRequest(
+        strategy=ShuffledTimeBlockSplit(segments=2, gap=2),
+        weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+        seed=42,
+    )
+    fn = split_partition_pipeline(
+        request=split_request,
+        time_column="frame",
+    )
+    result = fn.execute_single(lf).collect()
+    print(result)
+    assert "split" in result.columns
+    assert result.height == 8
+    splits = result["split"]
+    assert splits.n_unique() == 2
+    assert "train" in splits
+    assert "val" in splits
+
+    counts = Counter(splits.to_list())
+    assert counts["train"] == 4
+    assert counts["val"] == 4
+
+
+def test_trajectory_pipeline_shuffled_time_blocks_keep_segments_separate() -> None:
+    """Shuffled time-block splits should fan out one scene per contiguous segment."""
+    lf = pl.DataFrame({
+        "frame": list(range(8)),
+        "id": [1] * 8,
+        "x": [float(frame) for frame in range(8)],
+        "y": [0.0] * 8,
+    }).lazy()
+    pipeline = trajectory_pipeline(
+        LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
+        split_request=SplitRequest(
+            strategy=ShuffledTimeBlockSplit(segments=4),
+            weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+            seed=0,
+        ),
+    )
+
+    results = list(pipeline.execute(lf, collect=True))
+
+    assert len(results) == 4
+    assert [result.height for result in results] == [2, 2, 2, 2]
+    assert all(result["split"].n_unique() == 1 for result in results)
+
+
+def test_trajectory_pipeline_shuffled_time_blocks_window_within_segments() -> None:
+    """Windowing should stay inside each shuffled time-block segment instead of merging by split."""
+    lf = pl.DataFrame({
+        "frame": list(range(8)),
+        "id": [1] * 8,
+        "x": [float(frame) for frame in range(8)],
+        "y": [0.0] * 8,
+    }).lazy()
+    pipeline = trajectory_pipeline(
+        LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step_size=2),
+        split_request=SplitRequest(
+            strategy=ShuffledTimeBlockSplit(segments=4),
+            weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+            seed=0,
+        ),
+    )
+
+    results = list(pipeline.execute(lf, collect=True))
+
+    assert len(results) == 4
+    assert [result.height for result in results] == [2, 2, 2, 2]
+    assert all(result["split"].n_unique() == 1 for result in results)

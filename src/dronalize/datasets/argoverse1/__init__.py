@@ -6,7 +6,6 @@ from dronalize.datasets.argoverse1.map.builder import Argoverse1MapBuilder
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "argoverse1",
     Argoverse1Loader,
-    Argoverse1Loader,
     execution_scope_fn=_scope.argoverse1_execution_scope,
     has_map=True,
 )

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from dronalize.datasets.waymo.protos import lean_map_pb2
-from dronalize.maps import BaseMapBuilder
+from dronalize.maps.builder import BaseMapBuilder
 from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:

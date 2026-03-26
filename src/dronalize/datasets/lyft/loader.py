@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -15,9 +15,9 @@ from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.common import utils
 from dronalize.exceptions import SplitNotSupportedError
-from dronalize.loading import BaseSceneLoader, IngestOutput, Source
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, MapBinding, Source
 from dronalize.maps.resolver import no_map, shared_map
-from dronalize.pipeline.factories import trajectory_pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
@@ -25,8 +25,8 @@ if TYPE_CHECKING:
 
     from zarr import Array
 
-    from dronalize.maps import MapResolver
-    from dronalize.pipeline import Pipeline
+    from dronalize.config.split import SplitRequest
+    from dronalize.maps.resolver import MapResolver
     from dronalize.scene import SceneSchema
 
 
@@ -55,21 +55,26 @@ class _ArrayData:
 class LyftLoader(BaseSceneLoader[_Source]):
     """Loader for Lyft Level 5 scenes stored in Zarr format."""
 
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        scene_split_enabled=True,
+    )
+
     def __init__(
         self,
         data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
         *,
         scene_batch_size: int | None = 100,
     ) -> None:
-        """Initialize the dataset loader.
+        """Initialize the Lyft Level 5 loader.
 
         Parameters
         ----------
         data_root : Path or str
-            Root directory of the dataset.
+            Root directory of the extracted Lyft Level 5 dataset.
         scene_batch_size : int, optional
             Number of scenes to load in each batch. Higher batch size may lead
             to faster processing at diminishing returns, but also higher memory
@@ -78,7 +83,12 @@ class LyftLoader(BaseSceneLoader[_Source]):
             Loader configuration override. If None, the default configuration
             is used.
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
         self._data_root: Path = Path(data_root)
         self._data: dict[DatasetSplit, _ArrayData] = {}
         self._batch_size: int | None = scene_batch_size
@@ -117,7 +127,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
             end = min(current + batch_size, total_scenes)
             yield Source(
                 current,
-                inner=_Source(interval=(current, end), split=split),
+                data=_Source(interval=(current, end), split=split),
             )
             current += batch_size
 
@@ -144,11 +154,11 @@ class LyftLoader(BaseSceneLoader[_Source]):
         return self._source_count(total_scenes, self._batch_size)
 
     @override
-    def ingest(self, source: Source[_Source]) -> Iterable[IngestOutput]:
-        start, end = source.inner.interval
+    def ingest(self, source: Source[_Source]) -> Iterable[IngestedData]:
+        start, end = source.data.interval
 
         # Now uses the lazy loader directly to ensure availability
-        arrays = self._get_arrays(source.inner.split)
+        arrays = self._get_arrays(source.data.split)
         scenes_np: npt.NDArray[np.void] = cast("npt.NDArray[np.void]", arrays.scenes[start:end])
 
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
@@ -169,11 +179,9 @@ class LyftLoader(BaseSceneLoader[_Source]):
                 frame_offset=frame_start,
                 agent_offset=agent_start,
             )
-            yield df.lazy(), self.map_resolver()
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return trajectory_pipeline(self.loader_config)
+            yield IngestedData(
+                frame=df.lazy(), map_binding=MapBinding(resolver=self.map_resolver())
+            )
 
     @classmethod
     @override

@@ -3,28 +3,27 @@ from __future__ import annotations
 import functools
 import sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
 
 from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config import LoaderConfig
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.common import utils
 from dronalize.datasets.opendd.map.builder import OpenDDMapBuilder
-from dronalize.loading import BaseSceneLoader
-from dronalize.loading.loader import IngestOutput, Source
-from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, Source
 from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from dronalize.config.split import SplitRequest
     from dronalize.maps.graph import MapGraph
     from dronalize.maps.resolver import MapResolver
-    from dronalize.pipeline.pipeline import Pipeline
     from dronalize.scene import Scene, SceneSchema
 
 
@@ -43,6 +42,10 @@ def _table_query(table_name: str) -> str:
 class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     """Loader for OpenDD data split across multiple SQLite databases."""
 
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        source_split_enabled=True,
+    )
+
     def __init__(
         self,
         data_root: Path | str,
@@ -50,17 +53,16 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         map_config: MapConfig | None = None,
         *,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
         """Initialize the multi-database OpenDD loader.
 
         Parameters
         ----------
         data_root : Path or str
-            Path to a directory containing one subdirectory or database file per
-            OpenDD segment.
-        loader_config : , optional
-            Loader configuration override. If None, the default configuration
-            is used.
+            Root directory containing the extracted OpenDD SQLite files.
+        loader_config : LoaderConfig, optional
+            Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
             splits, so `None` processes all sources.
@@ -70,6 +72,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
+            split_request=split_request,
         )
         self._data_root: Path = Path(data_root)
 
@@ -85,17 +88,21 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         for db_path in self._db_paths():
             for table_name in _list_table_names(db_path):
                 identifier = f"{db_path.stem}:{table_name}"
-                yield Source(identifier=identifier, inner=(db_path, table_name))
+                yield Source(
+                    identifier=identifier,
+                    data=(db_path, table_name),
+                    map_key=str(db_path.parent),
+                )
 
     @override
     def num_sources(self) -> int | None:
         return sum(_count_tables(db_path) for db_path in self._db_paths())
 
     @override
-    def ingest(self, source: Source[tuple[Path, str]]) -> Iterable[IngestOutput]:
-        db_path, table_name = source.inner
+    def ingest(self, source: Source[tuple[Path, str]]) -> Iterable[IngestedData]:
+        db_path, table_name = source.data
         with sqlite3.connect(db_path) as connection:
-            yield (
+            yield IngestedData(
                 pl
                 .read_database(_table_query(table_name), connection)
                 .lazy()
@@ -121,12 +128,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
                     .alias("agent_category"),
                 )
                 .drop("CLASS", "TIMESTAMP"),
-                str(db_path.parent),
             )
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override

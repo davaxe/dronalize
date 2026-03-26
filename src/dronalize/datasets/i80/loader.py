@@ -1,29 +1,33 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
 
 from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config import LoaderConfig
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.common import utils
-from dronalize.loading import BaseSceneLoader, IngestOutput, Source
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, Source
 from dronalize.maps.resolver import MapResolver, no_map, shared_map
-from dronalize.pipeline.factories import highway_trajectory_pipeline
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.pipeline.pipeline import Pipeline
+    from dronalize.config.split import SplitRequest
     from dronalize.scene import SceneSchema
 
 
 class I80Loader(BaseSceneLoader[Path]):
     """Scene loader for the I-80 dataset."""
+
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        block_split_enabled=True,
+    )
 
     def __init__(
         self,
@@ -31,32 +35,38 @@ class I80Loader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
         """Initialize the I80 dataset loader.
 
         Parameters
         ----------
         data_root : Path or str
-            Path to root of the I80 dataset, containing subdirectories of data files.
-        loader_config : , optional
-            Loader configuration. If None, the default configuration is used.
+            Root directory containing the extracted I-80 trajectory files.
+        loader_config : LoaderConfig, optional
+            Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
             splits, so `None` processes all sources.
 
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
-        self._data_dir: Path = Path(data_root)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
+        self._data_root: Path = Path(data_root)
 
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
-        for i, csv_file in enumerate(sorted(self._data_dir.rglob("trajectories*.csv"))):
-            yield Source(identifier=i, inner=csv_file)
+        for i, csv_file in enumerate(sorted(self._data_root.rglob("trajectories*.csv"))):
+            yield Source(identifier=i, data=csv_file)
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
-        yield (
-            pl.scan_csv(source.inner).select(
+    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
+        yield IngestedData(
+            pl.scan_csv(source.data).select(
                 pl.col("Vehicle_ID").alias("id"),
                 pl.col("Frame_ID").alias("frame"),
                 pl.col("Local_X").alias("x"),
@@ -71,16 +81,11 @@ class I80Loader(BaseSceneLoader[Path]):
                 .alias("agent_category"),
                 self._lane_changes_expr(),
             ),
-            None,
         )
 
     @override
     def num_sources(self) -> int | None:
-        return sum(1 for path in self._data_dir.rglob("trajectories*.csv") if path.is_file())
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return highway_trajectory_pipeline(self.loader_config)
+        return sum(1 for path in self._data_root.rglob("trajectories*.csv") if path.is_file())
 
     @classmethod
     @override

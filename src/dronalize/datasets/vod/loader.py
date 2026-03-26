@@ -4,8 +4,9 @@ from pathlib import Path
 from typing_extensions import override
 
 from dronalize.categories import DatasetSplit
-from dronalize.config import LoaderConfig
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
+from dronalize.config.split import SplitRequest
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
 
 
@@ -20,29 +21,31 @@ class VodLoader(NuScenesLoader):
 
     def __init__(
         self,
-        data_dir: Path | str,
+        data_root: Path | str,
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
-        """Initialize the dataset loader.
+        """Initialize the VOD loader.
 
         Parameters
         ----------
-        data_dir : Path or str
-            Directory of the trajectory data JSON files.
-        loader_config : , optional
-            Custom configuration, or default if None.
+        data_root : Path or str
+            Root directory of the extracted VOD dataset.
+        loader_config : LoaderConfig, optional
+            Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
             splits, so `None` processes all sources.
 
         """
         super().__init__(
-            data_dir,
+            data_root,
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
+            split_request=split_request,
         )
         # Overrides the internal nuScenes category filtering
         self._full_category_contains: list[str] = ["vehicle.ego"]

@@ -86,6 +86,26 @@ class SplitNotSupportedError(SplitError):
         )
 
 
+class SplitMethodNotSupportedError(SplitError):
+    """Raised when a loader does not implement the requested custom split method."""
+
+    def __init__(
+        self,
+        loader_name: str,
+        method: str,
+        supported_methods: tuple[str, ...],
+    ) -> None:
+        supported_display = ", ".join(supported_methods) if supported_methods else "none"
+        msg = (
+            f"{loader_name} does not support split method '{method}'. "
+            f"Supported methods: {supported_display}."
+        )
+        super().__init__(msg)
+        self.loader_name: str = loader_name
+        self.method: str = method
+        self.supported_methods: tuple[str, ...] = supported_methods
+
+
 class UnsupportedOutputFormatError(ValueError, DronalizeError):
     """Raised when an unknown writer/output format is requested."""
 

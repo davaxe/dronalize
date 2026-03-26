@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.maps import BaseMapBuilder
+from dronalize.maps.builder import BaseMapBuilder
 from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:

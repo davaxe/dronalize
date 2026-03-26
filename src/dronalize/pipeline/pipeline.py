@@ -12,7 +12,6 @@ from typing_extensions import override
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-
 Transform = Callable[[pl.LazyFrame], pl.LazyFrame]
 """A 1:1 transformation from one LazyFrame to another."""
 
@@ -175,11 +174,11 @@ class Pipeline:
             Input data. DataFrames will be converted to LazyFrames before
             processing.
         collect : bool, optional
-            If True, collect each resulting LazyFrame to a DataFrame before
+            If `True, collect each resulting LazyFrame to a DataFrame before
             yielding.
         filter_empty : bool, optional
-            If True, skip any resulting DataFrames that are empty.
-            Only applies when `collect=True`.
+            If `True`, skip any resulting DataFrames that are empty. Only
+            applies when `collect=True`.
 
         Yields
         ------
@@ -359,6 +358,28 @@ class Pipeline:
         return self.then(transform, name="cast")
 
     # -- introspection ------------------------------------------------------
+
+    def inspect(self, f: Callable[[pl.LazyFrame], None]) -> Pipeline:
+        """Apply a side-effecting function to each pipeline step.
+
+        This is useful for debugging or logging the steps in a pipeline.
+
+        Parameters
+        ----------
+        f : Callable[[_PipelineEntry], None]
+            A function that takes a pipeline entry and performs side effects.
+
+        Returns
+        -------
+        Pipeline
+            The unchanged pipeline, for chaining.
+        """
+
+        def _inspect_transform(df: pl.LazyFrame) -> pl.LazyFrame:
+            f(df)
+            return df
+
+        return self.then(_inspect_transform, name="inspect")
 
     def is_empty(self) -> bool:
         """Return True if the pipeline contains no steps."""

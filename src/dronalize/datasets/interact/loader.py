@@ -1,27 +1,31 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
 
 from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config import LoaderConfig
-from dronalize.loading import BaseSceneLoader, IngestOutput, Source
-from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.config.loader import LoaderConfig
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, Source
 from dronalize.scene import POSITIONS_VELOCITY_YAW_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.config.map import MapConfig
-    from dronalize.pipeline.pipeline import Pipeline
+    from dronalize.config.split import SplitRequest
     from dronalize.scene import SceneSchema
 
 
 class InteractionLoader(BaseSceneLoader[list[Path]]):
     """Loader for the INTERACTION dataset."""
+
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        scene_split_enabled=True,
+    )
 
     def __init__(
         self,
@@ -29,37 +33,37 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
         *,
         file_batch_size: int | None = None,
     ) -> None:
-        """Initialize the dataset loader.
-
-        The loader reads all CSV files in the given directory and
-        expects them to have the same schema as the INTERACTION dataset.
+        """Initialize the INTERACTION loader.
 
         Parameters
         ----------
         data_root : Path or str
-            Path to the root of the INTERACTION dataset.  This directory
-            should contain `train/`, `val/`, `test_multi-agent/`,
-            and `test_conditional-multi-agent/` subdirectories.
-        loader_config : , optional
-            Loader configuration override. If None, the default configuration
-            is used.
+            Root directory of the INTERACTION dataset. It should contain
+            `train/`, `val/`, `test_multi-agent/`, and
+            `test_conditional-multi-agent/`.
+        loader_config : LoaderConfig, optional
+            Loader configuration override.
         map_config : MapConfig, optional
-            Map configuration override. If None, the default configuration is
-            used.
+            Map configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. Can contain one or more predefined splits,
-            or `None` to process all sources.
+            Optional selection of predefined dataset splits. `None` processes
+            all available sources.
         file_batch_size : int, optional
             Number of files to read in each batch. If None, all files will be
-            read at once. Higher batch size may lead to faster processing at
-            diminishing returns, but also higher memory usage. `None` is not
-            recommended for large amounts of data.
-
+            read at once. Larger batches can improve throughput at the cost of
+            higher memory usage. `None` is usually only reasonable for small
+            datasets.
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
         self._data_root: Path = Path(data_root)
         self._file_batch_size: int | None = file_batch_size
 
@@ -91,10 +95,10 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
             return
 
     @override
-    def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[list[Path]]) -> Iterable[IngestedData]:
         data = (
             pl
-            .scan_csv(source.inner, include_file_paths="file_id", schema=_SCHEMA)
+            .scan_csv(source.data, include_file_paths="file_id", schema=_SCHEMA)
             .drop("track_to_predict", "interesting_agent", "width", "length", "timestamp_ms")
             .rename({
                 "psi_rad": "yaw",
@@ -110,16 +114,12 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         )
 
         for _, group in data.collect().group_by(["file_id", "case_id"]):
-            yield group.lazy().drop("file_id", "case_id"), None
+            yield IngestedData(frame=group.lazy().drop("file_id", "case_id"))
 
     @override
     def num_sources(self) -> int | None:
         splits = self.splits if self.splits is not None else self.predefined_splits()
         return sum(self._count_sources_for_split(split) for split in splits)
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override

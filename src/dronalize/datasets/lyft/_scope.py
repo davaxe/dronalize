@@ -20,26 +20,17 @@ def lyft_execution_scope(
     loader_config: LoaderConfig,
     map_config: MapConfig,
 ) -> Generator[None, None, None]:
-    """Lifecycle context for the Lyft dataset.
-
-    This will build the map graph from the raw map files and store it in shared
-    memory for use by the scene loader. The shared memory is cleaned up after
-    processing is complete.
-
-    Note that this is a context manager that will keep the map graph in shared
-    memory for the duration of the context.
+    """Prepare shared map state for a Lyft Level 5 processing run.
 
     Parameters
     ----------
     root : Path
-        Root directory of the dataset, which contains the raw map files.
+        Root directory of the extracted Lyft Level 5 dataset.
     loader_config : LoaderConfig
-        The loader configuration for this dataset. Not used in this startup hook,
-        but included in the signature for consistency with other datasets.
+        Unused by this hook. Included to match the standard dataset scope signature.
     map_config : MapConfig
-        The map configuration for this dataset, which specifies parameters for
-        building the map graph. If `map_config.include_map` is False, this startup
-        hook will do nothing.
+        Map-building configuration. If maps are disabled, this scope only clears
+        any previous shared-memory state.
 
     """
     _loader_config = loader_config

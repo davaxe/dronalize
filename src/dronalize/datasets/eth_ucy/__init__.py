@@ -8,11 +8,11 @@ from dronalize.datasets.eth_ucy.loader import (
 )
 
 DESCRIPTORS = {
-    "eth": DatasetDescriptor.from_loader("eth", EthLoader, EthLoader),
-    "hotel": DatasetDescriptor.from_loader("hotel", HotelLoader, HotelLoader),
-    "univ": DatasetDescriptor.from_loader("univ", UnivLoader, UnivLoader),
-    "zara1": DatasetDescriptor.from_loader("zara1", Zara1Loader, Zara1Loader),
-    "zara2": DatasetDescriptor.from_loader("zara2", Zara2Loader, Zara2Loader),
+    "eth": DatasetDescriptor.from_loader("eth", EthLoader),
+    "hotel": DatasetDescriptor.from_loader("hotel", HotelLoader),
+    "univ": DatasetDescriptor.from_loader("univ", UnivLoader),
+    "zara1": DatasetDescriptor.from_loader("zara1", Zara1Loader),
+    "zara2": DatasetDescriptor.from_loader("zara2", Zara2Loader),
 }
 
 __all__ = [

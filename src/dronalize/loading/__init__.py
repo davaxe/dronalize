@@ -1,19 +1,24 @@
 """Data loading — source discovery, ingestion, and scene creation."""
 
-from dronalize.loading.base import BaseSceneLoader
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
 from dronalize.loading.loader import (
-    IngestOutput,
-    MapContext,
+    BlockSplitSupport,
+    IngestedData,
+    MapBinding,
     ProcessableLoader,
+    ProcessedSceneData,
     SceneLoader,
     Source,
 )
 
 __all__ = [
     "BaseSceneLoader",
-    "IngestOutput",
-    "MapContext",
+    "BaseSceneLoaderConfig",
+    "BlockSplitSupport",
+    "IngestedData",
+    "MapBinding",
     "ProcessableLoader",
+    "ProcessedSceneData",
     "SceneLoader",
     "Source",
 ]

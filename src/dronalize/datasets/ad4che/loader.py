@@ -7,20 +7,21 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config import LoaderConfig
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.ad4che.map.builder import AD4CHEMapBuilder
 from dronalize.datasets.common import utils
 from dronalize.datasets.common.levelx_loader import LevelXDataLoader
-from dronalize.loading import Source
+from dronalize.loading.loader import Source
 from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.maps import MapResolver
+    from dronalize.config.split import SplitRequest
     from dronalize.maps.graph import MapGraph
+    from dronalize.maps.resolver import MapResolver
     from dronalize.scene import Scene, SceneSchema
 
 
@@ -33,6 +34,7 @@ class AD4CHELoader(LevelXDataLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
         """Initialize the trajectory data loader for the AD4CHE dataset.
 
@@ -52,6 +54,7 @@ class AD4CHELoader(LevelXDataLoader):
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
+            split_request=split_request,
         )
 
     @override
@@ -59,7 +62,7 @@ class AD4CHELoader(LevelXDataLoader):
         for recording_id, subdir in self._recordings():
             yield Source(
                 identifier=recording_id,
-                inner=subdir,
+                data=subdir,
                 map_key=f"{subdir.name}/{recording_id:02d}_laneWidthColorAndID.png",
             )
 
@@ -136,7 +139,7 @@ class AD4CHELoader(LevelXDataLoader):
         def _resolver(scene: Scene) -> MapGraph | None:
             if scene.map_key is None:
                 return None
-            path = self._data_dir / scene.map_key
+            path = self._data_root / scene.map_key
             map_graph = AD4CHEMapBuilder(path).build(
                 self.map_config.min_distance,
                 self.map_config.interp_distance,
@@ -147,7 +150,7 @@ class AD4CHELoader(LevelXDataLoader):
 
     def _recordings(self) -> Iterable[tuple[int, Path]]:
         """Yield discovered recording identifiers with their directories and metadata files."""
-        for subdir in sorted(path for path in self._data_dir.iterdir() if path.is_dir()):
+        for subdir in sorted(path for path in self._data_root.iterdir() if path.is_dir()):
             # subdir is on format DJI_XXXX
             number_str = subdir.name.split("_")[-1]
             yield int(number_str), subdir

@@ -6,17 +6,25 @@ import pytest
 from pydantic import ValidationError
 
 from dronalize.categories import AgentCategory
-from dronalize.config import Config, ConfigOverrides, load_config_overrides, resolve_runtime_config
-from dronalize.config.filtering import FilteringConfig
-from dronalize.config.loader import LoaderConfig
-from dronalize.config.map import (
+from dronalize.config import (
+    BySceneSplit,
+    Config,
+    ConfigOverrides,
+    FilteringConfig,
+    LoaderConfig,
     MapConfig,
+    SplitConfig,
+    SplitWeights,
+    WriterConfig,
+    load_config_overrides,
+    resolve_runtime_config,
+)
+from dronalize.config.map import (
     NoneExtraction,
     RadialExtraction,
     RectangularExtraction,
     SquareExtraction,
 )
-from dronalize.config.writer import WriterConfig
 from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.scene import (
     CANONICAL_V1,
@@ -317,6 +325,29 @@ def test_resolve_runtime_config_merges_writer_overrides() -> None:
     assert resolved.writer.offset_positions is True
 
 
+def test_resolve_runtime_config_merges_split_overrides() -> None:
+    """Split overrides should validate and merge through the top-level config model."""
+    default = Config(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1),
+        map=MapConfig.default(),
+    )
+
+    resolved = resolve_runtime_config(
+        default=default,
+        overrides={
+            "split": {
+                "strategy": {"type": "by_scene"},
+                "weights": {"train": 0.7, "val": 0.2, "test": 0.1},
+            }
+        },
+    )
+
+    assert resolved.split == SplitConfig(
+        strategy=BySceneSplit(),
+        weights=SplitWeights(train=0.7, val=0.2, test=0.1),
+    )
+
+
 def test_load_config_overrides_merges_global_section_into_each_dataset(tmp_path: Path) -> None:
     """Global config blocks should be merged into every dataset-specific override block."""
     config_path = tmp_path / "config.toml"
@@ -344,6 +375,31 @@ chunksize = 8
     assert overrides.for_dataset("a43") == {"execution": {"workers": 4, "parallel": True}}
     assert overrides.for_dataset("waymo") == {"execution": {"workers": 4, "chunksize": 8}}
     assert overrides.for_dataset("nuscenes") == {}
+
+
+def test_load_config_overrides_merges_global_split_section(tmp_path: Path) -> None:
+    """Global split settings should merge into each dataset-specific override block."""
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """[global.split.weights]
+train = 0.7
+val = 0.2
+test = 0.1
+
+[waymo.split.strategy]
+type = "by_scene"
+""",
+        encoding="utf-8",
+    )
+
+    overrides = load_config_overrides(config_path)
+
+    assert overrides.for_dataset("waymo") == {
+        "split": {
+            "weights": {"train": 0.7, "val": 0.2, "test": 0.1},
+            "strategy": {"type": "by_scene"},
+        }
+    }
 
 
 def test_square_extraction_valid() -> None:

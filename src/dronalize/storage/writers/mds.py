@@ -131,7 +131,7 @@ class MDSSceneWriter(SceneWriter):
             )
             final_dir = split_dir if not parallel else split_dir / str(group_name)
             writers[split] = MDSWriter(
-                out=str(final_dir),
+                out=final_dir.as_posix(),
                 columns=_mds_columns(config.precision),
                 compression=config.mds.compression,
                 hashes=list(config.mds.hashes) if config.mds.hashes is not None else None,
@@ -145,7 +145,6 @@ class MDSSceneWriter(SceneWriter):
     def write(
         self,
         scene: Scene,
-        split: DatasetSplit | None = None,
     ) -> bool:
         if self._writers is None:
             self._writers = self._init_writers(
@@ -158,25 +157,15 @@ class MDSSceneWriter(SceneWriter):
             )
 
         np_dtype = self._config.float_dtype
-        effective_split = (
-            split
-            if split is not None
-            else scene.split_assignment
-            if self._splits is not None
-            else None
-        )
-        if effective_split not in self._writers:
+        split: DatasetSplit | None = scene.split_assignment
+        if split not in self._writers:
             msg = (
-                f"Scene {scene.number} belongs to split {effective_split}, "
+                f"Scene {scene.number} belongs to split {split}, "
                 "but no writer is configured for this split."
             )
             raise ConfigurationError(msg)
 
-        scene = (
-            scene.override_split_assignment(effective_split)
-            if effective_split is not None
-            else scene
-        )
+        scene = scene.override_split_assignment(split) if split is not None else scene
         scene_sample = scene_to_numpy_dict(
             scene,
             dtype=np_dtype,
@@ -190,7 +179,7 @@ class MDSSceneWriter(SceneWriter):
             return_empty=True,
         )
 
-        self._writers[effective_split].write({
+        self._writers[split].write({
             "scene_number": int(scene_sample["scene_number"]),
             "input_len": scene.input_len,
             "output_len": scene.output_len,

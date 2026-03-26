@@ -11,7 +11,7 @@ import pytest
 pl = pytest.importorskip("polars")
 
 from dronalize.config import LoaderConfig, WriterConfig
-from dronalize.maps.graph import MapGraph
+from dronalize.maps import MapGraph
 from dronalize.scene import CANONICAL_V1, Scene
 
 pytest.importorskip("torch")

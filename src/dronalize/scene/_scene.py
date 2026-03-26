@@ -16,8 +16,9 @@ if TYPE_CHECKING:
 
 
 MapKey = str | None
-"""Lightweight map identifier stored on each scene."""
+"""Stable identifier for the map associated with a scene."""
 MapResolver = Callable[["Scene"], MapGraph | None]
+"""Callable that materializes a map graph for a scene when needed."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -33,13 +34,13 @@ class Scene:
     output_len: int
     """Number of predicted frames."""
     schema: SceneSchema
-    """Schema describing the current `inner` dataframe layout."""
+    """Schema describing which fields this scene currently provides."""
     sample_time: float | None = None
     """Time interval between frames in seconds."""
     map_key: MapKey = None
-    """Lightweight map identifier for the scene."""
+    """Stable map identifier for the scene, if one exists."""
     map_resolver: MapResolver | None = field(default=None, compare=False, repr=False)
-    """Resolver attached by the loader that produced this scene."""
+    """Resolver attached by the loader to materialize the scene map on demand."""
     split_assignment: DatasetSplit | None = None
     """Split assignment for this scene (train/val/test)."""
 
@@ -88,13 +89,13 @@ class Scene:
             raise ValueError(msg)
 
     def resolve_map(self) -> MapGraph | None:
-        """Resolve this scene's `map_key` into a `MapGraph`."""
+        """Materialize the map graph associated with this scene, if available."""
         if self.map_resolver is None:
             return None
         return self.map_resolver(self)
 
     def has_map(self) -> bool:
-        """Check if this scene has an attached map resolver."""
+        """Return whether this scene can materialize a map graph."""
         return self.map_resolver is not None
 
     def as_schema(self, schema: SceneSchema = CANONICAL_V1) -> Scene:

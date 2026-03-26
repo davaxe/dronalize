@@ -12,11 +12,46 @@ from rich import print as rprint
 from rich.table import Table
 
 from dronalize.categories import DatasetSplit
+from dronalize.config.split import SplitStrategyName
 from dronalize.storage.formats import OutputFormat
 
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
 # Typer resolves these annotation types at runtime when building the CLI.
-_RUNTIME_OPTION_TYPES = (DatasetSplit, Path)
+_RUNTIME_OPTION_TYPES = (DatasetSplit, Path, SplitStrategyName)
+_DATASET_SPLIT_DISPLAY_ORDER = {
+    DatasetSplit.TRAIN: 0,
+    DatasetSplit.VAL: 1,
+    DatasetSplit.TEST: 2,
+}
+
+
+def _format_split_support(
+    predefined_splits: list[DatasetSplit],
+    supported_split_methods: list[SplitStrategyName],
+    recommended_split_method: SplitStrategyName | None,
+) -> str:
+    """Return a compact summary of native and custom split support."""
+    native = ", ".join(
+        split.value
+        for split in sorted(
+            predefined_splits,
+            key=lambda split: _DATASET_SPLIT_DISPLAY_ORDER.get(
+                split, len(_DATASET_SPLIT_DISPLAY_ORDER)
+            ),
+        )
+    )
+    custom_methods = [
+        f"{method}[yellow]*[/yellow]" if method == recommended_split_method else method
+        for method in supported_split_methods
+    ]
+    custom = ", ".join(custom_methods)
+    if native and custom:
+        return f"{native} [dim]•[/dim] {custom}"
+    if native:
+        return native
+    if custom:
+        return custom
+    return "-"
 
 
 @app.command()
@@ -36,7 +71,7 @@ def process(
         typer.Option(
             "--split",
             "-s",
-            help="The predefined split of the dataset to process.",
+            help="Dataset-defined partition(s) to read, such as train/val/test.",
             show_default=False,
         ),
     ] = None,
@@ -60,7 +95,13 @@ def process(
         int | None,
         typer.Option("--limit", "-l", help="Limit the number of samples to process."),
     ] = None,
-    seed: Annotated[int | None, typer.Option("--seed", help="Random seed.")] = None,
+    seed: Annotated[
+        int | None,
+        typer.Option(
+            "--seed",
+            help="Random seed used by custom split assignment and other randomized operations.",
+        ),
+    ] = None,
     output_format: Annotated[
         OutputFormat,
         typer.Option("--output-format", help="Output format for processed data."),
@@ -69,9 +110,39 @@ def process(
         str | None,
         typer.Option("--scene-schema", help="Scene schema to persist in writer output."),
     ] = None,
-    custom_split: Annotated[
+    split_method: Annotated[
+        SplitStrategyName | None,
+        typer.Option(
+            "--split-method",
+            help=(
+                "Loader-side split strategy. Use 'auto' to pick the recommended "
+                "method when the loader exposes one."
+            ),
+        ),
+    ] = None,
+    split_weights: Annotated[
         tuple[float, float, float] | None,
-        typer.Option("--custom-split", help="Custom split ratios for train/val/test splits."),
+        typer.Option(
+            "--split-weights",
+            help="Custom train/val/test weights used by loader-side split assignment.",
+        ),
+    ] = None,
+    split_gap: Annotated[
+        int | None,
+        typer.Option(
+            "--split-gap",
+            help="Gap inserted between time-block or shuffled time-block partitions.",
+        ),
+    ] = None,
+    split_n_segments: Annotated[
+        int | None,
+        typer.Option(
+            "--split-n-segments",
+            help=(
+                "Number of contiguous temporal segments used by the "
+                "'shuffled_time_blocks' split strategy."
+            ),
+        ),
     ] = None,
     force: Annotated[
         bool,
@@ -86,25 +157,31 @@ def process(
         input_dir=input_dir,
         output_dir=output_dir,
         split=split,
-        config_path=config,
         jobs=jobs,
         limit=limit,
-        custom_split=custom_split,
         seed=seed,
         output_format=output_format,
         scene_schema=scene_schema,
+        split_method=split_method,
+        split_weights=split_weights,
+        split_gap=split_gap,
+        split_n_segments=split_n_segments,
+        config_path=config,
     )
 
     if not force:
         summary = job.summary()
-        table = Table(title=summary.title, show_header=False, box=box.ROUNDED)
+        table = Table(
+            title=summary.title,
+            show_header=False,
+            box=box.MINIMAL_DOUBLE_HEAD,
+            title_justify="left",
+        )
         table.add_column(style="cyan", justify="left", no_wrap=True)
         table.add_column(style="magenta")
-
         for label, value in summary.rows:
             table.add_row(label, value)
-
-        rprint(table)
+        rprint("\n", table)
         _ = typer.confirm("Proceed with this processing plan?", abort=True)
 
     from dronalize.cli.progress import run_with_rich_progress
@@ -127,16 +204,24 @@ def available(
 
     table = Table(
         title="Available Datasets",
+        box=box.MINIMAL_DOUBLE_HEAD,
         show_edge=True,
         show_lines=False,
-        style="white bold",
+        header_style="bold",  # Applied bold exclusively to headers
+        row_styles=["", "dim"],
     )
-    table.add_column("Dataset Name", style="cyan", no_wrap=True)
+    table.add_column("Dataset", style="cyan", no_wrap=True)
     if details:
-        table.add_column("Horizon (In/Out)", style="magenta")
-        table.add_column("Sample Frequency", justify="left", style="yellow")
-        table.add_column("Map", style="green", justify="center")
-        table.add_column("Predefined splits", style="blue")
+        table.caption = (
+            " Native splits are listed first, followed by custom strategies.\n"
+            " [yellow]*[/yellow] marks the recommended custom strategy."
+        )
+        table.caption_justify = "left"
+        table.caption_style = "dim"
+
+        table.add_column("Window @ Hz", justify="right", style="magenta", no_wrap=True)
+        table.add_column("Map", justify="center")
+        table.add_column("Split Support", style="blue")
 
     for dataset in available_datasets():
         descriptor = get(dataset)
@@ -145,16 +230,22 @@ def available(
             continue
 
         cfg = descriptor.default_config
-        horizon = f"{cfg.input_len:>3} / {cfg.output_len:<3}"
-        sample_frequency = f"{1 / cfg.sample_time:>3.1f} Hz"
+        input_len_padded = f"{cfg.input_len:>2}"
+        output_len_padded = f"{cfg.output_len:<3}"
+        freq_padded = f"{1 / cfg.sample_time:>4.1f}"
+        window = f"{input_len_padded}/{output_len_padded} @ {freq_padded}Hz"
         has_map = "[green]✓[/green]" if descriptor.has_map else "[red]✗[/red]"
-        splits_display = (
-            ", ".join(split.name.lower() for split in sorted(descriptor.predefined_splits))
-            if descriptor.predefined_splits
-            else "-"
+        split_support = _format_split_support(
+            descriptor.predefined_splits,
+            descriptor.supported_split_methods,
+            descriptor.recommended_split_method,
         )
-        table.add_row(descriptor.name, horizon, sample_frequency, has_map, splits_display)
-
+        table.add_row(
+            descriptor.name,
+            window,
+            has_map,
+            split_support,
+        )
     rprint("\n", table)
 
 

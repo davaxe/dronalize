@@ -6,7 +6,7 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dronalize.execution.common import Progress
+    from dronalize.execution.executor import Progress
     from dronalize.execution.runner import (
         DatasetJob,
         DatasetRun,
@@ -26,7 +26,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "DatasetJob": ("dronalize.execution.runner", "DatasetJob"),
     "DatasetRun": ("dronalize.execution.runner", "DatasetRun"),
     "ProcessingSummary": ("dronalize.execution.runner", "ProcessingSummary"),
-    "Progress": ("dronalize.execution.common", "Progress"),
+    "Progress": ("dronalize.execution.executor", "Progress"),
     "prepare_dataset": ("dronalize.execution.runner", "prepare_dataset"),
 }
 

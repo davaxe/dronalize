@@ -6,7 +6,6 @@ from dronalize.datasets.ind.map.builder import InDMapBuilder
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "ind",
     InDLoader,
-    InDLoader,
     execution_scope_fn=_scope.ind_execution_scope,
     has_map=True,
 )

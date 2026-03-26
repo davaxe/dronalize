@@ -16,7 +16,8 @@ from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config import LoaderConfig
+    from dronalize.config.loader import LoaderConfig
+    from dronalize.config.split import SplitRequest
     from dronalize.maps.graph import MapGraph
     from dronalize.maps.resolver import MapResolver
     from dronalize.scene import Scene, SceneSchema
@@ -31,15 +32,16 @@ class HighDLoader(LevelXDataLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
-        """Initialize the trajectory data loader for the highD dataset.
+        """Initialize the highD loader.
 
         Parameters
         ----------
-        data_root : Path
-            Path to the root directory of the highD dataset, which should contain a "data"
-        loader_config : , optional
-            Loader configuration. If None, the default configuration is used.
+        data_root : Path or str
+            Root directory of the extracted highD dataset.
+        loader_config : LoaderConfig, optional
+            Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Dataset split selection. This dataset does not define predefined
             splits, so `None` processes all sources.
@@ -50,6 +52,7 @@ class HighDLoader(LevelXDataLoader):
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
+            split_request=split_request,
         )
 
     @staticmethod

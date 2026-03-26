@@ -93,6 +93,9 @@ ignore = [
 ]
 pydocstyle = { convention = "numpy" }
 
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
 [tool.ruff.format]
 quote-style = "double"
 

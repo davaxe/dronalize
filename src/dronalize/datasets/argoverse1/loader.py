@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
@@ -10,22 +10,24 @@ from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
 from dronalize.datasets.common import utils
-from dronalize.loading import BaseSceneLoader
-from dronalize.loading.loader import IngestOutput, Source
-from dronalize.maps import no_map
-from dronalize.maps.resolver import MapResolver, shared_map
-from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, MapBinding, Source
+from dronalize.maps.resolver import MapResolver, no_map, shared_map
 from dronalize.scene import POSITIONS_ONLY_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.pipeline.pipeline import Pipeline
+    from dronalize.config.split import SplitRequest
     from dronalize.scene import SceneSchema
 
 
 class Argoverse1Loader(BaseSceneLoader[list[Path]]):
     """Loader for Argoverse 1 trajectory data stored in CSV format."""
+
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        scene_split_enabled=True,
+    )
 
     def __init__(
         self,
@@ -33,32 +35,35 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
         *,
         file_batch_size: int | None = 10,
     ) -> None:
-        """Initialize the dataset loader.
+        """Initialize the Argoverse 1 loader.
 
         Parameters
         ----------
         data_root : Path or str
-            Path to the root directory of the Argoverse 1 dataset.
-            This directory should contain the `forecasting_train_v1.1/`,
-            `forecasting_val_v1.1/`, and `forecasting_test_v1.1/`
-            subdirectories.
+            Root directory of the Argoverse 1 forecasting dataset. It should
+            contain `forecasting_train_v1.1/`, `forecasting_val_v1.1/`, and
+            `forecasting_test_v1.1/`.
         file_batch_size : int, optional
             Number of files to read in each batch. If None, all files will be
-            read at once. Higher batch size may lead to faster processing at
-            diminishing returns, but also higher memory usage. `None` is not
-            recommended for large amounts of data.
+            read at once. Larger batches can improve throughput at the cost of
+            higher memory usage. `None` is usually only reasonable for small
+            datasets.
         loader_config : LoaderConfig, optional
-            Loader configuration override. If None, the default configuration
-            will be used.
+            Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. Can contain one or more predefined splits,
-            or `None` to process all sources.
-
+            Optional selection of predefined dataset splits. `None` processes
+            all available sources.
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
         self._data_root: Path = Path(data_root)
         self._batch_size: int | None = file_batch_size
         self._train_dir: Path = self._data_root / "forecasting_train_v1.1" / "train" / "data"
@@ -79,10 +84,10 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         return self._sources_from_dir(self._test_dir)
 
     @override
-    def ingest(self, source: Source[list[Path]]) -> Iterable[IngestOutput]:
+    def ingest(self, source: Source[list[Path]]) -> Iterable[IngestedData]:
         batch_lf = (
             pl
-            .scan_csv(source.inner, include_file_paths="file_id", schema=_SCHEMA)
+            .scan_csv(source.data, include_file_paths="file_id", schema=_SCHEMA)
             .with_columns(
                 pl
                 .when(pl.col("OBJECT_TYPE") == "AV")
@@ -111,16 +116,15 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
 
         for _, group in batch_lf.collect().group_by(["file_id"]):
             map_key = str(group["map"].first())
-            yield group.lazy().drop("file_id"), map_key
+            yield IngestedData(
+                frame=group.drop("file_id").lazy(),
+                map_binding=MapBinding(key=map_key),
+            )
 
     @override
     def num_sources(self) -> int | None:
         splits = self.splits if self.splits is not None else self.predefined_splits()
         return sum(self._count_sources_for_split(split) for split in splits)
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override
@@ -152,7 +156,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         batch_size: int = self._batch_size or len(files) or 1
         for start in range(0, len(files), batch_size):
             batch_files = files[start : start + batch_size]
-            yield Source(identifier=start, inner=batch_files)
+            yield Source(identifier=start, data=batch_files)
 
     def _count_sources(self, data_dir: Path) -> int:
         if not data_dir.is_dir():

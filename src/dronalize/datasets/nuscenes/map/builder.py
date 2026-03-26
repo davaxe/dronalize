@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, TypedDict
 from typing_extensions import Self, override
 
 from dronalize.datasets.nuscenes.map import parser
-from dronalize.maps import BaseMapBuilder
+from dronalize.maps.builder import BaseMapBuilder
 from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    from dronalize.maps import Point
+    from dronalize.maps.builder import Point
 
 
 class NuScenesMapBuilder(BaseMapBuilder):

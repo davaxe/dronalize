@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
@@ -9,9 +9,8 @@ from typing_extensions import override
 from dronalize.categories import AgentCategory, DatasetSplit
 from dronalize.config.loader import LoaderConfig
 from dronalize.exceptions import SplitNotSupportedError
-from dronalize.loading import BaseSceneLoader
-from dronalize.loading.loader import IngestOutput, Source
-from dronalize.pipeline.factories import trajectory_pipeline
+from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
+from dronalize.loading.loader import IngestedData, Source
 from dronalize.pipeline.functional.resample import ResampleSpec
 from dronalize.scene import POSITIONS_YAW_V1
 
@@ -19,12 +18,16 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.config.map import MapConfig
-    from dronalize.pipeline.pipeline import Pipeline
+    from dronalize.config.split import SplitRequest
     from dronalize.scene import SceneSchema
 
 
 class ApolloScapeLoader(BaseSceneLoader[Path]):
     """Loader for the ApolloScape dataset."""
+
+    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
+        source_split_enabled=True,
+    )
 
     def __init__(
         self,
@@ -32,36 +35,30 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitRequest | None = None,
     ) -> None:
-        """Initialize the loader with the given data directory and loader configuration.
+        """Initialize the ApolloScape loader.
 
-        Each split subdirectory should contain the actual .txt datafiles stored
-        in CSV-like format, with the following columns (in order):
-        - frame: The frame number of the trajectory point.
-        - id: The unique identifier for the agent.
-        - agent_category: The category of the agent, encoded as an integer.
-        - x: The x-coordinate of the agent's position.
-        - y: The y-coordinate of the agent's position.
-        - z: The z-coordinate of the agent's position.
-        - length: The length of the agent.
-        - width: The width of the agent.
-        - height: The height of the agent.
-        - yaw: The yaw angle of the agent in radians.
+        The raw split directories contain space-separated text files with the
+        trajectory columns defined in `_DATA_SCHEMA`.
 
         Parameters
         ----------
         data_root : Path or str
-            The root directory of the ApolloScape dataset.  This directory
-            should contain `prediction_train/`, `prediction_test/`,
-            and `val_split/` subdirectories.
+            Root directory of the ApolloScape dataset. It should contain
+            `prediction_train/`, `prediction_test/`, and `val_split/`.
         loader_config : LoaderConfig, optional
             Configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. Can contain one or more predefined splits,
-            or `None` to process all sources.
-
+            Optional selection of predefined dataset splits. `None` processes
+            all available sources.
         """
-        super().__init__(loader_config=loader_config, map_config=map_config, splits=splits)
+        super().__init__(
+            loader_config=loader_config,
+            map_config=map_config,
+            splits=splits,
+            split_request=split_request,
+        )
         self._data_root: Path = Path(data_root)
 
     @classmethod
@@ -74,7 +71,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         if not data_dir.is_dir():
             return
         for data_file in sorted(data_dir.glob("*.txt")):
-            yield Source(identifier=data_file.stem, inner=data_file)
+            yield Source(identifier=data_file.stem, data=data_file)
 
     @override
     def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Path]]:
@@ -85,10 +82,10 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         raise SplitNotSupportedError(type(self).__name__, split)
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestOutput]:
-        yield (
+    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
+        yield IngestedData(
             pl.scan_csv(
-                source.inner,
+                source.data,
                 has_header=False,
                 schema=_DATA_SCHEMA,
                 separator=" ",
@@ -111,10 +108,6 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
             self.splits if self.splits is not None else self.predefined_splits()
         )
         return sum(self._count_sources_for_split(split) for split in splits)
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return trajectory_pipeline(self.loader_config)
 
     @classmethod
     @override

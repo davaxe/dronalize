@@ -13,12 +13,15 @@ else:
 
 from pydantic import BaseModel, Field, RootModel
 
-from dronalize.config.loader import LoaderConfig  # noqa: TC001
+from dronalize.config.loader import LoaderConfig
 from dronalize.config.map import MapConfig
+from dronalize.config.split import SplitConfig
 from dronalize.config.writer import WriterConfig
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from dronalize.config.writer import SceneSchemaLike
 
 TModel = TypeVar("TModel", bound=BaseModel)
 ConfigOverride = dict[str, object]
@@ -28,8 +31,22 @@ class ExecutionConfig(BaseModel):
     """Pydantic model for execution configuration defaults."""
 
     parallel: bool = False
-    workers: int = Field(default_factory=lambda: max(1, mp.cpu_count() - 1))
+    workers: int | None = Field(default_factory=lambda: max(1, mp.cpu_count() - 1))
     chunksize: int | None = None
+
+    def with_jobs(self, jobs: int) -> ExecutionConfig:
+        """Return a copy with a runtime worker override applied."""
+        if jobs == -1:
+            return self.model_copy(update={"parallel": True, "workers": None})
+        if jobs < 1:
+            msg = "jobs must be at least 1."
+            raise ValueError(msg)
+        return self.model_copy(
+            update={
+                "parallel": jobs > 1,
+                "workers": jobs,
+            }
+        )
 
 
 class Config(BaseModel):
@@ -37,8 +54,21 @@ class Config(BaseModel):
 
     loader: LoaderConfig
     map: MapConfig = Field(default_factory=MapConfig.default)
+    split: SplitConfig = Field(default_factory=SplitConfig)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
     writer: WriterConfig = Field(default_factory=WriterConfig)
+
+    def with_scene_schema(self, scene_schema: SceneSchemaLike | None) -> Config:
+        """Return a copy with a writer scene-schema override applied."""
+        if scene_schema is None:
+            return self
+        return self.model_copy(update={"writer": self.writer.with_scene_schema(scene_schema)})
+
+    def with_jobs(self, jobs: int | None) -> Config:
+        """Return a copy with runtime execution overrides applied."""
+        if jobs is None:
+            return self
+        return self.model_copy(update={"execution": self.execution.with_jobs(jobs)})
 
 
 class _ConfigOverrideFile(RootModel[dict[str, ConfigOverride]]):
@@ -126,3 +156,20 @@ def _deep_merge(base: Mapping[str, Any], overrides: Mapping[str, Any]) -> Config
         else:
             merged[key] = value
     return merged
+
+
+if __name__ == "__main__":
+    from pathlib import Path
+
+    import rich
+
+    base = LoaderConfig(input_len=10, output_len=20, sample_time=0.1)
+    path = Path("config.toml")
+    overrides = load_config_overrides(path)
+    dataset_name = "a43"
+    config = resolve_runtime_config(
+        default=Config(loader=base),
+        overrides=overrides.for_dataset(dataset_name),
+    )
+
+    rich.print(config)

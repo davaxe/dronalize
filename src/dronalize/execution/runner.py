@@ -6,24 +6,23 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import dronalize.exceptions as dronalize_exceptions
-import dronalize.execution.common as ex_common
 from dronalize.config.config import Config, load_config_overrides, resolve_runtime_config
+from dronalize.config.split import NativeSplit, Unsplit
 from dronalize.datasets import DatasetDescriptor, get
-from dronalize.execution.assigner import ConstantAssigner, StatelessWeightedAssigner
 from dronalize.execution.parallel.executor import ParallelExecutor
 from dronalize.execution.sequential import SequentialExecutor
 from dronalize.storage.formats import OutputFormat
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Sequence
+    from collections.abc import Generator, Iterable, Sequence
     from pathlib import Path
 
     from dronalize.categories import DatasetSplit
     from dronalize.config.loader import LoaderConfig
+    from dronalize.config.split import SplitRequest, SplitStrategyName
     from dronalize.config.writer import SceneSchemaLike, WriterConfig
-    from dronalize.execution.assigner import SplitAssigner
     from dronalize.execution.executor import ObservableWritingExecutor, WriterFactory
-    from dronalize.loading import BaseSceneLoader
+    from dronalize.loading.base import BaseSceneLoader
     from dronalize.scene import SceneSchema
 
 
@@ -44,7 +43,7 @@ class DatasetJob:
     output_dir: Path
     output_format: OutputFormat
     config: Config
-    split_plan: ex_common.SplitPlan
+    split_request: SplitRequest
     limit: int | None
     seed: int | None
 
@@ -53,31 +52,13 @@ class DatasetJob:
         """Return whether this planned run should execute in parallel."""
         return self.config.execution.parallel
 
-    def loader_splits(self) -> list[DatasetSplit] | None:
+    def loader_splits(self) -> tuple[DatasetSplit, ...] | None:
         """Resolve which predefined splits, if any, the loader should read."""
-        return self.split_plan.loader_splits(self.descriptor.predefined_splits)
+        return self.split_request.loader_splits()
 
-    def writer_splits(self) -> list[DatasetSplit] | None:
+    def writer_splits(self) -> tuple[DatasetSplit, ...] | None:
         """Resolve which split directories, if any, the writer should create."""
-        return self.split_plan.writer_splits()
-
-    def split_assigner(self) -> SplitAssigner | None:
-        """Build a split assigner for modes that derive splits during writing."""
-        groups = self.writer_splits()
-        if groups is None or len(groups) == 0:
-            return None
-
-        if self.split_plan.custom_weights is not None:
-            return StatelessWeightedAssigner(
-                groups=groups,
-                weights=self.split_plan.weights(),
-                seed=self.seed,
-            )
-
-        if len(self.descriptor.predefined_splits) == 0 and len(groups) == 1:
-            return ConstantAssigner(groups[0])
-
-        return None
+        return self.split_request.writer_splits()
 
     def build_loader(self) -> BaseSceneLoader[object]:
         """Instantiate the dataset loader for this job."""
@@ -86,6 +67,7 @@ class DatasetJob:
             loader_config=self.config.loader,
             map_config=self.config.map,
             splits=self.loader_splits(),
+            split_request=self.split_request,
             output_schema=self.config.writer.scene_schema,
         )
 
@@ -119,7 +101,6 @@ class DatasetJob:
     def summary(self) -> ProcessingSummary:
         """Return a display-ready summary of this prepared job."""
         loader, writer = self.config.loader, self.config.writer
-        splits = self.descriptor.predefined_splits
 
         raw_rows = [
             ("Dataset", self.descriptor.name),
@@ -127,17 +108,16 @@ class DatasetJob:
             ("Output directory", str(self.output_dir)),
             ("Output format", self.output_format.value),
             ("Scene schema", f"{writer.scene_schema.name} ({writer.feature_dim} features)"),
-            (
-                "Horizon (in/out)",
-                f"{loader.resampled_input_len} / {loader.resampled_output_len} frames",
-            ),
-            ("Sample rate", f"{1 / loader.post_sample_time:.1f} Hz"),
+            ("Window @ Hz", self._window_summary(loader)),
             ("Execution", self._execution_summary()),
-            ("Available splits", self._format_splits(splits)) if splits else None,
-            ("Read splits", self._loader_split_summary()),
-            ("Write outputs", self._writer_split_summary()),
+            *self._split_summary_rows(),
             ("Source limit", str(self.limit)) if self.limit is not None else None,
-            ("Random seed", str(self.seed)) if self.seed is not None else None,
+            (
+                "Random seed",
+                str(seed),
+            )
+            if (seed := self._effective_random_seed()) is not None
+            else None,
         ]
 
         return ProcessingSummary(
@@ -149,22 +129,40 @@ class DatasetJob:
         if not self.parallel:
             return "sequential"
         workers = self.config.execution.workers
+        if workers is None:
+            return "parallel (auto workers)"
         return f"parallel ({workers} worker{'s' if workers != 1 else ''})"
 
-    def _loader_split_summary(self) -> str:
-        return self._format_splits(s) if (s := self.loader_splits()) else "all available data"
+    @staticmethod
+    def _window_summary(loader: LoaderConfig) -> str:
+        return (
+            f"{loader.resampled_input_len}/{loader.resampled_output_len}"
+            f" @ {1 / loader.post_sample_time:.1f} Hz"
+        )
 
-    def _writer_split_summary(self) -> str:
-        if self.split_plan.custom_weights is not None:
-            return self._format_weighted_splits(self.split_plan.active_custom_groups())
-        return self._format_splits(s) if (s := self.writer_splits()) else "single output directory"
+    def _split_summary_rows(self) -> tuple[tuple[str, str], ...]:
+        if isinstance(self.split_request.strategy, NativeSplit):
+            splits = self.loader_splits()
+            return (("Native splits", self._format_splits(splits)),) if splits else ()
+        if not isinstance(self.split_request.strategy, Unsplit):
+            return (
+                ("Split assignment", self.split_request.method.replace("_", " ")),
+                (
+                    "Output splits",
+                    self._format_weighted_splits(self.split_request.active()),
+                ),
+            )
+        return ()
+
+    def _effective_random_seed(self) -> int | None:
+        return self.split_request.seed
 
     @staticmethod
-    def _format_splits(splits: list[DatasetSplit]) -> str:
+    def _format_splits(splits: Iterable[DatasetSplit]) -> str:
         return ", ".join(split.value for split in splits)
 
     @staticmethod
-    def _format_weighted_splits(groups: list[tuple[DatasetSplit, float]]) -> str:
+    def _format_weighted_splits(groups: Iterable[tuple[DatasetSplit, float]]) -> str:
         total_weight = sum(weight for _, weight in groups)
         if total_weight <= 0:
             return "single output directory"
@@ -193,7 +191,6 @@ class DatasetRun:
     job: DatasetJob
     executor: ObservableWritingExecutor
     _writer_factory: WriterFactory | None = field(default=None, init=False, repr=False)
-    _split_assigner: SplitAssigner | None = field(default=None, init=False, repr=False)
 
     def summary(self) -> ProcessingSummary:
         """Return the display-ready summary for the backing job."""
@@ -203,13 +200,8 @@ class DatasetRun:
         """Execute the active run."""
         if self._writer_factory is None:
             self._writer_factory = self.job.build_writer_factory()
-        if self._split_assigner is None:
-            self._split_assigner = self.job.split_assigner()
 
-        self.executor.execute(
-            writer_factory=self._writer_factory,
-            split_assigner=self._split_assigner,
-        )
+        self.executor.execute(writer_factory=self._writer_factory)
 
 
 def prepare_dataset(
@@ -217,33 +209,34 @@ def prepare_dataset(
     dataset: str,
     input_dir: Path,
     output_dir: Path,
-    split: ex_common.SplitType | Sequence[ex_common.SplitType] | None = None,
     output_format: str = "mds",
     scene_schema: SceneSchemaLike | None = None,
     config_path: Path | None = None,
     jobs: int | None = None,
     limit: int | None = None,
-    custom_split: tuple[float, float, float] | None = None,
+    split: Sequence[DatasetSplit | str] | DatasetSplit | str | None = None,
+    split_method: SplitStrategyName | None = None,
+    split_weights: tuple[float, float, float] | None = None,
+    split_gap: int | None = None,
+    split_n_segments: int | None = None,
     seed: int | None = None,
 ) -> DatasetJob:
     """Resolve user-facing options into a reusable processing job."""
     if not input_dir.exists():
         msg = f"Input directory {input_dir} does not exist."
         raise FileNotFoundError(msg)
-
-    split_plan = ex_common.resolve_split_plan(split, custom_split)
     descriptor = get(dataset)
-    ex_common.validate_split_plan(
-        split_plan,
-        dataset_name=descriptor.name,
-        predefined_splits=descriptor.predefined_splits,
-    )
 
     config = _resolve_job_config(
         descriptor,
         config_path=config_path,
         scene_schema=scene_schema,
         jobs=jobs,
+        split=split,
+        split_method=split_method,
+        split_weights=split_weights,
+        split_gap=split_gap,
+        split_n_segments=split_n_segments,
     )
 
     return DatasetJob(
@@ -252,7 +245,7 @@ def prepare_dataset(
         output_dir=output_dir,
         output_format=_resolve_output_format(output_format),
         config=config,
-        split_plan=split_plan,
+        split_request=config.split.request(seed),
         limit=limit,
         seed=seed,
     )
@@ -264,38 +257,38 @@ def _resolve_job_config(
     config_path: Path | None,
     scene_schema: SceneSchemaLike | None,
     jobs: int | None,
+    split: Sequence[DatasetSplit | str] | DatasetSplit | str | None,
+    split_method: SplitStrategyName | None,
+    split_weights: tuple[float, float, float] | None,
+    split_gap: int | None,
+    split_n_segments: int | None,
 ) -> Config:
-    config_overrides: dict[str, object] = {}
-    if config_path is not None:
-        config_overrides = load_config_overrides(config_path).for_dataset(descriptor.name)
+    config = resolve_runtime_config(
+        default=Config(loader=descriptor.default_config, map=descriptor.default_map_config),
+        overrides=_load_dataset_overrides(config_path, dataset_name=descriptor.name),
+    )
+    config.split = config.split.resolve_runtime_input(
+        split=split,
+        split_strategy_name=split_method,
+        split_weights=split_weights,
+        split_gap=split_gap,
+        split_n_segments=split_n_segments,
+        dataset_name=descriptor.name,
+        predefined_splits=descriptor.predefined_splits,
+        supported_split_methods=descriptor.supported_split_methods,
+        recommended_split_method=descriptor.recommended_split_method,
+    )
+    return config.with_scene_schema(scene_schema).with_jobs(jobs)
 
-    default_config = Config(loader=descriptor.default_config, map=descriptor.default_map_config)
-    config = resolve_runtime_config(default=default_config, overrides=config_overrides)
 
-    if scene_schema is not None:
-        writer_config = type(config.writer).model_validate({
-            **config.writer.model_dump(),
-            "scene_schema": scene_schema,
-        })
-        config = config.model_copy(update={"writer": writer_config})
-
-    if jobs is not None:
-        parallel = jobs > 1
-        if jobs == -1:
-            jobs = None
-            parallel = True
-        elif jobs < 1:
-            msg = "jobs must be at least 1."
-            raise ValueError(msg)
-        config = config.model_copy(
-            update={
-                "execution": config.execution.model_copy(
-                    update={"parallel": parallel, "workers": jobs},
-                ),
-            },
-        )
-
-    return config
+def _load_dataset_overrides(
+    config_path: Path | None,
+    *,
+    dataset_name: str,
+) -> dict[str, object]:
+    if config_path is None:
+        return {}
+    return load_config_overrides(config_path).for_dataset(dataset_name)
 
 
 def _resolve_output_format(output_format: str) -> OutputFormat:
@@ -334,4 +327,4 @@ def _get_writer(
         case OutputFormat.DUMMY:
             from dronalize.storage.writers._dummy import DummyWriter
 
-            return DummyWriter.as_factory(log=False)
+            return DummyWriter.as_factory(log=True)

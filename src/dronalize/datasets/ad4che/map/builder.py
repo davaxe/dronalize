@@ -7,7 +7,8 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from dronalize.maps import BaseMapBuilder, EdgeType
+from dronalize.maps.builder import BaseMapBuilder
+from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:
     from pathlib import Path

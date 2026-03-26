@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from dronalize.datasets.common import utils
-from dronalize.maps import BaseMapBuilder
+from dronalize.maps.builder import BaseMapBuilder
 from dronalize.maps.edge_type import EdgeType
 
 if TYPE_CHECKING:

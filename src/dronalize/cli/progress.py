@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 import rich.progress as rp
 
-from dronalize.categories import DatasetSplit
 from dronalize.execution import prepare_dataset
 
 if TYPE_CHECKING:
@@ -17,8 +16,7 @@ if TYPE_CHECKING:
 
     from rich.progress import Progress as RichProgress
 
-    from dronalize.execution.common import Progress
-    from dronalize.execution.executor import ObservableWritingExecutor
+    from dronalize.execution.executor import ObservableWritingExecutor, Progress
 
 
 def run_with_rich_progress(
@@ -160,14 +158,15 @@ if __name__ == "__main__":
     job = prepare_dataset(
         dataset="hotel",
         input_dir=Path(path) / "ethucy" / "hotel",
-        output_dir=Path("test2"),
-        split=[DatasetSplit.VAL],
+        output_dir=Path("test_output"),
+        split=None,
         output_format="dummy",
         config_path=None,
-        jobs=4,
+        jobs=6,
         limit=None,
-        custom_split=None,
-        seed=42,
+        seed=20,
+        split_method="by_source",
+        split_weights=(0.5, 0.25, 0.25),
     )
     with job.open() as run:
         run_with_rich_progress(run.executor, run.run, enable=True)
