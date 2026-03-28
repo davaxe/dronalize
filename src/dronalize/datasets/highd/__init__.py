@@ -1,6 +1,6 @@
-from dronalize.datasets._registry import DatasetDescriptor
 from dronalize.datasets.highd.loader import HighDLoader
-from dronalize.datasets.highd.map.builder import HighDMapBuilder
+from dronalize.datasets.highd.maps.builder import HighDMapBuilder
+from dronalize.datasets.registry import DatasetDescriptor
 
 DESCRIPTOR = DatasetDescriptor.from_loader("highd", HighDLoader, has_map=True)
 

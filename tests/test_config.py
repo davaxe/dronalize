@@ -5,48 +5,58 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from dronalize.categories import AgentCategory
-from dronalize.config import (
-    BySceneSplit,
-    Config,
-    ConfigOverrides,
-    FilteringConfig,
-    LoaderConfig,
-    MapConfig,
-    SplitConfig,
-    SplitWeights,
-    WriterConfig,
-    load_config_overrides,
-    resolve_runtime_config,
-)
-from dronalize.config.map import (
-    NoneExtraction,
-    RadialExtraction,
-    RectangularExtraction,
-    SquareExtraction,
-)
-from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.scene import (
+from dronalize.core.categories import AgentCategory
+from dronalize.core.scene import (
     CANONICAL_V1,
     POSITIONS_ONLY_V1,
     POSITIONS_VELOCITY_ACCELERATION_V1,
     POSITIONS_VELOCITY_YAW_V1,
 )
+from dronalize.io import WriterConfig
+from dronalize.processing.filters import (
+    AgentFilterRule,
+    CleanupRule,
+    DropAgentCategories,
+    Filter,
+    FilterSpec,
+    MinimumAgents,
+    MinimumAgentSamples,
+    RequireAgentFrames,
+    RequireContiguousSceneFrames,
+    RequireFullAgentWindow,
+    RequireSceneFrames,
+    SceneFilterRule,
+)
+from dronalize.processing.ingest import BySceneSplit, LoaderConfig, SplitConfig, SplitWeights
+from dronalize.processing.maps import (
+    BoundingBoxExtraction,
+    CircularExtraction,
+    FullMapExtraction,
+    MapConfig,
+    RelevantAreaExtraction,
+)
+from dronalize.processing.pipeline.functional.resample import ResampleSpec
+from dronalize.runtime import (
+    Config,
+    ConfigOverrides,
+    load_config_overrides,
+    resolve_runtime_config,
+)
 
 
-def test_radial_extraction_valid() -> None:
-    """Initialize RadialExtraction with a valid radius."""
-    extraction = RadialExtraction(radius=10.5)
+def test_circular_extraction_valid() -> None:
+    """Initialize CircularExtraction with a valid radius."""
+    extraction = CircularExtraction(radius=10.5)
 
-    assert extraction.mode == "radial"
+    assert extraction.mode == "circle"
     assert extraction.radius == pytest.approx(10.5)
 
 
-def test_rectangular_extraction_valid() -> None:
-    """Initialize RectangularExtraction with valid dimensions."""
-    extraction = RectangularExtraction(width=5.0, height=8.0)
+def test_bounding_box_extraction_valid() -> None:
+    """Initialize BoundingBoxExtraction with valid dimensions."""
+    extraction = BoundingBoxExtraction(width=5.0, height=8.0)
 
-    assert extraction.mode == "rectangular"
+    assert extraction.mode == "bounding_box"
     assert extraction.width == pytest.approx(5.0)
     assert extraction.height == pytest.approx(8.0)
 
@@ -58,30 +68,30 @@ def test_map_config_default_initialization() -> None:
     assert config.min_distance == pytest.approx(1.75)
     assert config.interp_distance == pytest.approx(3.0)
     assert config.include_map is True
-    assert isinstance(config.extraction, NoneExtraction)
-    assert config.extraction.mode == "none"
+    assert isinstance(config.extraction, FullMapExtraction)
+    assert config.extraction.mode == "full"
 
 
-def test_map_config_discriminator_radial() -> None:
-    """Parse a dictionary with radial mode to ensure proper union routing."""
+def test_map_config_discriminator_circular() -> None:
+    """Parse a dictionary with circle mode to ensure proper union routing."""
     config_dict = {
         "extraction": {
-            "mode": "radial",
+            "mode": "circle",
             "radius": 15.0,
         }
     }
 
     config = MapConfig.model_validate(config_dict)
 
-    assert isinstance(config.extraction, RadialExtraction)
+    assert isinstance(config.extraction, CircularExtraction)
     assert config.extraction.radius == pytest.approx(15.0)
 
 
-def test_map_config_discriminator_rectangular() -> None:
-    """Parse a dictionary with rectangular mode to ensure proper union routing."""
+def test_map_config_discriminator_bounding_box() -> None:
+    """Parse a dictionary with bounding_box mode to ensure proper union routing."""
     config_dict = {
         "extraction": {
-            "mode": "rectangular",
+            "mode": "bounding_box",
             "width": 20.0,
             "height": 10.0,
         }
@@ -89,7 +99,7 @@ def test_map_config_discriminator_rectangular() -> None:
 
     config = MapConfig.model_validate(config_dict)
 
-    assert isinstance(config.extraction, RectangularExtraction)
+    assert isinstance(config.extraction, BoundingBoxExtraction)
     assert config.extraction.width == pytest.approx(20.0)
     assert config.extraction.height == pytest.approx(10.0)
 
@@ -98,7 +108,7 @@ def test_map_config_missing_discriminator_params() -> None:
     """Raise ValidationError when required parameters for a specific mode are missing."""
     config_dict = {
         "extraction": {
-            "mode": "radial",
+            "mode": "circle",
             # missing "radius"
         }
     }
@@ -132,13 +142,13 @@ def test_map_config_additional_params() -> None:
     """Raise ValidationError when an unsupported extraction mode is provided."""
     config_dict = {
         "extraction": {
-            "mode": "radial",
+            "mode": "circle",
             "radius": 5.0,
             "width": 10.0,
         }
     }
     config = MapConfig.model_validate(config_dict)
-    assert isinstance(config.extraction, RadialExtraction)
+    assert isinstance(config.extraction, CircularExtraction)
     assert config.extraction.radius == pytest.approx(5.0)
     # The extra "width" parameter should be ignored and not cause a validation error
 
@@ -161,96 +171,227 @@ def test_map_config_distance_validation_failure() -> None:
     assert "interp_distance (2.0) must be greater than or equal to min_distance (5.0)" in error_msg
 
 
-def test_filtering_config_single_agent_category_string() -> None:
+def test_filters_parse_single_agent_category_string() -> None:
     """Parse a single string into a frozenset of AgentCategory."""
-    config = FilteringConfig.create(exclude_agent_categories="CAR")
+    rule = DropAgentCategories.define(categories="CAR")
 
-    assert config.exclude_agent_categories == frozenset([AgentCategory.CAR])
+    assert rule.categories == frozenset([AgentCategory.CAR])
 
 
-def test_filtering_config_list_agent_category_strings() -> None:
+def test_filters_parse_list_agent_category_strings() -> None:
     """Parse a list of strings into a frozenset of AgentCategory."""
-    config = FilteringConfig.create(exclude_agent_categories=["CAR", "PEDESTRIAN"])
+    rule = DropAgentCategories.define(categories=["CAR", "PEDESTRIAN"])
 
-    assert config.exclude_agent_categories == frozenset([
-        AgentCategory.CAR,
-        AgentCategory.PEDESTRIAN,
-    ])
+    assert rule.categories == frozenset([AgentCategory.CAR, AgentCategory.PEDESTRIAN])
 
 
-def test_filtering_config_existing_enum_member() -> None:
+def test_filters_accept_existing_enum_member() -> None:
     """Accept an existing Enum member directly and coerce it into a frozenset."""
-    config = FilteringConfig.create(exclude_agent_categories=AgentCategory.VAN)
+    rule = DropAgentCategories.define(categories=AgentCategory.VAN)
 
-    assert config.exclude_agent_categories == frozenset([AgentCategory.VAN])
-
-
-def test_filtering_config_invalid_agent_category() -> None:
-    """Raise ValidationError when an invalid agent category string is provided."""
-    with pytest.raises(ValidationError) as exc_info:
-        FilteringConfig.create(exclude_agent_categories=["CAR", "SPACESHIP"])
-
-    error_msg = str(exc_info.value)
-    assert "SPACESHIP" in error_msg
+    assert rule.categories == frozenset([AgentCategory.VAN])
 
 
-def test_filtering_config_single_frame_int() -> None:
-    """Parse a single integer into a frozenset of integers for require_frames."""
-    config = FilteringConfig.create(require_frames=19)
-
-    assert config.require_frames == frozenset([19])
-
-
-def test_filtering_config_list_frames() -> None:
-    """Parse a list of integers into a frozenset of integers for require_frames."""
-    config = FilteringConfig.create(require_frames=[19, 20, 21])
-
-    assert config.require_frames == frozenset([19, 20, 21])
+def test_filters_reject_invalid_agent_category() -> None:
+    """Raise ValueError when an invalid agent category string is provided."""
+    with pytest.raises(ValueError, match="Unknown agent category"):
+        DropAgentCategories.define(categories=["CAR", "SPACESHIP"])
 
 
-def test_filtering_config_none_values() -> None:
-    """Retain None values when no explicit frames or categories are provided."""
-    config = FilteringConfig()
+def test_filter_rules_parse_single_frame_int() -> None:
+    """Parse a single integer into a frozenset for required-agent frames."""
+    rule = RequireAgentFrames.define(frames=(19,))
 
-    assert config.exclude_agent_categories is None
-    assert config.require_frames is None
-
-
-def test_filtering_config_full_dict_validation() -> None:
-    """Validate a complete dictionary matching a TOML configuration block."""
-    raw_data = {
-        "min_agents": 3,
-        "require_all_valid": True,
-        "require_frames": [10, 15],
-        "exclude_agent_categories": "STATIC_OBJECT",
-        "filter_slow_agents": 1.5,
-        "min_samples_per_agent": 5,
-    }
-
-    config = FilteringConfig.model_validate(raw_data)
-
-    assert config.min_agents == 3
-    assert config.require_all_valid is True
-    assert config.require_frames == frozenset([10, 15])
-    assert config.exclude_agent_categories == frozenset([AgentCategory.STATIC_OBJECT])
-    assert config.filter_slow_agents == pytest.approx(1.5)
-    assert config.min_samples_per_agent == 5
+    assert rule.frames == frozenset([19])
 
 
-def test_loader_config_with_filtering_normalizes_negative_require_frames() -> None:
-    """Convert valid negative frame indices into offsets from the sequence end."""
-    config = LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filtering(
-        require_frames=[0, -1, -2]
+def test_filter_rules_parse_list_frames() -> None:
+    """Parse a list of integers into a frozenset for required-scene frames."""
+    rule = RequireSceneFrames.define(frames=[19, 20, 21])
+
+    assert rule.frames == frozenset([19, 20, 21])
+
+
+def test_filters_default_to_empty_rule_lists() -> None:
+    """Empty filters should simply contain no cleanup or validation rules."""
+    filters = Filter()
+
+    assert filters.cleanup_rules == ()
+    assert filters.filter_rules == ()
+
+
+def test_filters_reject_duplicate_rule_types() -> None:
+    """The same rule type should not appear twice in one filter."""
+    with pytest.raises(ValueError, match="Duplicate rule name"):
+        Filter.define(filter_rules=[MinimumAgents(minimum=1), MinimumAgents(minimum=2)])
+
+
+def test_filter_collects_direct_rule_objects() -> None:
+    """Direct rule instances should be stored as immutable tuples."""
+    filters = Filter.define(
+        cleanup_rules=[DropAgentCategories.define(categories="STATIC_OBJECT")],
+        filter_rules=[
+            MinimumAgents(minimum=3),
+            RequireFullAgentWindow(max_invalid_agents=1, max_invalid_fraction=0.25),
+            RequireAgentFrames.define(frames=[10, 15]),
+            MinimumAgentSamples(minimum=5),
+        ],
     )
 
-    assert config.filtering is not None
-    assert config.filtering.require_frames == frozenset([0, 3, 4])
+    assert isinstance(filters.cleanup_rules[0], DropAgentCategories)
+    assert filters.cleanup_rules[0].categories == frozenset([AgentCategory.STATIC_OBJECT])
+    assert isinstance(filters.filter_rules[0], MinimumAgents)
+    assert filters.filter_rules[0].minimum == 3
+    assert isinstance(filters.filter_rules[1], RequireFullAgentWindow)
+    assert filters.filter_rules[1].max_invalid_agents == 1
+    assert filters.filter_rules[1].max_invalid_fraction == pytest.approx(0.25)
+    assert isinstance(filters.filter_rules[2], RequireAgentFrames)
+    assert filters.filter_rules[2].frames == frozenset([10, 15])
+    assert isinstance(filters.filter_rules[3], MinimumAgentSamples)
+    assert filters.filter_rules[3].minimum == 5
 
 
-def test_loader_config_with_filtering_rejects_out_of_range_negative_frame() -> None:
-    """Keep the original invalid frame value in the error for easier debugging."""
-    with pytest.raises(ValueError, match=r"Invalid frame index: -6"):
-        LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filtering(require_frames=[-6])
+def test_filter_spec_parses_discriminated_rules() -> None:
+    """Config-facing filter specs should parse discriminated cleanup and validation rules."""
+    spec = FilterSpec.model_validate({
+        "mode": "replace",
+        "cleanup": [{"type": "drop_agent_categories", "categories": ["CAR", "PEDESTRIAN"]}],
+        "validate": [
+            {"type": "minimum_agents", "minimum": 2},
+            {
+                "type": "require_agent_frames",
+                "frames": [0, 4],
+                "max_invalid_agents": 1,
+                "max_invalid_fraction": 0.25,
+            },
+        ],
+    })
+
+    resolved = spec.resolve()
+
+    assert resolved.cleanup_rules == (
+        DropAgentCategories.define(categories=["CAR", "PEDESTRIAN"]),
+    )
+    assert resolved.filter_rules == (
+        MinimumAgents(minimum=2),
+        RequireAgentFrames.define(frames=[0, 4], max_invalid_agents=1, max_invalid_fraction=0.25),
+    )
+
+
+def test_loader_config_with_filters_rejects_out_of_range_negative_frame() -> None:
+    """Reject negative frame references that fall outside the configured sequence length."""
+    with pytest.raises(ValueError, match=r"Frame index -6 is out of range"):
+        LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
+            Filter.define(filter_rules=[RequireAgentFrames.define(frames=[-6])]),
+        )
+
+
+def test_loader_config_normalizes_negative_required_agent_frames() -> None:
+    """Negative frame references should resolve from the end of the configured sequence."""
+    config = LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
+        Filter.define(filter_rules=[RequireAgentFrames.define(frames=[-1, 0])]),
+    )
+
+    assert config.filters is not None
+    assert config.filters.filter_rules == (
+        RequireAgentFrames.define(frames=[4, 0]),
+    )
+
+
+def test_loader_config_normalizes_negative_required_scene_frames() -> None:
+    """Scene-level frame requirements should support negative indices as well."""
+    config = LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
+        Filter.define(filter_rules=[RequireSceneFrames.define(frames=[-1, -2, 0])]),
+    )
+
+    assert config.filters is not None
+    assert config.filters.filter_rules == (
+        RequireSceneFrames.define(frames=[4, 3, 0]),
+    )
+
+
+def test_filter_rules_expose_expected_protocols() -> None:
+    """Rule instances should advertise the expected cleanup and validation protocols."""
+    rules = [
+        DropAgentCategories.define(categories=["CAR"]),
+        MinimumAgents(minimum=1),
+        RequireSceneFrames.define(frames=[0]),
+        RequireContiguousSceneFrames(),
+        RequireFullAgentWindow(),
+        RequireAgentFrames.define(frames=[0]),
+        MinimumAgentSamples(minimum=2),
+    ]
+
+    assert isinstance(rules[0], CleanupRule)
+    assert all(isinstance(rule, SceneFilterRule) for rule in rules[1:4])
+    assert all(isinstance(rule, AgentFilterRule) for rule in rules[4:])
+
+
+def test_resolve_runtime_config_preserves_filter_objects() -> None:
+    """Runtime config merging should preserve direct filter objects from the default config."""
+    default = Config(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
+            Filter.define(
+                cleanup_rules=[DropAgentCategories.define(categories=["CAR"])],
+                filter_rules=[
+                    MinimumAgents(minimum=2),
+                    RequireAgentFrames.define(frames=[0]),
+                ],
+            )
+        ),
+        map=MapConfig.default(),
+    )
+
+    resolved = resolve_runtime_config(
+        default=default,
+        overrides={
+            "execution": {"workers": 8},
+        },
+    )
+
+    assert resolved.loader.filters is not None
+    assert resolved.loader.filters == default.loader.filters
+    assert resolved.execution.workers == 8
+
+
+def test_resolve_runtime_config_merges_filter_specs_on_top_of_default_filters() -> None:
+    """Filter specs in merge mode should replace same-name rules and keep other defaults."""
+    default = Config(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
+            Filter.define(
+                cleanup_rules=[DropAgentCategories.define(categories=["CAR"])],
+                filter_rules=[
+                    RequireAgentFrames.define(frames=[0]),
+                    MinimumAgents(minimum=2),
+                ],
+            )
+        ),
+        map=MapConfig.default(),
+    )
+
+    resolved = resolve_runtime_config(
+        default=default,
+        overrides={
+            "loader": {
+                "filters": {
+                    "mode": "merge",
+                    "validate": [
+                        {"type": "require_agent_frames", "frames": [1]},
+                        {"type": "minimum_agent_samples", "minimum": 3},
+                    ],
+                }
+            }
+        },
+    )
+
+    assert resolved.loader.filters == Filter.define(
+        cleanup_rules=[DropAgentCategories.define(categories=["CAR"])],
+        filter_rules=[
+            RequireAgentFrames.define(frames=[1]),
+            MinimumAgents(minimum=2),
+            MinimumAgentSamples(minimum=3),
+        ],
+    )
 
 
 def test_resolve_runtime_config_deep_merges_partial_overrides() -> None:
@@ -402,94 +543,80 @@ type = "by_scene"
     }
 
 
-def test_square_extraction_valid() -> None:
-    """Initialize SquareExtraction and verify computed dimensions."""
-    extraction = SquareExtraction(size=10.0)
+def test_load_config_overrides_supports_loader_filter_specs(tmp_path: Path) -> None:
+    """TOML loader filter tables should resolve into runtime filter objects."""
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """[a43.loader.filters]
+mode = "replace"
 
-    assert extraction.mode == "square"
-    assert extraction.size == pytest.approx(10.0)
-    assert extraction.width == pytest.approx(10.0)
-    assert extraction.height == pytest.approx(10.0)
+[[a43.loader.filters.cleanup]]
+type = "drop_agent_categories"
+categories = ["CAR"]
+
+[[a43.loader.filters.validate]]
+type = "minimum_agents"
+minimum = 3
+
+[[a43.loader.filters.validate]]
+type = "require_agent_frames"
+frames = [0, -1]
+max_invalid_agents = 1
+max_invalid_fraction = 0.2
+""",
+        encoding="utf-8",
+    )
+
+    overrides = load_config_overrides(config_path)
+    resolved = resolve_runtime_config(
+        default=Config(
+            loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1),
+            map=MapConfig.default(),
+        ),
+        overrides=overrides.for_dataset("a43"),
+    )
+
+    assert resolved.loader.filters == Filter.define(
+        cleanup_rules=[DropAgentCategories.define(categories=["CAR"])],
+        filter_rules=[
+            MinimumAgents(minimum=3),
+            RequireAgentFrames.define(
+                frames=[0, 4],
+                max_invalid_agents=1,
+                max_invalid_fraction=0.2,
+            ),
+        ],
+    )
 
 
-def test_square_extraction_model_dump() -> None:
-    """Serialize SquareExtraction to verify computed fields are included in output."""
-    extraction = SquareExtraction(size=25.0)
-    dumped = extraction.model_dump()
-
-    assert dumped["mode"] == "square"
-    assert dumped["size"] == pytest.approx(25.0)
-
-
-def test_map_config_discriminator_square() -> None:
-    """Parse a dictionary with square mode to ensure proper union routing."""
+def test_map_config_discriminator_relevant_area() -> None:
+    """Parse a dictionary with relevant mode to ensure proper union routing."""
     config_dict = {
         "extraction": {
-            "mode": "square",
-            "size": 15.0,
+            "mode": "relevant",
+            "padding_factor": 1.3,
         }
     }
 
     config = MapConfig.model_validate(config_dict)
 
-    assert isinstance(config.extraction, SquareExtraction)
-    assert config.extraction.size == pytest.approx(15.0)
-    assert config.extraction.width == pytest.approx(15.0)
-    assert config.extraction.height == pytest.approx(15.0)
+    assert isinstance(config.extraction, RelevantAreaExtraction)
+    assert config.extraction.mode == "relevant"
+    assert config.extraction.padding_factor == pytest.approx(1.3)
 
 
-@pytest.mark.parametrize("mode_alias", ["circular", "radius", "circle"])
-def test_radial_extraction_aliases(mode_alias: str) -> None:
-    """Ensure radial extraction accepts all defined string aliases."""
+def test_map_config_discriminator_full_map() -> None:
+    """Parse a dictionary with full mode to ensure proper union routing."""
     config_dict = {
         "extraction": {
-            "mode": mode_alias,
-            "radius": 12.5,
+            "mode": "full",
         }
     }
 
     config = MapConfig.model_validate(config_dict)
 
-    assert isinstance(config.extraction, RadialExtraction)
-    # The mode string is preserved as the alias the user provided
-    assert config.extraction.mode == mode_alias
-    assert config.extraction.radius == pytest.approx(12.5)
-
-
-@pytest.mark.parametrize("mode_alias", ["box", "rectangle"])
-def test_rectangular_extraction_aliases(mode_alias: str) -> None:
-    """Ensure rectangular extraction accepts all defined string aliases."""
-    config_dict = {
-        "extraction": {
-            "mode": mode_alias,
-            "width": 20.0,
-            "height": 10.0,
-        }
-    }
-
-    config = MapConfig.model_validate(config_dict)
-
-    assert isinstance(config.extraction, RectangularExtraction)
-    # The mode string is preserved as the alias the user provided
-    assert config.extraction.mode == mode_alias
-    assert config.extraction.width == pytest.approx(20.0)
-    assert config.extraction.height == pytest.approx(10.0)
-
-
-def test_square_extraction_missing_size() -> None:
-    """Raise ValidationError when the size parameter is missing for square extraction."""
-    config_dict = {
-        "extraction": {
-            "mode": "square",
-            # missing "size"
-        }
-    }
-
-    with pytest.raises(ValidationError) as exc_info:
-        MapConfig.model_validate(config_dict)
-
-    assert "Field required" in str(exc_info.value)
-    assert "size" in str(exc_info.value)
+    assert isinstance(config.extraction, FullMapExtraction)
+    assert config.extraction.mode == "full"
 
 
 def test_writer_config_positions_only_schema() -> None:

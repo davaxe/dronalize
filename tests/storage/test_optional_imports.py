@@ -41,13 +41,13 @@ def _block_imports(*blocked: str) -> str:
 
 
 def test_storage_dataset_package_import_is_lazy() -> None:
-    """Importing `dronalize.storage.dataset` should not require optional ML deps."""
+    """Importing `dronalize.io.adapters` should not require optional ML deps."""
     proc = _run_python(
         _block_imports("torch", "torch_geometric", "streaming")
         + textwrap.dedent(
             """
-            import dronalize.storage
-            import dronalize.storage.dataset
+            import dronalize.io
+            import dronalize.io.adapters
 
             print("ok")
             """
@@ -65,7 +65,7 @@ def test_mds_writer_missing_extra_has_install_hint() -> None:
         + textwrap.dedent(
             """
             try:
-                from dronalize.storage.writers.mds import MDSSceneWriter
+                from dronalize.io.writers.mds import MDSSceneWriter
             except ModuleNotFoundError as exc:
                 print(exc)
             else:
@@ -85,7 +85,7 @@ def test_dataset_adapter_missing_extra_has_install_hint() -> None:
         + textwrap.dedent(
             """
             try:
-                from dronalize.storage.dataset import MDSHeteroDataset
+                from dronalize.io.adapters import MDSHeteroDataset
             except ModuleNotFoundError as exc:
                 print(exc)
             else:

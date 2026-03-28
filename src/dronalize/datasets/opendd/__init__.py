@@ -1,6 +1,6 @@
-from dronalize.datasets._registry import DatasetDescriptor
 from dronalize.datasets.opendd.loader import OpenDDLoader
-from dronalize.datasets.opendd.map.builder import OpenDDMapBuilder
+from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
+from dronalize.datasets.registry import DatasetDescriptor
 
 DESCRIPTOR = DatasetDescriptor.from_loader("opendd", OpenDDLoader, has_map=True)
 

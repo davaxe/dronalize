@@ -2,15 +2,16 @@ import numpy as np
 import polars as pl
 from polars.testing import assert_series_equal
 
-from dronalize.config import LoaderConfig, WriterConfig
-from dronalize.maps import MapGraph
-from dronalize.scene import CANONICAL_V1, POSITIONS_ONLY_V1, Scene
-from dronalize.storage.encoding import (
+from dronalize.core.maps import MapGraph
+from dronalize.core.scene import CANONICAL_V1, POSITIONS_ONLY_V1, Scene
+from dronalize.io import WriterConfig
+from dronalize.io.encoding import (
     encode_map_from_scene,
     scene_sample_to_parts,
     scene_to_numpy_dict,
 )
-from dronalize.storage.spec import FORMAT_VERSION, StorageManifest
+from dronalize.io.manifest import FORMAT_VERSION, StorageManifest
+from dronalize.processing.ingest import LoaderConfig
 
 
 def _scene(*, with_map: bool = True) -> Scene:
@@ -21,7 +22,7 @@ def _scene(*, with_map: bool = True) -> Scene:
         edge_types=np.array([4, 5, 6], dtype=np.int32),
     )
     return Scene(
-        inner=pl.DataFrame(
+        frame=pl.DataFrame(
             {
                 "frame": [0, 1, 2, 0, 1, 2],
                 "id": [10, 10, 10, 20, 20, 20],
@@ -35,7 +36,7 @@ def _scene(*, with_map: bool = True) -> Scene:
                 "agent_category": [1, 1, 1, 2, 2, 2],
             },
         ),
-        number=7,
+        scene_number=7,
         input_len=2,
         output_len=1,
         schema=CANONICAL_V1,
@@ -97,6 +98,8 @@ def test_storage_manifest_reads_older_payloads_without_derivation_metadata() -> 
         "precision": "float32",
         "offset_positions": True,
         "has_map": False,
+        "sample_time": 1.0,
+        "original_sample_time": 1.0,
     })
 
     assert manifest.source_scene_schema == "canonical"
@@ -141,9 +144,9 @@ def test_inverse() -> None:
         sample,
         feature_columns=scene.schema.feature_columns(),
     )
-    inner = scene.inner.sort(by=["frame", "id"])
+    frame = scene.frame.sort(by=["frame", "id"])
     for feature in scene.schema.feature_columns():
         assert feature in reconstructed_scene.columns
-        assert_series_equal(inner[feature], reconstructed_scene[feature])
+        assert_series_equal(frame[feature], reconstructed_scene[feature])
 
-    assert_series_equal(inner["agent_category"], reconstructed_scene["agent_category"])
+    assert_series_equal(frame["agent_category"], reconstructed_scene["agent_category"])

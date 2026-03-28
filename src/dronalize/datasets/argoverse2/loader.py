@@ -7,29 +7,30 @@ from typing import TYPE_CHECKING, ClassVar
 import polars as pl
 from typing_extensions import override
 
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.config.map import MapConfig
-from dronalize.datasets.argoverse2.map.builder import Argoverse2MapBuilder
-from dronalize.datasets.common import utils
-from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
-from dronalize.loading.loader import IngestedData, MapBinding, Source
-from dronalize.scene import POSITIONS_VELOCITY_YAW_V1
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
+from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
+from dronalize.datasets.shared import utils
+from dronalize.processing.filters import DropAgentCategories, Filter, RequireAgentFrames
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
+from dronalize.processing.maps.config import MapConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.split import SplitRequest
-    from dronalize.maps.graph import MapGraph
-    from dronalize.maps.resolver import MapResolver
-    from dronalize.scene import Scene, SceneSchema
+    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.scene import Scene, SceneSchema
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.resolver import MapResolver
 
 
 class Argoverse2Loader(BaseSceneLoader[list[Path]]):
     """Loader for Argoverse 2 trajectory data stored in Parquet files."""
 
-    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
-        scene_split_enabled=True,
+    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
+        supports_scene_split=True,
     )
 
     def __init__(
@@ -116,7 +117,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             map_path = file_to_map.get(str(file_id))
             yield IngestedData(
                 frame=group.lazy().drop("file_id"),
-                map_binding=MapBinding(key=map_path),
+                map_binding=MapBinding(map_key=map_path),
             )
 
     @override
@@ -132,19 +133,25 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(input_len=50, output_len=60, sample_time=0.1).with_filtering(
-            require_frames=[49],
-            exclude_agent_categories=[
-                AgentCategory.STATIC_OBJECT,
-                AgentCategory.UNKNOWN,
-                AgentCategory.UNIMPORTANT,
-            ],
+        return LoaderConfig(input_len=50, output_len=60, sample_time=0.1).with_filters(
+            Filter.define(
+                cleanup_rules=[
+                    DropAgentCategories.define(
+                        categories=[
+                            AgentCategory.STATIC_OBJECT,
+                            AgentCategory.UNKNOWN,
+                            AgentCategory.UNIMPORTANT,
+                        ]
+                    ),
+                ],
+                filter_rules=[RequireAgentFrames.define(frames=[49])],
+            ),
         )
 
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.no_extraction()
+        return MapConfig.full_map()
 
     @override
     def map_resolver(self) -> MapResolver:

@@ -6,27 +6,28 @@ from typing import TYPE_CHECKING, ClassVar
 import polars as pl
 from typing_extensions import override
 
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.exceptions import SplitNotSupportedError
-from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
-from dronalize.loading.loader import IngestedData, Source
-from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.scene import POSITIONS_YAW_V1
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.errors import SplitNotSupportedError
+from dronalize.core.scene import POSITIONS_YAW_V1
+from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.map import MapConfig
-    from dronalize.config.split import SplitRequest
-    from dronalize.scene import SceneSchema
+    from dronalize.core.scene import SceneSchema
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.config import MapConfig
 
 
 class ApolloScapeLoader(BaseSceneLoader[Path]):
     """Loader for the ApolloScape dataset."""
 
-    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
-        source_split_enabled=True,
+    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
+        supports_source_split=True,
     )
 
     def __init__(
@@ -99,7 +100,6 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
                     5: AgentCategory.UNKNOWN.value,
                 }),
             ),
-            None,
         )
 
     @override
@@ -120,7 +120,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         return (
             LoaderConfig(input_len=4, output_len=6, sample_time=0.5)
             .with_resampling(ResampleSpec(up=5, down=1))
-            .with_filtering(require_frames=[3])
+            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[3])]))
             .with_window(1)
         )
 

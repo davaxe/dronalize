@@ -1,6 +1,6 @@
-from dronalize.datasets._registry import DatasetDescriptor
 from dronalize.datasets.ad4che.loader import AD4CHELoader
-from dronalize.datasets.ad4che.map.builder import AD4CHEMapBuilder
+from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
+from dronalize.datasets.registry import DatasetDescriptor
 
 DESCRIPTOR = DatasetDescriptor.from_loader("ad4che", AD4CHELoader, has_map=True)
 

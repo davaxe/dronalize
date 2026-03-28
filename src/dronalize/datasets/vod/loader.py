@@ -3,11 +3,12 @@ from pathlib import Path
 
 from typing_extensions import override
 
-from dronalize.categories import DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.config.map import MapConfig
-from dronalize.config.split import SplitRequest
+from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
+from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.splits import SplitRequest
+from dronalize.processing.maps.config import MapConfig
 
 
 class VodLoader(NuScenesLoader):
@@ -56,5 +57,5 @@ class VodLoader(NuScenesLoader):
         return (
             LoaderConfig(input_len=5, output_len=30, sample_time=0.1)
             .with_window(5)
-            .with_filtering(require_frames=[4])
+            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[4])]))
         )

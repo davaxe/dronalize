@@ -4,23 +4,21 @@ import polars as pl
 import pytest
 from typing_extensions import override
 
-from dronalize.categories import DatasetSplit
-from dronalize.config import (
+from dronalize.core.categories import DatasetSplit
+from dronalize.core.errors import SplitNotSupportedError, SplitStrategyNotSupportedError
+from dronalize.core.scene import CANONICAL_V1, POSITIONS_ONLY_V1, SceneSchema
+from dronalize.processing.ingest import (
+    BaseSceneLoader,
     BySourceSplit,
+    IngestedData,
     LoaderConfig,
+    LoaderSplitCapabilities,
+    Source,
     SplitRequest,
     SplitWeights,
     TimeBlockSplit,
 )
-from dronalize.exceptions import SplitMethodNotSupportedError, SplitNotSupportedError
-from dronalize.loading import (
-    BaseSceneLoader,
-    BaseSceneLoaderConfig,
-    IngestedData,
-    Source,
-)
-from dronalize.pipeline import Pipeline
-from dronalize.scene import CANONICAL_V1, POSITIONS_ONLY_V1, SceneSchema
+from dronalize.processing.pipeline import Pipeline
 
 
 def _canonical_frame(n_frames: int = 1) -> pl.LazyFrame:
@@ -123,7 +121,7 @@ class _PositionsOnlyLoader(_UnsplitLoader):
 
 
 class _DefaultPipelineBlockSplitLoader(BaseSceneLoader[str]):
-    config = BaseSceneLoaderConfig(block_split_enabled=True)
+    split_capabilities = LoaderSplitCapabilities(supports_block_split=True)
 
     @override
     def discover_sources(self) -> list[Source[str]]:
@@ -176,8 +174,8 @@ def test_default_pipeline_applies_block_split_request() -> None:
 
 
 def test_loader_rejects_direct_unsupported_split_request() -> None:
-    """Direct loader construction should validate unsupported custom split methods."""
-    with pytest.raises(SplitMethodNotSupportedError):
+    """Direct loader construction should validate unsupported custom split strategies."""
+    with pytest.raises(SplitStrategyNotSupportedError):
         _UnsplitLoader(
             loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
             split_request=SplitRequest(
@@ -197,8 +195,8 @@ def test_positions_only_loader_keeps_native_schema_by_default() -> None:
     scene = next(iter(loader.scenes()))
 
     assert scene.schema == POSITIONS_ONLY_V1
-    assert scene.inner.columns == ["frame", "id", "x", "y", "agent_category"]
-    assert scene.inner["x"].to_list() == pytest.approx([0.0, 1.0, 2.0])
+    assert scene.frame.columns == ["frame", "id", "x", "y", "agent_category"]
+    assert scene.frame["x"].to_list() == pytest.approx([0.0, 1.0, 2.0])
 
 
 def test_loader_exposes_effective_output_schema_helpers() -> None:

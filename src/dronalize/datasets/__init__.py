@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 
-from dronalize.datasets._registry import (
+from dronalize.datasets.registry import (
     DatasetDescriptor,
     ExecutionScope,
     available,
@@ -24,7 +24,7 @@ __all__ = [
 _DATASET_MODULES = {
     module_info.name
     for module_info in pkgutil.iter_modules(__path__)
-    if module_info.name not in {"common", "registry"}
+    if module_info.name not in {"registry", "shared"}
 }
 
 

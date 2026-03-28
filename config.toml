@@ -1,91 +1,86 @@
-# config.toml - Complete override example
+# Debug config for a single dataset override.
+# This file intentionally uses only one dataset section and demonstrates
+# most of the current override surface, including the new filter spec.
 
-[global.execution]
-parallel = true
-workers = -1 # -1 for all available cores
-chunksize = 100
-
-[global.map]
-min_distance = 1.75
-interp_distance = 3.0
-include_map = true
-
-[global.resampling]
-up = 1
-down = 1
-method = "linear"
-
-[global.map.extraction]
-mode = "none"
-
-# ------------------------------------------------------------------------------
-# Dataset 'a43' Overrides
-# Demonstrates heavy loader filtering and radial map extraction
-# ------------------------------------------------------------------------------
 [a43.execution]
-workers = 1
+parallel = true
+workers = 4
+chunksize = 64
 
 [a43.loader]
-input_len = 25
-output_len = 55
+input_len = 20
+output_len = 60
 sample_time = 0.1
-
-[a43.loader.filtering]
-min_agents = 2
-require_all_valid = true
-require_frames = [19, 20, 21]
-filter_agent_category = ["STATIC_OBJECT", "PEDESTRIAN"]
-filter_slow_agents = 0.5
-min_samples_per_agent = 10
 
 [a43.loader.window]
 window_size = 80
-step_size = 1
-
-[a43.loader.extra_kwargs]
-custom_flag = "active"
+step_size = 2
 
 [a43.loader.resampling]
 up = 2
 down = 1
-method = "spline"
-max_gap = 5
+method = "cubic"
+max_gap = 4
+sort = true
+position_columns = ["x", "y"]
+
+[a43.loader.resampling.output_derivatives]
+1 = ["vx", "vy"]
+2 = ["ax", "ay"]
+
+[a43.loader.extra_kwargs]
+custom_flag = "debug"
+emit_metrics = true
+
+[a43.loader.filters]
+mode = "merge"
+
+[[a43.loader.filters.cleanup]]
+type = "drop_agent_categories"
+categories = ["STATIC_OBJECT", "UNIMPORTANT"]
+
+[[a43.loader.filters.validate]]
+type = "minimum_agents"
+minimum = 2
+
+[[a43.loader.filters.validate]]
+type = "require_agent_frames"
+frames = [19]
+max_invalid_agents = 1
+max_invalid_fraction = 0.05
+
+[[a43.loader.filters.validate]]
+type = "minimum_agent_samples"
+minimum = 8
+max_invalid_agents = 1
+max_invalid_fraction = 0.05
 
 [a43.map]
-min_distance = 0.5
-interp_distance = 1.0
-include_map = false
+min_distance = 1.0
+interp_distance = 2.5
+include_map = true
 
 [a43.map.extraction]
-mode = "radial"
-radius = 50.0
+mode = "circle"
+radius = 60.0
 
 [a43.writer]
-scene_schema = "vx"
+scene_schema = "positions_velocity_yaw"
 precision = "float64"
+offset_positions = true
 
-[a43.split]
-weights = {"train" = 0.7, "val" = 0.2, "test" = 0.1}
+[a43.writer.mds]
+compression = "zstd:7"
+hashes = ["sha1", "xxh64"]
+size_limit = 33554432
+exist_ok = true
+
+[a43.split.weights]
+train = 0.7
+val = 0.2
+test = 0.1
 
 [a43.split.strategy]
 type = "shuffled_time_blocks"
-segments = 10
-
-
-# ------------------------------------------------------------------------------
-# Dataset 'b99' Overrides
-# Demonstrates partial overrides and rectangular map extraction
-# ------------------------------------------------------------------------------
-
-[b99.loader]
-input_len = 10
-output_len = 30
-sample_time = 0.5
-
-[b99.loader.resampling]
-method = "spline"
-
-[b99.map.extraction]
-mode = "rectangular"
-width = 120.5
-height = 80.0
+segments = 8
+gap = 2

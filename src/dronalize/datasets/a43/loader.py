@@ -6,32 +6,33 @@ from typing import TYPE_CHECKING, ClassVar
 import polars as pl
 from typing_extensions import override
 
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.config.map import MapConfig
-from dronalize.datasets.a43.map.builder import A43MapBuilder
-from dronalize.datasets.common import utils
-from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
-from dronalize.loading.loader import IngestedData, Source
-from dronalize.maps.resolver import MapResolver
-from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1, Scene
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1, Scene
+from dronalize.datasets.a43.maps.builder import A43MapBuilder
+from dronalize.datasets.shared import utils
+from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.maps.config import MapConfig
+from dronalize.processing.maps.resolver import MapResolver
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.split import (
+    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.scene import SceneSchema
+    from dronalize.processing.ingest.splits import (
         SplitRequest,
     )
-    from dronalize.maps.graph import MapGraph
-    from dronalize.maps.resolver import MapResolver
-    from dronalize.scene import SceneSchema
+    from dronalize.processing.maps.resolver import MapResolver
 
 
 class A43Loader(BaseSceneLoader[Path]):
     """Scene loader for the A43 dataset."""
 
-    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
-        block_split_enabled=True,
+    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
+        supports_block_split=True,
     )
 
     def __init__(
@@ -104,13 +105,13 @@ class A43Loader(BaseSceneLoader[Path]):
         return (
             LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
             .with_window(25)
-            .with_filtering(require_frames=[19])
+            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[19])]))
         )
 
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.no_extraction()
+        return MapConfig.full_map()
 
     @override
     def map_resolver(self) -> MapResolver:
@@ -118,8 +119,8 @@ class A43Loader(BaseSceneLoader[Path]):
             if scene.map_key is None:
                 return None
 
-            min_x = scene.inner.select(pl.col("x")).min().item()
-            max_x = scene.inner.select(pl.col("x")).max().item()
+            min_x = scene.frame.select(pl.col("x")).min().item()
+            max_x = scene.frame.select(pl.col("x")).max().item()
             builder = A43MapBuilder(scene.map_key, min_x, max_x)
             map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)

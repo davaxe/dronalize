@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dronalize.datasets.common.levelx_loader import LevelXDataLoader
+from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
 
 
 class UniDLoader(LevelXDataLoader):

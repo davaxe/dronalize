@@ -6,23 +6,24 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.config.map import MapConfig
-from dronalize.datasets.ad4che.map.builder import AD4CHEMapBuilder
-from dronalize.datasets.common import utils
-from dronalize.datasets.common.levelx_loader import LevelXDataLoader
-from dronalize.loading.loader import Source
-from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1
+from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
+from dronalize.datasets.shared import utils
+from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
+from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import Source
+from dronalize.processing.maps.config import MapConfig
+from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.split import SplitRequest
-    from dronalize.maps.graph import MapGraph
-    from dronalize.maps.resolver import MapResolver
-    from dronalize.scene import Scene, SceneSchema
+    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.scene import Scene, SceneSchema
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.resolver import MapResolver
 
 
 class AD4CHELoader(LevelXDataLoader):
@@ -125,14 +126,14 @@ class AD4CHELoader(LevelXDataLoader):
         return (
             LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
             .with_resampling(ResampleSpec(up=1, down=3))
-            .with_filtering(require_frames=[59])
+            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[59])]))
             .with_window(45)
         )
 
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.auto_extraction(padding_factor=1.15)
+        return MapConfig.relevant_area_extraction(padding_factor=1.15)
 
     @override
     def map_resolver(self) -> MapResolver:

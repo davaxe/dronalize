@@ -1,7 +1,7 @@
-from dronalize.datasets._registry import DatasetDescriptor
-from dronalize.datasets.vod import _scope
+from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.vod import scope as _scope
 from dronalize.datasets.vod.loader import VodLoader
-from dronalize.datasets.vod.map.builder import VODMapBuilder
+from dronalize.datasets.vod.maps.builder import VODMapBuilder
 
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "vod",

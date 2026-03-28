@@ -7,31 +7,32 @@ from typing import TYPE_CHECKING, ClassVar
 import polars as pl
 from typing_extensions import override
 
-import dronalize.pipeline.transforms as tr
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.datasets.waymo.map.builder import WaymoMapBuilder
+import dronalize.processing.pipeline.transforms as tr
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
+from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
-from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
-from dronalize.loading.loader import IngestedData, MapBinding, Source
-from dronalize.scene import POSITIONS_VELOCITY_YAW_V1
+from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.map import MapConfig
-    from dronalize.config.split import SplitRequest
-    from dronalize.maps.graph import MapGraph
-    from dronalize.maps.resolver import MapResolver
-    from dronalize.pipeline.pipeline import Pipeline
-    from dronalize.scene import Scene, SceneSchema
+    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.scene import Scene, SceneSchema
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.config import MapConfig
+    from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 class WaymoLoader(BaseSceneLoader[Path]):
     """Loader for Waymo Open Dataset scenarios stored in TFRecord format."""
 
-    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
-        scene_split_enabled=True,
+    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
+        supports_scene_split=True,
     )
 
     def __init__(
@@ -120,7 +121,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
 
             yield IngestedData(
                 frame=_scenario_to_polars(scenario).lazy(),
-                map_binding=MapBinding(resolver=resolver),
+                map_binding=MapBinding(map_resolver=resolver),
             )
 
     @override
@@ -135,8 +136,8 @@ class WaymoLoader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filtering(
-            require_frames=[9],
+        return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filters(
+            Filter.define(filter_rules=[RequireAgentFrames.define(frames=[9])]),
         )
 
     @staticmethod

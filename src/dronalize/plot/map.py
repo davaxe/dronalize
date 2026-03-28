@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Any, Final
 import altair as alt  # Optional dependency, checked at import time (in __init__.py)
 import polars as pl
 
-from dronalize.maps.edge_type import EdgeType
+from dronalize.core.maps.edge_types import EdgeType
 
 if TYPE_CHECKING:
     from types import ModuleType
 
-    from dronalize.maps.graph import MapGraph
+    from dronalize.core.maps.graph import MapGraph
 
 Chart = alt.Chart | alt.LayerChart
 

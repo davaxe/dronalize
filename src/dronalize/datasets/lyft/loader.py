@@ -10,24 +10,30 @@ import polars as pl
 from typing_extensions import override
 from zarr.creation import open_array
 
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.config.map import MapConfig
-from dronalize.datasets.common import utils
-from dronalize.exceptions import SplitNotSupportedError
-from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
-from dronalize.loading.loader import IngestedData, MapBinding, Source
-from dronalize.maps.resolver import no_map, shared_map
-from dronalize.scene import POSITIONS_ONLY_V1
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.errors import SplitNotSupportedError
+from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.datasets.shared import utils
+from dronalize.processing.filters import (
+    DropAgentCategories,
+    Filter,
+    MinimumAgents,
+    RequireAgentFrames,
+)
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
+from dronalize.processing.maps.config import MapConfig
+from dronalize.processing.maps.resolver import no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from zarr import Array
 
-    from dronalize.config.split import SplitRequest
-    from dronalize.maps.resolver import MapResolver
-    from dronalize.scene import SceneSchema
+    from dronalize.core.scene import SceneSchema
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.resolver import MapResolver
 
 
 @dataclass
@@ -55,8 +61,8 @@ class _ArrayData:
 class LyftLoader(BaseSceneLoader[_Source]):
     """Loader for Lyft Level 5 scenes stored in Zarr format."""
 
-    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
-        scene_split_enabled=True,
+    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
+        supports_scene_split=True,
     )
 
     def __init__(
@@ -180,7 +186,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
                 agent_offset=agent_start,
             )
             yield IngestedData(
-                frame=df.lazy(), map_binding=MapBinding(resolver=self.map_resolver())
+                frame=df.lazy(), map_binding=MapBinding(map_resolver=self.map_resolver())
             )
 
     @classmethod
@@ -198,17 +204,23 @@ class LyftLoader(BaseSceneLoader[_Source]):
                 sample_time=0.1,
             )
             .with_window(step_size=20)
-            .with_filtering(
-                min_agents=1,
-                exclude_agent_categories={AgentCategory.UNIMPORTANT},
-                require_frames=[19, -1],
+            .with_filters(
+                Filter.define(
+                    cleanup_rules=[
+                        DropAgentCategories.define(categories=[AgentCategory.UNIMPORTANT])
+                    ],
+                    filter_rules=[
+                        MinimumAgents(minimum=1),
+                        RequireAgentFrames.define(frames=[19]),
+                    ],
+                ),
             )
         )
 
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.auto_extraction()
+        return MapConfig.relevant_area_extraction()
 
     @override
     def map_resolver(self) -> MapResolver:

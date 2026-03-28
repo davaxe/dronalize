@@ -1,4 +1,3 @@
-from dronalize.datasets._registry import DatasetDescriptor
 from dronalize.datasets.eth_ucy.loader import (
     EthLoader,
     HotelLoader,
@@ -6,6 +5,7 @@ from dronalize.datasets.eth_ucy.loader import (
     Zara1Loader,
     Zara2Loader,
 )
+from dronalize.datasets.registry import DatasetDescriptor
 
 DESCRIPTORS = {
     "eth": DatasetDescriptor.from_loader("eth", EthLoader),

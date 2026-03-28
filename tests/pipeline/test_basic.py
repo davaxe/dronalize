@@ -2,7 +2,7 @@ import math
 
 import polars as pl
 
-from dronalize.pipeline.functional.basic import collect, lazy, yaw_from_pos, yaw_from_vel
+from dronalize.processing.pipeline.functional.basic import collect, lazy, yaw_from_pos, yaw_from_vel
 
 
 def test_lazy_from_dataframe() -> None:

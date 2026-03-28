@@ -1,7 +1,7 @@
-from dronalize.datasets._registry import DatasetDescriptor
-from dronalize.datasets.exid import _scope
+from dronalize.datasets.exid import scope as _scope
 from dronalize.datasets.exid.loader import ExiDLoader
-from dronalize.datasets.exid.map.builder import ExiDMapBuilder
+from dronalize.datasets.exid.maps.builder import ExiDMapBuilder
+from dronalize.datasets.registry import DatasetDescriptor
 
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "exid",

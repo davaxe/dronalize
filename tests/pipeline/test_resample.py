@@ -4,7 +4,7 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from dronalize.pipeline.functional.resample import ResampleMethod, ResampleSpec, resample
+from dronalize.processing.pipeline.functional.resample import ResampleMethod, ResampleSpec, resample
 
 
 def test_spec_simplifies_ratio() -> None:

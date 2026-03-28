@@ -6,29 +6,30 @@ from typing import TYPE_CHECKING, ClassVar
 import polars as pl
 from typing_extensions import override
 
-import dronalize.pipeline.transforms as tr
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.config.map import MapConfig
-from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
-from dronalize.loading.loader import IngestedData, Source
-from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.pipeline.functional.resample._common import ResampleMethod
-from dronalize.scene import POSITIONS_ONLY_V1
+import dronalize.processing.pipeline.transforms as tr
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.processing.filters import Filter, MinimumAgentSamples
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.maps.config import MapConfig
+from dronalize.processing.pipeline.functional.resample import ResampleSpec
+from dronalize.processing.pipeline.functional.resample._common import ResampleMethod
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.split import SplitRequest
-    from dronalize.pipeline.pipeline import Pipeline
-    from dronalize.scene import SceneSchema
+    from dronalize.core.scene import SceneSchema
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 class _EthUcyLoader(BaseSceneLoader[Path]):
     """Loader for ETH/UCY pedestrian trajectory datasets."""
 
-    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
-        source_split_enabled=True,
+    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
+        supports_source_split=True,
     )
 
     def __init__(
@@ -122,13 +123,12 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
                 sample_time=0.4,
             )
             .with_window(step_size=1)
-            .with_filtering(require_all_valid=True, min_samples_per_agent=2, require_frames=None)
+            .with_filters(Filter.define(filter_rules=[MinimumAgentSamples(minimum=2)]))
             .with_resampling(
                 ResampleSpec(
                     up=4,
                     down=1,
                     method=ResampleMethod.LINEAR,
-                    # output_derivatives={1: {"vx": None, "vy": None}, 2: {"ax": None, "ay": None}},
                 ),
             )
         )

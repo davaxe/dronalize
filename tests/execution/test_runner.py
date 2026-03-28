@@ -3,18 +3,18 @@ from typing import Literal, TypedDict
 
 import pytest
 
-from dronalize.categories import DatasetSplit
-from dronalize.config import SplitConfig
-from dronalize.config.split import (
+from dronalize.core.categories import DatasetSplit
+from dronalize.datasets import DatasetDescriptor
+from dronalize.datasets.a43.loader import A43Loader
+from dronalize.processing.ingest import (
     BySceneSplit,
     NativeSplit,
     ShuffledTimeBlockSplit,
+    SplitConfig,
     TimeBlockSplit,
     Unsplit,
 )
-from dronalize.datasets import DatasetDescriptor
-from dronalize.datasets.a43.loader import A43Loader
-from dronalize.execution.runner import prepare_dataset
+from dronalize.runtime.execution.runner import prepare_dataset
 
 
 class _CommonArgs(TypedDict):
@@ -48,7 +48,7 @@ def test_splits_a43() -> None:
 
     job = prepare_dataset(
         **common_args,
-        split_method="time_blocks",
+        split_strategy="time_blocks",
         split_weights=(0.7, 0.2, 0.1),
     )
 
@@ -56,11 +56,11 @@ def test_splits_a43() -> None:
     assert job.loader_splits() is None
     assert job.writer_splits() == (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
     assert isinstance(job.split_request.strategy, TimeBlockSplit)
-    assert job.split_request.method == "time_blocks"
+    assert job.split_request.strategy_name == "time_blocks"
 
     with pytest.raises(
         ValueError,
-        match=r"Specify a split method explicitly\.",
+        match=r"Specify a split strategy explicitly\.",
     ):
         _ = prepare_dataset(**common_args, split_weights=(0.7, 0.2, 0.1))
 
@@ -71,7 +71,7 @@ def test_splits_a43() -> None:
         _ = prepare_dataset(
             **common_args,
             split=["train"],
-            split_method="time_blocks",
+            split_strategy="time_blocks",
             split_weights=(0.5, 0.5, 0.0),
         )
 
@@ -83,7 +83,7 @@ def test_prepare_dataset_accepts_sequence_splits_for_native_datasets() -> None:
         input_dir=Path(__file__).parent,
         output_dir=Path(__file__).parent / "output",
         output_format="dummy",
-        split=("train",),
+        split="train",
     )
 
     assert job.loader_splits() == (DatasetSplit.TRAIN,)
@@ -135,8 +135,8 @@ def test_descriptor_from_loader_populates_common_metadata() -> None:
     assert descriptor.default_map_config == A43Loader.default_map_config()
     assert descriptor.native_schema == A43Loader.native_scene_schema()
     assert descriptor.predefined_splits == list(A43Loader.predefined_splits())
-    assert descriptor.supported_split_methods == list(A43Loader.supported_split_methods())
-    assert descriptor.recommended_split_method == A43Loader.recommended_split_method()
+    assert descriptor.supported_split_strategies == list(A43Loader.supported_split_strategies())
+    assert descriptor.recommended_split_strategy == A43Loader.recommended_split_strategy()
     assert descriptor.has_map is True
 
 
@@ -145,7 +145,7 @@ def test_dataset_job_build_loader_uses_resolved_runtime_config() -> None:
     job = prepare_dataset(
         **_a43_args(),
         scene_schema="positions_only",
-        split_method="time_blocks",
+        split_strategy="time_blocks",
         split_weights=(0.7, 0.2, 0.1),
     )
     loader = job.build_loader()
@@ -155,7 +155,7 @@ def test_dataset_job_build_loader_uses_resolved_runtime_config() -> None:
     assert loader.requested_scene_schema == job.config.writer.scene_schema
     assert loader.splits is None
     assert loader.split_request is not None
-    assert loader.split_request.method == "time_blocks"
+    assert loader.split_request.strategy_name == "time_blocks"
 
 
 def test_dataset_job_open_exposes_live_run() -> None:
@@ -171,7 +171,6 @@ def test_dataset_job_open_exposes_live_run() -> None:
 def test_dataset_job_run_executes_directly() -> None:
     """Prepared jobs should be executable directly without helper wrappers."""
     job = prepare_dataset(**_a43_args())
-
     job.run()
 
 
@@ -215,7 +214,7 @@ def test_splits_waymo() -> None:
 
     assert job.loader_splits() is None
     assert isinstance(job.split_request.strategy, BySceneSplit)
-    assert job.split_request.method == "by_scene"
+    assert job.split_request.strategy_name == "by_scene"
     writer_splits = job.writer_splits()
     assert writer_splits is not None
     assert sorted(writer_splits) == sorted([
@@ -229,7 +228,7 @@ def test_prepare_dataset_carries_split_config_from_runtime_options() -> None:
     """Runtime split options should be normalized into the resolved config model."""
     job = prepare_dataset(
         **_a43_args(),
-        split_method="shuffled_time_blocks",
+        split_strategy="shuffled_time_blocks",
         split_weights=(0.6, 0.2, 0.2),
         split_gap=5,
         split_n_segments=8,
@@ -269,7 +268,7 @@ gap = 2
     overridden = prepare_dataset(
         **_a43_args(),
         config_path=config_path,
-        split_method="shuffled_time_blocks",
+        split_strategy="shuffled_time_blocks",
         split_weights=(0.6, 0.2, 0.2),
         split_gap=5,
         split_n_segments=8,
@@ -303,7 +302,7 @@ type = "by_scene"
         "output_dir": Path(__file__).parent / "output",
         "output_format": "dummy",
     }
-    job = prepare_dataset(**common_args, config_path=config_path, split_method="unsplit")
+    job = prepare_dataset(**common_args, config_path=config_path, split_strategy="unsplit")
 
     assert isinstance(job.split_request.strategy, Unsplit)
     assert job.loader_splits() is None

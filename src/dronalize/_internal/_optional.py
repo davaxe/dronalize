@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, NoReturn
 
-from dronalize.exceptions import MissingOptionalDependencyError
+from dronalize.core.errors import MissingOptionalDependencyError
 
 if TYPE_CHECKING:
     from types import ModuleType

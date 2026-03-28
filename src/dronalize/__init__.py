@@ -6,19 +6,19 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dronalize.categories import AgentCategory, DatasetSplit
-    from dronalize.config.config import (
+    from dronalize.core.categories import AgentCategory, DatasetSplit
+    from dronalize.core.scene.model import Scene
+    from dronalize.io.config import MDSFormatConfig, WriterConfig
+    from dronalize.processing.ingest.config import LoaderConfig, WindowParams
+    from dronalize.processing.maps.config import MapConfig
+    from dronalize.runtime.config import (
         Config,
         ConfigOverrides,
         ExecutionConfig,
         load_config_overrides,
         resolve_runtime_config,
     )
-    from dronalize.config.loader import LoaderConfig, WindowParams
-    from dronalize.config.map import MapConfig
-    from dronalize.config.writer import MDSFormatConfig, WriterConfig
-    from dronalize.execution.runner import DatasetJob, DatasetRun, prepare_dataset
-    from dronalize.scene._scene import Scene
+    from dronalize.runtime.execution.runner import DatasetJob, DatasetRun, prepare_dataset
 
 __all__ = [
     "AgentCategory",
@@ -40,22 +40,22 @@ __all__ = [
 ]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "AgentCategory": ("dronalize.categories", "AgentCategory"),
-    "Config": ("dronalize.config.config", "Config"),
-    "ConfigOverrides": ("dronalize.config.config", "ConfigOverrides"),
-    "DatasetJob": ("dronalize.execution.runner", "DatasetJob"),
-    "DatasetRun": ("dronalize.execution.runner", "DatasetRun"),
-    "DatasetSplit": ("dronalize.categories", "DatasetSplit"),
-    "ExecutionConfig": ("dronalize.config.config", "ExecutionConfig"),
-    "LoaderConfig": ("dronalize.config.loader", "LoaderConfig"),
-    "MDSFormatConfig": ("dronalize.config.writer", "MDSFormatConfig"),
-    "MapConfig": ("dronalize.config.map", "MapConfig"),
-    "Scene": ("dronalize.scene._scene", "Scene"),
-    "WindowParams": ("dronalize.config.loader", "WindowParams"),
-    "WriterConfig": ("dronalize.config.writer", "WriterConfig"),
-    "load_config_overrides": ("dronalize.config.config", "load_config_overrides"),
-    "prepare_dataset": ("dronalize.execution.runner", "prepare_dataset"),
-    "resolve_runtime_config": ("dronalize.config.config", "resolve_runtime_config"),
+    "AgentCategory": ("dronalize.core.categories", "AgentCategory"),
+    "Config": ("dronalize.runtime.config", "Config"),
+    "ConfigOverrides": ("dronalize.runtime.config", "ConfigOverrides"),
+    "DatasetJob": ("dronalize.runtime.execution.runner", "DatasetJob"),
+    "DatasetRun": ("dronalize.runtime.execution.runner", "DatasetRun"),
+    "DatasetSplit": ("dronalize.core.categories", "DatasetSplit"),
+    "ExecutionConfig": ("dronalize.runtime.config", "ExecutionConfig"),
+    "LoaderConfig": ("dronalize.processing.ingest.config", "LoaderConfig"),
+    "MDSFormatConfig": ("dronalize.io.config", "MDSFormatConfig"),
+    "MapConfig": ("dronalize.processing.maps.config", "MapConfig"),
+    "Scene": ("dronalize.core.scene.model", "Scene"),
+    "WindowParams": ("dronalize.processing.ingest.config", "WindowParams"),
+    "WriterConfig": ("dronalize.io.config", "WriterConfig"),
+    "load_config_overrides": ("dronalize.runtime.config", "load_config_overrides"),
+    "prepare_dataset": ("dronalize.runtime.execution.runner", "prepare_dataset"),
+    "resolve_runtime_config": ("dronalize.runtime.config", "resolve_runtime_config"),
 }
 
 

@@ -1,7 +1,7 @@
-from dronalize.datasets._registry import DatasetDescriptor
-from dronalize.datasets.unid import _scope
+from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.unid import scope as _scope
 from dronalize.datasets.unid.loader import UniDLoader
-from dronalize.datasets.unid.map.builder import UniDMapBuilder
+from dronalize.datasets.unid.maps.builder import UniDMapBuilder
 
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "unid",

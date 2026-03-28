@@ -1,7 +1,7 @@
-from dronalize.datasets._registry import DatasetDescriptor
-from dronalize.datasets.nuscenes import _scope
+from dronalize.datasets.nuscenes import scope as _scope
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
-from dronalize.datasets.nuscenes.map.builder import NuScenesMapBuilder
+from dronalize.datasets.nuscenes.maps.builder import NuScenesMapBuilder
+from dronalize.datasets.registry import DatasetDescriptor
 
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "nuscenes",

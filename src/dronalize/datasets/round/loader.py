@@ -3,15 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.datasets.common.levelx_loader import LevelXDataLoader
+from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.categories import DatasetSplit
-    from dronalize.config.loader import LoaderConfig
-    from dronalize.config.map import MapConfig
-    from dronalize.config.split import SplitRequest
+    from dronalize.core.categories import DatasetSplit
+    from dronalize.processing.ingest.config import LoaderConfig
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.config import MapConfig
 
 
 class RounDLoader(LevelXDataLoader):

@@ -13,7 +13,7 @@ def _is_missing_cli_dependency(exc: ModuleNotFoundError) -> bool:
 def main() -> None:
     """Run the optional CLI if its dependencies are installed."""
     try:
-        from dronalize.cli.app import main as cli_main  # noqa: PLC0415
+        from dronalize.runtime.cli.app import main as cli_main  # noqa: PLC0415
     except ModuleNotFoundError as exc:
         if _is_missing_cli_dependency(exc):
             raise ModuleNotFoundError(_CLI_INSTALL_HINT) from exc

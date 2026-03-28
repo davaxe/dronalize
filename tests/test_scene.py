@@ -5,7 +5,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dronalize.scene import (
+from dronalize.core.scene import (
     CANONICAL_V1,
     POSITIONS_ONLY_V1,
     POSITIONS_YAW_V1,
@@ -13,8 +13,8 @@ from dronalize.scene import (
     SceneField,
     SceneSchema,
 )
-from dronalize.scene._derivations import ConversionContext, plan_derivations
-from dronalize.storage.encoding import scene_to_numpy_dict
+from dronalize.core.scene.derivations import ConversionContext, plan_derivations
+from dronalize.io.encoding import scene_to_numpy_dict
 
 
 def test_scene_schema_define_uses_semantic_fields_in_canonical_order() -> None:
@@ -83,14 +83,14 @@ def test_scene_schema_requires_base_fields() -> None:
 def test_scene_as_schema_derives_velocity_acceleration_and_yaw() -> None:
     """Test that schema conversion derives canonical kinematics from positions."""
     scene = Scene(
-        inner=pl.DataFrame({
+        frame=pl.DataFrame({
             "frame": [0, 1, 2],
             "id": [1, 1, 1],
             "x": [0.0, 1.0, 2.0],
             "y": [0.0, 0.0, 0.0],
             "agent_category": [0, 0, 0],
         }),
-        number=7,
+        scene_number=7,
         input_len=2,
         output_len=1,
         schema=POSITIONS_ONLY_V1,
@@ -100,24 +100,24 @@ def test_scene_as_schema_derives_velocity_acceleration_and_yaw() -> None:
     converted = scene.as_schema(CANONICAL_V1)
 
     assert converted.schema == CANONICAL_V1
-    assert converted.inner["vx"].to_list() == pytest.approx([1.0, 1.0, 1.0])
-    assert converted.inner["vy"].to_list() == pytest.approx([0.0, 0.0, 0.0])
-    assert converted.inner["ax"].to_list() == pytest.approx([0.0, 0.0, 0.0])
-    assert converted.inner["ay"].to_list() == pytest.approx([0.0, 0.0, 0.0])
-    assert converted.inner["yaw"].to_list() == pytest.approx([0.0, 0.0, 0.0])
+    assert converted.frame["vx"].to_list() == pytest.approx([1.0, 1.0, 1.0])
+    assert converted.frame["vy"].to_list() == pytest.approx([0.0, 0.0, 0.0])
+    assert converted.frame["ax"].to_list() == pytest.approx([0.0, 0.0, 0.0])
+    assert converted.frame["ay"].to_list() == pytest.approx([0.0, 0.0, 0.0])
+    assert converted.frame["yaw"].to_list() == pytest.approx([0.0, 0.0, 0.0])
 
 
 def test_scene_as_schema_derives_yaw_from_position_without_sample_time() -> None:
     """Test that yaw-only conversion can use position differences without sample time."""
     scene = Scene(
-        inner=pl.DataFrame({
+        frame=pl.DataFrame({
             "frame": [0, 1, 2],
             "id": [1, 1, 1],
             "x": [0.0, 1.0, 2.0],
             "y": [0.0, 0.0, 0.0],
             "agent_category": [0, 0, 0],
         }),
-        number=9,
+        scene_number=9,
         input_len=2,
         output_len=1,
         schema=POSITIONS_ONLY_V1,
@@ -126,20 +126,20 @@ def test_scene_as_schema_derives_yaw_from_position_without_sample_time() -> None
     converted = scene.as_schema(POSITIONS_YAW_V1)
 
     assert converted.schema == POSITIONS_YAW_V1
-    assert converted.inner["yaw"].to_list() == pytest.approx([0.0, 0.0, 0.0])
+    assert converted.frame["yaw"].to_list() == pytest.approx([0.0, 0.0, 0.0])
 
 
 def test_scene_as_schema_requires_sample_time_for_derivatives() -> None:
     """Test that kinematic derivation fails clearly without sample-time metadata."""
     scene = Scene(
-        inner=pl.DataFrame({
+        frame=pl.DataFrame({
             "frame": [0, 1],
             "id": [1, 1],
             "x": [0.0, 1.0],
             "y": [0.0, 0.0],
             "agent_category": [0, 0],
         }),
-        number=1,
+        scene_number=1,
         input_len=1,
         output_len=1,
         schema=POSITIONS_ONLY_V1,
@@ -159,14 +159,14 @@ def test_scene_schema_feature_columns_follow_canonical_tensor_order() -> None:
 def test_scene_to_numpy_dict_respects_requested_scene_schema() -> None:
     """NumPy conversion should derive feature width from the requested scene schema."""
     scene = Scene(
-        inner=pl.DataFrame({
+        frame=pl.DataFrame({
             "frame": [0, 1, 2],
             "id": [1, 1, 1],
             "x": [0.0, 1.0, 2.0],
             "y": [0.0, 0.0, 0.0],
             "agent_category": [0, 0, 0],
         }),
-        number=3,
+        scene_number=3,
         input_len=2,
         output_len=1,
         schema=POSITIONS_ONLY_V1,

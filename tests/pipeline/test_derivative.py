@@ -1,7 +1,7 @@
 import polars as pl
 from polars.testing import assert_frame_equal
 
-from dronalize.pipeline.functional.derivative import derivative
+from dronalize.processing.pipeline.functional.derivative import derivative
 
 
 def test_first_derivative_linear() -> None:

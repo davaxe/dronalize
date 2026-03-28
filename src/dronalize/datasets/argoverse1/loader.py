@@ -6,27 +6,28 @@ from typing import TYPE_CHECKING, ClassVar
 import polars as pl
 from typing_extensions import override
 
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.config.map import MapConfig
-from dronalize.datasets.common import utils
-from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
-from dronalize.loading.loader import IngestedData, MapBinding, Source
-from dronalize.maps.resolver import MapResolver, no_map, shared_map
-from dronalize.scene import POSITIONS_ONLY_V1
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.datasets.shared import utils
+from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
+from dronalize.processing.maps.config import MapConfig
+from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.split import SplitRequest
-    from dronalize.scene import SceneSchema
+    from dronalize.core.scene import SceneSchema
+    from dronalize.processing.ingest.splits import SplitRequest
 
 
 class Argoverse1Loader(BaseSceneLoader[list[Path]]):
     """Loader for Argoverse 1 trajectory data stored in CSV format."""
 
-    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
-        scene_split_enabled=True,
+    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
+        supports_scene_split=True,
     )
 
     def __init__(
@@ -118,7 +119,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
             map_key = str(group["map"].first())
             yield IngestedData(
                 frame=group.drop("file_id").lazy(),
-                map_binding=MapBinding(key=map_key),
+                map_binding=MapBinding(map_key=map_key),
             )
 
     @override
@@ -134,14 +135,14 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(input_len=20, output_len=30, sample_time=0.1).with_filtering(
-            require_frames=[19],
+        return LoaderConfig(input_len=20, output_len=30, sample_time=0.1).with_filters(
+            Filter.define(filter_rules=[RequireAgentFrames.define(frames=[19])]),
         )
 
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.auto_extraction()
+        return MapConfig.relevant_area_extraction()
 
     @override
     def map_resolver(self) -> MapResolver:

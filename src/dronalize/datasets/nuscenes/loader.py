@@ -6,21 +6,22 @@ from typing import TYPE_CHECKING, ClassVar, cast
 import polars as pl
 from typing_extensions import override
 
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.loader import LoaderConfig
-from dronalize.loading.base import BaseSceneLoader, BaseSceneLoaderConfig
-from dronalize.loading.loader import IngestedData, Source
-from dronalize.maps.resolver import no_map, shared_map
-from dronalize.pipeline.functional.resample import ResampleSpec
-from dronalize.scene import POSITIONS_ONLY_V1
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.maps.resolver import no_map, shared_map
+from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.map import MapConfig
-    from dronalize.config.split import SplitRequest
-    from dronalize.maps.resolver import MapResolver
-    from dronalize.scene import SceneSchema
+    from dronalize.core.scene import SceneSchema
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.config import MapConfig
+    from dronalize.processing.maps.resolver import MapResolver
 
 
 class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
@@ -31,8 +32,8 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     efficient access during ingestion.
     """
 
-    config: ClassVar[BaseSceneLoaderConfig] = BaseSceneLoaderConfig(
-        source_split_enabled=True,
+    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
+        supports_source_split=True,
     )
 
     def __init__(
@@ -135,7 +136,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
             LoaderConfig(input_len=4, output_len=12, sample_time=0.5)
             .with_resampling(ResampleSpec(up=5, down=1))
             .with_window(step_size=1)
-            .with_filtering(require_frames=[3])
+            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[3])]))
         )
 
     @override

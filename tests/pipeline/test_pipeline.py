@@ -11,18 +11,19 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from dronalize.categories import AgentCategory
-from dronalize.config import (
+from dronalize.core.categories import AgentCategory
+from dronalize.processing.filters import DropAgentCategories, Filter
+from dronalize.processing.ingest import (
     LoaderConfig,
     ShuffledTimeBlockSplit,
     SplitRequest,
     SplitWeights,
     TimeBlockSplit,
 )
-from dronalize.pipeline import Pipeline
-from dronalize.pipeline import transforms as transform
-from dronalize.pipeline.factories import split_partition_pipeline, trajectory_pipeline
-from dronalize.pipeline.functional.resample import ResampleSpec
+from dronalize.processing.pipeline import Pipeline
+from dronalize.processing.pipeline import transforms as transform
+from dronalize.processing.pipeline.factories import split_partition_pipeline, trajectory_pipeline
+from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Helpers / fixtures
@@ -348,7 +349,7 @@ def test_transform_derivative_second_with_intermediate() -> None:
 def test_transform_filter_no_config_passes_all(trajectory_lf: pl.LazyFrame) -> None:
     """Ensure the filter transform passes all rows when no specific rules apply."""
     config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1)
-    fn = transform.filter_scene(config.filtering)
+    fn = transform.filter_scene(config.filters)
     result = fn(trajectory_lf).collect()
     assert_frame_equal(result, trajectory_lf.collect())
 
@@ -357,14 +358,14 @@ def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
     """Verify the filter transform removes agents that match the specified filtering category."""
     # Filter out agent_category == 1 -> should remove all
 
-    config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filtering(
-        exclude_agent_categories=[AgentCategory.CAR]
+    config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filters(
+        Filter.define(
+            cleanup_rules=[DropAgentCategories.define(categories=[AgentCategory.CAR])],
+        )
     )
-    fn = transform.filter_scene(config.filtering)
+    fn = transform.filter_scene(config.filters)
     result = fn(trajectory_lf).collect()
-    # All agents have category 1 (CAR), and min_agents=2 by default,
-    # so after filtering CAR agents out, no valid agents remain,
-    # thus the entire frame should be filtered
+    # All agents have category 1 (CAR), so cleanup removes every row.
     assert result.shape[0] == 0
 
 

@@ -8,10 +8,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-    from dronalize.categories import DatasetSplit
-    from dronalize.config.loader import LoaderConfig
-    from dronalize.config.map import MapConfig
-    from dronalize.config.split import SplitRequest
+    from dronalize.core.categories import DatasetSplit
+    from dronalize.processing.ingest.config import LoaderConfig
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.config import MapConfig
 
 
 class US101Loader(I80Loader):

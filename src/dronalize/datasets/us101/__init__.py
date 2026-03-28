@@ -1,7 +1,7 @@
-from dronalize.datasets._registry import DatasetDescriptor
-from dronalize.datasets.us101 import _scope
+from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.us101 import scope as _scope
 from dronalize.datasets.us101.loader import US101Loader
-from dronalize.datasets.us101.map.builder import US101MapBuilder
+from dronalize.datasets.us101.maps.builder import US101MapBuilder
 
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "us101",

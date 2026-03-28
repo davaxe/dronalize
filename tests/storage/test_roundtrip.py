@@ -10,17 +10,18 @@ import pytest
 
 pl = pytest.importorskip("polars")
 
-from dronalize.config import LoaderConfig, WriterConfig
-from dronalize.maps import MapGraph
-from dronalize.scene import CANONICAL_V1, Scene
+from dronalize.core.maps import MapGraph
+from dronalize.core.scene import CANONICAL_V1, Scene
+from dronalize.io import WriterConfig
 
 pytest.importorskip("torch")
 pytest.importorskip("streaming")
 pytest.importorskip("torch_geometric")
 
-from dronalize.storage.dataset.mds import _MDSDatasetBackend  # noqa: PLC2701
-from dronalize.storage.encoding import encode_map_from_scene, scene_to_numpy_dict
-from dronalize.storage.writers.mds import MDSSceneWriter
+from dronalize.io.adapters.mds import _MDSDatasetBackend  # noqa: PLC2701
+from dronalize.io.encoding import encode_map_from_scene, scene_to_numpy_dict
+from dronalize.io.writers.mds import MDSSceneWriter
+from dronalize.processing.ingest import LoaderConfig
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,7 +35,7 @@ def _scene() -> Scene:
         edge_types=np.array([4, 5, 6], dtype=np.int32),
     )
     return Scene(
-        inner=pl.DataFrame({
+        frame=pl.DataFrame({
             "frame": [0, 1, 2, 0, 1, 2],
             "id": [10, 10, 10, 20, 20, 20],
             "x": [0.0, 1.0, 2.0, 0.0, 0.0, 0.0],
@@ -46,7 +47,7 @@ def _scene() -> Scene:
             "yaw": [0.0, 0.0, 0.0, 1.57, 1.57, 1.57],
             "agent_category": [1, 1, 1, 2, 2, 2],
         }),
-        number=7,
+        scene_number=7,
         input_len=2,
         output_len=1,
         schema=CANONICAL_V1,

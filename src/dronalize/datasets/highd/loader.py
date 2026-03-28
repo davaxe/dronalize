@@ -6,21 +6,21 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.categories import AgentCategory, DatasetSplit
-from dronalize.config.map import MapConfig
-from dronalize.datasets.common import utils
-from dronalize.datasets.common.levelx_loader import LevelXDataLoader
-from dronalize.datasets.highd.map.builder import HighDMapBuilder
-from dronalize.scene import POSITIONS_VELOCITY_ACCELERATION_V1
+from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1
+from dronalize.datasets.highd.maps.builder import HighDMapBuilder
+from dronalize.datasets.shared import utils
+from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
+from dronalize.processing.maps.config import MapConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.loader import LoaderConfig
-    from dronalize.config.split import SplitRequest
-    from dronalize.maps.graph import MapGraph
-    from dronalize.maps.resolver import MapResolver
-    from dronalize.scene import Scene, SceneSchema
+    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.scene import Scene, SceneSchema
+    from dronalize.processing.ingest.config import LoaderConfig
+    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.maps.resolver import MapResolver
 
 
 class HighDLoader(LevelXDataLoader):
@@ -112,7 +112,7 @@ class HighDLoader(LevelXDataLoader):
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.no_extraction(interp_distance=10)
+        return MapConfig.full_map(interp_distance=10)
 
     @override
     def map_resolver(self) -> MapResolver:
@@ -120,8 +120,8 @@ class HighDLoader(LevelXDataLoader):
             if scene.map_key is None:
                 return None
 
-            min_x = scene.inner.select(pl.col("x")).min().item()
-            max_x = scene.inner.select(pl.col("x")).max().item()
+            min_x = scene.frame.select(pl.col("x")).min().item()
+            max_x = scene.frame.select(pl.col("x")).max().item()
             dist = max_x - min_x
             builder = HighDMapBuilder(Path(scene.map_key), min_x - dist * 0.1, max_x + dist * 0.1)
             map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)

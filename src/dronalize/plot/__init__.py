@@ -1,21 +1,40 @@
-"""Plot package: optional visualization utilities for trajectories and map graphs.
+"""Optional visualization utilities for trajectories and map graphs."""
 
-Requires the `plot` extra::
+from __future__ import annotations
 
-    pip install dronalize[plot]
-"""
+import importlib
+from typing import TYPE_CHECKING
 
-from dronalize._internal._optional import require_optional
-
-# Validate the optional plotting dependency once at package import time.
-_ = require_optional("altair", extra="plot")
-
-from dronalize.plot.map import plot_map_graph  # noqa: E402
-from dronalize.plot.overlay import plot_trajectories_on_map  # noqa: E402
-from dronalize.plot.trajectory import plot_trajectories  # noqa: E402
+if TYPE_CHECKING:
+    from dronalize.plot.map import plot_map_graph
+    from dronalize.plot.overlay import plot_trajectories_on_map
+    from dronalize.plot.trajectory import plot_trajectories
 
 __all__ = [
     "plot_map_graph",
     "plot_trajectories",
     "plot_trajectories_on_map",
 ]
+
+_EXPORTS: dict[str, tuple[str, str]] = {
+    "plot_map_graph": ("dronalize.plot.map", "plot_map_graph"),
+    "plot_trajectories": ("dronalize.plot.trajectory", "plot_trajectories"),
+    "plot_trajectories_on_map": ("dronalize.plot.overlay", "plot_trajectories_on_map"),
+}
+
+
+def __getattr__(name: str) -> object:
+    """Resolve plotting helpers lazily to avoid importing optional deps eagerly."""
+    if name not in _EXPORTS:
+        msg = f"module '{__name__}' has no attribute '{name}'"
+        raise AttributeError(msg)
+
+    module_name, export_name = _EXPORTS[name]
+    value = getattr(importlib.import_module(module_name), export_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    """Expose lazy plotting exports during interactive discovery."""
+    return sorted(set(globals()) | set(__all__))

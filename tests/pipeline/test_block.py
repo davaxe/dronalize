@@ -5,7 +5,7 @@ from __future__ import annotations
 import polars as pl
 import pytest
 
-from dronalize.pipeline.functional.block import cumulative_blocks, shuffled_blocks
+from dronalize.processing.pipeline.functional.block import cumulative_blocks, shuffled_blocks
 
 
 def test_cumulative_blocks_split_evenly_with_gap_and_offset() -> None:

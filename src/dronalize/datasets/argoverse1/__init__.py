@@ -1,7 +1,7 @@
-from dronalize.datasets._registry import DatasetDescriptor
-from dronalize.datasets.argoverse1 import _scope
+from dronalize.datasets.argoverse1 import scope as _scope
 from dronalize.datasets.argoverse1.loader import Argoverse1Loader
-from dronalize.datasets.argoverse1.map.builder import Argoverse1MapBuilder
+from dronalize.datasets.argoverse1.maps.builder import Argoverse1MapBuilder
+from dronalize.datasets.registry import DatasetDescriptor
 
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "argoverse1",
