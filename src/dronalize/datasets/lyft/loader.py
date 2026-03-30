@@ -15,10 +15,10 @@ from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY_V1
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import (
-    DropAgentCategories,
+    ExcludeAgentCategories,
     Filter,
     MinimumAgents,
-    RequireAgentFrames,
+    RequireAgentCoverageAtFrames,
 )
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
@@ -204,15 +204,13 @@ class LyftLoader(BaseSceneLoader[_Source]):
                 sample_time=0.1,
             )
             .with_window(step_size=20)
-            .with_filters(
+            .with_filter(
                 Filter.define(
                     cleanup_rules=[
-                        DropAgentCategories.define(categories=[AgentCategory.UNIMPORTANT])
+                        ExcludeAgentCategories.define(categories=[AgentCategory.UNIMPORTANT])
                     ],
-                    filter_rules=[
-                        MinimumAgents(minimum=1),
-                        RequireAgentFrames.define(frames=[19]),
-                    ],
+                    scene_validation_rules=[MinimumAgents(minimum=1)],
+                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[19])],
                 ),
             )
         )

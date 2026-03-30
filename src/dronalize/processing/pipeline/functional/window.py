@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 import polars.selectors as cs
+
+from dronalize._internal._polars_ops import normalize_group_by
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -12,14 +13,6 @@ if TYPE_CHECKING:
     from dronalize._internal._typing import DataFrameT
 
 WindowPolicy = Literal["strict", "anchored", "partial"]
-
-
-@dataclass
-class AdaptiveStepSize:
-    """Defines a step size for a specific subset of the data based on a predicate."""
-
-    predicate: pl.Expr
-    step_size: int
 
 
 def sliding_window(
@@ -60,7 +53,7 @@ def sliding_window(
         Adds a `window_index` column to the input DataFrame indicating the window
         each row belongs to.
     """
-    group_keys = [group_by] if isinstance(group_by, str) else list(group_by or [])
+    group_keys = list(normalize_group_by(group_by))
 
     if not is_sorted:
         data = data.sort([*group_keys, sliding_col] if group_keys else sliding_col)
@@ -75,55 +68,6 @@ def sliding_window(
         offset_sliding_col=offset_sliding_col,
     )
     return _explode_windows(windows, sliding_col, group_keys)
-
-
-def sliding_window_adaptive(
-    data: DataFrameT,
-    window_size: int,
-    step_size: Sequence[AdaptiveStepSize],
-    sliding_col: str = "frame",
-    *,
-    policy: WindowPolicy = "strict",
-    group_by: str | Sequence[str] | None = None,
-    is_sorted: bool = False,
-    offset_sliding_col: bool = False,
-) -> DataFrameT:
-    """Generate sliding windows from a DataFrame with adaptive step sizes."""
-    if len(step_size) == 1:
-        return sliding_window(
-            data=data,
-            window_size=window_size,
-            step_size=step_size[0].step_size,
-            sliding_col=sliding_col,
-            policy=policy,
-            group_by=group_by,
-            is_sorted=is_sorted,
-            offset_sliding_col=offset_sliding_col,
-        )
-
-    group_keys = [group_by] if isinstance(group_by, str) else list(group_by or [])
-    if not is_sorted:
-        data = data.sort([*group_keys, sliding_col] if group_keys else sliding_col)
-
-    groups: list[DataFrameT] = []
-    for step_idx, step in enumerate(step_size):
-        step_data = data.filter(step.predicate)
-        windows = _create_windows(
-            step_data,
-            window_size,
-            step.step_size,
-            sliding_col=sliding_col,
-            policy=policy,
-            group_by=group_keys,
-            offset_sliding_col=offset_sliding_col,
-        ).with_columns(pl.lit(step_idx).alias("_step_idx"))
-        groups.append(windows)
-
-    out = pl.concat(groups, how="vertical").sort(["_step_idx", sliding_col, *group_keys])
-
-    return _explode_windows(out, sliding_col, group_keys, extra_exclude_cols=("_step_idx",)).drop(
-        "_step_idx"
-    )
 
 
 def _create_windows(

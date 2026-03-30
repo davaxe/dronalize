@@ -9,7 +9,11 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import CANONICAL_V1
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import DropAgentCategories, Filter, RequireAgentFrames
+from dronalize.processing.filters import (
+    ExcludeAgentCategories,
+    Filter,
+    RequireAgentCoverageAtFrames,
+)
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -161,7 +165,6 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
                 (pl.col("x") + source.metadata["utm_x0"]).alias("x"),
                 (pl.col("y") + source.metadata["utm_y0"]).alias("y"),
             )
-
         yield IngestedData(combined)
 
     @override
@@ -180,10 +183,12 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
             LoaderConfig(input_len=50, output_len=125, sample_time=0.04)
             .with_resampling(ResampleSpec(up=2, down=5))
             .with_window(25)
-            .with_filters(
+            .with_filter(
                 Filter.define(
-                    cleanup_rules=[DropAgentCategories.define(categories=[AgentCategory.TRAILER])],
-                    filter_rules=[RequireAgentFrames.define(frames=[49])],
+                    cleanup_rules=[
+                        ExcludeAgentCategories.define(categories=[AgentCategory.TRAILER])
+                    ],
+                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[49])],
                 ),
             )
         )

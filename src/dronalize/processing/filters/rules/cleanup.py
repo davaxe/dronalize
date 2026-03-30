@@ -30,14 +30,18 @@ AgentSet = Annotated[
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
-class DropAgentCategories(CleanupRule):
+class ExcludeAgentCategories(CleanupRule):
     """Remove rows that belong to the given agent categories."""
 
     categories: AgentSet
-    type: Literal["drop_agent_categories"] = Field("drop_agent_categories", repr=False, init=False)
+    type: Literal["exclude_categories"] = Field(
+        "exclude_categories",
+        repr=False,
+        init=False,
+    )
 
     @classmethod
-    def define(cls, categories: AgentInput) -> DropAgentCategories:
+    def define(cls, categories: AgentInput) -> ExcludeAgentCategories:
         """Alternate constructor that accepts one or many category values."""
         return cls(categories=_coerce_agent_set(categories))
 
@@ -45,3 +49,25 @@ class DropAgentCategories(CleanupRule):
     def expr(self, ctx: FilterContext) -> pl.Expr:
         category_column = ctx.category_column_or_raise()
         return ~pl.col(category_column).is_in(self.categories)
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
+class IncludeAgentCategories(CleanupRule):
+    """Keep only rows that belong to the given agent categories."""
+
+    categories: AgentSet
+    type: Literal["include_categories"] = Field(
+        "include_categories",
+        repr=False,
+        init=False,
+    )
+
+    @override
+    def expr(self, ctx: FilterContext) -> pl.Expr:
+        category_column = ctx.category_column_or_raise()
+        return pl.col(category_column).is_in(self.categories)
+
+
+CleanupSpec = Annotated[
+    ExcludeAgentCategories | IncludeAgentCategories, Field(discriminator="type")
+]

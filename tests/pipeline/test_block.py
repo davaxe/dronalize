@@ -68,7 +68,7 @@ def test_cumulative_blocks_apply_per_group() -> None:
         df,
         weights=[0.5, 0.5],
         time_column="frame",
-        group_by="scene",
+        group_by=["scene"],
         gap=0,
     ).sort(["scene", "frame", "value"])
 
@@ -166,7 +166,7 @@ def test_shuffled_blocks_assign_segment_consistently_within_each_group() -> None
         weights=[0.5, 0.5],
         n_segments=4,
         time_column="frame",
-        group_by="scene",
+        group_by=["scene"],
         seed=42,
         assignment_column="unit",
     )

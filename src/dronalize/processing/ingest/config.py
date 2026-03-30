@@ -5,8 +5,10 @@ from typing import ClassVar
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self
 
-from dronalize.processing.filters.filter import Filter, normalize_filter_frames
-from dronalize.processing.pipeline.functional.resample import ResampleSpec  # noqa: TC001
+from dronalize.processing.filters.filter import Filter
+from dronalize.processing.pipeline.functional.resample import ResampleSpec
+
+_ = ResampleSpec, Filter  # silence unused import; used by pydantic
 
 
 class WindowParams(BaseModel):
@@ -31,13 +33,13 @@ class LoaderConfig(BaseModel):
     sample_time: float = Field(gt=0)
     resampling: ResampleSpec | None = Field(default=None)
     window: WindowParams | None = Field(default=None)
-    filters: Filter | None = Field(default=None)
+    filter: Filter | None = Field(default=None)
     extra_kwargs: dict[str, object] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate(self) -> LoaderConfig:
         self._validate_window()
-        return self._normalize_filters()
+        return self
 
     def _validate_window(self) -> None:
         if self.window is None:
@@ -49,18 +51,6 @@ class LoaderConfig(BaseModel):
                 f"({sequence_length}) for consistent windowing."
             )
             raise ValueError(msg)
-
-    def _normalize_filters(self) -> LoaderConfig:
-        if self.filters is None:
-            return self
-
-        normalized = normalize_filter_frames(
-            self.filters,
-            sequence_length=self._sequence_length(),
-        )
-        if normalized == self.filters:
-            return self
-        return self.model_copy(update={"filters": normalized})
 
     def _sequence_length(self) -> int:
         """Return the total number of frames in one input/output sequence."""
@@ -90,9 +80,9 @@ class LoaderConfig(BaseModel):
         )
         return self._updated(window=new_window_params)
 
-    def with_filters(self, filters: Filter | None) -> Self:
-        """Return a copy with the given scene filters."""
-        return self._updated(filters=filters)
+    def with_filter(self, scene_filter: Filter | None) -> Self:
+        """Return a copy with the given scene filter."""
+        return self._updated(filter=scene_filter)
 
     def with_resampling(
         self,

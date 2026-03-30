@@ -11,11 +11,12 @@ from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1
 from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
-from dronalize.processing.filters import Filter, RequireAgentFrames
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import Source
 from dronalize.processing.maps.config import MapConfig
+from dronalize.processing.pipeline.factory import trajectory_pipeline
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
+from dronalize.processing.pipeline.presets import highway_trajectory_spec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from dronalize.core.scene import Scene, SceneSchema
     from dronalize.processing.ingest.splits import SplitRequest
     from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.pipeline import Pipeline
 
 
 class AD4CHELoader(LevelXDataLoader):
@@ -71,13 +73,23 @@ class AD4CHELoader(LevelXDataLoader):
     def num_sources(self) -> int | None:
         return sum(1 for _ in self._recordings())
 
+    @override
+    def pipeline(self) -> Pipeline:
+        return trajectory_pipeline(
+            highway_trajectory_spec(
+                self.loader_config,
+                split_request=self.split_request,
+                min_lane_change_events=5,
+                negative_keep_every=3,
+            )
+        )
+
     @staticmethod
     @override
     def meta_data_select() -> list[pl.Expr]:
         """Select the relevant columns from the metadata CSV."""
         return [
             pl.col("id"),
-            pl.col("numLaneChanges").alias("lane_changes"),
             pl
             .col("class")
             .replace_strict({
@@ -101,6 +113,7 @@ class AD4CHELoader(LevelXDataLoader):
             pl.col("yVelocity").alias("vy"),
             pl.col("xAcceleration").alias("ax"),
             pl.col("yAcceleration").alias("ay"),
+            pl.col("laneId").alias("lane_id"),
         ]
 
     @staticmethod
@@ -126,7 +139,6 @@ class AD4CHELoader(LevelXDataLoader):
         return (
             LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
             .with_resampling(ResampleSpec(up=1, down=3))
-            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[59])]))
             .with_window(45)
         )
 
@@ -174,3 +186,24 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float64,
     "yAcceleration": pl.Float64,
 })
+
+if __name__ == "__main__":
+    import os
+
+    import altair as alt
+
+    from dronalize.datasets.registry import DatasetDescriptor
+
+    _ = alt.renderers.enable("browser")
+
+    path_str = os.environ.get("TRAJ_DATA", None)
+    path = Path() if path_str is None else Path(path_str)
+    path /= "ad4che"
+    loader = AD4CHELoader(path)
+    descriptor = DatasetDescriptor.from_loader("ad4che", AD4CHELoader, has_map=True)
+
+    with descriptor.execution_scope(
+        path, AD4CHELoader.default_config(), AD4CHELoader.default_map_config()
+    ):
+        count = sum(1 for _ in loader.scenes())
+        print(f"Discovered {count} scenes.")

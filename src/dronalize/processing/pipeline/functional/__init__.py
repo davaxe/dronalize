@@ -7,6 +7,7 @@ from dronalize.processing.pipeline.functional.basic import (
 )
 from dronalize.processing.pipeline.functional.block import cumulative_blocks, shuffled_blocks
 from dronalize.processing.pipeline.functional.derivative import derivative
+from dronalize.processing.pipeline.functional.highway import valid_lane_change
 from dronalize.processing.pipeline.functional.resample import resample
 from dronalize.processing.pipeline.functional.window import sliding_window
 
@@ -17,6 +18,7 @@ __all__ = [
     "resample",
     "shuffled_blocks",
     "sliding_window",
+    "valid_lane_change",
     "yaw_from_pos",
     "yaw_from_pos_expr",
     "yaw_from_vel",

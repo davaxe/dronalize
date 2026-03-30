@@ -123,7 +123,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
                 sample_time=0.4,
             )
             .with_window(step_size=1)
-            .with_filters(Filter.define(filter_rules=[MinimumAgentSamples(minimum=2)]))
+            .with_filter(Filter.define(agent_validation_rules=[MinimumAgentSamples(minimum=2)]))
             .with_resampling(
                 ResampleSpec(
                     up=4,

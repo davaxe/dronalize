@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, Literal
 
 import polars as pl
 
+from dronalize._internal._polars_ops import normalize_group_by
 from dronalize.processing.filters.context import FilterContext
 from dronalize.processing.filters.rules.base import (
-    AgentFilterRule,
-    SceneFilterRule,
+    AgentValidationRule,
     rule_name,
 )
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from dronalize._internal._typing import DataFrameT
     from dronalize.processing.filters.filter import Filter
-    from dronalize.processing.filters.rules.base import CleanupRule, FilterRule, Rule
+    from dronalize.processing.filters.rules.base import CleanupRule, Rule, SceneValidationRule
 
 
 _FILTER_SCENE_IS_VALID = "_filter_scene_is_valid"
@@ -60,7 +60,7 @@ class RuleDiagnostics:
 
 def filter_scene(
     data: DataFrameT,
-    filters: Filter | None,
+    scene_filter: Filter | None,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
@@ -69,12 +69,12 @@ def filter_scene(
     mode: FilterMode = "filtered",
 ) -> DataFrameT:
     """Apply cleanup and validation rules to trajectory scenes."""
-    if filters is None:
+    if scene_filter is None:
         return data
 
     diagnosed, diagnostic_columns = _diagnose_scene(
         data,
-        filters,
+        scene_filter,
         group_by=group_by,
         agent_id=agent_id,
         frame_column=frame_column,
@@ -87,7 +87,7 @@ def filter_scene(
 
 def _diagnose_scene(
     data: DataFrameT,
-    filters: Filter,
+    scene_filter: Filter,
     *,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
@@ -101,8 +101,19 @@ def _diagnose_scene(
         frame_column=frame_column,
         category_column=category_column,
     )
-    cleaned = _apply_cleanup(data, filters.cleanup_rules, ctx)
-    return _annotate_rules(cleaned, filters.filter_rules, ctx)
+    cleaned = _apply_cleanup(data, scene_filter.cleanup_rules, ctx)
+    diagnosed, diagnostic_columns, scene_pass_columns = _annotate_scene_rules(
+        cleaned,
+        scene_filter.scene_validation_rules,
+        ctx,
+    )
+    return _annotate_agent_rules(
+        diagnosed,
+        scene_filter.agent_validation_rules,
+        ctx,
+        diagnostic_columns=diagnostic_columns,
+        scene_pass_columns=scene_pass_columns,
+    )
 
 
 def _build_context(
@@ -112,7 +123,7 @@ def _build_context(
     frame_column: str,
     category_column: str | None,
 ) -> FilterContext:
-    group_by_list = [group_by] if isinstance(group_by, str) else list(group_by or [])
+    group_by_list = list(normalize_group_by(group_by))
     scene_window = group_by_list or pl.lit(1)
     agent_window = [*group_by_list, agent_id] if group_by_list else [agent_id]
     scene_start_frame = pl.col(frame_column).min().over(scene_window)
@@ -134,19 +145,37 @@ def _apply_cleanup(
     return data.filter(_and_all([rule.expr(ctx) for rule in rules]))
 
 
-def _annotate_rules(
+def _annotate_scene_rules(
     data: DataFrameT,
-    rules: tuple[FilterRule, ...],
+    rules: tuple[SceneValidationRule, ...],
     ctx: FilterContext,
-) -> tuple[DataFrameT, list[str]]:
+) -> tuple[DataFrameT, list[str], list[str]]:
     diagnostic_columns: list[str] = []
     scene_pass_columns: list[str] = []
     diagnosed = data
 
     for rule in rules:
-        diagnosed, columns = _apply_rule(diagnosed, rule, ctx)
+        diagnosed, columns = _apply_scene_rule(diagnosed, rule, ctx)
         scene_pass_columns.append(columns.scene_pass)
-        diagnostic_columns.extend(_rule_diagnostic_names(rule, columns))
+        diagnostic_columns.extend(columns.scene_names())
+
+    return diagnosed, diagnostic_columns, scene_pass_columns
+
+
+def _annotate_agent_rules(
+    data: DataFrameT,
+    rules: tuple[AgentValidationRule, ...],
+    ctx: FilterContext,
+    *,
+    diagnostic_columns: list[str],
+    scene_pass_columns: list[str],
+) -> tuple[DataFrameT, list[str]]:
+    diagnosed = data
+
+    for rule in rules:
+        diagnosed, columns = _apply_agent_rule(diagnosed, rule, ctx)
+        scene_pass_columns.append(columns.scene_pass)
+        diagnostic_columns.extend(columns.agent_names())
 
     diagnosed = diagnosed.with_columns(
         _and_all([pl.col(column) for column in scene_pass_columns]).alias(_FILTER_SCENE_IS_VALID),
@@ -155,22 +184,9 @@ def _annotate_rules(
     return diagnosed, diagnostic_columns
 
 
-def _apply_rule(
-    data: DataFrameT,
-    rule: FilterRule,
-    ctx: FilterContext,
-) -> tuple[DataFrameT, RuleDiagnostics]:
-    if isinstance(rule, AgentFilterRule):
-        return _apply_agent_rule(data, rule, ctx)
-    if isinstance(rule, SceneFilterRule):
-        return _apply_scene_rule(data, rule, ctx)
-    msg = f"Unsupported rule type: {type(rule).__name__}."
-    raise TypeError(msg)
-
-
 def _apply_scene_rule(
     data: DataFrameT,
-    rule: SceneFilterRule,
+    rule: SceneValidationRule,
     ctx: FilterContext,
 ) -> tuple[DataFrameT, RuleDiagnostics]:
     columns = RuleDiagnostics.from_rule(rule)
@@ -180,7 +196,7 @@ def _apply_scene_rule(
 
 def _apply_agent_rule(
     data: DataFrameT,
-    rule: AgentFilterRule,
+    rule: AgentValidationRule,
     ctx: FilterContext,
 ) -> tuple[DataFrameT, RuleDiagnostics]:
     columns = RuleDiagnostics.from_rule(rule)
@@ -220,9 +236,3 @@ def _and_all(exprs: list[pl.Expr]) -> pl.Expr:
     if len(exprs) == 0:
         return pl.lit(value=True)
     return pl.all_horizontal(*exprs)
-
-
-def _rule_diagnostic_names(rule: FilterRule, columns: RuleDiagnostics) -> list[str]:
-    if isinstance(rule, AgentFilterRule):
-        return columns.agent_names()
-    return columns.scene_names()

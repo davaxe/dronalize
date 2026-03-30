@@ -12,7 +12,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY_V1
 from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -143,7 +143,11 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
             LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
             .with_resampling(ResampleSpec(up=1, down=3))
             .with_window(75)
-            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[59])]))
+            .with_filter(
+                Filter.define(
+                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[59])]
+                )
+            )
         )
 
     @classmethod

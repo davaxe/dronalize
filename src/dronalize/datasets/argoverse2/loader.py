@@ -11,7 +11,11 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
 from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import DropAgentCategories, Filter, RequireAgentFrames
+from dronalize.processing.filters import (
+    ExcludeAgentCategories,
+    Filter,
+    RequireAgentCoverageAtFrames,
+)
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
@@ -133,10 +137,10 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(input_len=50, output_len=60, sample_time=0.1).with_filters(
+        return LoaderConfig(input_len=50, output_len=60, sample_time=0.1).with_filter(
             Filter.define(
                 cleanup_rules=[
-                    DropAgentCategories.define(
+                    ExcludeAgentCategories.define(
                         categories=[
                             AgentCategory.STATIC_OBJECT,
                             AgentCategory.UNKNOWN,
@@ -144,7 +148,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
                         ]
                     ),
                 ],
-                filter_rules=[RequireAgentFrames.define(frames=[49])],
+                agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[49])],
             ),
         )
 

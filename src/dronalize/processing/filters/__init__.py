@@ -2,37 +2,37 @@ from dronalize.processing.filters.apply import filter_scene
 from dronalize.processing.filters.filter import Filter, FilterSpec
 from dronalize.processing.filters.rules.agent import (
     MinimumAgentSamples,
-    RequireAgentFrames,
-    RequireFullAgentWindow,
+    RequireAgentCoverageAtFrames,
+    RequireCompleteAgentCoverage,
 )
 from dronalize.processing.filters.rules.base import (
-    AgentFilterRule,
+    AgentValidationRule,
     CleanupRule,
-    FilterRule,
     Rule,
-    SceneFilterRule,
+    SceneValidationRule,
+    ValidationRule,
 )
+from dronalize.processing.filters.rules.cleanup import ExcludeAgentCategories
 from dronalize.processing.filters.rules.scene import (
-    DropAgentCategories,
     MinimumAgents,
-    RequireContiguousSceneFrames,
-    RequireSceneFrames,
+    RequireGaplessSceneFrames,
+    RequireSceneCoverageAtFrames,
 )
 
 __all__ = [
-    "AgentFilterRule",
+    "AgentValidationRule",
     "CleanupRule",
-    "DropAgentCategories",
+    "ExcludeAgentCategories",
     "Filter",
-    "FilterRule",
     "FilterSpec",
     "MinimumAgentSamples",
     "MinimumAgents",
-    "RequireAgentFrames",
-    "RequireContiguousSceneFrames",
-    "RequireFullAgentWindow",
-    "RequireSceneFrames",
+    "RequireAgentCoverageAtFrames",
+    "RequireCompleteAgentCoverage",
+    "RequireGaplessSceneFrames",
+    "RequireSceneCoverageAtFrames",
     "Rule",
-    "SceneFilterRule",
+    "SceneValidationRule",
+    "ValidationRule",
     "filter_scene",
 ]

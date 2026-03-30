@@ -32,25 +32,25 @@ position_columns = ["x", "y"]
 custom_flag = "debug"
 emit_metrics = true
 
-[a43.loader.filters]
+[a43.loader.filter]
 mode = "merge"
 
-[[a43.loader.filters.cleanup]]
-type = "drop_agent_categories"
+[[a43.loader.filter.cleanup]]
+type = "exclude_categories"
 categories = ["STATIC_OBJECT", "UNIMPORTANT"]
 
-[[a43.loader.filters.validate]]
-type = "minimum_agents"
+[[a43.loader.filter.validate_scene]]
+type = "min_agents"
 minimum = 2
 
-[[a43.loader.filters.validate]]
-type = "require_agent_frames"
+[[a43.loader.filter.validate_agent]]
+type = "agent_frames"
 frames = [19]
 max_invalid_agents = 1
 max_invalid_fraction = 0.05
 
-[[a43.loader.filters.validate]]
-type = "minimum_agent_samples"
+[[a43.loader.filter.validate_agent]]
+type = "min_agent_samples"
 minimum = 8
 max_invalid_agents = 1
 max_invalid_fraction = 0.05

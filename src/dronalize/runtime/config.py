@@ -108,7 +108,7 @@ def resolve_runtime_config(
 ) -> Config:
     """Merge dataset overrides into a default runtime config and validate the result."""
     merged_data = _deep_merge(_config_data(default), _config_data(overrides or {}))
-    merged_data = _resolve_loader_filters(merged_data, default_filters=default.loader.filters)
+    merged_data = _resolve_loader_filter(merged_data, default_filter=default.loader.filter)
     return Config.model_validate(merged_data)
 
 
@@ -119,25 +119,25 @@ def _config_data(value: BaseModel | ConfigOverride) -> ConfigOverride:
     return {name: _config_data(getattr(value, name)) for name in type(value).model_fields}
 
 
-def _resolve_loader_filters(
+def _resolve_loader_filter(
     merged_data: ConfigOverride,
     *,
-    default_filters: Filter | None,
+    default_filter: Filter | None,
 ) -> ConfigOverride:
     """Resolve config-facing filter specs into runtime filter objects."""
     loader_value = merged_data.get("loader")
     if not _is_config_section(loader_value):
         return merged_data
 
-    filters_value = loader_value.get("filters")
-    if filters_value is None or isinstance(filters_value, Filter):
+    filter_value = loader_value.get("filter")
+    if filter_value is None or isinstance(filter_value, Filter):
         return merged_data
-    if not _is_config_section(filters_value):
+    if not _is_config_section(filter_value):
         return merged_data
 
-    resolved_filters = FilterSpec.model_validate(filters_value).resolve(default_filters)
+    resolved_filter = FilterSpec.model_validate(filter_value).resolve(default_filter)
     resolved_loader = dict(loader_value)
-    resolved_loader["filters"] = resolved_filters
+    resolved_loader["filter"] = resolved_filter
 
     resolved_config = dict(merged_data)
     resolved_config["loader"] = resolved_loader

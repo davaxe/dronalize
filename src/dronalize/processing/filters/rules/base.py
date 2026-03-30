@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from pydantic import Field
+
 if TYPE_CHECKING:
     import polars as pl
 
@@ -16,19 +18,23 @@ class Rule(ABC):
     def expr(self, ctx: FilterContext) -> pl.Expr:
         """Return the Polars expression that evaluates the rule."""
 
+    def name(self) -> str:
+        """Return the stable rule identifier used in config and diagnostics."""
+        return rule_name(self)
 
-class FilterRule(Rule, ABC):
+
+class ValidationRule(Rule, ABC):
     """Base class for validation rules that decide scene validity."""
 
 
-class AgentFilterRule(FilterRule, ABC):
+class AgentValidationRule(ValidationRule, ABC):
     """Base class for per-agent validation rules."""
 
-    max_invalid_agents: int
-    max_invalid_fraction: float
+    max_invalid_agents: int = Field(ge=0, kw_only=True)
+    max_invalid_fraction: float = Field(ge=0.0, le=1.0, kw_only=True)
 
 
-class SceneFilterRule(FilterRule, ABC):
+class SceneValidationRule(ValidationRule, ABC):
     """Base class for scene-level validation rules."""
 
 

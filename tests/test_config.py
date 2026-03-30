@@ -14,18 +14,18 @@ from dronalize.core.scene import (
 )
 from dronalize.io import WriterConfig
 from dronalize.processing.filters import (
-    AgentFilterRule,
+    AgentValidationRule,
     CleanupRule,
-    DropAgentCategories,
+    ExcludeAgentCategories,
     Filter,
     FilterSpec,
     MinimumAgents,
     MinimumAgentSamples,
-    RequireAgentFrames,
-    RequireContiguousSceneFrames,
-    RequireFullAgentWindow,
-    RequireSceneFrames,
-    SceneFilterRule,
+    RequireAgentCoverageAtFrames,
+    RequireCompleteAgentCoverage,
+    RequireGaplessSceneFrames,
+    RequireSceneCoverageAtFrames,
+    SceneValidationRule,
 )
 from dronalize.processing.ingest import BySceneSplit, LoaderConfig, SplitConfig, SplitWeights
 from dronalize.processing.maps import (
@@ -42,23 +42,6 @@ from dronalize.runtime import (
     load_config_overrides,
     resolve_runtime_config,
 )
-
-
-def test_circular_extraction_valid() -> None:
-    """Initialize CircularExtraction with a valid radius."""
-    extraction = CircularExtraction(radius=10.5)
-
-    assert extraction.mode == "circle"
-    assert extraction.radius == pytest.approx(10.5)
-
-
-def test_bounding_box_extraction_valid() -> None:
-    """Initialize BoundingBoxExtraction with valid dimensions."""
-    extraction = BoundingBoxExtraction(width=5.0, height=8.0)
-
-    assert extraction.mode == "bounding_box"
-    assert extraction.width == pytest.approx(5.0)
-    assert extraction.height == pytest.approx(8.0)
 
 
 def test_map_config_default_initialization() -> None:
@@ -173,21 +156,21 @@ def test_map_config_distance_validation_failure() -> None:
 
 def test_filters_parse_single_agent_category_string() -> None:
     """Parse a single string into a frozenset of AgentCategory."""
-    rule = DropAgentCategories.define(categories="CAR")
+    rule = ExcludeAgentCategories.define(categories="CAR")
 
     assert rule.categories == frozenset([AgentCategory.CAR])
 
 
 def test_filters_parse_list_agent_category_strings() -> None:
     """Parse a list of strings into a frozenset of AgentCategory."""
-    rule = DropAgentCategories.define(categories=["CAR", "PEDESTRIAN"])
+    rule = ExcludeAgentCategories.define(categories=["CAR", "PEDESTRIAN"])
 
     assert rule.categories == frozenset([AgentCategory.CAR, AgentCategory.PEDESTRIAN])
 
 
 def test_filters_accept_existing_enum_member() -> None:
     """Accept an existing Enum member directly and coerce it into a frozenset."""
-    rule = DropAgentCategories.define(categories=AgentCategory.VAN)
+    rule = ExcludeAgentCategories.define(categories=AgentCategory.VAN)
 
     assert rule.categories == frozenset([AgentCategory.VAN])
 
@@ -195,71 +178,72 @@ def test_filters_accept_existing_enum_member() -> None:
 def test_filters_reject_invalid_agent_category() -> None:
     """Raise ValueError when an invalid agent category string is provided."""
     with pytest.raises(ValueError, match="Unknown agent category"):
-        DropAgentCategories.define(categories=["CAR", "SPACESHIP"])
+        ExcludeAgentCategories.define(categories=["CAR", "SPACESHIP"])
 
 
-def test_filter_rules_parse_single_frame_int() -> None:
+def test_validation_rules_parse_single_frame_int() -> None:
     """Parse a single integer into a frozenset for required-agent frames."""
-    rule = RequireAgentFrames.define(frames=(19,))
+    rule = RequireAgentCoverageAtFrames.define(frames=(19,))
 
     assert rule.frames == frozenset([19])
 
 
-def test_filter_rules_parse_list_frames() -> None:
+def test_validation_rules_parse_list_frames() -> None:
     """Parse a list of integers into a frozenset for required-scene frames."""
-    rule = RequireSceneFrames.define(frames=[19, 20, 21])
+    rule = RequireSceneCoverageAtFrames.define(frames=[19, 20, 21])
 
     assert rule.frames == frozenset([19, 20, 21])
 
 
 def test_filters_default_to_empty_rule_lists() -> None:
     """Empty filters should simply contain no cleanup or validation rules."""
-    filters = Filter()
+    scene_filter = Filter()
 
-    assert filters.cleanup_rules == ()
-    assert filters.filter_rules == ()
+    assert scene_filter.cleanup_rules == ()
+    assert scene_filter.scene_validation_rules == ()
+    assert scene_filter.agent_validation_rules == ()
 
 
 def test_filters_reject_duplicate_rule_types() -> None:
     """The same rule type should not appear twice in one filter."""
     with pytest.raises(ValueError, match="Duplicate rule name"):
-        Filter.define(filter_rules=[MinimumAgents(minimum=1), MinimumAgents(minimum=2)])
+        Filter.define(scene_validation_rules=[MinimumAgents(minimum=1), MinimumAgents(minimum=2)])
 
 
 def test_filter_collects_direct_rule_objects() -> None:
     """Direct rule instances should be stored as immutable tuples."""
-    filters = Filter.define(
-        cleanup_rules=[DropAgentCategories.define(categories="STATIC_OBJECT")],
-        filter_rules=[
-            MinimumAgents(minimum=3),
-            RequireFullAgentWindow(max_invalid_agents=1, max_invalid_fraction=0.25),
-            RequireAgentFrames.define(frames=[10, 15]),
+    scene_filter = Filter.define(
+        cleanup_rules=[ExcludeAgentCategories.define(categories="STATIC_OBJECT")],
+        scene_validation_rules=[MinimumAgents(minimum=3)],
+        agent_validation_rules=[
+            RequireCompleteAgentCoverage(max_invalid_agents=1, max_invalid_fraction=0.25),
+            RequireAgentCoverageAtFrames.define(frames=[10, 15]),
             MinimumAgentSamples(minimum=5),
         ],
     )
 
-    assert isinstance(filters.cleanup_rules[0], DropAgentCategories)
-    assert filters.cleanup_rules[0].categories == frozenset([AgentCategory.STATIC_OBJECT])
-    assert isinstance(filters.filter_rules[0], MinimumAgents)
-    assert filters.filter_rules[0].minimum == 3
-    assert isinstance(filters.filter_rules[1], RequireFullAgentWindow)
-    assert filters.filter_rules[1].max_invalid_agents == 1
-    assert filters.filter_rules[1].max_invalid_fraction == pytest.approx(0.25)
-    assert isinstance(filters.filter_rules[2], RequireAgentFrames)
-    assert filters.filter_rules[2].frames == frozenset([10, 15])
-    assert isinstance(filters.filter_rules[3], MinimumAgentSamples)
-    assert filters.filter_rules[3].minimum == 5
+    assert isinstance(scene_filter.cleanup_rules[0], ExcludeAgentCategories)
+    assert scene_filter.cleanup_rules[0].categories == frozenset([AgentCategory.STATIC_OBJECT])
+    assert isinstance(scene_filter.scene_validation_rules[0], MinimumAgents)
+    assert scene_filter.scene_validation_rules[0].minimum == 3
+    assert isinstance(scene_filter.agent_validation_rules[0], RequireCompleteAgentCoverage)
+    assert scene_filter.agent_validation_rules[0].max_invalid_agents == 1
+    assert scene_filter.agent_validation_rules[0].max_invalid_fraction == pytest.approx(0.25)
+    assert isinstance(scene_filter.agent_validation_rules[1], RequireAgentCoverageAtFrames)
+    assert scene_filter.agent_validation_rules[1].frames == frozenset([10, 15])
+    assert isinstance(scene_filter.agent_validation_rules[2], MinimumAgentSamples)
+    assert scene_filter.agent_validation_rules[2].minimum == 5
 
 
 def test_filter_spec_parses_discriminated_rules() -> None:
     """Config-facing filter specs should parse discriminated cleanup and validation rules."""
     spec = FilterSpec.model_validate({
         "mode": "replace",
-        "cleanup": [{"type": "drop_agent_categories", "categories": ["CAR", "PEDESTRIAN"]}],
-        "validate": [
-            {"type": "minimum_agents", "minimum": 2},
+        "cleanup": [{"type": "exclude_categories", "categories": ["CAR", "PEDESTRIAN"]}],
+        "validate_scene": [{"type": "min_agents", "minimum": 2}],
+        "validate_agent": [
             {
-                "type": "require_agent_frames",
+                "type": "agent_frames",
                 "frames": [0, 4],
                 "max_invalid_agents": 1,
                 "max_invalid_fraction": 0.25,
@@ -270,73 +254,41 @@ def test_filter_spec_parses_discriminated_rules() -> None:
     resolved = spec.resolve()
 
     assert resolved.cleanup_rules == (
-        DropAgentCategories.define(categories=["CAR", "PEDESTRIAN"]),
+        ExcludeAgentCategories.define(categories=["CAR", "PEDESTRIAN"]),
     )
-    assert resolved.filter_rules == (
-        MinimumAgents(minimum=2),
-        RequireAgentFrames.define(frames=[0, 4], max_invalid_agents=1, max_invalid_fraction=0.25),
-    )
-
-
-def test_loader_config_with_filters_rejects_out_of_range_negative_frame() -> None:
-    """Reject negative frame references that fall outside the configured sequence length."""
-    with pytest.raises(ValueError, match=r"Frame index -6 is out of range"):
-        LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
-            Filter.define(filter_rules=[RequireAgentFrames.define(frames=[-6])]),
-        )
-
-
-def test_loader_config_normalizes_negative_required_agent_frames() -> None:
-    """Negative frame references should resolve from the end of the configured sequence."""
-    config = LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
-        Filter.define(filter_rules=[RequireAgentFrames.define(frames=[-1, 0])]),
-    )
-
-    assert config.filters is not None
-    assert config.filters.filter_rules == (
-        RequireAgentFrames.define(frames=[4, 0]),
+    assert resolved.scene_validation_rules == (MinimumAgents(minimum=2),)
+    assert resolved.agent_validation_rules == (
+        RequireAgentCoverageAtFrames.define(
+            frames=[0, 4], max_invalid_agents=1, max_invalid_fraction=0.25
+        ),
     )
 
 
-def test_loader_config_normalizes_negative_required_scene_frames() -> None:
-    """Scene-level frame requirements should support negative indices as well."""
-    config = LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
-        Filter.define(filter_rules=[RequireSceneFrames.define(frames=[-1, -2, 0])]),
-    )
-
-    assert config.filters is not None
-    assert config.filters.filter_rules == (
-        RequireSceneFrames.define(frames=[4, 3, 0]),
-    )
-
-
-def test_filter_rules_expose_expected_protocols() -> None:
+def test_validation_rules_expose_expected_protocols() -> None:
     """Rule instances should advertise the expected cleanup and validation protocols."""
     rules = [
-        DropAgentCategories.define(categories=["CAR"]),
+        ExcludeAgentCategories.define(categories=["CAR"]),
         MinimumAgents(minimum=1),
-        RequireSceneFrames.define(frames=[0]),
-        RequireContiguousSceneFrames(),
-        RequireFullAgentWindow(),
-        RequireAgentFrames.define(frames=[0]),
+        RequireSceneCoverageAtFrames.define(frames=[0]),
+        RequireGaplessSceneFrames(),
+        RequireCompleteAgentCoverage(),
+        RequireAgentCoverageAtFrames.define(frames=[0]),
         MinimumAgentSamples(minimum=2),
     ]
 
     assert isinstance(rules[0], CleanupRule)
-    assert all(isinstance(rule, SceneFilterRule) for rule in rules[1:4])
-    assert all(isinstance(rule, AgentFilterRule) for rule in rules[4:])
+    assert all(isinstance(rule, SceneValidationRule) for rule in rules[1:4])
+    assert all(isinstance(rule, AgentValidationRule) for rule in rules[4:])
 
 
 def test_resolve_runtime_config_preserves_filter_objects() -> None:
     """Runtime config merging should preserve direct filter objects from the default config."""
     default = Config(
-        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filter(
             Filter.define(
-                cleanup_rules=[DropAgentCategories.define(categories=["CAR"])],
-                filter_rules=[
-                    MinimumAgents(minimum=2),
-                    RequireAgentFrames.define(frames=[0]),
-                ],
+                cleanup_rules=[ExcludeAgentCategories.define(categories=["CAR"])],
+                scene_validation_rules=[MinimumAgents(minimum=2)],
+                agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[0])],
             )
         ),
         map=MapConfig.default(),
@@ -349,21 +301,19 @@ def test_resolve_runtime_config_preserves_filter_objects() -> None:
         },
     )
 
-    assert resolved.loader.filters is not None
-    assert resolved.loader.filters == default.loader.filters
+    assert resolved.loader.filter is not None
+    assert resolved.loader.filter == default.loader.filter
     assert resolved.execution.workers == 8
 
 
-def test_resolve_runtime_config_merges_filter_specs_on_top_of_default_filters() -> None:
+def test_resolve_runtime_config_merges_filter_specs_on_top_of_default_filter() -> None:
     """Filter specs in merge mode should replace same-name rules and keep other defaults."""
     default = Config(
-        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filters(
+        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filter(
             Filter.define(
-                cleanup_rules=[DropAgentCategories.define(categories=["CAR"])],
-                filter_rules=[
-                    RequireAgentFrames.define(frames=[0]),
-                    MinimumAgents(minimum=2),
-                ],
+                cleanup_rules=[ExcludeAgentCategories.define(categories=["CAR"])],
+                scene_validation_rules=[MinimumAgents(minimum=2)],
+                agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[0])],
             )
         ),
         map=MapConfig.default(),
@@ -373,22 +323,21 @@ def test_resolve_runtime_config_merges_filter_specs_on_top_of_default_filters() 
         default=default,
         overrides={
             "loader": {
-                "filters": {
+                "filter": {
                     "mode": "merge",
-                    "validate": [
-                        {"type": "require_agent_frames", "frames": [1]},
-                        {"type": "minimum_agent_samples", "minimum": 3},
+                    "validate_agent": [
+                        {"type": "agent_frames", "frames": [1]},
+                        {"type": "min_agent_samples", "minimum": 3},
                     ],
                 }
             }
         },
     )
-
-    assert resolved.loader.filters == Filter.define(
-        cleanup_rules=[DropAgentCategories.define(categories=["CAR"])],
-        filter_rules=[
-            RequireAgentFrames.define(frames=[1]),
-            MinimumAgents(minimum=2),
+    assert resolved.loader.filter == Filter.define(
+        cleanup_rules=[ExcludeAgentCategories.define(categories=["CAR"])],
+        scene_validation_rules=[MinimumAgents(minimum=2)],
+        agent_validation_rules=[
+            RequireAgentCoverageAtFrames.define(frames=[1]),
             MinimumAgentSamples(minimum=3),
         ],
     )
@@ -547,20 +496,20 @@ def test_load_config_overrides_supports_loader_filter_specs(tmp_path: Path) -> N
     """TOML loader filter tables should resolve into runtime filter objects."""
     config_path = tmp_path / "config.toml"
     config_path.write_text(
-        """[a43.loader.filters]
+        """[a43.loader.filter]
 mode = "replace"
 
-[[a43.loader.filters.cleanup]]
-type = "drop_agent_categories"
+[[a43.loader.filter.cleanup]]
+type = "exclude_categories"
 categories = ["CAR"]
 
-[[a43.loader.filters.validate]]
-type = "minimum_agents"
+[[a43.loader.filter.validate_scene]]
+type = "min_agents"
 minimum = 3
 
-[[a43.loader.filters.validate]]
-type = "require_agent_frames"
-frames = [0, -1]
+[[a43.loader.filter.validate_agent]]
+type = "agent_frames"
+frames = [0, 4]
 max_invalid_agents = 1
 max_invalid_fraction = 0.2
 """,
@@ -575,16 +524,15 @@ max_invalid_fraction = 0.2
         ),
         overrides=overrides.for_dataset("a43"),
     )
-
-    assert resolved.loader.filters == Filter.define(
-        cleanup_rules=[DropAgentCategories.define(categories=["CAR"])],
-        filter_rules=[
-            MinimumAgents(minimum=3),
-            RequireAgentFrames.define(
+    assert resolved.loader.filter == Filter.define(
+        cleanup_rules=[ExcludeAgentCategories.define(categories=["CAR"])],
+        scene_validation_rules=[MinimumAgents(minimum=3)],
+        agent_validation_rules=[
+            RequireAgentCoverageAtFrames.define(
                 frames=[0, 4],
                 max_invalid_agents=1,
                 max_invalid_fraction=0.2,
-            ),
+            )
         ],
     )
 

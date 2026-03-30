@@ -10,7 +10,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1, Scene
 from dronalize.datasets.a43.maps.builder import A43MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -105,7 +105,11 @@ class A43Loader(BaseSceneLoader[Path]):
         return (
             LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
             .with_window(25)
-            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[19])]))
+            .with_filter(
+                Filter.define(
+                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[19])]
+                )
+            )
         )
 
     @classmethod

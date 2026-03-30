@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY_V1
-from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -136,7 +136,11 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
             LoaderConfig(input_len=4, output_len=12, sample_time=0.5)
             .with_resampling(ResampleSpec(up=5, down=1))
             .with_window(step_size=1)
-            .with_filters(Filter.define(filter_rules=[RequireAgentFrames.define(frames=[3])]))
+            .with_filter(
+                Filter.define(
+                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[3])]
+                )
+            )
         )
 
     @override

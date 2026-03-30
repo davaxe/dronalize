@@ -11,20 +11,12 @@ if TYPE_CHECKING:
     from dronalize._internal._typing import DataFrameT
 
 
-def _normalize_group_by(group_by: str | Sequence[str] | None) -> list[str]:
-    if group_by is None:
-        return []
-    if isinstance(group_by, str):
-        return [group_by]
-    return list(group_by)
-
-
 def cumulative_blocks(
     data: DataFrameT,
     weights: Sequence[float],
     *,
     time_column: str = "frame",
-    group_by: str | Sequence[str] | None = None,
+    group_by: Sequence[str] | None = None,
     gap: int = 0,
     remove_gap: bool = True,
     offset_time_column: bool = True,
@@ -89,14 +81,17 @@ def cumulative_blocks(
     │ 2     ┆ 2        ┆ 23    ┆ 1     │
     └───────┴──────────┴───────┴───────┘
     """
-    groups = _normalize_group_by(group_by)
+    groups = list(group_by) if group_by is not None else []
     weight_sum: float = sum(weights)
     weights_n: list[float] = [w / weight_sum for w in weights]
 
-    min_t: pl.Expr = pl.col(time_column).over(groups).min() if groups else pl.col(time_column).min()
-    max_t: pl.Expr = pl.col(time_column).over(groups).max() if groups else pl.col(time_column).max()
-    n: pl.Expr = max_t - min_t + 1
+    min_t: pl.Expr = pl.col(time_column).min()
+    max_t: pl.Expr = pl.col(time_column).max()
+    if groups:
+        min_t = min_t.over(groups)
+        max_t = max_t.over(groups)
 
+    n: pl.Expr = max_t - min_t + 1
     n_gaps = max(0, len(weights) - 1)
     total_gap = n_gaps * gap
     usable = n - total_gap
@@ -148,7 +143,7 @@ def shuffled_blocks(
     n_segments: int,
     *,
     time_column: str = "frame",
-    group_by: str | Sequence[str] | None = None,
+    group_by: Sequence[str] | None = None,
     gap: int = 0,
     seed: int | None = None,
     assignment_column: str = "block",
@@ -219,11 +214,11 @@ def _assign_weighted_groups(
     group_column: str,
     weights: Sequence[float],
     *,
-    group_by: str | Sequence[str] | None = None,
+    group_by: Sequence[str] | None = None,
     out_col: str = "new_group",
     seed: int | None = None,
 ) -> DataFrameT:
-    groups_by = _normalize_group_by(group_by)
+    groups_by = list(group_by) if group_by is not None else []
     hash_seed = seed if seed is not None else random.randint(0, 2**64 - 1)
     key_columns = [*groups_by, group_column]
     assignment_column = out_col if out_col != group_column else "_assigned_group"

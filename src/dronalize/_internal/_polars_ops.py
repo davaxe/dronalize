@@ -107,3 +107,12 @@ def derivative(
         current_exprs = next_order_exprs
 
     return data.with_columns(all_expressions)
+
+
+def normalize_group_by(group_by: str | Sequence[str] | None) -> tuple[str, ...]:
+    """Normalize group-by inputs to a tuple of column names."""
+    if group_by is None:
+        return ()
+    if isinstance(group_by, str):
+        return (group_by,)
+    return tuple(group_by)

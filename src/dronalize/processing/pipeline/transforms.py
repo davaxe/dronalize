@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 def filter_scene(
-    filters: Filter | None = None,
+    scene_filter: Filter | None = None,
     *,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
@@ -32,7 +32,7 @@ def filter_scene(
 
     Parameters
     ----------
-    filters : Filter, optional
+    scene_filter : Filter, optional
         Filter specification containing cleanup and validation rules.
     group_by : str or Sequence[str], optional
         Column(s) that define independent scenes inside the frame.
@@ -45,16 +45,12 @@ def filter_scene(
     mode : {"filtered", "diagnose"}, optional
         Whether to return only valid scenes or annotate all cleaned scenes.
 
-    Returns
-    -------
-    Transform
-
     """
 
     def _filter(df: pl.LazyFrame) -> pl.LazyFrame:
         return f.filter_scene(
             df,
-            filters=filters,
+            scene_filter=scene_filter,
             group_by=group_by,
             agent_id=agent_id,
             frame_column=frame_column,
@@ -76,10 +72,6 @@ def require_min(group_by: str | Sequence[str], minimum: int = 2) -> Transform:
         Column(s) to group by.
     minimum : int, optional
         Minimum number of rows required per group. Default is 1.
-
-    Returns
-    -------
-    Transform
     """
 
     def _require_min(df: pl.LazyFrame) -> pl.LazyFrame:
@@ -106,10 +98,6 @@ def resample(
         Column name for the frame index.
     group_by : str or Sequence[str], optional
         Columns to partition tracks by.
-
-    Returns
-    -------
-    Transform
 
     """
     resample_spec = spec or ResampleSpec()
@@ -154,10 +142,6 @@ def derivative(
     derivative_rename : dict[int, list[str]], optional
         Custom derivative column names.
 
-    Returns
-    -------
-    Transform
-
     """
 
     def _derivative(df: pl.LazyFrame) -> pl.LazyFrame:
@@ -196,10 +180,6 @@ def yaw_from_vel(
     only_null : bool, optional
         Whether to only compute yaw for rows where `yaw_col` is null. Note that
         this requires that `yaw_col` already exists in the input frame.
-
-    Returns
-    -------
-    Transform
 
     """
     if only_null:
@@ -246,10 +226,6 @@ def yaw_from_pos(
         Whether to only compute yaw for rows where `yaw_col` is null. Note that
         this requires that `yaw_col` already exists in the input frame.
 
-    Returns
-    -------
-    Transform
-
     """
     if only_null:
 
@@ -295,10 +271,6 @@ def window(
         Column to slide over.
     offset_sliding_col : bool, optional
         Whether to zero-offset the sliding column in each window.
-
-    Returns
-    -------
-    Transform
 
     """
 
@@ -359,10 +331,6 @@ def block_partition_cumulative(
     partition_column : str, optional
         Name of the output partition column. Default is `"block"`.
 
-    Returns
-    -------
-    Transform
-
     """
 
     def _block_partition_cumulative(df: pl.LazyFrame) -> pl.LazyFrame:
@@ -421,10 +389,6 @@ def block_partition_shuffle(
     segment_column : str, optional
         Name of the intermediate contiguous segment column. Default is `"unit"`.
 
-    Returns
-    -------
-    Transform
-
     """
 
     def _block_partition_shuffle(df: pl.LazyFrame) -> pl.LazyFrame:
@@ -446,6 +410,67 @@ def block_partition_shuffle(
     return _block_partition_shuffle
 
 
+def valid_lane_change(
+    persist: int,
+    margin_before: int = 0,
+    margin_after: int = 0,
+    *,
+    frame_column: str = "frame",
+    agent_id_column: str = "id",
+    lane_id_column: str = "lane_id",
+    group_by: str | Sequence[str] | None = None,
+    valid_column: str = "valid_lane_change",
+) -> Transform:
+    """Add a boolean column indicating whether change occurs at each frame.
+
+    This is a wrapper around `valid_lane_change_expr` that handles the necessary
+    sorting to ensure correct results. The added column will be named according
+    to the `valid_column` parameter (default is "valid_lane_change"). See
+    `valid_lane_change_expr` for more details.
+
+    Parameters
+    ----------
+    persist : int
+        Number of frames the lane change should persist in order to be considered
+        valid. This is useful if the lane assignment is noisy.
+    margin_before : int, optional
+        Number of frames that should exist before the lane change in order
+        to be considered valid.
+    margin_after : int, optional
+        Number of frames that should exist after the lane change in order
+        to be considered valid.
+    frame_column : str, optional
+        Name of the frame column. Default is "frame".
+    agent_id_column : str, optional
+        Name of the agent id column. Default is "id".
+    lane_id_column : str, optional
+        Name of the lane id column. Default is "lane_id".
+    group_by : str or Sequence[str] or None, optional
+        Column name(s) used to partition each group independently. Default is no
+        partitioning.
+    valid_column : str, optional
+        Name of the output boolean column indicating valid lane changes.
+
+    """
+
+    def _valid_lane_change(df: pl.LazyFrame) -> pl.LazyFrame:
+        return f.valid_lane_change(
+            df,
+            persist=persist,
+            margin_before=margin_before,
+            margin_after=margin_after,
+            frame_column=frame_column,
+            agent_id_column=agent_id_column,
+            lane_id_column=lane_id_column,
+            group_by=group_by,
+            valid_column=valid_column,
+        )
+
+    _valid_lane_change.__name__ = "valid_lane_change"
+    _valid_lane_change.__qualname__ = "transforms.valid_lane_change"
+    return _valid_lane_change
+
+
 def group_by_yield(
     *by: str,
     drop_group_cols: bool = True,
@@ -463,10 +488,6 @@ def group_by_yield(
     drop_group_cols : bool, optional
         Whether to drop the grouping columns from each yielded frame.
 
-    Returns
-    -------
-    FlatMapTransform
-
     """
     by_tuple = tuple(by)
 
@@ -475,7 +496,7 @@ def group_by_yield(
 
         parts = collected.partition_by(
             *by_tuple,
-            maintain_order=False,
+            maintain_order=True,
             as_dict=False,
             include_key=not drop_group_cols,
         )
@@ -498,10 +519,6 @@ def select(*expr: pl.Expr, **named_expr: pl.Expr) -> Transform:
     **named_expr : pl.Expr
         Keyword expressions to pass to select.
 
-    Returns
-    -------
-    Transform
-
     """
 
     def _select(df: pl.LazyFrame) -> pl.LazyFrame:
@@ -521,10 +538,6 @@ def with_columns(*expr: pl.Expr, **named_expr: pl.Expr) -> Transform:
         Positional expressions to pass to with_columns.
     **named_expr : pl.Expr
         Keyword expressions to pass to with_columns.
-
-    Returns
-    -------
-    Transform
 
     """
 

@@ -366,13 +366,13 @@ class Pipeline:
 
         Parameters
         ----------
-        f : Callable[[_PipelineEntry], None]
+        f : Callable[[LazyFrame], None]
             A function that takes a pipeline entry and performs side effects.
 
         Returns
         -------
         Pipeline
-            The unchanged pipeline, for chaining.
+            The (functionally) unchanged pipeline, for chaining.
         """
 
         def _inspect_transform(df: pl.LazyFrame) -> pl.LazyFrame:

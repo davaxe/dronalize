@@ -117,7 +117,7 @@ class StorageManifest:
             offset_positions=bool(payload["offset_positions"]),
             has_map=bool(payload["has_map"]),
             sample_time=float(payload["sample_time"]),
-            original_sample_time=float(payload.get("original_sample_time", payload["sample_time"])),
+            original_sample_time=float(payload["original_sample_time"]),
         )
 
 

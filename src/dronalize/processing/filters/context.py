@@ -5,7 +5,7 @@ import polars as pl
 
 @dataclass(slots=True, frozen=True)
 class FilterContext:
-    """Shared expressions and column metadata used while evaluating filter rules."""
+    """Shared expressions and column metadata used while evaluating filter logic."""
 
     agent_id: str
     frame_column: str

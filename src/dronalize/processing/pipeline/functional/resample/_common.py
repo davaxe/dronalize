@@ -10,6 +10,8 @@ import polars as pl
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self, override
 
+from dronalize._internal._polars_ops import normalize_group_by
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
@@ -174,14 +176,6 @@ class ResamplePlan:
     output_derivatives: DerivativeOrderMap
     packed_columns: ColumnOrder
     evaluation_orders: tuple[int, ...]
-
-
-def normalize_group_by(group_by: str | Sequence[str] | None) -> tuple[str, ...]:
-    if group_by is None:
-        return ()
-    if isinstance(group_by, str):
-        return (group_by,)
-    return tuple(group_by)
 
 
 def build_plan(

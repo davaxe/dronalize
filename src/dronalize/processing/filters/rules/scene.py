@@ -8,7 +8,7 @@ from pydantic import BeforeValidator, Field, dataclasses
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
-from dronalize.processing.filters.rules.base import SceneFilterRule
+from dronalize.processing.filters.rules.base import SceneValidationRule
 
 if TYPE_CHECKING:
     from dronalize.processing.filters.context import FilterContext
@@ -28,11 +28,11 @@ FrameSet = Annotated[frozenset[int], Field(min_length=1), BeforeValidator(_coerc
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
-class MinimumAgents(SceneFilterRule):
+class MinimumAgents(SceneValidationRule):
     """Require a minimum number of retained agents in the scene."""
 
     minimum: int = Field(default=1, ge=0)
-    type: Literal["minimum_agents"] = Field("minimum_agents", repr=False, init=False)
+    type: Literal["min_agents"] = Field("min_agents", repr=False, init=False)
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
@@ -40,14 +40,18 @@ class MinimumAgents(SceneFilterRule):
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
-class RequireSceneFrames(SceneFilterRule):
+class RequireSceneCoverageAtFrames(SceneValidationRule):
     """Require specific relative frames to exist in the scene window."""
 
     frames: FrameSet
-    type: Literal["require_scene_frames"] = Field("require_scene_frames", repr=False, init=False)
+    type: Literal["scene_frames"] = Field(
+        "scene_frames",
+        repr=False,
+        init=False,
+    )
 
     @classmethod
-    def define(cls, frames: FrameInput) -> RequireSceneFrames:
+    def define(cls, frames: FrameInput) -> RequireSceneCoverageAtFrames:
         """Alternate constructor that accepts one or many frame indices."""
         return cls(frames=_coerce_frame_set(frames))
 
@@ -59,12 +63,10 @@ class RequireSceneFrames(SceneFilterRule):
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
-class RequireContiguousSceneFrames(SceneFilterRule):
+class RequireGaplessSceneFrames(SceneValidationRule):
     """Require the cleaned scene window to have no frame gaps."""
 
-    type: Literal["require_contiguous_scene_frames"] = Field(
-        "require_contiguous_scene_frames", repr=False, init=False
-    )
+    type: Literal["gapless_scene_frames"] = Field("gapless_scene_frames", repr=False, init=False)
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
@@ -73,3 +75,9 @@ class RequireContiguousSceneFrames(SceneFilterRule):
             pl.col(ctx.frame_column).max() - pl.col(ctx.frame_column).min() + 1,
         )
         return unique_frame_count == frame_span
+
+
+SceneValidationSpec = Annotated[
+    MinimumAgents | RequireSceneCoverageAtFrames | RequireGaplessSceneFrames,
+    Field(discriminator="type"),
+]

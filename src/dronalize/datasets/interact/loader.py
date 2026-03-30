@@ -8,7 +8,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
-from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -130,8 +130,10 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(input_len=10, output_len=30, sample_time=0.1).with_filters(
-            Filter.define(filter_rules=[RequireAgentFrames.define(frames=[19])]),
+        return LoaderConfig(input_len=10, output_len=30, sample_time=0.1).with_filter(
+            Filter.define(
+                agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[19])]
+            ),
         )
 
     @staticmethod

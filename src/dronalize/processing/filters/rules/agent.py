@@ -3,11 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import polars as pl
-from pydantic import BeforeValidator, Field
-from pydantic.dataclasses import dataclass
+from pydantic import BeforeValidator, ConfigDict, Field, dataclasses
 from typing_extensions import override
 
-from dronalize.processing.filters.rules.base import AgentFilterRule
+from dronalize.processing.filters.rules.base import AgentValidationRule
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -24,14 +23,14 @@ def coerce_frame_set(value: int | Iterable[int]) -> FrameSet:
 FrameSet = Annotated[frozenset[int], Field(min_length=1), BeforeValidator(coerce_frame_set)]
 
 
-@dataclass(slots=True, frozen=True)
-class RequireFullAgentWindow(AgentFilterRule):
+@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True))
+class RequireCompleteAgentCoverage(AgentValidationRule):
     """Require each retained agent to span the full scene window."""
 
     max_invalid_agents: int = Field(default=0, ge=0)
     max_invalid_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
-    type: Literal["require_full_agent_window"] = Field(
-        "require_full_agent_window", repr=False, init=False
+    type: Literal["complete_agent_coverage"] = Field(
+        "complete_agent_coverage", repr=False, init=False
     )
 
     @override
@@ -41,14 +40,18 @@ class RequireFullAgentWindow(AgentFilterRule):
         return agent_length == scene_length
 
 
-@dataclass(slots=True, frozen=True)
-class RequireAgentFrames(AgentFilterRule):
+@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True))
+class RequireAgentCoverageAtFrames(AgentValidationRule):
     """Require each retained agent to cover specific relative frames."""
 
     frames: FrameSet
     max_invalid_agents: int = Field(default=0, ge=0)
     max_invalid_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
-    type: Literal["require_agent_frames"] = Field("require_agent_frames", repr=False, init=False)
+    type: Literal["agent_frames"] = Field(
+        "agent_frames",
+        repr=False,
+        init=False,
+    )
 
     @classmethod
     def define(
@@ -56,7 +59,7 @@ class RequireAgentFrames(AgentFilterRule):
         frames: Iterable[int],
         max_invalid_agents: int = 0,
         max_invalid_fraction: float = 0.0,
-    ) -> RequireAgentFrames:
+    ) -> RequireAgentCoverageAtFrames:
         """Return a defined rule.
 
         This constructor allow for mor flexible input in comparison to the
@@ -75,15 +78,25 @@ class RequireAgentFrames(AgentFilterRule):
         return ctx.over_agent_window(required) == len(self.frames)
 
 
-@dataclass(slots=True, frozen=True)
-class MinimumAgentSamples(AgentFilterRule):
+@dataclasses.dataclass(slots=True)
+class MinimumAgentSamples(AgentValidationRule):
     """Require a minimum number of samples per retained agent."""
 
     minimum: int = Field(ge=1)
     max_invalid_agents: int = Field(default=0, ge=0)
     max_invalid_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
-    type: Literal["minimum_agent_samples"] = Field("minimum_agent_samples", repr=False, init=False)
+    type: Literal["min_agent_samples"] = Field(
+        "min_agent_samples",
+        repr=False,
+        init=False,
+    )
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
         return ctx.over_agent_window(pl.len()) >= self.minimum
+
+
+AgentValidationSpec = Annotated[
+    RequireCompleteAgentCoverage | RequireAgentCoverageAtFrames | MinimumAgentSamples,
+    Field(discriminator="type"),
+]

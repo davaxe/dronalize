@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
     job = prepare_dataset(
         dataset="hotel",
-        input_dir=Path(path) / "data" / "hotel",
+        input_dir=Path(path) / "ethucy" / "hotel",
         output_dir=Path("test_output"),
         split=None,
         output_format="dummy",

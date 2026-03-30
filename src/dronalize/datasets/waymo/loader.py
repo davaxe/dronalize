@@ -12,7 +12,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
 from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
-from dronalize.processing.filters import Filter, RequireAgentFrames
+from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
@@ -136,8 +136,8 @@ class WaymoLoader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filters(
-            Filter.define(filter_rules=[RequireAgentFrames.define(frames=[9])]),
+        return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filter(
+            Filter.define(agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[9])]),
         )
 
     @staticmethod

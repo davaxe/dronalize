@@ -34,7 +34,8 @@ from dronalize.processing.ingest.splits import (
 )
 from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapKey, MapResolver, no_map
-from dronalize.processing.pipeline.factories import trajectory_pipeline
+from dronalize.processing.pipeline.factory import trajectory_pipeline
+from dronalize.processing.pipeline.presets import standard_trajectory_spec
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -194,8 +195,10 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         override this when they need dataset-specific post-processing.
         """
         return trajectory_pipeline(
-            self.loader_config,
-            split_request=self.split_request,
+            standard_trajectory_spec(
+                self.loader_config,
+                split_request=self.split_request,
+            )
         )
 
     def discover_sources(self) -> Iterable[Source[SourceT]]:

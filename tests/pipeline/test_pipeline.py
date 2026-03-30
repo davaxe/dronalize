@@ -1,5 +1,4 @@
 # pyright: standard
-
 """Tests for the composable Pipeline infrastructure."""
 
 from __future__ import annotations
@@ -12,7 +11,7 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from dronalize.core.categories import AgentCategory
-from dronalize.processing.filters import DropAgentCategories, Filter
+from dronalize.processing.filters import ExcludeAgentCategories, Filter
 from dronalize.processing.ingest import (
     LoaderConfig,
     ShuffledTimeBlockSplit,
@@ -22,8 +21,12 @@ from dronalize.processing.ingest import (
 )
 from dronalize.processing.pipeline import Pipeline
 from dronalize.processing.pipeline import transforms as transform
-from dronalize.processing.pipeline.factories import split_partition_pipeline, trajectory_pipeline
+from dronalize.processing.pipeline.extensions import LaneChangeSamplingExtension
+from dronalize.processing.pipeline.factory import trajectory_pipeline
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
+from dronalize.processing.pipeline.presets import highway_trajectory_spec, standard_trajectory_spec
+from dronalize.processing.pipeline.spec import LaneChangeDetection
+from dronalize.processing.pipeline.splitting import split_partition_pipeline
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Helpers / fixtures
@@ -349,7 +352,7 @@ def test_transform_derivative_second_with_intermediate() -> None:
 def test_transform_filter_no_config_passes_all(trajectory_lf: pl.LazyFrame) -> None:
     """Ensure the filter transform passes all rows when no specific rules apply."""
     config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1)
-    fn = transform.filter_scene(config.filters)
+    fn = transform.filter_scene(config.filter)
     result = fn(trajectory_lf).collect()
     assert_frame_equal(result, trajectory_lf.collect())
 
@@ -358,12 +361,12 @@ def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
     """Verify the filter transform removes agents that match the specified filtering category."""
     # Filter out agent_category == 1 -> should remove all
 
-    config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filters(
+    config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filter(
         Filter.define(
-            cleanup_rules=[DropAgentCategories.define(categories=[AgentCategory.CAR])],
+            cleanup_rules=[ExcludeAgentCategories.define(categories=[AgentCategory.CAR])],
         )
     )
-    fn = transform.filter_scene(config.filters)
+    fn = transform.filter_scene(config.filter)
     result = fn(trajectory_lf).collect()
     # All agents have category 1 (CAR), so cleanup removes every row.
     assert result.shape[0] == 0
@@ -592,12 +595,14 @@ def test_trajectory_pipeline_shuffled_time_blocks_keep_segments_separate() -> No
         "y": [0.0] * 8,
     }).lazy()
     pipeline = trajectory_pipeline(
-        LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
-        split_request=SplitRequest(
-            strategy=ShuffledTimeBlockSplit(segments=4),
-            weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
-            seed=0,
-        ),
+        standard_trajectory_spec(
+            LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
+            split_request=SplitRequest(
+                strategy=ShuffledTimeBlockSplit(segments=4),
+                weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+                seed=0,
+            ),
+        )
     )
 
     results = list(pipeline.execute(lf, collect=True))
@@ -616,12 +621,14 @@ def test_trajectory_pipeline_shuffled_time_blocks_window_within_segments() -> No
         "y": [0.0] * 8,
     }).lazy()
     pipeline = trajectory_pipeline(
-        LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step_size=2),
-        split_request=SplitRequest(
-            strategy=ShuffledTimeBlockSplit(segments=4),
-            weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
-            seed=0,
-        ),
+        standard_trajectory_spec(
+            LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step_size=2),
+            split_request=SplitRequest(
+                strategy=ShuffledTimeBlockSplit(segments=4),
+                weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+                seed=0,
+            ),
+        )
     )
 
     results = list(pipeline.execute(lf, collect=True))
@@ -629,3 +636,97 @@ def test_trajectory_pipeline_shuffled_time_blocks_window_within_segments() -> No
     assert len(results) == 4
     assert [result.height for result in results] == [2, 2, 2, 2]
     assert all(result["split"].n_unique() == 1 for result in results)
+
+
+def test_trajectory_spec_highway_sets_lane_change_sampling_defaults() -> None:
+    """The highway spec helper should configure lane-aware sampling succinctly."""
+    spec = highway_trajectory_spec(
+        LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
+        negative_keep_every=4,
+        min_lane_change_events=2,
+        lane_change=LaneChangeDetection(persist=2, margin_before=1),
+    )
+
+    assert spec.columns.lane_id == "lane_id"
+    assert spec.extension == LaneChangeSamplingExtension(
+        negative_keep_every=4,
+        min_lane_change_events=2,
+        persist=2,
+        margin_before=1,
+        margin_after=0,
+    )
+
+
+def test_trajectory_spec_standard_uses_standard_policy() -> None:
+    """The standard spec helper should not attach an extension by default."""
+    spec = standard_trajectory_spec(LoaderConfig(input_len=1, output_len=1, sample_time=1.0))
+
+    assert spec.extension is None
+
+
+def test_trajectory_pipeline_window_by_without_window_keeps_groups_separate() -> None:
+    """Scene grouping should still fan out when only window_by is configured."""
+    lf = pl.DataFrame({
+        "recording": [1, 1, 2, 2],
+        "frame": [0, 1, 0, 1],
+        "id": [1, 1, 1, 1],
+        "x": [0.0, 1.0, 10.0, 11.0],
+        "y": [0.0, 0.0, 0.0, 0.0],
+    }).lazy()
+
+    pipeline = trajectory_pipeline(
+        standard_trajectory_spec(
+            LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
+            window_by="recording",
+        )
+    )
+
+    results = list(pipeline.execute(lf, collect=True))
+
+    assert len(results) == 2
+    assert sorted(result["recording"].unique().item() for result in results) == [1, 2]
+
+
+def test_trajectory_pipeline_highway_sampling_thins_negative_windows_only() -> None:
+    """Lane-change windows should be kept while no-change windows are downsampled."""
+    lf = pl.DataFrame({
+        "frame": list(range(8)),
+        "id": [1] * 8,
+        "x": [float(frame) for frame in range(8)],
+        "y": [0.0] * 8,
+        "lane_id": [1, 1, 1, 2, 2, 2, 2, 2],
+    }).lazy()
+    pipeline = trajectory_pipeline(
+        highway_trajectory_spec(
+            LoaderConfig(input_len=1, output_len=2, sample_time=1.0).with_window(step_size=1),
+            negative_keep_every=2,
+        )
+    )
+
+    results = list(pipeline.execute(lf, collect=True))
+    starts = [result["x"][0] for result in results]
+
+    assert starts == [0.0, 1.0, 2.0, 3.0, 4.0]
+
+
+def test_trajectory_pipeline_highway_sampling_can_require_multiple_lane_changes() -> None:
+    """A window should only count as positive after the configured event threshold."""
+    lf = pl.DataFrame({
+        "frame": list(range(10)),
+        "id": [1] * 10,
+        "x": [float(frame) for frame in range(10)],
+        "y": [0.0] * 10,
+        "lane_id": [1, 1, 2, 2, 2, 3, 3, 3, 3, 3],
+    }).lazy()
+    pipeline = trajectory_pipeline(
+        highway_trajectory_spec(
+            LoaderConfig(input_len=1, output_len=3, sample_time=1.0).with_window(step_size=1),
+            negative_keep_every=10,
+            min_lane_change_events=2,
+        )
+    )
+
+    results = list(pipeline.execute(lf, collect=True))
+    starts = [result["x"][0] for result in results]
+
+    assert starts == [0.0, 2.0]
