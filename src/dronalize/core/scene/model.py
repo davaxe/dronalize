@@ -136,20 +136,14 @@ def convert_scene(scene: Scene, target: SceneSchema = CANONICAL_V1) -> Scene:
     return replace(
         scene,
         frame=_convert_frame(
-            scene.frame,
-            source=scene.schema,
-            target=target,
-            sample_time=scene.sample_time,
+            scene.frame, source=scene.schema, target=target, sample_time=scene.sample_time
         ),
         schema=target,
     )
 
 
 def derived_scene_fields(
-    source: SceneSchema,
-    target: SceneSchema,
-    *,
-    sample_time: float | None,
+    source: SceneSchema, target: SceneSchema, *, sample_time: float | None
 ) -> tuple[SceneField, ...]:
     """Return target schema fields that would be materialized by conversion.
 
@@ -172,19 +166,12 @@ def derived_scene_fields(
 
 
 def _convert_frame(
-    data: pl.DataFrame,
-    *,
-    source: SceneSchema,
-    target: SceneSchema,
-    sample_time: float | None,
+    data: pl.DataFrame, *, source: SceneSchema, target: SceneSchema, sample_time: float | None
 ) -> pl.DataFrame:
     """Convert a data frame from one scene schema to another."""
     semantic = _to_semantic_frame(data, source).sort(["id", "frame"])
     semantic = _derive_missing_fields(
-        semantic,
-        source=source,
-        target=target,
-        sample_time=sample_time,
+        semantic, source=source, target=target, sample_time=sample_time
     )
     return semantic.select([pl.col(field).cast(dtype) for field, dtype in target.field_items()])
 
@@ -194,11 +181,7 @@ def _to_semantic_frame(data: pl.DataFrame, schema: SceneSchema) -> pl.DataFrame:
 
 
 def _derive_missing_fields(
-    data: pl.DataFrame,
-    *,
-    source: SceneSchema,
-    target: SceneSchema,
-    sample_time: float | None,
+    data: pl.DataFrame, *, source: SceneSchema, target: SceneSchema, sample_time: float | None
 ) -> pl.DataFrame:
     if (source.fields & target.fields) == target.fields:
         return data
@@ -234,9 +217,7 @@ def _matches_physical_schema_name(actual: pl.Schema, expected: pl.Schema) -> boo
 
 
 def _get_schema_mismatch_message(
-    actual: pl.Schema,
-    expected: pl.Schema,
-    schema_name: str | None = None,
+    actual: pl.Schema, expected: pl.Schema, schema_name: str | None = None
 ) -> str:
     missing = [col for col in expected if col not in actual]
     mismatched = {

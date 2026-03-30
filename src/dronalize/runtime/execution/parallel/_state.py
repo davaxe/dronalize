@@ -143,10 +143,7 @@ class SharedResources:
     @classmethod
     def create(cls) -> SharedResources:
         """Create all shared resources required by the executor."""
-        return cls(
-            registry=WorkerRegistry.create(),
-            progress=ProgressState.create(),
-        )
+        return cls(registry=WorkerRegistry.create(), progress=ProgressState.create())
 
     def reset(self) -> None:
         """Reset all shared counters and worker ID allocation."""

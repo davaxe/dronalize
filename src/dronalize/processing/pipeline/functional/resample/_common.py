@@ -10,12 +10,12 @@ import polars as pl
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import Self, override
 
-from dronalize._internal._polars_ops import normalize_group_by
+from dronalize._internal.polars_ops import normalize_group_by
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize._internal._typing import DataFrameT
+    from dronalize._internal.typing import DataFrameT
 
 SEGMENT_COLUMN: Final = "_resample_segment"
 
@@ -70,13 +70,13 @@ class ResampleSpec(BaseModel):
     def with_input_derivative(self, order: int, columns: Iterable[str]) -> ResampleSpec:
         """Return a new spec with the given input derivative order and columns."""
         return self._with_update(
-            input_derivatives={**self.input_derivatives, order: dict.fromkeys(columns)},
+            input_derivatives={**self.input_derivatives, order: dict.fromkeys(columns)}
         )
 
     def with_output_derivative(self, order: int, columns: Iterable[str]) -> ResampleSpec:
         """Return a new spec with the given output derivative order and columns."""
         return self._with_update(
-            output_derivatives={**self.output_derivatives, order: dict.fromkeys(columns)},
+            output_derivatives={**self.output_derivatives, order: dict.fromkeys(columns)}
         )
 
     @field_validator("position_columns", mode="before")
@@ -91,8 +91,7 @@ class ResampleSpec(BaseModel):
     @field_validator("input_derivatives", "output_derivatives", mode="before")
     @classmethod
     def _normalize_derivatives(
-        cls,
-        value: dict[int, ColumnOrder | Sequence[str]] | None,
+        cls, value: dict[int, ColumnOrder | Sequence[str]] | None
     ) -> DerivativeOrderMap:
         return {
             int(order): dict.fromkeys(cols.keys() if isinstance(cols, dict) else cols)
@@ -179,10 +178,7 @@ class ResamplePlan:
 
 
 def build_plan(
-    spec: ResampleSpec,
-    *,
-    frame_column: str,
-    group_by: str | Sequence[str] | None,
+    spec: ResampleSpec, *, frame_column: str, group_by: str | Sequence[str] | None
 ) -> ResamplePlan:
     group_columns = normalize_group_by(group_by)
     packed_columns = dict.fromkeys((
@@ -192,7 +188,7 @@ def build_plan(
     ))
 
     evaluation_orders = tuple(
-        dict.fromkeys((0, *spec.input_derivatives.keys(), *spec.output_derivatives.keys())),
+        dict.fromkeys((0, *spec.input_derivatives.keys(), *spec.output_derivatives.keys()))
     )
 
     return ResamplePlan(
@@ -208,12 +204,7 @@ def build_plan(
 
 
 def segment_data(
-    data: DataFrameT,
-    *,
-    frame_column: str,
-    group_by: Sequence[str],
-    max_gap: int,
-    sort: bool,
+    data: DataFrameT, *, frame_column: str, group_by: Sequence[str], max_gap: int, sort: bool
 ) -> DataFrameT:
     if sort:
         data = data.sort([*group_by, frame_column])

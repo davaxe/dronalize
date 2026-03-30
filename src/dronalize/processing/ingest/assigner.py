@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from dronalize._internal._typing import T_co
+from dronalize._internal.typing import T_co
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
@@ -132,8 +132,7 @@ def _hash_to_unit_interval(seed: int, *values: int | str) -> float:
 
 
 def _prepare_groups_and_weights(
-    groups: Sequence[T_co],
-    weights: Sequence[float] | None,
+    groups: Sequence[T_co], weights: Sequence[float] | None
 ) -> tuple[list[T_co], npt.NDArray[np.float64]]:
     """Validate and normalize assigner groups and weights."""
     normalized_groups = list(dict.fromkeys(groups))

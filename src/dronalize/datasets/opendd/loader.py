@@ -12,7 +12,8 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY_V1
 from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -44,7 +45,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     """Loader for OpenDD data split across multiple SQLite databases."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True,
+        supports_source_split=True
     )
 
     def __init__(
@@ -90,9 +91,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
             for table_name in _list_table_names(db_path):
                 identifier = f"{db_path.stem}:{table_name}"
                 yield Source(
-                    identifier=identifier,
-                    data=(db_path, table_name),
-                    map_key=str(db_path.parent),
+                    identifier=identifier, data=(db_path, table_name), map_key=str(db_path.parent)
                 )
 
     @override
@@ -128,7 +127,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
                     )
                     .alias("agent_category"),
                 )
-                .drop("CLASS", "TIMESTAMP"),
+                .drop("CLASS", "TIMESTAMP")
             )
 
     @classmethod
@@ -143,11 +142,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
             LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
             .with_resampling(ResampleSpec(up=1, down=3))
             .with_window(75)
-            .with_filter(
-                Filter.define(
-                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[59])]
-                )
-            )
+            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[59])]))
         )
 
     @classmethod
@@ -163,9 +158,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
 
             return utils.extract_based_on_scene(
                 self._get_map(
-                    scene.map_key,
-                    self.map_config.min_distance,
-                    self.map_config.interp_distance,
+                    scene.map_key, self.map_config.min_distance, self.map_config.interp_distance
                 ),
                 scene,
                 self.map_config.extraction,
@@ -175,11 +168,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
 
     @staticmethod
     @functools.lru_cache(maxsize=10)
-    def _get_map(
-        key: str,
-        min_distance: float | None,
-        interp_distance: float | None,
-    ) -> MapGraph:
+    def _get_map(key: str, min_distance: float | None, interp_distance: float | None) -> MapGraph:
         database: str = Path(key).name
         map_path = Path(key) / f"map_{database}" / f"map_{database}.sqlite"
         return OpenDDMapBuilder.from_sqlite_file(map_path).build(min_distance, interp_distance)
@@ -194,6 +183,14 @@ def _list_table_names(db_path: Path) -> list[str]:
 def _count_tables(db_path: Path) -> int:
     with sqlite3.connect(db_path) as connection:
         row = connection.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table';",
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table';"
         ).fetchone()
     return row[0] if row is not None else 0
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.opendd import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("opendd")
+    _ = debug_descriptor(DESCRIPTOR, root)

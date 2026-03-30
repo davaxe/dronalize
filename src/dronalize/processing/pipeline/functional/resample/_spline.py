@@ -23,12 +23,11 @@ from dronalize.processing.pipeline.functional.resample._common import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal._typing import DataFrameT
+    from dronalize._internal.typing import DataFrameT
 
 Interpolator = PPoly
 InterpolatorFactory = Callable[
-    [npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64] | None],
-    Interpolator,
+    [npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64] | None], Interpolator
 ]
 
 
@@ -77,12 +76,8 @@ def spline_resample(
     )
 
 
-def _return_dtype(
-    plan: ResamplePlan,
-) -> dict[str, type[pl.DataType]]:
-    base: dict[str, type[pl.DataType]] = {
-        **dict.fromkeys(plan.packed_columns, pl.Float64),
-    }
+def _return_dtype(plan: ResamplePlan) -> dict[str, type[pl.DataType]]:
+    base: dict[str, type[pl.DataType]] = {**dict.fromkeys(plan.packed_columns, pl.Float64)}
     base[plan.frame_column] = pl.Int64
     if plan.output_derivatives:
         for columns in plan.output_derivatives.values():
@@ -200,10 +195,7 @@ def _populate_single_point_outputs(
 
 
 def _single_point_frames(
-    df: pl.DataFrame,
-    frame_column: str,
-    up: int,
-    down: int,
+    df: pl.DataFrame, frame_column: str, up: int, down: int
 ) -> npt.NDArray[np.int64]:
     frames = df[frame_column].to_numpy().astype(np.float64, copy=False)
     return (frames * (up / down)).astype(np.int64)

@@ -84,10 +84,7 @@ class LoaderConfig(BaseModel):
         """Return a copy with the given scene filter."""
         return self._updated(filter=scene_filter)
 
-    def with_resampling(
-        self,
-        spec: ResampleSpec,
-    ) -> Self:
+    def with_resampling(self, spec: ResampleSpec) -> Self:
         """Return a copy with the given resampling parameters.
 
         Parameters

@@ -10,7 +10,7 @@ import pytest
 from dronalize.processing.ingest.assigner import StatelessWeightedAssigner
 
 
-def test_deterministic_assigner_distribution_matches_weights() -> None:
+def test_distribution_matches_weights() -> None:
     """Verify that the stateless assigner produces the expected distribution."""
     groups = ["A", "B", "C"]
     weights = [0.5, 0.3, 0.2]
@@ -25,7 +25,7 @@ def test_deterministic_assigner_distribution_matches_weights() -> None:
     assert pytest.approx(counts["C"] / total, abs=0.02) == 0.2
 
 
-def test_deterministic_assigner_multiple_keys() -> None:
+def test_multi_key_distribution() -> None:
     """Verify that different keys produce different assignments."""
     groups = ["A", "B", "C"]
     weights = [0.5, 0.3, 0.2]
@@ -40,7 +40,7 @@ def test_deterministic_assigner_multiple_keys() -> None:
     assert pytest.approx(counts["C"] / total, abs=0.01) == 0.2
 
 
-def test_deterministic_assigner_same_assignments() -> None:
+def test_same_seed_same_assignments() -> None:
     """Verify that the same key produces the same assignment across same seed."""
     groups = ["A", "B", "C"]
     weights = [0.5, 0.3, 0.2]
@@ -55,7 +55,7 @@ def test_deterministic_assigner_same_assignments() -> None:
     assert assignments1 == assignments2
 
 
-def test_deterministic_assigner_different_assignments() -> None:
+def test_different_seed_changes_split() -> None:
     """Verify that different seeds produce different assignments for the same values."""
     groups = ["A", "B", "C"]
     weights = [0.5, 0.3, 0.2]

@@ -51,8 +51,7 @@ def swap_left_and_right(
 
 
 def edge_borders_from_centerline(
-    centerline: npt.NDArray[np.float64],
-    width_scaling_factor: float = 1.0,
+    centerline: npt.NDArray[np.float64], width_scaling_factor: float = 1.0
 ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """Convert a lane centerline polyline into a rough polygon of the lane's area.
 
@@ -101,17 +100,13 @@ def edge_borders_from_centerline(
     subtract_cond2 = np.logical_and(dx > 0, dy > 0)
     subtract_cond = np.logical_or(subtract_cond1, subtract_cond2)
     left_centerline, right_centerline = swap_left_and_right(
-        subtract_cond,
-        left_centerline,
-        right_centerline,
+        subtract_cond, left_centerline, right_centerline
     )
 
     # right centerline also depended on if we added or subtracted y
     neg_disp_cond = displacement[:, 1] > 0
     left_centerline, right_centerline = swap_left_and_right(
-        neg_disp_cond,
-        left_centerline,
-        right_centerline,
+        neg_disp_cond, left_centerline, right_centerline
     )
 
     left_centerline, right_centerline = right_centerline, left_centerline
@@ -121,24 +116,20 @@ def edge_borders_from_centerline(
 
 
 def lane_segment_successors(
-    lane_segment: LaneSegment,
-    lane_segments: dict[int, LaneSegment],
+    lane_segment: LaneSegment, lane_segments: dict[int, LaneSegment]
 ) -> Iterable[LaneSegment]:
     """Get successors of a lane segment."""
     return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.successors)
 
 
 def lane_segment_predecessors(
-    lane_segment: LaneSegment,
-    lane_segments: dict[int, LaneSegment],
+    lane_segment: LaneSegment, lane_segments: dict[int, LaneSegment]
 ) -> Iterable[LaneSegment]:
     """Get predecessors of a lane segment."""
     return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.predecessors)
 
 
-def lane_segment_is_regulatory(
-    lane_segment: LaneSegment,
-) -> bool:
+def lane_segment_is_regulatory(lane_segment: LaneSegment) -> bool:
     """Check if a lane segment is regulatory.
 
     Parameters
@@ -155,8 +146,6 @@ def lane_segment_is_regulatory(
     return lane_segment.is_intersection and lane_segment.has_traffic_control
 
 
-def any_lane_segment_is_regulatory(
-    lane_segments: Iterable[LaneSegment],
-) -> bool:
+def any_lane_segment_is_regulatory(lane_segments: Iterable[LaneSegment]) -> bool:
     """Check if any lane segment in the iterable is regulatory."""
     return any(lane_segment_is_regulatory(lane_segment) for lane_segment in lane_segments)

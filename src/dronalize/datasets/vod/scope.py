@@ -14,9 +14,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def vod_execution_scope(
-    root: Path,
-    loader_config: LoaderConfig,
-    map_config: MapConfig,
+    root: Path, loader_config: LoaderConfig, map_config: MapConfig
 ) -> Generator[None, None, None]:
     """Prepare shared map state for a VOD processing run.
 
@@ -40,8 +38,7 @@ def vod_execution_scope(
     map_dir = root / "maps" / "expansion" / "delft.json"
     builder = _MapBuilder.from_json_file(map_dir)
     map_graph: MapGraph = builder.build(
-        min_distance=map_config.min_distance,
-        interp_distance=map_config.interp_distance,
+        min_distance=map_config.min_distance, interp_distance=map_config.interp_distance
     )
     shm = map_graph.to_shared()
 

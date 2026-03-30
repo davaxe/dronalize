@@ -88,11 +88,7 @@ class Node:
     @classmethod
     def from_dict(cls, data: dict[str, str]) -> Node:
         """Create a `Node` instance from a dictionary."""
-        return cls(
-            id=int(data["id"]),
-            x=float(data["x"]),
-            y=float(data["y"]),
-        )
+        return cls(id=int(data["id"]), x=float(data["x"]), y=float(data["y"]))
 
     @classmethod
     def from_xml_element(cls, element: ET.Element) -> Node:
@@ -180,10 +176,7 @@ class LaneSegment:
             Edge type for the right border.
 
         """
-        ln, rn = (
-            self.l_neighbor_id is not None,
-            self.r_neighbor_id is not None,
-        )
+        ln, rn = (self.l_neighbor_id is not None, self.r_neighbor_id is not None)
         left_edge_type = EdgeType.VIRTUAL if ln else EdgeType.CURB
         right_edge_type = EdgeType.VIRTUAL if rn else EdgeType.CURB
 

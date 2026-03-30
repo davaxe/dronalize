@@ -21,9 +21,7 @@ class NuScenesMapBuilder(BaseMapBuilder):
     """A builder for creating a MapGraph from a NuscenesMap."""
 
     def __init__(
-        self,
-        nuscenes_map: parser.NuScenesMap,
-        ignore_edge_types: set[str] | None = None,
+        self, nuscenes_map: parser.NuScenesMap, ignore_edge_types: set[str] | None = None
     ) -> None:
         """Initialize the map builder with a `NuScenesMap`."""
         super().__init__()
@@ -46,21 +44,14 @@ class NuScenesMapBuilder(BaseMapBuilder):
         )
 
     @classmethod
-    def from_json_file(
-        cls,
-        path: Path,
-        *,
-        ignore_edge_types: set[str] | None = None,
-    ) -> Self:
+    def from_json_file(cls, path: Path, *, ignore_edge_types: set[str] | None = None) -> Self:
         """Create a map builder from a file path."""
         nuscenes_map = parser.NuScenesMap(path)
         return cls(nuscenes_map, ignore_edge_types=ignore_edge_types)
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         self.min_distance = min_distance if min_distance is not None else 0.0
         for edge_type, method in self._edge_type_methods.items():
@@ -176,8 +167,7 @@ class NuScenesMapBuilder(BaseMapBuilder):
             )
 
     def _extract_edges(
-        self,
-        segments: list[tuple[str, parser.SegmentDividerType]],
+        self, segments: list[tuple[str, parser.SegmentDividerType]]
     ) -> NuScenesMapBuilder._Edges:
         return {
             "points": [self.map_nodes[n_id].as_point() for n_id, _ in segments],

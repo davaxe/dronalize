@@ -10,11 +10,7 @@ if TYPE_CHECKING:
     from dronalize.plot.overlay import plot_trajectories_on_map
     from dronalize.plot.trajectory import plot_trajectories
 
-__all__ = [
-    "plot_map_graph",
-    "plot_trajectories",
-    "plot_trajectories_on_map",
-]
+__all__ = ["plot_map_graph", "plot_trajectories", "plot_trajectories_on_map"]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
     "plot_map_graph": ("dronalize.plot.map", "plot_map_graph"),

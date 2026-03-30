@@ -49,12 +49,7 @@ class ExecutionConfig(BaseModel):
         if jobs < 1:
             msg = "jobs must be at least 1."
             raise ValueError(msg)
-        return self.model_copy(
-            update={
-                "parallel": jobs > 1,
-                "workers": jobs,
-            }
-        )
+        return self.model_copy(update={"parallel": jobs > 1, "workers": jobs})
 
 
 class Config(BaseModel):
@@ -101,11 +96,7 @@ def load_config_overrides(config_path: Path) -> ConfigOverrides:
     return ConfigOverrides(datasets=_apply_global_section(config_file))
 
 
-def resolve_runtime_config(
-    *,
-    default: Config,
-    overrides: ConfigOverride | None = None,
-) -> Config:
+def resolve_runtime_config(*, default: Config, overrides: ConfigOverride | None = None) -> Config:
     """Merge dataset overrides into a default runtime config and validate the result."""
     merged_data = _deep_merge(_config_data(default), _config_data(overrides or {}))
     merged_data = _resolve_loader_filter(merged_data, default_filter=default.loader.filter)
@@ -120,9 +111,7 @@ def _config_data(value: BaseModel | ConfigOverride) -> ConfigOverride:
 
 
 def _resolve_loader_filter(
-    merged_data: ConfigOverride,
-    *,
-    default_filter: Filter | None,
+    merged_data: ConfigOverride, *, default_filter: Filter | None
 ) -> ConfigOverride:
     """Resolve config-facing filter specs into runtime filter objects."""
     loader_value = merged_data.get("loader")

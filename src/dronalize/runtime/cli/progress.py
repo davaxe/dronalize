@@ -20,10 +20,7 @@ if TYPE_CHECKING:
 
 
 def run_with_rich_progress(
-    executor: ObservableWritingExecutor,
-    run: Callable[[], None],
-    *,
-    enable: bool = True,
+    executor: ObservableWritingExecutor, run: Callable[[], None], *, enable: bool = True
 ) -> None:
     """Execute a run while rendering Rich progress for an observable executor."""
     if not enable:
@@ -31,12 +28,7 @@ def run_with_rich_progress(
         return
 
     rich_progress = _get_rich_progress()
-    task_id = rich_progress.add_task(
-        "Processing",
-        total=0,
-        scenes=0,
-        workers=0,
-    )
+    task_id = rich_progress.add_task("Processing", total=0, scenes=0, workers=0)
     monitor = _ProgressMonitor(executor, rich_progress, task_id)
     thread = monitor.thread()
 
@@ -55,10 +47,7 @@ class _ProgressMonitor:
     """Background monitor that projects executor progress onto Rich."""
 
     def __init__(
-        self,
-        executor: ObservableWritingExecutor,
-        rich_progress: RichProgress,
-        task_id: rp.TaskID,
+        self, executor: ObservableWritingExecutor, rich_progress: RichProgress, task_id: rp.TaskID
     ) -> None:
         self._executor: ObservableWritingExecutor = executor
         self._rich_progress: RichProgress = rich_progress

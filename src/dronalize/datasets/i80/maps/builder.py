@@ -4,10 +4,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.datasets.shared.highway_builder import (
-    HighwayLaneMapBuilder,
-    LaneDescription,
-)
+from dronalize.datasets.shared.highway_builder import HighwayLaneMapBuilder, LaneDescription
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -39,12 +36,7 @@ class I80MapBuilder(HighwayLaneMapBuilder):
             pl.col("Local_Y").alias("y").mul(0.3048),
             pl.col("Lane_ID").alias("lane_id"),
         )
-        super().__init__(
-            data,
-            bin_size=10.0,
-            include_outer_borders=True,
-            smoothing=3.0,
-        )
+        super().__init__(data, bin_size=10.0, include_outer_borders=True, smoothing=3.0)
         self._lane_description: LaneDescription | None = LaneDescription(
-            ids=list(range(1, 7)), direction=[True] * 6,
+            ids=list(range(1, 7)), direction=[True] * 6
         )

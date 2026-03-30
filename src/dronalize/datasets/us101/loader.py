@@ -38,3 +38,11 @@ class US101Loader(I80Loader):
             splits=splits,
             split_request=split_request,
         )
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+    from dronalize.datasets.us101 import DESCRIPTOR
+
+    root = resolve_dataset_root_from_env("us101")
+    _ = debug_descriptor(DESCRIPTOR, root)

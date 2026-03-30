@@ -58,11 +58,7 @@ class DummyWriter(SceneWriter):
 
     @classmethod
     @override
-    def as_factory(
-        cls,
-        *,
-        log: bool = False,
-    ) -> Callable[[int | None], DummyWriter]:
+    def as_factory(cls, *, log: bool = False) -> Callable[[int | None], DummyWriter]:
         if cls._counts_shared is None:
             cls._counts_shared = {
                 "unsplit": mp.Value("i", 0),
@@ -74,11 +70,7 @@ class DummyWriter(SceneWriter):
         return functools.partial(cls, log=log, count_shared=cls._counts_shared)
 
     @override
-    def write(
-        self,
-        scene: Scene,
-        split: DatasetSplit | None = None,
-    ) -> bool:
+    def write(self, scene: Scene, split: DatasetSplit | None = None) -> bool:
         effective_split = split if split is not None else scene.split_assignment
         self._count["scenes"] += 1
         self._count[effective_split.value if effective_split else "unsplit"] += 1
@@ -101,7 +93,7 @@ class DummyWriter(SceneWriter):
             split_counts: dict[str, int] = {
                 split: v.value for split, v in self._count_shared.items()
             }
-            print(f"Total: {total:,}")
+            print(f"Total: {total:,} scenes")
             for split, count in split_counts.items():
                 pct = (count / total * 100) if total > 0 else 0.0
                 print(f"  {split:<12} {count:>10,}  ({pct:6.2f}%)")

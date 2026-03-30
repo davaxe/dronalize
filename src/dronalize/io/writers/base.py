@@ -18,10 +18,7 @@ class StorageWriter(Protocol):
 
     manifest: StorageManifest
 
-    def write(
-        self,
-        scene: Scene,
-    ) -> bool:
+    def write(self, scene: Scene) -> bool:
         """Write a single processed scene."""
         ...
 

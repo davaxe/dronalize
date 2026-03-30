@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from dronalize._internal._polars_ops import normalize_group_by
+from dronalize._internal.polars_ops import normalize_group_by
 from dronalize.processing.pipeline._internal import SCENE_ID_COLUMN, SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.pipeline import Pipeline
 

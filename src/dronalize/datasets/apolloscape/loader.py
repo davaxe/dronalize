@@ -9,7 +9,6 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_YAW_V1
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -27,7 +26,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
     """Loader for the ApolloScape dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True,
+        supports_source_split=True
     )
 
     def __init__(
@@ -85,12 +84,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
     @override
     def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
         yield IngestedData(
-            pl.scan_csv(
-                source.data,
-                has_header=False,
-                schema=_DATA_SCHEMA,
-                separator=" ",
-            ).select(
+            pl.scan_csv(source.data, has_header=False, schema=_DATA_SCHEMA, separator=" ").select(
                 *("frame", "id", "x", "y", "yaw"),
                 pl.col("agent_category").replace_strict({
                     1: AgentCategory.CAR.value,
@@ -99,7 +93,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
                     4: AgentCategory.BICYCLE.value,
                     5: AgentCategory.UNKNOWN.value,
                 }),
-            ),
+            )
         )
 
     @override
@@ -120,11 +114,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         return (
             LoaderConfig(input_len=4, output_len=6, sample_time=0.5)
             .with_resampling(ResampleSpec(up=5, down=1))
-            .with_filter(
-                Filter.define(
-                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[3])]
-                )
-            )
+            # .with_filter(Filter.define_cleanup(MinimumAgentSamples(minimum=2)))
             .with_window(1)
         )
 
@@ -148,3 +138,11 @@ _DATA_SCHEMA: pl.Schema = pl.Schema({
     "height": pl.Float64,
     "yaw": pl.Float64,
 })
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.apolloscape import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("apollo")
+    _ = debug_descriptor(DESCRIPTOR, root, step=50)

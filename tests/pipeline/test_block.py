@@ -8,19 +8,11 @@ import pytest
 from dronalize.processing.pipeline.functional.block import cumulative_blocks, shuffled_blocks
 
 
-def test_cumulative_blocks_split_evenly_with_gap_and_offset() -> None:
+def test_cumulative_blocks_split_evenly() -> None:
     """Split rows into contiguous blocks and offset time."""
-    df = pl.DataFrame({
-        "frame": list(range(8)),
-        "value": [10, 11, 12, 13, 20, 21, 22, 23],
-    })
+    df = pl.DataFrame({"frame": list(range(8)), "value": [10, 11, 12, 13, 20, 21, 22, 23]})
 
-    result = cumulative_blocks(
-        df,
-        weights=[0.5, 0.5],
-        time_column="frame",
-        gap=2,
-    )
+    result = cumulative_blocks(df, weights=[0.5, 0.5], time_column="frame", gap=2)
 
     expected = pl.DataFrame({
         "frame": [0, 1, 2, 0, 1, 2],
@@ -31,12 +23,9 @@ def test_cumulative_blocks_split_evenly_with_gap_and_offset() -> None:
     assert result.equals(expected)
 
 
-def test_cumulative_blocks_keep_gap_rows_when_requested() -> None:
+def test_cumulative_blocks_gap_rows() -> None:
     """Keep gap rows and preserve null block assignments."""
-    df = pl.DataFrame({
-        "frame": list(range(8)),
-        "value": [10, 11, 12, 13, 20, 21, 22, 23],
-    })
+    df = pl.DataFrame({"frame": list(range(8)), "value": [10, 11, 12, 13, 20, 21, 22, 23]})
 
     result = cumulative_blocks(
         df,
@@ -56,7 +45,7 @@ def test_cumulative_blocks_keep_gap_rows_when_requested() -> None:
     assert result.equals(expected)
 
 
-def test_cumulative_blocks_apply_per_group() -> None:
+def test_cumulative_blocks_grouped() -> None:
     """Assign blocks independently within each group."""
     df = pl.DataFrame({
         "scene": ["A"] * 6 + ["B"] * 6,
@@ -65,11 +54,7 @@ def test_cumulative_blocks_apply_per_group() -> None:
     })
 
     result = cumulative_blocks(
-        df,
-        weights=[0.5, 0.5],
-        time_column="frame",
-        group_by=["scene"],
-        gap=0,
+        df, weights=[0.5, 0.5], time_column="frame", group_by=["scene"], gap=0
     ).sort(["scene", "frame", "value"])
 
     expected = pl.DataFrame({
@@ -82,28 +67,17 @@ def test_cumulative_blocks_apply_per_group() -> None:
     assert result.equals(expected)
 
 
-def test_cumulative_blocks_raise_when_gap_exceeds_available_frames() -> None:
+def test_cumulative_blocks_large_gap() -> None:
     """Reject impossible block layouts."""
-    df = pl.DataFrame({
-        "frame": [0, 1, 2],
-        "value": [10, 11, 12],
-    })
+    df = pl.DataFrame({"frame": [0, 1, 2], "value": [10, 11, 12]})
 
     with pytest.raises(ValueError, match="leaves no usable frames"):
-        _ = cumulative_blocks(
-            df,
-            weights=[1.0, 1.0, 1.0],
-            time_column="frame",
-            gap=2,
-        )
+        _ = cumulative_blocks(df, weights=[1.0, 1.0, 1.0], time_column="frame", gap=2)
 
 
-def test_shuffled_blocks_be_deterministic_for_fixed_seed() -> None:
+def test_shuffled_blocks_are_deterministic() -> None:
     """Produce stable assignments for a fixed seed."""
-    df = pl.DataFrame({
-        "frame": list(range(12)),
-        "value": list(range(12)),
-    })
+    df = pl.DataFrame({"frame": list(range(12)), "value": list(range(12))})
 
     result_1 = shuffled_blocks(
         df,
@@ -126,12 +100,9 @@ def test_shuffled_blocks_be_deterministic_for_fixed_seed() -> None:
     assert result_1.equals(result_2)
 
 
-def test_shuffled_blocks_keep_assignment_column_and_add_segment_column() -> None:
+def test_shuffled_blocks_keep_assignment() -> None:
     """Return both contiguous segments and weighted assignments."""
-    df = pl.DataFrame({
-        "frame": list(range(12)),
-        "value": list(range(12)),
-    })
+    df = pl.DataFrame({"frame": list(range(12)), "value": list(range(12))})
 
     result = shuffled_blocks(
         df,
@@ -153,7 +124,7 @@ def test_shuffled_blocks_keep_assignment_column_and_add_segment_column() -> None
     assert unique_assignments.issubset({0, 1, 2})
 
 
-def test_shuffled_blocks_assign_segment_consistently_within_each_group() -> None:
+def test_shuffled_blocks_group_segments() -> None:
     """Assign the same label to all rows of a segment within a group."""
     df = pl.DataFrame({
         "scene": ["A"] * 8 + ["B"] * 8,

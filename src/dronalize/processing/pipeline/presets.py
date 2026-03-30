@@ -5,11 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dronalize.processing.pipeline.extensions import LaneChangeSamplingExtension
-from dronalize.processing.pipeline.spec import (
-    LaneChangeDetection,
-    TrackColumns,
-    TrajectorySpec,
-)
+from dronalize.processing.pipeline.spec import LaneChangeDetection, TrackColumns, TrajectorySpec
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -42,12 +38,7 @@ def standard_trajectory_spec(
     window_by: str | Sequence[str] | None = None,
 ) -> TrajectorySpec:
     """Build the default trajectory pipeline specification."""
-    return _base_spec(
-        config,
-        split_request=split_request,
-        columns=columns,
-        window_by=window_by,
-    )
+    return _base_spec(config, split_request=split_request, columns=columns, window_by=window_by)
 
 
 def highway_trajectory_spec(
@@ -64,10 +55,7 @@ def highway_trajectory_spec(
     """Build a spec for lane-change-aware highway window sampling."""
     lane_change = lane_change or LaneChangeDetection()
     base_spec = _base_spec(
-        config,
-        split_request=split_request,
-        columns=columns,
-        window_by=window_by,
+        config, split_request=split_request, columns=columns, window_by=window_by
     )
     return base_spec.with_columns(base_spec.columns.with_lane_id(lane_id)).with_extension(
         LaneChangeSamplingExtension(

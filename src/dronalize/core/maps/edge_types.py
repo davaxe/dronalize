@@ -24,11 +24,7 @@ class EdgeType(IntEnum):
     LINE_THIN_DOUBLE_DASHED = 15
 
     @classmethod
-    def from_str(
-        cls,
-        type_str: str | None,
-        subtype: str | None = None,
-    ) -> EdgeType:
+    def from_str(cls, type_str: str | None, subtype: str | None = None) -> EdgeType:
         """Convert string representation to EdgeType."""
         if type_str is None:
             return cls.NONE

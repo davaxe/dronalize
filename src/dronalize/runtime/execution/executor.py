@@ -34,9 +34,7 @@ class WritingExecutor(Protocol):
     """
 
     def execute(
-        self,
-        writer_factory: WriterFactory,
-        finalize: Callable[[SceneWriter], None] | None = None,
+        self, writer_factory: WriterFactory, finalize: Callable[[SceneWriter], None] | None = None
     ) -> None:
         """Run the executor and write all produced scenes.
 

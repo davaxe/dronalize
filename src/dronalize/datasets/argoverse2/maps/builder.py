@@ -44,9 +44,7 @@ class Argoverse2MapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         # Used implicitly when `self.add_path_lazy` is called
         _, _ = min_distance, interp_distance
@@ -58,14 +56,8 @@ class Argoverse2MapBuilder(BaseMapBuilder):
     def _add_pedestrian_crossing_edges(self) -> None:
         """Add edges for pedestrian crossings in the map."""
         for crossing in self.map.pedestrian_crossings.values():
-            self.add_path_lazy(
-                points=crossing.first_edge,
-                edge_type=EdgeType.PEDESTRIAN_MARKING,
-            )
-            self.add_path_lazy(
-                points=crossing.second_edge,
-                edge_type=EdgeType.PEDESTRIAN_MARKING,
-            )
+            self.add_path_lazy(points=crossing.first_edge, edge_type=EdgeType.PEDESTRIAN_MARKING)
+            self.add_path_lazy(points=crossing.second_edge, edge_type=EdgeType.PEDESTRIAN_MARKING)
 
     def _add_lane_boundary_edges(self) -> None:
         """Add edges for lane boundaries in the map."""
@@ -76,23 +68,16 @@ class Argoverse2MapBuilder(BaseMapBuilder):
             left = self._lane_segment_points(segment, side="left")
             if left is not None:
                 points, edge = left
-                self.add_path_lazy(
-                    points=points,
-                    edge_type=edge,
-                )
+                self.add_path_lazy(points=points, edge_type=edge)
 
             right = self._lane_segment_points(segment, side="right")
             if right is not None:
                 points, edge = right
-                self.add_path_lazy(
-                    points=points,
-                    edge_type=edge,
-                )
+                self.add_path_lazy(points=points, edge_type=edge)
 
     @staticmethod
     def _lane_segment_points(
-        segment: parser.LaneSegment,
-        side: Literal["left", "right"],
+        segment: parser.LaneSegment, side: Literal["left", "right"]
     ) -> tuple[list[Point], EdgeType] | None:
         """Get all points for a lane segment's boundaries."""
         boundary = segment.left_boundary if side == "left" else segment.right_boundary

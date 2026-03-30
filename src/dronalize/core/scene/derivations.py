@@ -7,7 +7,7 @@ from typing import Final
 
 import polars as pl
 
-from dronalize._internal._polars_ops import derivative, yaw_from_pos, yaw_from_vel
+from dronalize._internal.polars_ops import derivative, yaw_from_pos, yaw_from_vel
 from dronalize.core.scene.schema import SceneField
 
 _POSITION_FIELDS: Final[SceneField] = SceneField.X | SceneField.Y
@@ -48,11 +48,7 @@ class DerivationRule:
     needs_sample_time: bool = False
     """Flag to indicate if the rule requires sample time."""
 
-    def is_applicable(
-        self,
-        available: SceneField,
-        context: ConversionContext,
-    ) -> bool:
+    def is_applicable(self, available: SceneField, context: ConversionContext) -> bool:
         """Return True if the rule can be applied in the current state."""
         has_inputs = (available & self.requires) == self.requires
         adds_new_fields = (available & self.outputs) != self.outputs
@@ -85,9 +81,7 @@ def _rules_for_context(context: ConversionContext) -> tuple[DerivationRule, ...]
 
 @functools.lru_cache(maxsize=32)
 def plan_derivations(
-    available_fields: SceneField,
-    required_fields: SceneField,
-    context: ConversionContext,
+    available_fields: SceneField, required_fields: SceneField, context: ConversionContext
 ) -> tuple[DerivationRule, ...] | None:
     """Return the lowest-cost derivation plan for reaching the required fields."""
     context = ConversionContext(context.sample_time, context.group_by)
@@ -159,36 +153,17 @@ def _apply_derivative(
 
 
 def _velocity_from_position(data: pl.LazyFrame, context: ConversionContext) -> pl.LazyFrame:
-    return _apply_derivative(
-        data,
-        context,
-        x_col="x",
-        y_col="y",
-        order=1,
-        rename={1: ["vx", "vy"]},
-    )
+    return _apply_derivative(data, context, x_col="x", y_col="y", order=1, rename={1: ["vx", "vy"]})
 
 
 def _acceleration_from_velocity(data: pl.LazyFrame, context: ConversionContext) -> pl.LazyFrame:
     return _apply_derivative(
-        data,
-        context,
-        x_col="vx",
-        y_col="vy",
-        order=1,
-        rename={1: ["ax", "ay"]},
+        data, context, x_col="vx", y_col="vy", order=1, rename={1: ["ax", "ay"]}
     )
 
 
 def _acceleration_from_position(data: pl.LazyFrame, context: ConversionContext) -> pl.LazyFrame:
-    return _apply_derivative(
-        data,
-        context,
-        x_col="x",
-        y_col="y",
-        order=2,
-        rename={2: ["ax", "ay"]},
-    )
+    return _apply_derivative(data, context, x_col="x", y_col="y", order=2, rename={2: ["ax", "ay"]})
 
 
 def _kinematics_from_position(data: pl.LazyFrame, context: ConversionContext) -> pl.LazyFrame:

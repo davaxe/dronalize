@@ -223,10 +223,7 @@ class MapGraph:
         offset = 0
         for arr in arrays_to_serialize:
             target_arr: npt.NDArray[Any] = np.ndarray(
-                arr.shape,
-                dtype=arr.dtype,
-                buffer=shared.buf,
-                offset=offset,
+                arr.shape, dtype=arr.dtype, buffer=shared.buf, offset=offset
             )
             np.copyto(target_arr, arr)
             offset += arr.nbytes
@@ -304,9 +301,7 @@ class MapGraph:
         )
 
     def extract_radius(
-        self,
-        center: tuple[float, float] | npt.NDArray[np.floating[Any]] | None,
-        radius: float,
+        self, center: tuple[float, float] | npt.NDArray[np.floating[Any]] | None, radius: float
     ) -> MapGraph:
         """Extract a subgraph within a specified radius from a center point.
 
@@ -418,10 +413,7 @@ class MapGraph:
 
         return self.extract_bbox(center, half_w, half_h)
 
-    def _subgraph_from_mask(
-        self,
-        node_mask: npt.NDArray[np.bool_],
-    ) -> MapGraph:
+    def _subgraph_from_mask(self, node_mask: npt.NDArray[np.bool_]) -> MapGraph:
         """Build a new `MapGraph` from a boolean node mask."""
         new_edge_indices, edge_mask = _extract_subgraph(node_mask, self.edge_indices)
 
@@ -456,8 +448,7 @@ class MapGraph:
 
 
 def _extract_subgraph(
-    node_mask: npt.NDArray[np.bool_],
-    edge_indices: npt.NDArray[np.int32],
+    node_mask: npt.NDArray[np.bool_], edge_indices: npt.NDArray[np.int32]
 ) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.bool_]]:
     """Extract a subgraph given a boolean node mask.
 

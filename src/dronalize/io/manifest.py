@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypedDict
 import numpy as np
 import numpy.typing as npt
 
-from dronalize._internal._typing import FloatScalarT
+from dronalize._internal.typing import FloatScalarT
 from dronalize.core.scene.model import derived_scene_fields
 
 if TYPE_CHECKING:
@@ -130,8 +130,7 @@ def write_manifest(root: Path, manifest: StorageManifest) -> None:
     """Write the storage manifest for one output root."""
     root.mkdir(parents=True, exist_ok=True)
     _ = manifest_path(root).write_text(
-        json.dumps(manifest.to_json_dict(), indent=2),
-        encoding="utf-8",
+        json.dumps(manifest.to_json_dict(), indent=2), encoding="utf-8"
     )
 
 

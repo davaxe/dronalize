@@ -77,11 +77,7 @@ class SindMapBuilder(OSMMapBuilder):
 
     @override
     def _process_node(
-        self,
-        elem: ET.Element,
-        x_offset: float,
-        y_offset: float,
-        root: ET.Element,
+        self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element
     ) -> None:
         """Process an OSM node element."""
         node_id = int(elem.attrib["id"])
@@ -90,10 +86,7 @@ class SindMapBuilder(OSMMapBuilder):
 
         # Apply SIND-specific UTM projection
         x_utm, y_utm, _, _ = utils.from_latlon(
-            lat,
-            lon,
-            force_zone_number=self._zone_number,
-            force_zone_letter=self._zone_letter,
+            lat, lon, force_zone_number=self._zone_number, force_zone_letter=self._zone_letter
         )
         local_x = x_utm - self._origin_utm_x
         local_y = y_utm - self._origin_utm_y

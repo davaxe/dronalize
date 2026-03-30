@@ -69,11 +69,7 @@ class OSMMapBuilder(BaseMapBuilder):
         return EdgeType.from_str(way.tags.get("type"), way.tags.get("subtype"))
 
     def _process_node(
-        self,
-        elem: ET.Element,
-        x_offset: float,
-        y_offset: float,
-        root: ET.Element,
+        self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element
     ) -> None:
         """Process an OSM node element."""
         node_id = int(elem.attrib["id"])
@@ -113,9 +109,7 @@ class OSMMapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         # Use iterparse for memory-efficient incremental XML parsing
         context = ET.iterparse(self._osm_file, events=("start", "end"))

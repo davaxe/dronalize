@@ -17,3 +17,11 @@ class UniDLoader(LevelXDataLoader):
     across the X-level dataset family.
 
     """
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+    from dronalize.datasets.unid import DESCRIPTOR
+
+    root = resolve_dataset_root_from_env("unid")
+    _ = debug_descriptor(DESCRIPTOR, root)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from itertools import islice
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import altair as alt
@@ -11,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
     from dronalize.core.scene import Scene
+    from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.processing.ingest.loader import SceneLoader
 
 
@@ -79,3 +82,39 @@ def debug_visualize_scenes(
             chart.show()
         charts.append(chart)
     return charts
+
+
+def resolve_dataset_root_from_env(
+    *default_parts: str, alternatives: Sequence[Sequence[str]] = ()
+) -> Path:
+    """Resolve a dataset root from `TRAJ_DATA`, preferring existing candidates."""
+    path_str = os.environ.get("TRAJ_DATA")
+    base = Path() if path_str is None else Path(path_str)
+
+    for parts in (default_parts, *alternatives):
+        candidate = base.joinpath(*parts)
+        if candidate.exists():
+            return candidate
+
+    return base.joinpath(*default_parts)
+
+
+def debug_descriptor(
+    descriptor: DatasetDescriptor,
+    root: Path,
+    *,
+    max_scenes: int = 3,
+    skip_scenes: int = 0,
+    step: int = 1,
+) -> list[alt.TopLevelMixin]:
+    """Build a loader from its descriptor and visualize a scene sample."""
+    loader_config = descriptor.default_config
+    map_config = descriptor.default_map_config
+    loader = descriptor.build_loader(
+        root, loader_config=loader_config, map_config=map_config, output_schema=None
+    )
+
+    with descriptor.execution_scope(root, loader_config, map_config):
+        return debug_visualize_scenes(
+            loader, max_scenes=max_scenes, skip_scenes=skip_scenes, step=step
+        )

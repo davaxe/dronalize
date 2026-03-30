@@ -50,9 +50,7 @@ class WaymoMapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         self._processed_features: set[int] = set()
 
@@ -64,10 +62,7 @@ class WaymoMapBuilder(BaseMapBuilder):
         self._add_lane_edges(min_distance, interp_distance)
         self._add_stop_sign_nodes()
 
-    def _process_map_features(
-        self,
-        map_features: Sequence[lean_map_pb2.MapFeature],
-    ) -> None:
+    def _process_map_features(self, map_features: Sequence[lean_map_pb2.MapFeature]) -> None:
         """Process the map features and populate nodes and id_adj_list."""
         r_lines = self.road_lines
         r_edges = self.road_edges
@@ -95,9 +90,7 @@ class WaymoMapBuilder(BaseMapBuilder):
                 dw[feature.id] = feature.driveway
 
     def _add_speed_bump_edges(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         """Add edges for speed bumps to the map graph."""
         for feature_id, speed_bump in self.speed_bumps.items():
@@ -120,9 +113,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             _ = self.add_node(stop_sign.position.x, stop_sign.position.y)
 
     def _add_lane_edges(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         """Process a lane center feature and update nodes and id_adj_list."""
         for feature_id, lane in self.lanes.items():
@@ -140,9 +131,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             self._processed_features.add(feature_id)
 
     def _add_crosswalk_edges(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         """Process a crosswalk feature and update nodes and id_adj_list."""
         for feature_id, crosswalk in self.crosswalks.items():
@@ -160,9 +149,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             self._processed_features.add(feature_id)
 
     def _add_driveway_edges(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         """Process a driveway feature and update nodes and id_adj_list."""
         for feature_id, driveway in self.driveways.items():
@@ -180,9 +167,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             self._processed_features.add(feature_id)
 
     def _add_road_edge_edges(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         """Process a road edge feature and update nodes and id_adj_list."""
         for feature_id, road_edge in self.road_edges.items():
@@ -198,9 +183,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             self._processed_features.add(feature_id)
 
     def _add_road_line_edges(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         """Process a road line feature and update nodes and id_adj_list."""
         for feature_id, road_line in self.road_lines.items():

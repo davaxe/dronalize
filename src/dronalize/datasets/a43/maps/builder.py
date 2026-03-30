@@ -32,9 +32,7 @@ class A43MapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         markings = self._markings[self._name]
         for i, y in enumerate(markings):
@@ -43,7 +41,4 @@ class A43MapBuilder(BaseMapBuilder):
             else:
                 edge_type = EdgeType.LINE_THIN_DASHED
 
-            self.add_path_lazy(
-                points=[(self._min_x, y), (self._max_x, y)],
-                edge_type=edge_type,
-            )
+            self.add_path_lazy(points=[(self._min_x, y), (self._max_x, y)], edge_type=edge_type)

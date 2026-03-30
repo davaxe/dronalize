@@ -32,9 +32,7 @@ class MapBuilder(Protocol):
     """Minimal protocol for building a map graph."""
 
     def build(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> MapGraph:
         """Build the final `MapGraph`.
 
@@ -83,11 +81,7 @@ class BaseMapBuilder(MapBuilder, ABC):
     _edge_types: list[int] = field(default_factory=list, init=False)
     _seen_edges: set[tuple[int, int, int]] = field(default_factory=set, init=False)
 
-    _pending_paths: list[_PendingPathDict] = field(
-        default_factory=list,
-        repr=False,
-        init=False,
-    )
+    _pending_paths: list[_PendingPathDict] = field(default_factory=list, repr=False, init=False)
     """Paths queued via `add_path_lazy` for deferred processing."""
 
     def _next_node_id(self) -> int:
@@ -166,9 +160,7 @@ class BaseMapBuilder(MapBuilder, ABC):
 
     @abstractmethod
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         """Prepare internal structure for building the map graph.
 
@@ -205,12 +197,7 @@ class BaseMapBuilder(MapBuilder, ABC):
         self.edge_map = edge_map
         return self
 
-    def add_edge(
-        self,
-        from_id: int,
-        to_id: int,
-        edge_type: EdgeType,
-    ) -> None:
+    def add_edge(self, from_id: int, to_id: int, edge_type: EdgeType) -> None:
         """Add a directed edge to the graph.
 
         If the edge already exists it is silently skipped.
@@ -244,10 +231,7 @@ class BaseMapBuilder(MapBuilder, ABC):
         self._edge_dst.append(v)
         self._edge_types.append(edge_type_int)
 
-    def add_edges_from_iterable(
-        self,
-        edges: Iterable[tuple[int, int, EdgeType]],
-    ) -> None:
+    def add_edges_from_iterable(self, edges: Iterable[tuple[int, int, EdgeType]]) -> None:
         """Add edges to the graph from an iterable.
 
         Parameters
@@ -297,9 +281,7 @@ class BaseMapBuilder(MapBuilder, ABC):
         """
         prev_id = src_id
         for stage, _, (ix, iy) in interpolate_position(
-            src_xy,
-            dst_xy,
-            target_distance=interp_distance,
+            src_xy, dst_xy, target_distance=interp_distance
         ):
             new_id = dst_id if stage == InterpolationStage.LAST else self.add_node(ix, iy)
             yield prev_id, new_id, edge_type
@@ -357,25 +339,15 @@ class BaseMapBuilder(MapBuilder, ABC):
         for i in range(len(points) - 1):
             self.add_edges_from_iterable(
                 self.interpolate_edge(
-                    ids[i],
-                    points[i],
-                    ids[i + 1],
-                    points[i + 1],
-                    interp_distance,
-                    edge_types[i],
-                ),
+                    ids[i], points[i], ids[i + 1], points[i + 1], interp_distance, edge_types[i]
+                )
             )
 
         if is_polygon:
             self.add_edges_from_iterable(
                 self.interpolate_edge(
-                    ids[-1],
-                    points[-1],
-                    ids[0],
-                    points[0],
-                    interp_distance,
-                    edge_types[-1],
-                ),
+                    ids[-1], points[-1], ids[0], points[0], interp_distance, edge_types[-1]
+                )
             )
 
         return ids
@@ -402,12 +374,7 @@ class BaseMapBuilder(MapBuilder, ABC):
             Connect last point back to first.
 
         """
-        _ = self.add_path(
-            points,
-            edge_type,
-            is_polygon=is_polygon,
-            interp_distance=interp_distance,
-        )
+        _ = self.add_path(points, edge_type, is_polygon=is_polygon, interp_distance=interp_distance)
 
     def add_node_edges_loop_min_dist(
         self,
@@ -436,10 +403,7 @@ class BaseMapBuilder(MapBuilder, ABC):
         """
         if min_distance is None:
             _ = self.add_path(
-                points,
-                edge_type,
-                is_polygon=is_polygon,
-                interp_distance=interp_distance,
+                points, edge_type, is_polygon=is_polygon, interp_distance=interp_distance
             )
             return
 
@@ -477,13 +441,8 @@ class BaseMapBuilder(MapBuilder, ABC):
             dst_id = self.add_node(*dst_pt)
             self.add_edges_from_iterable(
                 self.interpolate_edge(
-                    prev_id,
-                    prev_pt,
-                    dst_id,
-                    dst_pt,
-                    interp_distance,
-                    edge_types[i],
-                ),
+                    prev_id, prev_pt, dst_id, dst_pt, interp_distance, edge_types[i]
+                )
             )
             prev_id = dst_id
             prev_pt = dst_pt
@@ -496,13 +455,8 @@ class BaseMapBuilder(MapBuilder, ABC):
             close_id = self.add_node(*first_pt)
             self.add_edges_from_iterable(
                 self.interpolate_edge(
-                    prev_id,
-                    prev_pt,
-                    close_id,
-                    first_pt,
-                    interp_distance,
-                    edge_types[-1],
-                ),
+                    prev_id, prev_pt, close_id, first_pt, interp_distance, edge_types[-1]
+                )
             )
 
     def add_path_lazy(
@@ -531,9 +485,7 @@ class BaseMapBuilder(MapBuilder, ABC):
         })
 
     def _process_pending_paths(
-        self,
-        min_distance: float | None,
-        interp_distance: float | None,
+        self, min_distance: float | None, interp_distance: float | None
     ) -> None:
         for path_data in self._pending_paths:
             self.add_node_edges_loop_min_dist(
@@ -547,9 +499,7 @@ class BaseMapBuilder(MapBuilder, ABC):
 
     @override
     def build(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> MapGraph:
         """Build the final `MapGraph`.
 
@@ -566,21 +516,12 @@ class BaseMapBuilder(MapBuilder, ABC):
             The constructed graph.
 
         """
-        min_distance, interp_distance = self._resolve_distance(
-            min_distance,
-            interp_distance,
-        )
+        min_distance, interp_distance = self._resolve_distance(min_distance, interp_distance)
 
-        self.build_impl(
-            min_distance=min_distance,
-            interp_distance=interp_distance,
-        )
+        self.build_impl(min_distance=min_distance, interp_distance=interp_distance)
 
         if self._pending_paths:
-            self._process_pending_paths(
-                min_distance=min_distance,
-                interp_distance=interp_distance,
-            )
+            self._process_pending_paths(min_distance=min_distance, interp_distance=interp_distance)
 
         return self._to_map_graph()
 
@@ -602,9 +543,7 @@ class BaseMapBuilder(MapBuilder, ABC):
         edge_types = np.array(self._edge_types, dtype=np.int32)
 
         return MapGraph(
-            edge_indices=edge_indices,
-            node_positions=node_positions,
-            edge_types=edge_types,
+            edge_indices=edge_indices, node_positions=node_positions, edge_types=edge_types
         )
 
     def node_xy(self, node_id: int) -> Point:
@@ -630,8 +569,7 @@ class BaseMapBuilder(MapBuilder, ABC):
 
     @staticmethod
     def _resolve_distance(
-        min_distance: float | None,
-        interp_distance: float | None,
+        min_distance: float | None, interp_distance: float | None
     ) -> tuple[float | None, float | None]:
         min_distance = min_distance if min_distance is not None else 0.0
         interp_distance = interp_distance if interp_distance is not None else np.inf
@@ -654,9 +592,7 @@ class InterpolationStage(IntEnum):
 
 
 def interpolate_position(
-    src: tuple[float, float],
-    dst: tuple[float, float],
-    target_distance: float | None = None,
+    src: tuple[float, float], dst: tuple[float, float], target_distance: float | None = None
 ) -> Iterable[tuple[InterpolationStage, int, tuple[float, float]]]:
     """Interpolate positions between *src* and *dst*.
 
@@ -719,8 +655,7 @@ class Edges:
 
 
 def get_edges_from_adj_list(
-    adj_list: dict[int, list[int]],
-    edge_type: EdgeType | None = None,
+    adj_list: dict[int, list[int]], edge_type: EdgeType | None = None
 ) -> list[tuple[int, int, EdgeType]]:
     """Convert an adjacency-list dict into a flat list of edge tuples.
 

@@ -34,8 +34,7 @@ def no_map() -> MapResolver:
 
 
 def shared_map(
-    shared_name: dict[MapKey, str] | str,
-    f: Callable[[Scene, MapGraph], MapGraph] | None = None,
+    shared_name: dict[MapKey, str] | str, f: Callable[[Scene, MapGraph], MapGraph] | None = None
 ) -> MapResolver:
     """Create a resolver that materializes a scene map from shared memory.
 

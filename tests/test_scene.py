@@ -1,5 +1,4 @@
 # pyright: standard
-# ruff: noqa: PLC2701
 
 import numpy as np
 import polars as pl
@@ -17,7 +16,7 @@ from dronalize.core.scene.derivations import ConversionContext, plan_derivations
 from dronalize.io.encoding import scene_to_numpy_dict
 
 
-def test_scene_schema_define_uses_semantic_fields_in_canonical_order() -> None:
+def test_scene_schema_orders_fields() -> None:
     """Test that field-based schema definitions normalize to canonical dataframe order."""
     schema = SceneSchema.define(
         name="custom",
@@ -37,7 +36,7 @@ def test_scene_schema_define_uses_semantic_fields_in_canonical_order() -> None:
     assert schema.has(SceneField.FRAME, "id", "x", "y")
 
 
-def test_scene_schema_accepts_combined_intflag_fields() -> None:
+def test_scene_schema_accepts_bitmasks() -> None:
     """Test that schemas can be defined directly from an IntFlag bitmask."""
     schema = SceneSchema.define(
         "positions_velocity",
@@ -62,7 +61,7 @@ def test_scene_schema_accepts_combined_intflag_fields() -> None:
     assert schema.semantic_fields() == ("frame", "id", "x", "y", "vx", "vy")
 
 
-def test_plan_derivations_accepts_scene_field_bitmasks() -> None:
+def test_plan_derivations_bitmasks() -> None:
     """Derivation planning should operate directly on SceneField bitmasks."""
     plan = plan_derivations(
         SceneField.X | SceneField.Y,
@@ -74,13 +73,13 @@ def test_plan_derivations_accepts_scene_field_bitmasks() -> None:
     assert tuple(rule.name for rule in plan) == ("velocity_from_position", "yaw_from_velocity")
 
 
-def test_scene_schema_requires_base_fields() -> None:
+def test_scene_schema_requires_bases() -> None:
     """Test that schemas must include the base frame, id, and position fields."""
     with pytest.raises(ValueError, match="base fields"):
         SceneSchema.define(name="invalid", fields=(SceneField.FRAME, SceneField.ID, SceneField.X))
 
 
-def test_scene_as_schema_derives_velocity_acceleration_and_yaw() -> None:
+def test_scene_derives_kinematics() -> None:
     """Test that schema conversion derives canonical kinematics from positions."""
     scene = Scene(
         frame=pl.DataFrame({
@@ -107,7 +106,7 @@ def test_scene_as_schema_derives_velocity_acceleration_and_yaw() -> None:
     assert converted.frame["yaw"].to_list() == pytest.approx([0.0, 0.0, 0.0])
 
 
-def test_scene_as_schema_derives_yaw_from_position_without_sample_time() -> None:
+def test_scene_derives_yaw_without_sample_time() -> None:
     """Test that yaw-only conversion can use position differences without sample time."""
     scene = Scene(
         frame=pl.DataFrame({
@@ -129,7 +128,7 @@ def test_scene_as_schema_derives_yaw_from_position_without_sample_time() -> None
     assert converted.frame["yaw"].to_list() == pytest.approx([0.0, 0.0, 0.0])
 
 
-def test_scene_as_schema_requires_sample_time_for_derivatives() -> None:
+def test_scene_requires_sample_time() -> None:
     """Test that kinematic derivation fails clearly without sample-time metadata."""
     scene = Scene(
         frame=pl.DataFrame({
@@ -149,14 +148,14 @@ def test_scene_as_schema_requires_sample_time_for_derivatives() -> None:
         scene.as_schema(CANONICAL_V1)
 
 
-def test_scene_schema_feature_columns_follow_canonical_tensor_order() -> None:
+def test_feature_columns_canonical_order() -> None:
     """Feature columns should reflect only persisted tensor fields in canonical order."""
     assert POSITIONS_ONLY_V1.feature_columns() == ("x", "y")
     assert POSITIONS_YAW_V1.feature_columns() == ("x", "y", "yaw")
     assert CANONICAL_V1.feature_columns() == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
 
 
-def test_scene_to_numpy_dict_respects_requested_scene_schema() -> None:
+def test_scene_to_numpy_dict_schema() -> None:
     """NumPy conversion should derive feature width from the requested scene schema."""
     scene = Scene(
         frame=pl.DataFrame({

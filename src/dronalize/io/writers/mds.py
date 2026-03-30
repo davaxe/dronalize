@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from typing_extensions import override
 
-from dronalize._internal._optional import raise_missing_optional_dependency
+from dronalize._internal.optional import raise_missing_optional_dependency
 from dronalize.core.errors import ConfigurationError
 from dronalize.io.encoding import encode_map_from_scene, scene_to_numpy_dict
 from dronalize.io.manifest import StorageManifest, write_manifest
@@ -21,11 +21,7 @@ try:
     from streaming import MDSWriter
     from streaming.base.util import merge_index
 except ModuleNotFoundError as error:
-    raise_missing_optional_dependency(
-        error,
-        feature="The MDS scene writer",
-        extra="storage-mds",
-    )
+    raise_missing_optional_dependency(error, feature="The MDS scene writer", extra="storage-mds")
 
 
 if TYPE_CHECKING:
@@ -149,10 +145,7 @@ class MDSSceneWriter(SceneWriter):
         return writers
 
     @override
-    def write(
-        self,
-        scene: Scene,
-    ) -> bool:
+    def write(self, scene: Scene) -> bool:
         if self._writers is None:
             self._writers = self._init_writers(
                 self._base_output_dir,

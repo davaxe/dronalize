@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from dronalize._internal._optional import require_optional
+from dronalize._internal.optional import require_optional
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -72,10 +72,7 @@ def plot_trajectories(
     alt = require_optional("altair", extra="plot")
     alt.renderers.enable("browser")
     data = _sample_trajectory_groups(
-        data,
-        group_by=group_by,
-        n_groups=n_groups,
-        group_sample_seed=group_sample_seed,
+        data, group_by=group_by, n_groups=n_groups, group_sample_seed=group_sample_seed
     )
 
     layers = _build_trajectory_layers(
@@ -105,11 +102,7 @@ def plot_trajectories(
 
 
 def _sample_trajectory_groups(
-    data: pl.DataFrame,
-    *,
-    group_by: str | None,
-    n_groups: int | None,
-    group_sample_seed: int | None,
+    data: pl.DataFrame, *, group_by: str | None, n_groups: int | None, group_sample_seed: int | None
 ) -> pl.DataFrame:
     """Optionally subsample grouped trajectories before plotting."""
     if n_groups is None or group_by is None:
@@ -164,24 +157,16 @@ def _build_trajectory_layers(
         x=alt.X(x_col, title=x_label or x_col, scale=alt.Scale(zero=False)),
         y=alt.Y(y_col, title=y_label or y_col, scale=alt.Scale(zero=False)),
         color=alt.Color(
-            group_by or alt.Undefined,
-            scale=alt.Scale(scheme="category20"),
-            legend=None,
+            group_by or alt.Undefined, scale=alt.Scale(scheme="category20"), legend=None
         ),
         order=alt.Order(field=frame_col),
         tooltip=tooltips,
     )
 
-    gap_lines = base.mark_line(
-        strokeDash=[4, 4],
-        strokeWidth=1.5,
-        opacity=0.4,
-    )
+    gap_lines = base.mark_line(strokeDash=[4, 4], strokeWidth=1.5, opacity=0.4)
 
     solid_lines = base.encode(detail="__segment").mark_line(
-        point=alt.OverlayMarkDef(filled=True, size=15),
-        strokeWidth=2,
-        opacity=0.8,
+        point=alt.OverlayMarkDef(filled=True, size=15), strokeWidth=2, opacity=0.8
     )
     start_markers = (
         alt

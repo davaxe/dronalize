@@ -21,7 +21,7 @@ class TrackColumns:
 
     frame: str = "frame"
     agent_id: str = "id"
-    category: str | None = "agent_category"
+    category: str = "agent_category"
     lane_id: str | None = None
 
     def with_lane_id(self, lane_id: str) -> Self:

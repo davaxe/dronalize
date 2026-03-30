@@ -14,7 +14,7 @@ from dronalize.processing.pipeline.functional.resample._spline import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal._typing import DataFrameT
+    from dronalize._internal.typing import DataFrameT
 
 
 def resample(
@@ -29,10 +29,7 @@ def resample(
     match resample_spec.method:
         case ResampleMethod.LINEAR:
             return linear_resample(
-                data=data,
-                spec=resample_spec,
-                frame_column=frame_column,
-                group_by=group_by,
+                data=data, spec=resample_spec, frame_column=frame_column, group_by=group_by
             )
         case ResampleMethod.CUBIC:
             return spline_resample(

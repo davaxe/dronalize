@@ -11,11 +11,9 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
 from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import (
-    ExcludeAgentCategories,
-    Filter,
-    RequireAgentCoverageAtFrames,
-)
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
+from dronalize.processing.filters.cleanup import ExcludeCategories
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
@@ -34,7 +32,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
     """Loader for Argoverse 2 trajectory data stored in Parquet files."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True,
+        supports_scene_split=True
     )
 
     def __init__(
@@ -120,8 +118,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         for (file_id,), group in batch_lf.collect().group_by(["file_id"]):
             map_path = file_to_map.get(str(file_id))
             yield IngestedData(
-                frame=group.lazy().drop("file_id"),
-                map_binding=MapBinding(map_key=map_path),
+                frame=group.lazy().drop("file_id"), map_binding=MapBinding(map_key=map_path)
             )
 
     @override
@@ -140,16 +137,16 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         return LoaderConfig(input_len=50, output_len=60, sample_time=0.1).with_filter(
             Filter.define(
                 cleanup_rules=[
-                    ExcludeAgentCategories.define(
+                    ExcludeCategories.define(
                         categories=[
                             AgentCategory.STATIC_OBJECT,
                             AgentCategory.UNKNOWN,
                             AgentCategory.UNIMPORTANT,
                         ]
-                    ),
+                    )
                 ],
-                agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[49])],
-            ),
+                agent_rules=[RequireFrames.define(frames=[49])],
+            )
         )
 
     @classmethod
@@ -165,9 +162,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
 
             return utils.extract_based_on_scene(
                 self._get_map(
-                    scene.map_key,
-                    self.map_config.min_distance,
-                    self.map_config.interp_distance,
+                    scene.map_key, self.map_config.min_distance, self.map_config.interp_distance
                 ),
                 scene,
                 self.map_config.extraction,
@@ -177,11 +172,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
 
     @staticmethod
     @functools.lru_cache(maxsize=10)
-    def _get_map(
-        key: str,
-        min_distance: float | None,
-        interp_distance: float | None,
-    ) -> MapGraph:
+    def _get_map(key: str, min_distance: float | None, interp_distance: float | None) -> MapGraph:
         return Argoverse2MapBuilder.from_json_file(Path(key)).build(min_distance, interp_distance)
 
     @staticmethod
@@ -199,9 +190,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             "unknown": AgentCategory.UNKNOWN,
         }
         return pl.col(col).replace_strict(
-            mapping,
-            default=AgentCategory.UNKNOWN,
-            return_dtype=pl.Int32,
+            mapping, default=AgentCategory.UNKNOWN, return_dtype=pl.Int32
         )
 
     def _count_sources(self, data_dir: Path) -> int:
@@ -220,3 +209,11 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         if split is DatasetSplit.VAL:
             return self._count_sources(self._data_root / "val")
         return self._count_sources(self._data_root / "test")
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.argoverse2 import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("argoverse2")
+    _ = debug_descriptor(DESCRIPTOR, root)

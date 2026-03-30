@@ -15,7 +15,7 @@ from dronalize.processing.pipeline.functional.resample._common import (
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal._typing import DataFrameT
+    from dronalize._internal.typing import DataFrameT
     from dronalize.processing.pipeline.functional.resample._common import ResampleSpec
 
 
@@ -26,11 +26,7 @@ def linear_resample(
     frame_column: str = "frame",
     group_by: str | Sequence[str] | None = None,
 ) -> DataFrameT:
-    plan = build_plan(
-        spec,
-        frame_column=frame_column,
-        group_by=group_by,
-    )
+    plan = build_plan(spec, frame_column=frame_column, group_by=group_by)
 
     if spec.no_resampling:
         return data
@@ -38,11 +34,7 @@ def linear_resample(
         data = data.sort([*plan.group_by, frame_column])
 
     data = segment_data(
-        data,
-        frame_column=frame_column,
-        group_by=plan.group_by,
-        max_gap=spec.max_gap,
-        sort=False,
+        data, frame_column=frame_column, group_by=plan.group_by, max_gap=spec.max_gap, sort=False
     )
 
     if spec.up > 1:
@@ -53,29 +45,16 @@ def linear_resample(
     return data.drop(SEGMENT_COLUMN, strict=False)
 
 
-def _downsample_dataframe(
-    data: DataFrameT,
-    *,
-    factor: int,
-    frame_column: str,
-) -> DataFrameT:
+def _downsample_dataframe(data: DataFrameT, *, factor: int, frame_column: str) -> DataFrameT:
     return data.filter(pl.col(frame_column) % factor == 0).with_columns(
-        (pl.col(frame_column) // factor).alias(frame_column),
+        (pl.col(frame_column) // factor).alias(frame_column)
     )
 
 
-def _upsample_dataframe(
-    data: DataFrameT,
-    *,
-    factor: int,
-    plan: ResamplePlan,
-) -> DataFrameT:
+def _upsample_dataframe(data: DataFrameT, *, factor: int, plan: ResamplePlan) -> DataFrameT:
     scaled = data.with_columns((pl.col(plan.frame_column) * factor).alias(plan.frame_column))
     frame_range = pl.int_range(
-        pl.col(plan.frame_column).min(),
-        pl.col(plan.frame_column).max() + 1,
-        step=1,
-        dtype=pl.Int64,
+        pl.col(plan.frame_column).min(), pl.col(plan.frame_column).max() + 1, step=1, dtype=pl.Int64
     ).alias(plan.frame_column)
 
     if plan.segment_keys:

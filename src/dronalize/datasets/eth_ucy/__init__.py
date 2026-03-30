@@ -15,11 +15,4 @@ DESCRIPTORS = {
     "zara2": DatasetDescriptor.from_loader("zara2", Zara2Loader),
 }
 
-__all__ = [
-    "DESCRIPTORS",
-    "EthLoader",
-    "HotelLoader",
-    "UnivLoader",
-    "Zara1Loader",
-    "Zara2Loader",
-]
+__all__ = ["DESCRIPTORS", "EthLoader", "HotelLoader", "UnivLoader", "Zara1Loader", "Zara2Loader"]

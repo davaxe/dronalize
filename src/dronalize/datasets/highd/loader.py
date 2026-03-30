@@ -64,10 +64,7 @@ class HighDLoader(LevelXDataLoader):
             pl.col("numLaneChanges").alias("lane_changes"),
             pl
             .col("class")
-            .replace_strict({
-                "Car": AgentCategory.CAR.value,
-                "Truck": AgentCategory.TRUCK.value,
-            })
+            .replace_strict({"Car": AgentCategory.CAR.value, "Truck": AgentCategory.TRUCK.value})
             .cast(pl.Int32())
             .alias("agent_category"),
         ]
@@ -130,10 +127,7 @@ class HighDLoader(LevelXDataLoader):
         return _resolver
 
 
-_META_SCHEMA: pl.Schema = pl.Schema({
-    "id": pl.Int32,
-    "numLaneChanges": pl.Int8,
-})
+_META_SCHEMA: pl.Schema = pl.Schema({"id": pl.Int32, "numLaneChanges": pl.Int8})
 
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "frame": pl.Int32,
@@ -147,3 +141,11 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float64,
     "yAcceleration": pl.Float64,
 })
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.highd import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("highd")
+    _ = debug_descriptor(DESCRIPTOR, root)

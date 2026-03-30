@@ -10,7 +10,8 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1, Scene
 from dronalize.datasets.a43.maps.builder import A43MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -22,9 +23,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.maps.graph import MapGraph
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import (
-        SplitRequest,
-    )
+    from dronalize.processing.ingest.splits import SplitRequest
     from dronalize.processing.maps.resolver import MapResolver
 
 
@@ -32,7 +31,7 @@ class A43Loader(BaseSceneLoader[Path]):
     """Scene loader for the A43 dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_block_split=True,
+        supports_block_split=True
     )
 
     def __init__(
@@ -87,7 +86,7 @@ class A43Loader(BaseSceneLoader[Path]):
                     "Bus": AgentCategory.BUS,
                 })
                 .alias("agent_category"),
-            ),
+            )
         )
 
     @override
@@ -105,11 +104,7 @@ class A43Loader(BaseSceneLoader[Path]):
         return (
             LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
             .with_window(25)
-            .with_filter(
-                Filter.define(
-                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[19])]
-                )
-            )
+            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[19])]))
         )
 
     @classmethod
@@ -130,3 +125,11 @@ class A43Loader(BaseSceneLoader[Path]):
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 
         return _resolver
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.a43 import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("A43")
+    _ = debug_descriptor(DESCRIPTOR, root)

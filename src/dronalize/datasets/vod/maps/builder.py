@@ -20,12 +20,7 @@ if TYPE_CHECKING:
 class VODMapBuilder(NuScenesMapBuilder):
     """A builder for creating a MapGraph from a VOD map."""
 
-    def __init__(
-        self,
-        path: Path,
-        *,
-        ignore_edge_types: set[str] | None = None,
-    ) -> None:
+    def __init__(self, path: Path, *, ignore_edge_types: set[str] | None = None) -> None:
         """Initialize the VOD map builder.
 
         Parameters
@@ -55,12 +50,7 @@ class VODMapBuilder(NuScenesMapBuilder):
 
     @override
     @classmethod
-    def from_json_file(
-        cls,
-        path: Path,
-        *,
-        ignore_edge_types: set[str] | None = None,
-    ) -> Self:
+    def from_json_file(cls, path: Path, *, ignore_edge_types: set[str] | None = None) -> Self:
         """Create a VOD map builder from a file path."""
         return cls(path, ignore_edge_types=ignore_edge_types)
 
@@ -68,12 +58,7 @@ class VODMapBuilder(NuScenesMapBuilder):
         """Add edges for arcline paths."""
         for arcline in self.map.arcline_path_3.values():
             ctrl = np.asarray(arcline.ctrl, dtype=float)
-            spline = BSpline(
-                arcline.knots,
-                ctrl,
-                3,
-                extrapolate=False,
-            )
+            spline = BSpline(arcline.knots, ctrl, 3, extrapolate=False)
 
             u = np.linspace(0, 1, 100)
             xy = spline(u).astype(np.float64)

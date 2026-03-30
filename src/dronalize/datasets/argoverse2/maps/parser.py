@@ -39,19 +39,13 @@ class Argoverse2Map:
     @cached_property
     def segments(self) -> dict[int, LaneSegment]:
         """Get the lane segments from the JSON data."""
-        segments_data: dict[str, dict[str, Any]] = self.json_data.get(
-            "lane_segments",
-            [],
-        )
+        segments_data: dict[str, dict[str, Any]] = self.json_data.get("lane_segments", [])
         return {segment["id"]: LaneSegment.from_dict(segment) for segment in segments_data.values()}
 
     @cached_property
     def pedestrian_crossings(self) -> dict[int, PedestrianCrossing]:
         """Get the pedestrian crossings from the JSON data."""
-        crossings_data: dict[str, dict[str, Any]] = self.json_data.get(
-            "pedestrian_crossings",
-            [],
-        )
+        crossings_data: dict[str, dict[str, Any]] = self.json_data.get("pedestrian_crossings", [])
         return {
             crossing["id"]: PedestrianCrossing.from_dict(crossing)
             for crossing in crossings_data.values()
@@ -60,10 +54,7 @@ class Argoverse2Map:
     @cached_property
     def drivable_areas(self) -> dict[int, DrivableArea]:
         """Get the drivable areas from the JSON data."""
-        areas_data: dict[str, dict[str, Any]] = self.json_data.get(
-            "drivable_areas",
-            [],
-        )
+        areas_data: dict[str, dict[str, Any]] = self.json_data.get("drivable_areas", [])
         return {area["id"]: DrivableArea.from_dict(area) for area in areas_data.values()}
 
 
@@ -103,21 +94,13 @@ class LaneBoundary:
     points: list[Point]
 
     @classmethod
-    def from_dict(
-        cls,
-        data: dict[str, Any],
-        *,
-        left: bool,
-    ) -> LaneBoundary:
+    def from_dict(cls, data: dict[str, Any], *, left: bool) -> LaneBoundary:
         """Create a `LaneBoundary` instance from a dictionary."""
         boundary_key = "left_lane_boundary" if left else "right_lane_boundary"
         type_key = "left_lane_mark_type" if left else "right_lane_mark_type"
 
         points: list[Point] = [(node["x"], node["y"]) for node in data[boundary_key]]
-        return cls(
-            lane_type=LaneBoundaryType[data[type_key]],
-            points=points,
-        )
+        return cls(lane_type=LaneBoundaryType[data[type_key]], points=points)
 
     def get_edge_type(self) -> EdgeType:
         """Get the corresponding `EdgeType` for the lane boundary."""
@@ -207,6 +190,5 @@ class DrivableArea:
     def from_dict(cls, data: dict[str, Any]) -> DrivableArea:
         """Create a `DrivableArea` instance from a dictionary."""
         return cls(
-            id=data["id"],
-            boundary=[(node["x"], node["y"]) for node in data["area_boundary"]],
+            id=data["id"], boundary=[(node["x"], node["y"]) for node in data["area_boundary"]]
         )

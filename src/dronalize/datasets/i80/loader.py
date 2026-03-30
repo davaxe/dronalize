@@ -9,7 +9,8 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY_V1
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -27,7 +28,7 @@ class I80Loader(BaseSceneLoader[Path]):
     """Scene loader for the I-80 dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_block_split=True,
+        supports_block_split=True
     )
 
     def __init__(
@@ -81,7 +82,7 @@ class I80Loader(BaseSceneLoader[Path]):
                 })
                 .alias("agent_category"),
                 self._lane_changes_expr(),
-            ),
+            )
         )
 
     @override
@@ -99,11 +100,7 @@ class I80Loader(BaseSceneLoader[Path]):
         return (
             LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
             .with_window(25)
-            .with_filter(
-                Filter.define(
-                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[19])]
-                )
-            )
+            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[19])]))
         )
 
     @classmethod
@@ -118,10 +115,7 @@ class I80Loader(BaseSceneLoader[Path]):
         return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 
     @staticmethod
-    def _lane_changes_expr(
-        lane_id_col: str = "Lane_ID",
-        id_col: str = "Vehicle_ID",
-    ) -> pl.Expr:
+    def _lane_changes_expr(lane_id_col: str = "Lane_ID", id_col: str = "Vehicle_ID") -> pl.Expr:
         return (
             pl
             .col(lane_id_col)
@@ -131,3 +125,11 @@ class I80Loader(BaseSceneLoader[Path]):
             .over(id_col)
             .alias("lane_changes")
         )
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.i80 import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("i80")
+    _ = debug_descriptor(DESCRIPTOR, root)

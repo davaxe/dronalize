@@ -11,6 +11,8 @@ from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1
 from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
+from dronalize.processing.filters.agent import MinSamples
+from dronalize.processing.filters.filter import Filter
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import Source
 from dronalize.processing.maps.config import MapConfig
@@ -140,6 +142,7 @@ class AD4CHELoader(LevelXDataLoader):
             LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
             .with_resampling(ResampleSpec(up=1, down=3))
             .with_window(45)
+            .with_filter(Filter.define_cleanup(MinSamples(minimum=4)))
         )
 
     @classmethod
@@ -154,8 +157,7 @@ class AD4CHELoader(LevelXDataLoader):
                 return None
             path = self._data_root / scene.map_key
             map_graph = AD4CHEMapBuilder(path).build(
-                self.map_config.min_distance,
-                self.map_config.interp_distance,
+                self.map_config.min_distance, self.map_config.interp_distance
             )
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 
@@ -169,10 +171,7 @@ class AD4CHELoader(LevelXDataLoader):
             yield int(number_str), subdir
 
 
-_META_SCHEMA: pl.Schema = pl.Schema({
-    "id": pl.Int32,
-    "numLaneChanges": pl.Int8,
-})
+_META_SCHEMA: pl.Schema = pl.Schema({"id": pl.Int32, "numLaneChanges": pl.Int8})
 
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "frame": pl.Int32,
@@ -188,22 +187,8 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
 })
 
 if __name__ == "__main__":
-    import os
+    from dronalize.datasets.ad4che import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
-    import altair as alt
-
-    from dronalize.datasets.registry import DatasetDescriptor
-
-    _ = alt.renderers.enable("browser")
-
-    path_str = os.environ.get("TRAJ_DATA", None)
-    path = Path() if path_str is None else Path(path_str)
-    path /= "ad4che"
-    loader = AD4CHELoader(path)
-    descriptor = DatasetDescriptor.from_loader("ad4che", AD4CHELoader, has_map=True)
-
-    with descriptor.execution_scope(
-        path, AD4CHELoader.default_config(), AD4CHELoader.default_map_config()
-    ):
-        count = sum(1 for _ in loader.scenes())
-        print(f"Discovered {count} scenes.")
+    root = resolve_dataset_root_from_env("ad4che")
+    _ = debug_descriptor(DESCRIPTOR, root, max_scenes=3, skip_scenes=40)

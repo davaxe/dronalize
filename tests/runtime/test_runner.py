@@ -33,7 +33,7 @@ def _a43_args() -> _CommonArgs:
     }
 
 
-def test_splits_a43() -> None:
+def test_a43_splits() -> None:
     """Test that the runner correctly handles the a43 dataset, which has no native splits."""
     common_args = _a43_args()
     job = prepare_dataset(**common_args, split=None)
@@ -47,9 +47,7 @@ def test_splits_a43() -> None:
         _ = prepare_dataset(**common_args, split=["train"])
 
     job = prepare_dataset(
-        **common_args,
-        split_strategy="time_blocks",
-        split_weights=(0.7, 0.2, 0.1),
+        **common_args, split_strategy="time_blocks", split_weights=(0.7, 0.2, 0.1)
     )
 
     assert job.descriptor.predefined_splits == []
@@ -58,15 +56,11 @@ def test_splits_a43() -> None:
     assert isinstance(job.split_request.strategy, TimeBlockSplit)
     assert job.split_request.strategy_name == "time_blocks"
 
-    with pytest.raises(
-        ValueError,
-        match=r"Specify a split strategy explicitly\.",
-    ):
+    with pytest.raises(ValueError, match=r"Specify a split strategy explicitly\."):
         _ = prepare_dataset(**common_args, split_weights=(0.7, 0.2, 0.1))
 
     with pytest.raises(
-        ValueError,
-        match=r"Native splits and custom split assignment are mutually exclusive\.",
+        ValueError, match=r"Native splits and custom split assignment are mutually exclusive\."
     ):
         _ = prepare_dataset(
             **common_args,
@@ -76,7 +70,7 @@ def test_splits_a43() -> None:
         )
 
 
-def test_prepare_dataset_accepts_sequence_splits_for_native_datasets() -> None:
+def test_prepare_dataset_native_splits() -> None:
     """Tuple-based split requests should behave the same as list-based ones."""
     job = prepare_dataset(
         dataset="waymo",
@@ -91,7 +85,7 @@ def test_prepare_dataset_accepts_sequence_splits_for_native_datasets() -> None:
     assert isinstance(job.split_request.strategy, NativeSplit)
 
 
-def test_prepare_dataset_overrides_worker_count() -> None:
+def test_prepare_dataset_workers() -> None:
     """An explicit jobs override should update both execution mode and worker count."""
     parallel_args = prepare_dataset(**_a43_args(), jobs=3)
     assert parallel_args.parallel is True
@@ -107,7 +101,7 @@ def test_prepare_dataset_overrides_worker_count() -> None:
         _ = prepare_dataset(**_a43_args(), jobs=0)
 
 
-def test_prepare_dataset_accepts_auto_worker_mode() -> None:
+def test_prepare_dataset_auto_workers() -> None:
     """The `-1` worker sentinel should keep parallel mode while deferring worker count."""
     job = prepare_dataset(**_a43_args(), jobs=-1)
 
@@ -116,7 +110,7 @@ def test_prepare_dataset_accepts_auto_worker_mode() -> None:
     assert job.config.execution.workers is None
 
 
-def test_prepare_dataset_overrides_scene_schema() -> None:
+def test_prepare_dataset_schema() -> None:
     """An explicit scene schema override should update the resolved writer config."""
     job = prepare_dataset(**_a43_args(), scene_schema="positions_only")
 
@@ -125,7 +119,7 @@ def test_prepare_dataset_overrides_scene_schema() -> None:
     assert job.config.writer.feature_columns == ("x", "y")
 
 
-def test_descriptor_from_loader_populates_common_metadata() -> None:
+def test_descriptor_from_loader() -> None:
     """Descriptor helpers should derive repeated metadata from the loader class."""
     descriptor = DatasetDescriptor.from_loader("a43-test", A43Loader, has_map=True)
 
@@ -140,7 +134,7 @@ def test_descriptor_from_loader_populates_common_metadata() -> None:
     assert descriptor.has_map is True
 
 
-def test_dataset_job_build_loader_uses_resolved_runtime_config() -> None:
+def test_build_loader_uses_config() -> None:
     """Job-local loader construction should carry resolved runtime settings."""
     job = prepare_dataset(
         **_a43_args(),
@@ -158,7 +152,7 @@ def test_dataset_job_build_loader_uses_resolved_runtime_config() -> None:
     assert loader.split_request.strategy_name == "time_blocks"
 
 
-def test_dataset_job_open_exposes_live_run() -> None:
+def test_job_open_returns_live_run() -> None:
     """Prepared jobs should open into live runs with observable executors."""
     job = prepare_dataset(**_a43_args())
 
@@ -168,13 +162,13 @@ def test_dataset_job_open_exposes_live_run() -> None:
         assert callable(run.executor.progress_event)
 
 
-def test_dataset_job_run_executes_directly() -> None:
+def test_job_run() -> None:
     """Prepared jobs should be executable directly without helper wrappers."""
     job = prepare_dataset(**_a43_args())
     job.run()
 
 
-def test_splits_waymo() -> None:
+def test_waymo_splits() -> None:
     """Test that the runner correctly handles the waymo dataset, which has native splits."""
     common_args: _CommonArgs = {
         "dataset": "waymo",
@@ -205,8 +199,7 @@ def test_splits_waymo() -> None:
     assert isinstance(job.split_request.strategy, NativeSplit)
 
     with pytest.raises(
-        ValueError,
-        match=r"Native splits and custom split assignment are mutually exclusive\.",
+        ValueError, match=r"Native splits and custom split assignment are mutually exclusive\."
     ):
         _ = prepare_dataset(**common_args, split_weights=(0.5, 0.5, 0.0), split=["train"])
 
@@ -224,7 +217,7 @@ def test_splits_waymo() -> None:
     ])
 
 
-def test_prepare_dataset_carries_split_config_from_runtime_options() -> None:
+def test_prepare_dataset_split_config() -> None:
     """Runtime split options should be normalized into the resolved config model."""
     job = prepare_dataset(
         **_a43_args(),
@@ -242,7 +235,7 @@ def test_prepare_dataset_carries_split_config_from_runtime_options() -> None:
     assert job.config.split.weights.values() == (0.6, 0.2, 0.2)
 
 
-def test_prepare_dataset_uses_split_config_file_until_cli_overrides(tmp_path: Path) -> None:
+def test_prepare_dataset_config_file_splits(tmp_path: Path) -> None:
     """Split config should load from TOML and allow CLI overrides on top."""
     config_path = tmp_path / "config.toml"
     _ = config_path.write_text(
@@ -281,7 +274,7 @@ gap = 2
     assert overridden.config.split.weights.values() == (0.6, 0.2, 0.2)
 
 
-def test_prepare_dataset_cli_can_clear_configured_splits(tmp_path: Path) -> None:
+def test_prepare_dataset_clears_splits(tmp_path: Path) -> None:
     """An explicit CLI no-split request should override split config from file."""
     config_path = tmp_path / "config.toml"
     _ = config_path.write_text(

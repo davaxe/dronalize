@@ -13,11 +13,7 @@ def _run_python(script: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "src")
     return subprocess.run(
-        [sys.executable, "-c", script],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
+        [sys.executable, "-c", script], check=False, capture_output=True, text=True, env=env
     )
 
 
@@ -40,7 +36,7 @@ def _block_imports(*blocked: str) -> str:
     )
 
 
-def test_storage_dataset_package_import_is_lazy() -> None:
+def test_adapter_import_is_lazy() -> None:
     """Importing `dronalize.io.adapters` should not require optional ML deps."""
     proc = _run_python(
         _block_imports("torch", "torch_geometric", "streaming")
@@ -58,7 +54,7 @@ def test_storage_dataset_package_import_is_lazy() -> None:
     assert proc.stdout.strip() == "ok"
 
 
-def test_mds_writer_missing_extra_has_install_hint() -> None:
+def test_mds_writer_install_hint() -> None:
     """The MDS writer should explain which extra to install."""
     proc = _run_python(
         _block_imports("streaming")
@@ -78,7 +74,7 @@ def test_mds_writer_missing_extra_has_install_hint() -> None:
     assert "pip install dronalize[storage-mds]" in proc.stdout
 
 
-def test_dataset_adapter_missing_extra_has_install_hint() -> None:
+def test_dataset_adapter_install_hint() -> None:
     """The dataset adapter should explain which extra to install."""
     proc = _run_python(
         _block_imports("torch", "torch_geometric")

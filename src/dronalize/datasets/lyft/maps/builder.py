@@ -21,11 +21,7 @@ class LyftMapBuilder(BaseMapBuilder):
         self.added_lanes: set[str] = set()
 
     @classmethod
-    def from_files(
-        cls,
-        map_path: Path | str,
-        meta_json: Path | str,
-    ) -> LyftMapBuilder:
+    def from_files(cls, map_path: Path | str, meta_json: Path | str) -> LyftMapBuilder:
         """Create a map builder from map and metadata files.
 
         The metafile needs the `world_to_ecef` transformation matrix
@@ -52,9 +48,7 @@ class LyftMapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         # Used implicitly when `self.add_path_lazy` is called
         _, _ = min_distance, interp_distance

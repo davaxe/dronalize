@@ -27,10 +27,7 @@ class MDSFormatConfig(BaseModel):
 class WriterConfig(BaseModel):
     """User-facing configuration shared by scene writers."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        frozen=True,
-        arbitrary_types_allowed=True,
-    )
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     scene_schema: ResolvedSceneSchema = CANONICAL_V1
     precision: WriterPrecision = "float32"
@@ -48,9 +45,7 @@ class WriterConfig(BaseModel):
         """Flexible constructor for WriterConfig."""
         resolved_schema = get_scene_schema(scene_schema)
         return cls(
-            scene_schema=resolved_schema,
-            precision=precision,
-            offset_positions=offset_positions,
+            scene_schema=resolved_schema, precision=precision, offset_positions=offset_positions
         )
 
     def with_scene_schema(self, scene_schema: SceneSchemaLike) -> WriterConfig:

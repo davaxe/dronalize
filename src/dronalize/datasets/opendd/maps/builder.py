@@ -52,17 +52,11 @@ class OpenDDMapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         self._add_edges(min_distance, interp_distance)
 
-    def _add_edges(
-        self,
-        min_distance: float | None,
-        interp_distance: float | None,
-    ) -> None:
+    def _add_edges(self, min_distance: float | None, interp_distance: float | None) -> None:
         """Add edges to the graph based on the adjacency list."""
         _ = self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         table_names = [row[0] for row in self.cursor.fetchall()]
@@ -77,10 +71,7 @@ class OpenDDMapBuilder(BaseMapBuilder):
             self._process_map_row(map_data_row, min_distance, interp_distance)
 
     def _process_map_row(
-        self,
-        map_data_row: MapDataRow,
-        min_distance: float | None,
-        interp_distance: float | None,
+        self, map_data_row: MapDataRow, min_distance: float | None, interp_distance: float | None
     ) -> None:
         """Process a single map data row and update the graph."""
         self.add_node_edges_loop_min_dist(
@@ -128,9 +119,7 @@ class LineString(Geometry):
 
         coords_str = geometry_str[len("LINESTRING (") : -1]
         coords = coords_str.split(", ")
-        return cls(
-            [(float(coord.split()[0]), float(coord.split()[1])) for coord in coords],
-        )
+        return cls([(float(coord.split()[0]), float(coord.split()[1])) for coord in coords])
 
     @override
     def connections(self) -> Iterable[tuple[Point, Point]]:
@@ -165,10 +154,7 @@ class Polygon(Geometry):
     def connections(self) -> Iterable[tuple[Point, Point]]:
         """Iterate over edge connections in the polygon."""
         for i in range(len(self._coordinates)):
-            yield (
-                self._coordinates[i],
-                self._coordinates[(i + 1) % len(self._coordinates)],
-            )
+            yield (self._coordinates[i], self._coordinates[(i + 1) % len(self._coordinates)])
 
 
 @dataclass

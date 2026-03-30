@@ -42,17 +42,12 @@ def require_optional(module_name: str, *, extra: str | None = None) -> ModuleTyp
             f"Install {install_target} to use it."
         )
         raise MissingOptionalDependencyError(
-            msg,
-            dependencies=(module_name,),
-            install_target=install_target,
+            msg, dependencies=(module_name,), install_target=install_target
         ) from exc
 
 
 def raise_missing_optional_dependency(
-    error: ModuleNotFoundError,
-    *,
-    feature: str,
-    extra: str,
+    error: ModuleNotFoundError, *, feature: str, extra: str
 ) -> NoReturn:
     """Raise a friendlier import error for optional storage features."""
     msg = (

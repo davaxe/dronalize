@@ -35,10 +35,7 @@ if TYPE_CHECKING:
 class NuScenesMap:
     """A class representing a NuScenes map, containing various map objects."""
 
-    def __init__(
-        self,
-        json_file: Path,
-    ) -> None:
+    def __init__(self, json_file: Path) -> None:
         """Initialize the `NuscenesMap` with data from a JSON file.
 
         Parameters
@@ -69,26 +66,17 @@ class NuScenesMap:
     @cached_property
     def road_dividers(self) -> dict[str, RoadDivider]:
         """A dictionary of `RoadDivider` objects keyed by their str."""
-        return _many_from_dict(
-            RoadDivider,
-            self.json_data["road_divider"],
-        )
+        return _many_from_dict(RoadDivider, self.json_data["road_divider"])
 
     @cached_property
     def road_segments(self) -> dict[str, RoadSegment]:
         """A dictionary of `RoadSegment` objects keyed by their str."""
-        return _many_from_dict(
-            RoadSegment,
-            self.json_data["road_segment"],
-        )
+        return _many_from_dict(RoadSegment, self.json_data["road_segment"])
 
     @cached_property
     def pedestrian_crossings(self) -> dict[str, PedestrianCrossing]:
         """A dictionary of `PedestrianCrossing` objects keyed by their str."""
-        return _many_from_dict(
-            PedestrianCrossing,
-            self.json_data["ped_crossing"],
-        )
+        return _many_from_dict(PedestrianCrossing, self.json_data["ped_crossing"])
 
     @cached_property
     def walkways(self) -> dict[str, Walkway]:
@@ -98,26 +86,17 @@ class NuScenesMap:
     @cached_property
     def traffic_lights(self) -> dict[str, TrafficLight]:
         """A dictionary of `TrafficLight` objects keyed by their str."""
-        return _many_from_dict(
-            TrafficLight,
-            self.json_data["traffic_light"],
-        )
+        return _many_from_dict(TrafficLight, self.json_data["traffic_light"])
 
     @cached_property
     def lane_dividers(self) -> dict[str, LaneDivider]:
         """A dictionary of `LaneDivider` objects keyed by their str."""
-        return _many_from_dict(
-            LaneDivider,
-            self.json_data["lane_divider"],
-        )
+        return _many_from_dict(LaneDivider, self.json_data["lane_divider"])
 
     @cached_property
     def stop_lines(self) -> dict[str, StopLine]:
         """A dictionary of `StopLine` objects keyed by their str."""
-        return _many_from_dict(
-            StopLine,
-            self.json_data["stop_line"],
-        )
+        return _many_from_dict(StopLine, self.json_data["stop_line"])
 
     @cached_property
     def lanes(self) -> dict[str, Lane]:
@@ -127,18 +106,12 @@ class NuScenesMap:
     @cached_property
     def road_blocks(self) -> dict[str, RoadBlock]:
         """A dictionary of `RoadBlock` objects keyed by their str."""
-        return _many_from_dict(
-            RoadBlock,
-            self.json_data["road_block"],
-        )
+        return _many_from_dict(RoadBlock, self.json_data["road_block"])
 
     @cached_property
     def carpark_areas(self) -> dict[str, CarparkArea]:
         """A dictionary of `Carpark` objects keyed by their str."""
-        return _many_from_dict(
-            CarparkArea,
-            self.json_data.get("carpark_area", []),
-        )
+        return _many_from_dict(CarparkArea, self.json_data.get("carpark_area", []))
 
     @cached_property
     def arcline_path_3(self) -> dict[str, ArclinePathV1]:
@@ -226,11 +199,7 @@ class Node:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Node:
         """Create a `Node` instance from a dictionary."""
-        return Node(
-            id=str(data["token"]),
-            x=data["x"],
-            y=data["y"],
-        )
+        return Node(id=str(data["token"]), x=data["x"], y=data["y"])
 
 
 @dataclass
@@ -246,10 +215,7 @@ class ArclinePathV1:
     def from_dict(cls, data: dict[str, Any]) -> ArclinePathV1:
         """Create a `ArclinePathV1` instance from a dictionary."""
         return ArclinePathV1(
-            id=str(data["token"]),
-            knots=data["knots"],
-            ctrl=data["ctrl"],
-            order=data["order"],
+            id=str(data["token"]), knots=data["knots"], ctrl=data["ctrl"], order=data["order"]
         )
 
 
@@ -263,10 +229,7 @@ class Line:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Line:
         """Create a `Line` instance from a dictionary."""
-        return Line(
-            id=str(data["token"]),
-            nodes=[str(node) for node in data["node_tokens"]],
-        )
+        return Line(id=str(data["token"]), nodes=[str(node) for node in data["node_tokens"]])
 
 
 @dataclass
@@ -355,10 +318,7 @@ class Walkway:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a `Walkway` instance from a dictionary."""
-        return cls(
-            id=str(data["token"]),
-            polygon=str(data["polygon_token"]),
-        )
+        return cls(id=str(data["token"]), polygon=str(data["polygon_token"]))
 
 
 @dataclass
@@ -371,10 +331,7 @@ class TrafficLight:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         """Create a `TrafficLight` instance from a dictionary."""
-        return cls(
-            id=str(data["token"]),
-            line=str(data["line_token"]),
-        )
+        return cls(id=str(data["token"]), line=str(data["line_token"]))
 
 
 @dataclass
@@ -383,9 +340,7 @@ class LaneDivider:
 
     id: str
     line: str
-    segment_types: list[tuple[str, SegmentDividerType]] = field(
-        default_factory=list,
-    )
+    segment_types: list[tuple[str, SegmentDividerType]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -393,9 +348,7 @@ class LaneDivider:
         return cls(
             id=str(data["token"]),
             line=str(data["line_token"]),
-            segment_types=_parse_segment_divider(
-                data.get("lane_divider_segments", []),
-            ),
+            segment_types=_parse_segment_divider(data.get("lane_divider_segments", [])),
         )
 
 
@@ -465,12 +418,8 @@ class Lane:
     id: str
     polygon: str
     lane_type: LaneType = LaneType.NONE
-    left_lane_divider_segments: list[tuple[str, SegmentDividerType]] = field(
-        default_factory=list,
-    )
-    right_lane_divider_segments: list[tuple[str, SegmentDividerType]] = field(
-        default_factory=list,
-    )
+    left_lane_divider_segments: list[tuple[str, SegmentDividerType]] = field(default_factory=list)
+    right_lane_divider_segments: list[tuple[str, SegmentDividerType]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -480,10 +429,10 @@ class Lane:
             polygon=str(data["polygon_token"]),
             lane_type=_resolve_lane_type(data.get("lane_type")),
             left_lane_divider_segments=_parse_segment_divider(
-                data.get("left_lane_divider_segments", []),
+                data.get("left_lane_divider_segments", [])
             ),
             right_lane_divider_segments=_parse_segment_divider(
-                data.get("right_lane_divider_segments", []),
+                data.get("right_lane_divider_segments", [])
             ),
         )
 
@@ -531,9 +480,7 @@ class RoadBlock:
         )
 
 
-def _parse_segment_divider(
-    segments: list[dict[str, Any]],
-) -> list[tuple[str, SegmentDividerType]]:
+def _parse_segment_divider(segments: list[dict[str, Any]]) -> list[tuple[str, SegmentDividerType]]:
     """Parse a list of segment dividers from a dictionary.
 
     This is an internal utility method used to convert the
@@ -541,10 +488,7 @@ def _parse_segment_divider(
     containing the node str and the segment divider type.
     """
     return [
-        (
-            str(segment_dict["node_token"]),
-            SegmentDividerType[segment_dict["segment_type"]],
-        )
+        (str(segment_dict["node_token"]), SegmentDividerType[segment_dict["segment_type"]])
         for segment_dict in segments
     ]
 
@@ -552,10 +496,7 @@ def _parse_segment_divider(
 T = TypeVar("T", bound="_FromDict")
 
 
-def _many_from_dict(
-    cls: type[T],
-    data: Iterable[dict[str, Any]],
-) -> dict[str, T]:
+def _many_from_dict(cls: type[T], data: Iterable[dict[str, Any]]) -> dict[str, T]:
     """Deserialize a sequence of dictionaries into a dictionary of objects.
 
     If an item cannot be deserialized, it is skipped. If `debug` is True, a

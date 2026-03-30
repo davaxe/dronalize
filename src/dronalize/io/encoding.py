@@ -11,7 +11,7 @@ from dronalize.core.categories import AgentCategory
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal._typing import FloatDType
+    from dronalize._internal.typing import FloatDType
     from dronalize.core.maps.graph import MapGraph
     from dronalize.core.scene import Scene, SceneSchema
     from dronalize.io.manifest import (
@@ -100,8 +100,7 @@ def scene_to_numpy_dict(
     raw_categories = type_df["agent_category"].to_numpy()
     if category_mapping:
         agent_types = np.array(
-            [category_mapping.get(AgentCategory(c), -1) for c in raw_categories],
-            dtype=np.int32,
+            [category_mapping.get(AgentCategory(c), -1) for c in raw_categories], dtype=np.int32
         )
     else:
         agent_types = raw_categories.astype(np.int32)
@@ -181,24 +180,18 @@ def encode_map_from_scene(
 
 @overload
 def _map_graph_to_numpy(
-    graph: MapGraph,
-    dtype: type[np.float32],
-    offset: npt.NDArray[np.float64] | None = None,
+    graph: MapGraph, dtype: type[np.float32], offset: npt.NDArray[np.float64] | None = None
 ) -> MapSampleF32: ...
 
 
 @overload
 def _map_graph_to_numpy(
-    graph: MapGraph,
-    dtype: type[np.float64],
-    offset: npt.NDArray[np.float64] | None = None,
+    graph: MapGraph, dtype: type[np.float64], offset: npt.NDArray[np.float64] | None = None
 ) -> MapSampleF64: ...
 
 
 def _map_graph_to_numpy(
-    graph: MapGraph,
-    dtype: FloatDType,
-    offset: npt.NDArray[np.float64] | None = None,
+    graph: MapGraph, dtype: FloatDType, offset: npt.NDArray[np.float64] | None = None
 ) -> MapSampleF32 | MapSampleF64:
     """Convert a MapGraph to a persisted dictionary of NumPy arrays."""
     node_positions = graph.node_positions - offset if offset is not None else graph.node_positions
@@ -212,10 +205,7 @@ def _map_graph_to_numpy(
 
 
 def scene_sample_to_parts(
-    sample: SceneSample[Any],
-    *,
-    feature_columns: Sequence[str],
-    start_frame: int = 0,
+    sample: SceneSample[Any], *, feature_columns: Sequence[str], start_frame: int = 0
 ) -> pl.DataFrame:
     """Convert a persisted scene sample back into a Polars DataFrame.
 

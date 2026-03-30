@@ -110,16 +110,14 @@ class HighwayLaneMapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         if self._lane_description is not None:
             mapping: dict[LaneId, int] = {
                 lane_id: idx for idx, lane_id in enumerate(self._lane_description.ids)
             }
             self._data = self._data.with_columns(
-                pl.col(self._lane_id_col).replace_strict(mapping).alias(self._lane_id_col),
+                pl.col(self._lane_id_col).replace_strict(mapping).alias(self._lane_id_col)
             )
 
         lane_centers = self._get_lane_centers(self._data, bin_size=self._bin_size)
@@ -192,9 +190,7 @@ class HighwayLaneMapBuilder(BaseMapBuilder):
         avg_half_width = (
             borders
             .join(
-                centers,
-                left_on=["left_lane", "long_bin"],
-                right_on=[self._lane_id_col, "long_bin"],
+                centers, left_on=["left_lane", "long_bin"], right_on=[self._lane_id_col, "long_bin"]
             )
             .select((pl.col("border_lat") - pl.col("lat_center")).abs())
             .collect()
@@ -207,7 +203,7 @@ class HighwayLaneMapBuilder(BaseMapBuilder):
             pl.col(self._lane_id_col).max().alias("max_id"),
         ]).filter(
             (pl.col(self._lane_id_col) == pl.col("min_id"))
-            | (pl.col(self._lane_id_col) == pl.col("max_id")),
+            | (pl.col(self._lane_id_col) == pl.col("max_id"))
         )
 
         return extreme_lanes.select([

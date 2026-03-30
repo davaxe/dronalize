@@ -13,7 +13,7 @@ def test_spec_simplifies_ratio() -> None:
     assert (spec.up, spec.down) == (2, 1)
 
 
-def test_spec_rejects_derivative_length_mismatch() -> None:
+def test_spec_rejects_derivative_lengths() -> None:
     """Derivative column groups must align with the position dimensionality."""
     with pytest.raises(ValueError, match="must match position_columns length"):
         _ = ResampleSpec(
@@ -23,16 +23,15 @@ def test_spec_rejects_derivative_length_mismatch() -> None:
         )
 
 
-def test_linear_rejects_derivative_config() -> None:
+def test_linear_rejects_derivatives() -> None:
     """Linear resampling rejects derivative inputs and outputs."""
     with pytest.raises(ValueError, match="does not support derivative"):
         _ = ResampleSpec(
-            method=ResampleMethod.LINEAR,
-            output_derivatives={1: dict.fromkeys(("vx", "vy"))},
+            method=ResampleMethod.LINEAR, output_derivatives={1: dict.fromkeys(("vx", "vy"))}
         )
 
 
-def test_hermite_requires_first_order_inputs() -> None:
+def test_hermite_requires_first_order() -> None:
     """Hermite resampling requires first-order derivative constraints."""
     with pytest.raises(
         ValueError, match="Hermite resampling requires exactly first-order derivative inputs"
@@ -40,16 +39,15 @@ def test_hermite_requires_first_order_inputs() -> None:
         _ = ResampleSpec(method=ResampleMethod.HERMITE)
 
 
-def test_cubic_does_not_accept_input_derivatives() -> None:
+def test_cubic_rejects_derivatives() -> None:
     """Cubic spline resampling no longer switches implicitly to Hermite."""
     with pytest.raises(ValueError, match="does not accept input_derivatives"):
         _ = ResampleSpec(
-            method=ResampleMethod.CUBIC,
-            input_derivatives={1: dict.fromkeys(("vx", "vy"))},
+            method=ResampleMethod.CUBIC, input_derivatives={1: dict.fromkeys(("vx", "vy"))}
         )
 
 
-def test_linear_no_resampling_preserves_other_columns() -> None:
+def test_linear_no_resampling_preserves_cols() -> None:
     """A no-op resample leaves non-generated columns untouched."""
     df = pl.DataFrame({
         "frame": [0, 1, 2],
@@ -80,7 +78,7 @@ def test_downsample_by_two() -> None:
     assert result["y"].to_list() == [0.0, 20.0, 40.0]
 
 
-def test_upsample_by_two_carries_rest_columns() -> None:
+def test_upsample_by_two_preserves_cols() -> None:
     """Linear upsampling interpolates positions and forward-fills carried columns."""
     df = pl.DataFrame({
         "frame": [0, 1, 2],
@@ -98,7 +96,7 @@ def test_upsample_by_two_carries_rest_columns() -> None:
     assert result["agent_category"].to_list() == [5, 5, 5, 5, 5]
 
 
-def test_resample_preserves_other_columns_implicitly() -> None:
+def test_resample_preserves_columns() -> None:
     """Resampling implicitly carries every non-generated column."""
     df = pl.DataFrame({
         "frame": [0, 1, 2],
@@ -132,7 +130,7 @@ def test_group_by_isolation() -> None:
     assert agent2["x"].to_list() == [10.0, 30.0]
 
 
-def test_linear_gap_segmentation_avoids_cross_gap_interpolation() -> None:
+def test_gap_segmentation_avoids_crossing() -> None:
     """Interpolation does not bridge discontinuities larger than `max_gap`."""
     df = pl.DataFrame({
         "frame": [0, 1, 4, 5],
@@ -148,12 +146,9 @@ def test_linear_gap_segmentation_avoids_cross_gap_interpolation() -> None:
     assert result["label"].to_list() == ["a", "a", "a", "b", "b", "b"]
 
 
-def test_cubic_outputs_named_derivatives() -> None:
+def test_cubic_derivative_names() -> None:
     """Spline methods emit requested derivative columns with user-provided names."""
-    df = pl.DataFrame({
-        "frame": [0, 1],
-        "x": [0.0, 1.0],
-    })
+    df = pl.DataFrame({"frame": [0, 1], "x": [0.0, 1.0]})
 
     result = resample(
         df,
@@ -171,13 +166,9 @@ def test_cubic_outputs_named_derivatives() -> None:
     assert result["dx"].to_list() == pytest.approx([1.0, 1.0, 1.0, 1.0, 1.0])
 
 
-def test_hermite_uses_input_derivatives_and_emits_outputs() -> None:
+def test_hermite_uses_input_derivatives() -> None:
     """Hermite can reuse input derivative columns while also emitting higher orders."""
-    df = pl.DataFrame({
-        "frame": [0, 1],
-        "x": [0.0, 1.0],
-        "vx": [0.0, 0.0],
-    })
+    df = pl.DataFrame({"frame": [0, 1], "x": [0.0, 1.0], "vx": [0.0, 0.0]})
 
     result = resample(
         df,

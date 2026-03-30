@@ -18,11 +18,7 @@ from dronalize.processing.ingest.splits import SplitStrategyName
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
 # Typer resolves these annotation types at runtime when building the CLI.
 _RUNTIME_OPTION_TYPES = (DatasetSplit, Path, SplitStrategyName)
-_DATASET_SPLIT_DISPLAY_ORDER = {
-    DatasetSplit.TRAIN: 0,
-    DatasetSplit.VAL: 1,
-    DatasetSplit.TEST: 2,
-}
+_DATASET_SPLIT_DISPLAY_ORDER = {DatasetSplit.TRAIN: 0, DatasetSplit.VAL: 1, DatasetSplit.TEST: 2}
 
 
 def _format_split_support(
@@ -59,12 +55,10 @@ def process(
     *,
     dataset: Annotated[str, typer.Argument(help="The name of the dataset to process.")],
     input_dir: Annotated[
-        Path,
-        typer.Option("--input", "-i", help="Directory containing the raw dataset."),
+        Path, typer.Option("--input", "-i", help="Directory containing the raw dataset.")
     ],
     output_dir: Annotated[
-        Path,
-        typer.Option("--output", "-o", help="Directory to save the processed dataset."),
+        Path, typer.Option("--output", "-o", help="Directory to save the processed dataset.")
     ],
     split: Annotated[
         list[DatasetSplit] | None,
@@ -76,8 +70,7 @@ def process(
         ),
     ] = None,
     config: Annotated[
-        Path | None,
-        typer.Option("--config", "-c", help="Path to the optional configuration file."),
+        Path | None, typer.Option("--config", "-c", help="Path to the optional configuration file.")
     ] = None,
     jobs: Annotated[
         int | None,
@@ -88,12 +81,10 @@ def process(
         ),
     ] = None,
     progress: Annotated[
-        bool,
-        typer.Option("--progress/--no-progress", help="Show progress during processing."),
+        bool, typer.Option("--progress/--no-progress", help="Show progress during processing.")
     ] = True,
     limit: Annotated[
-        int | None,
-        typer.Option("--limit", "-l", help="Limit the number of samples to process."),
+        int | None, typer.Option("--limit", "-l", help="Limit the number of samples to process.")
     ] = None,
     seed: Annotated[
         int | None,
@@ -103,12 +94,10 @@ def process(
         ),
     ] = None,
     output_format: Annotated[
-        OutputFormat,
-        typer.Option("--output-format", help="Output format for processed data."),
+        OutputFormat, typer.Option("--output-format", help="Output format for processed data.")
     ] = OutputFormat.MDS,
     scene_schema: Annotated[
-        str | None,
-        typer.Option("--scene-schema", help="Scene schema to persist in writer output."),
+        str | None, typer.Option("--scene-schema", help="Scene schema to persist in writer output.")
     ] = None,
     split_strategy: Annotated[
         SplitStrategyName | None,
@@ -130,8 +119,7 @@ def process(
     split_gap: Annotated[
         int | None,
         typer.Option(
-            "--split-gap",
-            help="Gap inserted between time-block or shuffled time-block partitions.",
+            "--split-gap", help="Gap inserted between time-block or shuffled time-block partitions."
         ),
     ] = None,
     split_n_segments: Annotated[
@@ -145,8 +133,7 @@ def process(
         ),
     ] = None,
     force: Annotated[
-        bool,
-        typer.Option("--force", "-f", help="Force processing without confirmation."),
+        bool, typer.Option("--force", "-f", help="Force processing without confirmation.")
     ] = False,
 ) -> None:
     """[bold]Process a specified dataset[/bold]."""
@@ -240,12 +227,7 @@ def available(
             descriptor.supported_split_strategies,
             descriptor.recommended_split_strategy,
         )
-        table.add_row(
-            descriptor.name,
-            window,
-            has_map,
-            split_support,
-        )
+        table.add_row(descriptor.name, window, has_map, split_support)
     rprint("\n", table)
 
 

@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 import polars.selectors as cs
 
-from dronalize._internal._polars_ops import normalize_group_by
+from dronalize._internal.polars_ops import normalize_group_by
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal._typing import DataFrameT
+    from dronalize._internal.typing import DataFrameT
 
 WindowPolicy = Literal["strict", "anchored", "partial"]
 
@@ -91,14 +91,8 @@ def _create_windows(
         slide_actual -= slide_actual.first()
 
     grouped = data.group_by_dynamic(
-        sliding_col,
-        every=f"{step_size}i",
-        period=f"{window_size}i",
-        group_by=group_by or None,
-    ).agg(
-        slide_actual.alias(f"{sliding_col}_actual"),
-        cs.all().exclude(sliding_col),
-    )
+        sliding_col, every=f"{step_size}i", period=f"{window_size}i", group_by=group_by or None
+    ).agg(slide_actual.alias(f"{sliding_col}_actual"), cs.all().exclude(sliding_col))
 
     if policy == "strict":
         span = (

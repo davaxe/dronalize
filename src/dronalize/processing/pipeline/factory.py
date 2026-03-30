@@ -40,9 +40,7 @@ def trajectory_pipeline(spec: TrajectorySpec) -> Pipeline:
     )
     pipeline = pipeline.compose(builder.post_window)
     pipeline = _attach_scene_id(
-        pipeline,
-        scene_key_columns=builder.scene_key_columns(),
-        scene_id_column=scene_id_column,
+        pipeline, scene_key_columns=builder.scene_key_columns(), scene_id_column=scene_id_column
     )
     pipeline = _apply_filter(
         pipeline,
@@ -63,10 +61,7 @@ def trajectory_pipeline(spec: TrajectorySpec) -> Pipeline:
 
 
 def _attach_scene_id(
-    pipeline: Pipeline,
-    *,
-    scene_key_columns: list[str],
-    scene_id_column: str | None,
+    pipeline: Pipeline, *, scene_key_columns: list[str], scene_id_column: str | None
 ) -> Pipeline:
     if scene_id_column is None:
         return pipeline
@@ -115,7 +110,7 @@ def _apply_filter(
     scene_id_column: str | None,
     agent_id_column: str,
     frame_column: str,
-    category_column: str | None,
+    category_column: str,
 ) -> Pipeline:
     if filter_spec is not None:
         return pipeline.then(

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 __all__ = ["MDSHeteroDataset"]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "MDSHeteroDataset": ("dronalize.io.adapters.mds", "MDSHeteroDataset"),
+    "MDSHeteroDataset": ("dronalize.io.adapters.mds", "MDSHeteroDataset")
 }
 
 

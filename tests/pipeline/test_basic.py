@@ -64,10 +64,7 @@ def test_yaw_from_vel_custom_columns() -> None:
 
 def test_yaw_from_vel_multiple_rows() -> None:
     """Yaw is computed independently for each row."""
-    df = pl.DataFrame({
-        "vx": [1.0, 0.0, -1.0],
-        "vy": [0.0, 1.0, 0.0],
-    })
+    df = pl.DataFrame({"vx": [1.0, 0.0, -1.0], "vy": [0.0, 1.0, 0.0]})
     result = yaw_from_vel(df)
     expected_yaw = [0.0, math.pi / 2, math.pi]
     for actual, expected in zip(result["yaw"].to_list(), expected_yaw, strict=True):

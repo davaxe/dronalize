@@ -17,9 +17,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def sind_execution_scope(
-    root: Path,
-    loader_config: LoaderConfig,
-    map_config: MapConfig,
+    root: Path, loader_config: LoaderConfig, map_config: MapConfig
 ) -> Generator[None, None, None]:
     """Prepare shared map state for a SinD processing run.
 
@@ -54,8 +52,7 @@ def sind_execution_scope(
         map_path = map_dir / path
         builder = _MapBuilder(map_path)
         map_graph: MapGraph = builder.build(
-            min_distance=map_config.min_distance,
-            interp_distance=map_config.interp_distance,
+            min_distance=map_config.min_distance, interp_distance=map_config.interp_distance
         )
         shm.append(map_graph.to_shared())
         mappings[key] = shm[-1].name

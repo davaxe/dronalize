@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast, overload
 
 from typing_extensions import Unpack, override
 
-from dronalize._internal._optional import raise_missing_optional_dependency
+from dronalize._internal.optional import raise_missing_optional_dependency
 from dronalize.io.adapters.sample import RawSceneSample as _RawSceneSample
 
 try:
@@ -12,11 +12,7 @@ try:
     from streaming import Stream, StreamingDataset
     from torch_geometric.data import Dataset, HeteroData
 except ModuleNotFoundError as error:
-    raise_missing_optional_dependency(
-        error,
-        feature="The MDS PyG dataset adapter",
-        extra="pyg",
-    )
+    raise_missing_optional_dependency(error, feature="The MDS PyG dataset adapter", extra="pyg")
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Sequence
@@ -93,8 +89,7 @@ class _MDSDatasetBackend(StreamingDataset):
 
     @override
     def __getitem__(
-        self,
-        at: int | slice | list[int] | npt.NDArray[np.int64],
+        self, at: int | slice | list[int] | npt.NDArray[np.int64]
     ) -> _RawSceneSample | list[_RawSceneSample]:
         out: dict[str, Any] | list[dict[str, Any]] = super().__getitem__(at)
         if isinstance(out, list):
@@ -110,16 +105,10 @@ class _MDSDatasetBackend(StreamingDataset):
         map_node_types = torch.tensor(sample["map_node_types"])
         map_edge_types = torch.tensor(sample["map_edge_types"])
 
-        (
-            map_node_positions,
-            map_edge_indices,
-            map_node_types,
-            map_edge_types,
-        ) = _MDSDatasetBackend._normalize_map_tensors(
-            map_node_positions,
-            map_edge_indices,
-            map_node_types,
-            map_edge_types,
+        (map_node_positions, map_edge_indices, map_node_types, map_edge_types) = (
+            _MDSDatasetBackend._normalize_map_tensors(
+                map_node_positions, map_edge_indices, map_node_types, map_edge_types
+            )
         )
 
         return _RawSceneSample(

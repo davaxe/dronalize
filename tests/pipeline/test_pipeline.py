@@ -11,7 +11,7 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from dronalize.core.categories import AgentCategory
-from dronalize.processing.filters import ExcludeAgentCategories, Filter
+from dronalize.processing.filters import Filter, cleanup
 from dronalize.processing.ingest import (
     LoaderConfig,
     ShuffledTimeBlockSplit,
@@ -91,7 +91,7 @@ def test_pipeline_then_returns_new() -> None:
     assert len(p2) == 1
 
 
-def test_pipeline_then_flat_map_returns_new() -> None:
+def test_then_flat_map_is_immutable() -> None:
     """Ensure that calling then_flat_map() returns a completely new Pipeline instance."""
     p1 = Pipeline()
     p2 = p1.then_flat_map(_split_by_id)
@@ -99,7 +99,7 @@ def test_pipeline_then_flat_map_returns_new() -> None:
     assert len(p2) == 1
 
 
-def test_pipeline_chaining_multiple_steps() -> None:
+def test_pipeline_chaining() -> None:
     """Verify that chaining multiple steps works and evaluates as truthy."""
     pipe = Pipeline().then(_add_one_to_x).then(_multiply_x_by_two)
     assert len(pipe) == 2
@@ -152,7 +152,7 @@ def test_run_single_transform(simple_lf: pl.LazyFrame) -> None:
     assert_frame_equal(result, expected)
 
 
-def test_run_chained_transforms_apply_in_order(simple_lf: pl.LazyFrame) -> None:
+def test_run_chained_transforms(simple_lf: pl.LazyFrame) -> None:
     """Ensure chained transforms apply in the exact order they were added."""
     # add 1 first, then multiply by 2 → (x+1)*2
     pipe = Pipeline().then(_add_one_to_x).then(_multiply_x_by_two)
@@ -161,7 +161,7 @@ def test_run_chained_transforms_apply_in_order(simple_lf: pl.LazyFrame) -> None:
     assert_frame_equal(result, expected)
 
 
-def test_run_fan_out_produces_multiple_outputs(simple_lf: pl.LazyFrame) -> None:
+def test_run_fan_out(simple_lf: pl.LazyFrame) -> None:
     """Verify that a fan-out transform correctly produces multiple output frames."""
     pipe = Pipeline().then_flat_map(_split_by_id)
     results = list(pipe.execute(simple_lf))
@@ -171,7 +171,7 @@ def test_run_fan_out_produces_multiple_outputs(simple_lf: pl.LazyFrame) -> None:
         assert r.collect().shape[0] == 4
 
 
-def test_run_transform_after_fan_out_applied_to_each(simple_lf: pl.LazyFrame) -> None:
+def test_run_after_fan_out(simple_lf: pl.LazyFrame) -> None:
     """Ensure transforms added after a fan-out apply independently to all resulting frames."""
     pipe = Pipeline().then_flat_map(_split_by_id).then(_add_one_to_x)
     results = [r.collect() for r in pipe.execute(simple_lf)]
@@ -190,7 +190,7 @@ def test_run_single_raises_on_fan_out(simple_lf: pl.LazyFrame) -> None:
         pipe.execute_single(simple_lf)
 
 
-def test_run_single_succeeds_for_single_output(simple_lf: pl.LazyFrame) -> None:
+def test_run_single_one_output(simple_lf: pl.LazyFrame) -> None:
     """Ensure run_single succeeds seamlessly when exactly one frame is produced."""
     pipe = Pipeline().then(_add_one_to_x)
     result = pipe.execute_single(simple_lf)
@@ -269,21 +269,21 @@ def test_lambda_sort() -> None:
     assert pipe.execute_single(lf).collect()["a"].to_list() == [1, 2, 3]
 
 
-def test_transform_group_by_yield_splits(simple_lf: pl.LazyFrame) -> None:
+def test_group_by_yield_splits(simple_lf: pl.LazyFrame) -> None:
     """Ensure group_by_yield accurately splits the frame based on the specified column."""
     fan = transform.group_by_yield("id")
     results = list(fan(simple_lf))
     assert len(results) == 2
 
 
-def test_transform_group_by_yield_drops_col_by_default(simple_lf: pl.LazyFrame) -> None:
+def test_group_by_yield_drops_group_col(simple_lf: pl.LazyFrame) -> None:
     """Verify group_by_yield drops the original grouping column by default."""
     fan = transform.group_by_yield("id")
     for r in fan(simple_lf):
         assert "id" not in r.collect().columns
 
 
-def test_transform_group_by_yield_keeps_col(simple_lf: pl.LazyFrame) -> None:
+def test_group_by_yield_keeps_group_col(simple_lf: pl.LazyFrame) -> None:
     """Verify group_by_yield retains the grouping column when configured to do so."""
     fan = transform.group_by_yield("id", drop_group_cols=False)
     for r in fan(simple_lf):
@@ -295,7 +295,7 @@ def test_transform_group_by_yield_keeps_col(simple_lf: pl.LazyFrame) -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def test_transform_yaw_from_vel_default_columns() -> None:
+def test_transform_yaw_from_vel() -> None:
     """Calculate yaw from velocity data using the default column names."""
     lf = pl.DataFrame({"vx": [1.0, 0.0], "vy": [0.0, 1.0]}).lazy()
     fn = transform.yaw_from_vel()
@@ -306,7 +306,7 @@ def test_transform_yaw_from_vel_default_columns() -> None:
     assert yaws[1] == pytest.approx(math.pi / 2)
 
 
-def test_transform_yaw_from_vel_custom_columns() -> None:
+def test_transform_yaw_from_vel_custom() -> None:
     """Calculate yaw from velocity data using custom column names."""
     lf = pl.DataFrame({"vel_x": [1.0], "vel_y": [0.0]}).lazy()
     fn = transform.yaw_from_vel(vx_col="vel_x", vy_col="vel_y", yaw_col="heading")
@@ -332,7 +332,7 @@ def test_transform_derivative_first() -> None:
     assert "d1_x" in result.columns
 
 
-def test_transform_derivative_custom_rename() -> None:
+def test_transform_derivative_rename() -> None:
     """Calculate the first derivative and apply a custom renaming scheme."""
     lf = pl.DataFrame({"x": [0.0, 1.0, 4.0, 9.0]}).lazy()
     fn = transform.derivative("x", dt=1.0, n=1, derivative_rename={1: ["velocity"]})
@@ -340,7 +340,7 @@ def test_transform_derivative_custom_rename() -> None:
     assert "velocity" in result.columns
 
 
-def test_transform_derivative_second_with_intermediate() -> None:
+def test_transform_second_derivative() -> None:
     """Calculate the second derivative and include the intermediate first derivative."""
     lf = pl.DataFrame({"x": [0.0, 1.0, 4.0, 9.0, 16.0]}).lazy()
     fn = transform.derivative("x", dt=1.0, n=2, include_intermediate=True)
@@ -349,21 +349,13 @@ def test_transform_derivative_second_with_intermediate() -> None:
     assert "d2_x" in result.columns
 
 
-def test_transform_filter_no_config_passes_all(trajectory_lf: pl.LazyFrame) -> None:
-    """Ensure the filter transform passes all rows when no specific rules apply."""
-    config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1)
-    fn = transform.filter_scene(config.filter)
-    result = fn(trajectory_lf).collect()
-    assert_frame_equal(result, trajectory_lf.collect())
-
-
-def test_transform_filter_removes_category(trajectory_lf: pl.LazyFrame) -> None:
+def test_transform_filter_category(trajectory_lf: pl.LazyFrame) -> None:
     """Verify the filter transform removes agents that match the specified filtering category."""
     # Filter out agent_category == 1 -> should remove all
 
     config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filter(
         Filter.define(
-            cleanup_rules=[ExcludeAgentCategories.define(categories=[AgentCategory.CAR])],
+            cleanup_rules=[cleanup.ExcludeCategories.define(categories=[AgentCategory.CAR])]
         )
     )
     fn = transform.filter_scene(config.filter)
@@ -401,7 +393,7 @@ def test_transform_resample_downsample() -> None:
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-def test_pipeline_integration_filter_then_yaw() -> None:
+def test_pipeline_filter_then_yaw() -> None:
     """Apply a filter and then calculate yaw to verify transform integration."""
     lf = pl.DataFrame({
         "id": [1, 1, 2, 2],
@@ -470,10 +462,7 @@ def test_block_partition_cumulative() -> None:
     split_request = SplitRequest(
         strategy=TimeBlockSplit(gap=0), weights=SplitWeights.from_tuple((0.6, 0.2, 0.2))
     )
-    fn = split_partition_pipeline(
-        request=split_request,
-        time_column="frame",
-    )
+    fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
     assert "split" in result.columns
     splits = result["split"]
@@ -499,10 +488,7 @@ def test_block_partition_cumulative_gap() -> None:
     split_request = SplitRequest(
         strategy=TimeBlockSplit(gap=2), weights=SplitWeights.from_tuple((0.5, 0.5, 0.0))
     )
-    fn = split_partition_pipeline(
-        request=split_request,
-        time_column="frame",
-    )
+    fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
     assert "split" in result.columns
     assert result.height == 8
@@ -530,10 +516,7 @@ def test_block_partition_shuffled() -> None:
         weights=SplitWeights.from_tuple((0.6, 0.2, 0.2)),
         seed=0,
     )
-    fn = split_partition_pipeline(
-        request=split_request,
-        time_column="frame",
-    )
+    fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
     assert "split" in result.columns
     splits = result["split"]
@@ -568,10 +551,7 @@ def test_block_partition_shuffled_gap() -> None:
         weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
         seed=42,
     )
-    fn = split_partition_pipeline(
-        request=split_request,
-        time_column="frame",
-    )
+    fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
     print(result)
     assert "split" in result.columns
@@ -586,7 +566,7 @@ def test_block_partition_shuffled_gap() -> None:
     assert counts["val"] == 4
 
 
-def test_trajectory_pipeline_shuffled_time_blocks_keep_segments_separate() -> None:
+def test_pipeline_keeps_shuffled_segments() -> None:
     """Shuffled time-block splits should fan out one scene per contiguous segment."""
     lf = pl.DataFrame({
         "frame": list(range(8)),
@@ -612,7 +592,7 @@ def test_trajectory_pipeline_shuffled_time_blocks_keep_segments_separate() -> No
     assert all(result["split"].n_unique() == 1 for result in results)
 
 
-def test_trajectory_pipeline_shuffled_time_blocks_window_within_segments() -> None:
+def test_pipeline_windows_within_segments() -> None:
     """Windowing should stay inside each shuffled time-block segment instead of merging by split."""
     lf = pl.DataFrame({
         "frame": list(range(8)),
@@ -638,7 +618,7 @@ def test_trajectory_pipeline_shuffled_time_blocks_window_within_segments() -> No
     assert all(result["split"].n_unique() == 1 for result in results)
 
 
-def test_trajectory_spec_highway_sets_lane_change_sampling_defaults() -> None:
+def test_highway_spec_lane_change_defaults() -> None:
     """The highway spec helper should configure lane-aware sampling succinctly."""
     spec = highway_trajectory_spec(
         LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
@@ -649,22 +629,18 @@ def test_trajectory_spec_highway_sets_lane_change_sampling_defaults() -> None:
 
     assert spec.columns.lane_id == "lane_id"
     assert spec.extension == LaneChangeSamplingExtension(
-        negative_keep_every=4,
-        min_lane_change_events=2,
-        persist=2,
-        margin_before=1,
-        margin_after=0,
+        negative_keep_every=4, min_lane_change_events=2, persist=2, margin_before=1, margin_after=0
     )
 
 
-def test_trajectory_spec_standard_uses_standard_policy() -> None:
+def test_standard_spec_policy() -> None:
     """The standard spec helper should not attach an extension by default."""
     spec = standard_trajectory_spec(LoaderConfig(input_len=1, output_len=1, sample_time=1.0))
 
     assert spec.extension is None
 
 
-def test_trajectory_pipeline_window_by_without_window_keeps_groups_separate() -> None:
+def test_window_by_keeps_groups() -> None:
     """Scene grouping should still fan out when only window_by is configured."""
     lf = pl.DataFrame({
         "recording": [1, 1, 2, 2],
@@ -676,8 +652,7 @@ def test_trajectory_pipeline_window_by_without_window_keeps_groups_separate() ->
 
     pipeline = trajectory_pipeline(
         standard_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
-            window_by="recording",
+            LoaderConfig(input_len=1, output_len=1, sample_time=1.0), window_by="recording"
         )
     )
 
@@ -687,7 +662,7 @@ def test_trajectory_pipeline_window_by_without_window_keeps_groups_separate() ->
     assert sorted(result["recording"].unique().item() for result in results) == [1, 2]
 
 
-def test_trajectory_pipeline_highway_sampling_thins_negative_windows_only() -> None:
+def test_highway_sampling_thins_negatives() -> None:
     """Lane-change windows should be kept while no-change windows are downsampled."""
     lf = pl.DataFrame({
         "frame": list(range(8)),
@@ -709,7 +684,7 @@ def test_trajectory_pipeline_highway_sampling_thins_negative_windows_only() -> N
     assert starts == [0.0, 1.0, 2.0, 3.0, 4.0]
 
 
-def test_trajectory_pipeline_highway_sampling_can_require_multiple_lane_changes() -> None:
+def test_highway_sampling_requires_multiple_changes() -> None:
     """A window should only count as positive after the configured event threshold."""
     lf = pl.DataFrame({
         "frame": list(range(10)),

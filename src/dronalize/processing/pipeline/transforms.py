@@ -23,7 +23,7 @@ def filter_scene(
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
-    category_column: str | None = "agent_category",
+    category_column: str = "agent_category",
     mode: FilterMode = "filtered",
 ) -> Transform:
     """Create a filtering transform.
@@ -33,7 +33,7 @@ def filter_scene(
     Parameters
     ----------
     scene_filter : Filter, optional
-        Filter specification containing cleanup and validation rules.
+        Filter specification containing cleanup and check rules.
     group_by : str or Sequence[str], optional
         Column(s) that define independent scenes inside the frame.
     agent_id : str, optional
@@ -103,12 +103,7 @@ def resample(
     resample_spec = spec or ResampleSpec()
 
     def _resample(df: pl.LazyFrame) -> pl.LazyFrame:
-        return f.resample(
-            df,
-            resample_spec,
-            frame_column=frame_column,
-            group_by=group_by,
-        )
+        return f.resample(df, resample_spec, frame_column=frame_column, group_by=group_by)
 
     _resample.__name__ = "resample"
     _resample.__qualname__ = "transforms.resample"
@@ -161,11 +156,7 @@ def derivative(
 
 
 def yaw_from_vel(
-    vx_col: str = "vx",
-    vy_col: str = "vy",
-    yaw_col: str = "yaw",
-    *,
-    only_null: bool = False,
+    vx_col: str = "vx", vy_col: str = "vy", yaw_col: str = "yaw", *, only_null: bool = False
 ) -> Transform:
     """Create a yaw-from-velocity transform.
 
@@ -190,7 +181,7 @@ def yaw_from_vel(
                 .when(pl.col(yaw_col).is_null())
                 .then(f.yaw_from_vel_expr(vx_col, vy_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
-                .alias(yaw_col),
+                .alias(yaw_col)
             )
 
     else:
@@ -204,11 +195,7 @@ def yaw_from_vel(
 
 
 def yaw_from_pos(
-    x_col: str = "x",
-    y_col: str = "y",
-    yaw_col: str = "yaw",
-    *,
-    only_null: bool = False,
+    x_col: str = "x", y_col: str = "y", yaw_col: str = "yaw", *, only_null: bool = False
 ) -> Transform:
     """Create a yaw-from-position transform.
 
@@ -235,7 +222,7 @@ def yaw_from_pos(
                 .when(pl.col(yaw_col).is_null())
                 .then(f.yaw_from_pos_expr(x_col, y_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
-                .alias(yaw_col),
+                .alias(yaw_col)
             )
 
     else:
@@ -471,10 +458,7 @@ def valid_lane_change(
     return _valid_lane_change
 
 
-def group_by_yield(
-    *by: str,
-    drop_group_cols: bool = True,
-) -> FlatMapTransform:
+def group_by_yield(*by: str, drop_group_cols: bool = True) -> FlatMapTransform:
     """Create a fan-out that partitions by column(s) and yields each group.
 
     This collects the LazyFrame, groups it, and yields each group as
@@ -495,10 +479,7 @@ def group_by_yield(
         collected = df.collect()
 
         parts = collected.partition_by(
-            *by_tuple,
-            maintain_order=True,
-            as_dict=False,
-            include_key=not drop_group_cols,
+            *by_tuple, maintain_order=True, as_dict=False, include_key=not drop_group_cols
         )
 
         for part in parts:

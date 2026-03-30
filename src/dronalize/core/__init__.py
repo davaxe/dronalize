@@ -2,7 +2,4 @@
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 
-__all__ = [
-    "AgentCategory",
-    "DatasetSplit",
-]
+__all__ = ["AgentCategory", "DatasetSplit"]

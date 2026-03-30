@@ -112,17 +112,13 @@ class DatasetJob:
             ("Execution", self._execution_summary()),
             *self._split_summary_rows(),
             ("Source limit", str(self.limit)) if self.limit is not None else None,
-            (
-                "Random seed",
-                str(seed),
-            )
+            ("Random seed", str(seed))
             if (seed := self._effective_random_seed()) is not None
             else None,
         ]
 
         return ProcessingSummary(
-            title="Processing Plan",
-            rows=tuple(row for row in raw_rows if row is not None),
+            title="Processing Plan", rows=tuple(row for row in raw_rows if row is not None)
         )
 
     def _execution_summary(self) -> str:
@@ -147,10 +143,7 @@ class DatasetJob:
         if not isinstance(self.split_request.strategy, Unsplit):
             return (
                 ("Split assignment", self.split_request.strategy_name.replace("_", " ")),
-                (
-                    "Output splits",
-                    self._format_weighted_splits(self.split_request.active()),
-                ),
+                ("Output splits", self._format_weighted_splits(self.split_request.active())),
             )
         return ()
 
@@ -281,11 +274,7 @@ def _resolve_job_config(
     return config.with_scene_schema(scene_schema).with_jobs(jobs)
 
 
-def _load_dataset_overrides(
-    config_path: Path | None,
-    *,
-    dataset_name: str,
-) -> dict[str, object]:
+def _load_dataset_overrides(config_path: Path | None, *, dataset_name: str) -> dict[str, object]:
     if config_path is None:
         return {}
     return load_config_overrides(config_path).for_dataset(dataset_name)

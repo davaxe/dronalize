@@ -44,3 +44,11 @@ class RounDLoader(LevelXDataLoader):
             splits=splits,
             split_request=split_request,
         )
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.round import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("round")
+    _ = debug_descriptor(DESCRIPTOR, root)

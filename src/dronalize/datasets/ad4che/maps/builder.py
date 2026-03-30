@@ -29,10 +29,7 @@ class AD4CHEMapBuilder(BaseMapBuilder):
     """
 
     def __init__(
-        self,
-        map_image_path: Path,
-        pixel_to_meter: float = PIXEL_TO_METER,
-        spatial_ds: float = 3.0,
+        self, map_image_path: Path, pixel_to_meter: float = PIXEL_TO_METER, spatial_ds: float = 3.0
     ) -> None:
         """Initialize the map builder.
 
@@ -59,9 +56,7 @@ class AD4CHEMapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         # Load the image in grayscale
         gray = cv2.imread(str(self.map_image_path), cv2.IMREAD_GRAYSCALE)
@@ -88,9 +83,7 @@ class AD4CHEMapBuilder(BaseMapBuilder):
                 points = [(float(pt[0]), h_meters - float(pt[1])) for pt in coords]
 
                 self.add_path_lazy(
-                    points=points,
-                    edge_type=EdgeType.LINE_THICK_DASHED,
-                    is_polygon=False,
+                    points=points, edge_type=EdgeType.LINE_THICK_DASHED, is_polygon=False
                 )
 
 
@@ -102,8 +95,7 @@ def _get_black_border_pixels(gray_image: MatLike) -> npt.NDArray[np.uint8]:
 
 
 def _spatial_downsample_polyline(
-    polyline: npt.NDArray[np.float64],
-    d_min: float = 0.5,
+    polyline: npt.NDArray[np.float64], d_min: float = 0.5
 ) -> npt.NDArray[np.float64]:
     if len(polyline) < 2:
         return polyline

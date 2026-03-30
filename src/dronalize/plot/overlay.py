@@ -49,10 +49,7 @@ def plot_trajectories_on_map(
         alt.data_transformers.disable_max_rows()
 
     data = _sample_trajectory_groups(
-        data,
-        group_by=group_by,
-        n_groups=n_groups,
-        group_sample_seed=group_sample_seed,
+        data, group_by=group_by, n_groups=n_groups, group_sample_seed=group_sample_seed
     )
 
     layers: list[alt.Chart] = []
@@ -60,10 +57,7 @@ def plot_trajectories_on_map(
 
     if graph.num_edges > 0:
         map_layers, edge_selection = _build_map_graph_layers(
-            graph,
-            alt=alt,
-            alpha=map_alpha,
-            include_nodes=include_map_nodes,
+            graph, alt=alt, alpha=map_alpha, include_nodes=include_map_nodes
         )
         layers.extend(map_layers)
         params.append(edge_selection)
@@ -80,7 +74,7 @@ def plot_trajectories_on_map(
                 x_label=x_label,
                 y_label=y_label,
                 highlight_frame=highlight_frame,
-            ),
+            )
         )
 
     if not layers:

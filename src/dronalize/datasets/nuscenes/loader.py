@@ -8,7 +8,8 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY_V1
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -33,7 +34,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     """
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True,
+        supports_source_split=True
     )
 
     def __init__(
@@ -104,16 +105,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     @override
     def ingest(self, source: Source[tuple[int, str]]) -> Iterable[IngestedData]:
         index, token = source.data
-        scenes = (
-            self
-            ._scene_cache[index][token]
-            .drop([
-                "scene_token",
-                "scene_name",
-                "map",
-            ])
-            .lazy()
-        )
+        scenes = self._scene_cache[index][token].drop(["scene_token", "scene_name", "map"]).lazy()
         yield IngestedData(
             scenes.filter(
                 ~pl.col("status").is_in(self._status_to_filter),
@@ -121,7 +113,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
                     ~pl.col("full_category").str.contains(category)
                     for category in self._full_category_contains
                 ],
-            ).drop(["status", "full_category", "full_status"]),
+            ).drop(["status", "full_category", "full_status"])
         )
 
     @classmethod
@@ -136,11 +128,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
             LoaderConfig(input_len=4, output_len=12, sample_time=0.5)
             .with_resampling(ResampleSpec(up=5, down=1))
             .with_window(step_size=1)
-            .with_filter(
-                Filter.define(
-                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[3])]
-                )
-            )
+            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[3])]))
         )
 
     @override
@@ -154,21 +142,13 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
         for data_dir in self._data_dirs:
             data_dict: dict[str, pl.LazyFrame] = {}
             for name, schema in self._schemas.items():
-                data_dict[name] = load_cached_table(
-                    name=name,
-                    base_dir=data_dir,
-                    schema=schema,
-                )
+                data_dict[name] = load_cached_table(name=name, base_dir=data_dir, schema=schema)
             self._dfs.append(data_dict)
 
     def _precompute_global_data(self) -> None:
         # 1. Build the global timeline (Sample + Scene + Log)
         for dfs in self._dfs:
-            timeline_lf = build_scene_timeline(
-                dfs["sample"],
-                dfs["scene"],
-                dfs["log"],
-            )
+            timeline_lf = build_scene_timeline(dfs["sample"], dfs["scene"], dfs["log"])
 
             # 2. Process Ego
             ego_lf = extract_ego_tracks(timeline_lf, dfs["sample_data"], dfs["ego_pose"])
@@ -198,20 +178,15 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
 
             self._scene_cache.append(
                 cast(
-                    "dict[str, pl.DataFrame]",
-                    combined_df.partition_by("scene_token", as_dict=True),
-                ),
+                    "dict[str, pl.DataFrame]", combined_df.partition_by("scene_token", as_dict=True)
+                )
             )
 
         self._status_to_filter: list[str] = ["parked", "undefined"]
         self._full_category_contains: list[str] = ["object"]
 
 
-def load_cached_table(
-    name: str,
-    base_dir: Path,
-    schema: pl.Schema | None = None,
-) -> pl.LazyFrame:
+def load_cached_table(name: str, base_dir: Path, schema: pl.Schema | None = None) -> pl.LazyFrame:
     """Load a table from Parquet if available/enabled, otherwise falls back to JSON.
 
     Parameters
@@ -237,9 +212,7 @@ def load_cached_table(
 
 
 def build_scene_timeline(
-    sample_lf: pl.LazyFrame,
-    scene_lf: pl.LazyFrame,
-    log_lf: pl.LazyFrame,
+    sample_lf: pl.LazyFrame, scene_lf: pl.LazyFrame, log_lf: pl.LazyFrame
 ) -> pl.LazyFrame:
     """Build a frame-indexed scene timeline table.
 
@@ -275,7 +248,7 @@ def build_scene_timeline(
             .over("scene_token")
             .sub(1)
             .alias("frame")
-            .cast(pl.Int64),
+            .cast(pl.Int64)
         )
     )
 
@@ -310,10 +283,7 @@ def extract_ego_tracks(
     """
     return (
         timeline_lf
-        .join(
-            sample_data_lf.select(["sample_token", "ego_pose_token"]),
-            on="sample_token",
-        )
+        .join(sample_data_lf.select(["sample_token", "ego_pose_token"]), on="sample_token")
         .group_by("sample_token", maintain_order=False)
         .first()
         .join(ego_pose_lf, left_on="ego_pose_token", right_on="token")
@@ -388,14 +358,9 @@ def extract_agent_tracks(
         .join(instance_lf, left_on="instance_token", right_on="token")
         .join(cat_lookup, left_on="category_token", right_on="cat_token")
         .with_columns(pl.col("attribute_tokens").list.first().alias("first_attr_token"))
-        .join(
-            attr_lookup,
-            left_on="first_attr_token",
-            right_on="attr_token",
-            how="left",
-        )
+        .join(attr_lookup, left_on="first_attr_token", right_on="attr_token", how="left")
         .with_columns(
-            pl.col("instance_token").rank("dense").over("scene_token").cast(pl.Int32).alias("id"),
+            pl.col("instance_token").rank("dense").over("scene_token").cast(pl.Int32).alias("id")
         )
         .select(
             *("scene_token", "scene_name", "map", "frame", "id"),
@@ -454,16 +419,8 @@ _SCHEMAS: dict[str, pl.Schema | None] = {
         "first_annotation_token": pl.String,
         "last_annotation_token": pl.String,
     }),
-    "category": pl.Schema({
-        "token": pl.String,
-        "name": pl.String,
-        "description": pl.String,
-    }),
-    "attribute": pl.Schema({
-        "token": pl.String,
-        "name": pl.String,
-        "description": pl.String,
-    }),
+    "category": pl.Schema({"token": pl.String, "name": pl.String, "description": pl.String}),
+    "attribute": pl.Schema({"token": pl.String, "name": pl.String, "description": pl.String}),
     "ego_pose": pl.Schema({
         "token": pl.String,
         "timestamp": pl.Int64,
@@ -541,3 +498,11 @@ _STATUS_MAPPING: dict[str, str] = {
     "cycle.with_rider": "moving",
     "cycle.without_rider": "stopped",
 }
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.nuscenes import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("nuscenes")
+    _ = debug_descriptor(DESCRIPTOR, root)

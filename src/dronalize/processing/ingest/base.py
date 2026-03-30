@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, ClassVar, Concatenate
 
 from typing_extensions import override
 
-from dronalize._internal._typing import P, SourceT
+from dronalize._internal.typing import P, SourceT
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError, SplitStrategyNotSupportedError
 from dronalize.core.scene import CANONICAL_V1, Scene, SceneField, SceneSchema
@@ -135,9 +135,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         supported_strategies = cls.supported_split_strategies()
         if split_request.strategy_name not in supported_strategies:
             raise SplitStrategyNotSupportedError(
-                cls.__name__,
-                split_request.strategy_name,
-                supported_strategies,
+                cls.__name__, split_request.strategy_name, supported_strategies
             )
 
     @classmethod
@@ -195,10 +193,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         override this when they need dataset-specific post-processing.
         """
         return trajectory_pipeline(
-            standard_trajectory_spec(
-                self.loader_config,
-                split_request=self.split_request,
-            )
+            standard_trajectory_spec(self.loader_config, split_request=self.split_request)
         )
 
     def discover_sources(self) -> Iterable[Source[SourceT]]:
@@ -236,8 +231,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         return no_map()
 
     def _assign_source_splits(
-        self,
-        sources: Iterable[tuple[Source[SourceT], DatasetSplit | None]],
+        self, sources: Iterable[tuple[Source[SourceT], DatasetSplit | None]]
     ) -> Iterable[Source[SourceT]]:
         """Assign splits to sources according to the active split request, if any."""
         if self.split_request is not None and isinstance(
@@ -291,10 +285,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     @override
     def for_each_scene(
-        self,
-        callback: Callable[Concatenate[Scene, P], None],
-        *args: P.args,
-        **kwargs: P.kwargs,
+        self, callback: Callable[Concatenate[Scene, P], None], *args: P.args, **kwargs: P.kwargs
     ) -> None:
         for scene in self.scenes():
             callback(scene, *args, **kwargs)
@@ -308,10 +299,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     @override
     def create_scene(
-        self,
-        data: ProcessedSceneData,
-        source: Source[SourceT],
-        scene_number: int,
+        self, data: ProcessedSceneData, source: Source[SourceT], scene_number: int
     ) -> Scene:
         """Create a Scene object from the processed DataFrame and its source."""
         map_key, map_resolver = self._resolve_scene_map(source, data.map_binding)
@@ -373,17 +361,14 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             cls._shared_memory_name = None
 
     def _resolve_split_assignment(
-        self,
-        data: ProcessedSceneData,
-        request: SplitRequest,
+        self, data: ProcessedSceneData, request: SplitRequest
     ) -> DatasetSplit | None:
         identifier = data.stable_identifier
         match request.strategy:
             case BySceneSplit():
                 return (
                     self._scene_assigner.assign(
-                        identifier.source_local_scene_index,
-                        identifier.source_identifier,
+                        identifier.source_local_scene_index, identifier.source_identifier
                     )
                     if self._scene_assigner is not None
                     else None
@@ -399,9 +384,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
                 raise ValueError(msg)
 
     def _resolve_scene_split_assignment(
-        self,
-        data: ProcessedSceneData,
-        source: Source[SourceT],
+        self, data: ProcessedSceneData, source: Source[SourceT]
     ) -> DatasetSplit | None:
         """Resolve the effective split assignment for one created scene."""
         request = self.split_request
@@ -414,9 +397,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         return self._resolve_split_assignment(data, request)
 
     def _resolve_scene_map(
-        self,
-        source: Source[SourceT],
-        map_binding: MapBinding,
+        self, source: Source[SourceT], map_binding: MapBinding
     ) -> tuple[MapKey, MapResolver | None]:
         """Resolve the effective map key and resolver for one processed scene."""
         map_key = map_binding.map_key if map_binding.map_key is not None else source.map_key

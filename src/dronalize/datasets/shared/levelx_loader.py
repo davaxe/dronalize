@@ -9,11 +9,9 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import CANONICAL_V1
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import (
-    ExcludeAgentCategories,
-    Filter,
-    RequireAgentCoverageAtFrames,
-)
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
+from dronalize.processing.filters.cleanup import ExcludeCategories
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -39,7 +37,7 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
     """
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True,
+        supports_source_split=True
     )
 
     def __init__(
@@ -154,10 +152,10 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
         tracks = source.data / f"{source.identifier:0>2}_tracks.csv"
         meta = source.data / f"{source.identifier:0>2}_tracksMeta.csv"
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-            *self.meta_data_select(),
+            *self.meta_data_select()
         )
         tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
-            *self.track_data_select(),
+            *self.track_data_select()
         )
         combined = tracks_df.join(meta_df, left_on="id", right_on="id")
         if "utm_x0" in source.metadata and "utm_y0" in source.metadata:
@@ -185,11 +183,9 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
             .with_window(25)
             .with_filter(
                 Filter.define(
-                    cleanup_rules=[
-                        ExcludeAgentCategories.define(categories=[AgentCategory.TRAILER])
-                    ],
-                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[49])],
-                ),
+                    cleanup_rules=[ExcludeCategories.define(categories=[AgentCategory.TRAILER])],
+                    agent_rules=[RequireFrames.define(frames=[49])],
+                )
             )
         )
 
@@ -213,10 +209,7 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
         return recording_ids
 
 
-_META_SCHEMA: pl.Schema = pl.Schema({
-    "trackId": pl.Int32,
-    "class": pl.Utf8,
-})
+_META_SCHEMA: pl.Schema = pl.Schema({"trackId": pl.Int32, "class": pl.Utf8})
 
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "frame": pl.Int32,

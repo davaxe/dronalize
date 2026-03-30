@@ -34,10 +34,7 @@ class FullMapExtraction(BaseModel):
 
 
 MapExtraction = Annotated[
-    CircularExtraction
-    | BoundingBoxExtraction
-    | FullMapExtraction
-    | RelevantAreaExtraction,
+    CircularExtraction | BoundingBoxExtraction | FullMapExtraction | RelevantAreaExtraction,
     Field(discriminator="mode"),
 ]
 
@@ -72,9 +69,7 @@ class MapConfig(BaseModel):
 
     @classmethod
     def full_map(
-        cls,
-        min_distance: float | None = 1.75,
-        interp_distance: float | None = 3.0,
+        cls, min_distance: float | None = 1.75, interp_distance: float | None = 3.0
     ) -> MapConfig:
         """Return a map configuration that keeps the full map."""
         return cls(
@@ -99,10 +94,7 @@ class MapConfig(BaseModel):
 
     @classmethod
     def circular_extraction(
-        cls,
-        radius: float,
-        min_distance: float | None = 1.75,
-        interp_distance: float | None = 3.0,
+        cls, radius: float, min_distance: float | None = 1.75, interp_distance: float | None = 3.0
     ) -> MapConfig:
         """Return a map configuration with circular extraction."""
         return cls(

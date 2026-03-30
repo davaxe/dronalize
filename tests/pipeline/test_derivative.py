@@ -37,7 +37,7 @@ def test_second_derivative_quadratic() -> None:
     assert abs(values[2] - 2.0) < 1e-4
 
 
-def test_second_derivative_with_intermediate() -> None:
+def test_second_derivative_intermediate() -> None:
     """With include_intermediate=True, both d1 and d2 columns should appear."""
     df = pl.DataFrame({"x": [0.0, 1.0, 4.0, 9.0, 16.0]})
     result = derivative(df, "x", dt=1.0, n=2, include_intermediate=True)
@@ -58,10 +58,7 @@ def test_custom_dt_scaling() -> None:
 
 def test_multiple_columns() -> None:
     """Derivative can be computed for multiple columns at once."""
-    df = pl.DataFrame({
-        "x": [0.0, 1.0, 2.0, 3.0],
-        "y": [0.0, 2.0, 4.0, 6.0],
-    })
+    df = pl.DataFrame({"x": [0.0, 1.0, 2.0, 3.0], "y": [0.0, 2.0, 4.0, 6.0]})
     result = derivative(df, "x", "y", dt=1.0, n=1)
     assert "d1_x" in result.columns
     assert "d1_y" in result.columns
@@ -74,10 +71,7 @@ def test_multiple_columns() -> None:
 
 def test_derivative_rename() -> None:
     """Custom column names via derivative_rename are applied correctly."""
-    df = pl.DataFrame({
-        "x": [0.0, 1.0, 2.0, 3.0],
-        "y": [0.0, 0.0, 0.0, 0.0],
-    })
+    df = pl.DataFrame({"x": [0.0, 1.0, 2.0, 3.0], "y": [0.0, 0.0, 0.0, 0.0]})
     rename = {1: ["vx", "vy"]}
     result = derivative(df, "x", "y", dt=1.0, n=1, derivative_rename=rename)
     assert "vx" in result.columns
@@ -87,10 +81,7 @@ def test_derivative_rename() -> None:
 
 def test_derivative_rename_two_orders() -> None:
     """Custom column names for both first and second derivatives."""
-    df = pl.DataFrame({
-        "x": [0.0, 1.0, 4.0, 9.0, 16.0],
-        "y": [0.0, 0.0, 0.0, 0.0, 0.0],
-    })
+    df = pl.DataFrame({"x": [0.0, 1.0, 4.0, 9.0, 16.0], "y": [0.0, 0.0, 0.0, 0.0, 0.0]})
     rename = {1: ["vx", "vy"], 2: ["ax", "ay"]}
     result = derivative(
         df, "x", "y", dt=1.0, n=2, include_intermediate=True, derivative_rename=rename
@@ -103,10 +94,7 @@ def test_derivative_rename_two_orders() -> None:
 
 def test_group_by_isolation() -> None:
     """Derivatives are computed independently within each group."""
-    df = pl.DataFrame({
-        "id": [1, 1, 1, 2, 2, 2],
-        "x": [0.0, 1.0, 2.0, 10.0, 20.0, 30.0],
-    })
+    df = pl.DataFrame({"id": [1, 1, 1, 2, 2, 2], "x": [0.0, 1.0, 2.0, 10.0, 20.0, 30.0]})
     result = derivative(df, "x", dt=1.0, n=1, group_by="id")
     values = result["d1_x"].to_list()
     # Agent 1: constant dx = 1
@@ -121,11 +109,7 @@ def test_group_by_isolation() -> None:
 
 def test_group_by_list() -> None:
     """group_by accepts a list of column names."""
-    df = pl.DataFrame({
-        "scene": [1, 1, 1, 1],
-        "id": [1, 1, 2, 2],
-        "x": [0.0, 5.0, 0.0, 100.0],
-    })
+    df = pl.DataFrame({"scene": [1, 1, 1, 1], "id": [1, 1, 2, 2], "x": [0.0, 5.0, 0.0, 100.0]})
     result = derivative(df, "x", dt=1.0, n=1, group_by=["scene", "id"])
     values = result["d1_x"].to_list()
     # Agent 1: dx = 5

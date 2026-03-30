@@ -8,7 +8,7 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal._typing import DataFrameT
+    from dronalize._internal.typing import DataFrameT
 
 
 def cumulative_blocks(
@@ -274,8 +274,7 @@ def _allocate_group_counts(total_items: int, weights: Sequence[float]) -> list[i
     remaining = total_items - sum(counts)
 
     fractional_order = sorted(
-        range(len(weights)),
-        key=lambda index: (-(exact_counts[index] - counts[index]), index),
+        range(len(weights)), key=lambda index: (-(exact_counts[index] - counts[index]), index)
     )
     for index in fractional_order[:remaining]:
         counts[index] += 1

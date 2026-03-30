@@ -1,4 +1,4 @@
-from dronalize._internal._polars_ops import (
+from dronalize._internal.polars_ops import (
     collect,
     lazy,
     yaw_from_pos,

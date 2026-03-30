@@ -8,7 +8,8 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -25,7 +26,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
     """Loader for the INTERACTION dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True,
+        supports_scene_split=True
     )
 
     def __init__(
@@ -101,11 +102,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
             pl
             .scan_csv(source.data, include_file_paths="file_id", schema=_SCHEMA)
             .drop("track_to_predict", "interesting_agent", "width", "length", "timestamp_ms")
-            .rename({
-                "psi_rad": "yaw",
-                "frame_id": "frame",
-                "track_id": "id",
-            })
+            .rename({"psi_rad": "yaw", "frame_id": "frame", "track_id": "id"})
             .with_columns(
                 pl.col("file_id").cast(pl.Categorical).to_physical(),
                 pl.col("case_id").cast(pl.UInt32),
@@ -131,9 +128,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=10, output_len=30, sample_time=0.1).with_filter(
-            Filter.define(
-                agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[19])]
-            ),
+            Filter.define(agent_rules=[RequireFrames.define(frames=[19])])
         )
 
     @staticmethod
@@ -147,7 +142,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
                 pl
                 .when((pl.col("vx") ** 2 + pl.col("vy") ** 2).sqrt() < 2)
                 .then(AgentCategory.PEDESTRIAN.value)
-                .otherwise(AgentCategory.BICYCLE.value),
+                .otherwise(AgentCategory.BICYCLE.value)
             )
             .otherwise(pl.col("agent_type"))
         )
@@ -168,7 +163,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         if split is DatasetSplit.VAL:
             return self._count_sources(self._data_root / "val")
         return self._count_sources(self._data_root / "test_multi-agent") + self._count_sources(
-            self._data_root / "test_conditional-multi-agent",
+            self._data_root / "test_conditional-multi-agent"
         )
 
 
@@ -188,3 +183,11 @@ _SCHEMA = pl.Schema({
     "track_to_predict": pl.Float64,
     "interesting_agent": pl.Float64,
 })
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.interact import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("interact", alternatives=[("interaction",)])
+    _ = debug_descriptor(DESCRIPTOR, root)

@@ -19,11 +19,7 @@ class MissingOptionalDependencyError(DronalizeError):
     """Raised when an optional dependency required by a feature is unavailable."""
 
     def __init__(
-        self,
-        message: str,
-        *,
-        dependencies: tuple[str, ...] = (),
-        install_target: str | None = None,
+        self, message: str, *, dependencies: tuple[str, ...] = (), install_target: str | None = None
     ) -> None:
         super().__init__(message)
         self.dependencies: tuple[str, ...] = dependencies
@@ -68,9 +64,7 @@ class SplitNotSupportedError(SplitError):
     """
 
     def __init__(
-        self,
-        loader_name: str,
-        split: DatasetSplit | str | list[DatasetSplit] | list[str],
+        self, loader_name: str, split: DatasetSplit | str | list[DatasetSplit] | list[str]
     ) -> None:
         def _display(value: DatasetSplit | str) -> str:
             return value.value if isinstance(value, DatasetSplit) else str(value)
@@ -90,10 +84,7 @@ class SplitStrategyNotSupportedError(SplitError):
     """Raised when a loader does not implement the requested custom split strategy."""
 
     def __init__(
-        self,
-        loader_name: str,
-        strategy_name: str,
-        supported_strategies: tuple[str, ...],
+        self, loader_name: str, strategy_name: str, supported_strategies: tuple[str, ...]
     ) -> None:
         supported_display = ", ".join(supported_strategies) if supported_strategies else "none"
         msg = (
@@ -112,7 +103,7 @@ class UnsupportedOutputFormatError(ValueError, DronalizeError):
     def __init__(self, output_format: str, supported_formats: tuple[str, ...]) -> None:
         supported = ", ".join(supported_formats)
         super().__init__(
-            f"Unsupported output format '{output_format}'. Supported formats: {supported}.",
+            f"Unsupported output format '{output_format}'. Supported formats: {supported}."
         )
         self.output_format: str = output_format
         self.supported_formats: tuple[str, ...] = supported_formats

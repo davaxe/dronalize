@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Collection, Iterable
 from enum import Enum, IntEnum, auto
+from typing import TypeVar
 
 
 class AgentCategory(IntEnum):
@@ -49,3 +51,17 @@ class DatasetSplit(str, Enum):
     TRAIN = "train"
     VAL = "val"
     TEST = "test"
+
+
+AgentCategoryLike = int | str | AgentCategory
+AgentCategoryInput = AgentCategoryLike | Iterable[AgentCategoryLike]
+
+T = TypeVar("T", bound=Collection[AgentCategory])
+
+
+def coerce_agent_categories(
+    value: AgentCategoryInput, collection: Callable[[Iterable[AgentCategory]], T]
+) -> T:
+    """Convert one or many agent-category values into a normalized collection."""
+    values = [value] if isinstance(value, (str, int, AgentCategory)) else value
+    return collection(AgentCategory.from_value(item) for item in values)

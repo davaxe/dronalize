@@ -4,10 +4,7 @@ from dronalize.datasets.vod.loader import VodLoader
 from dronalize.datasets.vod.maps.builder import VODMapBuilder
 
 DESCRIPTOR = DatasetDescriptor.from_loader(
-    "vod",
-    VodLoader,
-    execution_scope_fn=_scope.vod_execution_scope,
-    has_map=True,
+    "vod", VodLoader, execution_scope_fn=_scope.vod_execution_scope, has_map=True
 )
 
 __all__ = ["DESCRIPTOR", "VODMapBuilder", "VodLoader"]

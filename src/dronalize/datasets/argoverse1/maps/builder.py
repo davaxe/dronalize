@@ -49,20 +49,12 @@ class Argoverse1MapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         # Dict to store endpoints (start and end) of each lane segment to enable
         # efficient connection of segments after all segments are added
-        self._lane_endpoints: dict[
-            int,
-            Argoverse1MapBuilder.SegmentEndpoints,
-        ] = {}
-        self._build_segment_edges(
-            interp_distance=interp_distance,
-            min_distance=min_distance,
-        )
+        self._lane_endpoints: dict[int, Argoverse1MapBuilder.SegmentEndpoints] = {}
+        self._build_segment_edges(interp_distance=interp_distance, min_distance=min_distance)
         self._connect_lane_segments()
 
     # --- Private methods ---
@@ -137,17 +129,12 @@ class Argoverse1MapBuilder(BaseMapBuilder):
             self.add_edge(left_from, left_to, left_edge_type)
 
     def _build_segment_edges(
-        self,
-        *,
-        interp_distance: float | None = None,
-        min_distance: float | None = None,
+        self, *, interp_distance: float | None = None, min_distance: float | None = None
     ) -> None:
         """Build edges through a lane segment."""
         for segment in self.lane_segments.values():
             self._add_boundary_edges(
-                segment,
-                interp_distance=interp_distance,
-                min_distance=min_distance,
+                segment, interp_distance=interp_distance, min_distance=min_distance
             )
 
     def _add_boundary_edges(
@@ -166,7 +153,7 @@ class Argoverse1MapBuilder(BaseMapBuilder):
             and segment.turn_direction == parser.TurnType.NONE
         )
         add_as_polygon &= not utils.any_lane_segment_is_regulatory(
-            utils.lane_segment_successors(segment, self.lane_segments),
+            utils.lane_segment_successors(segment, self.lane_segments)
         )
 
         right, left = utils.edge_borders_from_centerline(np.array(centerline))
@@ -189,30 +176,18 @@ class Argoverse1MapBuilder(BaseMapBuilder):
         else:
             # Add left border edges
             l_nodes = self._numpy_add_edge_loop(
-                left,
-                edge_type=l_type,
-                interp_distance=interp_distance,
-                min_distance=min_distance,
+                left, edge_type=l_type, interp_distance=interp_distance, min_distance=min_distance
             )
             # Add right border edges
             r_nodes = self._numpy_add_edge_loop(
-                right,
-                edge_type=r_type,
-                interp_distance=interp_distance,
-                min_distance=min_distance,
+                right, edge_type=r_type, interp_distance=interp_distance, min_distance=min_distance
             )
 
         # Store endpoints for the lane segment for later use to connect lanes
         if len(l_nodes) > 1 and len(r_nodes) > 1:
             self._lane_endpoints[segment.id] = {
-                "right": {
-                    "start_id": r_nodes[0],
-                    "end_id": r_nodes[-1],
-                },
-                "left": {
-                    "start_id": l_nodes[0],
-                    "end_id": l_nodes[-1],
-                },
+                "right": {"start_id": r_nodes[0], "end_id": r_nodes[-1]},
+                "left": {"start_id": l_nodes[0], "end_id": l_nodes[-1]},
             }
 
     def _numpy_add_edge_loop(
@@ -253,12 +228,7 @@ class Argoverse1MapBuilder(BaseMapBuilder):
 
             last_id = prev_id
             for s_id, d_id, e_type in self.interpolate_edge(
-                prev_id,
-                prev_pt,
-                dst_id,
-                dst_pt,
-                interp_distance,
-                current_edge_type,
+                prev_id, prev_pt, dst_id, dst_pt, interp_distance, current_edge_type
             ):
                 self.add_edge(s_id, d_id, e_type)
                 added_ids.append(d_id)

@@ -42,9 +42,7 @@ class HighDMapBuilder(BaseMapBuilder):
 
     @override
     def build_impl(
-        self,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
+        self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         # These are used implicitly if `MapBuilder.build` is called.
         _min_distance, _interp_distance = min_distance, interp_distance

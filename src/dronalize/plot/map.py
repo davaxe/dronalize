@@ -60,10 +60,7 @@ def plot_map_graph(
         return _empty_chart(alt, "Empty Graph")
 
     layers, edge_selection = _build_map_graph_layers(
-        graph,
-        alt=alt,
-        alpha=alpha,
-        include_nodes=include_nodes,
+        graph, alt=alt, alpha=alpha, include_nodes=include_nodes
     )
 
     return (
@@ -115,11 +112,7 @@ def _prepare_map_edge_dataframe(graph: MapGraph) -> pl.DataFrame:
 
 
 def _build_map_graph_layers(
-    graph: MapGraph,
-    *,
-    alt: ModuleType,
-    alpha: float,
-    include_nodes: bool,
+    graph: MapGraph, *, alt: ModuleType, alpha: float, include_nodes: bool
 ) -> tuple[list[alt.Chart], Any]:
     """Build the layered Altair charts for a map graph."""
     df_edges = _prepare_map_edge_dataframe(graph)
@@ -150,21 +143,14 @@ def _build_map_graph_layers(
                 "edge_type:N",
                 scale=alt.Scale(domain=plot_domain, range=plot_color),
                 legend=alt.Legend(
-                    title="Edge Type",
-                    symbolType="stroke",
-                    symbolStrokeWidth=3,
-                    orient="right",
+                    title="Edge Type", symbolType="stroke", symbolStrokeWidth=3, orient="right"
                 ),
             ),
             size=alt.Size(
-                "edge_type:N",
-                scale=alt.Scale(domain=plot_domain, range=plot_width),
-                legend=None,
+                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_width), legend=None
             ),
             strokeDash=alt.StrokeDash(
-                "edge_type:N",
-                scale=alt.Scale(domain=plot_domain, range=plot_dash),
-                legend=None,
+                "edge_type:N", scale=alt.Scale(domain=plot_domain, range=plot_dash), legend=None
             ),
             opacity=alt.when(edge_selection).then(alt.value(alpha)).otherwise(alt.value(0.05)),
             tooltip=[

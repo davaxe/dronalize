@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 from typing_extensions import Self, override
 
 import dronalize.runtime.execution.parallel._state as _state  # noqa: PLR0402
-from dronalize._internal._typing import P, SourceT
+from dronalize._internal.typing import P, SourceT
 from dronalize.core.scene import Scene
 from dronalize.runtime.execution.executor import ObservableWritingExecutor, Progress, WriterFactory
 
@@ -90,10 +90,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
         self._inner: ProcessableLoader[SourceT] = inner
         self._shared: _state.SharedResources = _state.SharedResources.create()
-        self._chunksize: int = chunksize or self._optimal_chunksize(
-            inner.num_sources(),
-            workers,
-        )
+        self._chunksize: int = chunksize or self._optimal_chunksize(inner.num_sources(), workers)
         self._limit: int | None = limit
         self._processes: int | None = workers
         self._num_sources: int | None = inner.num_sources()
@@ -149,9 +146,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
     @override
     def execute(
-        self,
-        writer_factory: WriterFactory,
-        finalize: Callable[[SceneWriter], None] | None = None,
+        self, writer_factory: WriterFactory, finalize: Callable[[SceneWriter], None] | None = None
     ) -> None:
         """Process scenes in parallel and write them inside worker processes.
 
@@ -175,18 +170,15 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         payloads_limited: Iterable[_SceneProcessArgs[SourceT]] = (
             itertools.islice(payloads, self._limit) if self._limit is not None else payloads
         )
-        try:
-            _ = deque(
-                self._execute_parallel(
-                    self._process_fn_write,
-                    payloads_limited,
-                    _init_write_worker,
-                    *(self._shared, writer_factory, finalize),
-                ),
-                maxlen=0,
-            )
-        finally:
-            ...
+        _ = deque(
+            self._execute_parallel(
+                self._process_fn_write,
+                payloads_limited,
+                _init_write_worker,
+                *(self._shared, writer_factory, finalize),
+            ),
+            maxlen=0,
+        )
 
     @override
     def progress(self) -> Progress:
@@ -242,10 +234,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         return processed_scenes
 
     @staticmethod
-    def _generate_scenes(
-        loader: ProcessableLoader[_S],
-        source: Source[_S],
-    ) -> Iterator[Scene]:
+    def _generate_scenes(loader: ProcessableLoader[_S], source: Source[_S]) -> Iterator[Scene]:
         """Process a single source and yield numbered scenes.
 
         Scene numbers are assigned from a shared global counter when scenes are
@@ -303,10 +292,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         self.progress_event().set()
 
     @staticmethod
-    def _optimal_chunksize(
-        num_sources: int | None,
-        num_processes: int | None,
-    ) -> int:
+    def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:
         """Compute a simple default chunk size.
 
         The heuristic targets roughly four chunks per process, with a minimum of

@@ -1,6 +1,6 @@
 from dronalize.datasets.apolloscape.loader import ApolloScapeLoader
 from dronalize.datasets.registry import DatasetDescriptor
 
-DESCRIPTOR = DatasetDescriptor.from_loader("apolloscape", ApolloScapeLoader, has_map=True)
+DESCRIPTOR = DatasetDescriptor.from_loader("apolloscape", ApolloScapeLoader, has_map=False)
 
 __all__ = ["DESCRIPTOR", "ApolloScapeLoader"]

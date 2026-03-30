@@ -56,7 +56,7 @@ class LaneChangeSamplingExtension:
                     lane_id_column=lane_id,
                     group_by=builder.window_group_columns() or None,
                     valid_column=_LANE_CHANGE_EVENT_COLUMN,
-                ),
+                )
             )
         )
 
@@ -80,10 +80,7 @@ class LaneChangeSamplingExtension:
                 else (pl.col(builder.scene_id_column) % self.negative_keep_every) == 0
             )
             return df.filter(is_positive | keep_negative).select(
-                pl.all().exclude(
-                    _LANE_CHANGE_EVENT_COLUMN,
-                    _SCENE_LANE_CHANGE_COUNT_COLUMN,
-                )
+                pl.all().exclude(_LANE_CHANGE_EVENT_COLUMN, _SCENE_LANE_CHANGE_COUNT_COLUMN)
             )
 
         builder.add_post_filter(

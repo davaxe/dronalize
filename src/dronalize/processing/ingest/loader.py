@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, Protocol
 
-from dronalize._internal._typing import P, SourceId, SourceT
+from dronalize._internal.typing import P, SourceId, SourceT
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -100,10 +100,7 @@ class SceneLoader(Protocol):
         ...
 
     def for_each_scene(
-        self,
-        callback: Callable[Concatenate[Scene, P], None],
-        *args: P.args,
-        **kwargs: P.kwargs,
+        self, callback: Callable[Concatenate[Scene, P], None], *args: P.args, **kwargs: P.kwargs
     ) -> None:
         """Call `callback` for each processed scene.
 
@@ -170,10 +167,7 @@ class ProcessableLoader(Protocol, Generic[SourceT]):
         ...
 
     def create_scene(
-        self,
-        data: ProcessedSceneData,
-        source: Source[SourceT],
-        scene_number: int,
+        self, data: ProcessedSceneData, source: Source[SourceT], scene_number: int
     ) -> Scene:
         """Construct a Scene object from processed data.
 

@@ -14,12 +14,10 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY_V1
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import (
-    ExcludeAgentCategories,
-    Filter,
-    MinimumAgents,
-    RequireAgentCoverageAtFrames,
-)
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
+from dronalize.processing.filters.cleanup import ExcludeCategories
+from dronalize.processing.filters.scene import MinimumAgents
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
@@ -62,7 +60,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
     """Loader for Lyft Level 5 scenes stored in Zarr format."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True,
+        supports_scene_split=True
     )
 
     def __init__(
@@ -131,10 +129,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
         current: int = 0
         while current < total_scenes:
             end = min(current + batch_size, total_scenes)
-            yield Source(
-                current,
-                data=_Source(interval=(current, end), split=split),
-            )
+            yield Source(current, data=_Source(interval=(current, end), split=split))
             current += batch_size
 
     @override
@@ -198,20 +193,16 @@ class LyftLoader(BaseSceneLoader[_Source]):
     @override
     def default_config(cls) -> LoaderConfig:
         return (
-            LoaderConfig(
-                input_len=20,
-                output_len=50,
-                sample_time=0.1,
-            )
+            LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
             .with_window(step_size=20)
             .with_filter(
                 Filter.define(
                     cleanup_rules=[
-                        ExcludeAgentCategories.define(categories=[AgentCategory.UNIMPORTANT])
+                        ExcludeCategories.define(categories=[AgentCategory.UNIMPORTANT])
                     ],
-                    scene_validation_rules=[MinimumAgents(minimum=1)],
-                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[19])],
-                ),
+                    scene_rules=[MinimumAgents(minimum=1)],
+                    agent_rules=[RequireFrames.define(frames=[19])],
+                )
             )
         )
 
@@ -341,3 +332,11 @@ def _scene_to_polars(
         "agent_category": agent_categories,
     })
     return pl.concat([ego_df, agent_df])
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.lyft import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("lyft")
+    _ = debug_descriptor(DESCRIPTOR, root)

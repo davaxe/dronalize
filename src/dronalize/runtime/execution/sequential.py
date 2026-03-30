@@ -47,9 +47,7 @@ class SequentialExecutor(ObservableWritingExecutor):
 
     @override
     def execute(
-        self,
-        writer_factory: WriterFactory,
-        finalize: Callable[[SceneWriter], None] | None = None,
+        self, writer_factory: WriterFactory, finalize: Callable[[SceneWriter], None] | None = None
     ) -> None:
         """Process all scenes sequentially and write them with worker ID `0`."""
         writer = writer_factory(0)

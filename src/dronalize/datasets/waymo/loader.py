@@ -12,7 +12,8 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
 from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
@@ -32,7 +33,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
     """Loader for Waymo Open Dataset scenarios stored in TFRecord format."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True,
+        supports_scene_split=True
     )
 
     def __init__(
@@ -104,10 +105,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
             resolver: MapResolver | None
             if self._include_map:
 
-                def _resolver(
-                    scene: Scene,
-                    _raw_data: bytes = raw_data,
-                ) -> MapGraph:
+                def _resolver(scene: Scene, _raw_data: bytes = raw_data) -> MapGraph:
                     _ = scene
                     map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
                     return WaymoMapBuilder.from_proto(map_data.map_features).build(
@@ -137,7 +135,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=10, output_len=80, sample_time=0.1).with_filter(
-            Filter.define(agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[9])]),
+            Filter.define(agent_rules=[RequireFrames.define(frames=[9])])
         )
 
     @staticmethod
@@ -249,3 +247,11 @@ _OBJECT_TYPE_TO_CATEGORY: dict[int, AgentCategory] = {
     3: AgentCategory.BICYCLE,  # TYPE_CYCLIST
     4: AgentCategory.UNKNOWN,  # TYPE_OTHER
 }
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+    from dronalize.datasets.waymo import DESCRIPTOR
+
+    root = resolve_dataset_root_from_env("waymo")
+    _ = debug_descriptor(DESCRIPTOR, root)

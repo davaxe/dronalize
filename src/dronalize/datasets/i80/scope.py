@@ -14,9 +14,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def i80_execution_scope(
-    root: Path,
-    loader_config: LoaderConfig,
-    map_config: MapConfig,
+    root: Path, loader_config: LoaderConfig, map_config: MapConfig
 ) -> Generator[None, None, None]:
     """Prepare shared map state for an I-80 processing run.
 
@@ -39,8 +37,7 @@ def i80_execution_scope(
 
     builder = _MapBuilder(root)
     map_graph: MapGraph = builder.build(
-        min_distance=map_config.min_distance,
-        interp_distance=map_config.interp_distance,
+        min_distance=map_config.min_distance, interp_distance=map_config.interp_distance
     )
     shm = map_graph.to_shared()
 

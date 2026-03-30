@@ -20,9 +20,7 @@ if TYPE_CHECKING:
     from dronalize.core.maps.graph import MapGraph
 
 
-def extract_fn(
-    extraction: MapExtraction,
-) -> Callable[[Scene, MapGraph], MapGraph]:
+def extract_fn(extraction: MapExtraction) -> Callable[[Scene, MapGraph], MapGraph]:
     """Create an extraction function based on the scene and extraction configuration.
 
     Parameters
@@ -45,9 +43,7 @@ def extract_fn(
 
 
 def extract_based_on_scene(
-    map_graph: MapGraph,
-    scene: Scene,
-    extraction: MapExtraction,
+    map_graph: MapGraph, scene: Scene, extraction: MapExtraction
 ) -> MapGraph:
     """Extract a subgraph based on the scene and extraction configuration.
 
@@ -66,12 +62,7 @@ def extract_based_on_scene(
     center_x = scene.frame.select("x").mean().item()
     center_y = scene.frame.select("y").mean().item()
     center = (center_x, center_y)
-    return extract(
-        map_graph,
-        center=center,
-        extraction=extraction,
-        relevant_positions=scene,
-    )
+    return extract(map_graph, center=center, extraction=extraction, relevant_positions=scene)
 
 
 def extract(
@@ -181,8 +172,7 @@ def from_latlon(
 
     """
     latitude_array, longitude_array = np.broadcast_arrays(
-        np.asarray(latitude, dtype=np.float64),
-        np.asarray(longitude, dtype=np.float64),
+        np.asarray(latitude, dtype=np.float64), np.asarray(longitude, dtype=np.float64)
     )
 
     if not _in_bounds(latitude_array, -80, 84):
@@ -283,11 +273,7 @@ def _to_native(value: FloatArray) -> float | FloatArray:
 
 
 def _in_bounds(
-    values: FloatArray,
-    lower: float,
-    upper: float,
-    *,
-    upper_strict: bool = False,
+    values: FloatArray, lower: float, upper: float, *, upper_strict: bool = False
 ) -> bool:
     minimum = float(np.min(values))
     maximum = float(np.max(values))
@@ -331,10 +317,7 @@ def _latitude_to_zone_letter(latitude: FloatArray) -> str | None:
     return None
 
 
-def _latlon_to_zone_number(
-    latitude: FloatArray,
-    longitude: FloatArray,
-) -> int:
+def _latlon_to_zone_number(latitude: FloatArray, longitude: FloatArray) -> int:
     latitude_value = float(latitude.flat[0])
     longitude_value = float(longitude.flat[0])
     longitude_value = (longitude_value % 360 + 540) % 360 - 180

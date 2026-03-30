@@ -9,7 +9,8 @@ from typing_extensions import override
 import dronalize.processing.pipeline.transforms as tr
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY_V1
-from dronalize.processing.filters import Filter, MinimumAgentSamples
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import MinSamples
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -29,7 +30,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
     """Loader for ETH/UCY pedestrian trajectory datasets."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True,
+        supports_source_split=True
     )
 
     def __init__(
@@ -92,7 +93,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
             ).with_columns(
                 ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
                 pl.col("id").cast(pl.Int32),
-            ),
+            )
         )
 
     @override
@@ -117,20 +118,10 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
     @override
     def default_config(cls) -> LoaderConfig:
         return (
-            LoaderConfig(
-                input_len=8,
-                output_len=12,
-                sample_time=0.4,
-            )
+            LoaderConfig(input_len=8, output_len=12, sample_time=0.4)
             .with_window(step_size=1)
-            .with_filter(Filter.define(agent_validation_rules=[MinimumAgentSamples(minimum=2)]))
-            .with_resampling(
-                ResampleSpec(
-                    up=4,
-                    down=1,
-                    method=ResampleMethod.LINEAR,
-                ),
-            )
+            .with_filter(Filter.define(agent_rules=[MinSamples(minimum=2)]))
+            .with_resampling(ResampleSpec(up=4, down=1, method=ResampleMethod.LINEAR))
         )
 
     @classmethod
@@ -244,3 +235,17 @@ class Zara2Loader(_EthUcyLoader):
             splits=splits,
             split_request=split_request,
         )
+
+
+if __name__ == "__main__":
+    import os
+
+    from dronalize.datasets.eth_ucy import DESCRIPTORS
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    dataset_name = os.environ.get("ETH_UCY_DATASET", "hotel")
+    descriptor = DESCRIPTORS[dataset_name]
+    root = resolve_dataset_root_from_env(
+        "ethucy", dataset_name, alternatives=[("eth_ucy", dataset_name)]
+    )
+    _ = debug_descriptor(descriptor, root)

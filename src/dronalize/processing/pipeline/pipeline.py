@@ -108,11 +108,7 @@ class Pipeline:
         return Pipeline((*self._steps, _FlatMapEntry(transform, name)))
 
     def compose(
-        self,
-        other: Pipeline,
-        *,
-        when: bool = True,
-        otherwise: Pipeline | None = None,
+        self, other: Pipeline, *, when: bool = True, otherwise: Pipeline | None = None
     ) -> Pipeline:
         """Concatenate *other* pipeline's steps after this one.
 
@@ -151,19 +147,11 @@ class Pipeline:
 
     @overload
     def execute(
-        self,
-        df: pl.LazyFrame | pl.DataFrame,
-        *,
-        collect: Literal[True],
-        filter_empty: bool = True,
+        self, df: pl.LazyFrame | pl.DataFrame, *, collect: Literal[True], filter_empty: bool = True
     ) -> Iterator[pl.DataFrame]: ...
 
     def execute(
-        self,
-        df: pl.LazyFrame | pl.DataFrame,
-        *,
-        collect: bool = False,
-        filter_empty: bool = True,
+        self, df: pl.LazyFrame | pl.DataFrame, *, collect: bool = False, filter_empty: bool = True
     ) -> Iterator[pl.LazyFrame | pl.DataFrame]:
         """
         Execute every step in order, yielding the resulting LazyFrame(s).
@@ -222,19 +210,11 @@ class Pipeline:
 
     @overload
     def execute_single(
-        self,
-        df: pl.LazyFrame,
-        *,
-        collect: Literal[True],
-        filter_empty: Literal[True],
+        self, df: pl.LazyFrame, *, collect: Literal[True], filter_empty: Literal[True]
     ) -> pl.DataFrame | None: ...
 
     def execute_single(
-        self,
-        df: pl.LazyFrame | pl.DataFrame,
-        *,
-        collect: bool = False,
-        filter_empty: bool = True,
+        self, df: pl.LazyFrame | pl.DataFrame, *, collect: bool = False, filter_empty: bool = True
     ) -> pl.LazyFrame | pl.DataFrame | None:
         """
         Execute the pipeline expecting exactly one output.

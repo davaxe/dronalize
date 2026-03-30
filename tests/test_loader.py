@@ -143,7 +143,7 @@ class _DefaultPipelineBlockSplitLoader(BaseSceneLoader[str]):
         return CANONICAL_V1
 
 
-def test_unsplit_loader_rejects_native_split_selection() -> None:
+def test_unsplit_loader_rejects_splits() -> None:
     """Loaders without native dataset partitions should reject split filtering."""
     loader = _UnsplitLoader(splits=DatasetSplit.TRAIN)
 
@@ -151,16 +151,15 @@ def test_unsplit_loader_rejects_native_split_selection() -> None:
         _ = list(loader.sources())
 
 
-def test_default_pipeline_applies_block_split_request() -> None:
+def test_default_pipeline_block_split() -> None:
     """The base loader pipeline should forward block split requests to the factory."""
     unsplit_loader = _DefaultPipelineBlockSplitLoader(
-        loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
+        loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0)
     )
     split_loader = _DefaultPipelineBlockSplitLoader(
         loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
         split_request=SplitRequest(
-            strategy=TimeBlockSplit(gap=0),
-            weights=SplitWeights(train=0.5, val=0.5, test=0.0),
+            strategy=TimeBlockSplit(gap=0), weights=SplitWeights(train=0.5, val=0.5, test=0.0)
         ),
     )
 
@@ -173,23 +172,21 @@ def test_default_pipeline_applies_block_split_request() -> None:
     assert [frame.frame.height for frame in split_processed] == [3, 3]
 
 
-def test_loader_rejects_direct_unsupported_split_request() -> None:
+def test_loader_rejects_bad_split_request() -> None:
     """Direct loader construction should validate unsupported custom split strategies."""
     with pytest.raises(SplitStrategyNotSupportedError):
         _UnsplitLoader(
             loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
             split_request=SplitRequest(
-                strategy=BySourceSplit(),
-                weights=SplitWeights(train=1.0, val=0.0, test=0.0),
+                strategy=BySourceSplit(), weights=SplitWeights(train=1.0, val=0.0, test=0.0)
             ),
         )
 
 
-def test_positions_only_loader_keeps_native_schema_by_default() -> None:
+def test_positions_only_loader_native_schema() -> None:
     """Native schemas should be preserved when no output schema is requested."""
     loader = _PositionsOnlyLoader(
-        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0),
-        output_schema=None,
+        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0), output_schema=None
     )
 
     scene = next(iter(loader.scenes()))
@@ -199,11 +196,10 @@ def test_positions_only_loader_keeps_native_schema_by_default() -> None:
     assert scene.frame["x"].to_list() == pytest.approx([0.0, 1.0, 2.0])
 
 
-def test_loader_exposes_effective_output_schema_helpers() -> None:
+def test_loader_output_schema_helpers() -> None:
     """Schema helpers should reflect the effective requested output schema."""
     loader = _PositionsOnlyLoader(
-        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0),
-        output_schema=None,
+        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0), output_schema=None
     )
 
     assert loader.requested_scene_schema is None

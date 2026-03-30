@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Concatenate, cast
 
-from dronalize._internal._typing import P
+from dronalize._internal.typing import P
 from dronalize.core.errors import (
     DatasetNotFoundError,
     DatasetRegistryError,
@@ -32,8 +32,7 @@ ExecutionScope = Callable[[Path, LoaderConfig, MapConfig], AbstractContextManage
 """Function for creating an execution context for a dataset."""
 
 LoaderFactory = Callable[
-    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P],
-    BaseSceneLoader[Any],
+    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P], BaseSceneLoader[Any]
 ]
 
 
@@ -98,10 +97,7 @@ class DatasetDescriptor:
 
     @contextmanager
     def execution_scope(
-        self,
-        root: Path,
-        loader_config: LoaderConfig,
-        map_config: MapConfig,
+        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig
     ) -> Generator[None, None, None]:
         """Execute the lifecycle context manager, if defined."""
         if self.execution_scope_fn is not None:
@@ -162,31 +158,15 @@ def _builtin(
 
 _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     "a43": _builtin("dronalize.datasets.a43"),
-    "ad4che": _builtin(
-        "dronalize.datasets.ad4che",
-        optional_dependencies=("cv2",),
-        extra="ad4che",
-    ),
+    "ad4che": _builtin("dronalize.datasets.ad4che", optional_dependencies=("cv2",), extra="ad4che"),
     "apolloscape": _builtin("dronalize.datasets.apolloscape"),
     "argoverse1": _builtin("dronalize.datasets.argoverse1"),
     "argoverse2": _builtin("dronalize.datasets.argoverse2"),
     "eth": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="eth"),
-    "hotel": _builtin(
-        "dronalize.datasets.eth_ucy",
-        export_name="DESCRIPTORS",
-        export_key="hotel",
-    ),
+    "hotel": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="hotel"),
     "univ": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="univ"),
-    "zara1": _builtin(
-        "dronalize.datasets.eth_ucy",
-        export_name="DESCRIPTORS",
-        export_key="zara1",
-    ),
-    "zara2": _builtin(
-        "dronalize.datasets.eth_ucy",
-        export_name="DESCRIPTORS",
-        export_key="zara2",
-    ),
+    "zara1": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="zara1"),
+    "zara2": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="zara2"),
     "exid": _builtin("dronalize.datasets.exid"),
     "highd": _builtin("dronalize.datasets.highd"),
     "i80": _builtin("dronalize.datasets.i80"),
@@ -205,9 +185,7 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     "us101": _builtin("dronalize.datasets.us101"),
     "vod": _builtin("dronalize.datasets.vod"),
     "waymo": _builtin(
-        "dronalize.datasets.waymo",
-        optional_dependencies=("google.protobuf",),
-        extra="waymo",
+        "dronalize.datasets.waymo", optional_dependencies=("google.protobuf",), extra="waymo"
     ),
 }
 
@@ -314,10 +292,7 @@ def _has_module(module_name: str) -> bool:
 
 
 def _missing_dependency_error(
-    *,
-    subject: str,
-    spec: _BuiltinDatasetSpec,
-    missing: tuple[str, ...],
+    *, subject: str, spec: _BuiltinDatasetSpec, missing: tuple[str, ...]
 ) -> MissingOptionalDependencyError:
     """Build a consistent error for unavailable optional dataset dependencies."""
     install_target = f"dronalize[{spec.extra}]" if spec.extra else None
@@ -328,7 +303,5 @@ def _missing_dependency_error(
         f"{missing_str}. {install_hint}"
     )
     return MissingOptionalDependencyError(
-        msg,
-        dependencies=tuple(missing),
-        install_target=install_target,
+        msg, dependencies=tuple(missing), install_target=install_target
     )

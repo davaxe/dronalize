@@ -42,7 +42,7 @@ class LyftLVL5Map:
             self.meta: dict[str, Any] = json.load(file)
 
         self._ecef_to_world: npt.NDArray[np.float64] = np.linalg.inv(
-            np.array(self.meta["world_to_ecef"], dtype=np.float64),
+            np.array(self.meta["world_to_ecef"], dtype=np.float64)
         )
         self.elements: Sequence[proto.MapElement] = map_fragment.elements
 
@@ -53,9 +53,7 @@ class LyftLVL5Map:
         for el in self.elements:
             lane_id: str = _global_id_to_str(el.id)
             lane = Lane.from_proto_lane(
-                lane_id,
-                el.element.lane,
-                transformation=self._ecef_to_world,
+                lane_id, el.element.lane, transformation=self._ecef_to_world
             )
             lanes[_global_id_to_str(el.id)] = lane
 
@@ -67,9 +65,7 @@ class LyftLVL5Map:
         segments: dict[str, RoadNetworkSegment] = {}
         for el in self.elements:
             if el.element.HasField("segment"):
-                segment = RoadNetworkSegment.from_proto_road_network_segment(
-                    el.element.segment,
-                )
+                segment = RoadNetworkSegment.from_proto_road_network_segment(el.element.segment)
                 segments[_global_id_to_str(el.id)] = segment
 
         return segments
@@ -81,8 +77,7 @@ class LyftLVL5Map:
         for el in self.elements:
             if el.element.HasField("traffic_control_element"):
                 element = TrafficControlElement.from_proto_traffic_control_element(
-                    el.element.traffic_control_element,
-                    transformation=self._ecef_to_world,
+                    el.element.traffic_control_element, transformation=self._ecef_to_world
                 )
                 elements[_global_id_to_str(el.id)] = element
 
@@ -94,9 +89,7 @@ class LyftLVL5Map:
         nodes: dict[str, RoadNetworkNode] = {}
         for el in self.elements:
             if el.element.HasField("node"):
-                node = RoadNetworkNode.from_proto_road_network_node(
-                    el.element.node,
-                )
+                node = RoadNetworkNode.from_proto_road_network_node(el.element.node)
                 nodes[_global_id_to_str(el.id)] = node
 
         return nodes
@@ -234,10 +227,7 @@ class LaneSet:
     """Description of the lane set's turn, e.g., "left||"."""
 
     @classmethod
-    def from_proto_lane_set(
-        cls,
-        lane_set: proto.RoadNetworkSegment.LaneSet,
-    ) -> LaneSet:
+    def from_proto_lane_set(cls, lane_set: proto.RoadNetworkSegment.LaneSet) -> LaneSet:
         """Create a `LaneSet` instance from a `LaneSet` protobuf message."""
         return cls(
             num_driving_lanes=lane_set.num_driving_lanes,
@@ -264,10 +254,7 @@ class Junction:
     """Ids of the traffic control elements connected to this junction."""
 
     @classmethod
-    def from_proto_junction(
-        cls,
-        junction: proto.Junction,
-    ) -> Junction:
+    def from_proto_junction(cls, junction: proto.Junction) -> Junction:
         """Create a `Junction` instance from a protobuf version."""
         return cls(
             is_non_trivial=junction.is_non_trivial_intersection,
@@ -303,10 +290,7 @@ class RoadNetworkNode:
     """Z-level of the node, used for elevation in 3D space."""
 
     @classmethod
-    def from_proto_road_network_node(
-        cls,
-        node: proto.RoadNetworkNode,
-    ) -> RoadNetworkNode:
+    def from_proto_road_network_node(cls, node: proto.RoadNetworkNode) -> RoadNetworkNode:
         """Create a `RoadNetworkNode` instance from a protobuf version."""
         return cls(
             latitude=node.location.lat_e7 * 1e-7,
@@ -356,8 +340,7 @@ class RoadNetworkSegment:
 
     @classmethod
     def from_proto_road_network_segment(
-        cls,
-        segment: proto.RoadNetworkSegment,
+        cls, segment: proto.RoadNetworkSegment
     ) -> RoadNetworkSegment:
         """Create a `RoadNetworkSegment` instance from a protobuf version."""
         return cls(
@@ -529,26 +512,17 @@ class Lane:
 
     @classmethod
     def from_proto_lane(
-        cls,
-        lane_id: str,
-        lane: proto.Lane,
-        transformation: npt.NDArray[np.float64] | None = None,
+        cls, lane_id: str, lane: proto.Lane, transformation: npt.NDArray[np.float64] | None = None
     ) -> Lane:
         """Create a `Lane` instance from a protobuf message."""
         return cls(
             id=lane_id,
-            parent_segment_or_junction=_global_id_to_str(
-                lane.parent_segment_or_junction,
-            ),
+            parent_segment_or_junction=_global_id_to_str(lane.parent_segment_or_junction),
             left_boundary=LaneBoundary.from_proto_lane_boundary(
-                lane.left_boundary,
-                lane.geo_frame,
-                transformation,
+                lane.left_boundary, lane.geo_frame, transformation
             ),
             right_boundary=LaneBoundary.from_proto_lane_boundary(
-                lane.right_boundary,
-                lane.geo_frame,
-                transformation,
+                lane.right_boundary, lane.geo_frame, transformation
             ),
             travel_direction=TravelDirection(lane.orientation_in_parent_segment),
             lane_successors=[_global_id_to_str(successor) for successor in lane.lanes_ahead],
@@ -628,9 +602,7 @@ class TrafficControlElement:
         )
 
     @staticmethod
-    def _solve_type(
-        element: proto.TrafficControlElement,
-    ) -> TrafficControlElementType:
+    def _solve_type(element: proto.TrafficControlElement) -> TrafficControlElementType:
         """Solve the type of the traffic control element."""
         keys = {key.name for key, _ in element.ListFields()}
         key_to_type = {
@@ -703,22 +675,14 @@ def transform(
 
 
 def _enu_to_ecef(
-    e: float,
-    n: float,
-    u: float,
-    lat: float,
-    lon: float,
+    e: float, n: float, u: float, lat: float, lon: float
 ) -> tuple[float, float, float]:
     x0, y0, z0 = _geodetic_to_ecef(lat, lon, 0.0)
     dx, dy, dz = _enu_to_uvw(e, n, u, lat, lon)
     return x0 + dx, y0 + dy, z0 + dz
 
 
-def _geodetic_to_ecef(
-    lat: float,
-    lon: float,
-    alt: float,
-) -> tuple[float, float, float]:
+def _geodetic_to_ecef(lat: float, lon: float, alt: float) -> tuple[float, float, float]:
     # WGS84 constants
     semi_major_axis = 6378137.0  # meters
     semi_minor_axis = 6356752.31424518
@@ -729,10 +693,7 @@ def _geodetic_to_ecef(
     cos_lon = math.cos(lon)
 
     # Radius of curvature in the prime vertical
-    n = semi_major_axis**2 / math.hypot(
-        semi_major_axis * cos_lat,
-        semi_minor_axis * sin_lat,
-    )
+    n = semi_major_axis**2 / math.hypot(semi_major_axis * cos_lat, semi_minor_axis * sin_lat)
 
     # ECEF coordinates
     x = (n + alt) * cos_lat * cos_lon
@@ -743,11 +704,7 @@ def _geodetic_to_ecef(
 
 
 def _enu_to_uvw(
-    east: float,
-    north: float,
-    up: float,
-    lat: float,
-    lon: float,
+    east: float, north: float, up: float, lat: float, lon: float
 ) -> tuple[float, float, float]:
     cos_lat = math.cos(lat)
     sin_lat = math.sin(lat)

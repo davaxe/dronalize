@@ -9,7 +9,8 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY_V1
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
@@ -27,7 +28,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
     """Loader for Argoverse 1 trajectory data stored in CSV format."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True,
+        supports_scene_split=True
     )
 
     def __init__(
@@ -118,8 +119,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         for _, group in batch_lf.collect().group_by(["file_id"]):
             map_key = str(group["map"].first())
             yield IngestedData(
-                frame=group.drop("file_id").lazy(),
-                map_binding=MapBinding(map_key=map_key),
+                frame=group.drop("file_id").lazy(), map_binding=MapBinding(map_key=map_key)
             )
 
     @override
@@ -136,9 +136,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
     @override
     def default_config(cls) -> LoaderConfig:
         return LoaderConfig(input_len=20, output_len=30, sample_time=0.1).with_filter(
-            Filter.define(
-                agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[19])]
-            ),
+            Filter.define(agent_rules=[RequireFrames.define(frames=[19])])
         )
 
     @classmethod
@@ -187,3 +185,11 @@ _SCHEMA: pl.Schema = pl.Schema({
     "Y": pl.Float64,
     "CITY_NAME": pl.String,
 })
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.argoverse1 import DESCRIPTOR
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+
+    root = resolve_dataset_root_from_env("argoverse1")
+    _ = debug_descriptor(DESCRIPTOR, root)

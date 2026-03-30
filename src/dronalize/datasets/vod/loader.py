@@ -5,7 +5,8 @@ from typing_extensions import override
 
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
-from dronalize.processing.filters import Filter, RequireAgentCoverageAtFrames
+from dronalize.processing.filters import Filter
+from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.splits import SplitRequest
 from dronalize.processing.maps.config import MapConfig
@@ -57,9 +58,13 @@ class VodLoader(NuScenesLoader):
         return (
             LoaderConfig(input_len=5, output_len=30, sample_time=0.1)
             .with_window(5)
-            .with_filter(
-                Filter.define(
-                    agent_validation_rules=[RequireAgentCoverageAtFrames.define(frames=[4])]
-                )
-            )
+            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[4])]))
         )
+
+
+if __name__ == "__main__":
+    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
+    from dronalize.datasets.vod import DESCRIPTOR
+
+    root = resolve_dataset_root_from_env("vod")
+    _ = debug_descriptor(DESCRIPTOR, root)

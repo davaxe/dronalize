@@ -100,12 +100,7 @@ class SceneSchema:
             raise ValueError(msg)
 
     @classmethod
-    def define(
-        cls,
-        name: str,
-        *,
-        fields: SceneField | Iterable[SceneField | str],
-    ) -> SceneSchema:
+    def define(cls, name: str, *, fields: SceneField | Iterable[SceneField | str]) -> SceneSchema:
         """Construct a schema from semantic field identifiers."""
         fields = _resolve_fields(fields)
         return cls(name=name, fields=fields)
@@ -185,16 +180,13 @@ _BASE_FIELDS: Final[SceneField] = (
 
 POSITIONS_ONLY_V1: Final[SceneSchema] = SceneSchema.define("positions_only", fields=_BASE_FIELDS)
 POSITIONS_YAW_V1: Final[SceneSchema] = SceneSchema.define(
-    "positions_yaw",
-    fields=_BASE_FIELDS | SceneField.YAW,
+    "positions_yaw", fields=_BASE_FIELDS | SceneField.YAW
 )
 POSITIONS_VELOCITY_V1: Final[SceneSchema] = SceneSchema.define(
-    "positions_velocity",
-    fields=_BASE_FIELDS | SceneField.VX | SceneField.VY,
+    "positions_velocity", fields=_BASE_FIELDS | SceneField.VX | SceneField.VY
 )
 POSITIONS_VELOCITY_YAW_V1: Final[SceneSchema] = SceneSchema.define(
-    "positions_velocity_yaw",
-    fields=_BASE_FIELDS | SceneField.VX | SceneField.VY | SceneField.YAW,
+    "positions_velocity_yaw", fields=_BASE_FIELDS | SceneField.VX | SceneField.VY | SceneField.YAW
 )
 POSITIONS_VELOCITY_ACCELERATION_V1: Final[SceneSchema] = SceneSchema.define(
     "positions_velocity_acceleration",
@@ -252,10 +244,7 @@ def get_scene_schema(schema: SceneSchema | str | dict[str, Any]) -> SceneSchema:
         return schema
 
     if isinstance(schema, dict):
-        return SceneSchema(
-            name=schema["name"],
-            fields=schema["fields"],
-        )
+        return SceneSchema(name=schema["name"], fields=schema["fields"])
 
     if schema in SCENE_SCHEMAS:
         return SCENE_SCHEMAS[schema]

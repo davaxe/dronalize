@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 import dronalize.processing.pipeline.transforms as tr
-from dronalize._internal._polars_ops import normalize_group_by
+from dronalize._internal.polars_ops import normalize_group_by
 from dronalize.processing.ingest.splits import ShuffledTimeBlockSplit, SplitRequest, TimeBlockSplit
 from dronalize.processing.pipeline._internal import SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.pipeline import Pipeline
