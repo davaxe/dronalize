@@ -7,13 +7,14 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 import dronalize.processing.pipeline.transforms as tr
+from dronalize.processing.pipeline._internal import SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.builder import TrajectoryPipelineBuilder
 from dronalize.processing.pipeline.pipeline import Pipeline
 from dronalize.processing.pipeline.splitting import apply_split_partition
 
 if TYPE_CHECKING:
     from dronalize.processing.filters import Filter
-    from dronalize.processing.ingest.config import WindowParams
+    from dronalize.processing.ingest.config import WindowConfig
     from dronalize.processing.pipeline.functional.resample import ResampleSpec
     from dronalize.processing.pipeline.spec import TrajectorySpec
 
@@ -57,6 +58,7 @@ def trajectory_pipeline(spec: TrajectorySpec) -> Pipeline:
         agent_id_column=spec.columns.agent_id,
         scene_id_column=scene_id_column,
         resampling=spec.config.resampling,
+        drop=_factory_generated_drop_columns(builder, scene_id_column=scene_id_column),
     )
 
 
@@ -89,14 +91,14 @@ def _apply_window(
     *,
     frame_column: str,
     window_group_columns: list[str],
-    window_spec: WindowParams | None,
+    window_spec: WindowConfig | None,
 ) -> Pipeline:
     if window_spec is None:
         return pipeline
     return pipeline.then(
         tr.window(
-            window_spec.window_size,
-            window_spec.step_size,
+            window_spec.size,
+            window_spec.step,
             group_by=window_group_columns or None,
             sliding_col=frame_column,
         )
@@ -132,6 +134,7 @@ def _apply_resample_and_yield(
     agent_id_column: str,
     scene_id_column: str | None,
     resampling: ResampleSpec | None,
+    drop: list[str] | None = None,
 ) -> Pipeline:
     pipeline = pipeline.then(
         tr.resample(
@@ -146,4 +149,21 @@ def _apply_resample_and_yield(
     )
     if scene_id_column is not None:
         pipeline = pipeline.then_flat_map(tr.group_by_yield(scene_id_column))
+    if drop is not None:
+        pipeline = pipeline.then(tr.select(pl.all().exclude(drop)))
     return pipeline
+
+
+def _factory_generated_drop_columns(
+    builder: TrajectoryPipelineBuilder, *, scene_id_column: str | None
+) -> list[str] | None:
+    drop_columns: list[str] = []
+
+    if builder.has_window:
+        drop_columns.append("window_index")
+    if builder.split_columns():
+        drop_columns.append(SPLIT_PARTITION_COLUMN)
+    if scene_id_column is not None:
+        drop_columns.append(scene_id_column)
+
+    return drop_columns or None

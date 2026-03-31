@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def us101_execution_scope(
-    root: Path, loader_config: LoaderConfig, map_config: MapConfig
+    root: Path, loader_config: LoaderConfig, map_config: MapConfig | None
 ) -> Generator[None, None, None]:
     """Prepare shared map state for a US-101 processing run.
 
@@ -30,7 +30,7 @@ def us101_execution_scope(
 
     """
     _loader_config = loader_config
-    if not map_config.include_map:
+    if map_config is None:
         _Loader.set_shared_memory()
         yield
         return

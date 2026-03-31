@@ -100,11 +100,11 @@ def extract(
             return graph.extract_bbox(center, width, height)
         case CircularExtraction(radius=radius):
             return graph.extract_radius(center, radius)
-        case RelevantAreaExtraction(padding_factor=padding_factor):
+        case RelevantAreaExtraction(padding=padding):
             if relevant_positions is None:
                 msg = "relevant_positions must be provided for RelevantAreaExtraction"
                 raise ValueError(msg)
-            return graph.extract_relevant(relevant_positions, padding_factor)
+            return graph.extract_relevant(relevant_positions, padding)
         case FullMapExtraction():
             return graph
 

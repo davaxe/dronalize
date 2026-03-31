@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dronalize.runtime.execution.executor import ObservableWritingExecutor, Progress, WriterFactory
+from dronalize.runtime.executor import ObservableWritingExecutor, Progress, WriterFactory
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -39,7 +39,6 @@ class SequentialExecutor(ObservableWritingExecutor):
         self._scene_counter: int = 0
         self._source_counter: int = 0
         self._total_sources: int | None = inner.num_sources()
-        self._total_scenes: int | None = inner.num_scenes()
         self._update_event: threading.Event = threading.Event()
         self._running: bool = False
         if self._limit and self._total_sources is not None:
@@ -68,7 +67,7 @@ class SequentialExecutor(ObservableWritingExecutor):
             processed_sources=self._source_counter,
             processed_scenes=self._scene_counter,
             total_sources=self._total_sources,
-            total_scenes=self._total_scenes,
+            total_scenes=None,
             active_workers=1,
         )
 

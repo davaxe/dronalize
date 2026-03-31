@@ -10,7 +10,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY_V1
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import RequireFrames
+from dronalize.processing.filters.agent import MinSamples
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
 
 
 class I80Loader(BaseSceneLoader[Path]):
@@ -37,7 +37,7 @@ class I80Loader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the I80 dataset loader.
 
@@ -81,7 +81,7 @@ class I80Loader(BaseSceneLoader[Path]):
                     3: AgentCategory.TRUCK,
                 })
                 .alias("agent_category"),
-                self._lane_changes_expr(),
+                pl.col("Lane_ID").alias("lane_id"),
             )
         )
 
@@ -100,7 +100,8 @@ class I80Loader(BaseSceneLoader[Path]):
         return (
             LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
             .with_window(25)
-            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[19])]))
+            .with_filter(Filter.define_cleanup(MinSamples(minimum=2)))
+            .with_highway(required_lane_changes=3, negative_keep_every=3)
         )
 
     @classmethod
@@ -113,18 +114,6 @@ class I80Loader(BaseSceneLoader[Path]):
         if self._shared_memory_name is None:
             return no_map()
         return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
-
-    @staticmethod
-    def _lane_changes_expr(lane_id_col: str = "Lane_ID", id_col: str = "Vehicle_ID") -> pl.Expr:
-        return (
-            pl
-            .col(lane_id_col)
-            .ne(pl.col(lane_id_col).shift())
-            .fill_null(value=False)
-            .sum()
-            .over(id_col)
-            .alias("lane_changes")
-        )
 
 
 if __name__ == "__main__":

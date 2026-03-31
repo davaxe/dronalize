@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from typing import Annotated, ClassVar, Literal
+from typing import ClassVar, Literal
 
 import numpy as np
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from dronalize.core.scene import CANONICAL_V1, SceneSchema, get_scene_schema
+from dronalize.core.scene.schema import SceneSchemaDefinition
 
 FloatDType = type[np.float32] | type[np.float64]
 WriterPrecision = Literal["float32", "float64"]
-SceneSchemaLike = SceneSchema | str | dict[str, object]
-ResolvedSceneSchema = Annotated[SceneSchema, BeforeValidator(get_scene_schema)]
+SceneSchemaLike = SceneSchema | str | SceneSchemaDefinition
 
 
 class MDSFormatConfig(BaseModel):
@@ -25,11 +25,11 @@ class MDSFormatConfig(BaseModel):
 
 
 class WriterConfig(BaseModel):
-    """User-facing configuration shared by scene writers."""
+    """Resolved runtime configuration shared by scene writers."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    scene_schema: ResolvedSceneSchema = CANONICAL_V1
+    scene_schema: SceneSchema = CANONICAL_V1
     precision: WriterPrecision = "float32"
     offset_positions: bool = True
     mds: MDSFormatConfig = Field(default_factory=MDSFormatConfig)

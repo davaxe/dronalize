@@ -140,17 +140,6 @@ class ProcessableLoader(Protocol, Generic[SourceT]):
         """
         ...
 
-    def num_scenes(self) -> int | None:
-        """Get the total number of scenes that will be generated.
-
-        Returns
-        -------
-        int or None
-            Total number of scenes, or None if the count is unknown or depends
-            on dynamic processing (e.g., sliding window extraction).
-        """
-        ...
-
     def process_next(self, source: Source[SourceT]) -> Iterable[ProcessedSceneData]:
         """Process one source into finalized scene payloads.
 

@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.maps.graph import MapGraph
     from dronalize.core.scene import Scene, SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
     from dronalize.processing.maps.resolver import MapResolver
     from dronalize.processing.pipeline.pipeline import Pipeline
@@ -42,7 +42,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the Waymo loader.
 
@@ -71,7 +71,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
             split_request=split_request,
         )
         self._data_root: Path = Path(data_root)
-        self._include_map: bool = self.map_config.include_map
+        self._include_map: bool = self.map_config is not None
 
     @classmethod
     @override
@@ -108,9 +108,12 @@ class WaymoLoader(BaseSceneLoader[Path]):
                 def _resolver(scene: Scene, _raw_data: bytes = raw_data) -> MapGraph:
                     _ = scene
                     map_data = lean_map_pb2.LeanMapContainer.FromString(_raw_data)
+                    map_config = self.map_config
                     return WaymoMapBuilder.from_proto(map_data.map_features).build(
-                        min_distance=self.map_config.min_distance,
-                        interp_distance=self.map_config.interp_distance,
+                        min_distance=map_config.min_distance if map_config is not None else None,
+                        interp_distance=(
+                            map_config.interp_distance if map_config is not None else None
+                        ),
                     )
 
                 resolver = _resolver

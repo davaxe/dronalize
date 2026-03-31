@@ -16,18 +16,15 @@ from dronalize.processing.filters.filter import Filter
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import Source
 from dronalize.processing.maps.config import MapConfig
-from dronalize.processing.pipeline.factory import trajectory_pipeline
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
-from dronalize.processing.pipeline.presets import highway_trajectory_spec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps.graph import MapGraph
     from dronalize.core.scene import Scene, SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
-    from dronalize.processing.pipeline import Pipeline
 
 
 class AD4CHELoader(LevelXDataLoader):
@@ -39,7 +36,7 @@ class AD4CHELoader(LevelXDataLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the trajectory data loader for the AD4CHE dataset.
 
@@ -74,17 +71,6 @@ class AD4CHELoader(LevelXDataLoader):
     @override
     def num_sources(self) -> int | None:
         return sum(1 for _ in self._recordings())
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return trajectory_pipeline(
-            highway_trajectory_spec(
-                self.loader_config,
-                split_request=self.split_request,
-                min_lane_change_events=5,
-                negative_keep_every=3,
-            )
-        )
 
     @staticmethod
     @override
@@ -143,12 +129,13 @@ class AD4CHELoader(LevelXDataLoader):
             .with_resampling(ResampleSpec(up=1, down=3))
             .with_window(45)
             .with_filter(Filter.define_cleanup(MinSamples(minimum=4)))
+            .with_highway(required_lane_changes=5, negative_keep_every=3)
         )
 
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.relevant_area_extraction(padding_factor=1.15)
+        return MapConfig.relevant_area_extraction(padding=1.15)
 
     @override
     def map_resolver(self) -> MapResolver:

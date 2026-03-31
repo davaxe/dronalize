@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import polars as pl
-from pydantic import ConfigDict, Field, dataclasses, model_validator
+from pydantic import Field, model_validator
 from typing_extensions import override
 
 from dronalize.core.models import AbsoluteTolerance, RelativeTolerance, Tolerance, tol
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from dronalize.processing.filters.context import FilterContext
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class RequireFrames(AgentCheckRule):
     """Require each retained agent to cover specific relative frames."""
 
@@ -50,7 +49,6 @@ class RequireFrames(AgentCheckRule):
         return ctx.over_agent_window(required) == len(self.frames)
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class RequireWindow(AgentCheckRule):
     """Require a minimum fraction of frames in a relative agent window."""
 
@@ -75,7 +73,6 @@ class RequireWindow(AgentCheckRule):
         return covered_frames.cast(pl.Float64) >= required_coverage
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class MinSamples(AgentCheckRule):
     """Require a minimum number of samples per agent."""
 
@@ -87,7 +84,6 @@ class MinSamples(AgentCheckRule):
         return ctx.over_agent_window(pl.len()) >= self.minimum
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class MaxMissingFrames(AgentCheckRule):
     """Require a maximum number of missing frames per agent."""
 
@@ -102,7 +98,6 @@ class MaxMissingFrames(AgentCheckRule):
         return missing_frames <= self.maximum
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class MaxGap(AgentCheckRule):
     """Require the gap between two be less than or equal to a give maximum."""
 
@@ -117,7 +112,6 @@ class MaxGap(AgentCheckRule):
         return max_gap <= self.maximum
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class MinConsecutiveFrames(AgentCheckRule):
     """Require a minimum longest consecutive run per agent."""
 
@@ -141,7 +135,6 @@ class MinConsecutiveFrames(AgentCheckRule):
         return longest_run >= self.minimum
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class StartsByFrame(AgentCheckRule):
     """Require each retained agent to start by a specific relative frame."""
 
@@ -154,7 +147,6 @@ class StartsByFrame(AgentCheckRule):
         return first_frame <= self.frame
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class EndsAfterFrame(AgentCheckRule):
     """Require each retained agent to end after a specific relative frame."""
 
@@ -167,7 +159,6 @@ class EndsAfterFrame(AgentCheckRule):
         return last_frame >= self.frame
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class MinSpan(AgentCheckRule):
     """Require a minimum span between the first and last frame of each retained agent."""
 

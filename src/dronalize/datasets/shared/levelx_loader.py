@@ -10,7 +10,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import CANONICAL_V1
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import RequireFrames
+from dronalize.processing.filters.agent import MinSamples
 from dronalize.processing.filters.cleanup import ExcludeCategories
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
 
 
 class LevelXDataLoader(BaseSceneLoader[Path]):
@@ -46,7 +46,7 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the loader for an X-level dataset (e.g., rounD, inD).
 
@@ -179,12 +179,17 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=50, output_len=125, sample_time=0.04)
-            .with_resampling(ResampleSpec(up=2, down=5))
+            .with_resampling(
+                ResampleSpec
+                .cubic(up=2, down=1)
+                .with_output_derivative(1, "vx", "vy")
+                .with_output_derivative(2, "ax", "ay")
+            )
             .with_window(25)
             .with_filter(
-                Filter.define(
-                    cleanup_rules=[ExcludeCategories.define(categories=[AgentCategory.TRAILER])],
-                    agent_rules=[RequireFrames.define(frames=[49])],
+                Filter.define_cleanup(
+                    ExcludeCategories.define(categories=[AgentCategory.TRAILER]),
+                    MinSamples(minimum=6),
                 )
             )
         )

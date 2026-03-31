@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from dronalize.core.maps.graph import MapGraph
     from dronalize.core.scene import Scene, SceneSchema
     from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
 
 
@@ -32,7 +32,7 @@ class HighDLoader(LevelXDataLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the highD loader.
 
@@ -82,6 +82,7 @@ class HighDLoader(LevelXDataLoader):
             pl.col("yVelocity").alias("vy"),
             pl.col("xAcceleration").alias("ax"),
             pl.col("yAcceleration").alias("ay"),
+            pl.col("laneId").alias("lane_id"),
         ]
 
     @staticmethod
@@ -110,6 +111,11 @@ class HighDLoader(LevelXDataLoader):
     @override
     def default_map_config(cls) -> MapConfig:
         return MapConfig.full_map(interp_distance=10)
+
+    @classmethod
+    @override
+    def default_config(cls) -> LoaderConfig:
+        return super().default_config().with_highway(required_lane_changes=3, negative_keep_every=3)
 
     @override
     def map_resolver(self) -> MapResolver:

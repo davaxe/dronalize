@@ -14,7 +14,7 @@ from dronalize.processing.ingest import (
     LoaderConfig,
     LoaderSplitCapabilities,
     Source,
-    SplitRequest,
+    SplitConfig,
     SplitWeights,
     TimeBlockSplit,
 )
@@ -158,8 +158,8 @@ def test_default_pipeline_block_split() -> None:
     )
     split_loader = _DefaultPipelineBlockSplitLoader(
         loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
-        split_request=SplitRequest(
-            strategy=TimeBlockSplit(gap=0), weights=SplitWeights(train=0.5, val=0.5, test=0.0)
+        split_request=SplitConfig(
+            mode=TimeBlockSplit(gap=0), ratio=SplitWeights(train=0.5, val=0.5, test=0.0)
         ),
     )
 
@@ -173,12 +173,12 @@ def test_default_pipeline_block_split() -> None:
 
 
 def test_loader_rejects_bad_split_request() -> None:
-    """Direct loader construction should validate unsupported custom split strategies."""
+    """Direct loader construction should validate unsupported custom split modes."""
     with pytest.raises(SplitStrategyNotSupportedError):
         _UnsplitLoader(
             loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
-            split_request=SplitRequest(
-                strategy=BySourceSplit(), weights=SplitWeights(train=1.0, val=0.0, test=0.0)
+            split_request=SplitConfig(
+                mode=BySourceSplit(), ratio=SplitWeights(train=1.0, val=0.0, test=0.0)
             ),
         )
 

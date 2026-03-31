@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.pipeline.extensions.base import TrajectoryPipelineExtension
 
 
@@ -30,20 +30,11 @@ class TrackColumns:
 
 
 @dataclass(frozen=True, slots=True)
-class LaneChangeDetection:
-    """Parameters used to derive lane-change events from tracks."""
-
-    persist: int = 1
-    margin_before: int = 0
-    margin_after: int = 0
-
-
-@dataclass(frozen=True, slots=True)
 class TrajectorySpec:
     """Declarative specification for building a trajectory-processing pipeline."""
 
     config: LoaderConfig
-    split_request: SplitRequest | None = None
+    split_request: SplitConfig | None = None
     columns: TrackColumns = field(default_factory=TrackColumns)
     window_by: str | Sequence[str] | None = None
     extension: TrajectoryPipelineExtension | None = None

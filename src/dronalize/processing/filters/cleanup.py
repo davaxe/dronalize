@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import polars as pl
-from pydantic import ConfigDict, Field, dataclasses
+from pydantic import Field
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategoryInput, coerce_agent_categories
@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from dronalize.processing.filters.context import FilterContext
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class PruneByRule(CleanupRule):
     """Remove rows for agents that fail the given validation rule."""
 
@@ -28,7 +27,6 @@ class PruneByRule(CleanupRule):
         return pl.when(scope).then(agent_validity).otherwise(statement=True)
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class ExcludeCategories(CleanupRule):
     """Remove rows that belong to the given agent categories."""
 
@@ -47,7 +45,6 @@ class ExcludeCategories(CleanupRule):
         return ~pl.col(ctx.category_column).is_in(self.categories)
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class IncludeCategories(CleanupRule):
     """Keep only rows that belong to the given agent categories."""
 

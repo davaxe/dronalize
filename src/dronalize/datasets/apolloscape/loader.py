@@ -9,6 +9,8 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_YAW_V1
+from dronalize.processing.filters.agent import MinSamples
+from dronalize.processing.filters.filter import Filter
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
@@ -18,7 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
 
 
@@ -35,7 +37,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the ApolloScape loader.
 
@@ -113,8 +115,13 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=4, output_len=6, sample_time=0.5)
-            .with_resampling(ResampleSpec(up=5, down=1))
-            # .with_filter(Filter.define_cleanup(MinimumAgentSamples(minimum=2)))
+            .with_resampling(
+                ResampleSpec
+                .cubic(up=5, down=1)
+                .with_output_derivative(1, "vx", "vy")
+                .with_output_derivative(2, "ax", "ay")
+            )
+            .with_filter(Filter.define_cleanup(MinSamples(minimum=2)))
             .with_window(1)
         )
 
@@ -145,4 +152,6 @@ if __name__ == "__main__":
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("apollo")
-    _ = debug_descriptor(DESCRIPTOR, root, step=50)
+    scenes = debug_descriptor(DESCRIPTOR, root, step=150)
+    for scene in scenes:
+        scene.frame.write_csv(f"debug_scene_{scene.scene_number}.csv")

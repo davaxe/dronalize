@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import altair as alt
 
 from dronalize.plot import plot_trajectories, plot_trajectories_on_map
+from dronalize.processing.ingest.base import CANONICAL_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -33,12 +34,12 @@ def debug_visualize_scenes(
     title_prefix: str | None = None,
     trajectory_kwargs: dict[str, Any] | None = None,
     overlay_kwargs: dict[str, Any] | None = None,
-) -> list[alt.TopLevelMixin]:
+) -> list[Scene]:
     _ = alt.renderers.enable("browser")
 
     trajectory_kwargs = {} if trajectory_kwargs is None else dict(trajectory_kwargs)
     overlay_kwargs = {} if overlay_kwargs is None else dict(overlay_kwargs)
-    charts: list[alt.TopLevelMixin] = []
+    scenes_list: list[Scene] = []
 
     scenes: Iterator[Scene] = iter(source.scenes())
     for scene in islice(scenes, skip_scenes, skip_scenes + max_scenes * step, step):
@@ -80,8 +81,8 @@ def debug_visualize_scenes(
 
         if show:
             chart.show()
-        charts.append(chart)
-    return charts
+        scenes_list.append(scene)
+    return scenes_list
 
 
 def resolve_dataset_root_from_env(
@@ -106,14 +107,14 @@ def debug_descriptor(
     max_scenes: int = 3,
     skip_scenes: int = 0,
     step: int = 1,
-) -> list[alt.TopLevelMixin]:
+) -> list[Scene]:
     """Build a loader from its descriptor and visualize a scene sample."""
-    loader_config = descriptor.default_config
+    loader_config = descriptor.default_loader_config
     map_config = descriptor.default_map_config
     loader = descriptor.build_loader(
         root, loader_config=loader_config, map_config=map_config, output_schema=None
     )
-
+    loader.set_output_schema(CANONICAL_V1)
     with descriptor.execution_scope(root, loader_config, map_config):
         return debug_visualize_scenes(
             loader, max_scenes=max_scenes, skip_scenes=skip_scenes, step=step

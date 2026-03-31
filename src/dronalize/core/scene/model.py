@@ -82,8 +82,7 @@ class Scene:
     def __post_init__(self) -> None:
         """Cast and validate the scene schema."""
         frame = _cast_to_schema(self.frame, self.schema.physical)
-        if frame is not self.frame:
-            object.__setattr__(self, "frame", frame)
+        object.__setattr__(self, "frame", frame)
 
         # Verify schema compatibility with the frame DataFrame
         if not _matches_physical_schema(self.frame.schema, self.schema.physical):
@@ -201,7 +200,13 @@ def _derive_missing_fields(
 
 
 def _cast_to_schema(data: pl.DataFrame, schema: pl.Schema) -> pl.DataFrame:
-    if not _matches_physical_schema_name(data.schema, schema):
+    """Cast the columns of a DataFrame to match the provided schema.
+
+    This does not remove extra columns or add missing columns; it only casts
+    existing columns to the specified types.
+
+    """
+    if _matches_physical_schema(data.schema, schema):
         return data
     casts = [pl.col(col).cast(dtype) for col, dtype in schema.items() if data.schema[col] != dtype]
     return data if not casts else data.with_columns(casts)
@@ -209,11 +214,6 @@ def _cast_to_schema(data: pl.DataFrame, schema: pl.Schema) -> pl.DataFrame:
 
 def _matches_physical_schema(actual: pl.Schema, expected: pl.Schema) -> bool:
     return all(column in actual and actual[column] == dtype for column, dtype in expected.items())
-
-
-def _matches_physical_schema_name(actual: pl.Schema, expected: pl.Schema) -> bool:
-    """Check if the actual schema matches the expected schema, ignoring dtypes."""
-    return all(column in actual for column in expected)
 
 
 def _get_schema_mismatch_message(

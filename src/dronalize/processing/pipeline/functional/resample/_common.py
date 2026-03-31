@@ -13,7 +13,7 @@ from typing_extensions import Self, override
 from dronalize._internal.polars_ops import normalize_group_by
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Sequence
 
     from dronalize._internal.typing import DataFrameT
 
@@ -63,21 +63,63 @@ class ResampleSpec(BaseModel):
     output_derivatives: DerivativeOrderMap = Field(default_factory=dict)
     max_gap: int = Field(default=1, gt=0)
     sort: bool = Field(default=True)
+    sample_time: float = Field(default=1.0, gt=0.0)
+
+    @classmethod
+    def cubic(cls, up: int = 1, down: int = 1) -> ResampleSpec:
+        """Return a spec for cubic spline resampling."""
+        return cls(up=up, down=down, method=ResampleMethod.CUBIC)
+
+    @classmethod
+    def pchip(cls, up: int = 1, down: int = 1) -> ResampleSpec:
+        """Return a spec for PCHIP resampling."""
+        return cls(up=up, down=down, method=ResampleMethod.PCHIP)
+
+    @classmethod
+    def hermite(cls, up: int = 1, down: int = 1) -> ResampleSpec:
+        """Return a spec for Hermite spline resampling."""
+        return cls(up=up, down=down, method=ResampleMethod.HERMITE)
+
+    @classmethod
+    def linear(cls, up: int = 1, down: int = 1) -> ResampleSpec:
+        """Return a spec for linear resampling."""
+        return cls(up=up, down=down, method=ResampleMethod.LINEAR)
 
     def _with_update(self, **kwargs: object) -> ResampleSpec:
         return self.model_copy(update=kwargs)
 
-    def with_input_derivative(self, order: int, columns: Iterable[str]) -> ResampleSpec:
+    def with_input_derivative(self, order: int, *columns: str) -> ResampleSpec:
         """Return a new spec with the given input derivative order and columns."""
         return self._with_update(
             input_derivatives={**self.input_derivatives, order: dict.fromkeys(columns)}
         )
 
-    def with_output_derivative(self, order: int, columns: Iterable[str]) -> ResampleSpec:
+    def with_output_derivative(self, order: int, *columns: str) -> ResampleSpec:
         """Return a new spec with the given output derivative order and columns."""
         return self._with_update(
             output_derivatives={**self.output_derivatives, order: dict.fromkeys(columns)}
         )
+
+    def with_sample_time(self, sample_time: float) -> ResampleSpec:
+        """Return a new spec with the given sample time."""
+        return self._with_update(sample_time=sample_time)
+
+    def with_default_output_deivative(
+        self, *, first: bool = True, second: bool = True
+    ) -> ResampleSpec:
+        """Return a spec wit default added output derivatives.
+
+        By default adds:
+         - First-order output derivatives "vx", "vy"
+         - Second-order output derivatives "ax", "ay"
+
+        """
+        new = self
+        if first:
+            new = self.with_output_derivative(1, "vx", "vy")
+        if second:
+            new = self.with_output_derivative(2, "ax", "ay")
+        return new
 
     @field_validator("position_columns", mode="before")
     @classmethod
@@ -143,21 +185,25 @@ class ResampleSpec(BaseModel):
 
     @override
     def __repr_args__(self) -> list[tuple[str, object]]:
-        return [
+        repr_args: list[tuple[str, object]] = []
+        repr_args.extend([
             ("factors", f"{self.up}:{self.down}"),
             ("method", self.method.value),
             ("position_columns", tuple(self.position_columns.keys())),
-            (
-                "input_derivatives",
-                {order: tuple(cols.keys()) for order, cols in self.input_derivatives.items()},
-            ),
-            (
-                "output_derivatives",
-                {order: tuple(cols.keys()) for order, cols in self.output_derivatives.items()},
-            ),
             ("max_gap", self.max_gap),
             ("sort", self.sort),
-        ]
+        ])
+        if self.input_derivatives:
+            repr_args.append((
+                "input_derivatives",
+                {order: tuple(cols.keys()) for order, cols in self.input_derivatives.items()},
+            ))
+        if self.output_derivatives:
+            repr_args.append((
+                "output_derivatives",
+                {order: tuple(cols.keys()) for order, cols in self.output_derivatives.items()},
+            ))
+        return repr_args
 
     @property
     def no_resampling(self) -> bool:
@@ -174,6 +220,7 @@ class ResamplePlan:
     input_derivatives: DerivativeOrderMap
     output_derivatives: DerivativeOrderMap
     packed_columns: ColumnOrder
+    emitted_columns: ColumnOrder
     evaluation_orders: tuple[int, ...]
 
 
@@ -185,6 +232,10 @@ def build_plan(
         frame_column,
         *spec.position_columns,
         *chain.from_iterable(spec.input_derivatives.values()),
+    ))
+    emitted_columns = dict.fromkeys((
+        *packed_columns.keys(),
+        *chain.from_iterable(spec.output_derivatives.values()),
     ))
 
     evaluation_orders = tuple(
@@ -199,6 +250,7 @@ def build_plan(
         input_derivatives=dict(spec.input_derivatives),
         output_derivatives=dict(spec.output_derivatives),
         packed_columns=packed_columns,
+        emitted_columns=emitted_columns,
         evaluation_orders=evaluation_orders,
     )
 
@@ -216,14 +268,9 @@ def segment_data(
 
 
 def packed_struct_expression(plan: ResamplePlan) -> pl.Expr:
-    expressions: list[pl.Expr] = [pl.col(column) for column in plan.packed_columns]
-    expressions.extend(
-        pl.lit(None, dtype=pl.Float64).alias(column)
-        for column in chain.from_iterable(plan.output_derivatives.values())
-        if column not in plan.packed_columns
-    )
-    return pl.struct(expressions)
+    return pl.struct(pl.col(column) for column in plan.packed_columns)
 
 
 def not_packed_columns(plan: ResamplePlan) -> pl.Expr:
-    return pl.all().exclude((*plan.group_by, *plan.packed_columns, SEGMENT_COLUMN))
+    excluded = [*plan.group_by, *plan.emitted_columns, SEGMENT_COLUMN]
+    return pl.all().exclude(excluded)

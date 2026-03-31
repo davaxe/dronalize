@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, TypeVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Annotated, ClassVar, TypeVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, dataclasses, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from dronalize.processing.filters.agent import AgentCheckSpec
 from dronalize.processing.filters.base import AgentCheckRule, CleanupRule, Rule, SceneCheckRule
@@ -19,7 +20,7 @@ CleanupSpecs = Annotated[tuple[CleanupSpec, ...], BeforeValidator(tuple)]
 SceneCheckSpecs = Annotated[tuple[SceneCheckSpec, ...], BeforeValidator(tuple)]
 
 
-@dataclasses.dataclass(slots=True, frozen=True, config=ConfigDict(arbitrary_types_allowed=True))
+@dataclass(slots=True, frozen=True)
 class Filter:
     """Collection of cleanup and check rules."""
 
@@ -27,8 +28,8 @@ class Filter:
     scene_rules: tuple[SceneCheckRule, ...] = ()
     agent_rules: tuple[AgentCheckRule, ...] = ()
 
-    @model_validator(mode="after")
-    def _validate_uniqueness(self) -> Filter:
+    def __post_init__(self) -> None:
+        """Validate that all rules have unique names."""
         # Since the name is used to determine possible temporary columns in
         # dataframe transformations, it must be unique across all rules.
         seen: set[str] = set()
@@ -38,7 +39,6 @@ class Filter:
                 msg = f"Duplicate rule name: {name}"
                 raise ValueError(msg)
             seen.add(name)
-        return self
 
     @classmethod
     def define(
@@ -63,13 +63,7 @@ class Filter:
         agents instead of individual rows.
 
         """
-        rules_list: list[CleanupRule] = []
-        for rule in rules:
-            if isinstance(rule, AgentCheckRule):
-                rules_list.append(PruneByRule(rule=rule, rule_id=rule.rule_id))
-                continue
-            rules_list.append(rule)
-        return cls.define(cleanup_rules=rules_list)
+        return cls.define(cleanup_rules=(_as_cleanup_rule(rule) for rule in rules))
 
     @classmethod
     def define_scene_rules(cls, *rules: SceneCheckRule) -> Filter:
@@ -83,28 +77,42 @@ class Filter:
 
 
 class FilterSpec(BaseModel):
-    """Config-facing filter specification that resolves into a runtime `Filter`."""
+    """Filter rule specification that resolves into a runtime `Filter`."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
-    mode: Literal["replace", "merge"] = "replace"
     cleanup: CleanupSpecs = Field(())
     scene: SceneCheckSpecs = Field(())
     agent: AgentCheckSpecs = Field(())
 
-    def resolve(self, base: Filter | None = None) -> Filter:
-        """Resolve the spec into the executable runtime filter object."""
-        if self.mode == "replace":
-            return Filter.define(
-                cleanup_rules=self.cleanup, scene_rules=self.scene, agent_rules=self.agent
-            )
-
-        base_filter = Filter() if base is None else base
+    def resolve(self) -> Filter:
+        """Resolve the specification into the executable runtime filter object."""
         return Filter.define(
-            cleanup_rules=_merge_rules(base_filter.cleanup_rules, self.cleanup),
-            scene_rules=_merge_rules(base_filter.scene_rules, self.scene),
-            agent_rules=_merge_rules(base_filter.agent_rules, self.agent),
+            cleanup_rules=self.cleanup, scene_rules=self.scene, agent_rules=self.agent
         )
+
+
+def merge_filters(base: Filter | None, updates: Filter) -> Filter:
+    """Merge filters by effective rule name while preserving visible order."""
+    base_filter = Filter() if base is None else base
+    return Filter.define(
+        cleanup_rules=_merge_rules(base_filter.cleanup_rules, updates.cleanup_rules),
+        scene_rules=_merge_rules(base_filter.scene_rules, updates.scene_rules),
+        agent_rules=_merge_rules(base_filter.agent_rules, updates.agent_rules),
+    )
+
+
+def remove_filter_rules(scene_filter: Filter, rule_names: tuple[str, ...]) -> Filter:
+    """Return a filter without any rules whose effective names are in *rule_names*."""
+    if not rule_names:
+        return scene_filter
+
+    blocked = set(rule_names)
+    return Filter.define(
+        cleanup_rules=(rule for rule in scene_filter.cleanup_rules if rule.name() not in blocked),
+        scene_rules=(rule for rule in scene_filter.scene_rules if rule.name() not in blocked),
+        agent_rules=(rule for rule in scene_filter.agent_rules if rule.name() not in blocked),
+    )
 
 
 def _merge_rules(base: tuple[RuleT, ...], updates: tuple[RuleT, ...]) -> tuple[RuleT, ...]:
@@ -116,3 +124,10 @@ def _merge_rules(base: tuple[RuleT, ...], updates: tuple[RuleT, ...]) -> tuple[R
     merged = [updates_by_name.pop(rule.name(), rule) for rule in base]
     merged.extend(updates_by_name.values())
     return tuple(merged)
+
+
+def _as_cleanup_rule(rule: CleanupRule | AgentCheckRule) -> CleanupRule:
+    """Normalize cleanup definitions so agent checks can be used as pruning rules."""
+    if isinstance(rule, AgentCheckRule):
+        return PruneByRule(rule=rule, rule_id=rule.rule_id)
+    return rule

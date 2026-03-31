@@ -11,7 +11,7 @@ from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.pipeline.spec import TrackColumns, TrajectorySpec
 
 
@@ -35,7 +35,7 @@ class TrajectoryPipelineBuilder:
         return self.spec.columns
 
     @property
-    def split_request(self) -> SplitRequest | None:
+    def split_request(self) -> SplitConfig | None:
         """Return the active split request, if any."""
         return self.spec.split_request
 

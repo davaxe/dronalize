@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.categories import DatasetSplit
     from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
 
 
@@ -34,7 +34,7 @@ class InDLoader(LevelXDataLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the inD loader."""
         super().__init__(

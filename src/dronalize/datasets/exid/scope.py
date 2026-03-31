@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def exid_execution_scope(
-    root: Path, loader_config: LoaderConfig, map_config: MapConfig
+    root: Path, loader_config: LoaderConfig, map_config: MapConfig | None
 ) -> Generator[None, None, None]:
     """Prepare shared map state for an exiD processing run.
 
@@ -27,13 +27,13 @@ def exid_execution_scope(
         Root directory of the extracted exiD dataset.
     loader_config : LoaderConfig
         Unused by this hook. Included to match the standard dataset scope signature.
-    map_config : MapConfig
+    map_config : MapConfig | None
         Map-building configuration. If maps are disabled, this scope only clears
         any previous shared-memory state.
 
     """
     _loader_config = loader_config
-    if not map_config.include_map:
+    if map_config is None:
         _Loader.set_shared_memory()
         yield
         return

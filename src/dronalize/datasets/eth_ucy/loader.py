@@ -14,7 +14,6 @@ from dronalize.processing.filters.agent import MinSamples
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
-from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
 from dronalize.processing.pipeline.functional.resample._common import ResampleMethod
 
@@ -22,7 +21,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.processing.maps.config import MapConfig
     from dronalize.processing.pipeline.pipeline import Pipeline
 
 
@@ -40,7 +40,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the ETH/UCY loader.
 
@@ -119,15 +119,15 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=8, output_len=12, sample_time=0.4)
-            .with_window(step_size=1)
+            .with_window(step=1)
             .with_filter(Filter.define(agent_rules=[MinSamples(minimum=2)]))
             .with_resampling(ResampleSpec(up=4, down=1, method=ResampleMethod.LINEAR))
         )
 
     @classmethod
     @override
-    def default_map_config(cls) -> MapConfig:
-        return MapConfig.no_map()
+    def default_map_config(cls) -> MapConfig | None:
+        return None
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:
         num_sources = 0
@@ -146,7 +146,7 @@ class HotelLoader(_EthUcyLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
@@ -166,7 +166,7 @@ class EthLoader(_EthUcyLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
@@ -186,7 +186,7 @@ class UnivLoader(_EthUcyLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
@@ -206,7 +206,7 @@ class Zara1Loader(_EthUcyLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,
@@ -226,7 +226,7 @@ class Zara2Loader(_EthUcyLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         super().__init__(
             data_root=data_root,

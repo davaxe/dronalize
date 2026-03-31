@@ -1,26 +1,49 @@
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing_extensions import Self
+from typing_extensions import Self, TypedDict, Unpack
 
-from dronalize.processing.filters.filter import Filter
-from dronalize.processing.pipeline.functional.resample import ResampleSpec
+from dronalize.processing.filters.filter import Filter  # noqa: TC001
+from dronalize.processing.pipeline.functional.resample import ResampleSpec  # noqa: TC001
 
-_ = ResampleSpec, Filter  # silence unused import; used by pydantic
+LoaderOptionValue: TypeAlias = Any
 
 
-class WindowParams(BaseModel):
+class LoaderConfigUpdate(TypedDict, total=False):
+    """Typed update payload for frozen `LoaderConfig` builder helpers."""
+
+    input_len: int
+    output_len: int
+    sample_time: float
+    resampling: ResampleSpec | None
+    window: WindowConfig | None
+    filter: Filter | None
+    highway: HighwayParams | None
+    options: dict[str, LoaderOptionValue]
+
+
+class WindowConfig(BaseModel):
     """Configuration for sliding window sampling of scenes."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    window_size: int = Field(gt=0, description="Number of frames in each window.")
-    step_size: int = Field(gt=0, description="Number of frames to skip between windows.")
+    size: int = Field(gt=0)
+    step: int = Field(gt=0)
 
     def __bool__(self) -> bool:
-        """Return True if windowing is enabled (i.e., step_size > 0)."""
-        return self.step_size > 0 and self.window_size > 0
+        """Return True if windowing is enabled."""
+        return self.step > 0 and self.size > 0
+
+
+class HighwayParams(BaseModel):
+    """Configuration for highway-specific processing."""
+
+    persist: int = Field(gt=0)
+    margin_before: int = Field(default=0, ge=0)
+    margin_after: int = Field(default=0, ge=0)
+    required_lane_changes: int = Field(default=1, ge=0)
+    negative_keep_every: int = Field(default=3, ge=1)
 
 
 class LoaderConfig(BaseModel):
@@ -32,9 +55,10 @@ class LoaderConfig(BaseModel):
     output_len: int = Field(gt=0)
     sample_time: float = Field(gt=0)
     resampling: ResampleSpec | None = Field(default=None)
-    window: WindowParams | None = Field(default=None)
+    window: WindowConfig | None = Field(default=None)
     filter: Filter | None = Field(default=None)
-    extra_kwargs: dict[str, object] = Field(default_factory=dict)
+    highway: HighwayParams | None = Field(default=None)
+    options: dict[str, LoaderOptionValue] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate(self) -> LoaderConfig:
@@ -45,9 +69,9 @@ class LoaderConfig(BaseModel):
         if self.window is None:
             return
         sequence_length = self._sequence_length()
-        if self.window.window_size != sequence_length:
+        if self.window.size != sequence_length:
             msg = (
-                f"Window size ({self.window.window_size}) must equal input_len + output_len "
+                f"Window size ({self.window.size}) must equal input_len + output_len "
                 f"({sequence_length}) for consistent windowing."
             )
             raise ValueError(msg)
@@ -58,14 +82,14 @@ class LoaderConfig(BaseModel):
 
     # -- builder helpers (return new frozen instances) -----------------------
 
-    def with_window(self, step_size: int, window_size: int | None = None) -> Self:
+    def with_window(self, step: int, size: int | None = None) -> Self:
         """Return a copy with the given window parameters.
 
         Parameters
         ----------
-        step_size : int
+        step : int
             Number of frames to advance between consecutive windows.
-        window_size : int, optional
+        size : int, optional
             Total number of frames in each window. If None, defaults to
             `input_len + output_len`.
 
@@ -74,9 +98,8 @@ class LoaderConfig(BaseModel):
         Self
             A **new** config instance with window parameters set.
         """
-        new_window_params = WindowParams(
-            window_size=window_size if window_size is not None else self._sequence_length(),
-            step_size=step_size,
+        new_window_params = WindowConfig(
+            size=size if size is not None else self._sequence_length(), step=step
         )
         return self._updated(window=new_window_params)
 
@@ -86,6 +109,10 @@ class LoaderConfig(BaseModel):
 
     def with_resampling(self, spec: ResampleSpec) -> Self:
         """Return a copy with the given resampling parameters.
+
+        !!! note
+            The sampling time in the provided spec will be overridden to match
+            the config's `sample_time`.
 
         Parameters
         ----------
@@ -97,9 +124,30 @@ class LoaderConfig(BaseModel):
         Self
             A **new** config instance with resampling parameters set.
         """
+        if spec.sample_time != self.sample_time:
+            spec = spec.with_sample_time(self.sample_time)
         return self._updated(resampling=spec)
 
-    def _updated(self, **updates: object) -> Self:
+    def with_highway(
+        self,
+        persist: int = 1,
+        margin_before: int = 0,
+        margin_after: int = 0,
+        required_lane_changes: int = 1,
+        negative_keep_every: int = 3,
+    ) -> Self:
+        """Return a copy with the given highway parameters."""
+        return self._updated(
+            highway=HighwayParams(
+                persist=persist,
+                margin_before=margin_before,
+                margin_after=margin_after,
+                required_lane_changes=required_lane_changes,
+                negative_keep_every=negative_keep_every,
+            )
+        )
+
+    def _updated(self, **updates: Unpack[LoaderConfigUpdate]) -> Self:
         current = {name: getattr(self, name) for name in type(self).model_fields}
         return type(self).model_validate({**current, **updates})
 

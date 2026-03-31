@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.categories import DatasetSplit
     from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
 
 
@@ -34,7 +34,7 @@ class RounDLoader(LevelXDataLoader):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the rounD loader."""
         super().__init__(
@@ -50,5 +50,7 @@ if __name__ == "__main__":
     from dronalize.datasets.round import DESCRIPTOR
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
-    root = resolve_dataset_root_from_env("round")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    root = resolve_dataset_root_from_env("rounD")
+    scenes = debug_descriptor(DESCRIPTOR, root, step=350)
+    for scene in scenes:
+        scene.frame.write_csv(f"debug_scene_{scene.scene_number}.csv")

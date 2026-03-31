@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
 
 
 class Argoverse1Loader(BaseSceneLoader[list[Path]]):
@@ -37,7 +37,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
         *,
         file_batch_size: int | None = 10,
     ) -> None:

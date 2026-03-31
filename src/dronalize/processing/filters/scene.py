@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import polars as pl
-from pydantic import ConfigDict, Field, dataclasses, model_validator
+from pydantic import Field, model_validator
 from typing_extensions import override
 
 from dronalize.core.models import Range
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from dronalize.processing.filters.context import FilterContext
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class MinimumAgents(SceneCheckRule):
     """Require a minimum number of retained agents in the scene."""
 
@@ -32,7 +31,6 @@ class MinimumAgents(SceneCheckRule):
         return ctx.retained_agent_count(self.selector) >= self.minimum
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class AgentRange(SceneCheckRule):
     """Require a minimum and/or maximum number of retained agents in the scene."""
 
@@ -59,7 +57,6 @@ class AgentRange(SceneCheckRule):
         return cond
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class CategoryRange(SceneCheckRule):
     """Require a minimum and/or maximum number of retained agents in each category."""
 
@@ -83,7 +80,6 @@ class CategoryRange(SceneCheckRule):
         return cond
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class RequireFrames(SceneCheckRule):
     """Require specific relative frames to exist in the scene window."""
 
@@ -102,7 +98,6 @@ class RequireFrames(SceneCheckRule):
         return ctx.over_scene_window(required) == len(self.frames)
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class RequireWindow(SceneCheckRule):
     """Require a minimum fraction of frames in a relative scene window."""
 
@@ -127,7 +122,6 @@ class RequireWindow(SceneCheckRule):
         return covered_frames >= required_coverage
 
 
-@dataclasses.dataclass(slots=True, config=ConfigDict(frozen=True), kw_only=True)
 class MaxMissingFrames(SceneCheckRule):
     """Require the cleaned scene window to stay within a missing-frame budget."""
 

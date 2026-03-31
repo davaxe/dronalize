@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 @contextmanager
 def nuscenes_execution_scope(
-    root: Path, loader_config: LoaderConfig, map_config: MapConfig
+    root: Path, loader_config: LoaderConfig, map_config: MapConfig | None
 ) -> Generator[None, None, None]:
     """Prepare shared map state for a nuScenes processing run.
 
@@ -33,7 +33,7 @@ def nuscenes_execution_scope(
 
     """
     _loader_config = loader_config
-    if not map_config.include_map:
+    if map_config is None:
         NuScenesLoader.set_shared_memory()
         yield
         return

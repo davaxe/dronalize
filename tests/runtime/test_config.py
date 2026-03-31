@@ -33,7 +33,41 @@ from dronalize.processing.maps import (
     RelevantAreaExtraction,
 )
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
-from dronalize.runtime import Config, ConfigOverrides, load_config_overrides, resolve_runtime_config
+from dronalize.runtime import (
+    ConfigFile,
+    ConfigResolver,
+    FileDatasetConfig,
+    ResolvedConfig,
+    load_project_config,
+    resolve_runtime_config,
+)
+
+DEFAULT_LOADER_CONFIG = LoaderConfig(input_len=3, output_len=2, sample_time=0.1)
+
+
+def _runtime_config(*, loader: LoaderConfig | None = None) -> ResolvedConfig:
+    return ResolvedConfig(loader=loader or DEFAULT_LOADER_CONFIG, map=MapConfig.default())
+
+
+def _file_config(data: object) -> FileDatasetConfig:
+    return FileDatasetConfig.model_validate(data)
+
+
+def _write_project_config(tmp_path: Path, content: str) -> Path:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(content, encoding="utf-8")
+    return config_path
+
+
+def _load_dataset_overrides(
+    tmp_path: Path,
+    content: str,
+    *,
+    dataset_name: str = "a43",
+) -> FileDatasetConfig:
+    return load_project_config(_write_project_config(tmp_path, content)).dataset_config(
+        dataset_name
+    )
 
 
 def test_map_config_defaults() -> None:
@@ -42,7 +76,6 @@ def test_map_config_defaults() -> None:
 
     assert config.min_distance == pytest.approx(1.75)
     assert config.interp_distance == pytest.approx(3.0)
-    assert config.include_map is True
     assert isinstance(config.extraction, FullMapExtraction)
     assert config.extraction.mode == "full"
 
@@ -268,10 +301,21 @@ def test_filter_define_collects_rules() -> None:
     assert scene_filter.agent_rules[2].rule_id == "sample_floor"
 
 
+def test_filter_define_cleanup_wraps_agent_rules() -> None:
+    """Agent rules passed to cleanup helpers should be wrapped as pruning rules."""
+    scene_filter = Filter.define_cleanup(agent.MinSamples(minimum=5, rule_id="sample_floor"))
+
+    assert scene_filter.cleanup_rules == (
+        cleanup.PruneByRule(
+            rule=agent.MinSamples(minimum=5, rule_id="sample_floor"),
+            rule_id="sample_floor",
+        ),
+    )
+
+
 def test_filter_spec_parses_basic_rules() -> None:
     """Config-facing filter specs should parse discriminated cleanup and check rules."""
     spec = FilterSpec.model_validate({
-        "mode": "replace",
         "cleanup": [{"type": "exclude", "categories": ["CAR", "PEDESTRIAN"]}],
         "scene": [{"type": "min_agents", "minimum": 2}],
         "agent": [
@@ -297,7 +341,6 @@ def test_filter_spec_parses_basic_rules() -> None:
 def test_filter_spec_parses_ids_and_selectors() -> None:
     """Config-facing filter specs should resolve the extended rule capabilities."""
     spec = FilterSpec.model_validate({
-        "mode": "replace",
         "cleanup": [{"type": "include", "categories": ["CAR"], "rule_id": "cars_only"}],
         "scene": [
             {
@@ -355,7 +398,6 @@ def test_filter_spec_parses_ids_and_selectors() -> None:
 def test_filter_spec_parses_new_rules() -> None:
     """Config-facing filter specs should parse the newer rule variants."""
     spec = FilterSpec.model_validate({
-        "mode": "replace",
         "scene": [
             {"type": "agent_range", "minimum": 2, "maximum": 4},
             {
@@ -411,27 +453,30 @@ def test_filter_rules_expose_protocols() -> None:
 
 def test_runtime_config_keeps_filter_objects() -> None:
     """Runtime config merging should preserve direct filter objects from the default config."""
-    default = Config(
+    default = _runtime_config(
         loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filter(
             Filter.define(
                 cleanup_rules=[cleanup.ExcludeCategories.define(categories=["CAR"])],
                 scene_rules=[scene.MinimumAgents(minimum=2)],
                 agent_rules=[agent.RequireFrames.define(frames=[0])],
             )
-        ),
-        map=MapConfig.default(),
+        )
     )
 
-    resolved = resolve_runtime_config(default=default, overrides={"execution": {"workers": 8}})
+    resolved = resolve_runtime_config(
+        default=default,
+        overrides=_file_config({"execution": {"jobs": 8}}),
+    )
 
     assert resolved.loader.filter is not None
     assert resolved.loader.filter == default.loader.filter
-    assert resolved.execution.workers == 8
+    assert resolved.execution.jobs == 8
+    assert resolved.execution.parallel is True
 
 
 def test_runtime_config_merges_filters() -> None:
-    """Filter specs in merge mode should replace same-name rules and keep other defaults."""
-    default = Config(
+    """Filter overrides should extend existing rules and support explicit removals."""
+    default = _runtime_config(
         loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_filter(
             Filter.define(
                 cleanup_rules=[cleanup.ExcludeCategories.define(categories=["CAR"])],
@@ -441,30 +486,29 @@ def test_runtime_config_merges_filters() -> None:
                     agent.RequireFrames.define(frames=[4], rule_id="pred_anchor"),
                 ],
             )
-        ),
-        map=MapConfig.default(),
+        )
     )
 
     resolved = resolve_runtime_config(
         default=default,
-        overrides={
+        overrides=_file_config({
             "loader": {
                 "filter": {
-                    "mode": "merge",
+                    "mode": "extend",
                     "agent": [
                         {"type": "frames", "frames": [1], "rule_id": "obs_anchor"},
                         {"type": "min_samples", "minimum": 3},
                     ],
+                    "remove": ["pred_anchor"],
                 }
             }
-        },
+        }),
     )
     assert resolved.loader.filter == Filter.define(
         cleanup_rules=[cleanup.ExcludeCategories.define(categories=["CAR"])],
         scene_rules=[scene.MinimumAgents(minimum=2)],
         agent_rules=[
             agent.RequireFrames.define(frames=[1], rule_id="obs_anchor"),
-            agent.RequireFrames.define(frames=[4], rule_id="pred_anchor"),
             agent.MinSamples(minimum=3),
         ],
     )
@@ -472,25 +516,22 @@ def test_runtime_config_merges_filters() -> None:
 
 def test_runtime_config_deep_merge() -> None:
     """Deep merges should preserve unspecified nested fields from the default config."""
-    default = Config(
-        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1).with_resampling(
-            ResampleSpec(up=2, down=1)
-        ),
-        map=MapConfig.default(),
+    default = _runtime_config(
+        loader=DEFAULT_LOADER_CONFIG.with_resampling(ResampleSpec(up=2, down=1))
     )
 
     resolved = resolve_runtime_config(
         default=default,
-        overrides={
-            "execution": {"workers": 8},
-            "loader": {"window": {"window_size": 5, "step_size": 1}},
-        },
+        overrides=_file_config({
+            "execution": {"jobs": 8},
+            "loader": {"window": {"size": 5, "step": 1}},
+        }),
     )
 
-    assert resolved.execution.workers == 8
-    assert resolved.execution.parallel is False
+    assert resolved.execution.jobs == 8
+    assert resolved.execution.parallel is True
     assert resolved.loader.window is not None
-    assert resolved.loader.window.window_size == 5
+    assert resolved.loader.window.size == 5
     assert resolved.loader.resampling == default.loader.resampling
 
 
@@ -522,13 +563,13 @@ def test_writer_schema_drives_layout() -> None:
 
 def test_runtime_config_merges_writer() -> None:
     """Writer overrides should merge into the default writer config."""
-    default = Config(
-        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1), map=MapConfig.default()
-    )
+    default = _runtime_config()
 
     resolved = resolve_runtime_config(
         default=default,
-        overrides={"writer": {"scene_schema": "positions_only", "precision": "float64"}},
+        overrides=_file_config(
+            {"writer": {"schema": "positions_only", "precision": "float64"}}
+        ),
     )
 
     assert resolved.writer.scene_schema == POSITIONS_ONLY_V1
@@ -538,108 +579,98 @@ def test_runtime_config_merges_writer() -> None:
 
 def test_runtime_config_merges_split() -> None:
     """Split overrides should validate and merge through the top-level config model."""
-    default = Config(
-        loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1), map=MapConfig.default()
-    )
+    default = _runtime_config()
 
     resolved = resolve_runtime_config(
         default=default,
-        overrides={
+        overrides=_file_config({
             "split": {
-                "strategy": {"type": "by_scene"},
-                "weights": {"train": 0.7, "val": 0.2, "test": 0.1},
+                "mode": "scene",
+                "ratio": {"train": 0.7, "val": 0.2, "test": 0.1},
             }
-        },
+        }),
     )
 
     assert resolved.split == SplitConfig(
-        strategy=BySceneSplit(), weights=SplitWeights(train=0.7, val=0.2, test=0.1)
+        mode=BySceneSplit(), ratio=SplitWeights(train=0.7, val=0.2, test=0.1)
     )
 
 
-def test_load_overrides_global_section(tmp_path: Path) -> None:
-    """Global config blocks should be merged into every dataset-specific override block."""
-    config_path = tmp_path / "config.toml"
-    config_path.write_text(
-        """[global.execution]
-workers = 4
+def test_load_overrides_preserves_global_and_dataset_sections(tmp_path: Path) -> None:
+    """Project config loading should keep global and dataset sections distinct and typed."""
+    overrides = load_project_config(
+        _write_project_config(
+            tmp_path,
+            """[global.execution]
+jobs = 4
 
-[a43.execution]
-parallel = true
+[datasets.a43.execution]
+jobs = 1
 
-[waymo.execution]
+[datasets.waymo.execution]
 chunksize = 8
 """,
-        encoding="utf-8",
+        )
     )
 
-    overrides = load_config_overrides(config_path)
-
-    assert overrides == ConfigOverrides(
-        datasets={
-            "a43": {"execution": {"workers": 4, "parallel": True}},
-            "waymo": {"execution": {"workers": 4, "chunksize": 8}},
-        }
+    assert isinstance(overrides, ConfigFile)
+    assert overrides.global_ == _file_config({"execution": {"jobs": 4}})
+    assert overrides.dataset_config("a43") == _file_config({"execution": {"jobs": 1}})
+    assert overrides.dataset_config("waymo") == _file_config(
+        {"execution": {"chunksize": 8}}
     )
-    assert overrides.for_dataset("a43") == {"execution": {"workers": 4, "parallel": True}}
-    assert overrides.for_dataset("waymo") == {"execution": {"workers": 4, "chunksize": 8}}
-    assert overrides.for_dataset("nuscenes") == {}
+    assert overrides.dataset_config("nuscenes") == FileDatasetConfig()
 
 
-def test_load_overrides_global_split(tmp_path: Path) -> None:
-    """Global split settings should merge into each dataset-specific override block."""
-    config_path = tmp_path / "config.toml"
-    config_path.write_text(
-        """[global.split.weights]
-train = 0.7
-val = 0.2
-test = 0.1
+def test_resolver_applies_global_then_dataset_overrides(tmp_path: Path) -> None:
+    """The central resolver should apply global overrides before dataset-specific ones."""
+    config_path = _write_project_config(
+        tmp_path,
+        """[global.execution]
+jobs = 4
 
-[waymo.split.strategy]
-type = "by_scene"
+[datasets.a43.execution]
+jobs = 1
 """,
-        encoding="utf-8",
     )
 
-    overrides = load_config_overrides(config_path)
+    default = _runtime_config()
+    overrides = load_project_config(config_path)
+    resolver = ConfigResolver()
 
-    assert overrides.for_dataset("waymo") == {
-        "split": {
-            "weights": {"train": 0.7, "val": 0.2, "test": 0.1},
-            "strategy": {"type": "by_scene"},
-        }
-    }
+    resolved = resolver.resolve_from_defaults(default=default, overrides=overrides.global_)
+    resolved = resolver.resolve_from_defaults(
+        default=resolved, overrides=overrides.dataset_config("a43")
+    )
+
+    assert resolved.execution.jobs == 1
+    assert resolved.execution.parallel is False
 
 
 def test_load_overrides_filter_specs(tmp_path: Path) -> None:
     """TOML loader filter tables should resolve into runtime filter objects."""
-    config_path = tmp_path / "config.toml"
-    config_path.write_text(
-        """[a43.loader.filter]
+    overrides = _load_dataset_overrides(
+        tmp_path,
+        """[datasets.a43.loader.filter]
 mode = "replace"
 
-[[a43.loader.filter.cleanup]]
+[[datasets.a43.loader.filter.cleanup]]
 type = "exclude"
 categories = ["CAR"]
 
-[[a43.loader.filter.scene]]
+[[datasets.a43.loader.filter.scene]]
 type = "min_agents"
 minimum = 3
 
-[[a43.loader.filter.agent]]
+[[datasets.a43.loader.filter.agent]]
 type = "frames"
 frames = [0, 4]
 tolerance = { kind = "combined", absolute = 1, relative = 0.2 }
 """,
-        encoding="utf-8",
     )
-
-    overrides = load_config_overrides(config_path)
     resolved = resolve_runtime_config(
-        default=Config(
-            loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1), map=MapConfig.default()
-        ),
-        overrides=overrides.for_dataset("a43"),
+        default=_runtime_config(),
+        overrides=overrides,
     )
     assert resolved.loader.filter == Filter.define(
         cleanup_rules=[cleanup.ExcludeCategories.define(categories=["CAR"])],
@@ -651,34 +682,21 @@ tolerance = { kind = "combined", absolute = 1, relative = 0.2 }
 
 
 def test_load_overrides_extended_filters(tmp_path: Path) -> None:
-    """TOML loader filter tables should resolve ids, selectors, and window rules."""
-    config_path = tmp_path / "config.toml"
-    config_path.write_text(
-        """[a43.loader.filter]
-mode = "replace"
+    """Filter file overrides should extend defaults and remove named rules explicitly."""
+    overrides = _load_dataset_overrides(
+        tmp_path,
+        """[datasets.a43.loader.filter]
+mode = "extend"
+remove = ["pred_anchor"]
 
-[[a43.loader.filter.cleanup]]
-type = "include"
-categories = ["CAR"]
-rule_id = "cars_only"
-
-[[a43.loader.filter.scene]]
-type = "min_agents"
-minimum = 2
-rule_id = "min_cars"
-
-[a43.loader.filter.scene.selector]
-mode = "include"
-categories = ["CAR"]
-
-[[a43.loader.filter.scene]]
+[[datasets.a43.loader.filter.scene]]
 type = "window"
 start_frame = 0
 end_frame = 4
 min_fraction = 0.6
 rule_id = "obs_window"
 
-[[a43.loader.filter.agent]]
+[[datasets.a43.loader.filter.agent]]
 type = "window"
 start_frame = 0
 end_frame = 4
@@ -686,26 +704,25 @@ min_fraction = 0.8
 tolerance = { kind = "combined", absolute = 1, "relative" = 0.5 }
 rule_id = "dynamic_window"
 
-[a43.loader.filter.agent.selector]
+[datasets.a43.loader.filter.agent.selector]
 mode = "exclude"
 categories = ["PEDESTRIAN"]
 """,
-        encoding="utf-8",
     )
-
-    overrides = load_config_overrides(config_path)
     resolved = resolve_runtime_config(
-        default=Config(
-            loader=LoaderConfig(input_len=3, output_len=2, sample_time=0.1), map=MapConfig.default()
+        default=_runtime_config(
+            loader=DEFAULT_LOADER_CONFIG.with_filter(
+                Filter.define(
+                    scene_rules=[scene.MinimumAgents(minimum=2, rule_id="min_cars")],
+                    agent_rules=[agent.RequireFrames.define(frames=[4], rule_id="pred_anchor")],
+                )
+            )
         ),
-        overrides=overrides.for_dataset("a43"),
+        overrides=overrides,
     )
     assert resolved.loader.filter == Filter.define(
-        cleanup_rules=[cleanup.IncludeCategories.define(categories=["CAR"], rule_id="cars_only")],
         scene_rules=[
-            scene.MinimumAgents(
-                minimum=2, rule_id="min_cars", selector=AgentSelector.include(["CAR"])
-            ),
+            scene.MinimumAgents(minimum=2, rule_id="min_cars"),
             scene.RequireWindow(start_frame=0, end_frame=4, min_fraction=0.6, rule_id="obs_window"),
         ],
         agent_rules=[
@@ -721,15 +738,112 @@ categories = ["PEDESTRIAN"]
     )
 
 
+def test_load_overrides_rejects_unknown_nested_keys(tmp_path: Path) -> None:
+    """Typed config loading should reject stale nested override schemas immediately."""
+    config_path = _write_project_config(
+        tmp_path,
+        """[datasets.a43.loader.filter.extend]
+
+[[datasets.a43.loader.filter.extend.validate_scene]]
+type = "min_agents"
+minimum = 2
+""",
+    )
+
+    with pytest.raises(ValidationError):
+        load_project_config(config_path)
+
+
+def test_load_overrides_rejects_top_level_dataset_sections(tmp_path: Path) -> None:
+    """Top-level dataset sections should no longer be accepted in TOML."""
+    config_path = _write_project_config(
+        tmp_path,
+        """[a43.execution]
+jobs = 4
+""",
+    )
+
+    with pytest.raises(ValidationError):
+        load_project_config(config_path)
+
+
+def test_load_overrides_translates_flat_split_and_map_sections(tmp_path: Path) -> None:
+    """Flat TOML split and map sections should load into the authoring config shape."""
+    overrides = _load_dataset_overrides(
+        tmp_path,
+        """[datasets.a43.map]
+enabled = true
+min_distance = 1.0
+interp_distance = 2.5
+extraction = "circle"
+radius = 60.0
+
+[datasets.a43.split]
+mode = "shuffled-time"
+ratio = { train = 0.7, val = 0.2, test = 0.1 }
+segments = 8
+gap = 2
+""",
+    )
+
+    assert overrides.map == _file_config(
+        {
+            "map": {
+                "enabled": True,
+                "min_distance": 1.0,
+                "interp_distance": 2.5,
+                "extraction": "circle",
+                "radius": 60.0,
+            }
+        }
+    ).map
+    assert overrides.split == _file_config(
+        {
+            "split": {
+                "mode": "shuffled-time",
+                "ratio": {"train": 0.7, "val": 0.2, "test": 0.1},
+                "segments": 8,
+                "gap": 2,
+            }
+        }
+    ).split
+
+
+def test_load_overrides_translates_resampling_derivative_entries(tmp_path: Path) -> None:
+    """Array-of-table derivative entries should load into the authoring resampling model."""
+    overrides = _load_dataset_overrides(
+        tmp_path,
+        """[datasets.a43.loader.resampling]
+up = 2
+down = 1
+
+[[datasets.a43.loader.resampling.output_derivatives]]
+order = 1
+columns = ["vx", "vy"]
+
+[[datasets.a43.loader.resampling.output_derivatives]]
+order = 2
+columns = ["ax", "ay"]
+""",
+    )
+
+    assert overrides.loader is not None
+    assert overrides.loader.resampling is not None
+    assert overrides.loader.resampling.output_derivative_map() == {
+        1: ["vx", "vy"],
+        2: ["ax", "ay"],
+    }
+
+
 def test_map_config_parses_relevant_area() -> None:
     """Parse a dictionary with relevant mode to ensure proper union routing."""
-    config_dict = {"extraction": {"mode": "relevant", "padding_factor": 1.3}}
+    config_dict = {"extraction": {"mode": "relevant", "padding": 1.3}}
 
     config = MapConfig.model_validate(config_dict)
 
     assert isinstance(config.extraction, RelevantAreaExtraction)
     assert config.extraction.mode == "relevant"
-    assert config.extraction.padding_factor == pytest.approx(1.3)
+    assert config.extraction.padding == pytest.approx(1.3)
 
 
 def test_map_config_parses_full_map() -> None:
@@ -744,8 +858,7 @@ def test_map_config_parses_full_map() -> None:
 
 def test_writer_schema_positions_only() -> None:
     """Verify initialization with the 'positions_only' shorthand string."""
-    base = {"precision": "float64", "offset_positions": False}
-    config = WriterConfig.model_validate({**base, "scene_schema": "positions_only"})
+    config = WriterConfig.create("positions_only", precision="float64", offset_positions=False)
 
     assert config.scene_schema == POSITIONS_ONLY_V1
     assert config.feature_columns == ("x", "y")
@@ -754,11 +867,11 @@ def test_writer_schema_positions_only() -> None:
 
 def test_writer_schema_predefined() -> None:
     """Ensure the config accepts a predefined schema object."""
-    base = {"precision": "float64", "offset_positions": False}
-    config = WriterConfig.model_validate({
-        **base,
-        "scene_schema": POSITIONS_VELOCITY_ACCELERATION_V1,
-    })
+    config = WriterConfig(
+        scene_schema=POSITIONS_VELOCITY_ACCELERATION_V1,
+        precision="float64",
+        offset_positions=False,
+    )
 
     assert config.scene_schema == POSITIONS_VELOCITY_ACCELERATION_V1
     assert config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
@@ -767,8 +880,7 @@ def test_writer_schema_predefined() -> None:
 
 def test_writer_schema_single_custom() -> None:
     """Check that a single custom field is correctly appended to base fields."""
-    base = {"precision": "float64", "offset_positions": False}
-    config = WriterConfig.model_validate({**base, "scene_schema": "vx"})
+    config = WriterConfig.create("vx", precision="float64", offset_positions=False)
 
     assert config.feature_columns == ("x", "y", "vx")
     assert config.feature_dim == 3
@@ -777,8 +889,7 @@ def test_writer_schema_single_custom() -> None:
 
 def test_writer_schema_multiple_custom() -> None:
     """Validate that multiple colon-separated fields generate a custom schema."""
-    base = {"precision": "float64", "offset_positions": False}
-    config = WriterConfig.model_validate({**base, "scene_schema": "vx:vy:yaw"})
+    config = WriterConfig.create("vx:vy:yaw", precision="float64", offset_positions=False)
 
     assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
     assert config.feature_dim == 5
@@ -787,8 +898,7 @@ def test_writer_schema_multiple_custom() -> None:
 
 def test_writer_schema_custom_order() -> None:
     """Confirm that the internal representation maintains consistent field ordering."""
-    base = {"precision": "float64", "offset_positions": False}
-    config = WriterConfig.model_validate({**base, "scene_schema": "yaw:vx:vy"})
+    config = WriterConfig.create("yaw:vx:vy", precision="float64", offset_positions=False)
 
     assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
     assert config.feature_dim == 5
@@ -796,10 +906,10 @@ def test_writer_schema_custom_order() -> None:
 
 
 def test_writer_schema_rejects_invalid() -> None:
-    """Raise ValidationError when required base fields are missing from a custom schema."""
-    base = {"precision": "float64", "offset_positions": False}
-    with pytest.raises(ValidationError, match=r"must include the base fields"):
-        WriterConfig.model_validate({
-            **base,
-            "scene_schema": {"name": "custom_schema", "fields": ["x", "y", "ax"]},
-        })
+    """Raise ValueError when required base fields are missing from a custom schema."""
+    with pytest.raises(ValueError, match=r"must include the base fields"):
+        WriterConfig.create(
+            {"name": "custom_schema", "fields": ["x", "y", "ax"]},
+            precision="float64",
+            offset_positions=False,
+        )

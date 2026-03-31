@@ -1,7 +1,7 @@
 """Data loading - source discovery, ingestion, and scene creation."""
 
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig, WindowParams
+from dronalize.processing.ingest.config import LoaderConfig, WindowConfig
 from dronalize.processing.ingest.loader import (
     BlockSplitSupport,
     IngestedData,
@@ -17,9 +17,8 @@ from dronalize.processing.ingest.splits import (
     NativeSplit,
     ShuffledTimeBlockSplit,
     SplitConfig,
-    SplitRequest,
-    SplitStrategy,
-    SplitStrategyName,
+    SplitMode,
+    SplitModeName,
     SplitWeights,
     TimeBlockSplit,
     Unsplit,
@@ -41,11 +40,10 @@ __all__ = [
     "ShuffledTimeBlockSplit",
     "Source",
     "SplitConfig",
-    "SplitRequest",
-    "SplitStrategy",
-    "SplitStrategyName",
+    "SplitMode",
+    "SplitModeName",
     "SplitWeights",
     "TimeBlockSplit",
     "Unsplit",
-    "WindowParams",
+    "WindowConfig",
 ]

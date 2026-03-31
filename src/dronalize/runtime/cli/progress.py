@@ -9,14 +9,14 @@ from typing import TYPE_CHECKING
 
 import rich.progress as rp
 
-from dronalize.runtime.execution import prepare_dataset
+from dronalize.runtime import plan_dataset
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from rich.progress import Progress as RichProgress
 
-    from dronalize.runtime.execution.executor import ObservableWritingExecutor, Progress
+    from dronalize.runtime.executor import ObservableWritingExecutor, Progress
 
 
 def run_with_rich_progress(
@@ -144,18 +144,17 @@ if __name__ == "__main__":
     if path is None:
         path = Path()
 
-    job = prepare_dataset(
+    plan = plan_dataset(
         dataset="hotel",
-        input_dir=Path(path) / "ethucy" / "hotel",
+        input_dir=Path(path) / "data" / "hotel",
         output_dir=Path("test_output"),
-        split=None,
+        split="source",
         output_format="dummy",
         config_path=None,
         jobs=1,
         limit=None,
         seed=20,
-        split_strategy="by_source",
-        split_weights=(0.8, 0.1, 0.1),
+        ratio=(0.8, 0.1, 0.1),
     )
-    with job.open() as run:
+    with plan.open() as run:
         run_with_rich_progress(run.executor, run.run, enable=True)

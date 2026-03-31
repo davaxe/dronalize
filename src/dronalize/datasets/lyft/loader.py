@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from zarr import Array
 
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
 
 
@@ -69,7 +69,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
         *,
         scene_batch_size: int | None = 100,
     ) -> None:
@@ -194,7 +194,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
     def default_config(cls) -> LoaderConfig:
         return (
             LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
-            .with_window(step_size=20)
+            .with_window(step=20)
             .with_filter(
                 Filter.define(
                     cleanup_rules=[

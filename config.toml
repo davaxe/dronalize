@@ -1,22 +1,20 @@
-# Debug config for a single dataset override.
-# This file intentionally uses only one dataset section and demonstrates
-# most of the current override surface, including the new filter spec.
+# Debug config for one dataset using the explicit TOML-facing schema.
+# This file intentionally demonstrates most of the override surface.
 
-[a43.execution]
-parallel = true
-workers = 4
+[global.execution]
+jobs = 4
 chunksize = 64
 
-[a43.loader]
+[datasets.a43.loader]
 input_len = 20
 output_len = 60
 sample_time = 0.1
 
-[a43.loader.window]
-window_size = 80
-step_size = 2
+[datasets.a43.loader.window]
+size = 80
+step = 2
 
-[a43.loader.resampling]
+[datasets.a43.loader.resampling]
 up = 2
 down = 1
 method = "cubic"
@@ -24,63 +22,60 @@ max_gap = 4
 sort = true
 position_columns = ["x", "y"]
 
-[a43.loader.resampling.output_derivatives]
-1 = ["vx", "vy"]
-2 = ["ax", "ay"]
+[[datasets.a43.loader.resampling.output_derivatives]]
+order = 1
+columns = ["vx", "vy"]
 
-[a43.loader.extra_kwargs]
+[[datasets.a43.loader.resampling.output_derivatives]]
+order = 2
+columns = ["ax", "ay"]
+
+[datasets.a43.loader.options]
 custom_flag = "debug"
 emit_metrics = true
 
-[a43.loader.filter]
-mode = "merge"
+[datasets.a43.loader.filter]
+mode = "extend"
 
-[[a43.loader.filter.cleanup]]
-type = "exclude_categories"
+[[datasets.a43.loader.filter.cleanup]]
+type = "exclude"
 categories = ["STATIC_OBJECT", "UNIMPORTANT"]
 
-[[a43.loader.filter.validate_scene]]
+[[datasets.a43.loader.filter.scene]]
 type = "min_agents"
 minimum = 2
 
-[[a43.loader.filter.validate_agent]]
-type = "agent_frames"
+[[datasets.a43.loader.filter.agent]]
+type = "frames"
 frames = [19]
-max_invalid_agents = 1
-max_invalid_fraction = 0.05
+rule_id = "agent_frames"
+tolerance = { kind = "combined", absolute = 1, relative = 0.05 }
 
-[[a43.loader.filter.validate_agent]]
-type = "min_agent_samples"
+[[datasets.a43.loader.filter.agent]]
+type = "min_samples"
 minimum = 8
-max_invalid_agents = 1
-max_invalid_fraction = 0.05
+rule_id = "sample_floor"
 
-[a43.map]
+[datasets.a43.map]
 min_distance = 1.0
 interp_distance = 2.5
-include_map = true
-
-[a43.map.extraction]
-mode = "circle"
+enabled = true
+extraction = "circle"
 radius = 60.0
 
-[a43.writer]
-scene_schema = "positions_velocity_yaw"
+[datasets.a43.writer]
+schema = "positions_velocity_yaw"
 precision = "float64"
 offset_positions = true
 
-[a43.writer.mds]
+[datasets.a43.writer.mds]
 compression = "zstd:7"
 hashes = ["sha1", "xxh64"]
 size_limit = 33554432
 exist_ok = true
 
-[a43.split.weights]
-train = 0.7
-val = 0.2
-test = 0.1
-
-[a43.split.strategy]
-type = "shuffled_time_blocks"
+[datasets.a43.split]
+mode = "shuffled-time"
+ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
 gap = 2

@@ -35,13 +35,13 @@ from dronalize.processing.ingest.splits import (
 from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapKey, MapResolver, no_map
 from dronalize.processing.pipeline.factory import trajectory_pipeline
-from dronalize.processing.pipeline.presets import standard_trajectory_spec
+from dronalize.processing.pipeline.presets import highway_trajectory_spec, standard_trajectory_spec
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitRequest, SplitStrategyName
+    from dronalize.processing.ingest.splits import SplitConfig, SplitModeName
     from dronalize.processing.pipeline.pipeline import Pipeline
 
 
@@ -67,21 +67,24 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities()
     _shared_memory_name: ClassVar[dict[MapKey, str] | str | None] = None
+    _DEFAULT_MAP_CONFIG: ClassVar[object] = object()
 
     def __init__(
         self,
         loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
+        map_config: MapConfig | object | None = _DEFAULT_MAP_CONFIG,
         *,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
         output_schema: SceneSchema | None = CANONICAL_V1,
     ) -> None:
         self._output_schema: SceneSchema | None = output_schema
         self._pipeline: Pipeline | None = None
-        self.split_request: SplitRequest | None = split_request
+        self.split_request: SplitConfig | None = split_request
         self.loader_config: LoaderConfig = loader_config or self.default_config()
-        self.map_config: MapConfig = map_config or self.default_map_config()
+        self.map_config: MapConfig | None = (
+            self.default_map_config() if map_config is self._DEFAULT_MAP_CONFIG else map_config
+        )
         self._scene_counter: int = 0
         self._rng: random.Random = (
             random.Random(self.split_request.seed)
@@ -90,7 +93,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         )
 
         self._scene_assigner: SplitAssigner | None = None
-        if split_request is not None and isinstance(split_request.strategy, BySceneSplit):
+        if split_request is not None and isinstance(split_request.mode, BySceneSplit):
             self._scene_assigner = StatelessWeightedAssigner(
                 split_request.active_splits(),
                 split_request.active_weights(),
@@ -125,17 +128,17 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         return self.output_scene_schema.has(*fields)
 
     @classmethod
-    def _validate_split_request(cls, split_request: SplitRequest | None) -> None:
+    def _validate_split_request(cls, split_request: SplitConfig | None) -> None:
         """Reject direct split requests that this loader does not advertise."""
         if split_request is None:
             return
-        if isinstance(split_request.strategy, (Unsplit, NativeSplit)):
+        if isinstance(split_request.mode, (Unsplit, NativeSplit)):
             return
 
         supported_strategies = cls.supported_split_strategies()
-        if split_request.strategy_name not in supported_strategies:
+        if split_request.mode_name not in supported_strategies:
             raise SplitStrategyNotSupportedError(
-                cls.__name__, split_request.strategy_name, supported_strategies
+                cls.__name__, split_request.mode_name, supported_strategies
             )
 
     @classmethod
@@ -154,30 +157,26 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         return ()
 
     @classmethod
-    def supported_split_strategies(cls) -> tuple[SplitStrategyName, ...]:
-        """Return custom split strategies implemented by this loader.
+    def supported_split_strategies(cls) -> tuple[SplitModeName, ...]:
+        """Return custom split modes implemented by this loader.
 
         The default implementation derives the list from `cls.split_capabilities`, but
         subclasses can override it when they need more control.
         """
         return (
-            *(("by_source",) if cls.split_capabilities.supports_source_split else ()),
-            *(("by_scene",) if cls.split_capabilities.supports_scene_split else ()),
-            *(
-                ("time_blocks", "shuffled_time_blocks")
-                if cls.split_capabilities.supports_block_split
-                else ()
-            ),
+            *(("source",) if cls.split_capabilities.supports_source_split else ()),
+            *(("scene",) if cls.split_capabilities.supports_scene_split else ()),
+            *(("time", "shuffled-time") if cls.split_capabilities.supports_block_split else ()),
         )
 
     @classmethod
-    def recommended_split_strategy(cls) -> SplitStrategyName | None:
-        """Return the preferred custom split strategy for automatic selection, if any."""
+    def recommended_split_strategy(cls) -> SplitModeName | None:
+        """Return the preferred custom split mode for automatic selection, if any."""
         strategies = cls.supported_split_strategies()
         return strategies[0] if len(strategies) == 1 else None
 
     @classmethod
-    def default_map_config(cls) -> MapConfig:
+    def default_map_config(cls) -> MapConfig | None:
         """Return the default map configuration for this dataset."""
         return MapConfig.default()
 
@@ -194,6 +193,8 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         """
         return trajectory_pipeline(
             standard_trajectory_spec(self.loader_config, split_request=self.split_request)
+            if self.loader_config.highway is None
+            else highway_trajectory_spec(self.loader_config, split_request=self.split_request)
         )
 
     def discover_sources(self) -> Iterable[Source[SourceT]]:
@@ -234,9 +235,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         self, sources: Iterable[tuple[Source[SourceT], DatasetSplit | None]]
     ) -> Iterable[Source[SourceT]]:
         """Assign splits to sources according to the active split request, if any."""
-        if self.split_request is not None and isinstance(
-            self.split_request.strategy, BySourceSplit
-        ):
+        if self.split_request is not None and isinstance(self.split_request.mode, BySourceSplit):
             # If `BySourceSplit` is requested, assign splits at the source level
             sources = self._by_source_assignments(
                 [source for source, _ in sources], self.split_request
@@ -246,7 +245,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             yield source.with_predefined_split(split)
 
     def _by_source_assignments(
-        self, sources: list[Source[SourceT]], request: SplitRequest
+        self, sources: list[Source[SourceT]], request: SplitConfig
     ) -> list[tuple[Source[SourceT], DatasetSplit]]:
         self._rng.shuffle(sources)
         n_sources = len(sources)
@@ -303,7 +302,6 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     ) -> Scene:
         """Create a Scene object from the processed DataFrame and its source."""
         map_key, map_resolver = self._resolve_scene_map(source, data.map_binding)
-
         scene = Scene(
             frame=data.frame,
             scene_number=scene_number,
@@ -337,10 +335,6 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
                 source_local_scene_index += 1
 
     @override
-    def num_scenes(self) -> int | None:
-        return None
-
-    @override
     def num_sources(self) -> int | None:
         return None
 
@@ -361,10 +355,10 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
             cls._shared_memory_name = None
 
     def _resolve_split_assignment(
-        self, data: ProcessedSceneData, request: SplitRequest
+        self, data: ProcessedSceneData, request: SplitConfig
     ) -> DatasetSplit | None:
         identifier = data.stable_identifier
-        match request.strategy:
+        match request.mode:
             case BySceneSplit():
                 return (
                     self._scene_assigner.assign(
@@ -390,9 +384,9 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         request = self.split_request
         if request is None:
             return source.predefined_split
-        if isinstance(request.strategy, Unsplit):
+        if isinstance(request.mode, Unsplit):
             return None
-        if isinstance(request.strategy, NativeSplit | BySourceSplit):
+        if isinstance(request.mode, NativeSplit | BySourceSplit):
             return source.predefined_split
         return self._resolve_split_assignment(data, request)
 
@@ -402,7 +396,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
         """Resolve the effective map key and resolver for one processed scene."""
         map_key = map_binding.map_key if map_binding.map_key is not None else source.map_key
 
-        if not self.map_config.include_map:
+        if self.map_config is None:
             return None, None
 
         map_resolver = map_binding.map_resolver

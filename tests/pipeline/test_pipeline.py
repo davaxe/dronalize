@@ -1,4 +1,5 @@
 # pyright: standard
+# ruff: noqa: PLC2701
 """Tests for the composable Pipeline infrastructure."""
 
 from __future__ import annotations
@@ -15,17 +16,17 @@ from dronalize.processing.filters import Filter, cleanup
 from dronalize.processing.ingest import (
     LoaderConfig,
     ShuffledTimeBlockSplit,
-    SplitRequest,
+    SplitConfig,
     SplitWeights,
     TimeBlockSplit,
 )
 from dronalize.processing.pipeline import Pipeline
 from dronalize.processing.pipeline import transforms as transform
+from dronalize.processing.pipeline._internal import SCENE_ID_COLUMN, SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.extensions import LaneChangeSamplingExtension
 from dronalize.processing.pipeline.factory import trajectory_pipeline
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
 from dronalize.processing.pipeline.presets import highway_trajectory_spec, standard_trajectory_spec
-from dronalize.processing.pipeline.spec import LaneChangeDetection
 from dronalize.processing.pipeline.splitting import split_partition_pipeline
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -459,8 +460,8 @@ def test_block_partition_cumulative() -> None:
         "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
     }).lazy()
 
-    split_request = SplitRequest(
-        strategy=TimeBlockSplit(gap=0), weights=SplitWeights.from_tuple((0.6, 0.2, 0.2))
+    split_request = SplitConfig(
+        mode=TimeBlockSplit(gap=0), ratio=SplitWeights.from_tuple((0.6, 0.2, 0.2))
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
@@ -485,8 +486,8 @@ def test_block_partition_cumulative_gap() -> None:
         "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
     }).lazy()
 
-    split_request = SplitRequest(
-        strategy=TimeBlockSplit(gap=2), weights=SplitWeights.from_tuple((0.5, 0.5, 0.0))
+    split_request = SplitConfig(
+        mode=TimeBlockSplit(gap=2), ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0))
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
@@ -511,9 +512,9 @@ def test_block_partition_shuffled() -> None:
         "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
     }).lazy()
 
-    split_request = SplitRequest(
-        strategy=ShuffledTimeBlockSplit(segments=5),
-        weights=SplitWeights.from_tuple((0.6, 0.2, 0.2)),
+    split_request = SplitConfig(
+        mode=ShuffledTimeBlockSplit(segments=5),
+        ratio=SplitWeights.from_tuple((0.6, 0.2, 0.2)),
         seed=0,
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
@@ -546,9 +547,9 @@ def test_block_partition_shuffled_gap() -> None:
         "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
     }).lazy()
 
-    split_request = SplitRequest(
-        strategy=ShuffledTimeBlockSplit(segments=2, gap=2),
-        weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+    split_request = SplitConfig(
+        mode=ShuffledTimeBlockSplit(segments=2, gap=2),
+        ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
         seed=42,
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
@@ -577,9 +578,9 @@ def test_pipeline_keeps_shuffled_segments() -> None:
     pipeline = trajectory_pipeline(
         standard_trajectory_spec(
             LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
-            split_request=SplitRequest(
-                strategy=ShuffledTimeBlockSplit(segments=4),
-                weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+            split_request=SplitConfig(
+                mode=ShuffledTimeBlockSplit(segments=4),
+                ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
                 seed=0,
             ),
         )
@@ -602,10 +603,10 @@ def test_pipeline_windows_within_segments() -> None:
     }).lazy()
     pipeline = trajectory_pipeline(
         standard_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step_size=2),
-            split_request=SplitRequest(
-                strategy=ShuffledTimeBlockSplit(segments=4),
-                weights=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+            LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step=2),
+            split_request=SplitConfig(
+                mode=ShuffledTimeBlockSplit(segments=4),
+                ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
                 seed=0,
             ),
         )
@@ -618,13 +619,61 @@ def test_pipeline_windows_within_segments() -> None:
     assert all(result["split"].n_unique() == 1 for result in results)
 
 
+def test_pipeline_drops_window_index_from_output() -> None:
+    """Window metadata used for grouping should not leak into the final output."""
+    lf = pl.DataFrame({
+        "frame": list(range(4)),
+        "id": [1] * 4,
+        "x": [float(frame) for frame in range(4)],
+        "y": [0.0] * 4,
+    }).lazy()
+    pipeline = trajectory_pipeline(
+        standard_trajectory_spec(
+            LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step=2)
+        )
+    )
+
+    results = list(pipeline.execute(lf, collect=True))
+
+    assert len(results) == 2
+    assert all("window_index" not in result.columns for result in results)
+    assert all(SCENE_ID_COLUMN not in result.columns for result in results)
+
+
+def test_pipeline_drops_internal_grouping_columns() -> None:
+    """Split/window grouping metadata should be removed after fan-out."""
+    lf = pl.DataFrame({
+        "frame": list(range(8)),
+        "id": [1] * 8,
+        "x": [float(frame) for frame in range(8)],
+        "y": [0.0] * 8,
+    }).lazy()
+    pipeline = trajectory_pipeline(
+        standard_trajectory_spec(
+            LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step=2),
+            split_request=SplitConfig(
+                mode=ShuffledTimeBlockSplit(segments=4),
+                ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
+                seed=0,
+            ),
+        )
+    )
+
+    results = list(pipeline.execute(lf, collect=True))
+
+    assert len(results) == 4
+    assert all("split" in result.columns for result in results)
+    assert all("window_index" not in result.columns for result in results)
+    assert all(SPLIT_PARTITION_COLUMN not in result.columns for result in results)
+    assert all(SCENE_ID_COLUMN not in result.columns for result in results)
+
+
 def test_highway_spec_lane_change_defaults() -> None:
     """The highway spec helper should configure lane-aware sampling succinctly."""
     spec = highway_trajectory_spec(
-        LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
-        negative_keep_every=4,
-        min_lane_change_events=2,
-        lane_change=LaneChangeDetection(persist=2, margin_before=1),
+        LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_highway(
+            negative_keep_every=4, required_lane_changes=2, persist=2, margin_before=1
+        ),
     )
 
     assert spec.columns.lane_id == "lane_id"
@@ -673,8 +722,9 @@ def test_highway_sampling_thins_negatives() -> None:
     }).lazy()
     pipeline = trajectory_pipeline(
         highway_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=2, sample_time=1.0).with_window(step_size=1),
-            negative_keep_every=2,
+            LoaderConfig(input_len=1, output_len=2, sample_time=1.0)
+            .with_window(step=1)
+            .with_highway(negative_keep_every=2)
         )
     )
 
@@ -695,10 +745,10 @@ def test_highway_sampling_requires_multiple_changes() -> None:
     }).lazy()
     pipeline = trajectory_pipeline(
         highway_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=3, sample_time=1.0).with_window(step_size=1),
-            negative_keep_every=10,
-            min_lane_change_events=2,
-        )
+            LoaderConfig(input_len=1, output_len=3, sample_time=1.0)
+            .with_window(step=1)
+            .with_highway(negative_keep_every=10, required_lane_changes=2)
+        ),
     )
 
     results = list(pipeline.execute(lf, collect=True))

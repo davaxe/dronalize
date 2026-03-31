@@ -69,27 +69,23 @@ class SplitNotSupportedError(SplitError):
         def _display(value: DatasetSplit | str) -> str:
             return value.value if isinstance(value, DatasetSplit) else str(value)
 
-        if isinstance(split, list):
-            split_display = ", ".join(_display(item) for item in split)
-        else:
-            split_display = _display(split)
-        super().__init__(f"{loader_name} does not support split '{split_display}'.")
+        requested = split if isinstance(split, list) else [split]
+        rendered = [_display(item) for item in requested]
+        super().__init__(f"{loader_name} does not support split '{', '.join(rendered)}'.")
         self.loader_name: str = loader_name
-        self.split: list[str] = (
-            [_display(item) for item in split] if isinstance(split, list) else [_display(split)]
-        )
+        self.split: list[str] = rendered
 
 
 class SplitStrategyNotSupportedError(SplitError):
-    """Raised when a loader does not implement the requested custom split strategy."""
+    """Raised when a loader does not implement the requested custom split mode."""
 
     def __init__(
         self, loader_name: str, strategy_name: str, supported_strategies: tuple[str, ...]
     ) -> None:
         supported_display = ", ".join(supported_strategies) if supported_strategies else "none"
         msg = (
-            f"{loader_name} does not support split strategy '{strategy_name}'. "
-            f"Supported strategies: {supported_display}."
+            f"{loader_name} does not support split mode '{strategy_name}'. "
+            f"Supported modes: {supported_display}."
         )
         super().__init__(msg)
         self.loader_name: str = loader_name

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, ClassVar
 
-from pydantic import ConfigDict, Field, StringConstraints, dataclasses
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from typing_extensions import override
 
 from dronalize.core.models import Tolerance, tol
 from dronalize.processing.filters.context import AgentSelector
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     import polars as pl
 
     from dronalize.processing.filters.context import FilterContext
@@ -16,11 +19,12 @@ if TYPE_CHECKING:
 RuleId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]+$")]
 
 
-@dataclasses.dataclass(config=ConfigDict(frozen=True), kw_only=True)
-class Rule(ABC):
+class Rule(BaseModel, ABC):  # pyright: ignore[reportUnsafeMultipleInheritance]: https://docs.pydantic.dev/1.10/usage/models/?utm_source=chatgpt.com#abstract-base-classes
     """Base class shared by all filtering rules."""
 
-    rule_id: RuleId | None = None
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    rule_id: RuleId | None = Field(default=None, repr=False)
 
     @abstractmethod
     def expr(self, ctx: FilterContext) -> pl.Expr:
@@ -31,25 +35,29 @@ class Rule(ABC):
         return rule_name(self)
 
 
-@dataclasses.dataclass(config=ConfigDict(frozen=True), kw_only=True)
 class CheckRule(Rule, ABC):
     """Base class for rules that contribute pass/fail checks."""
 
 
-@dataclasses.dataclass(config=ConfigDict(frozen=True), kw_only=True)
 class AgentCheckRule(CheckRule, ABC):
     """Base class for per-agent check rules."""
 
     selector: AgentSelector | None = None
     tolerance: Tolerance = Field(default=tol(absolute=0))
 
+    @override
+    def __repr_args__(self) -> Iterator[tuple[str | None, object]]:
+        """Omit selector from repr when none."""
+        for name, value in super().__repr_args__():
+            if name == "selector" and value is None:
+                continue
+            yield name, value
 
-@dataclasses.dataclass(config=ConfigDict(frozen=True), kw_only=True)
+
 class SceneCheckRule(CheckRule, ABC):
     """Base class for scene-level check rules."""
 
 
-@dataclasses.dataclass(config=ConfigDict(frozen=True), kw_only=True)
 class CleanupRule(Rule, ABC):
     """Base class for rules that physically remove rows before validation."""
 

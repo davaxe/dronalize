@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 from typing_extensions import Self, override
 
-import dronalize.runtime.execution.parallel._state as _state  # noqa: PLR0402
+import dronalize.runtime.parallel._state as _state  # noqa: PLR0402
 from dronalize._internal.typing import P, SourceT
 from dronalize.core.scene import Scene
-from dronalize.runtime.execution.executor import ObservableWritingExecutor, Progress, WriterFactory
+from dronalize.runtime.executor import ObservableWritingExecutor, Progress, WriterFactory
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
@@ -94,7 +94,6 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         self._limit: int | None = limit
         self._processes: int | None = workers
         self._num_sources: int | None = inner.num_sources()
-        self._num_scenes: int | None = None
         self._running: bool = False
 
         if self._num_sources is not None and self._limit is not None:
@@ -199,7 +198,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
                 processed_scenes=self._shared.progress.scene_counter.value,
                 active_workers=self._shared.progress.active_workers.value,
                 total_sources=self._num_sources,
-                total_scenes=self._num_scenes,
+                total_scenes=None,
             )
 
     @override

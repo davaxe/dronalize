@@ -1,8 +1,10 @@
 # pyright: standard
 
+import numpy as np
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
+from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
 from dronalize.processing.pipeline.functional.resample import ResampleMethod, ResampleSpec, resample
 
@@ -160,10 +162,12 @@ def test_cubic_derivative_names() -> None:
             output_derivatives={1: dict.fromkeys(("dx",))},
         ),
     )
-
+    x_cubic = CubicSpline(df["frame"], df["x"], bc_type="natural")
+    x_evaluated = x_cubic(np.linspace(0, 1, 5))
+    dx_evaluated = x_cubic(np.linspace(0, 1, 5), 1)
     assert result["frame"].to_list() == [0, 1, 2, 3, 4]
-    assert result["x"].to_list() == pytest.approx([0.0, 0.25, 0.5, 0.75, 1.0])
-    assert result["dx"].to_list() == pytest.approx([1.0, 1.0, 1.0, 1.0, 1.0])
+    assert result["x"].to_list() == pytest.approx(x_evaluated.tolist())
+    assert result["dx"].to_list() == pytest.approx(dx_evaluated.tolist())
 
 
 def test_hermite_uses_input_derivatives() -> None:
@@ -201,3 +205,44 @@ def test_lazyframe_input_matches_eager() -> None:
     lazy = resample(df.lazy(), spec).collect()
 
     assert_frame_equal(eager, lazy)
+
+
+def test_advanced_dataframe_single() -> None:
+    """Test that a more complex resampling scenario matches SciPy's direct interpolation."""
+    n = 40
+    t = np.linspace(0, 2 * np.pi, n, dtype=np.float64)
+    x = np.cos(3 * t)
+    y = np.sin(4 * t + np.pi / 3)
+    dx = -3 * np.sin(3 * t)
+    dy = 4 * np.cos(4 * t + np.pi / 3)
+    df = pl.DataFrame({"frame": np.arange(n), "x": x, "y": y, "vx": dx, "vy": dy})
+    result = resample(
+        df,
+        ResampleSpec(
+            up=4,
+            down=1,
+            method=ResampleMethod.HERMITE,
+            position_columns=dict.fromkeys(("x", "y")),
+            input_derivatives={1: dict.fromkeys(("vx", "vy"))},
+            output_derivatives={1: dict.fromkeys(("vx", "vy")), 2: dict.fromkeys(("ax", "ay"))},
+        ),
+    )
+
+    t = np.arange(n)
+    n_new = (40 - 1) * 4 + 1
+    t_new = np.arange(n_new, dtype=np.float64) * 0.25
+    x_cubic = CubicHermiteSpline(t, x, dx, axis=0)
+    y_cubic = CubicHermiteSpline(t, y, dy, axis=0)
+    x_evaluated = x_cubic(t_new)
+    y_evaluated = y_cubic(t_new)
+    dx_evaluated = x_cubic(t_new, nu=1)
+    dy_evaluated = y_cubic(t_new, nu=1)
+    ax_evaluated = x_cubic(t_new, nu=2)
+    ay_evaluated = y_cubic(t_new, nu=2)
+    assert result["frame"].to_list() == list(range(4 * n - 3))
+    assert np.isclose(result["x"].to_numpy(), x_evaluated).all()
+    assert np.isclose(result["y"].to_numpy(), y_evaluated).all()
+    assert np.isclose(result["vx"].to_numpy(), dx_evaluated).all()
+    assert np.isclose(result["vy"].to_numpy(), dy_evaluated).all()
+    assert np.isclose(result["ax"].to_numpy(), ax_evaluated).all()
+    assert np.isclose(result["ay"].to_numpy(), ay_evaluated).all()

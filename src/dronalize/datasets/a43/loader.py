@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.maps.graph import MapGraph
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
 
 
@@ -40,7 +40,7 @@ class A43Loader(BaseSceneLoader[Path]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the A43 dataset loader.
 

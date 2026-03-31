@@ -5,19 +5,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from dronalize.processing.pipeline.extensions import LaneChangeSamplingExtension
-from dronalize.processing.pipeline.spec import LaneChangeDetection, TrackColumns, TrajectorySpec
+from dronalize.processing.pipeline.spec import TrackColumns, TrajectorySpec
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
 
 
 def _base_spec(
     config: LoaderConfig,
     *,
-    split_request: SplitRequest | None,
+    split_request: SplitConfig | None,
     columns: TrackColumns | None,
     window_by: str | Sequence[str] | None,
 ) -> TrajectorySpec:
@@ -33,7 +33,7 @@ def _base_spec(
 def standard_trajectory_spec(
     config: LoaderConfig,
     *,
-    split_request: SplitRequest | None = None,
+    split_request: SplitConfig | None = None,
     columns: TrackColumns | None = None,
     window_by: str | Sequence[str] | None = None,
 ) -> TrajectorySpec:
@@ -44,25 +44,28 @@ def standard_trajectory_spec(
 def highway_trajectory_spec(
     config: LoaderConfig,
     *,
-    split_request: SplitRequest | None = None,
+    split_request: SplitConfig | None = None,
     lane_id: str = "lane_id",
-    negative_keep_every: int = 3,
-    min_lane_change_events: int = 1,
-    lane_change: LaneChangeDetection | None = None,
     columns: TrackColumns | None = None,
     window_by: str | Sequence[str] | None = None,
 ) -> TrajectorySpec:
     """Build a spec for lane-change-aware highway window sampling."""
-    lane_change = lane_change or LaneChangeDetection()
+    highway_params = config.highway
     base_spec = _base_spec(
         config, split_request=split_request, columns=columns, window_by=window_by
     )
+    if highway_params is None or highway_params.negative_keep_every == 1:
+        # If every negative sample is kept, there is no difference in output
+        # selection between lane-change-aware sampling and standard sampling, so
+        # skip the extension (which is more efficient).
+        return base_spec
+
     return base_spec.with_columns(base_spec.columns.with_lane_id(lane_id)).with_extension(
         LaneChangeSamplingExtension(
-            negative_keep_every=negative_keep_every,
-            min_lane_change_events=min_lane_change_events,
-            persist=lane_change.persist,
-            margin_before=lane_change.margin_before,
-            margin_after=lane_change.margin_after,
+            negative_keep_every=highway_params.negative_keep_every,
+            min_lane_change_events=highway_params.required_lane_changes,
+            persist=highway_params.persist,
+            margin_before=highway_params.margin_before,
+            margin_after=highway_params.margin_after,
         )
     )

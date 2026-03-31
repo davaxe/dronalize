@@ -9,7 +9,7 @@ class RelevantAreaExtraction(BaseModel):
     """Configuration for extraction around relevant scene positions."""
 
     mode: Literal["relevant"] = Field("relevant", repr=False, init=False)
-    padding_factor: float = Field(gt=1.0, default=1.2)
+    padding: float = Field(gt=1.0, default=1.2)
 
 
 class CircularExtraction(BaseModel):
@@ -46,7 +46,6 @@ class MapConfig(BaseModel):
 
     min_distance: float | None = Field(gt=0, default=1.75)
     interp_distance: float | None = Field(gt=0, default=3.0)
-    include_map: bool = True
     extraction: MapExtraction = Field(default_factory=FullMapExtraction)
 
     @model_validator(mode="after")
@@ -81,7 +80,7 @@ class MapConfig(BaseModel):
     @classmethod
     def relevant_area_extraction(
         cls,
-        padding_factor: float = 1.15,
+        padding: float = 1.15,
         min_distance: float | None = 1.75,
         interp_distance: float | None = 3.0,
     ) -> MapConfig:
@@ -89,7 +88,7 @@ class MapConfig(BaseModel):
         return cls(
             min_distance=min_distance,
             interp_distance=interp_distance,
-            extraction=RelevantAreaExtraction(padding_factor=padding_factor),
+            extraction=RelevantAreaExtraction(padding=padding),
         )
 
     @classmethod
@@ -116,14 +115,4 @@ class MapConfig(BaseModel):
             min_distance=min_distance,
             interp_distance=interp_distance,
             extraction=BoundingBoxExtraction(width=width, height=height),
-        )
-
-    @classmethod
-    def no_map(cls) -> MapConfig:
-        """Return a map configuration that indicates no map should be used."""
-        return cls(
-            min_distance=None,
-            interp_distance=None,
-            include_map=False,
-            extraction=FullMapExtraction(),
         )

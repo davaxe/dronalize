@@ -2,12 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntFlag, auto
-from typing import TYPE_CHECKING, Any, Final
+from typing import Final, Iterable, Sequence, TypedDict  # noqa: UP035
 
 import polars as pl
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
 
 
 class SceneField(IntFlag):
@@ -225,6 +222,13 @@ def available_scene_schema_names() -> tuple[str, ...]:
     return tuple(SCENE_SCHEMAS)
 
 
+class SceneSchemaDefinition(TypedDict):
+    """Structured payload used to define a custom scene schema."""
+
+    name: str
+    fields: SceneField | Sequence[SceneField | str]
+
+
 _STR_TO_FIELD: Final[dict[str, SceneField]] = {
     "vel": SceneField.VX | SceneField.VY,
     "acc": SceneField.AX | SceneField.AY,
@@ -238,7 +242,7 @@ _STR_TO_FIELD: Final[dict[str, SceneField]] = {
 }
 
 
-def get_scene_schema(schema: SceneSchema | str | dict[str, Any]) -> SceneSchema:
+def get_scene_schema(schema: SceneSchema | str | SceneSchemaDefinition) -> SceneSchema:
     """Resolve a schema instance or registered schema name to a SceneSchema."""
     if isinstance(schema, SceneSchema):
         return schema

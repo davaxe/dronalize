@@ -5,11 +5,13 @@ from __future__ import annotations
 import functools
 import importlib
 import importlib.util
-from collections.abc import Callable, Generator, Sequence
+import inspect
+from collections.abc import Callable, Generator, Iterable, Sequence
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from enum import IntFlag, auto
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Concatenate, cast
+from typing import TYPE_CHECKING, Any, Generic, Protocol, cast
 
 from dronalize._internal.typing import P
 from dronalize.core.errors import (
@@ -17,23 +19,53 @@ from dronalize.core.errors import (
     DatasetRegistryError,
     MissingOptionalDependencyError,
 )
-from dronalize.processing.ingest.base import BaseSceneLoader
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.maps.config import MapConfig
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene.schema import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest, SplitStrategyName
+    from dronalize.processing.ingest.base import BaseSceneLoader
+    from dronalize.processing.ingest.splits import SplitConfig, SplitModeName
 
 _REGISTRY: dict[str, DatasetDescriptor] = {}
 
-ExecutionScope = Callable[[Path, LoaderConfig, MapConfig], AbstractContextManager[None]]
+ExecutionScope = Callable[[Path, LoaderConfig, MapConfig | None], AbstractContextManager[None]]
 """Function for creating an execution context for a dataset."""
 
-LoaderFactory = Callable[
-    Concatenate[Path | str, LoaderConfig | None, MapConfig | None, P], BaseSceneLoader[Any]
-]
+
+class LoaderFactory(Protocol, Generic[P]):
+    """Protocol for functions that create dataset loaders with flexible arguments."""
+
+    def __call__(
+        self,
+        path: Path | str,
+        loader_config: LoaderConfig | None = None,
+        map_config: MapConfig | None = None,
+        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
+        split_request: SplitConfig | None = None,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> BaseSceneLoader[Any]:
+        """Create a scene loader for the dataset with the given configuration."""
+        ...
+
+
+class DatasetCapabilities(IntFlag):
+    """Optional flags to indicate special capabilities."""
+
+    MAP_AVAILABLE = auto()
+    """Have map data available that can be included in the output."""
+    NATIVE_SPLITS = auto()
+    """Expose native dataset splits that can be requested by name."""
+    CUSTOM_SPLITS = auto()
+    """Support custom split strategies defined by the loader."""
+    HIGHWAY_PIPELINE = auto()
+    """Recommend using the highway processing pipeline for this dataset."""
+    EXECUTION_SCOPE = auto()
+    """Require a custom execution scope to manage dataset-specific resources."""
+    EXTRA_LOADER_ARGS = auto()
+    """Loader can accept extra arguments for dataset-specific configuration."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,10 +78,10 @@ class DatasetDescriptor:
     loader_factory: LoaderFactory[...]
     """Factory function that creates a scene loader for the dataset."""
 
-    default_config: LoaderConfig
+    default_loader_config: LoaderConfig
     """Default loader configuration for the dataset."""
 
-    default_map_config: MapConfig
+    default_map_config: MapConfig | None
     """Default map configuration for the dataset."""
 
     native_schema: SceneSchema
@@ -58,17 +90,27 @@ class DatasetDescriptor:
     execution_scope_fn: ExecutionScope | None = None
     """Optional runtime context manager factory for dataset-specific resources."""
 
-    has_map: bool = False
-    """Whether the dataset exposes map data."""
-
     predefined_splits: list[DatasetSplit] = field(default_factory=list)
     """Predefined splits exposed by the dataset, if any."""
 
-    supported_split_strategies: list[SplitStrategyName] = field(default_factory=list)
+    supported_split_strategies: list[SplitModeName] = field(default_factory=list)
     """Custom split strategies exposed by the loader, if any."""
 
-    recommended_split_strategy: SplitStrategyName | None = None
+    recommended_split_strategy: SplitModeName | None = None
     """Preferred custom split strategy for automatic selection, if any."""
+
+    capabilities: DatasetCapabilities = field(default=DatasetCapabilities(0))
+    """Bitfield of flags indicating special dataset capabilities."""
+
+    @property
+    def has_map(self) -> bool:
+        """Return whether the dataset exposes map data."""
+        return bool(self.capabilities & DatasetCapabilities.MAP_AVAILABLE)
+
+    @property
+    def has_execution_scope(self) -> bool:
+        """Return whether dataset processing opens a dataset-specific execution scope."""
+        return self.execution_scope_fn is not None
 
     @classmethod
     def from_loader(
@@ -78,26 +120,28 @@ class DatasetDescriptor:
         loader_factory: LoaderFactory[...] | None = None,
         *,
         execution_scope_fn: ExecutionScope | None = None,
-        has_map: bool = False,
+        capabilities: DatasetCapabilities | None = None,
+        infer_capabilities: bool = True,
     ) -> DatasetDescriptor:
         """Create a descriptor directly from a loader class."""
         resolved_factory = loader_cls if loader_factory is None else loader_factory
-        return cls(
+        descriptor = cls(
             name=name,
             loader_factory=cast("LoaderFactory[...]", resolved_factory),
-            default_config=loader_cls.default_config(),
+            default_loader_config=loader_cls.default_config(),
             default_map_config=loader_cls.default_map_config(),
             native_schema=loader_cls.native_scene_schema(),
             execution_scope_fn=execution_scope_fn,
-            has_map=has_map,
             predefined_splits=list(loader_cls.predefined_splits()),
             supported_split_strategies=list(loader_cls.supported_split_strategies()),
             recommended_split_strategy=loader_cls.recommended_split_strategy(),
+            capabilities=capabilities or DatasetCapabilities(0),
         )
+        return descriptor.infer_capabilities() if infer_capabilities else descriptor
 
     @contextmanager
     def execution_scope(
-        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig
+        self, root: Path, loader_config: LoaderConfig, map_config: MapConfig | None
     ) -> Generator[None, None, None]:
         """Execute the lifecycle context manager, if defined."""
         if self.execution_scope_fn is not None:
@@ -106,24 +150,47 @@ class DatasetDescriptor:
         else:
             yield
 
+    def with_capabilities(self, *flags: DatasetCapabilities) -> DatasetDescriptor:
+        """Return a copy of this descriptor with additional capabilities."""
+        combined = self.capabilities
+        for flag in flags:
+            combined |= flag
+        return replace(self, capabilities=combined)
+
+    def infer_capabilities(self) -> DatasetDescriptor:
+        """Return a copy of this descriptor with inferred capabilities based on its properties."""
+        flags = DatasetCapabilities(0)
+        if self.predefined_splits:
+            flags |= DatasetCapabilities.NATIVE_SPLITS
+        if self.supported_split_strategies or self.recommended_split_strategy is not None:
+            flags |= DatasetCapabilities.CUSTOM_SPLITS
+        if self.execution_scope_fn is not None:
+            flags |= DatasetCapabilities.EXECUTION_SCOPE
+        if _loader_factory_accepts_extra_args(self.loader_factory):
+            flags |= DatasetCapabilities.EXTRA_LOADER_ARGS
+
+        return self.with_capabilities(flags)
+
+    def extend_inferred_capabilities(self, *flags: DatasetCapabilities) -> DatasetDescriptor:
+        """Return a copy of this descriptor with inferred capabilities extended by *flags*."""
+        inferred = self.infer_capabilities()
+        return inferred.with_capabilities(*flags)
+
     def build_loader(
         self,
         root: Path,
         *,
         loader_config: LoaderConfig,
-        map_config: MapConfig,
+        map_config: MapConfig | None,
         output_schema: SceneSchema | None,
         splits: Sequence[DatasetSplit] | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> BaseSceneLoader[Any]:
         """Instantiate the dataset loader with the resolved runtime configuration."""
-        kwargs: dict[str, object] = dict(loader_config.extra_kwargs)
-        if splits is not None:
-            kwargs["splits"] = splits
-        if split_request is not None:
-            kwargs["split_request"] = split_request
-
-        loader = self.loader_factory(root, loader_config, map_config, **kwargs)
+        kwargs: dict[str, Any] = dict(loader_config.options)
+        loader = self.loader_factory(
+            root, loader_config, map_config, split_request=split_request, splits=splits, **kwargs
+        )
         loader.set_output_schema(output_schema)
         return loader
 
@@ -229,6 +296,25 @@ def available() -> list[str]:
 def _builtin_datasets() -> dict[str, _BuiltinDatasetSpec]:
     """Return the static built-in dataset table."""
     return _BUILTIN_DATASETS
+
+
+def _loader_factory_accepts_extra_args(factory: LoaderFactory[...]) -> bool:
+    """Return whether the loader factory accepts dataset-specific extra arguments."""
+    allowed_params = {
+        "path",
+        "root",
+        "data_root",
+        "loader_config",
+        "map_config",
+        "splits",
+        "split_request",
+    }
+    signature = inspect.signature(factory)
+    return any(
+        parameter.kind in {parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD}
+        or parameter.name not in allowed_params
+        for parameter in signature.parameters.values()
+    )
 
 
 @functools.cache

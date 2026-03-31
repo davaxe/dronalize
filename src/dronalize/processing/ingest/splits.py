@@ -1,9 +1,4 @@
-"""Dataset split configuration and runtime planning.
-
-This module defines the loader-side split strategies used across the project:
-time-block splits, shuffled time-block splits, scene-level assignment, and
-source-level assignment.
-"""
+"""Dataset split configuration and runtime planning."""
 
 from __future__ import annotations
 
@@ -13,16 +8,8 @@ from typing import Annotated, ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dronalize.core.categories import DatasetSplit
-from dronalize.core.errors import (
-    ConfigurationError,
-    SplitConflictError,
-    SplitNotSupportedError,
-    SplitStrategyNotSupportedError,
-)
 
-SplitStrategyName = Literal[
-    "time_blocks", "shuffled_time_blocks", "by_scene", "by_source", "auto", "native", "unsplit"
-]
+SplitModeName = Literal["time", "shuffled-time", "scene", "source", "auto", "native", "none"]
 NativeSplitSelection = Sequence[DatasetSplit | str] | DatasetSplit | str | None
 
 
@@ -36,7 +23,7 @@ class TimeBlockSplit(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
     gap: int = Field(ge=0, default=0)
-    type: Literal["time_blocks"] = Field("time_blocks", repr=False, init=False)
+    type: Literal["time"] = Field("time", repr=False, init=False)
 
 
 class ShuffledTimeBlockSplit(BaseModel):
@@ -50,7 +37,7 @@ class ShuffledTimeBlockSplit(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
     segments: int = Field(ge=1)
     gap: int = Field(ge=0, default=0)
-    type: Literal["shuffled_time_blocks"] = Field("shuffled_time_blocks", repr=False, init=False)
+    type: Literal["shuffled-time"] = Field("shuffled-time", repr=False, init=False)
 
 
 class BySceneSplit(BaseModel):
@@ -61,7 +48,7 @@ class BySceneSplit(BaseModel):
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    type: Literal["by_scene"] = Field("by_scene", repr=False, init=False)
+    type: Literal["scene"] = Field("scene", repr=False, init=False)
 
 
 class BySourceSplit(BaseModel):
@@ -72,7 +59,7 @@ class BySourceSplit(BaseModel):
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    type: Literal["by_source"] = Field("by_source", repr=False, init=False)
+    type: Literal["source"] = Field("source", repr=False, init=False)
 
 
 class NativeSplit(BaseModel):
@@ -83,14 +70,13 @@ class NativeSplit(BaseModel):
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    train: bool = Field(default=False)
-    val: bool = Field(default=False)
-    test: bool = Field(default=False)
+    splits: tuple[DatasetSplit, ...] = Field(default_factory=tuple)
+    read: tuple[DatasetSplit, ...] = Field(default_factory=tuple)
     type: Literal["native"] = Field("native", repr=False, init=False)
 
     def active_splits(self) -> tuple[DatasetSplit, ...]:
         """Return the dataset splits that should receive data for this request."""
-        return tuple(split for split in DatasetSplit if getattr(self, split.value, False))
+        return self.read
 
 
 class Unsplit(BaseModel):
@@ -100,10 +86,10 @@ class Unsplit(BaseModel):
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    type: Literal["unsplit"] = Field("unsplit", repr=False, init=False)
+    type: Literal["none"] = Field("none", repr=False, init=False)
 
 
-SplitStrategy = Annotated[
+SplitMode = Annotated[
     TimeBlockSplit | BySceneSplit | ShuffledTimeBlockSplit | BySourceSplit | NativeSplit | Unsplit,
     Field(discriminator="type"),
 ]
@@ -113,17 +99,9 @@ class SplitWeights(BaseModel):
     """Weights used when routing data into train/val/test splits."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    train: float = Field(ge=0)
-    val: float = Field(ge=0)
-    test: float = Field(ge=0)
-
-    @model_validator(mode="before")
-    @classmethod
-    def _set_none_to_zero(cls, values: dict[str, float]) -> dict[str, float]:
-        for split in ("train", "val", "test"):
-            if values.get(split) is None:
-                values[split] = 0.0
-        return values
+    train: float = Field(ge=0, default=0.0)
+    val: float = Field(ge=0, default=0.0)
+    test: float = Field(ge=0, default=0.0)
 
     @model_validator(mode="after")
     def _validate_total_weight(self) -> SplitWeights:
@@ -154,31 +132,44 @@ class SplitWeights(BaseModel):
         return cls(train=values[0], val=values[1], test=values[2])
 
 
-class SplitRequest(BaseModel):
-    """Resolved loader-side custom split request."""
+class SplitConfig(BaseModel):
+    """Runtime split configuration resolved from config files or CLI overrides."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    strategy: SplitStrategy
-    weights: SplitWeights | None = None
+    mode: SplitMode = Field(default_factory=Unsplit)
+    ratio: SplitWeights | None = None
     seed: int | None = None
 
+    @model_validator(mode="after")
+    def _validate_runtime_shape(self) -> SplitConfig:
+        if isinstance(self.mode, (NativeSplit, Unsplit)):
+            if self.ratio is not None:
+                msg = "Resolved native or unsplit configs must not carry split ratios."
+                raise ValueError(msg)
+            return self
+
+        if self.ratio is None:
+            msg = "Resolved custom split configs require train/val/test split ratios."
+            raise ValueError(msg)
+        return self
+
     @property
-    def strategy_name(self) -> SplitStrategyName:
-        """Return the resolved split strategy name."""
-        return self.strategy.type
+    def mode_name(self) -> SplitModeName:
+        """Return the resolved split mode name."""
+        return self.mode.type
 
     @property
     def uses_block_split(self) -> bool:
-        """Return whether the split strategy uses block-based splitting."""
-        return type(self.strategy) in {TimeBlockSplit, ShuffledTimeBlockSplit}
+        """Return whether the split mode uses block-based splitting."""
+        return type(self.mode) in {TimeBlockSplit, ShuffledTimeBlockSplit}
 
     def active_splits(self) -> tuple[DatasetSplit, ...]:
         """Return the dataset splits that should receive data for this request."""
-        return self.weights.active_splits() if self.weights else ()
+        return self.ratio.active_splits() if self.ratio else ()
 
     def active_weights(self) -> tuple[float, ...]:
         """Return the non-zero weights corresponding to `active_splits()`."""
-        return self.weights.active_weights() if self.weights else ()
+        return self.ratio.active_weights() if self.ratio else ()
 
     def active(self) -> tuple[tuple[DatasetSplit, float], ...]:
         """Return tuples of (split, weight) for splits with non-zero weights."""
@@ -186,136 +177,18 @@ class SplitRequest(BaseModel):
 
     def loader_splits(self) -> tuple[DatasetSplit, ...] | None:
         """Get splits to pass to the loader."""
-        if isinstance(self.strategy, NativeSplit):
-            return self.strategy.active_splits() or None
+        if isinstance(self.mode, NativeSplit):
+            return self.mode.active_splits() or None
         return None
 
     def writer_splits(self) -> tuple[DatasetSplit, ...] | None:
         """Get splits to pass to the writer."""
-        if isinstance(self.strategy, NativeSplit):
-            return self.strategy.active_splits() or None
-        if isinstance(self.strategy, Unsplit):
+        if isinstance(self.mode, NativeSplit):
+            return self.mode.active_splits() or None
+        if isinstance(self.mode, Unsplit):
             return None
         return self.active_splits() or None
 
-
-class SplitConfig(BaseModel):
-    """Runtime split configuration resolved from config files or CLI overrides."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-    strategy: SplitStrategy | None = None
-    weights: SplitWeights | None = None
-
-    def request(self, seed: int | None = None) -> SplitRequest:
-        """Get a loader-side split request based on this configuration."""
-        return SplitRequest(strategy=self.strategy or Unsplit(), weights=self.weights, seed=seed)
-
-    def resolve_runtime_overrides(
-        self,
-        split: Sequence[DatasetSplit | str] | DatasetSplit | str | None,
-        split_strategy_name: SplitStrategyName | None,
-        split_weights: tuple[float, float, float] | None,
-        split_gap: int | None = None,
-        split_n_segments: int | None = None,
-        *,
-        dataset_name: str,
-        predefined_splits: Sequence[DatasetSplit] = (),
-        supported_split_strategies: Sequence[SplitStrategyName] = (),
-        recommended_split_strategy: SplitStrategyName | None = None,
-    ) -> SplitConfig:
-        """Return a copy with runtime split overrides applied."""
-        if split is not None and (
-            split_weights is not None
-            or split_gap is not None
-            or split_n_segments is not None
-            or split_strategy_name not in {None, "native"}
-        ):
-            msg = "Native splits and custom split assignment are mutually exclusive."
-            raise SplitConflictError(msg)
-
-        norm_splits = ()
-        if split is not None:
-            requested = [split] if isinstance(split, (DatasetSplit, str)) else list(split)
-            norm_splits = tuple(dict.fromkeys(DatasetSplit(v) for v in requested))
-
-        strat_name = split_strategy_name
-        if strat_name == "auto" or (strat_name is None and split_weights is not None):
-            strat_name = _resolve_auto_strategy(
-                dataset_name, supported_split_strategies, recommended_split_strategy
-            )
-
-        strategy = _resolve_strategy(
-            strat_name, split_gap, split_n_segments, norm_splits, self.strategy
-        )
-
-        if isinstance(strategy, Unsplit):
-            return SplitConfig(strategy=strategy)
-
-        if isinstance(strategy, NativeSplit):
-            req_splits = strategy.active_splits() or tuple(predefined_splits)
-            if not req_splits:
-                msg = f"{dataset_name} does not expose native dataset splits."
-                raise ConfigurationError(msg)
-
-            unsupported = [s for s in req_splits if s not in predefined_splits]
-            if unsupported or not predefined_splits:
-                raise SplitNotSupportedError(dataset_name, unsupported or list(req_splits))
-
-            return SplitConfig(strategy=strategy)
-
-        if strategy.type not in supported_split_strategies:
-            raise SplitStrategyNotSupportedError(
-                dataset_name, strategy.type, tuple(supported_split_strategies)
-            )
-
-        weights = (
-            SplitWeights.from_tuple(split_weights) if split_weights is not None else self.weights
-        )
-        if weights is None:
-            msg = "Custom split assignment requires train/val/test split weights."
-            raise ConfigurationError(msg)
-
-        return SplitConfig(strategy=strategy, weights=weights)
-
-
-def _resolve_strategy(
-    strategy_name: SplitStrategyName | None,
-    split_gap: int | None = None,
-    split_n_segments: int | None = None,
-    splits: Sequence[DatasetSplit] = (),
-    previous_strategy: SplitStrategy | None = None,
-) -> SplitStrategy:
-    split_vals = {s.value for s in splits}
-    strategy_map: dict[str | None, SplitStrategy] = {
-        "time_blocks": TimeBlockSplit(gap=split_gap or 0),
-        "shuffled_time_blocks": ShuffledTimeBlockSplit(
-            segments=split_n_segments or 1, gap=split_gap or 0
-        ),
-        "by_scene": BySceneSplit(),
-        "by_source": BySourceSplit(),
-        "unsplit": Unsplit(),
-        "native": NativeSplit(
-            train="train" in split_vals, val="val" in split_vals, test="test" in split_vals
-        ),
-    }
-    strategy = strategy_map.get(strategy_name) or previous_strategy
-    if strategy is None and splits:
-        return strategy_map["native"]
-
-    return strategy or Unsplit()
-
-
-def _resolve_auto_strategy(
-    dataset_name: str,
-    supported_strategies: Sequence[SplitStrategyName],
-    recommended_strategy: SplitStrategyName | None,
-) -> SplitStrategyName:
-    if not supported_strategies:
-        msg = f"{dataset_name} does not support custom split assignment."
-        raise ConfigurationError(msg)
-    if recommended_strategy:
-        return recommended_strategy
-    if len(supported_strategies) == 1:
-        return supported_strategies[0]
-    msg = "Specify a split strategy explicitly."
-    raise ConfigurationError(msg)
+    def with_seed(self, seed: int | None) -> SplitConfig:
+        """Return a copy with the plan-specific random seed attached."""
+        return self.model_copy(update={"seed": seed})

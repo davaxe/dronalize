@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitRequest
+    from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
     from dronalize.processing.maps.resolver import MapResolver
 
@@ -43,7 +43,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
         loader_config: LoaderConfig | None = None,
         map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitRequest | None = None,
+        split_request: SplitConfig | None = None,
     ) -> None:
         """Initialize the nuScenes loader.
 
@@ -127,7 +127,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
         return (
             LoaderConfig(input_len=4, output_len=12, sample_time=0.5)
             .with_resampling(ResampleSpec(up=5, down=1))
-            .with_window(step_size=1)
+            .with_window(step=1)
             .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[3])]))
         )
 
