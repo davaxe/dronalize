@@ -4,10 +4,11 @@ import numpy as np
 import polars as pl
 import pytest
 
+from dronalize.core.errors import SceneSchemaError
 from dronalize.core.scene import (
-    CANONICAL_V1,
-    POSITIONS_ONLY_V1,
-    POSITIONS_YAW_V1,
+    CANONICAL,
+    POSITIONS_ONLY,
+    POSITIONS_YAW,
     Scene,
     SceneField,
     SceneSchema,
@@ -27,10 +28,11 @@ def test_scene_schema_orders_fields() -> None:
             SceneField.ID,
             SceneField.VX,
             SceneField.X,
+            SceneField.AGENT_CATEGORY,
         ),
     )
 
-    assert schema.semantic_fields() == ("frame", "id", "x", "y", "vx", "vy")
+    assert schema.semantic_fields() == ("frame", "id", "x", "y", "vx", "vy", "agent_category")
     assert schema.column_for(SceneField.VX) == "vx"
     assert schema.dtype_for("vx") == pl.Float64()
     assert schema.has(SceneField.FRAME, "id", "x", "y")
@@ -47,6 +49,7 @@ def test_scene_schema_accepts_bitmasks() -> None:
             | SceneField.Y
             | SceneField.VX
             | SceneField.VY
+            | SceneField.AGENT_CATEGORY
         ),
     )
 
@@ -57,8 +60,9 @@ def test_scene_schema_accepts_bitmasks() -> None:
         | SceneField.Y
         | SceneField.VX
         | SceneField.VY
+        | SceneField.AGENT_CATEGORY
     )
-    assert schema.semantic_fields() == ("frame", "id", "x", "y", "vx", "vy")
+    assert schema.semantic_fields() == ("frame", "id", "x", "y", "vx", "vy", "agent_category")
 
 
 def test_plan_derivations_bitmasks() -> None:
@@ -75,7 +79,7 @@ def test_plan_derivations_bitmasks() -> None:
 
 def test_scene_schema_requires_bases() -> None:
     """Test that schemas must include the base frame, id, and position fields."""
-    with pytest.raises(ValueError, match="base fields"):
+    with pytest.raises(SceneSchemaError, match="base fields"):
         SceneSchema.define(name="invalid", fields=(SceneField.FRAME, SceneField.ID, SceneField.X))
 
 
@@ -92,13 +96,13 @@ def test_scene_derives_kinematics() -> None:
         scene_number=7,
         input_len=2,
         output_len=1,
-        schema=POSITIONS_ONLY_V1,
+        schema=POSITIONS_ONLY,
         sample_time=1.0,
     )
 
-    converted = scene.as_schema(CANONICAL_V1)
+    converted = scene.as_schema(CANONICAL)
 
-    assert converted.schema == CANONICAL_V1
+    assert converted.schema == CANONICAL
     assert converted.frame["vx"].to_list() == pytest.approx([1.0, 1.0, 1.0])
     assert converted.frame["vy"].to_list() == pytest.approx([0.0, 0.0, 0.0])
     assert converted.frame["ax"].to_list() == pytest.approx([0.0, 0.0, 0.0])
@@ -119,12 +123,12 @@ def test_scene_derives_yaw_without_sample_time() -> None:
         scene_number=9,
         input_len=2,
         output_len=1,
-        schema=POSITIONS_ONLY_V1,
+        schema=POSITIONS_ONLY,
     )
 
-    converted = scene.as_schema(POSITIONS_YAW_V1)
+    converted = scene.as_schema(POSITIONS_YAW)
 
-    assert converted.schema == POSITIONS_YAW_V1
+    assert converted.schema == POSITIONS_YAW
     assert converted.frame["yaw"].to_list() == pytest.approx([0.0, 0.0, 0.0])
 
 
@@ -141,18 +145,18 @@ def test_scene_requires_sample_time() -> None:
         scene_number=1,
         input_len=1,
         output_len=1,
-        schema=POSITIONS_ONLY_V1,
+        schema=POSITIONS_ONLY,
     )
 
-    with pytest.raises(ValueError, match="No derivation plan"):
-        scene.as_schema(CANONICAL_V1)
+    with pytest.raises(SceneSchemaError, match="No derivation plan"):
+        scene.as_schema(CANONICAL)
 
 
 def test_feature_columns_canonical_order() -> None:
     """Feature columns should reflect only persisted tensor fields in canonical order."""
-    assert POSITIONS_ONLY_V1.feature_columns() == ("x", "y")
-    assert POSITIONS_YAW_V1.feature_columns() == ("x", "y", "yaw")
-    assert CANONICAL_V1.feature_columns() == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
+    assert POSITIONS_ONLY.feature_columns() == ("x", "y")
+    assert POSITIONS_YAW.feature_columns() == ("x", "y", "yaw")
+    assert CANONICAL.feature_columns() == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
 
 
 def test_scene_to_numpy_dict_schema() -> None:
@@ -168,12 +172,12 @@ def test_scene_to_numpy_dict_schema() -> None:
         scene_number=3,
         input_len=2,
         output_len=1,
-        schema=POSITIONS_ONLY_V1,
+        schema=POSITIONS_ONLY,
         sample_time=1.0,
     )
 
-    canonical = scene_to_numpy_dict(scene, scene_schema=CANONICAL_V1, dtype=np.float64)
-    positions_only = scene_to_numpy_dict(scene, scene_schema=POSITIONS_ONLY_V1, dtype=np.float64)
+    canonical = scene_to_numpy_dict(scene, scene_schema=CANONICAL, dtype=np.float64)
+    positions_only = scene_to_numpy_dict(scene, scene_schema=POSITIONS_ONLY, dtype=np.float64)
 
     assert canonical["features"].shape == (1, 3, 7)
     assert positions_only["features"].shape == (1, 3, 2)

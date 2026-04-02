@@ -1,3 +1,5 @@
+"""Linear interpolation backend for temporal trajectory resampling."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
@@ -26,6 +28,7 @@ def linear_resample(
     frame_column: str = "frame",
     group_by: str | Sequence[str] | None = None,
 ) -> DataFrameT:
+    """Resample trajectory data using linear interpolation and carry-forward values."""
     plan = build_plan(spec, frame_column=frame_column, group_by=group_by)
 
     if spec.no_resampling:

@@ -1,3 +1,5 @@
+"""Block-oriented transforms used for temporal split assignment."""
+
 from __future__ import annotations
 
 import random

@@ -1,3 +1,5 @@
+"""Scene containers and schema-conversion helpers."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -7,13 +9,14 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
+from dronalize.core.errors import SceneSchemaError
 from dronalize.core.maps.graph import MapGraph
 from dronalize.core.scene.derivations import (
     ConversionContext,
     apply_derivation_plan,
     plan_derivations,
 )
-from dronalize.core.scene.schema import CANONICAL_V1, SceneField, SceneSchema
+from dronalize.core.scene.schema import CANONICAL, SceneField, SceneSchema
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
@@ -91,7 +94,7 @@ class Scene:
                 expected=self.schema.physical,
                 schema_name=self.schema.name,
             )
-            raise ValueError(msg)
+            raise SceneSchemaError(msg)
 
     def resolve_map(self) -> MapGraph | None:
         """Materialize the map graph associated with this scene, if available."""
@@ -103,7 +106,7 @@ class Scene:
         """Return whether this scene can materialize a map graph."""
         return self.map_resolver is not None
 
-    def as_schema(self, schema: SceneSchema = CANONICAL_V1) -> Scene:
+    def as_schema(self, schema: SceneSchema = CANONICAL) -> Scene:
         """Return a copy converted to the requested scene schema."""
         if self.schema == schema and _matches_physical_schema(self.frame.schema, schema.physical):
             return self
@@ -130,7 +133,7 @@ class Scene:
         )
 
 
-def convert_scene(scene: Scene, target: SceneSchema = CANONICAL_V1) -> Scene:
+def convert_scene(scene: Scene, target: SceneSchema = CANONICAL) -> Scene:
     """Convert a scene to the requested schema."""
     return replace(
         scene,
@@ -146,7 +149,7 @@ def derived_scene_fields(
 ) -> tuple[SceneField, ...]:
     """Return target schema fields that would be materialized by conversion.
 
-    The result is ordered according to the target schema. A `ValueError` is
+    The result is ordered according to the target schema. A `SceneSchemaError` is
     raised when the requested conversion cannot be planned with the available
     source fields and sampling metadata.
 
@@ -159,7 +162,7 @@ def derived_scene_fields(
     plan = plan_derivations(source.fields, target.fields, context)
     if plan is None:
         msg = f"No derivation plan found to convert from schema {source.name} to {target.name} "
-        raise ValueError(msg)
+        raise SceneSchemaError(msg)
 
     return tuple(field for field in target.ordered_fields() if (missing_fields & field) == field)
 
@@ -189,13 +192,13 @@ def _derive_missing_fields(
     plan = plan_derivations(source.fields, target.fields, context)
     if plan is None:
         msg = f"No derivation plan found to convert from schema {source.name} to {target.name} "
-        raise ValueError(msg)
+        raise SceneSchemaError(msg)
 
     output, output_fields = apply_derivation_plan(data, plan, context, source.fields)
     if output_fields != target.fields:
         missing = ", ".join(field.to_str() for field in (target.fields & ~output_fields).fields())
         msg = f"Cannot materialize scene schema {target.name}; missing {missing}."
-        raise ValueError(msg)
+        raise SceneSchemaError(msg)
     return output
 
 

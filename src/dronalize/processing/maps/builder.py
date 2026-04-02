@@ -1,3 +1,5 @@
+"""Generic map-graph builder abstractions and geometry helpers."""
+
 from __future__ import annotations
 
 import math

@@ -1,3 +1,5 @@
+"""Map-graph builder for the Waymo Open Dataset."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

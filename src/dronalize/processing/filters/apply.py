@@ -1,3 +1,5 @@
+"""Application and diagnostics helpers for scene-filter rule sets."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,3 +1,5 @@
+"""Single-process executor for sequential scene generation and writing."""
+
 from __future__ import annotations
 
 import itertools

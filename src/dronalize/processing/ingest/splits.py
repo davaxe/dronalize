@@ -8,6 +8,7 @@ from typing import Annotated, ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dronalize.core.categories import DatasetSplit
+from dronalize.core.errors import SplitError
 
 SplitModeName = Literal["time", "shuffled-time", "scene", "source", "auto", "native", "none"]
 NativeSplitSelection = Sequence[DatasetSplit | str] | DatasetSplit | str | None
@@ -107,7 +108,7 @@ class SplitWeights(BaseModel):
     def _validate_total_weight(self) -> SplitWeights:
         if self.train + self.val + self.test <= 0:
             msg = "At least one split weight must be greater than zero."
-            raise ValueError(msg)
+            raise SplitError(msg)
         return self
 
     def active_splits(self) -> tuple[DatasetSplit, ...]:
@@ -145,12 +146,12 @@ class SplitConfig(BaseModel):
         if isinstance(self.mode, (NativeSplit, Unsplit)):
             if self.ratio is not None:
                 msg = "Resolved native or unsplit configs must not carry split ratios."
-                raise ValueError(msg)
+                raise SplitError(msg)
             return self
 
         if self.ratio is None:
             msg = "Resolved custom split configs require train/val/test split ratios."
-            raise ValueError(msg)
+            raise SplitError(msg)
         return self
 
     @property

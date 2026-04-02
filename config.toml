@@ -1,5 +1,5 @@
-# Debug config for one dataset using the explicit TOML-facing schema.
-# This file intentionally demonstrates most of the override surface.
+# Example config for one dataset using the explicit TOML-facing schema.
+# This file is intended to be a real, loadable example.
 
 [global.execution]
 jobs = 4
@@ -29,10 +29,6 @@ columns = ["vx", "vy"]
 [[datasets.a43.loader.resampling.output_derivatives]]
 order = 2
 columns = ["ax", "ay"]
-
-[datasets.a43.loader.options]
-custom_flag = "debug"
-emit_metrics = true
 
 [datasets.a43.loader.filter]
 mode = "extend"

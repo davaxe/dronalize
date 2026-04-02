@@ -1,3 +1,5 @@
+"""Loader implementation for the ApolloScape dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +10,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
-from dronalize.core.scene import POSITIONS_YAW_V1
+from dronalize.core.scene import POSITIONS_YAW
 from dronalize.processing.filters.agent import MinSamples
 from dronalize.processing.filters.filter import Filter
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
@@ -24,7 +26,7 @@ if TYPE_CHECKING:
     from dronalize.processing.maps.config import MapConfig
 
 
-class ApolloScapeLoader(BaseSceneLoader[Path]):
+class ApolloScapeLoader(BaseSceneLoader):
     """Loader for the ApolloScape dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -108,7 +110,7 @@ class ApolloScapeLoader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_YAW_V1
+        return POSITIONS_YAW
 
     @classmethod
     @override

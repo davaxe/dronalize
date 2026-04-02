@@ -1,3 +1,5 @@
+"""Map-building scope helpers for the rounD dataset."""
+
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path

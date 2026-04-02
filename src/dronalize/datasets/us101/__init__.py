@@ -7,7 +7,7 @@ DESCRIPTOR = DatasetDescriptor.from_loader(
     "us101",
     US101Loader,
     execution_scope_fn=_scope.us101_execution_scope,
-    capabilities=DatasetCapabilities.MAP_AVAILABLE | DatasetCapabilities.HIGHWAY_PIPELINE,
+    capabilities=DatasetCapabilities.HIGHWAY_PIPELINE,
     infer_capabilities=True,
 )
 

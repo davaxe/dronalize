@@ -1,32 +1,27 @@
+"""Adapters for reading Dronalize MDS exports as raw tensor samples."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypedDict, cast, overload
 
+import torch
+from streaming import Stream, StreamingDataset
 from typing_extensions import Unpack, override
 
-from dronalize._internal.optional import raise_missing_optional_dependency
 from dronalize.io.adapters.sample import RawSceneSample as _RawSceneSample
 
-try:
-    import torch
-    from streaming import Stream, StreamingDataset
-    from torch_geometric.data import Dataset, HeteroData
-except ModuleNotFoundError as error:
-    raise_missing_optional_dependency(error, feature="The MDS PyG dataset adapter", extra="pyg")
-
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator, Sequence
+    from collections.abc import Iterator, Sequence
     from pathlib import Path
 
     import numpy as np
     import numpy.typing as npt
 
-# Rexport streaming.Stream for users of this module, so they don't need to
-# import streaming directly.
-__all__ = ["Stream"]
+# Re-export the streaming entry point and the public raw-reader surface.
+__all__ = ["MDSDataset", "Stream", "StreamingDatasetInitArgs"]
 
 
-class _StreamingDatasetInitArgs(TypedDict, total=False):
+class StreamingDatasetInitArgs(TypedDict, total=False):
     """All optional arguments to `StreamingDataset` initializer."""
 
     download_retry: int
@@ -52,7 +47,7 @@ class _StreamingDatasetInitArgs(TypedDict, total=False):
     stream_config: dict[str, Any]
 
 
-class _MDSDatasetBackend(StreamingDataset):
+class MDSDataset(StreamingDataset):
     """Read raw scene samples from an MDS dataset split."""
 
     @override
@@ -62,7 +57,7 @@ class _MDSDatasetBackend(StreamingDataset):
         path: Path | None = None,
         split: str | None = None,
         streams: Sequence[Stream] | None = None,
-        **args: Unpack[_StreamingDatasetInitArgs],
+        **args: Unpack[StreamingDatasetInitArgs],
     ) -> None:
         if path is None and streams is None:
             msg = "Either `path` or `streams` must be provided."
@@ -75,8 +70,9 @@ class _MDSDatasetBackend(StreamingDataset):
 
     @override
     def __iter__(self) -> Iterator[_RawSceneSample]:  # pyright: ignore[reportIncompatibleMethodOverride]
-        # This implcity calls __get_item__ that converts the raw dict samples
-        # into MDSRawSceneSample instances.
+        """Iterate over raw scene samples decoded into ``RawSceneSample`` objects."""
+        # StreamingDataset iteration goes through __getitem__, so samples are
+        # converted from raw dicts into RawSceneSample instances here as well.
         return cast("Iterator[_RawSceneSample]", super().__iter__())
 
     @overload
@@ -91,6 +87,7 @@ class _MDSDatasetBackend(StreamingDataset):
     def __getitem__(
         self, at: int | slice | list[int] | npt.NDArray[np.int64]
     ) -> _RawSceneSample | list[_RawSceneSample]:
+        """Return one or more decoded raw scene samples."""
         out: dict[str, Any] | list[dict[str, Any]] = super().__getitem__(at)
         if isinstance(out, list):
             return [self._convert_sample(sample) for sample in out]
@@ -106,7 +103,7 @@ class _MDSDatasetBackend(StreamingDataset):
         map_edge_types = torch.tensor(sample["map_edge_types"])
 
         (map_node_positions, map_edge_indices, map_node_types, map_edge_types) = (
-            _MDSDatasetBackend._normalize_map_tensors(
+            MDSDataset._normalize_map_tensors(
                 map_node_positions, map_edge_indices, map_node_types, map_edge_types
             )
         )
@@ -152,60 +149,3 @@ class _MDSDatasetBackend(StreamingDataset):
             )
 
         return map_node_positions, map_edge_indices, map_node_types, map_edge_types
-
-
-class MDSHeteroDataset(Dataset):
-    """PyG compatible dataset for trajectory (scenes) data."""
-
-    def __init__(
-        self,
-        *,
-        path: Path | None = None,
-        split: str | None = None,
-        streams: Sequence[Stream] | None = None,
-        transform: Callable[[HeteroData], HeteroData] | None = None,
-        backend_args: _StreamingDatasetInitArgs | None = None,
-    ) -> None:
-        super().__init__(transform=transform)
-        self.backend: _MDSDatasetBackend = _MDSDatasetBackend(
-            path=path, split=split, streams=streams, **(backend_args or {})
-        )
-
-    @override
-    def __iter__(self) -> Iterator[HeteroData]:
-        for raw_sample in self.backend:
-            yield _convert_to_hetero(raw_sample)
-
-    @override
-    def len(self) -> int:
-        return len(self.backend)
-
-    @override
-    def get(self, idx: int) -> HeteroData:
-        return _convert_to_hetero(self.backend[idx])
-
-
-def _convert_to_hetero(sample: _RawSceneSample) -> HeteroData:
-    data = HeteroData()
-
-    # Agent node store
-    data["agent"].x = sample.input_features
-    data["agent"].x_mask = sample.input_mask
-    data["agent"].y = sample.output_features
-    data["agent"].y_mask = sample.output_mask
-    data["agent"].agent_type = sample.agent_types
-    data["agent"].num_nodes = sample.input_features.size(0)
-
-    # Map node store
-    data["map"].x = sample.map_node_positions
-    data["map"].node_type = sample.map_node_types
-    data["map"].num_nodes = sample.map_node_positions.size(0)
-
-    # Map edges
-    data["map", "connects", "map"].edge_index = sample.map_edge_indices.long()
-    data["map", "connects", "map"].edge_type = sample.map_edge_types
-
-    # Scene-level metadata
-    data.scene_number = int(sample.scene_number)
-    data.global_origin = sample.global_origin
-    return data

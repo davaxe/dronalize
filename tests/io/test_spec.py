@@ -1,12 +1,14 @@
+from pathlib import Path
+
 import numpy as np
 import polars as pl
 from polars.testing import assert_series_equal
 
 from dronalize.core.maps import MapGraph
-from dronalize.core.scene import CANONICAL_V1, POSITIONS_ONLY_V1, Scene
+from dronalize.core.scene import CANONICAL, POSITIONS_ONLY, Scene
 from dronalize.io import WriterConfig
 from dronalize.io.encoding import encode_map_from_scene, scene_sample_to_parts, scene_to_numpy_dict
-from dronalize.io.manifest import FORMAT_VERSION, StorageManifest
+from dronalize.io.manifest import FORMAT_VERSION, StorageManifest, read_manifest, write_manifest
 from dronalize.processing.ingest import LoaderConfig
 
 
@@ -33,7 +35,7 @@ def _scene(*, with_map: bool = True) -> Scene:
         scene_number=7,
         input_len=2,
         output_len=1,
-        schema=CANONICAL_V1,
+        schema=CANONICAL,
         sample_time=1.0,
         map_key="toy-map" if with_map else None,
         map_resolver=(lambda _scene, graph=graph: graph) if with_map else None,
@@ -47,7 +49,7 @@ def test_manifest_matches_contract() -> None:
 
     manifest = StorageManifest.from_configs(
         loader_config=loader_config,
-        source_scene_schema=CANONICAL_V1,
+        source_scene_schema=CANONICAL,
         writer_config=writer_config,
         has_map=True,
     )
@@ -71,7 +73,7 @@ def test_manifest_lists_derived_fields() -> None:
 
     manifest = StorageManifest.from_configs(
         loader_config=loader_config,
-        source_scene_schema=POSITIONS_ONLY_V1,
+        source_scene_schema=POSITIONS_ONLY,
         writer_config=writer_config,
         has_map=False,
     )
@@ -98,6 +100,28 @@ def test_manifest_reads_older_payloads() -> None:
 
     assert manifest.source_scene_schema == "canonical"
     assert manifest.derived_features == ()
+
+
+def test_manifest_roundtrip_preserves_derived_features(tmp_path: Path) -> None:
+    """Writing and reading the current manifest format should preserve derived fields."""
+    manifest = StorageManifest(
+        format_version=FORMAT_VERSION,
+        source_scene_schema="positions_only",
+        scene_schema="canonical",
+        derived_features=("vx", "vy"),
+        feature_columns=("x", "y", "vx", "vy"),
+        input_len=2,
+        output_len=1,
+        precision="float32",
+        offset_positions=True,
+        has_map=False,
+        sample_time=1.0,
+        original_sample_time=1.0,
+    )
+
+    write_manifest(tmp_path, manifest)
+
+    assert read_manifest(tmp_path) == manifest
 
 
 def test_scene_encoding_names() -> None:

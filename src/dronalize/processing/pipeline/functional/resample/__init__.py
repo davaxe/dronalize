@@ -1,3 +1,5 @@
+"""Public API for temporal trajectory resampling."""
+
 from dronalize.processing.pipeline.functional.resample._common import (
     ColumnOrder,
     DerivativeOrderMap,

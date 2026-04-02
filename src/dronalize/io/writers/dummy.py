@@ -1,3 +1,5 @@
+"""No-op writer backend used for tests and dry-run style execution."""
+
 from __future__ import annotations
 
 import functools
@@ -19,7 +21,20 @@ if TYPE_CHECKING:
 
 
 def create_writer(*, log: bool, identifier: int | None = None) -> DummyWriter:
-    """Return factory function for dummy writer."""
+    """Construct a ``DummyWriter`` instance directly.
+
+    Parameters
+    ----------
+    log : bool
+        Whether ``finish_final()`` should print aggregated counts.
+    identifier : int | None, optional
+        Optional identifier attached to the writer instance.
+
+    Returns
+    -------
+    DummyWriter
+        Configured dummy writer instance.
+    """
     return DummyWriter(identifier, log=log)
 
 
@@ -59,6 +74,7 @@ class DummyWriter(SceneWriter):
     @classmethod
     @override
     def as_factory(cls, *, log: bool = False) -> Callable[[int | None], DummyWriter]:
+        """Create a factory that shares split counters across workers."""
         if cls._counts_shared is None:
             cls._counts_shared = {
                 "unsplit": mp.Value("i", 0),
@@ -71,6 +87,7 @@ class DummyWriter(SceneWriter):
 
     @override
     def write(self, scene: Scene, split: DatasetSplit | None = None) -> bool:
+        """Count one scene without writing any output."""
         effective_split = split if split is not None else scene.split_assignment
         self._count["scenes"] += 1
         self._count[effective_split.value if effective_split else "unsplit"] += 1
@@ -78,6 +95,7 @@ class DummyWriter(SceneWriter):
 
     @override
     def finish_local(self) -> None:
+        """Merge this worker's local counters into the shared totals."""
         for split, count in self._count.items():
             if self._count_shared is not None and split in self._count_shared:
                 with self._count_shared[split].get_lock():
@@ -85,6 +103,7 @@ class DummyWriter(SceneWriter):
 
     @override
     def finish_final(self) -> None:
+        """Optionally print the aggregated split counts for the full run."""
         if self._log:
             if self._count_shared is None:
                 return

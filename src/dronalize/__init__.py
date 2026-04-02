@@ -60,7 +60,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "MDSFormatConfig": ("dronalize.io.config", "MDSFormatConfig"),
     "MapConfig": ("dronalize.processing.maps.config", "MapConfig"),
     "PlanOverrides": ("dronalize.runtime.config", "PlanOverrides"),
-    "ProjectConfigFile": ("dronalize.runtime.config", "ProjectConfigFile"),
     "ResolvedConfig": ("dronalize.runtime.config", "ResolvedConfig"),
     "ResolvedExecutionConfig": ("dronalize.runtime.config", "ResolvedExecutionConfig"),
     "Scene": ("dronalize.core.scene.model", "Scene"),

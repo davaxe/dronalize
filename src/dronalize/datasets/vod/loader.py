@@ -1,3 +1,5 @@
+"""Loader implementation for the View-of-Delft dataset."""
+
 from collections.abc import Iterable
 from pathlib import Path
 

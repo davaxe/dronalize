@@ -1,3 +1,5 @@
+"""Base scene-loader implementation and split-assignment helpers."""
+
 from __future__ import annotations
 
 import itertools
@@ -6,14 +8,20 @@ import operator
 import random
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Concatenate
+from typing import TYPE_CHECKING, ClassVar, Concatenate, Generic, cast
 
-from typing_extensions import override
+from pydantic import BaseModel, ConfigDict, ValidationError
+from typing_extensions import TypeVar, override
 
 from dronalize._internal.typing import P, SourceT
 from dronalize.core.categories import DatasetSplit
-from dronalize.core.errors import SplitNotSupportedError, SplitStrategyNotSupportedError
-from dronalize.core.scene import CANONICAL_V1, Scene, SceneField, SceneSchema
+from dronalize.core.errors import (
+    LoaderConfigError,
+    SplitAssignmentError,
+    SplitNotSupportedError,
+    SplitStrategyNotSupportedError,
+)
+from dronalize.core.scene import Scene, SceneField, SceneSchema
 from dronalize.processing.ingest.assigner import SplitAssigner, StatelessWeightedAssigner
 from dronalize.processing.ingest.loader import (
     IngestedData,
@@ -32,17 +40,27 @@ from dronalize.processing.ingest.splits import (
     TimeBlockSplit,
     Unsplit,
 )
-from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapKey, MapResolver, no_map
 from dronalize.processing.pipeline.factory import trajectory_pipeline
 from dronalize.processing.pipeline.presets import highway_trajectory_spec, standard_trajectory_spec
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Mapping
 
     from dronalize.processing.ingest.config import LoaderConfig
     from dronalize.processing.ingest.splits import SplitConfig, SplitModeName
+    from dronalize.processing.maps.config import MapConfig
     from dronalize.processing.pipeline.pipeline import Pipeline
+
+
+class LoaderOptions(BaseModel):
+    """Configuration options for scene loaders."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+
+class NoLoaderOptions(LoaderOptions):
+    """Empty loader options for datasets that do not require any configuration."""
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
@@ -62,29 +80,63 @@ class LoaderSplitCapabilities:
     """Enable block-based assignment for long recordings that stay source-local."""
 
 
-class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
+_LoaderOptionsT = TypeVar("_LoaderOptionsT", bound=LoaderOptions, default=NoLoaderOptions)
+
+
+class BaseSceneLoader(
+    ABC, SceneLoader, ProcessableLoader[SourceT], Generic[SourceT, _LoaderOptionsT]
+):
     """Base class for turning lightweight sources into standardized scenes."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities()
     _shared_memory_name: ClassVar[dict[MapKey, str] | str | None] = None
-    _DEFAULT_MAP_CONFIG: ClassVar[object] = object()
 
     def __init__(
         self,
         loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | object | None = _DEFAULT_MAP_CONFIG,
-        *,
+        map_config: MapConfig | None = None,
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         split_request: SplitConfig | None = None,
-        output_schema: SceneSchema | None = CANONICAL_V1,
+        output_schema: SceneSchema | None = None,
+        loader_options: _LoaderOptionsT | None = None,
     ) -> None:
+        """Initialize the loader with the given configuration and split request.
+
+        Parameters
+        ----------
+        loader_config : LoaderConfig | None, optional
+            Configuration for the loader's processing pipeline. When omitted,
+            the loader uses its default configuration.
+        map_config : MapConfig | None, optional
+            Configuration for map data processing. `None` indicates that
+            the loader should not attempt to resolve any map data for its scenes.
+        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
+            Predefined dataset splits to load. When omitted, the loader yields
+            sources across all available splits. When specified, the loader
+            validates that the requested splits are supported and only yields
+            sources belonging to those
+            splits.
+        split_request : SplitConfig | None, optional
+            Custom split request for dynamic assignment. When omitted, the
+            loader does not apply any custom split strategy and only uses
+            predefined splits if applicable.
+        output_schema : SceneSchema | None, optional
+            Schema to convert output scenes to before yielding. When omitted,
+            the loader produces scenes in its native schema. When explicitly set
+            to `None`, the loader also produces scenes in its native schema but
+            downstream consumers are not informed of this fact through metadata.
+        loader_options : LoaderOptions | None, optional
+            Dataset-specific options validated against this loader's
+            `loader_options_model()`. When omitted, the loader uses
+            `default_loader_options()`.
+
+        """
+        self.loader_options: _LoaderOptionsT = loader_options or self.default_loader_options()
         self._output_schema: SceneSchema | None = output_schema
         self._pipeline: Pipeline | None = None
         self.split_request: SplitConfig | None = split_request
         self.loader_config: LoaderConfig = loader_config or self.default_config()
-        self.map_config: MapConfig | None = (
-            self.default_map_config() if map_config is self._DEFAULT_MAP_CONFIG else map_config
-        )
+        self.map_config: MapConfig | None = map_config
         self._scene_counter: int = 0
         self._rng: random.Random = (
             random.Random(self.split_request.seed)
@@ -178,7 +230,28 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     @classmethod
     def default_map_config(cls) -> MapConfig | None:
         """Return the default map configuration for this dataset."""
-        return MapConfig.default()
+        return None
+
+    @classmethod
+    def loader_options_model(cls) -> type[_LoaderOptionsT]:
+        """Return model used for validating this loader's options, if any."""
+        # The cast keeps the default case lightweight for loaders without
+        # dataset-specific options.
+        return cast("type[_LoaderOptionsT]", NoLoaderOptions)
+
+    @classmethod
+    def default_loader_options(cls) -> _LoaderOptionsT:
+        """Return an instance of this loader's default configuration options."""
+        return cls.loader_options_model()()
+
+    @classmethod
+    def parse_loader_options(cls, options_dict: Mapping[str, object] | None) -> _LoaderOptionsT:
+        """Parse a dictionary of configuration options into this loader's options model."""
+        try:
+            return cls.loader_options_model().model_validate(options_dict or {})
+        except ValidationError as e:
+            msg = f"Invalid loader options for {cls.__name__}: {e}"
+            raise LoaderConfigError(msg) from e
 
     @abstractmethod
     def ingest(self, source: Source[SourceT]) -> Iterable[IngestedData]:
@@ -286,11 +359,13 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
     def for_each_scene(
         self, callback: Callable[Concatenate[Scene, P], None], *args: P.args, **kwargs: P.kwargs
     ) -> None:
+        """Call ``callback`` for each scene produced by :meth:`scenes`."""
         for scene in self.scenes():
             callback(scene, *args, **kwargs)
 
     @override
     def scenes(self) -> Iterable[Scene]:
+        """Yield fully constructed scenes across all selected sources."""
         for source in self.sources():
             for processed in self.process_next(source):
                 yield self.create_scene(processed, source, self._scene_counter)
@@ -317,6 +392,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     @override
     def process_next(self, source: Source[SourceT]) -> Iterable[ProcessedSceneData]:
+        """Process one source into scene payloads ready for ``Scene`` creation."""
         if self._pipeline is None:
             self._pipeline = self.pipeline()
 
@@ -336,6 +412,7 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
 
     @override
     def num_sources(self) -> int | None:
+        """Return the number of sources when known in advance."""
         return None
 
     @classmethod
@@ -369,13 +446,17 @@ class BaseSceneLoader(ABC, SceneLoader, ProcessableLoader[SourceT]):
                 )
             case TimeBlockSplit() | ShuffledTimeBlockSplit():
                 if "split" in data.frame:
-                    split_str: str = str(data.frame["split"].first())
-                    return DatasetSplit(split_str.lower())
+                    split_str = str(data.frame["split"].first())
+                    try:
+                        return DatasetSplit(split_str.lower())
+                    except ValueError as exc:
+                        msg = f"Invalid split assignment '{split_str}' in dataframe."
+                        raise SplitAssignmentError(msg) from exc
                 msg = "Did not get split column in dataframe"
-                raise ValueError(msg)
+                raise SplitAssignmentError(msg)
             case Unsplit() | NativeSplit() | BySourceSplit():
                 msg = "These cases should have been handled before calling this method."
-                raise ValueError(msg)
+                raise RuntimeError(msg)
 
     def _resolve_scene_split_assignment(
         self, data: ProcessedSceneData, source: Source[SourceT]

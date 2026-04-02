@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect as inspect_module
 from typing import TYPE_CHECKING, Any
 
 from rich import box
@@ -13,6 +12,8 @@ from dronalize.datasets.registry import DatasetCapabilities
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from pydantic import BaseModel
 
     from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.processing.ingest.config import LoaderConfig
@@ -36,16 +37,6 @@ _CUSTOM_SPLIT_MODE_DESCRIPTIONS: dict[SplitModeName, str] = {
     "native": "Use dataset-defined train/val/test partitions as-is.",
     "none": "Process all data without split routing.",
 }
-_RESERVED_LOADER_PARAMETER_NAMES = {
-    "data_root",
-    "root",
-    "loader_config",
-    "map_config",
-    "splits",
-    "split_request",
-    "output_schema",
-}
-
 PLAN_NOTICE = (
     "\n[bold yellow]This is the processing plan. No changes have been made yet.[/bold yellow]"
 )
@@ -55,7 +46,7 @@ _CAPABILITY_BADGES: tuple[tuple[DatasetCapabilities, str, str], ...] = (
     (DatasetCapabilities.CUSTOM_SPLITS, "blue", "custom splits"),
     (DatasetCapabilities.HIGHWAY_PIPELINE, "magenta", "highway pipeline"),
     (DatasetCapabilities.EXECUTION_SCOPE, "yellow", "execution scope"),
-    (DatasetCapabilities.EXTRA_LOADER_ARGS, "red", "extra loader args"),
+    (DatasetCapabilities.EXTRA_LOADER_ARGS, "red", "loader options"),
 )
 
 
@@ -153,7 +144,7 @@ def build_dataset_inspect_tables(descriptor: DatasetDescriptor) -> tuple[Table, 
     loader_defaults.add_row("Resampling", _format_resampling(config))
     loader_defaults.add_row("Windowing", _format_windowing(config))
     loader_defaults.add_row("Filter rules", _format_filter_rules(config))
-    loader_defaults.add_row("Options", _format_options(config.options))
+    loader_defaults.add_row("Options", _format_options(descriptor.default_loader_options))
 
     tables: list[Table] = [overview, loader_defaults]
     if loader_options := _loader_option_rows(descriptor):
@@ -336,11 +327,14 @@ def _format_filter_rules(config: LoaderConfig) -> str:
     return " | ".join(groups) if groups else "none"
 
 
-def _format_options(options: dict[str, Any]) -> str:
+def _format_options(options: BaseModel) -> str:
     """Return a readable summary of loader options."""
-    if not options:
+    options_dict: dict[str, Any] = {}
+    if hasattr(options, "model_dump"):
+        options_dict = options.model_dump(exclude_defaults=False)
+    if not options_dict:
         return "none"
-    return ", ".join(f"{key}={value!r}" for key, value in sorted(options.items()))
+    return ", ".join(f"{key}={value!r}" for key, value in sorted(options_dict.items()))
 
 
 def _format_map_extraction(map_config: MapConfig) -> str:
@@ -372,23 +366,11 @@ def _format_supported_modes(
 
 
 def _loader_option_rows(descriptor: DatasetDescriptor) -> list[tuple[str, str]]:
-    """Return non-standard loader constructor options and their defaults."""
-    parameters = inspect_module.signature(descriptor.loader_factory).parameters
+    """Return typed loader option fields and their defaults."""
+    default_values = descriptor.default_loader_options.model_dump(exclude_defaults=False)
     rows: list[tuple[str, str]] = []
-    for index, parameter in enumerate(parameters.values()):
-        if parameter.kind in {
-            inspect_module.Parameter.VAR_POSITIONAL,
-            inspect_module.Parameter.VAR_KEYWORD,
-        }:
-            continue
-        if index < 3:
-            continue
-        if parameter.name in _RESERVED_LOADER_PARAMETER_NAMES:
-            continue
-
-        if parameter.default is inspect_module.Signature.empty:
-            default = "[yellow]required[/yellow]"
-        else:
-            default = repr(parameter.default)
-        rows.append((parameter.name, default))
+    for name, field in descriptor.loader_options_type.model_fields.items():
+        value = default_values.get(name)
+        default = "[yellow]required[/yellow]" if field.is_required() else repr(value)
+        rows.append((name, default))
     return rows

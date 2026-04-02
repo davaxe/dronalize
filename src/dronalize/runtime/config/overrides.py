@@ -1,3 +1,5 @@
+"""Runtime-only overrides layered on top of authoring configuration."""
+
 from __future__ import annotations
 
 from typing import ClassVar

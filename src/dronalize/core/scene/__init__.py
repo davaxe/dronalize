@@ -2,12 +2,12 @@
 
 from dronalize.core.scene.model import MapKey, MapResolver, Scene
 from dronalize.core.scene.schema import (
-    CANONICAL_V1,
-    POSITIONS_ONLY_V1,
-    POSITIONS_VELOCITY_ACCELERATION_V1,
-    POSITIONS_VELOCITY_V1,
-    POSITIONS_VELOCITY_YAW_V1,
-    POSITIONS_YAW_V1,
+    CANONICAL,
+    POSITIONS_ONLY,
+    POSITIONS_VELOCITY,
+    POSITIONS_VELOCITY_ACCELERATION,
+    POSITIONS_VELOCITY_YAW,
+    POSITIONS_YAW,
     SCENE_SCHEMAS,
     SceneField,
     SceneSchema,
@@ -17,12 +17,12 @@ from dronalize.core.scene.schema import (
 )
 
 __all__ = [
-    "CANONICAL_V1",
-    "POSITIONS_ONLY_V1",
-    "POSITIONS_VELOCITY_ACCELERATION_V1",
-    "POSITIONS_VELOCITY_V1",
-    "POSITIONS_VELOCITY_YAW_V1",
-    "POSITIONS_YAW_V1",
+    "CANONICAL",
+    "POSITIONS_ONLY",
+    "POSITIONS_VELOCITY",
+    "POSITIONS_VELOCITY_ACCELERATION",
+    "POSITIONS_VELOCITY_YAW",
+    "POSITIONS_YAW",
     "SCENE_SCHEMAS",
     "MapKey",
     "MapResolver",

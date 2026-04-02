@@ -4,8 +4,10 @@ import numpy as np
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
+from pydantic import ValidationError
 from scipy.interpolate import CubicHermiteSpline, CubicSpline
 
+from dronalize.core.errors import LoaderConfigError
 from dronalize.processing.pipeline.functional.resample import ResampleMethod, ResampleSpec, resample
 
 
@@ -17,36 +19,50 @@ def test_spec_simplifies_ratio() -> None:
 
 def test_spec_rejects_derivative_lengths() -> None:
     """Derivative column groups must align with the position dimensionality."""
-    with pytest.raises(ValueError, match="must match position_columns length"):
+    with pytest.raises(ValidationError) as exc_info:
         _ = ResampleSpec(
             method=ResampleMethod.HERMITE,
             position_columns=dict.fromkeys(("x", "y")),
             input_derivatives={1: dict.fromkeys(("vx",))},
         )
+    assert "must match position_columns length" in str(exc_info.value)
+    assert isinstance(exc_info.value.errors()[0]["ctx"]["error"], LoaderConfigError)
 
 
 def test_linear_rejects_derivatives() -> None:
     """Linear resampling rejects derivative inputs and outputs."""
-    with pytest.raises(ValueError, match="does not support derivative"):
+    with pytest.raises(ValidationError) as exc_info:
         _ = ResampleSpec(
             method=ResampleMethod.LINEAR, output_derivatives={1: dict.fromkeys(("vx", "vy"))}
         )
+    assert "does not support derivative" in str(exc_info.value)
+    error = exc_info.value.errors()[0]
+    assert "ctx" in error
+    ctx = error["ctx"]
+    assert isinstance(ctx["error"], LoaderConfigError)
 
 
 def test_hermite_requires_first_order() -> None:
     """Hermite resampling requires first-order derivative constraints."""
-    with pytest.raises(
-        ValueError, match="Hermite resampling requires exactly first-order derivative inputs"
-    ):
+    with pytest.raises(ValidationError) as exc_info:
         _ = ResampleSpec(method=ResampleMethod.HERMITE)
+    assert "Hermite resampling requires exactly first-order derivative inputs" in str(
+        exc_info.value
+    )
+    error = exc_info.value.errors()[0]
+    assert "ctx" in error
+    ctx = error["ctx"]
+    assert isinstance(ctx["error"], LoaderConfigError)
 
 
 def test_cubic_rejects_derivatives() -> None:
     """Cubic spline resampling no longer switches implicitly to Hermite."""
-    with pytest.raises(ValueError, match="does not accept input_derivatives"):
+    with pytest.raises(ValidationError) as exc_info:
         _ = ResampleSpec(
             method=ResampleMethod.CUBIC, input_derivatives={1: dict.fromkeys(("vx", "vy"))}
         )
+    assert "does not accept input_derivatives" in str(exc_info.value)
+    assert isinstance(exc_info.value.errors()[0]["ctx"]["error"], LoaderConfigError)
 
 
 def test_linear_no_resampling_preserves_cols() -> None:

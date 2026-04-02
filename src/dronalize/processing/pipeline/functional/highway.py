@@ -1,3 +1,5 @@
+"""Highway-specific transforms used for lane-change sampling pipelines."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

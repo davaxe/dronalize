@@ -1,29 +1,54 @@
+"""Enumerations and coercion helpers for shared categorical types."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Collection, Iterable
-from enum import Enum, IntEnum, auto
+from enum import Enum, IntEnum
 from typing import TypeVar
 
 
 class AgentCategory(IntEnum):
-    """Enumeration of categories of agents / objects."""
+    """Enumeration of categories of agents / objects.
 
-    CAR = auto()
-    VAN = auto()
-    TRAILER = auto()
-    TRUCK = auto()
-    TRAM = auto()
-    BUS = auto()
-    MOTORCYCLE = auto()
-    BICYCLE = auto()
-    PEDESTRIAN = auto()
-    TRICYCLE = auto()
-    ANIMAL = auto()
-    STATIC_OBJECT = auto()
-    MOVEABLE_OBJECT = auto()
-    EMERGENCY_VEHICLE = auto()
-    UNKNOWN = auto()
-    UNIMPORTANT = auto()
+    !!! note "Dataset-dependent categories"
+        Agent categories are not standardized across datasets, and are mapped
+        from their original dataset-specific labels into this shared set of
+        categories as closely as possible.
+
+    """
+
+    ANIMAL = 1
+    """Non-human agents, including pets and wildlife."""
+    BICYCLE = 2
+    """Two-wheeled non-motorized vehicles."""
+    BUS = 3
+    """Large passenger vehicles, including city buses."""
+    CAR = 4
+    """Passenger vehicles, including sedans, SUVs, and pickup trucks."""
+    EMERGENCY_VEHICLE = 5
+    """Emergency response vehicles."""
+    MOTORCYCLE = 6
+    """Two-wheeled motorized vehicles."""
+    MOVEABLE_OBJECT = 7
+    """Generic category for moveable-objects (dataset dependent)."""
+    PEDESTRIAN = 8
+    """People walking or running."""
+    STATIC_OBJECT = 9
+    """Generic category for static-objects (dataset dependent)."""
+    TRAILER = 10
+    """Semi-trailers and other trailer types."""
+    TRAM = 11
+    """Street-level rail vehicles."""
+    TRICYCLE = 12
+    """Three-wheeled vehicles."""
+    TRUCK = 13
+    """Heavy-duty vehicles."""
+    UNIMPORTANT = 14
+    """Agents that are unimportant to model for a given dataset or task."""
+    UNKNOWN = 15
+    """Agents of unknown or unclassifiable category."""
+    VAN = 16
+    """Larger passenger vehicles, including minivans and cargo vans."""
 
     @classmethod
     def from_string(cls, value: str) -> AgentCategory:

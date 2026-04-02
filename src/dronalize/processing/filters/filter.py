@@ -1,3 +1,5 @@
+"""Filter containers, specs, and rule-merging helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

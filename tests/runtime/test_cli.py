@@ -134,3 +134,23 @@ gap = 2
     assert "Invalid configuration:" in result.output
     assert "datasets.a43.split" in result.output
     assert "Traceback" not in result.output
+
+
+def test_show_config_rejects_highway_config_for_unsupported_dataset_without_traceback(
+    tmp_path: Path,
+) -> None:
+    """Unsupported highway config should fail during planning with a clean CLI error."""
+    config_path = tmp_path / "bad.toml"
+    _ = config_path.write_text(
+        """[datasets.waymo.loader.highway]
+persist = 2
+negative_keep_every = 3
+""",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["show-config", "waymo", "--config", str(config_path)])
+
+    assert result.exit_code == 2
+    assert "waymo does not support highway sampling" in result.output
+    assert "Traceback" not in result.output

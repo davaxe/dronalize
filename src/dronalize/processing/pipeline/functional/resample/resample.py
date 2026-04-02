@@ -1,3 +1,5 @@
+"""Public entry point for temporal resampling of trajectory tables."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -24,7 +26,28 @@ def resample(
     frame_column: str = "frame",
     group_by: str | Sequence[str] | None = None,
 ) -> DataFrameT:
-    """Resample trajectory data according to an explicit resampling spec."""
+    """Resample trajectory data according to an explicit resampling spec.
+
+    Parameters
+    ----------
+    data : DataFrameT
+        Polars ``DataFrame`` or ``LazyFrame`` containing the trajectory data to
+        resample.
+    spec : ResampleSpec | None, optional
+        Resampling specification. When omitted, the default
+        :class:`ResampleSpec` is used.
+    frame_column : str, optional
+        Column containing monotonically increasing frame indices within each
+        trajectory group.
+    group_by : str or sequence of str or None, optional
+        Column or columns that define independent trajectories. When ``None``,
+        the full table is treated as one trajectory.
+
+    Returns
+    -------
+    DataFrameT
+        Resampled table of the same eager/lazy type as ``data``.
+    """
     resample_spec = spec or ResampleSpec()
     match resample_spec.method:
         case ResampleMethod.LINEAR:

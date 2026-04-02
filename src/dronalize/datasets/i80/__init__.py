@@ -6,7 +6,7 @@ from dronalize.datasets.registry import DatasetCapabilities, DatasetDescriptor
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "i80",
     I80Loader,
-    capabilities=DatasetCapabilities.MAP_AVAILABLE | DatasetCapabilities.HIGHWAY_PIPELINE,
+    capabilities=DatasetCapabilities.HIGHWAY_PIPELINE,
     infer_capabilities=True,
     execution_scope_fn=i80_execution_scope,
 )

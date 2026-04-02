@@ -1,3 +1,5 @@
+"""Persisted metadata models shared across storage backends."""
+
 from __future__ import annotations
 
 import json
@@ -75,7 +77,26 @@ class StorageManifest:
         writer_config: WriterConfig,
         has_map: bool,
     ) -> StorageManifest:
-        """Create a manifest from resolved loader and writer settings."""
+        """Create a manifest from resolved loader and writer settings.
+
+        Parameters
+        ----------
+        loader_config : LoaderConfig
+            Effective loader configuration after all overrides have been
+            applied.
+        source_scene_schema : SceneSchema
+            Schema produced natively by the dataset loader before optional
+            conversion for storage.
+        writer_config : WriterConfig
+            Effective writer configuration used for persistence.
+        has_map : bool
+            Whether exported scenes are expected to carry map payloads.
+
+        Returns
+        -------
+        StorageManifest
+            Manifest ready to serialize next to the exported dataset.
+        """
         return cls(
             format_version=FORMAT_VERSION,
             source_scene_schema=source_scene_schema.name,
@@ -99,17 +120,19 @@ class StorageManifest:
         )
 
     def to_json_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable dict representation of the manifest."""
+        """Return a JSON-serializable representation of the manifest."""
         return asdict(self)
 
     @classmethod
     def from_json_dict(cls, payload: dict[str, Any]) -> StorageManifest:
-        """Create a manifest from JSON data."""
+        """Create a manifest from previously serialized JSON data."""
         return cls(
             format_version=int(payload["format_version"]),
             source_scene_schema=str(payload.get("source_scene_schema", payload["scene_schema"])),
             scene_schema=str(payload["scene_schema"]),
-            derived_features=tuple(payload.get("derived_scene_fields", ())),
+            derived_features=tuple(
+                payload.get("derived_features", payload.get("derived_scene_fields", ()))
+            ),
             feature_columns=tuple(payload["feature_columns"]),
             input_len=int(payload["input_len"]),
             output_len=int(payload["output_len"]),
@@ -122,7 +145,7 @@ class StorageManifest:
 
 
 def manifest_path(root: Path) -> Path:
-    """Return the manifest file path for one storage root."""
+    """Return the manifest path for one storage root."""
     return root / MANIFEST_FILENAME
 
 

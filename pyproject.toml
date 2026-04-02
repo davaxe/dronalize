@@ -18,6 +18,8 @@ dependencies = [
     "numpy>=1.24.0",
     "polars>=1.0.0",
     "scipy>=1.10.0",
+    "torch>=2.0.0",
+    "mosaicml-streaming>=0.13.0",
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
     "tomli>=2.0.1; python_version < '3.11'",
@@ -34,8 +36,7 @@ plot = ["altair>=5.0.0"]
 lyft = ["zarr<3", "numcodecs<=0.13.1", "protobuf>=4.25.8"]
 waymo = ["protobuf>=4.25.8"]
 ad4che = ["opencv-python"]
-storage-mds = ["mosaicml-streaming>=0.13.0"]
-pyg = ["dronalize[storage-mds]", "torch>=2.0.0", "torch-geometric>=2.7.0"]
+pyg = ["torch-geometric>=2.7.0"]
 
 all_datasets = ["dronalize[ad4che, waymo, lyft]"]
 
@@ -53,7 +54,9 @@ tools = [
     "mkdocs-material>=9.6.0",
     "mkdocstrings[python]>=1.0.3",
     "pyrefly>=0.55.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.15.4",
+    "zensical>=0.0.31",
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -7,7 +7,7 @@ DESCRIPTOR = DatasetDescriptor.from_loader(
     "exid",
     ExiDLoader,
     execution_scope_fn=_scope.exid_execution_scope,
-    capabilities=DatasetCapabilities.MAP_AVAILABLE | DatasetCapabilities.HIGHWAY_PIPELINE,
+    capabilities=DatasetCapabilities.HIGHWAY_PIPELINE,
     infer_capabilities=True,
 )
 

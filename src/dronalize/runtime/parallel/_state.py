@@ -1,3 +1,5 @@
+"""Shared multiprocessing state used by the parallel runtime executor."""
+
 from __future__ import annotations
 
 import contextlib

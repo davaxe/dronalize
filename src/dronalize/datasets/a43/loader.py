@@ -1,3 +1,5 @@
+"""Loader implementation for the A43 dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +9,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1, Scene
+from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION, Scene
 from dronalize.datasets.a43.maps.builder import A43MapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
@@ -27,7 +29,7 @@ if TYPE_CHECKING:
     from dronalize.processing.maps.resolver import MapResolver
 
 
-class A43Loader(BaseSceneLoader[Path]):
+class A43Loader(BaseSceneLoader):
     """Scene loader for the A43 dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -96,7 +98,7 @@ class A43Loader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_VELOCITY_ACCELERATION_V1
+        return POSITIONS_VELOCITY_ACCELERATION
 
     @classmethod
     @override
@@ -115,7 +117,7 @@ class A43Loader(BaseSceneLoader[Path]):
     @override
     def map_resolver(self) -> MapResolver:
         def _resolver(scene: Scene) -> MapGraph | None:
-            if scene.map_key is None:
+            if scene.map_key is None or self.map_config is None:
                 return None
 
             min_x = scene.frame.select(pl.col("x")).min().item()

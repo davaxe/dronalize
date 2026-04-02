@@ -1,3 +1,5 @@
+"""Loader implementation for the Argoverse 2 dataset."""
+
 from __future__ import annotations
 
 import functools
@@ -5,16 +7,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
+from pydantic import Field
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
+from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.filters.cleanup import ExcludeCategories
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderOptions, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
 from dronalize.processing.maps.config import MapConfig
@@ -28,7 +31,13 @@ if TYPE_CHECKING:
     from dronalize.processing.maps.resolver import MapResolver
 
 
-class Argoverse2Loader(BaseSceneLoader[list[Path]]):
+class Argoverse2LoaderOptions(LoaderOptions):
+    """Loader options for the Argoverse 2 dataset."""
+
+    file_batch_size: int = Field(default=100, ge=1)
+
+
+class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
     """Loader for Argoverse 2 trajectory data stored in Parquet files."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -43,7 +52,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         split_request: SplitConfig | None = None,
         *,
-        file_batch_size: int | None = 100,
+        loader_options: Argoverse2LoaderOptions | None = None,
     ) -> None:
         """Initialize the Argoverse 2 loader.
 
@@ -53,8 +62,9 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             Root directory of the Argoverse 2 dataset. It should contain
             `train/`, `val/`, and `test/` subdirectories with scenario
             Parquet files.
-        file_batch_size : int, optional
-            Number of files to process in each batch.
+        loader_options : Argoverse2LoaderOptions, optional
+            Dataset-specific loader options. `file_batch_size` controls how
+            many scenario files are processed in each batch.
         loader_config : LoaderConfig, optional
             Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
@@ -66,9 +76,15 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
             map_config=map_config,
             splits=splits,
             split_request=split_request,
+            loader_options=loader_options,
         )
         self._data_root: Path = Path(data_root)
-        self._file_batch_size: int | None = file_batch_size
+        self._file_batch_size: int = self.loader_options.file_batch_size
+
+    @classmethod
+    @override
+    def loader_options_model(cls) -> type[Argoverse2LoaderOptions]:
+        return Argoverse2LoaderOptions
 
     @classmethod
     @override
@@ -79,9 +95,8 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         if not data_dir.is_dir():
             return
         parquet_files = sorted(data_dir.glob("*/*.parquet"))
-        batch_size: int = self._file_batch_size or len(parquet_files) or 1
-        for i in range(0, len(parquet_files), batch_size):
-            batch_files = parquet_files[i : i + batch_size]
+        for i in range(0, len(parquet_files), self._file_batch_size):
+            batch_files = parquet_files[i : i + self._file_batch_size]
             yield Source(identifier=i, data=batch_files)
 
     @override
@@ -129,7 +144,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_VELOCITY_YAW_V1
+        return POSITIONS_VELOCITY_YAW
 
     @classmethod
     @override
@@ -157,7 +172,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
     @override
     def map_resolver(self) -> MapResolver:
         def _resolver(scene: Scene) -> MapGraph | None:
-            if scene.map_key is None:
+            if scene.map_key is None or self.map_config is None:
                 return None
 
             return utils.extract_based_on_scene(
@@ -199,8 +214,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path]]):
         num_files = sum(1 for _ in data_dir.glob("*/*.parquet"))
         if num_files == 0:
             return 0
-        batch_size = self._file_batch_size or num_files
-        batches, extra = divmod(num_files, batch_size)
+        batches, extra = divmod(num_files, self._file_batch_size)
         return batches + int(extra > 0)
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:

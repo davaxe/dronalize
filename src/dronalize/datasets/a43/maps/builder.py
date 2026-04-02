@@ -1,3 +1,5 @@
+"""Map-graph builder for the A43 dataset."""
+
 from __future__ import annotations
 
 from typing_extensions import override

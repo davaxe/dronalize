@@ -1,3 +1,5 @@
+"""Small shared validation models for ranges and tolerances."""
+
 from __future__ import annotations
 
 from typing import Annotated, ClassVar, Literal

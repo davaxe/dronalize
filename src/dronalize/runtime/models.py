@@ -1,3 +1,5 @@
+"""Runtime plan and execution models for dataset processing runs."""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -27,7 +29,7 @@ if TYPE_CHECKING:
 
 @dataclass(slots=True, frozen=True)
 class SummarySection:
-    """One titled section in a processing summary."""
+    """One titled section in a rendered processing summary."""
 
     title: str
     rows: tuple[tuple[str, str], ...]
@@ -42,7 +44,7 @@ class ProcessingSummary:
 
     @property
     def rows(self) -> tuple[tuple[str, str], ...]:
-        """Return the summary rows flattened across all sections."""
+        """Return all summary rows flattened across sections."""
         return tuple(row for section in self.sections for row in section.rows)
 
 
@@ -51,13 +53,21 @@ class DatasetPlan:
     """Resolved, side-effect-free plan for one dataset processing run."""
 
     descriptor: DatasetDescriptor
+    """Underlying dataset descriptor that this plan is based on."""
     data_root: Path
+    """Root directory where the dataset files are located."""
     output_dir: Path
+    """Directory where processed dataset files should be written."""
     output_format: OutputFormat
+    """Output format to write the processed dataset in."""
     config: ResolvedConfig
+    """Fully resolved configuration for this plan, including defaults and overrides."""
     split_request: SplitConfig
+    """Split configuration for this plan."""
     limit: int | None
+    """Optional limit on the number of sources to process."""
     seed: int | None
+    """Optional random seed for reproducible processing runs."""
 
     @property
     def parallel(self) -> bool:
@@ -65,15 +75,15 @@ class DatasetPlan:
         return self.config.execution.parallel
 
     def loader_splits(self) -> tuple[DatasetSplit, ...] | None:
-        """Resolve which predefined splits, if any, the loader should read."""
+        """Return the predefined dataset splits that the loader should read."""
         return self.split_request.loader_splits()
 
     def writer_splits(self) -> tuple[DatasetSplit, ...] | None:
-        """Resolve which split directories, if any, the writer should create."""
+        """Return the output split directories that the writer should create."""
         return self.split_request.writer_splits()
 
     def summary(self) -> ProcessingSummary:
-        """Return a display-ready summary for this plan."""
+        """Build a display-ready summary for this plan."""
         summarize_plan = import_module("dronalize.runtime.summary").summarize_plan
         return summarize_plan(self)
 
@@ -88,7 +98,7 @@ class DatasetPlan:
 
 @dataclass(slots=True)
 class DatasetRun:
-    """Live execution context with resources opened and progress observable."""
+    """Live execution context with open resources and an attached executor."""
 
     plan: DatasetPlan
     executor: ObservableWritingExecutor
@@ -111,7 +121,19 @@ class DatasetRun:
 
 @contextmanager
 def open_plan(plan: DatasetPlan) -> Generator[DatasetRun, None, None]:
-    """Open a live execution context for a plan."""
+    """Open a live execution context for ``plan``.
+
+    Parameters
+    ----------
+    plan : DatasetPlan
+        Fully resolved processing plan to open.
+
+    Yields
+    ------
+    DatasetRun
+        Live run object with dataset-specific resources opened and an executor
+        ready to process data.
+    """
     with plan.descriptor.execution_scope(plan.data_root, plan.config.loader, plan.config.map):
         loader = _build_loader(plan)
         executor = _build_executor(plan, loader)
@@ -119,12 +141,12 @@ def open_plan(plan: DatasetPlan) -> Generator[DatasetRun, None, None]:
 
 
 def execute_run(run: DatasetRun) -> None:
-    """Execute an open run."""
+    """Execute a previously opened run."""
     run.executor.execute(writer_factory=run.ensure_writer_factory())
 
 
 def run_plan(plan: DatasetPlan) -> None:
-    """Open a plan and execute it immediately."""
+    """Open ``plan`` and execute it immediately."""
     with open_plan(plan) as run:
         run.run()
 
@@ -140,7 +162,7 @@ def _resolve_writer_factory(
     parallel: bool,
     has_map: bool,
 ) -> WriterFactory:
-    """Resolve an output writer factory from a normalized format identifier."""
+    """Resolve a writer factory from a normalized output-format identifier."""
     match output_format:
         case OutputFormat.MDS:
             from dronalize.io.writers.mds import MDSSceneWriter  # noqa: PLC0415
@@ -161,10 +183,11 @@ def _resolve_writer_factory(
 
 
 def _build_loader(plan: DatasetPlan) -> BaseSceneLoader[object]:
-    """Instantiate the dataset loader for a plan."""
+    """Instantiate the dataset loader described by ``plan``."""
     return plan.descriptor.build_loader(
         plan.data_root,
         loader_config=plan.config.loader,
+        loader_options=plan.config.loader_options,
         map_config=plan.config.map,
         splits=plan.loader_splits(),
         split_request=plan.split_request,
@@ -175,7 +198,7 @@ def _build_loader(plan: DatasetPlan) -> BaseSceneLoader[object]:
 def _build_executor(
     plan: DatasetPlan, loader: BaseSceneLoader[object]
 ) -> ObservableWritingExecutor:
-    """Construct the runtime executor for a plan."""
+    """Construct the runtime executor for ``plan`` and ``loader``."""
     if plan.parallel:
         return ParallelExecutor(
             loader,
@@ -188,7 +211,7 @@ def _build_executor(
 
 
 def _build_writer_factory(plan: DatasetPlan) -> WriterFactory:
-    """Build the worker-local writer factory for a plan."""
+    """Build the worker-local writer factory for ``plan``."""
     writer_splits = plan.writer_splits()
     splits = None if writer_splits is None else tuple(dict.fromkeys(writer_splits))
     return _resolve_writer_factory(

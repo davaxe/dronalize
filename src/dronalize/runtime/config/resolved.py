@@ -1,10 +1,14 @@
+"""Resolved runtime configuration models used during execution."""
+
 from __future__ import annotations
 
 from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from dronalize.core.errors import ConfigurationError
 from dronalize.io.config import WriterConfig
+from dronalize.processing.ingest.base import LoaderOptions, NoLoaderOptions
 from dronalize.processing.ingest.config import LoaderConfig  # noqa: TC001
 from dronalize.processing.ingest.splits import SplitConfig
 from dronalize.processing.maps.config import MapConfig
@@ -22,7 +26,7 @@ class ResolvedExecutionConfig(BaseModel):
     def _validate_jobs(self) -> ResolvedExecutionConfig:
         if self.jobs is not None and self.jobs < 1:
             msg = "Resolved execution jobs must be at least 1 or None for auto."
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
         return self
 
     @property
@@ -42,6 +46,7 @@ class ResolvedConfig(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     loader: LoaderConfig
+    loader_options: LoaderOptions = Field(default_factory=NoLoaderOptions)
     map: MapConfig | None = Field(default_factory=MapConfig.default)
     split: SplitConfig = Field(default_factory=SplitConfig)
     execution: ResolvedExecutionConfig = Field(default_factory=ResolvedExecutionConfig)

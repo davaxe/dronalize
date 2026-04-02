@@ -7,7 +7,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import CANONICAL_V1
+from dronalize.core.scene import CANONICAL
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import MinSamples
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from dronalize.processing.ingest.splits import SplitConfig
 
 
-class LevelXDataLoader(BaseSceneLoader[Path]):
+class LevelXDataLoader(BaseSceneLoader):
     """Common trajectory data loader for X-level datasets.
 
     Each discovered source corresponds to one full recording. The source payload
@@ -172,7 +172,7 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return CANONICAL_V1
+        return CANONICAL
 
     @classmethod
     @override
@@ -201,7 +201,7 @@ class LevelXDataLoader(BaseSceneLoader[Path]):
 
     @override
     def map_resolver(self) -> MapResolver:
-        if self._shared_memory_name is None:
+        if self._shared_memory_name is None or self.map_config is None:
             return no_map()
         return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 

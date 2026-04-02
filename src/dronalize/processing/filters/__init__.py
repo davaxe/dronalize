@@ -1,3 +1,5 @@
+"""Public filter rules, specs, and composition helpers."""
+
 from dronalize.core.models import tol
 from dronalize.processing.filters import agent, base, cleanup, scene
 from dronalize.processing.filters.apply import filter_scene

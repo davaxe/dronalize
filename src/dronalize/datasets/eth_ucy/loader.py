@@ -1,3 +1,5 @@
+"""Loader implementations for the ETH/UCY pedestrian datasets."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +10,7 @@ from typing_extensions import override
 
 import dronalize.processing.pipeline.transforms as tr
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import MinSamples
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
@@ -26,7 +28,7 @@ if TYPE_CHECKING:
     from dronalize.processing.pipeline.pipeline import Pipeline
 
 
-class _EthUcyLoader(BaseSceneLoader[Path]):
+class _EthUcyLoader(BaseSceneLoader):
     """Loader for ETH/UCY pedestrian trajectory datasets."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -107,7 +109,7 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_ONLY_V1
+        return POSITIONS_ONLY
 
     @override
     def num_sources(self) -> int | None:
@@ -123,11 +125,6 @@ class _EthUcyLoader(BaseSceneLoader[Path]):
             .with_filter(Filter.define(agent_rules=[MinSamples(minimum=2)]))
             .with_resampling(ResampleSpec(up=4, down=1, method=ResampleMethod.LINEAR))
         )
-
-    @classmethod
-    @override
-    def default_map_config(cls) -> MapConfig | None:
-        return None
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:
         num_sources = 0

@@ -1,3 +1,5 @@
+"""Precedence and normalization logic for runtime configuration."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeVar
@@ -7,6 +9,7 @@ from pydantic import BaseModel
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import (
     ConfigurationError,
+    LoaderConfigError,
     SplitConflictError,
     SplitNotSupportedError,
     SplitStrategyNotSupportedError,
@@ -16,6 +19,7 @@ from dronalize.io.config import MDSFormatConfig
 from dronalize.io.config import WriterConfig as RuntimeWriterConfig
 from dronalize.processing.filters import Filter, merge_filters
 from dronalize.processing.filters.filter import remove_filter_rules
+from dronalize.processing.ingest.base import LoaderOptions, NoLoaderOptions
 from dronalize.processing.ingest.config import HighwayParams, WindowConfig
 from dronalize.processing.ingest.config import LoaderConfig as RuntimeLoaderConfig
 from dronalize.processing.ingest.splits import (
@@ -73,7 +77,9 @@ class ConfigResolver:
     ) -> ResolvedConfig:
         """Resolve dataset defaults, file config, and CLI overrides into runtime config."""
         config = ResolvedConfig(
-            loader=descriptor.default_loader_config, map=descriptor.default_map_config
+            loader=descriptor.default_loader_config,
+            loader_options=descriptor.default_loader_options,
+            map=descriptor.default_map_config,
         )
 
         if file_config is not None:
@@ -81,9 +87,11 @@ class ConfigResolver:
                 file_config.global_,
                 file_config.dataset_config(descriptor.name),
             ):
-                config = self._apply_config(config, authoring_config)
+                config = self._apply_config(config, authoring_config, dataset_name=descriptor.name)
 
-        return self._apply_plan_overrides(config, cli_overrides or PlanOverrides(), descriptor)
+        resolved = self._apply_plan_overrides(config, cli_overrides or PlanOverrides(), descriptor)
+        _validate_highway_config(descriptor=descriptor, config=resolved)
+        return resolved
 
     def resolve_from_defaults(
         self, *, default: ResolvedConfig, overrides: FileDatasetConfig | None = None
@@ -93,45 +101,64 @@ class ConfigResolver:
             return default
         return self._apply_config(default, overrides)
 
-    def _apply_config(self, config: ResolvedConfig, authoring: FileDatasetConfig) -> ResolvedConfig:
-        next_config = config
-        for field_name, authoring_value, apply in (
-            ("loader", authoring.loader, self._apply_loader_config),
-            ("map", authoring.map, self._apply_map_config),
-            ("writer", authoring.writer, self._apply_writer_config),
-            ("execution", authoring.execution, self._apply_execution_config),
-            ("split", authoring.split, self._apply_split_config),
-        ):
-            if authoring_value is None:
-                continue
-            next_config = next_config.model_copy(
-                update={field_name: apply(getattr(next_config, field_name), authoring_value)}
+    def _apply_config(
+        self,
+        config: ResolvedConfig,
+        authoring: FileDatasetConfig,
+        *,
+        dataset_name: str | None = None,
+    ) -> ResolvedConfig:
+        updates: dict[str, object] = {}
+
+        if authoring.loader is not None:
+            updates["loader"] = self._apply_loader_config(config.loader, authoring.loader)
+            updates["loader_options"] = self._apply_loader_options(
+                config.loader_options,
+                authoring.loader.options,
+                dataset_name=dataset_name,
             )
-        return next_config
+
+        if authoring.map is not None:
+            updates["map"] = self._apply_map_config(config.map, authoring.map)
+
+        if authoring.writer is not None:
+            updates["writer"] = self._apply_writer_config(config.writer, authoring.writer)
+
+        if authoring.execution is not None:
+            updates["execution"] = self._apply_execution_config(
+                config.execution,
+                authoring.execution,
+            )
+
+        if authoring.split is not None:
+            updates["split"] = self._apply_split_config(config.split, authoring.split)
+
+        return config if not updates else config.model_copy(update=updates)
 
     @staticmethod
     def _apply_plan_overrides(
         config: ResolvedConfig, overrides: PlanOverrides, descriptor: DatasetDescriptor
     ) -> ResolvedConfig:
-        next_config = config
+        updates: dict[str, object] = {}
+
         if overrides.scene_schema is not None:
-            writer_data = next_config.writer.model_dump(round_trip=True)
+            writer_data = config.writer.model_dump(round_trip=True)
             writer_data["scene_schema"] = get_scene_schema(overrides.scene_schema)
-            next_config = next_config.model_copy(
-                update={"writer": RuntimeWriterConfig.model_validate(writer_data)}
-            )
+            updates["writer"] = RuntimeWriterConfig.model_validate(writer_data)
+
         if overrides.jobs is not None:
-            next_config = next_config.model_copy(
-                update={"execution": _resolve_execution_jobs(next_config.execution, overrides.jobs)}
-            )
+            updates["execution"] = _resolve_execution_jobs(config.execution, overrides.jobs)
+
         if overrides.include_map is False:
-            next_config = next_config.model_copy(update={"map": None})
-        if overrides.include_map is True and next_config.map is None:
-            next_config = next_config.model_copy(update={"map": descriptor.default_map_config})
-        return next_config.model_copy(
+            updates["map"] = None
+        elif overrides.include_map is True and config.map is None:
+            updates["map"] = descriptor.default_map_config
+
+        resolved = config if not updates else config.model_copy(update=updates)
+        return resolved.model_copy(
             update={
                 "split": _resolve_split_config(
-                    base=next_config.split, overrides=overrides, descriptor=descriptor
+                    base=resolved.split, overrides=overrides, descriptor=descriptor
                 )
             }
         )
@@ -140,63 +167,75 @@ class ConfigResolver:
     def _apply_execution_config(
         base: ResolvedExecutionConfig, authoring: FileExecutionConfig
     ) -> ResolvedExecutionConfig:
-        next_execution = base
+        updates: dict[str, object] = {}
+
         if authoring.chunksize is not None:
-            next_execution = next_execution.model_copy(update={"chunksize": authoring.chunksize})
+            updates["chunksize"] = authoring.chunksize
+
         if authoring.jobs == "auto":
-            return next_execution.model_copy(update={"jobs": None})
-        if authoring.jobs is None:
-            return next_execution
-        return next_execution.model_copy(update={"jobs": authoring.jobs})
+            updates["jobs"] = None
+        elif authoring.jobs is not None:
+            updates["jobs"] = authoring.jobs
+
+        return _replace_model(base, **updates)
 
     @staticmethod
     def _apply_loader_config(
         base: RuntimeLoaderConfig, authoring: FileLoaderConfig
     ) -> RuntimeLoaderConfig:
-        next_loader = base
-        scalar_updates = {
-            field_name: value
-            for field_name in ("input_len", "output_len", "sample_time")
-            if (value := getattr(authoring, field_name)) is not None
-        }
-        if scalar_updates:
-            next_loader = _replace_model(next_loader, **scalar_updates)
+        updates: dict[str, object] = {}
 
-        if authoring.options is not None:
-            next_loader = next_loader.model_copy(update={"options": authoring.options})
+        for field_name in ("input_len", "output_len", "sample_time"):
+            if (value := getattr(authoring, field_name)) is not None:
+                updates[field_name] = value
+
         if authoring.highway is not None:
-            next_loader = next_loader.model_copy(
-                update={
-                    "highway": _merge_optional_model(
-                        next_loader.highway,
-                        HighwayParams.model_validate(authoring.highway),
-                        HighwayParams,
-                    )
-                }
+            updates["highway"] = _merge_optional_model(
+                base.highway,
+                HighwayParams.model_validate(authoring.highway),
+                HighwayParams,
             )
+
         if authoring.window is not None:
-            next_loader = next_loader.model_copy(
-                update={
-                    "window": _merge_optional_model(
-                        next_loader.window,
-                        WindowConfig(size=authoring.window.size, step=authoring.window.step),
-                        WindowConfig,
-                    )
-                }
+            updates["window"] = _merge_optional_model(
+                base.window,
+                WindowConfig(size=authoring.window.size, step=authoring.window.step),
+                WindowConfig,
             )
+
         if authoring.resampling is not None:
-            next_loader = next_loader.model_copy(
-                update={
-                    "resampling": _apply_resampling_config(
-                        next_loader.resampling, authoring.resampling
-                    )
-                }
-            )
+            updates["resampling"] = _apply_resampling_config(base.resampling, authoring.resampling)
+
         if authoring.filter is not None:
-            next_loader = next_loader.model_copy(
-                update={"filter": _apply_filter_config(next_loader.filter, authoring.filter)}
-            )
-        return next_loader
+            updates["filter"] = _apply_filter_config(base.filter, authoring.filter)
+
+        return _replace_model(base, **updates)
+
+    @staticmethod
+    def _apply_loader_options(
+        base: LoaderOptions,
+        raw_options: dict[str, object] | None,
+        *,
+        dataset_name: str | None,
+    ) -> LoaderOptions:
+        if raw_options is None:
+            return base
+
+        model_type = type(base)
+        try:
+            merged_options = base.model_dump(exclude_unset=False, round_trip=True)
+            merged_options.update(raw_options)
+            return model_type.model_validate(merged_options)
+        except ValueError as exc:
+            if model_type is NoLoaderOptions:
+                msg = (
+                    f"{dataset_name or 'This dataset'} does not expose dataset-specific loader "
+                    "options. Remove [loader.options] from the config for this dataset."
+                )
+                raise ConfigurationError(msg) from exc
+
+            msg = f"Invalid [loader.options] for {model_type.__name__}: {exc}"
+            raise LoaderConfigError(msg) from exc
 
     @staticmethod
     def _apply_map_config(
@@ -226,7 +265,12 @@ class ConfigResolver:
         if authoring.offset_positions is not None:
             updates["offset_positions"] = authoring.offset_positions
         if authoring.mds is not None:
-            updates["mds"] = _merge_model(base.mds, MDSFormatConfig.model_validate(authoring.mds))
+            updates["mds"] = _merge_model(
+                base.mds,
+                MDSFormatConfig.model_validate(
+                    authoring.mds.model_dump(exclude_unset=True, round_trip=True)
+                ),
+            )
         return _replace_model(base, **updates)
 
     @staticmethod
@@ -235,7 +279,7 @@ class ConfigResolver:
     ) -> RuntimeSplitConfig:
         updates: dict[str, object] = {}
         mode = _split_mode(authoring)
-        if mode is not _UNSET:
+        if mode is not None:
             updates["mode"] = mode
         if authoring.ratio is not None:
             updates["ratio"] = authoring.ratio
@@ -290,15 +334,12 @@ def _map_extraction(authoring: FileMapConfig) -> object:
             )
         case _:
             msg = "map extraction mode must be set before resolving extraction config."
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
 
 
-_UNSET = object()
-
-
-def _split_mode(authoring: FileSplitConfig) -> SplitMode | object:
+def _split_mode(authoring: FileSplitConfig) -> SplitMode | None:
     if authoring.mode is None:
-        return _UNSET
+        return None
     if authoring.mode == "native":
         requested_splits = tuple(authoring.read or ())
         return NativeSplit(read=requested_splits)
@@ -321,7 +362,7 @@ def _resolve_execution_jobs(base: ResolvedExecutionConfig, jobs: int) -> Resolve
         return base.model_copy(update={"jobs": None})
     if jobs < 1:
         msg = "jobs must be at least 1."
-        raise ValueError(msg)
+        raise ConfigurationError(msg)
     return base.model_copy(update={"jobs": jobs})
 
 
@@ -375,16 +416,15 @@ def _resolve_split_config(
 
 
 def _merge_model(base: _ResolvedModelT, overrides: BaseModel) -> _ResolvedModelT:
-    return type(base).model_validate({
-        **base.model_dump(round_trip=True),
-        **overrides.model_dump(exclude_unset=True, round_trip=True),
-    })
+    return type(base).model_validate(
+        base.model_copy(update=overrides.model_dump(exclude_unset=True, round_trip=True))
+    )
 
 
 def _replace_model(base: _ResolvedModelT, **updates: object) -> _ResolvedModelT:
     if not updates:
         return base
-    return type(base).model_validate({**base.model_dump(round_trip=True), **updates})
+    return type(base).model_validate(base.model_copy(update=updates))
 
 
 def _merge_optional_model(
@@ -544,6 +584,22 @@ def _resolve_mode_read(
     if requested_mode is None and isinstance(base.mode, NativeSplit):
         return base.mode.active_splits()
     return ()
+
+
+def _validate_highway_config(*, descriptor: DatasetDescriptor, config: ResolvedConfig) -> None:
+    if config.loader.highway is None:
+        return
+
+    from dronalize.datasets.registry import DatasetCapabilities  # noqa: PLC0415
+
+    if descriptor.capabilities & DatasetCapabilities.HIGHWAY_PIPELINE:
+        return
+
+    msg = (
+        f"{descriptor.name} does not support highway sampling. "
+        "Remove [loader.highway] from the config for this dataset."
+    )
+    raise ConfigurationError(msg)
 
 
 def _validate_split_overrides(

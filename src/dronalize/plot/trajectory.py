@@ -1,5 +1,7 @@
 # pyright: standard
 
+"""Altair helpers for visualizing scene trajectories."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any

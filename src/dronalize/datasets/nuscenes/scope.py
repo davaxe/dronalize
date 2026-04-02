@@ -1,3 +1,5 @@
+"""Execution-scope helpers for the nuScenes dataset."""
+
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path

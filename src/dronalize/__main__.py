@@ -1,3 +1,5 @@
+"""Command-line entry point for the optional Dronalize CLI."""
+
 from __future__ import annotations
 
 _CLI_INSTALL_HINT = "Install dronalize[cli] to use the dronalize command line interface."

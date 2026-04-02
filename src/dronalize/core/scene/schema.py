@@ -1,10 +1,15 @@
+"""Canonical scene fields, schemas, and schema lookup helpers."""
+
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence  # noqa: TC003
 from dataclasses import dataclass
 from enum import IntFlag, auto
-from typing import Final, Iterable, Sequence, TypedDict  # noqa: UP035
+from typing import Final, TypedDict
 
 import polars as pl
+
+from dronalize.core.errors import SceneSchemaError
 
 
 class SceneField(IntFlag):
@@ -40,7 +45,7 @@ class SceneField(IntFlag):
             return cls[value.upper()]
         except KeyError as exc:
             msg = f"Invalid SceneField: {value}"
-            raise ValueError(msg) from exc
+            raise SceneSchemaError(msg) from exc
 
     def fields(self) -> Iterable[SceneField]:
         """Yield individual SceneField members present in this combination."""
@@ -50,7 +55,7 @@ class SceneField(IntFlag):
         """Return the canonical physical column name for this SceneField."""
         if self.name is None:
             msg = f"Field combinations cannot be converted to strings: {self}"
-            raise ValueError(msg)
+            raise SceneSchemaError(msg)
         return self.name.lower()
 
 
@@ -77,7 +82,9 @@ _FEATURE_FIELDS: Final[SceneField] = (
 )
 
 
-_REQUIRED_FIELDS: Final[SceneField] = SceneField.FRAME | SceneField.ID | SceneField.X | SceneField.Y
+_REQUIRED_FIELDS: Final[SceneField] = (
+    SceneField.FRAME | SceneField.ID | SceneField.X | SceneField.Y | SceneField.AGENT_CATEGORY
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -94,7 +101,7 @@ class SceneSchema:
         if missing_required:
             missing: str = ", ".join(field.to_str() for field in missing_required.fields())
             msg = f"Scene schemas must include the base fields: {missing}."
-            raise ValueError(msg)
+            raise SceneSchemaError(msg)
 
     @classmethod
     def define(cls, name: str, *, fields: SceneField | Iterable[SceneField | str]) -> SceneSchema:
@@ -172,24 +179,29 @@ def _contains_fields(fields: SceneField, required: SceneField) -> bool:
 
 
 _BASE_FIELDS: Final[SceneField] = (
-    SceneField.FRAME | SceneField.ID | SceneField.X | SceneField.Y | SceneField.AGENT_CATEGORY
+    SceneField.FRAME | SceneField.ID | SceneField.AGENT_CATEGORY | SceneField.X | SceneField.Y
 )
 
-POSITIONS_ONLY_V1: Final[SceneSchema] = SceneSchema.define("positions_only", fields=_BASE_FIELDS)
-POSITIONS_YAW_V1: Final[SceneSchema] = SceneSchema.define(
-    "positions_yaw", fields=_BASE_FIELDS | SceneField.YAW
+POSITIONS_ONLY: Final[SceneSchema] = SceneSchema.define(
+    "positions_only",
+    fields=_BASE_FIELDS,
 )
-POSITIONS_VELOCITY_V1: Final[SceneSchema] = SceneSchema.define(
+POSITIONS_YAW: Final[SceneSchema] = SceneSchema.define(
+    "positions_yaw",
+    fields=_BASE_FIELDS | SceneField.YAW,
+)
+POSITIONS_VELOCITY: Final[SceneSchema] = SceneSchema.define(
     "positions_velocity", fields=_BASE_FIELDS | SceneField.VX | SceneField.VY
 )
-POSITIONS_VELOCITY_YAW_V1: Final[SceneSchema] = SceneSchema.define(
-    "positions_velocity_yaw", fields=_BASE_FIELDS | SceneField.VX | SceneField.VY | SceneField.YAW
+POSITIONS_VELOCITY_YAW: Final[SceneSchema] = SceneSchema.define(
+    "positions_velocity_yaw",
+    fields=(_BASE_FIELDS | SceneField.VX | SceneField.VY | SceneField.YAW),
 )
-POSITIONS_VELOCITY_ACCELERATION_V1: Final[SceneSchema] = SceneSchema.define(
+POSITIONS_VELOCITY_ACCELERATION: Final[SceneSchema] = SceneSchema.define(
     "positions_velocity_acceleration",
     fields=_BASE_FIELDS | SceneField.VX | SceneField.VY | SceneField.AX | SceneField.AY,
 )
-CANONICAL_V1: Final[SceneSchema] = SceneSchema.define(
+CANONICAL: Final[SceneSchema] = SceneSchema.define(
     "canonical",
     fields=_BASE_FIELDS
     | SceneField.VX
@@ -202,12 +214,12 @@ CANONICAL_V1: Final[SceneSchema] = SceneSchema.define(
 SCENE_SCHEMAS: Final[dict[str, SceneSchema]] = {
     schema.name: schema
     for schema in (
-        POSITIONS_ONLY_V1,
-        POSITIONS_YAW_V1,
-        POSITIONS_VELOCITY_V1,
-        POSITIONS_VELOCITY_YAW_V1,
-        POSITIONS_VELOCITY_ACCELERATION_V1,
-        CANONICAL_V1,
+        POSITIONS_ONLY,
+        POSITIONS_YAW,
+        POSITIONS_VELOCITY,
+        POSITIONS_VELOCITY_YAW,
+        POSITIONS_VELOCITY_ACCELERATION,
+        CANONICAL,
     )
 }
 
@@ -229,35 +241,16 @@ class SceneSchemaDefinition(TypedDict):
     fields: SceneField | Sequence[SceneField | str]
 
 
-_STR_TO_FIELD: Final[dict[str, SceneField]] = {
-    "vel": SceneField.VX | SceneField.VY,
-    "acc": SceneField.AX | SceneField.AY,
-    "velocity": SceneField.VX | SceneField.VY,
-    "acceleration": SceneField.AX | SceneField.AY,
-    "yaw": SceneField.YAW,
-    "vx": SceneField.VX,
-    "vy": SceneField.VY,
-    "ax": SceneField.AX,
-    "ay": SceneField.AY,
-}
-
-
 def get_scene_schema(schema: SceneSchema | str | SceneSchemaDefinition) -> SceneSchema:
     """Resolve a schema instance or registered schema name to a SceneSchema."""
     if isinstance(schema, SceneSchema):
         return schema
 
     if isinstance(schema, dict):
-        return SceneSchema(name=schema["name"], fields=schema["fields"])
+        return SceneSchema.define(schema["name"], fields=schema["fields"])
 
     if schema in SCENE_SCHEMAS:
         return SCENE_SCHEMAS[schema]
 
-    fields = _BASE_FIELDS
-    for field_str in schema.split(":"):
-        fields |= _STR_TO_FIELD.get(field_str.lower(), SceneField(0))
-    if fields != _BASE_FIELDS:
-        return SceneSchema(name=f"custom: {schema}", fields=fields)
-
     msg = f"Unknown scene schema '{schema}'."
-    raise ValueError(msg)
+    raise SceneSchemaError(msg)

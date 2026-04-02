@@ -1,3 +1,5 @@
+"""Spline-based interpolation backends for temporal trajectory resampling."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -37,6 +39,7 @@ def spline_resample(
     group_by: str | Sequence[str] | None = None,
     interpolator_factory: InterpolatorFactory,
 ) -> DataFrameT:
+    """Resample trajectory data with a SciPy spline interpolator."""
     plan = build_plan(spec, frame_column=frame_column, group_by=group_by)
 
     if spec.no_resampling and not plan.output_derivatives:
@@ -90,6 +93,7 @@ def cubic_spline_interpolator_factory(
     position_old: npt.NDArray[np.float64],
     derivative_old: npt.NDArray[np.float64] | None = None,
 ) -> Interpolator:
+    """Build a natural cubic-spline interpolator for one trajectory segment."""
     _ = derivative_old
     return CubicSpline(time_old, position_old, axis=0, bc_type="natural")
 
@@ -99,6 +103,7 @@ def pchip_interpolator_factory(
     position_old: npt.NDArray[np.float64],
     derivative_old: npt.NDArray[np.float64] | None = None,
 ) -> Interpolator:
+    """Build a monotone PCHIP interpolator for one trajectory segment."""
     _ = derivative_old
     return PchipInterpolator(time_old, position_old, axis=0)
 
@@ -108,6 +113,7 @@ def cubic_hermite_interpolator_factory(
     position_old: npt.NDArray[np.float64],
     derivative_old: npt.NDArray[np.float64] | None = None,
 ) -> Interpolator:
+    """Build a cubic-Hermite interpolator for one trajectory segment."""
     if derivative_old is None:
         msg = "Hermite resampling requires first-order derivative inputs."
         raise ValueError(msg)

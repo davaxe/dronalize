@@ -1,0 +1,196 @@
+[project]
+site_name = "dronalize"
+site_url = "https://westny.github.io/dronalize/"
+site_description = "CLI-first preprocessing and scene generation for motion forecasting datasets."
+site_author = "Theodor Westny, David Axelsson"
+copyright = "&copy; 2026 Dronalize contributors"
+docs_dir = "docs"
+site_dir = "site"
+repo_url = "https://github.com/westny/dronalize"
+repo_name = "westny/dronalize"
+extra_css = ["stylesheets/extra.css"]
+nav = [
+  { Home = "index.md" },
+
+  { Start = [
+    "start/index.md",
+    { Installation = "start/installation.md" },
+    { "First run (CLI)" = "start/first-run-cli.md" },
+    { "Python entry" = "start/python-entry.md" },
+    { Contributing = "start/contributing.md" },
+    { Changelog = "start/changelog.md" },
+    { Citation = "start/citation.md" },
+  ] },
+
+  { Concepts = [
+    "concepts/index.md",
+    { Architecture = "concepts/architecture.md" },
+    { "Configuration model" = "concepts/configuration-model.md" },
+    { "Split strategies" = "concepts/split-strategies.md" },
+    { Filtering = "concepts/filtering.md" },
+    { "Map processing" = "concepts/map-processing.md" },
+    { Datasets = "concepts/datasets.md" },
+    { "Outputs and schemas" = "concepts/outputs-and-schemas.md" },
+    { "Highway pipeline" = "concepts/highway.md" },
+  ] },
+
+  { "Output formats" = [
+    "outputs/index.md",
+    { "Mosaic Data Shard (MDS) format" = "outputs/mds.md" },
+  ] },
+
+  { "Configuration reference" = [
+    "reference/configuration/index.md",
+    { "[execution] section" = "reference/configuration/execution.md" },
+    { "[loader] section" = "reference/configuration/loader.md" },
+    { "[loader.filter] section" = "reference/configuration/filter.md" },
+    { "[map] section" = "reference/configuration/map.md" },
+    { "[writer] section" = "reference/configuration/writer.md" },
+    { "[split] section" = "reference/configuration/split.md" },
+  ] },
+
+  { "Dataset reference" = [
+    "reference/datasets/index.md",
+    { a43 = "reference/datasets/a43.md" },
+    { ad4che = "reference/datasets/ad4che.md" },
+    { apolloscape = "reference/datasets/apolloscape.md" },
+    { argoverse1 = "reference/datasets/argoverse1.md" },
+    { argoverse2 = "reference/datasets/argoverse2.md" },
+    { eth = "reference/datasets/eth.md" },
+    { exid = "reference/datasets/exid.md" },
+    { highd = "reference/datasets/highd.md" },
+    { hotel = "reference/datasets/hotel.md" },
+    { i80 = "reference/datasets/i80.md" },
+    { ind = "reference/datasets/ind.md" },
+    { interact = "reference/datasets/interact.md" },
+    { lyft = "reference/datasets/lyft.md" },
+    { nuscenes = "reference/datasets/nuscenes.md" },
+    { opendd = "reference/datasets/opendd.md" },
+    { round = "reference/datasets/round.md" },
+    { sind = "reference/datasets/sind.md" },
+    { unid = "reference/datasets/unid.md" },
+    { univ = "reference/datasets/univ.md" },
+    { us101 = "reference/datasets/us101.md" },
+    { vod = "reference/datasets/vod.md" },
+    { waymo = "reference/datasets/waymo.md" },
+    { zara1 = "reference/datasets/zara1.md" },
+    { zara2 = "reference/datasets/zara2.md" },
+  ] },
+
+  { "API reference" = [
+    "reference/api/index.md",
+    { dronalize = [
+      "reference/api/dronalize/index.md",
+      { "Processing configuration" = "reference/api/dronalize/configuration.md" },
+      { "Scene model" = "reference/api/dronalize/scenes.md" },
+    ] },
+    { "dronalize.core" = [
+      "reference/api/core/index.md",
+      { "Categories and splits" = "reference/api/core/categories-and-splits.md" },
+    ] },
+    { "dronalize.datasets" = [
+      "reference/api/datasets/index.md",
+      { "Registry operations" = "reference/api/datasets/registry.md" },
+      { "Descriptors and capabilities" = "reference/api/datasets/descriptors.md" },
+    ] },
+    { "dronalize.runtime" = [
+      "reference/api/runtime/index.md",
+      { Configuration = "reference/api/runtime/configuration.md" },
+      { "Planning and runs" = "reference/api/runtime/planning-and-runs.md" },
+    ] },
+    { "dronalize.io" = [
+      "reference/api/io/index.md",
+      { "Writer configuration" = "reference/api/io/writer-configuration.md" },
+      { "Storage and manifests" = "reference/api/io/storage-and-manifests.md" },
+    ] },
+    { "dronalize.plot" = [
+      "reference/api/plot/index.md",
+      { "Plotting helpers" = "reference/api/plot/plotting.md" },
+    ] },
+  ] },
+]
+
+[project.theme]
+variant = "modern"
+font.text = "Source Sans 3"
+font.code = "IBM Plex Mono"
+features = [
+    "navigation.tabs",
+    "navigation.tabs.sticky",
+    "navigation.sections",
+    "navigation.indexes",
+    "navigation.instant",
+    "navigation.instant.progress",
+    "navigation.instant.preview",
+    "navigation.path",
+    "navigation.tracking",
+    "navigation.top",
+    "toc.follow",
+    "search.highlight",
+    "content.code.copy",
+    "navigation.footer"
+]
+
+[project.theme.icon]
+logo = "lucide/waypoints"
+repo = "fontawesome/brands/github"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "custom"
+accent = "custom"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "custom"
+accent = "custom"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to light mode"
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src/dronalize"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+allow_inspection =  true
+docstring_section_style =  "list"
+docstring_style = "numpy"
+inherited_members = true
+line_length = 80
+separate_signature = true
+show_root_heading = true
+show_symbol_type_heading = true
+show_signature_annotations = true
+show_source = true
+show_symbol_type_toc = true
+signature_crossrefs = true
+show_if_no_docstring = false
+merge_init_into_class = true
+show_root_full_path = false
+unwrap_annotated = true
+filters = ["!^__.*__$"]
+
+[project.markdown_extensions.admonition]
+[project.markdown_extensions.abbr]
+[project.markdown_extensions.attr_list]
+[project.markdown_extensions.pymdownx.snippets]
+[project.markdown_extensions.md_in_html]
+[project.markdown_extensions.tables]
+[project.markdown_extensions.pymdownx.details]
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+[project.markdown_extensions.pymdownx.inlinehilite]
+[project.markdown_extensions.pymdownx.superfences]
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+
+[project.markdown_extensions.pymdownx.emoji]
+emoji_index = "zensical.extensions.emoji.twemoji"
+emoji_generator = "zensical.extensions.emoji.to_svg"
+
+[project.markdown_extensions.toc]

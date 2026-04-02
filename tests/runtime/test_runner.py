@@ -1,18 +1,27 @@
 # pyright: standard
 # ruff: noqa: PLC2701
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 import pytest
+from pydantic import BaseModel, ValidationError
 
+import dronalize
 from dronalize import DatasetPlan as RootDatasetPlan
 from dronalize import plan_dataset as root_plan_dataset
 from dronalize.core.categories import DatasetSplit
+from dronalize.core.errors import ConfigurationError, UnsupportedOutputFormatError
 from dronalize.datasets import DatasetCapabilities, DatasetDescriptor
 from dronalize.datasets.a43.loader import A43Loader
+from dronalize.datasets.argoverse1.loader import Argoverse1Loader, Argoverse1LoaderOptions
+from dronalize.datasets.argoverse2.loader import Argoverse2LoaderOptions
+from dronalize.datasets.interact.loader import InteractionLoaderOptions
+from dronalize.datasets.lyft.loader import LyftLoaderOptions
+from dronalize.io.formats import OutputFormat
 from dronalize.processing.ingest import (
     BySceneSplit,
     NativeSplit,
+    NoLoaderOptions,
     ShuffledTimeBlockSplit,
     SplitConfig,
     TimeBlockSplit,
@@ -30,7 +39,7 @@ class _CommonArgs(TypedDict):
     dataset: str
     input_dir: Path
     output_dir: Path
-    output_format: Literal["dummy"]
+    output_format: OutputFormat
 
 
 def _a43_args() -> _CommonArgs:
@@ -38,7 +47,7 @@ def _a43_args() -> _CommonArgs:
         "dataset": "a43",
         "input_dir": Path(__file__).parent,
         "output_dir": Path(__file__).parent / "output",
-        "output_format": "dummy",
+        "output_format": OutputFormat.DUMMY,
     }
 
 
@@ -48,6 +57,8 @@ def test_public_import_surface() -> None:
     assert RuntimeDatasetPlan is DatasetPlan
     assert root_plan_dataset is plan_dataset
     assert runtime_plan_dataset is plan_dataset
+    with pytest.raises(AttributeError):
+        _ = dronalize.ProjectConfigFile
 
 
 def test_a43_splits() -> None:
@@ -89,7 +100,7 @@ def test_plan_dataset_native_splits() -> None:
         dataset="waymo",
         input_dir=Path(__file__).parent,
         output_dir=Path(__file__).parent / "output",
-        output_format="dummy",
+        output_format=OutputFormat.DUMMY,
         split="native",
         read_split="train",
     )
@@ -156,6 +167,8 @@ def test_descriptor_from_loader() -> None:
     assert descriptor.name == "a43-test"
     assert descriptor.loader_factory is A43Loader
     assert descriptor.default_loader_config == A43Loader.default_config()
+    assert descriptor.loader_options_type is NoLoaderOptions
+    assert descriptor.default_loader_options == A43Loader.default_loader_options()
     assert descriptor.default_map_config == A43Loader.default_map_config()
     assert descriptor.native_schema == A43Loader.native_scene_schema()
     assert descriptor.predefined_splits == list(A43Loader.predefined_splits())
@@ -164,6 +177,27 @@ def test_descriptor_from_loader() -> None:
     assert descriptor.has_map is True
     assert descriptor.capabilities & DatasetCapabilities.MAP_AVAILABLE
     assert descriptor.capabilities & DatasetCapabilities.CUSTOM_SPLITS
+
+
+def test_descriptor_infers_map_capability_from_default_map_config() -> None:
+    """Descriptors built from loaders with map defaults should advertise map support."""
+    descriptor = DatasetDescriptor.from_loader("a43-test", A43Loader, infer_capabilities=True)
+
+    assert descriptor.has_map is True
+    assert descriptor.capabilities & DatasetCapabilities.MAP_AVAILABLE
+
+
+def test_descriptor_infers_loader_option_capability() -> None:
+    """Descriptors should advertise typed dataset-specific loader options explicitly."""
+    descriptor = DatasetDescriptor.from_loader(
+        "argoverse1-test",
+        Argoverse1Loader,
+        infer_capabilities=True,
+    )
+
+    assert descriptor.loader_options_type is Argoverse1LoaderOptions
+    assert descriptor.default_loader_options == Argoverse1Loader.default_loader_options()
+    assert descriptor.capabilities & DatasetCapabilities.EXTRA_LOADER_ARGS
 
 
 def test_build_loader_uses_config() -> None:
@@ -177,6 +211,7 @@ def test_build_loader_uses_config() -> None:
     loader = _build_loader(plan_obj)
 
     assert loader.loader_config == plan_obj.config.loader
+    assert loader.loader_options == plan_obj.config.loader_options
     assert loader.map_config == plan_obj.config.map
     assert loader.requested_scene_schema == plan_obj.config.writer.scene_schema
     assert loader.splits is None
@@ -208,6 +243,13 @@ def test_build_writer_factory_uses_plan_output_format() -> None:
     assert type(writer).__name__ == "DummyWriter"
 
 
+def test_plan_dataset_rejects_unknown_output_format() -> None:
+    """Planning should surface unsupported writer formats as a typed domain error."""
+    args = {**_a43_args(), "output_format": "bogus"}
+    with pytest.raises(UnsupportedOutputFormatError, match=r"Unsupported output format 'bogus'"):
+        _ = plan_dataset(**args)
+
+
 def test_plan_open_returns_live_run() -> None:
     """Prepared plans should open into live runs with observable executors."""
     plan_obj = plan_dataset(**_a43_args())
@@ -231,7 +273,7 @@ def test_waymo_splits() -> None:
         "dataset": "waymo",
         "input_dir": Path(__file__).parent,
         "output_dir": Path(__file__).parent / "output",
-        "output_format": "dummy",
+        "output_format": OutputFormat.DUMMY,
     }
     plan_obj = plan_dataset(**common_args, split=None)
 
@@ -325,6 +367,97 @@ gap = 2
     assert overridden.config.split.ratio.values() == (0.6, 0.2, 0.2)
 
 
+def test_plan_dataset_accepts_real_sample_config() -> None:
+    """The checked-in sample config should be a valid end-to-end planning example."""
+    config_path = Path(__file__).resolve().parents[2] / "config.toml"
+
+    plan_obj = plan_dataset(**_a43_args(), config_path=config_path)
+
+    assert plan_obj.config.loader.input_len == 20
+    assert plan_obj.config.loader.output_len == 60
+    assert plan_obj.config.loader.window is not None
+    assert plan_obj.config.loader.window.size == 80
+    assert isinstance(plan_obj.config.split.mode, ShuffledTimeBlockSplit)
+
+
+def test_plan_dataset_rejects_loader_options_for_datasets_without_extra_args(
+    tmp_path: Path,
+) -> None:
+    """Datasets without extra loader args should reject free-form loader options."""
+    config_path = tmp_path / "config.toml"
+    _ = config_path.write_text(
+        """[datasets.a43.loader.options]
+custom_flag = "debug"
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ConfigurationError, match=r"a43 does not expose dataset-specific loader options"
+    ):
+        _ = plan_dataset(**_a43_args(), config_path=config_path)
+
+
+def test_plan_dataset_resolves_typed_loader_options(tmp_path: Path) -> None:
+    """Datasets with loader options should resolve them into the typed runtime config."""
+    config_path = tmp_path / "config.toml"
+    _ = config_path.write_text(
+        """[datasets.argoverse1.loader.options]
+file_batch_size = 7
+""",
+        encoding="utf-8",
+    )
+
+    plan_obj = plan_dataset(
+        dataset="argoverse1",
+        input_dir=tmp_path,
+        output_dir=tmp_path / "output",
+        output_format=OutputFormat.DUMMY,
+        input_dir_exists=False,
+        config_path=config_path,
+    )
+
+    assert plan_obj.config.loader_options == Argoverse1LoaderOptions(file_batch_size=7)
+
+
+@pytest.mark.parametrize(
+    ("model_type", "field_name"),
+    [
+        (Argoverse1LoaderOptions, "file_batch_size"),
+        (Argoverse2LoaderOptions, "file_batch_size"),
+        (InteractionLoaderOptions, "file_batch_size"),
+        (LyftLoaderOptions, "scene_batch_size"),
+    ],
+)
+def test_batch_size_loader_options_reject_none(
+    model_type: type[BaseModel], field_name: str
+) -> None:
+    """Batch-size loader options should require positive integers."""
+    with pytest.raises(ValidationError):
+        _ = model_type.model_validate({field_name: None})
+
+
+def test_plan_dataset_rejects_highway_config_for_unsupported_datasets(tmp_path: Path) -> None:
+    """Datasets without highway support should fail during planning, not execution."""
+    config_path = tmp_path / "config.toml"
+    _ = config_path.write_text(
+        """[datasets.waymo.loader.highway]
+persist = 2
+negative_keep_every = 3
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match=r"waymo does not support highway sampling"):
+        _ = plan_dataset(
+            dataset="waymo",
+            input_dir=Path(__file__).parent,
+            output_dir=Path(__file__).parent / "output",
+            output_format=OutputFormat.DUMMY,
+            config_path=config_path,
+        )
+
+
 def test_plan_dataset_clears_splits(tmp_path: Path) -> None:
     """An explicit CLI no-split request should override split config from file."""
     config_path = tmp_path / "config.toml"
@@ -340,7 +473,7 @@ ratio = { train = 0.7, val = 0.2, test = 0.1 }
         "dataset": "waymo",
         "input_dir": Path(__file__).parent,
         "output_dir": Path(__file__).parent / "output",
-        "output_format": "dummy",
+        "output_format": OutputFormat.DUMMY,
     }
     plan_obj = plan_dataset(**common_args, config_path=config_path, split="none")
 

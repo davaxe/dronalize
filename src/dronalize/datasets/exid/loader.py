@@ -1,3 +1,5 @@
+"""Loader implementation for the ExiD dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path

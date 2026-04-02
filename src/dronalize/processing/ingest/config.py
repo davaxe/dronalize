@@ -1,14 +1,15 @@
+"""Configuration models for loader-side preprocessing and ingestion."""
+
 from __future__ import annotations
 
-from typing import Any, ClassVar, TypeAlias
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing_extensions import Self, TypedDict, Unpack
 
+from dronalize.core.errors import LoaderConfigError
 from dronalize.processing.filters.filter import Filter  # noqa: TC001
 from dronalize.processing.pipeline.functional.resample import ResampleSpec  # noqa: TC001
-
-LoaderOptionValue: TypeAlias = Any
 
 
 class LoaderConfigUpdate(TypedDict, total=False):
@@ -21,7 +22,6 @@ class LoaderConfigUpdate(TypedDict, total=False):
     window: WindowConfig | None
     filter: Filter | None
     highway: HighwayParams | None
-    options: dict[str, LoaderOptionValue]
 
 
 class WindowConfig(BaseModel):
@@ -58,7 +58,6 @@ class LoaderConfig(BaseModel):
     window: WindowConfig | None = Field(default=None)
     filter: Filter | None = Field(default=None)
     highway: HighwayParams | None = Field(default=None)
-    options: dict[str, LoaderOptionValue] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate(self) -> LoaderConfig:
@@ -74,7 +73,7 @@ class LoaderConfig(BaseModel):
                 f"Window size ({self.window.size}) must equal input_len + output_len "
                 f"({sequence_length}) for consistent windowing."
             )
-            raise ValueError(msg)
+            raise LoaderConfigError(msg)
 
     def _sequence_length(self) -> int:
         """Return the total number of frames in one input/output sequence."""

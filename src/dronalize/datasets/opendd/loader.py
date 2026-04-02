@@ -1,3 +1,5 @@
+"""Loader implementation for the OpenDD dataset."""
+
 from __future__ import annotations
 
 import functools
@@ -9,7 +11,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
@@ -133,7 +135,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_ONLY_V1
+        return POSITIONS_ONLY
 
     @classmethod
     @override
@@ -153,7 +155,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     @override
     def map_resolver(self) -> MapResolver:
         def _resolver(scene: Scene) -> MapGraph | None:
-            if scene.map_key is None:
+            if scene.map_key is None or self.map_config is None:
                 return None
 
             return utils.extract_based_on_scene(

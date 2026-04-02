@@ -1,3 +1,5 @@
+"""Executor protocols and shared progress models for runtime processing."""
+
 from __future__ import annotations
 
 import threading
@@ -50,7 +52,7 @@ class WritingExecutor(Protocol):
 
 
 class ObservableWritingExecutor(WritingExecutor, Protocol):
-    """Writing executor that can be observed."""
+    """Writing executor that exposes progress updates to callers."""
 
     def progress_event(self) -> AnyEvent:
         """Return an event set whenever execution state or progress may have changed."""

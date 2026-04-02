@@ -1,3 +1,5 @@
+"""Enumerations for persisted output formats supported by Dronalize."""
+
 from enum import Enum
 
 

@@ -1,3 +1,5 @@
+"""Scene-scoped filtering rules for trajectory scenes."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Literal
@@ -28,6 +30,7 @@ class MinimumAgents(SceneCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the scene-pass expression for the minimum retained-agent count."""
         return ctx.retained_agent_count(self.selector) >= self.minimum
 
 
@@ -48,6 +51,7 @@ class AgentRange(SceneCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the scene-pass expression for the retained-agent count range."""
         count = ctx.retained_agent_count(self.selector)
         cond = pl.lit(value=True)
         if self.minimum is not None:
@@ -70,6 +74,7 @@ class CategoryRange(SceneCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the scene-pass expression for the per-category agent ranges."""
         cond = pl.lit(value=True)
         for category, r in self.ranges.items():
             count = ctx.retained_agent_count(AgentSelector.include(category))
@@ -93,6 +98,7 @@ class RequireFrames(SceneCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the scene-pass expression for the required frame set."""
         relative_frame = ctx.relative_frame()
         required = relative_frame.filter(relative_frame.is_in(self.frames)).n_unique()
         return ctx.over_scene_window(required) == len(self.frames)
@@ -115,6 +121,7 @@ class RequireWindow(SceneCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the scene-pass expression for the required window coverage."""
         relative_frame = ctx.relative_frame()
         in_window = relative_frame.is_between(self.start_frame, self.end_frame, closed="both")
         covered_frames = ctx.over_scene_window(relative_frame.filter(in_window).n_unique())
@@ -130,6 +137,7 @@ class MaxMissingFrames(SceneCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the scene-pass expression for the missing-frame budget."""
         unique_frame_count = ctx.over_scene_window(pl.col(ctx.frame_column).n_unique())
         frame_span = ctx.over_scene_window(
             pl.col(ctx.frame_column).max() - pl.col(ctx.frame_column).min() + 1

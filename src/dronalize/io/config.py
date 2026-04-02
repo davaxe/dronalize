@@ -1,3 +1,5 @@
+"""Writer-side configuration models and shared type aliases."""
+
 from __future__ import annotations
 
 from typing import ClassVar, Literal
@@ -5,7 +7,7 @@ from typing import ClassVar, Literal
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from dronalize.core.scene import CANONICAL_V1, SceneSchema, get_scene_schema
+from dronalize.core.scene import CANONICAL, SceneSchema, get_scene_schema
 from dronalize.core.scene.schema import SceneSchemaDefinition
 
 FloatDType = type[np.float32] | type[np.float64]
@@ -29,7 +31,7 @@ class WriterConfig(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    scene_schema: SceneSchema = CANONICAL_V1
+    scene_schema: SceneSchema = CANONICAL
     precision: WriterPrecision = "float32"
     offset_positions: bool = True
     mds: MDSFormatConfig = Field(default_factory=MDSFormatConfig)
@@ -42,7 +44,24 @@ class WriterConfig(BaseModel):
         precision: WriterPrecision = "float32",
         offset_positions: bool = True,
     ) -> WriterConfig:
-        """Flexible constructor for WriterConfig."""
+        """Create a writer configuration from a flexible schema reference.
+
+        Parameters
+        ----------
+        scene_schema : SceneSchemaLike
+            Persisted scene schema as a concrete ``SceneSchema``, registered
+            schema name, or inline schema-definition payload.
+        precision : {"float32", "float64"}, optional
+            Floating-point precision used for persisted feature tensors.
+        offset_positions : bool, optional
+            Whether position features should be stored relative to the scene
+            mean position.
+
+        Returns
+        -------
+        WriterConfig
+            Fully resolved writer configuration.
+        """
         resolved_schema = get_scene_schema(scene_schema)
         return cls(
             scene_schema=resolved_schema, precision=precision, offset_positions=offset_positions

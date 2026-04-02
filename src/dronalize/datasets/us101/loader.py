@@ -1,3 +1,5 @@
+"""Loader implementation for the US-101 dataset."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

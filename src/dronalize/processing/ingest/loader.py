@@ -1,3 +1,5 @@
+"""Loader-side data structures and protocols for source-to-scene processing."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
@@ -56,7 +58,7 @@ class IngestedData:
 
 @dataclass(slots=True, frozen=True)
 class ProcessedSceneData:
-    """Final scene payload produced just before `Scene` construction."""
+    """Final scene payload produced immediately before ``Scene`` construction."""
 
     frame: pl.DataFrame
     stable_identifier: StableSceneIdentifier
@@ -93,7 +95,7 @@ class Source(Generic[SourceT]):
 
 
 class SceneLoader(Protocol):
-    """Minimal protocol for scene loading, used for type hinting."""
+    """Minimal scene-loading protocol used in public type annotations."""
 
     def scenes(self) -> Iterable[Scene]:
         """Yield processed scenes one by one."""
@@ -117,7 +119,7 @@ class SceneLoader(Protocol):
 
 
 class ProcessableLoader(Protocol, Generic[SourceT]):
-    """Minimal protocol required to work with a loader abstraction."""
+    """Protocol required by the runtime executors and pipeline helpers."""
 
     def sources(self) -> Iterable[Source[SourceT]]:
         """Discover and yield lightweight sources to be processed.

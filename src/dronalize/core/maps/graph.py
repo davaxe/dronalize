@@ -1,3 +1,5 @@
+"""Map-graph containers, shared-memory access, and spatial extraction helpers."""
+
 from __future__ import annotations
 
 import multiprocessing.shared_memory as shm

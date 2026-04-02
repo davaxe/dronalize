@@ -1,3 +1,5 @@
+"""Agent-scoped filtering rules for trajectory scenes."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Literal
@@ -44,6 +46,7 @@ class RequireFrames(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the configured frame set."""
         relative_frame = ctx.relative_frame()
         required = relative_frame.filter(relative_frame.is_in(self.frames)).n_unique()
         return ctx.over_agent_window(required) == len(self.frames)
@@ -66,6 +69,7 @@ class RequireWindow(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the configured window."""
         relative_frame = ctx.relative_frame()
         in_window = relative_frame.is_between(self.start_frame, self.end_frame, closed="both")
         covered_frames = ctx.over_agent_window(relative_frame.filter(in_window).n_unique())
@@ -81,6 +85,7 @@ class MinSamples(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the minimum sample count."""
         return ctx.over_agent_window(pl.len()) >= self.minimum
 
 
@@ -92,6 +97,7 @@ class MaxMissingFrames(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the missing-frame budget."""
         scene_length = ctx.scene_length()
         agent_length = ctx.over_agent_window(pl.col(ctx.frame_column).n_unique())
         missing_frames = scene_length - agent_length
@@ -106,6 +112,7 @@ class MaxGap(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the maximum frame gap."""
         frame_col = pl.col(ctx.frame_column)
         gaps = frame_col - frame_col.shift(1) - 1
         max_gap = ctx.over_agent_window(gaps.max())
@@ -122,6 +129,7 @@ class MinConsecutiveFrames(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the longest consecutive run."""
         frame_col = pl.col(ctx.frame_column)
         prev_frame = frame_col.shift(1)
         frame_diff = frame_col - prev_frame
@@ -143,6 +151,7 @@ class StartsByFrame(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the first observed frame."""
         first_frame = ctx.over_agent_window(pl.col(ctx.frame_column).min())
         return first_frame <= self.frame
 
@@ -155,6 +164,7 @@ class EndsAfterFrame(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the last observed frame."""
         last_frame = ctx.over_agent_window(pl.col(ctx.frame_column).max())
         return last_frame >= self.frame
 
@@ -167,6 +177,7 @@ class MinSpan(AgentCheckRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the per-agent pass expression for the minimum frame span."""
         first_frame = ctx.over_agent_window(pl.col(ctx.frame_column).min())
         last_frame = ctx.over_agent_window(pl.col(ctx.frame_column).max())
         span = last_frame - first_frame + 1

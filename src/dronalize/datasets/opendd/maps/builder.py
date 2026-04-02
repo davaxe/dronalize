@@ -1,3 +1,5 @@
+"""Map-graph builder for the OpenDD dataset."""
+
 from __future__ import annotations
 
 import sqlite3

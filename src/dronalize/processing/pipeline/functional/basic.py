@@ -1,3 +1,5 @@
+"""Basic dataframe utilities re-exported for functional pipelines."""
+
 from dronalize._internal.polars_ops import (
     collect,
     lazy,

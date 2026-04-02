@@ -1,3 +1,5 @@
+"""Map-graph builder for the SinD dataset."""
+
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET

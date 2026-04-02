@@ -1,16 +1,19 @@
+"""Loader implementation for the INTERACTION dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
+from pydantic import Field
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
+from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import RequireFrames
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderOptions, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, Source
 
@@ -22,7 +25,13 @@ if TYPE_CHECKING:
     from dronalize.processing.maps.config import MapConfig
 
 
-class InteractionLoader(BaseSceneLoader[list[Path]]):
+class InteractionLoaderOptions(LoaderOptions):
+    """Loader options for the INTERACTION dataset."""
+
+    file_batch_size: int = Field(default=100, ge=1)
+
+
+class InteractionLoader(BaseSceneLoader[list[Path], InteractionLoaderOptions]):
     """Loader for the INTERACTION dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -37,7 +46,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         split_request: SplitConfig | None = None,
         *,
-        file_batch_size: int | None = None,
+        loader_options: InteractionLoaderOptions | None = None,
     ) -> None:
         """Initialize the INTERACTION loader.
 
@@ -54,20 +63,24 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
             Optional selection of predefined dataset splits. `None` processes
             all available sources.
-        file_batch_size : int, optional
-            Number of files to read in each batch. If None, all files will be
-            read at once. Larger batches can improve throughput at the cost of
-            higher memory usage. `None` is usually only reasonable for small
-            datasets.
+        loader_options : InteractionLoaderOptions, optional
+            Dataset-specific loader options. `file_batch_size` controls how
+            many CSV files are read in each batch.
         """
         super().__init__(
             loader_config=loader_config,
             map_config=map_config,
             splits=splits,
             split_request=split_request,
+            loader_options=loader_options,
         )
         self._data_root: Path = Path(data_root)
-        self._file_batch_size: int | None = file_batch_size
+        self._file_batch_size: int = self.loader_options.file_batch_size
+
+    @classmethod
+    @override
+    def loader_options_model(cls) -> type[InteractionLoaderOptions]:
+        return InteractionLoaderOptions
 
     @classmethod
     @override
@@ -78,9 +91,8 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         if not data_dir.is_dir():
             return
         csv_files = sorted(data_dir.rglob("*.csv"))
-        batch_size = self._file_batch_size or len(csv_files) or 1
-        for start in range(0, len(csv_files), batch_size):
-            batch_files = csv_files[start : start + batch_size]
+        for start in range(0, len(csv_files), self._file_batch_size):
+            batch_files = csv_files[start : start + self._file_batch_size]
             yield Source(f"{data_dir.name}_b{start}", batch_files)
 
     @override
@@ -122,7 +134,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_VELOCITY_YAW_V1
+        return POSITIONS_VELOCITY_YAW
 
     @classmethod
     @override
@@ -153,8 +165,7 @@ class InteractionLoader(BaseSceneLoader[list[Path]]):
         num_files = sum(1 for _ in data_dir.rglob("*.csv"))
         if num_files == 0:
             return 0
-        batch_size = self._file_batch_size or num_files
-        batches, extra = divmod(num_files, batch_size)
+        batches, extra = divmod(num_files, self._file_batch_size)
         return batches + int(extra > 0)
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:

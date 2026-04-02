@@ -1,3 +1,5 @@
+"""Helpers for resolving per-scene map graphs at runtime."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -22,7 +24,7 @@ def no_map() -> MapResolver:
     Returns
     -------
     MapResolver
-        A resolver that always returns `None`.
+        Resolver that always returns ``None``.
 
     """
 
@@ -49,7 +51,8 @@ def shared_map(
     Returns
     -------
     MapResolver
-        A resolver that resolves the map from shared memory.
+        Resolver that opens the shared-memory map, optionally applies ``f``,
+        and returns a detached copy.
 
     """
 

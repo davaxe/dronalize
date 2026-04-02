@@ -1,3 +1,5 @@
+"""Loader implementation for the AD4CHE dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +9,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION_V1
+from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION
 from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
@@ -119,7 +121,7 @@ class AD4CHELoader(LevelXDataLoader):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_VELOCITY_ACCELERATION_V1
+        return POSITIONS_VELOCITY_ACCELERATION
 
     @classmethod
     @override
@@ -140,7 +142,7 @@ class AD4CHELoader(LevelXDataLoader):
     @override
     def map_resolver(self) -> MapResolver:
         def _resolver(scene: Scene) -> MapGraph | None:
-            if scene.map_key is None:
+            if scene.map_key is None or self.map_config is None:
                 return None
             path = self._data_root / scene.map_key
             map_graph = AD4CHEMapBuilder(path).build(

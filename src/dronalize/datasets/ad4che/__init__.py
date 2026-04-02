@@ -5,7 +5,7 @@ from dronalize.datasets.registry import DatasetCapabilities, DatasetDescriptor
 DESCRIPTOR = DatasetDescriptor.from_loader(
     "ad4che",
     AD4CHELoader,
-    capabilities=DatasetCapabilities.MAP_AVAILABLE | DatasetCapabilities.HIGHWAY_PIPELINE,
+    capabilities=DatasetCapabilities.HIGHWAY_PIPELINE,
     infer_capabilities=True,
 )
 

@@ -1,17 +1,20 @@
+"""Loader implementation for the Argoverse 1 dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
+from pydantic import Field
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import RequireFrames
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderOptions, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
 from dronalize.processing.maps.config import MapConfig
@@ -24,7 +27,13 @@ if TYPE_CHECKING:
     from dronalize.processing.ingest.splits import SplitConfig
 
 
-class Argoverse1Loader(BaseSceneLoader[list[Path]]):
+class Argoverse1LoaderOptions(LoaderOptions):
+    """Loader options for the Argoverse 1 dataset."""
+
+    file_batch_size: int = Field(default=10, ge=1)
+
+
+class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
     """Loader for Argoverse 1 trajectory data stored in CSV format."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -39,7 +48,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         split_request: SplitConfig | None = None,
         *,
-        file_batch_size: int | None = 10,
+        loader_options: Argoverse1LoaderOptions | None = None,
     ) -> None:
         """Initialize the Argoverse 1 loader.
 
@@ -49,11 +58,9 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
             Root directory of the Argoverse 1 forecasting dataset. It should
             contain `forecasting_train_v1.1/`, `forecasting_val_v1.1/`, and
             `forecasting_test_v1.1/`.
-        file_batch_size : int, optional
-            Number of files to read in each batch. If None, all files will be
-            read at once. Larger batches can improve throughput at the cost of
-            higher memory usage. `None` is usually only reasonable for small
-            datasets.
+        loader_options : Argoverse1LoaderOptions, optional
+            Dataset-specific loader options. `file_batch_size` controls how
+            many CSV files are read in each batch.
         loader_config : LoaderConfig, optional
             Loader configuration override.
         splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
@@ -65,12 +72,18 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
             map_config=map_config,
             splits=splits,
             split_request=split_request,
+            loader_options=loader_options,
         )
         self._data_root: Path = Path(data_root)
-        self._batch_size: int | None = file_batch_size
+        self._batch_size: int = self.loader_options.file_batch_size
         self._train_dir: Path = self._data_root / "forecasting_train_v1.1" / "train" / "data"
         self._val_dir: Path = self._data_root / "forecasting_val_v1.1" / "val" / "data"
         self._test_dir: Path = self._data_root / "forecasting_test_v1.1" / "test_obs" / "data"
+
+    @classmethod
+    @override
+    def loader_options_model(cls) -> type[Argoverse1LoaderOptions]:
+        return Argoverse1LoaderOptions
 
     @classmethod
     @override
@@ -130,7 +143,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_ONLY_V1
+        return POSITIONS_ONLY
 
     @classmethod
     @override
@@ -146,7 +159,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
 
     @override
     def map_resolver(self) -> MapResolver:
-        if self._shared_memory_name is None:
+        if self._shared_memory_name is None or self.map_config is None:
             return no_map()
         return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 
@@ -154,9 +167,8 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         if not data_dir.is_dir():
             return
         files: list[Path] = sorted(data_dir.glob("*.csv"))
-        batch_size: int = self._batch_size or len(files) or 1
-        for start in range(0, len(files), batch_size):
-            batch_files = files[start : start + batch_size]
+        for start in range(0, len(files), self._batch_size):
+            batch_files = files[start : start + self._batch_size]
             yield Source(identifier=start, data=batch_files)
 
     def _count_sources(self, data_dir: Path) -> int:
@@ -165,8 +177,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path]]):
         num_files = sum(1 for _ in data_dir.glob("*.csv"))
         if num_files == 0:
             return 0
-        batch_size = self._batch_size or num_files
-        batches, extra = divmod(num_files, batch_size)
+        batches, extra = divmod(num_files, self._batch_size)
         return batches + int(extra > 0)
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:

@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any
 
 import altair as alt
 
+from dronalize.core.scene.schema import CANONICAL
 from dronalize.plot import plot_trajectories, plot_trajectories_on_map
-from dronalize.processing.ingest.base import CANONICAL_V1
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -110,11 +110,16 @@ def debug_descriptor(
 ) -> list[Scene]:
     """Build a loader from its descriptor and visualize a scene sample."""
     loader_config = descriptor.default_loader_config
+    loader_options = descriptor.default_loader_options
     map_config = descriptor.default_map_config
     loader = descriptor.build_loader(
-        root, loader_config=loader_config, map_config=map_config, output_schema=None
+        root,
+        loader_config=loader_config,
+        loader_options=loader_options,
+        map_config=map_config,
+        output_schema=None,
     )
-    loader.set_output_schema(CANONICAL_V1)
+    loader.set_output_schema(CANONICAL)
     with descriptor.execution_scope(root, loader_config, map_config):
         return debug_visualize_scenes(
             loader, max_scenes=max_scenes, skip_scenes=skip_scenes, step=step

@@ -1,0 +1,60 @@
+# Zara1
+
+<div class="section-intro" markdown="1">
+Zara1 is a pedestrian-only scene from the ETH/UCY benchmark family. It is commonly used for social trajectory forecasting in crowded public spaces where human-human interaction is central.
+</div>
+
+<div class="summary-grid">
+  <div class="summary-item"><span>Domain</span><strong>Pedestrian</strong></div>
+  <div class="summary-item"><span>Primary agents</span><strong>Pedestrians</strong></div>
+  <div class="summary-item"><span>Capture platform</span><strong>Camera</strong></div>
+  <div class="summary-item"><span>Map context</span><strong>None</strong></div>
+  <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
+</div>
+
+## Dataset facts
+
+| Field               | Value                               | Notes                                                               |
+| ------------------- | ----------------------------------- | ------------------------------------------------------------------- |
+| Release year        | 2007                                | Part of the UCY scene family used with ETH/UCY benchmarks.          |
+| Domain              | Pedestrian                          | Used for interaction-aware human trajectory prediction.             |
+| Capture platform    | Overhead pedestrian scene recording | Focused on walker motion in a shared public space.                  |
+| Primary agent types | Pedestrians                         | Human motion is the only target class.                              |
+| Map context         | Limited                             | Typically treated as a scene benchmark rather than a map benchmark. |
+| Benchmark family    | ETH/UCY                             | Shares setup conventions with `eth`, `hotel`, `univ`, and `zara2`.  |
+| Data format         | Text trajectory files               | Commonly arranged into train, validation, and test folders.         |
+
+## Default processing profile
+
+These are the default Dronalize settings used when processing this dataset.
+
+| Setting | Default |
+| ------- | ------- |
+| Source sequence | 8 obs / 12 pred @ 2.5 Hz |
+| Effective sequence | 29 obs / 48 pred @ 10 Hz |
+| Resampling | Linear 4:1 |
+| Windowing | 20-frame window, step 1 |
+| Filtering | Keep agents with at least 2 samples |
+| Maps | Disabled |
+
+## Split support
+
+Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom modes, and any recommended strategy.
+
+```bash
+dronalize split-support zara1
+```
+
+## References
+
+- Family reference: [You'll never walk alone: Modeling social behavior for multi-target tracking](https://ieeexplore.ieee.org/document/5459260)
+
+## Expected structure
+
+```text
+ethucy/
+└── zara1/
+    ├── train/
+    ├── val/
+    └── test/
+```

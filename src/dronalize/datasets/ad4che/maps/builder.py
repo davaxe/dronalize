@@ -1,3 +1,5 @@
+"""Map-graph builder for the AD4CHE dataset."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final

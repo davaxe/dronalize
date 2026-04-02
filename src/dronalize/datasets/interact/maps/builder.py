@@ -1,3 +1,5 @@
+"""Map-graph builder for the INTERACTION dataset."""
+
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 
 

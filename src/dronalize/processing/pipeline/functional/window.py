@@ -1,3 +1,5 @@
+"""Sliding-window transforms for turning trajectories into scene windows."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal

@@ -6,7 +6,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError, SplitStrategyNotSupportedError
-from dronalize.core.scene import CANONICAL_V1, POSITIONS_ONLY_V1, SceneSchema
+from dronalize.core.scene import CANONICAL, POSITIONS_ONLY, SceneSchema
 from dronalize.processing.ingest import (
     BaseSceneLoader,
     BySourceSplit,
@@ -80,7 +80,7 @@ class _NativeSplitLoader(BaseSceneLoader[str]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return CANONICAL_V1
+        return CANONICAL
 
 
 class _UnsplitLoader(BaseSceneLoader[str]):
@@ -105,7 +105,7 @@ class _UnsplitLoader(BaseSceneLoader[str]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return CANONICAL_V1
+        return CANONICAL
 
 
 class _PositionsOnlyLoader(_UnsplitLoader):
@@ -117,7 +117,7 @@ class _PositionsOnlyLoader(_UnsplitLoader):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_ONLY_V1
+        return POSITIONS_ONLY
 
 
 class _DefaultPipelineBlockSplitLoader(BaseSceneLoader[str]):
@@ -140,7 +140,7 @@ class _DefaultPipelineBlockSplitLoader(BaseSceneLoader[str]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return CANONICAL_V1
+        return CANONICAL
 
 
 def test_unsplit_loader_rejects_splits() -> None:
@@ -191,7 +191,7 @@ def test_positions_only_loader_native_schema() -> None:
 
     scene = next(iter(loader.scenes()))
 
-    assert scene.schema == POSITIONS_ONLY_V1
+    assert scene.schema == POSITIONS_ONLY
     assert scene.frame.columns == ["frame", "id", "x", "y", "agent_category"]
     assert scene.frame["x"].to_list() == pytest.approx([0.0, 1.0, 2.0])
 
@@ -203,6 +203,6 @@ def test_loader_output_schema_helpers() -> None:
     )
 
     assert loader.requested_scene_schema is None
-    assert loader.output_scene_schema == POSITIONS_ONLY_V1
+    assert loader.output_scene_schema == POSITIONS_ONLY
     assert loader.requires_scene_fields("x", "y") is True
     assert loader.requires_scene_fields("vx") is False

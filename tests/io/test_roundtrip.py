@@ -11,14 +11,14 @@ import pytest
 pl = pytest.importorskip("polars")
 
 from dronalize.core.maps import MapGraph
-from dronalize.core.scene import CANONICAL_V1, Scene
+from dronalize.core.scene import CANONICAL, Scene
 from dronalize.io import WriterConfig
 
 pytest.importorskip("torch")
 pytest.importorskip("streaming")
 pytest.importorskip("torch_geometric")
 
-from dronalize.io.adapters.mds import _MDSDatasetBackend  # noqa: PLC2701
+from dronalize.io.adapters.mds import MDSDataset
 from dronalize.io.encoding import encode_map_from_scene, scene_to_numpy_dict
 from dronalize.io.writers.mds import MDSSceneWriter
 from dronalize.processing.ingest import LoaderConfig
@@ -50,7 +50,7 @@ def _scene() -> Scene:
         scene_number=7,
         input_len=2,
         output_len=1,
-        schema=CANONICAL_V1,
+        schema=CANONICAL,
         sample_time=1.0,
         map_key="toy-map",
         map_resolver=lambda _scene, graph=graph: graph,
@@ -108,7 +108,7 @@ def _assert_sample_equal(actual: dict[str, Any], expected: dict[str, Any]) -> No
 
 
 def _read_mds_sample(output_dir: Path) -> dict[str, Any]:
-    dataset = _MDSDatasetBackend(path=output_dir, split="all")
+    dataset = MDSDataset(path=output_dir, split="all")
     assert len(dataset) == 1
     sample = dataset[0]
     features = np.concatenate(
@@ -146,7 +146,7 @@ def test_mds_roundtrip(tmp_path: Path) -> None:
         output_dir,
         config=_writer_config(),
         loader_config=_loader_config(),
-        source_scene_schema=CANONICAL_V1,
+        source_scene_schema=CANONICAL,
         splits=None,
         parallel=False,
         has_map=True,

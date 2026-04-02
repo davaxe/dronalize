@@ -1,3 +1,5 @@
+"""Map-graph builder for the Lyft Level 5 dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path

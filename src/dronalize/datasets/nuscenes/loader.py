@@ -1,3 +1,5 @@
+"""Loader implementation for the nuScenes dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +9,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
@@ -119,7 +121,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_ONLY_V1
+        return POSITIONS_ONLY
 
     @classmethod
     @override

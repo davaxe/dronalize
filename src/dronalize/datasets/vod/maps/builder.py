@@ -1,3 +1,5 @@
+"""Map-graph builder for the View-of-Delft dataset."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

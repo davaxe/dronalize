@@ -1,3 +1,5 @@
+"""Authoring-time configuration models loaded from project files."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -11,10 +13,10 @@ except ModuleNotFoundError:
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dronalize.core.categories import DatasetSplit  # noqa: TC001
+from dronalize.core.errors import ConfigurationError, LoaderConfigError, SplitError
 from dronalize.io.config import SceneSchemaLike, WriterPrecision  # noqa: TC001
 from dronalize.processing.filters.filter import AgentCheckSpecs, CleanupSpecs, SceneCheckSpecs
 from dronalize.processing.filters.filter import FilterSpec as RuntimeFilterSpec
-from dronalize.processing.ingest.config import LoaderOptionValue  # noqa: TC001
 from dronalize.processing.ingest.splits import SplitModeName, SplitWeights  # noqa: TC001
 from dronalize.processing.pipeline.functional.resample._common import AliasedResampling, ColumnOrder
 
@@ -41,7 +43,7 @@ class FileExecutionConfig(_FileModel):
     def _validate_jobs(self) -> FileExecutionConfig:
         if self.jobs is not None and self.jobs != "auto" and self.jobs < 1:
             msg = "jobs must be a positive integer or 'auto'."
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
         return self
 
 
@@ -95,7 +97,7 @@ class FileLoaderFilterConfig(_FileModel):
         has_rules = bool(self.cleanup or self.scene or self.agent or self.remove)
         if has_rules and self.mode is None:
             msg = "filter mode is required when filter rules or remove entries are present."
-            raise ValueError(msg)
+            raise LoaderConfigError(msg)
         return self
 
     def rules(self) -> RuntimeFilterSpec:
@@ -113,7 +115,7 @@ class FileLoaderConfig(_FileModel):
     resampling: FileResamplingConfig | None = None
     filter: FileLoaderFilterConfig | None = None
     highway: dict[str, Any] | None = None
-    options: dict[str, LoaderOptionValue] | None = None
+    options: dict[str, Any] | None = None
 
 
 class FileMapConfig(_FileModel):
@@ -132,18 +134,18 @@ class FileMapConfig(_FileModel):
     def _validate_extraction(self) -> FileMapConfig:
         if self.extraction == "relevant" and self.padding is None:
             msg = "map padding is required when extraction='relevant'."
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
         if self.extraction == "circle" and self.radius is None:
             msg = "map radius is required when extraction='circle'."
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
         if self.extraction == "bounding_box" and (self.width is None or self.height is None):
             msg = "map width and height are required when extraction='bounding_box'."
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
         if self.extraction in {None, "full"} and any(
             value is not None for value in (self.padding, self.radius, self.width, self.height)
         ):
             msg = "map extraction-specific fields require an explicit extraction mode."
-            raise ValueError(msg)
+            raise ConfigurationError(msg)
         return self
 
 
@@ -179,27 +181,27 @@ class FileSplitConfig(_FileModel):
         if self.mode is None:
             if any(value is not None for value in (self.ratio, self.gap, self.segments, self.read)):
                 msg = "split mode is required when split settings are present."
-                raise ValueError(msg)
+                raise SplitError(msg)
             return self
 
         if self.mode in _MODES_REQUIRING_RATIO and self.ratio is None:
             msg = f"split ratio is required when mode='{self.mode}'."
-            raise ValueError(msg)
+            raise SplitError(msg)
         if self.gap is not None and self.mode not in _MODES_WITH_GAP:
             msg = "split gap is only valid for time and shuffled-time modes."
-            raise ValueError(msg)
+            raise SplitError(msg)
         if self.mode == "shuffled-time" and self.segments is None:
             msg = "split segments are required when mode='shuffled-time'."
-            raise ValueError(msg)
+            raise SplitError(msg)
         if self.mode != "shuffled-time" and self.segments is not None:
             msg = "split segments are only valid for mode='shuffled-time'."
-            raise ValueError(msg)
+            raise SplitError(msg)
         if self.mode != "native" and self.read is not None:
             msg = "split read is only valid for mode='native'."
-            raise ValueError(msg)
+            raise SplitError(msg)
         if self.mode in {"native", "none"} and self.ratio is not None:
             msg = f"split ratio is not valid when mode='{self.mode}'."
-            raise ValueError(msg)
+            raise SplitError(msg)
         return self
 
 

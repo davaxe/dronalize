@@ -1,3 +1,5 @@
+"""Configuration models for runtime map extraction and simplification."""
+
 from __future__ import annotations
 
 from typing import Annotated, ClassVar, Literal

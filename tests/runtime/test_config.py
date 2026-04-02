@@ -8,10 +8,10 @@ from pydantic import ValidationError
 from dronalize.core.categories import AgentCategory
 from dronalize.core.models import Range
 from dronalize.core.scene import (
-    CANONICAL_V1,
-    POSITIONS_ONLY_V1,
-    POSITIONS_VELOCITY_ACCELERATION_V1,
-    POSITIONS_VELOCITY_YAW_V1,
+    CANONICAL,
+    POSITIONS_ONLY,
+    POSITIONS_VELOCITY_ACCELERATION,
+    POSITIONS_VELOCITY_YAW,
 )
 from dronalize.io import WriterConfig
 from dronalize.processing.filters import (
@@ -544,19 +544,19 @@ def test_writer_schema_drives_layout() -> None:
     )
     positions_velocity_yaw = WriterConfig.create(scene_schema="positions_velocity_yaw")
 
-    assert default_config.scene_schema == CANONICAL_V1
+    assert default_config.scene_schema == CANONICAL
     assert default_config.feature_dim == 7
     assert default_config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
 
-    assert positions_only.scene_schema == POSITIONS_ONLY_V1
+    assert positions_only.scene_schema == POSITIONS_ONLY
     assert positions_only.feature_dim == 2
     assert positions_only.feature_columns == ("x", "y")
 
-    assert positions_velocity_acceleration.scene_schema == POSITIONS_VELOCITY_ACCELERATION_V1
+    assert positions_velocity_acceleration.scene_schema == POSITIONS_VELOCITY_ACCELERATION
     assert positions_velocity_acceleration.feature_dim == 6
     assert positions_velocity_acceleration.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
 
-    assert positions_velocity_yaw.scene_schema == POSITIONS_VELOCITY_YAW_V1
+    assert positions_velocity_yaw.scene_schema == POSITIONS_VELOCITY_YAW
     assert positions_velocity_yaw.feature_dim == 5
     assert positions_velocity_yaw.feature_columns == ("x", "y", "vx", "vy", "yaw")
 
@@ -567,12 +567,10 @@ def test_runtime_config_merges_writer() -> None:
 
     resolved = resolve_runtime_config(
         default=default,
-        overrides=_file_config(
-            {"writer": {"schema": "positions_only", "precision": "float64"}}
-        ),
+        overrides=_file_config({"writer": {"schema": "positions_only", "precision": "float64"}}),
     )
 
-    assert resolved.writer.scene_schema == POSITIONS_ONLY_V1
+    assert resolved.writer.scene_schema == POSITIONS_ONLY
     assert resolved.writer.precision == "float64"
     assert resolved.writer.offset_positions is True
 
@@ -616,9 +614,7 @@ chunksize = 8
     assert isinstance(overrides, ConfigFile)
     assert overrides.global_ == _file_config({"execution": {"jobs": 4}})
     assert overrides.dataset_config("a43") == _file_config({"execution": {"jobs": 1}})
-    assert overrides.dataset_config("waymo") == _file_config(
-        {"execution": {"chunksize": 8}}
-    )
+    assert overrides.dataset_config("waymo") == _file_config({"execution": {"chunksize": 8}})
     assert overrides.dataset_config("nuscenes") == FileDatasetConfig()
 
 
@@ -678,6 +674,72 @@ tolerance = { kind = "combined", absolute = 1, relative = 0.2 }
         agent_rules=[
             agent.RequireFrames.define(frames=[0, 4], tolerance=tol(absolute=1, relative=0.2))
         ],
+    )
+
+
+def test_load_overrides_prune_by_rule_cleanup(tmp_path: Path) -> None:
+    """TOML cleanup tables should parse prune-by-rule definitions."""
+    overrides = _load_dataset_overrides(
+        tmp_path,
+        """[datasets.a43.loader.filter]
+mode = "replace"
+
+[[datasets.a43.loader.filter.cleanup]]
+type = "prune_by_rule"
+rule = { type = "min_samples", minimum = 8, selector = { mode = "include", categories = ["CAR"] }, rule_id = "car_min_samples" }
+""",  # noqa: E501
+    )
+    resolved = resolve_runtime_config(
+        default=_runtime_config(),
+        overrides=overrides,
+    )
+    assert resolved.loader.filter == Filter.define(
+        cleanup_rules=[
+            cleanup.PruneByRule(
+                rule=agent.MinSamples(
+                    minimum=8,
+                    selector=AgentSelector.include(["CAR"]),
+                    rule_id="car_min_samples",
+                )
+            )
+        ]
+    )
+
+
+def test_load_overrides_prune_by_rule_cleanup_verbose_toml(tmp_path: Path) -> None:
+    """Expanded TOML tables should also parse prune-by-rule cleanup definitions."""
+    overrides = _load_dataset_overrides(
+        tmp_path,
+        """[datasets.a43.loader.filter]
+mode = "replace"
+
+[[datasets.a43.loader.filter.cleanup]]
+type = "prune_by_rule"
+
+[datasets.a43.loader.filter.cleanup.rule]
+type = "min_samples"
+minimum = 8
+rule_id = "car_min_samples"
+
+[datasets.a43.loader.filter.cleanup.rule.selector]
+mode = "include"
+categories = ["CAR"]
+""",
+    )
+    resolved = resolve_runtime_config(
+        default=_runtime_config(),
+        overrides=overrides,
+    )
+    assert resolved.loader.filter == Filter.define(
+        cleanup_rules=[
+            cleanup.PruneByRule(
+                rule=agent.MinSamples(
+                    minimum=8,
+                    selector=AgentSelector.include(["CAR"]),
+                    rule_id="car_min_samples",
+                )
+            )
+        ]
     )
 
 
@@ -786,8 +848,9 @@ gap = 2
 """,
     )
 
-    assert overrides.map == _file_config(
-        {
+    assert (
+        overrides.map
+        == _file_config({
             "map": {
                 "enabled": True,
                 "min_distance": 1.0,
@@ -795,18 +858,19 @@ gap = 2
                 "extraction": "circle",
                 "radius": 60.0,
             }
-        }
-    ).map
-    assert overrides.split == _file_config(
-        {
+        }).map
+    )
+    assert (
+        overrides.split
+        == _file_config({
             "split": {
                 "mode": "shuffled-time",
                 "ratio": {"train": 0.7, "val": 0.2, "test": 0.1},
                 "segments": 8,
                 "gap": 2,
             }
-        }
-    ).split
+        }).split
+    )
 
 
 def test_load_overrides_translates_resampling_derivative_entries(tmp_path: Path) -> None:
@@ -860,7 +924,7 @@ def test_writer_schema_positions_only() -> None:
     """Verify initialization with the 'positions_only' shorthand string."""
     config = WriterConfig.create("positions_only", precision="float64", offset_positions=False)
 
-    assert config.scene_schema == POSITIONS_ONLY_V1
+    assert config.scene_schema == POSITIONS_ONLY
     assert config.feature_columns == ("x", "y")
     assert config.feature_dim == 2
 
@@ -868,41 +932,65 @@ def test_writer_schema_positions_only() -> None:
 def test_writer_schema_predefined() -> None:
     """Ensure the config accepts a predefined schema object."""
     config = WriterConfig(
-        scene_schema=POSITIONS_VELOCITY_ACCELERATION_V1,
+        scene_schema=POSITIONS_VELOCITY_ACCELERATION,
         precision="float64",
         offset_positions=False,
     )
 
-    assert config.scene_schema == POSITIONS_VELOCITY_ACCELERATION_V1
+    assert config.scene_schema == POSITIONS_VELOCITY_ACCELERATION
     assert config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
     assert config.feature_dim == 6
 
 
 def test_writer_schema_single_custom() -> None:
-    """Check that a single custom field is correctly appended to base fields."""
-    config = WriterConfig.create("vx", precision="float64", offset_positions=False)
+    """Check that a single custom field is accepted via structured definition."""
+    config = WriterConfig.create(
+        {"name": "custom_vx", "fields": ["frame", "id", "x", "y", "vx", "agent_category"]},
+        precision="float64",
+        offset_positions=False,
+    )
 
     assert config.feature_columns == ("x", "y", "vx")
     assert config.feature_dim == 3
-    assert config.scene_schema.name == "custom: vx"
+    assert config.scene_schema.name == "custom_vx"
 
 
 def test_writer_schema_multiple_custom() -> None:
-    """Validate that multiple colon-separated fields generate a custom schema."""
-    config = WriterConfig.create("vx:vy:yaw", precision="float64", offset_positions=False)
+    """Validate that multiple custom fields generate a structured custom schema."""
+    config = WriterConfig.create(
+        {
+            "name": "custom_velocity_yaw",
+            "fields": ["frame", "id", "x", "y", "vx", "vy", "yaw", "agent_category"],
+        },
+        precision="float64",
+        offset_positions=False,
+    )
 
     assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
     assert config.feature_dim == 5
-    assert config.scene_schema.name == "custom: vx:vy:yaw"
+    assert config.scene_schema.name == "custom_velocity_yaw"
 
 
 def test_writer_schema_custom_order() -> None:
-    """Confirm that the internal representation maintains consistent field ordering."""
-    config = WriterConfig.create("yaw:vx:vy", precision="float64", offset_positions=False)
+    """Confirm that structured custom schemas still use canonical field ordering."""
+    config = WriterConfig.create(
+        {
+            "name": "custom_yaw_velocity",
+            "fields": ["frame", "id", "x", "y", "yaw", "vx", "vy", "agent_category"],
+        },
+        precision="float64",
+        offset_positions=False,
+    )
 
     assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
     assert config.feature_dim == 5
-    assert config.scene_schema.name == "custom: yaw:vx:vy"
+    assert config.scene_schema.name == "custom_yaw_velocity"
+
+
+def test_writer_schema_rejects_string_shorthand() -> None:
+    """Raise ValueError when using removed colon-separated schema shorthand."""
+    with pytest.raises(ValueError, match=r"Unknown scene schema 'vx:vy:yaw'"):
+        WriterConfig.create("vx:vy:yaw", precision="float64", offset_positions=False)
 
 
 def test_writer_schema_rejects_invalid() -> None:

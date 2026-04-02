@@ -1,3 +1,5 @@
+"""Deterministic assigners used for split routing and grouping."""
+
 from __future__ import annotations
 
 import hashlib

@@ -1,3 +1,5 @@
+"""Conversion helpers between scene objects and persisted tensor layouts."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, overload
@@ -54,7 +56,30 @@ def scene_to_numpy_dict(
     scene_schema: SceneSchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
 ) -> SceneSampleF32 | SceneSampleF64:
-    """Convert a Scene to a persisted tensor representation."""
+    """Convert a scene to the persisted tensor representation used by writers.
+
+    Parameters
+    ----------
+    scene : Scene
+        Scene to encode.
+    dtype : type[np.float32] or type[np.float64]
+        Floating-point dtype used for the output feature tensors.
+    offset_position : bool, optional
+        Whether to subtract the mean ``x`` and ``y`` position of the scene
+        before storing the feature tensor. The applied offset is returned in
+        ``global_origin``.
+    scene_schema : SceneSchema | None, optional
+        Target schema to persist. When provided, ``scene`` is converted before
+        encoding.
+    category_mapping : dict[AgentCategory, int] | None, optional
+        Optional mapping from internal agent categories to persisted integer
+        labels. Unmapped categories are encoded as ``-1``.
+
+    Returns
+    -------
+    SceneSampleF32 or SceneSampleF64
+        Dictionary of NumPy arrays containing the encoded scene tensors.
+    """
     if scene_schema is not None:
         scene = scene.as_schema(scene_schema)
 
@@ -162,7 +187,28 @@ def encode_map_from_scene(
     *,
     return_empty: bool = False,
 ) -> MapSampleF32 | MapSampleF64 | None:
-    """Resolve the map graph from the scene and convert it to a persisted layout."""
+    """Resolve the scene map and convert it to the persisted map layout.
+
+    Parameters
+    ----------
+    scene : Scene
+        Scene whose attached map should be encoded.
+    dtype : type[np.float32] or type[np.float64]
+        Floating-point dtype used for persisted node coordinates.
+    offset : ndarray of float64 or None
+        Position offset to subtract from map node coordinates before
+        persistence. This typically matches the ``global_origin`` returned by
+        :func:`scene_to_numpy_dict`.
+    return_empty : bool, optional
+        Whether to emit the sentinel empty-map payload when ``scene`` has no
+        map. When ``False``, ``None`` is returned instead.
+
+    Returns
+    -------
+    MapSampleF32 or MapSampleF64 or None
+        Encoded map payload, sentinel empty payload, or ``None`` when the
+        scene has no map and ``return_empty`` is ``False``.
+    """
     graph = scene.resolve_map()
     if graph is None:
         if not return_empty:
@@ -193,7 +239,7 @@ def _map_graph_to_numpy(
 def _map_graph_to_numpy(
     graph: MapGraph, dtype: FloatDType, offset: npt.NDArray[np.float64] | None = None
 ) -> MapSampleF32 | MapSampleF64:
-    """Convert a MapGraph to a persisted dictionary of NumPy arrays."""
+    """Convert a ``MapGraph`` to a persisted dictionary of NumPy arrays."""
     node_positions = graph.node_positions - offset if offset is not None else graph.node_positions
     map_dict: MapSample[Any] = {
         "map_node_positions": node_positions.astype(dtype, copy=False),
@@ -222,9 +268,9 @@ def scene_sample_to_parts(
 
     Returns
     -------
-    tuple[pl.DataFrame, int, int]
-        Reconstructed DataFrame of agent states, along with input and output
-        lengths.
+    pl.DataFrame
+        Reconstructed agent-state table with ``frame``, ``id``,
+        ``agent_category``, and the requested feature columns.
 
     """
     features = sample["features"]

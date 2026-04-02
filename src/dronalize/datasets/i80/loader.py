@@ -1,3 +1,5 @@
+"""Loader implementation for the I-80 dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +9,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import MinSamples
@@ -24,7 +26,7 @@ if TYPE_CHECKING:
     from dronalize.processing.ingest.splits import SplitConfig
 
 
-class I80Loader(BaseSceneLoader[Path]):
+class I80Loader(BaseSceneLoader):
     """Scene loader for the I-80 dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -92,7 +94,7 @@ class I80Loader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_ONLY_V1
+        return POSITIONS_ONLY
 
     @classmethod
     @override
@@ -111,7 +113,7 @@ class I80Loader(BaseSceneLoader[Path]):
 
     @override
     def map_resolver(self) -> MapResolver:
-        if self._shared_memory_name is None:
+        if self._shared_memory_name is None or self.map_config is None:
             return no_map()
         return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 

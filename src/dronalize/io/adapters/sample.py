@@ -1,3 +1,5 @@
+"""Lightweight in-memory sample containers returned by reader adapters."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

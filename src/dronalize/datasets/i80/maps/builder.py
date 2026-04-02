@@ -1,3 +1,5 @@
+"""Map-graph builder for the I-80 dataset."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

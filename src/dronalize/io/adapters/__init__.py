@@ -1,15 +1,17 @@
+"""Lazy public exports for storage-reader adapters."""
+
 from __future__ import annotations
 
 import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dronalize.io.adapters.mds import MDSHeteroDataset
+    from dronalize.io.adapters.pyg.mds import MDSHeteroDataset
 
 __all__ = ["MDSHeteroDataset"]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "MDSHeteroDataset": ("dronalize.io.adapters.mds", "MDSHeteroDataset")
+    "MDSHeteroDataset": ("dronalize.io.adapters.pyg.mds", "MDSHeteroDataset"),
 }
 
 

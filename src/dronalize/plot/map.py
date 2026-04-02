@@ -1,5 +1,7 @@
 # pyright: standard
 
+"""Altair helpers for visualizing map graphs."""
+
 from __future__ import annotations
 
 from functools import lru_cache

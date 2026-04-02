@@ -1,18 +1,16 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ParamSpec, TypeVar
+from pathlib import Path
+from typing import ParamSpec
 
 import numpy as np
+import polars as pl
+from typing_extensions import TypeVar
 
-if TYPE_CHECKING:
-    import polars as pl
-
-    DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
-else:
-    DataFrameT = TypeVar("DataFrameT")
+DataFrameT = TypeVar("DataFrameT", pl.DataFrame, pl.LazyFrame)
 
 SourceId = str | int
-SourceT = TypeVar("SourceT")
+SourceT = TypeVar("SourceT", default=Path)
 P = ParamSpec("P")
 T = TypeVar("T")
 T_co = TypeVar("T_co", covariant=True)

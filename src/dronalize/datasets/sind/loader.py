@@ -1,3 +1,5 @@
+"""Loader implementation for the SinD dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +9,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import CANONICAL_V1
+from dronalize.core.scene import CANONICAL
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
@@ -27,7 +29,7 @@ if TYPE_CHECKING:
 # one in repo: https://github.com/SOTIF-AVLab/SinD
 
 
-class SindLoader(BaseSceneLoader[Path]):
+class SindLoader(BaseSceneLoader):
     """Loader for the SIND dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -126,7 +128,7 @@ class SindLoader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return CANONICAL_V1
+        return CANONICAL
 
     @classmethod
     @override

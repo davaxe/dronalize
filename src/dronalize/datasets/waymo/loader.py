@@ -1,3 +1,5 @@
+"""Loader implementation for the Waymo Open Dataset."""
+
 from __future__ import annotations
 
 import struct
@@ -9,7 +11,7 @@ from typing_extensions import override
 
 import dronalize.processing.pipeline.transforms as tr
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_VELOCITY_YAW_V1
+from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
 from dronalize.processing.filters import Filter
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
     from dronalize.processing.pipeline.pipeline import Pipeline
 
 
-class WaymoLoader(BaseSceneLoader[Path]):
+class WaymoLoader(BaseSceneLoader):
     """Loader for Waymo Open Dataset scenarios stored in TFRecord format."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -132,7 +134,7 @@ class WaymoLoader(BaseSceneLoader[Path]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_VELOCITY_YAW_V1
+        return POSITIONS_VELOCITY_YAW
 
     @classmethod
     @override

@@ -1,3 +1,5 @@
+"""Project-specific exception hierarchy used across Dronalize."""
+
 from __future__ import annotations
 
 from dronalize.core.categories import DatasetSplit
@@ -13,6 +15,10 @@ class ConfigurationError(ValueError, DronalizeError):
 
 class LoaderConfigError(ConfigurationError, DronalizeError):
     """Raised when there is an issue with a loader configuration."""
+
+
+class SceneSchemaError(ConfigurationError, DronalizeError):
+    """Raised when a scene schema is invalid, unknown, or cannot be applied."""
 
 
 class MissingOptionalDependencyError(DronalizeError):
@@ -41,7 +47,7 @@ class DatasetNotFoundError(DronalizeError):
 
 
 class SplitError(ValueError, DronalizeError):
-    """Base class for dataset split validation errors."""
+    """Base class for dataset split-related errors."""
 
 
 class SplitConflictError(SplitError):
@@ -91,6 +97,10 @@ class SplitStrategyNotSupportedError(SplitError):
         self.loader_name: str = loader_name
         self.strategy_name: str = strategy_name
         self.supported_strategies: tuple[str, ...] = supported_strategies
+
+
+class SplitAssignmentError(SplitError):
+    """Raised when runtime split-assignment data is missing or invalid."""
 
 
 class UnsupportedOutputFormatError(ValueError, DronalizeError):

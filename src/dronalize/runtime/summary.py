@@ -1,3 +1,5 @@
+"""Human-readable summaries for prepared runtime processing plans."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -14,7 +16,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.categories import DatasetSplit
-    from dronalize.processing.ingest.config import LoaderConfig, LoaderOptionValue
+    from dronalize.processing.ingest.base import LoaderOptions
+    from dronalize.processing.ingest.config import LoaderConfig
     from dronalize.processing.maps.config import MapConfig
     from dronalize.runtime.models import DatasetPlan
 
@@ -42,7 +45,9 @@ def summarize_plan(plan: DatasetPlan) -> ProcessingSummary:
                 ("Resampling", _resampling_summary(loader)),
                 ("Filtering", _filter_summary(loader)),
                 ("Map", _map_summary(plan.config.map)),
-                ("Loader options", _format_options(loader.options)) if loader.options else None,
+                ("Loader options", _format_options(plan.config.loader_options))
+                if _has_loader_options(plan.config.loader_options)
+                else None,
             ),
         ),
         SummarySection(
@@ -171,8 +176,13 @@ def _format_weighted_splits(groups: Iterable[tuple[DatasetSplit, float]]) -> str
     return ", ".join(formatted)
 
 
-def _format_options(options: dict[str, LoaderOptionValue]) -> str:
-    return ", ".join(f"{key}={value!r}" for key, value in sorted(options.items()))
+def _has_loader_options(options: LoaderOptions) -> bool:
+    return bool(options.model_dump(exclude_defaults=True))
+
+
+def _format_options(options: LoaderOptions) -> str:
+    values = options.model_dump(exclude_defaults=True)
+    return ", ".join(f"{key}={value!r}" for key, value in sorted(values.items()))
 
 
 def _non_empty_rows(*rows: tuple[str, str] | None) -> tuple[tuple[str, str], ...]:

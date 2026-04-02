@@ -1,3 +1,5 @@
+"""Planning and execution helpers for scene-field derivations."""
+
 from __future__ import annotations
 
 import functools
@@ -8,6 +10,7 @@ from typing import Final
 import polars as pl
 
 from dronalize._internal.polars_ops import derivative, yaw_from_pos, yaw_from_vel
+from dronalize.core.errors import SceneSchemaError
 from dronalize.core.scene.schema import SceneField
 
 _POSITION_FIELDS: Final[SceneField] = SceneField.X | SceneField.Y
@@ -124,7 +127,7 @@ def plan_derivations(
 def _require_sample_time(sample_time: float | None) -> float:
     if sample_time is None:
         msg = "Scene schema conversion requires sample_time to derive kinematics."
-        raise ValueError(msg)
+        raise SceneSchemaError(msg)
     return sample_time
 
 

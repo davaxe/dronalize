@@ -1,3 +1,5 @@
+"""Map-graph builder for the inD dataset."""
+
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 
 

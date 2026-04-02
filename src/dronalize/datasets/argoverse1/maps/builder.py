@@ -1,3 +1,5 @@
+"""Map-graph builder for the Argoverse 1 dataset."""
+
 from __future__ import annotations
 
 from itertools import chain, repeat

@@ -1,3 +1,5 @@
+"""Loader implementation for the Lyft Level 5 dataset."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,18 +9,19 @@ from typing import TYPE_CHECKING, ClassVar, cast
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from pydantic import Field
 from typing_extensions import override
 from zarr.creation import open_array
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
-from dronalize.core.scene import POSITIONS_ONLY_V1
+from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
 from dronalize.processing.filters import Filter
 from dronalize.processing.filters.agent import RequireFrames
 from dronalize.processing.filters.cleanup import ExcludeCategories
 from dronalize.processing.filters.scene import MinimumAgents
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.ingest.base import BaseSceneLoader, LoaderOptions, LoaderSplitCapabilities
 from dronalize.processing.ingest.config import LoaderConfig
 from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
 from dronalize.processing.maps.config import MapConfig
@@ -32,6 +35,12 @@ if TYPE_CHECKING:
     from dronalize.core.scene import SceneSchema
     from dronalize.processing.ingest.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
+
+
+class LyftLoaderOptions(LoaderOptions):
+    """Loader options for the Lyft Level 5 dataset."""
+
+    scene_batch_size: int = Field(default=100, ge=1)
 
 
 @dataclass
@@ -56,7 +65,7 @@ class _ArrayData:
         return self.scenes.shape[0]
 
 
-class LyftLoader(BaseSceneLoader[_Source]):
+class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
     """Loader for Lyft Level 5 scenes stored in Zarr format."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
@@ -71,7 +80,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
         splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
         split_request: SplitConfig | None = None,
         *,
-        scene_batch_size: int | None = 100,
+        loader_options: LyftLoaderOptions | None = None,
     ) -> None:
         """Initialize the Lyft Level 5 loader.
 
@@ -79,10 +88,9 @@ class LyftLoader(BaseSceneLoader[_Source]):
         ----------
         data_root : Path or str
             Root directory of the extracted Lyft Level 5 dataset.
-        scene_batch_size : int, optional
-            Number of scenes to load in each batch. Higher batch size may lead
-            to faster processing at diminishing returns, but also higher memory
-            usage. `None` is not recommended for large amounts of data.
+        loader_options : LyftLoaderOptions, optional
+            Dataset-specific loader options. `scene_batch_size` controls how
+            many scenes are loaded in each batch.
         loader_config : LoaderConfig, optional
             Loader configuration override. If None, the default configuration
             is used.
@@ -92,10 +100,16 @@ class LyftLoader(BaseSceneLoader[_Source]):
             map_config=map_config,
             splits=splits,
             split_request=split_request,
+            loader_options=loader_options,
         )
         self._data_root: Path = Path(data_root)
         self._data: dict[DatasetSplit, _ArrayData] = {}
-        self._batch_size: int | None = scene_batch_size
+        self._batch_size: int = self.loader_options.scene_batch_size
+
+    @classmethod
+    @override
+    def loader_options_model(cls) -> type[LyftLoaderOptions]:
+        return LyftLoaderOptions
 
     @classmethod
     @override
@@ -124,13 +138,12 @@ class LyftLoader(BaseSceneLoader[_Source]):
     def _generate_sources(self, split: DatasetSplit) -> Iterable[Source[_Source]]:
         arrays = self._get_arrays(split)
         total_scenes = arrays.total_scenes
-        batch_size = self._batch_size or total_scenes
 
         current: int = 0
         while current < total_scenes:
-            end = min(current + batch_size, total_scenes)
+            end = min(current + self._batch_size, total_scenes)
             yield Source(current, data=_Source(interval=(current, end), split=split))
-            current += batch_size
+            current += self._batch_size
 
     @override
     def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[_Source]]:
@@ -145,9 +158,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
         return sum(self._count_sources_for_split(split) for split in splits)
 
     @staticmethod
-    def _source_count(total_scenes: int, batch_size: int | None) -> int:
-        if batch_size is None:
-            return 1
+    def _source_count(total_scenes: int, batch_size: int) -> int:
         return (total_scenes + batch_size - 1) // batch_size
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:
@@ -187,7 +198,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
     @classmethod
     @override
     def native_scene_schema(cls) -> SceneSchema:
-        return POSITIONS_ONLY_V1
+        return POSITIONS_ONLY
 
     @classmethod
     @override
@@ -213,7 +224,7 @@ class LyftLoader(BaseSceneLoader[_Source]):
 
     @override
     def map_resolver(self) -> MapResolver:
-        if self._shared_memory_name is None:
+        if self._shared_memory_name is None or self.map_config is None:
             return no_map()
         return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
 

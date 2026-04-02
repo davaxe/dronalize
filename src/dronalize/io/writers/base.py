@@ -1,3 +1,5 @@
+"""Protocols shared by persisted scene-writer backends."""
+
 from __future__ import annotations
 
 import functools
@@ -19,20 +21,20 @@ class StorageWriter(Protocol):
     manifest: StorageManifest
 
     def write(self, scene: Scene) -> bool:
-        """Write a single processed scene."""
+        """Write one processed scene and return whether it was accepted."""
         ...
 
     def finish_local(self) -> None:
-        """Finalize the current worker or process."""
+        """Finalize worker-local state once the current worker is done."""
         ...
 
     def finish_final(self) -> None:
-        """Finalize the full dataset once all workers are done."""
+        """Finalize dataset-wide state once all workers are done."""
         ...
 
     @classmethod
     def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int | None], Self]:  # noqa: ANN401
-        """Create a worker-local writer factory."""
+        """Create a worker-local writer factory for the configured backend."""
         return functools.partial(cls, *args, **kwargs)
 
 

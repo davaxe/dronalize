@@ -1,3 +1,5 @@
+"""Multiprocessing executor for parallel scene generation and writing."""
+
 from __future__ import annotations
 
 import functools

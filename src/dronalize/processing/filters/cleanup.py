@@ -1,3 +1,5 @@
+"""Cleanup rules that prune rows or agents before scene validation."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated, Literal
@@ -7,7 +9,8 @@ from pydantic import Field
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategoryInput, coerce_agent_categories
-from dronalize.processing.filters.base import AgentCheckRule, CleanupRule, RuleId
+from dronalize.processing.filters.agent import AgentCheckSpec  # noqa: TC001
+from dronalize.processing.filters.base import CleanupRule, RuleId
 from dronalize.processing.filters.context import AgentSet  # noqa: TC001
 
 if TYPE_CHECKING:
@@ -17,11 +20,12 @@ if TYPE_CHECKING:
 class PruneByRule(CleanupRule):
     """Remove rows for agents that fail the given validation rule."""
 
-    rule: AgentCheckRule
+    rule: AgentCheckSpec
     type: Literal["prune_by_rule"] = Field("prune_by_rule", repr=False, init=False)
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the row-retention expression for the wrapped agent rule."""
         scope = ctx.selector_mask(self.rule.selector)
         agent_validity = self.rule.expr(ctx)
         return pl.when(scope).then(agent_validity).otherwise(statement=True)
@@ -42,6 +46,7 @@ class ExcludeCategories(CleanupRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the row-retention expression that excludes selected categories."""
         return ~pl.col(ctx.category_column).is_in(self.categories)
 
 
@@ -60,9 +65,15 @@ class IncludeCategories(CleanupRule):
 
     @override
     def expr(self, ctx: FilterContext) -> pl.Expr:
+        """Return the row-retention expression that keeps selected categories."""
         return pl.col(ctx.category_column).is_in(self.categories)
 
 
-CleanupSpec = Annotated[ExcludeCategories | IncludeCategories, Field(discriminator="type")]
+CleanupSpec = Annotated[
+    PruneByRule | ExcludeCategories | IncludeCategories,
+    Field(discriminator="type"),
+]
 
 __all__ = ["CleanupRule", "CleanupSpec", "ExcludeCategories", "IncludeCategories", "PruneByRule"]
+
+_ = PruneByRule.model_rebuild(_types_namespace=globals())

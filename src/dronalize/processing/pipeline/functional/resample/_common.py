@@ -1,3 +1,5 @@
+"""Shared models and planning helpers for temporal resampling."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,6 +13,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, field_valida
 from typing_extensions import Self, override
 
 from dronalize._internal.polars_ops import normalize_group_by
+from dronalize.core.errors import LoaderConfigError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -32,7 +35,7 @@ class ResampleMethod(str, Enum):
     HERMITE = "hermite"
 
     def support_derivatives(self) -> bool:
-        """Whether the method supports input or output derivatives."""
+        """Return whether the method can consume or emit derivative columns."""
         return self in {ResampleMethod.CUBIC, ResampleMethod.PCHIP, ResampleMethod.HERMITE}
 
 
@@ -89,29 +92,28 @@ class ResampleSpec(BaseModel):
         return self.model_copy(update=kwargs)
 
     def with_input_derivative(self, order: int, *columns: str) -> ResampleSpec:
-        """Return a new spec with the given input derivative order and columns."""
+        """Return a copy with additional input-derivative columns registered."""
         return self._with_update(
             input_derivatives={**self.input_derivatives, order: dict.fromkeys(columns)}
         )
 
     def with_output_derivative(self, order: int, *columns: str) -> ResampleSpec:
-        """Return a new spec with the given output derivative order and columns."""
+        """Return a copy with additional output-derivative columns registered."""
         return self._with_update(
             output_derivatives={**self.output_derivatives, order: dict.fromkeys(columns)}
         )
 
     def with_sample_time(self, sample_time: float) -> ResampleSpec:
-        """Return a new spec with the given sample time."""
+        """Return a copy with a different sampling interval."""
         return self._with_update(sample_time=sample_time)
 
     def with_default_output_deivative(
         self, *, first: bool = True, second: bool = True
     ) -> ResampleSpec:
-        """Return a spec wit default added output derivatives.
+        """Return a copy with default derivative-output columns added.
 
-        By default adds:
-         - First-order output derivatives "vx", "vy"
-         - Second-order output derivatives "ax", "ay"
+        By default this method adds first-order outputs ``("vx", "vy")`` and
+        second-order outputs ``("ax", "ay")``.
 
         """
         new = self
@@ -127,7 +129,7 @@ class ResampleSpec(BaseModel):
         cols = dict.fromkeys(value.keys() if isinstance(value, dict) else value)
         if not cols:
             msg = "position_columns must contain at least one column."
-            raise ValueError(msg)
+            raise LoaderConfigError(msg)
         return cols
 
     @field_validator("input_derivatives", "output_derivatives", mode="before")
@@ -156,29 +158,29 @@ class ResampleSpec(BaseModel):
             for order, cols in mapping.items():
                 if order <= 0:
                     msg = f"{name}_derivatives keys must be positive derivative orders."
-                    raise ValueError(msg)
+                    raise LoaderConfigError(msg)
                 if len(cols) != pos_len:
                     msg = f"{name}_derivatives[{order}] must match position_columns length."
-                    raise ValueError(msg)
+                    raise LoaderConfigError(msg)
 
         # Validate method rules
         has_in, has_out = bool(self.input_derivatives), bool(self.output_derivatives)
         if self.method is ResampleMethod.LINEAR and (has_in or has_out):
             msg = "Linear resampling does not support derivative inputs or outputs."
-            raise ValueError(msg)
+            raise LoaderConfigError(msg)
         if self.method is ResampleMethod.HERMITE and set(self.input_derivatives) != {1}:
             msg = "Hermite resampling requires exactly first-order derivative inputs."
-            raise ValueError(msg)
+            raise LoaderConfigError(msg)
         if self.method not in {ResampleMethod.LINEAR, ResampleMethod.HERMITE} and has_in:
             msg = f"{self.method.value} resampling does not accept input_derivatives."
-            raise ValueError(msg)
+            raise LoaderConfigError(msg)
 
         generated = set(self.position_columns)
         for order, cols in self.output_derivatives.items():
             invalid_overlap = (generated & set(cols)) - set(self.input_derivatives.get(order, []))
             if invalid_overlap:
                 msg = "Output columns can only reuse names from matching input_derivatives."
-                raise ValueError(msg)
+                raise LoaderConfigError(msg)
             generated.update(cols)
 
         return self
@@ -207,12 +209,14 @@ class ResampleSpec(BaseModel):
 
     @property
     def no_resampling(self) -> bool:
-        """Whether the spec keeps the original sampling rate."""
+        """Return whether the specification keeps the original sampling rate."""
         return self.up == 1 and self.down == 1
 
 
 @dataclass(frozen=True)
 class ResamplePlan:
+    """Execution-ready resampling plan derived from a :class:`ResampleSpec`."""
+
     frame_column: str
     group_by: tuple[str, ...]
     segment_keys: tuple[str, ...]
@@ -227,6 +231,7 @@ class ResamplePlan:
 def build_plan(
     spec: ResampleSpec, *, frame_column: str, group_by: str | Sequence[str] | None
 ) -> ResamplePlan:
+    """Normalize a resampling specification into an execution plan."""
     group_columns = normalize_group_by(group_by)
     packed_columns = dict.fromkeys((
         frame_column,
@@ -258,6 +263,7 @@ def build_plan(
 def segment_data(
     data: DataFrameT, *, frame_column: str, group_by: Sequence[str], max_gap: int, sort: bool
 ) -> DataFrameT:
+    """Annotate contiguous trajectory segments separated by gaps larger than ``max_gap``."""
     if sort:
         data = data.sort([*group_by, frame_column])
     expr = (pl.col(frame_column).diff() > max_gap).fill_null(value=False).cum_sum()
@@ -268,9 +274,11 @@ def segment_data(
 
 
 def packed_struct_expression(plan: ResamplePlan) -> pl.Expr:
+    """Return a struct expression containing the columns resampling operates on."""
     return pl.struct(pl.col(column) for column in plan.packed_columns)
 
 
 def not_packed_columns(plan: ResamplePlan) -> pl.Expr:
+    """Return an expression selecting columns carried through unchanged."""
     excluded = [*plan.group_by, *plan.emitted_columns, SEGMENT_COLUMN]
     return pl.all().exclude(excluded)

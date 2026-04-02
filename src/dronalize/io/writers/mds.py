@@ -1,3 +1,5 @@
+"""MosaicML Streaming writer backend for persisted scene datasets."""
+
 from __future__ import annotations
 
 import functools
@@ -99,6 +101,7 @@ class MDSSceneWriter(SceneWriter):
         parallel: bool,
         has_map: bool,
     ) -> Callable[[int | None], MDSSceneWriter]:
+        """Create a worker-local factory for MDS scene writers."""
         return functools.partial(
             _create_writer,
             output_dir=output_dir,
@@ -146,6 +149,7 @@ class MDSSceneWriter(SceneWriter):
 
     @override
     def write(self, scene: Scene) -> bool:
+        """Encode and write one scene to the split-specific shard."""
         if self._writers is None:
             self._writers = self._init_writers(
                 self._base_output_dir,
@@ -193,6 +197,7 @@ class MDSSceneWriter(SceneWriter):
 
     @override
     def finish_local(self) -> None:
+        """Finish the local shard writers for the current worker."""
         if self._writers is None:
             return
         for writer in self._writers.values():
@@ -201,6 +206,7 @@ class MDSSceneWriter(SceneWriter):
 
     @override
     def finish_final(self) -> None:
+        """Merge per-worker MDS indices when running in parallel."""
         if not self._parallel:
             return
         if self._splits:
@@ -213,7 +219,7 @@ class MDSSceneWriter(SceneWriter):
 
 
 def _mds_columns(dtype: str) -> dict[str, str]:
-    """Define the MDS sample schema."""
+    """Return the MDS column schema for one encoded scene sample."""
     return {
         "scene_number": "int",
         "input_len": "int",
