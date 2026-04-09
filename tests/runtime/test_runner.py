@@ -7,29 +7,28 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 import dronalize
-from dronalize import DatasetPlan as RootDatasetPlan
-from dronalize import plan_dataset as root_plan_dataset
 from dronalize.core.categories import DatasetSplit
-from dronalize.core.errors import ConfigurationError, UnsupportedOutputFormatError
-from dronalize.datasets import DatasetCapabilities, DatasetDescriptor
+from dronalize.core.errors import ConfigurationError, UnsupportedStorageBackendError
+from dronalize.datasets import DatasetCapabilities, DatasetSpec
+from dronalize.datasets.a43 import DATASET_SPEC as A43_DATASET_SPEC
 from dronalize.datasets.a43.loader import A43Loader
+from dronalize.datasets.argoverse1 import DATASET_SPEC as ARGOVERSE1_DATASET_SPEC
 from dronalize.datasets.argoverse1.loader import Argoverse1Loader, Argoverse1LoaderOptions
 from dronalize.datasets.argoverse2.loader import Argoverse2LoaderOptions
+from dronalize.datasets.eth_ucy import DATASET_SPECS as ETH_UCY_DATASET_SPECS
 from dronalize.datasets.interact.loader import InteractionLoaderOptions
 from dronalize.datasets.lyft.loader import LyftLoaderOptions
-from dronalize.io.formats import OutputFormat
-from dronalize.processing.ingest import (
-    BySceneSplit,
-    NativeSplit,
+from dronalize.io.formats import StorageBackend
+from dronalize.processing.loading import (
+    NativeSplitStrategy,
     NoLoaderOptions,
-    ShuffledTimeBlockSplit,
+    NoSplitStrategy,
+    SceneSplitStrategy,
+    ShuffledTimeBlockStrategy,
     SplitConfig,
-    TimeBlockSplit,
-    Unsplit,
+    TimeBlockStrategy,
 )
 from dronalize.runtime import DatasetPlan, DatasetRun, plan_dataset, summarize_plan
-from dronalize.runtime import DatasetPlan as RuntimeDatasetPlan
-from dronalize.runtime import plan_dataset as runtime_plan_dataset
 from dronalize.runtime.models import _build_executor, _build_loader, _build_writer_factory
 from dronalize.runtime.parallel.executor import ParallelExecutor
 from dronalize.runtime.sequential import SequentialExecutor
@@ -39,7 +38,7 @@ class _CommonArgs(TypedDict):
     dataset: str
     input_dir: Path
     output_dir: Path
-    output_format: OutputFormat
+    storage_backend: StorageBackend
 
 
 def _a43_args() -> _CommonArgs:
@@ -47,30 +46,40 @@ def _a43_args() -> _CommonArgs:
         "dataset": "a43",
         "input_dir": Path(__file__).parent,
         "output_dir": Path(__file__).parent / "output",
-        "output_format": OutputFormat.DUMMY,
+        "storage_backend": StorageBackend.NULL,
     }
 
 
 def test_public_import_surface() -> None:
-    """The public package exports should expose the new planning API."""
-    assert RootDatasetPlan is DatasetPlan
-    assert RuntimeDatasetPlan is DatasetPlan
-    assert root_plan_dataset is plan_dataset
-    assert runtime_plan_dataset is plan_dataset
+    """The root package should stay a namespace instead of re-exporting helpers."""
+    assert not hasattr(dronalize, "DatasetPlan")
+    assert not hasattr(dronalize, "plan_dataset")
     with pytest.raises(AttributeError):
-        _ = dronalize.ProjectConfigFile
+        _ = dronalize.DatasetPlan
+
+
+def test_dataset_package_roots_expose_descriptors_only() -> None:
+    """Dataset package roots should publish descriptors, not loader internals."""
+    assert A43_DATASET_SPEC.name == "a43"
+    assert ARGOVERSE1_DATASET_SPEC.name == "argoverse1"
+    assert set(ETH_UCY_DATASET_SPECS) == {"eth", "hotel", "univ", "zara1", "zara2"}
+    assert not hasattr(__import__("dronalize.datasets.a43", fromlist=["A43Loader"]), "A43Loader")
+    assert not hasattr(
+        __import__("dronalize.datasets.argoverse1", fromlist=["Argoverse1MapBuilder"]),
+        "Argoverse1MapBuilder",
+    )
 
 
 def test_a43_splits() -> None:
-    """A43 should support custom split modes but not native dataset splits."""
+    """A43 should support custom split strategies but not native dataset splits."""
     common_args = _a43_args()
     plan_obj = plan_dataset(**common_args, split=None)
 
     assert isinstance(plan_obj, DatasetPlan)
     assert plan_obj.descriptor.predefined_splits == []
-    assert isinstance(plan_obj.split_request.mode, Unsplit)
+    assert isinstance(plan_obj.split_request.strategy, NoSplitStrategy)
     assert plan_obj.loader_splits() is None
-    assert plan_obj.writer_splits() is None
+    assert plan_obj.output_splits() is None
 
     with pytest.raises(ValueError, match=r"does not expose native dataset splits"):
         _ = plan_dataset(**common_args, split="native", read_split=["train"])
@@ -79,18 +88,18 @@ def test_a43_splits() -> None:
 
     assert plan_obj.descriptor.predefined_splits == []
     assert plan_obj.loader_splits() is None
-    assert plan_obj.writer_splits() == (
+    assert plan_obj.output_splits() == (
         DatasetSplit.TRAIN,
         DatasetSplit.VAL,
         DatasetSplit.TEST,
     )
-    assert isinstance(plan_obj.split_request.mode, TimeBlockSplit)
-    assert plan_obj.split_request.mode_name == "time"
+    assert isinstance(plan_obj.split_request.strategy, TimeBlockStrategy)
+    assert plan_obj.split_request.strategy_name == "time"
 
-    with pytest.raises(ValueError, match=r"--ratio is only valid with custom split modes"):
+    with pytest.raises(ValueError, match=r"--ratio is only valid with custom split strategies"):
         _ = plan_dataset(**common_args, ratio=(0.7, 0.2, 0.1))
 
-    with pytest.raises(ValueError, match=r"Specify a split mode explicitly"):
+    with pytest.raises(ValueError, match=r"Specify a split strategy explicitly"):
         _ = plan_dataset(**common_args, split="auto", ratio=(0.7, 0.2, 0.1))
 
 
@@ -100,14 +109,14 @@ def test_plan_dataset_native_splits() -> None:
         dataset="waymo",
         input_dir=Path(__file__).parent,
         output_dir=Path(__file__).parent / "output",
-        output_format=OutputFormat.DUMMY,
+        storage_backend=StorageBackend.NULL,
         split="native",
         read_split="train",
     )
 
     assert plan_obj.loader_splits() == (DatasetSplit.TRAIN,)
-    assert plan_obj.writer_splits() == (DatasetSplit.TRAIN,)
-    assert isinstance(plan_obj.split_request.mode, NativeSplit)
+    assert plan_obj.output_splits() == (DatasetSplit.TRAIN,)
+    assert isinstance(plan_obj.split_request.strategy, NativeSplitStrategy)
 
 
 def test_plan_dataset_workers() -> None:
@@ -136,12 +145,12 @@ def test_plan_dataset_auto_workers() -> None:
 
 
 def test_plan_dataset_schema() -> None:
-    """An explicit scene schema override should update the resolved writer config."""
-    plan_obj = plan_dataset(**_a43_args(), scene_schema="positions_only")
+    """An explicit trajectory-schema override should update the resolved export config."""
+    plan_obj = plan_dataset(**_a43_args(), trajectory_schema="positions_only")
 
-    assert plan_obj.config.writer.scene_schema.name == "positions_only"
-    assert plan_obj.config.writer.feature_dim == 2
-    assert plan_obj.config.writer.feature_columns == ("x", "y")
+    assert plan_obj.config.export.trajectory_schema.name == "positions_only"
+    assert plan_obj.config.export.feature_dim == 2
+    assert plan_obj.config.export.feature_columns == ("x", "y")
 
 
 def test_plan_dataset_include_map_overrides() -> None:
@@ -156,8 +165,8 @@ def test_plan_dataset_include_map_overrides() -> None:
 
 
 def test_descriptor_from_loader() -> None:
-    """Descriptor helpers should derive repeated metadata from the loader class."""
-    descriptor = DatasetDescriptor.from_loader(
+    """Dataset-spec helpers should derive repeated metadata from the loader class."""
+    descriptor = DatasetSpec.from_loader(
         "a43-test",
         A43Loader,
         capabilities=DatasetCapabilities.MAP_AVAILABLE,
@@ -170,7 +179,7 @@ def test_descriptor_from_loader() -> None:
     assert descriptor.loader_options_type is NoLoaderOptions
     assert descriptor.default_loader_options == A43Loader.default_loader_options()
     assert descriptor.default_map_config == A43Loader.default_map_config()
-    assert descriptor.native_schema == A43Loader.native_scene_schema()
+    assert descriptor.native_schema == A43Loader.native_trajectory_schema()
     assert descriptor.predefined_splits == list(A43Loader.predefined_splits())
     assert descriptor.supported_split_strategies == list(A43Loader.supported_split_strategies())
     assert descriptor.recommended_split_strategy == A43Loader.recommended_split_strategy()
@@ -180,16 +189,16 @@ def test_descriptor_from_loader() -> None:
 
 
 def test_descriptor_infers_map_capability_from_default_map_config() -> None:
-    """Descriptors built from loaders with map defaults should advertise map support."""
-    descriptor = DatasetDescriptor.from_loader("a43-test", A43Loader, infer_capabilities=True)
+    """Dataset specs built from loaders with map defaults should advertise map support."""
+    descriptor = DatasetSpec.from_loader("a43-test", A43Loader, infer_capabilities=True)
 
     assert descriptor.has_map is True
     assert descriptor.capabilities & DatasetCapabilities.MAP_AVAILABLE
 
 
 def test_descriptor_infers_loader_option_capability() -> None:
-    """Descriptors should advertise typed dataset-specific loader options explicitly."""
-    descriptor = DatasetDescriptor.from_loader(
+    """Dataset specs should advertise typed dataset-specific loader options explicitly."""
+    descriptor = DatasetSpec.from_loader(
         "argoverse1-test",
         Argoverse1Loader,
         infer_capabilities=True,
@@ -197,14 +206,14 @@ def test_descriptor_infers_loader_option_capability() -> None:
 
     assert descriptor.loader_options_type is Argoverse1LoaderOptions
     assert descriptor.default_loader_options == Argoverse1Loader.default_loader_options()
-    assert descriptor.capabilities & DatasetCapabilities.EXTRA_LOADER_ARGS
+    assert descriptor.capabilities & DatasetCapabilities.LOADER_OPTIONS
 
 
 def test_build_loader_uses_config() -> None:
     """Plan-local loader construction should carry resolved runtime settings."""
     plan_obj = plan_dataset(
         **_a43_args(),
-        scene_schema="positions_only",
+        trajectory_schema="positions_only",
         split="time",
         ratio=(0.7, 0.2, 0.1),
     )
@@ -213,10 +222,10 @@ def test_build_loader_uses_config() -> None:
     assert loader.loader_config == plan_obj.config.loader
     assert loader.loader_options == plan_obj.config.loader_options
     assert loader.map_config == plan_obj.config.map
-    assert loader.requested_scene_schema == plan_obj.config.writer.scene_schema
+    assert loader.requested_trajectory_schema == plan_obj.config.export.trajectory_schema
     assert loader.splits is None
     assert loader.split_request is not None
-    assert loader.split_request.mode_name == "time"
+    assert loader.split_request.strategy_name == "time"
 
 
 def test_build_executor_uses_plan_execution_mode() -> None:
@@ -233,20 +242,22 @@ def test_build_executor_uses_plan_execution_mode() -> None:
     )
 
 
-def test_build_writer_factory_uses_plan_output_format() -> None:
-    """Writer-factory construction should follow the resolved output format."""
+def test_build_writer_factory_uses_plan_storage_backend() -> None:
+    """Writer-factory construction should follow the resolved storage backend."""
     plan_obj = plan_dataset(**_a43_args())
     writer_factory = _build_writer_factory(plan_obj)
     writer = writer_factory(0)
 
     assert callable(writer_factory)
-    assert type(writer).__name__ == "DummyWriter"
+    assert type(writer).__name__ == "NullWriter"
 
 
-def test_plan_dataset_rejects_unknown_output_format() -> None:
-    """Planning should surface unsupported writer formats as a typed domain error."""
-    args = {**_a43_args(), "output_format": "bogus"}
-    with pytest.raises(UnsupportedOutputFormatError, match=r"Unsupported output format 'bogus'"):
+def test_plan_dataset_rejects_unknown_storage_backend() -> None:
+    """Planning should surface unsupported storage backends as a typed domain error."""
+    args = {**_a43_args(), "storage_backend": "bogus"}
+    with pytest.raises(
+        UnsupportedStorageBackendError, match=r"Unsupported storage backend 'bogus'"
+    ):
         _ = plan_dataset(**args)
 
 
@@ -273,7 +284,7 @@ def test_waymo_splits() -> None:
         "dataset": "waymo",
         "input_dir": Path(__file__).parent,
         "output_dir": Path(__file__).parent / "output",
-        "output_format": OutputFormat.DUMMY,
+        "storage_backend": StorageBackend.NULL,
     }
     plan_obj = plan_dataset(**common_args, split=None)
 
@@ -282,9 +293,9 @@ def test_waymo_splits() -> None:
         DatasetSplit.VAL,
         DatasetSplit.TEST,
     ])
-    assert isinstance(plan_obj.split_request.mode, Unsplit)
+    assert isinstance(plan_obj.split_request.strategy, NoSplitStrategy)
     assert plan_obj.loader_splits() is None
-    assert plan_obj.writer_splits() is None
+    assert plan_obj.output_splits() is None
 
     plan_obj = plan_dataset(**common_args, split="native", read_split=["train", "val"])
 
@@ -294,8 +305,8 @@ def test_waymo_splits() -> None:
         DatasetSplit.TEST,
     ])
     assert plan_obj.loader_splits() == (DatasetSplit.TRAIN, DatasetSplit.VAL)
-    assert plan_obj.writer_splits() == (DatasetSplit.TRAIN, DatasetSplit.VAL)
-    assert isinstance(plan_obj.split_request.mode, NativeSplit)
+    assert plan_obj.output_splits() == (DatasetSplit.TRAIN, DatasetSplit.VAL)
+    assert isinstance(plan_obj.split_request.strategy, NativeSplitStrategy)
 
     with pytest.raises(ValueError, match=r"--read-split is only valid with --split native"):
         _ = plan_dataset(**common_args, read_split=["train"])
@@ -303,9 +314,9 @@ def test_waymo_splits() -> None:
     plan_obj = plan_dataset(**common_args, split="scene", ratio=(0.5, 0.4, 0.1))
 
     assert plan_obj.loader_splits() is None
-    assert isinstance(plan_obj.split_request.mode, BySceneSplit)
-    assert plan_obj.split_request.mode_name == "scene"
-    writer_splits = plan_obj.writer_splits()
+    assert isinstance(plan_obj.split_request.strategy, SceneSplitStrategy)
+    assert plan_obj.split_request.strategy_name == "scene"
+    writer_splits = plan_obj.output_splits()
     assert writer_splits is not None
     assert sorted(writer_splits) == sorted([
         DatasetSplit.TRAIN,
@@ -325,9 +336,9 @@ def test_plan_dataset_split_config() -> None:
     )
 
     assert isinstance(plan_obj.config.split, SplitConfig)
-    assert isinstance(plan_obj.config.split.mode, ShuffledTimeBlockSplit)
-    assert plan_obj.config.split.mode.gap == 5
-    assert plan_obj.config.split.mode.segments == 8
+    assert isinstance(plan_obj.config.split.strategy, ShuffledTimeBlockStrategy)
+    assert plan_obj.config.split.strategy.gap == 5
+    assert plan_obj.config.split.strategy.segments == 8
     assert plan_obj.config.split.ratio is not None
     assert plan_obj.config.split.ratio.values() == (0.6, 0.2, 0.2)
 
@@ -337,7 +348,7 @@ def test_plan_dataset_config_file_splits(tmp_path: Path) -> None:
     config_path = tmp_path / "config.toml"
     _ = config_path.write_text(
         """[datasets.a43.split]
-mode = "time"
+strategy = "time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 gap = 2
 """,
@@ -346,8 +357,8 @@ gap = 2
 
     plan_obj = plan_dataset(**_a43_args(), config_path=config_path)
 
-    assert isinstance(plan_obj.config.split.mode, TimeBlockSplit)
-    assert plan_obj.config.split.mode.gap == 2
+    assert isinstance(plan_obj.config.split.strategy, TimeBlockStrategy)
+    assert plan_obj.config.split.strategy.gap == 2
     assert plan_obj.config.split.ratio is not None
     assert plan_obj.config.split.ratio.values() == (0.7, 0.2, 0.1)
 
@@ -360,9 +371,9 @@ gap = 2
         segments=8,
     )
 
-    assert isinstance(overridden.config.split.mode, ShuffledTimeBlockSplit)
-    assert overridden.config.split.mode.gap == 5
-    assert overridden.config.split.mode.segments == 8
+    assert isinstance(overridden.config.split.strategy, ShuffledTimeBlockStrategy)
+    assert overridden.config.split.strategy.gap == 5
+    assert overridden.config.split.strategy.segments == 8
     assert overridden.config.split.ratio is not None
     assert overridden.config.split.ratio.values() == (0.6, 0.2, 0.2)
 
@@ -377,7 +388,7 @@ def test_plan_dataset_accepts_real_sample_config() -> None:
     assert plan_obj.config.loader.output_len == 60
     assert plan_obj.config.loader.window is not None
     assert plan_obj.config.loader.window.size == 80
-    assert isinstance(plan_obj.config.split.mode, ShuffledTimeBlockSplit)
+    assert isinstance(plan_obj.config.split.strategy, ShuffledTimeBlockStrategy)
 
 
 def test_plan_dataset_rejects_loader_options_for_datasets_without_extra_args(
@@ -412,7 +423,7 @@ file_batch_size = 7
         dataset="argoverse1",
         input_dir=tmp_path,
         output_dir=tmp_path / "output",
-        output_format=OutputFormat.DUMMY,
+        storage_backend=StorageBackend.NULL,
         input_dir_exists=False,
         config_path=config_path,
     )
@@ -441,19 +452,19 @@ def test_plan_dataset_rejects_highway_config_for_unsupported_datasets(tmp_path: 
     """Datasets without highway support should fail during planning, not execution."""
     config_path = tmp_path / "config.toml"
     _ = config_path.write_text(
-        """[datasets.waymo.loader.highway]
+        """[datasets.waymo.loader.lane_change_sampling]
 persist = 2
 negative_keep_every = 3
 """,
         encoding="utf-8",
     )
 
-    with pytest.raises(ConfigurationError, match=r"waymo does not support highway sampling"):
+    with pytest.raises(ConfigurationError, match=r"waymo does not support lane-change sampling"):
         _ = plan_dataset(
             dataset="waymo",
             input_dir=Path(__file__).parent,
             output_dir=Path(__file__).parent / "output",
-            output_format=OutputFormat.DUMMY,
+            storage_backend=StorageBackend.NULL,
             config_path=config_path,
         )
 
@@ -463,7 +474,7 @@ def test_plan_dataset_clears_splits(tmp_path: Path) -> None:
     config_path = tmp_path / "config.toml"
     _ = config_path.write_text(
         """[datasets.waymo.split]
-mode = "scene"
+strategy = "scene"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 """,
         encoding="utf-8",
@@ -473,13 +484,13 @@ ratio = { train = 0.7, val = 0.2, test = 0.1 }
         "dataset": "waymo",
         "input_dir": Path(__file__).parent,
         "output_dir": Path(__file__).parent / "output",
-        "output_format": OutputFormat.DUMMY,
+        "storage_backend": StorageBackend.NULL,
     }
     plan_obj = plan_dataset(**common_args, config_path=config_path, split="none")
 
-    assert isinstance(plan_obj.split_request.mode, Unsplit)
+    assert isinstance(plan_obj.split_request.strategy, NoSplitStrategy)
     assert plan_obj.loader_splits() is None
-    assert plan_obj.writer_splits() is None
+    assert plan_obj.output_splits() is None
 
 
 def test_plan_summary_exposes_sections_and_rows() -> None:
@@ -503,5 +514,5 @@ def test_plan_summary_exposes_sections_and_rows() -> None:
         "Splits",
     )
     assert ("Map", "disabled") in summary.rows
-    assert ("Split mode", "shuffled-time") in summary.rows
+    assert ("Split strategy", "shuffled-time") in summary.rows
     assert ("Time split settings", "segments=8, gap=5 frames") in summary.rows

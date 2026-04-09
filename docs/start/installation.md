@@ -22,7 +22,8 @@ The base install already includes:
 
 - the runtime planning and processing stack
 - the default MDS writer backend
-- the raw MDS dataset reader `dronalize.io.adapters.mds.MDSDataset`
+- the framework-neutral MDS reader `dronalize.io.readers.mds.MDSReader`
+- the Torch adapter `dronalize.io.adapters.MDSTorchDataset`
 - PyTorch, which is required by the MDS backend
 
 The current optional extras are:
@@ -41,16 +42,18 @@ Use the base install unless a dataset explicitly needs an extra:
 
 | Dataset or feature | Extra |
 | --- | --- |
-| `dronalize.io.adapters.mds.MDSDataset` | none |
+| `dronalize.io.readers.mds.MDSReader` | none |
+| `dronalize.io.adapters.MDSTorchDataset` | none |
 | `a43`, `apolloscape`, `argoverse1`, `argoverse2`, `eth`, `exid`, `highd`, `hotel`, `i80`, `ind`, `interact`, `nuscenes`, `opendd`, `round`, `sind`, `unid`, `univ`, `us101`, `vod`, `zara1`, `zara2` | none |
 | `waymo` | `waymo` |
 | `lyft` | `lyft` |
 | `ad4che` | `ad4che` |
 | `dronalize.io.adapters.MDSHeteroDataset` | `pyg` |
 
-Use `MDSDataset` when you want a thin wrapper around Mosaic Streaming that returns raw
-`RawSceneSample` objects. Add the `pyg` extra only if you want `MDSHeteroDataset`, which converts
-those samples into PyTorch Geometric `HeteroData` objects.
+Use `MDSReader` when you want framework-neutral `RawSceneRecord` objects. Use
+`MDSTorchDataset` when you want an iterable Torch dataset surface over the same scene records.
+Add the `pyg` extra only if you want `MDSHeteroDataset`, which converts them into PyTorch
+Geometric `HeteroData` objects.
 
 ## Working with `uv`
 

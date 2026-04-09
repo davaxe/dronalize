@@ -9,14 +9,14 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.errors import SceneSchemaError
+from dronalize.core.errors import TrajectorySchemaError
 from dronalize.core.maps.graph import MapGraph
 from dronalize.core.scene.derivations import (
     ConversionContext,
     apply_derivation_plan,
     plan_derivations,
 )
-from dronalize.core.scene.schema import CANONICAL, SceneField, SceneSchema
+from dronalize.core.scene.schema import CANONICAL, TrajectoryField, TrajectorySchema
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
@@ -40,7 +40,7 @@ class Scene:
     """Number of observed frames."""
     output_len: int
     """Number of predicted frames."""
-    schema: SceneSchema
+    schema: TrajectorySchema
     """Schema describing which fields this scene currently provides."""
     sample_time: float | None = None
     """Time interval between frames in seconds."""
@@ -59,7 +59,7 @@ class Scene:
         *,
         input_len: int,
         output_len: int,
-        schema: SceneSchema,
+        schema: TrajectorySchema,
         sample_time: float | None = None,
         map_key: MapKey = None,
         map_resolver: MapResolver | None = None,
@@ -83,7 +83,7 @@ class Scene:
         )
 
     def __post_init__(self) -> None:
-        """Cast and validate the scene schema."""
+        """Cast and validate the trajectory schema."""
         frame = _cast_to_schema(self.frame, self.schema.physical)
         object.__setattr__(self, "frame", frame)
 
@@ -94,7 +94,7 @@ class Scene:
                 expected=self.schema.physical,
                 schema_name=self.schema.name,
             )
-            raise SceneSchemaError(msg)
+            raise TrajectorySchemaError(msg)
 
     def resolve_map(self) -> MapGraph | None:
         """Materialize the map graph associated with this scene, if available."""
@@ -106,8 +106,8 @@ class Scene:
         """Return whether this scene can materialize a map graph."""
         return self.map_resolver is not None
 
-    def as_schema(self, schema: SceneSchema = CANONICAL) -> Scene:
-        """Return a copy converted to the requested scene schema."""
+    def as_schema(self, schema: TrajectorySchema = CANONICAL) -> Scene:
+        """Return a copy converted to the requested trajectory schema."""
         if self.schema == schema and _matches_physical_schema(self.frame.schema, schema.physical):
             return self
 
@@ -133,7 +133,7 @@ class Scene:
         )
 
 
-def convert_scene(scene: Scene, target: SceneSchema = CANONICAL) -> Scene:
+def convert_scene(scene: Scene, target: TrajectorySchema = CANONICAL) -> Scene:
     """Convert a scene to the requested schema."""
     return replace(
         scene,
@@ -144,12 +144,12 @@ def convert_scene(scene: Scene, target: SceneSchema = CANONICAL) -> Scene:
     )
 
 
-def derived_scene_fields(
-    source: SceneSchema, target: SceneSchema, *, sample_time: float | None
-) -> tuple[SceneField, ...]:
+def derived_trajectory_fields(
+    source: TrajectorySchema, target: TrajectorySchema, *, sample_time: float | None
+) -> tuple[TrajectoryField, ...]:
     """Return target schema fields that would be materialized by conversion.
 
-    The result is ordered according to the target schema. A `SceneSchemaError` is
+    The result is ordered according to the target schema. A `TrajectorySchemaError` is
     raised when the requested conversion cannot be planned with the available
     source fields and sampling metadata.
 
@@ -162,15 +162,19 @@ def derived_scene_fields(
     plan = plan_derivations(source.fields, target.fields, context)
     if plan is None:
         msg = f"No derivation plan found to convert from schema {source.name} to {target.name} "
-        raise SceneSchemaError(msg)
+        raise TrajectorySchemaError(msg)
 
     return tuple(field for field in target.ordered_fields() if (missing_fields & field) == field)
 
 
 def _convert_frame(
-    data: pl.DataFrame, *, source: SceneSchema, target: SceneSchema, sample_time: float | None
+    data: pl.DataFrame,
+    *,
+    source: TrajectorySchema,
+    target: TrajectorySchema,
+    sample_time: float | None,
 ) -> pl.DataFrame:
-    """Convert a data frame from one scene schema to another."""
+    """Convert a data frame from one trajectory schema to another."""
     semantic = _to_semantic_frame(data, source).sort(["id", "frame"])
     semantic = _derive_missing_fields(
         semantic, source=source, target=target, sample_time=sample_time
@@ -178,12 +182,16 @@ def _convert_frame(
     return semantic.select([pl.col(field).cast(dtype) for field, dtype in target.field_items()])
 
 
-def _to_semantic_frame(data: pl.DataFrame, schema: SceneSchema) -> pl.DataFrame:
+def _to_semantic_frame(data: pl.DataFrame, schema: TrajectorySchema) -> pl.DataFrame:
     return data.select(schema.semantic_fields())
 
 
 def _derive_missing_fields(
-    data: pl.DataFrame, *, source: SceneSchema, target: SceneSchema, sample_time: float | None
+    data: pl.DataFrame,
+    *,
+    source: TrajectorySchema,
+    target: TrajectorySchema,
+    sample_time: float | None,
 ) -> pl.DataFrame:
     if (source.fields & target.fields) == target.fields:
         return data
@@ -192,13 +200,13 @@ def _derive_missing_fields(
     plan = plan_derivations(source.fields, target.fields, context)
     if plan is None:
         msg = f"No derivation plan found to convert from schema {source.name} to {target.name} "
-        raise SceneSchemaError(msg)
+        raise TrajectorySchemaError(msg)
 
     output, output_fields = apply_derivation_plan(data, plan, context, source.fields)
     if output_fields != target.fields:
         missing = ", ".join(field.to_str() for field in (target.fields & ~output_fields).fields())
-        msg = f"Cannot materialize scene schema {target.name}; missing {missing}."
-        raise SceneSchemaError(msg)
+        msg = f"Cannot materialize trajectory schema {target.name}; missing {missing}."
+        raise TrajectorySchemaError(msg)
     return output
 
 

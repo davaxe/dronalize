@@ -1,13 +1,12 @@
-from dronalize.datasets.lyft import scope as _scope
-from dronalize.datasets.lyft.loader import LyftLoader
-from dronalize.datasets.lyft.maps.builder import LyftMapBuilder
-from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.lyft import runtime_context as _runtime_context
+from dronalize.datasets.lyft.loader import LyftLoader as _Loader
+from dronalize.datasets.registry import DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "lyft",
-    LyftLoader,
-    execution_scope_fn=_scope.lyft_execution_scope,
+    _Loader,
+    runtime_context_fn=_runtime_context.lyft_runtime_context,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "LyftLoader", "LyftMapBuilder"]
+__all__ = ["DATASET_SPEC"]

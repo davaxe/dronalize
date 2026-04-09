@@ -1,6 +1,6 @@
-from dronalize.datasets.registry import DatasetDescriptor
-from dronalize.datasets.sind.loader import SindLoader
+from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.sind.loader import SindLoader as _Loader
 
-DESCRIPTOR = DatasetDescriptor.from_loader("sind", SindLoader, infer_capabilities=True)
+DATASET_SPEC = DatasetSpec.from_loader("sind", _Loader, infer_capabilities=True)
 
-__all__ = ["DESCRIPTOR", "SindLoader"]
+__all__ = ["DATASET_SPEC"]

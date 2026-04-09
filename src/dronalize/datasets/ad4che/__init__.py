@@ -1,12 +1,11 @@
-from dronalize.datasets.ad4che.loader import AD4CHELoader
-from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
-from dronalize.datasets.registry import DatasetCapabilities, DatasetDescriptor
+from dronalize.datasets.ad4che.loader import AD4CHELoader as _Loader
+from dronalize.datasets.registry import DatasetCapabilities, DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "ad4che",
-    AD4CHELoader,
-    capabilities=DatasetCapabilities.HIGHWAY_PIPELINE,
+    _Loader,
+    capabilities=DatasetCapabilities.LANE_CHANGE_SAMPLING,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "AD4CHELoader", "AD4CHEMapBuilder"]
+__all__ = ["DATASET_SPEC"]

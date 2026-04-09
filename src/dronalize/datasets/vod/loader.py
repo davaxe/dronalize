@@ -7,10 +7,10 @@ from typing_extensions import override
 
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.nuscenes.loader import NuScenesLoader
-from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import RequireFrames
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.splits import SplitConfig
+from dronalize.processing.filtering import Filter
+from dronalize.processing.filtering.agent import RequireFrames
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.splits import SplitConfig
 from dronalize.processing.maps.config import MapConfig
 
 
@@ -66,7 +66,7 @@ class VodLoader(NuScenesLoader):
 
 if __name__ == "__main__":
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-    from dronalize.datasets.vod import DESCRIPTOR
+    from dronalize.datasets.vod import DATASET_SPEC
 
     root = resolve_dataset_root_from_env("vod")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

@@ -2,7 +2,8 @@ import polars as pl
 from polars.testing import assert_frame_equal
 
 from dronalize.core.categories import AgentCategory
-from dronalize.processing.filters import AgentSelector, Filter, agent, filter_scene, scene, tol
+from dronalize.processing.filtering import tol
+from dronalize.processing.filtering import AgentSelector, Filter, agent, filter_scene, scene
 
 
 def test_tolerance_keeps_invalid_agents() -> None:

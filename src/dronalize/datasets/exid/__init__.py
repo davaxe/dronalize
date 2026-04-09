@@ -1,14 +1,13 @@
-from dronalize.datasets.exid import scope as _scope
-from dronalize.datasets.exid.loader import ExiDLoader
-from dronalize.datasets.exid.maps.builder import ExiDMapBuilder
-from dronalize.datasets.registry import DatasetCapabilities, DatasetDescriptor
+from dronalize.datasets.exid import runtime_context as _runtime_context
+from dronalize.datasets.exid.loader import ExiDLoader as _Loader
+from dronalize.datasets.registry import DatasetCapabilities, DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "exid",
-    ExiDLoader,
-    execution_scope_fn=_scope.exid_execution_scope,
-    capabilities=DatasetCapabilities.HIGHWAY_PIPELINE,
+    _Loader,
+    runtime_context_fn=_runtime_context.exid_runtime_context,
+    capabilities=DatasetCapabilities.LANE_CHANGE_SAMPLING,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "ExiDLoader", "ExiDMapBuilder"]
+__all__ = ["DATASET_SPEC"]

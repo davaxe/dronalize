@@ -1,8 +1,6 @@
-from dronalize.datasets.apolloscape.loader import ApolloScapeLoader
-from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.apolloscape.loader import ApolloScapeLoader as _Loader
+from dronalize.datasets.registry import DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
-    "apolloscape", ApolloScapeLoader, infer_capabilities=True
-)
+DATASET_SPEC = DatasetSpec.from_loader("apolloscape", _Loader, infer_capabilities=True)
 
-__all__ = ["DESCRIPTOR", "ApolloScapeLoader"]
+__all__ = ["DATASET_SPEC"]

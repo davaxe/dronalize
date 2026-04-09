@@ -3,25 +3,25 @@
 from __future__ import annotations
 
 import functools
-import itertools
 import multiprocessing as mp
 from collections import deque
 from multiprocessing.util import Finalize
-from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, NamedTuple, TypeVar
 
 from typing_extensions import Self, override
 
-import dronalize.runtime.parallel._state as _state  # noqa: PLR0402
 from dronalize._internal.typing import P, SourceT
 from dronalize.core.scene import Scene
-from dronalize.runtime.executor import ObservableWritingExecutor, Progress, WriterFactory
+from dronalize.runtime.executor import ObservableExecutor, Progress, WriterFactory
+from dronalize.runtime.parallel import _state
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
     from multiprocessing.synchronize import Event
 
-    from dronalize.io.writers.base import SceneWriter
-    from dronalize.processing.ingest.loader import ProcessableLoader, Source
+    from dronalize.io.backends.base import DatasetWriter
+    from dronalize.processing.loading.base import BaseSceneLoader
+    from dronalize.processing.loading.loader import Source
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene])
@@ -35,10 +35,10 @@ class _SceneProcessArgs(NamedTuple, Generic[SourceT]):
     """Arguments for processing a single source into scenes."""
 
     source: Source[SourceT]
-    loader: ProcessableLoader[SourceT]
+    loader: BaseSceneLoader[SourceT, Any]
 
 
-class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
+class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
     """Parallel writing executor backed by a processable loader.
 
     This executor uses Python's `multiprocessing` module to distribute source
@@ -66,7 +66,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
     def __init__(
         self,
-        inner: ProcessableLoader[SourceT],
+        inner: BaseSceneLoader[SourceT, Any],
         *,
         chunksize: int | None = None,
         workers: int | None = None,
@@ -76,7 +76,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
         Parameters
         ----------
-        inner : ProcessableLoader[SourceT]
+        inner : DatasetLoader[SourceT]
             Loader responsible for turning sources into scene data.
         chunksize : int, optional
             Number of sources sent to each worker task batch. If omitted, an
@@ -85,21 +85,21 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         workers : int, optional
             Number of worker processes. If omitted, the default multiprocessing
             process count is used.
+        limit : int, optional
+            An optional limit on the total number of scenes to process. If
+            `None`, all scenes produced by the loader are processed.
         """
         if workers is not None and workers <= 1:
             msg = "number of processes must be greater than 1 for ParallelExecutor."
             raise ValueError(msg)
 
-        self._inner: ProcessableLoader[SourceT] = inner
-        self._shared: _state.SharedResources = _state.SharedResources.create()
+        self._inner: BaseSceneLoader[SourceT, Any] = inner
+        self._shared: _state.SharedResources = _state.SharedResources.create(scene_limit=limit)
         self._chunksize: int = chunksize or self._optimal_chunksize(inner.num_sources(), workers)
         self._limit: int | None = limit
         self._processes: int | None = workers
         self._num_sources: int | None = inner.num_sources()
         self._running: bool = False
-
-        if self._num_sources is not None and self._limit is not None:
-            self._num_sources = min(self._num_sources, self._limit)
 
     def workers(self, workers: int | None) -> Self:
         """Set the number of worker processes.
@@ -147,11 +147,11 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
     @override
     def execute(
-        self, writer_factory: WriterFactory, finalize: Callable[[SceneWriter], None] | None = None
+        self, writer_factory: WriterFactory, finalize: Callable[[DatasetWriter], None] | None = None
     ) -> None:
         """Process scenes in parallel and write them inside worker processes.
 
-        This mode initializes one `SceneWriter` per worker process. Each worker
+        This mode initializes one `DatasetWriter` per worker process. Each worker
         writes scenes locally without sending them back to the parent process.
 
         A unique integer worker ID is passed to `writer_factory`. This can be
@@ -159,22 +159,19 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
 
         Parameters
         ----------
-        writer_factory : Callable[[int], SceneWriter]
+        writer_factory : Callable[[int], DatasetWriter]
             Factory called once per worker process with that worker's integer
             ID.
-        finalize : Callable[[SceneWriter], None], optional
+        finalize : Callable[[DatasetWriter], None], optional
             Optional custom per-worker finalization hook. If omitted,
             `writer.finish_local()` is called instead.
 
         """
         payloads = (_SceneProcessArgs(source, self._inner) for source in self._inner.sources())
-        payloads_limited: Iterable[_SceneProcessArgs[SourceT]] = (
-            itertools.islice(payloads, self._limit) if self._limit is not None else payloads
-        )
         _ = deque(
             self._execute_parallel(
                 self._process_fn_write,
-                payloads_limited,
+                payloads,
                 _init_write_worker,
                 *(self._shared, writer_factory, finalize),
             ),
@@ -200,7 +197,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
                 processed_scenes=self._shared.progress.scene_counter.value,
                 active_workers=self._shared.progress.active_workers.value,
                 total_sources=self._num_sources,
-                total_scenes=None,
+                total_scenes=self._limit,
             )
 
     @override
@@ -223,7 +220,7 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
             Number of scenes written from the source.
         """
         if _ctx.writer is None:
-            msg = "SceneWriter was not initialized for this worker process."
+            msg = "DatasetWriter was not initialized for this worker process."
             raise ValueError(msg)
 
         processed_scenes: int = 0
@@ -235,14 +232,16 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         return processed_scenes
 
     @staticmethod
-    def _generate_scenes(loader: ProcessableLoader[_S], source: Source[_S]) -> Iterator[Scene]:
+    def _generate_scenes(loader: BaseSceneLoader[_S, Any], source: Source[_S]) -> Iterator[Scene]:
         """Process a single source and yield numbered scenes.
 
         Scene numbers are assigned from a shared global counter when scenes are
         created inside worker processes.
         """
         for processed in loader.process_next(source):
-            scene_number = _ctx.shared.progress.increment_scene()
+            scene_number = _ctx.shared.progress.claim_scene(_ctx.shared.scene_limit)
+            if scene_number is None:
+                return
             yield loader.create_scene(processed, source, scene_number)
 
     def _execute_parallel(
@@ -283,7 +282,6 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         self.progress_event().set()
         with mp.Pool(self._processes, initializer=pool_initializer) as pool:
             yield from pool.imap_unordered(process_fn, payloads, self._chunksize)
-
             pool.close()
             pool.join()
 
@@ -301,7 +299,6 @@ class ParallelExecutor(ObservableWritingExecutor, Generic[SourceT]):
         """
         if num_sources is None:
             return 1
-
         process_count = num_processes or mp.cpu_count()
         chunksize, extra = divmod(num_sources, process_count * 4)
         chunksize += int(extra > 0)
@@ -337,8 +334,8 @@ def _init_worker(shared: _state.SharedResources, *, with_finalize: bool = True) 
 
 def _init_write_worker(
     shared: _state.SharedResources,
-    writer_factory: Callable[[int], SceneWriter],
-    finalize: Callable[[SceneWriter], None] | None,
+    writer_factory: Callable[[int], DatasetWriter],
+    finalize: Callable[[DatasetWriter], None] | None,
 ) -> None:
     """Initialize a worker for `execute()` write mode.
 
@@ -348,11 +345,10 @@ def _init_write_worker(
 
     """
     global _ctx  # noqa: PLW0602
-
     _init_worker(shared, with_finalize=False)
 
     assert _ctx is not None
-    writer: SceneWriter | None = None
+    writer: DatasetWriter | None = None
     try:
         writer = writer_factory(_ctx.worker_id)
         _ctx.writer = writer

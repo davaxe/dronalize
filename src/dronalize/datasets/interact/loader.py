@@ -11,17 +11,21 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
-from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import RequireFrames
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderOptions, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.filtering import Filter
+from dronalize.processing.filtering.agent import RequireFrames
+from dronalize.processing.loading.base import (
+    BaseSceneLoader,
+    LoaderOptions,
+    LoaderSplitCapabilities,
+)
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
 
 
@@ -109,7 +113,7 @@ class InteractionLoader(BaseSceneLoader[list[Path], InteractionLoaderOptions]):
             return
 
     @override
-    def ingest(self, source: Source[list[Path]]) -> Iterable[IngestedData]:
+    def load_source(self, source: Source[list[Path]]) -> Iterable[LoadedSourceData]:
         data = (
             pl
             .scan_csv(source.data, include_file_paths="file_id", schema=_SCHEMA)
@@ -124,7 +128,7 @@ class InteractionLoader(BaseSceneLoader[list[Path], InteractionLoaderOptions]):
         )
 
         for _, group in data.collect().group_by(["file_id", "case_id"]):
-            yield IngestedData(frame=group.lazy().drop("file_id", "case_id"))
+            yield LoadedSourceData(frame=group.lazy().drop("file_id", "case_id"))
 
     @override
     def num_sources(self) -> int | None:
@@ -133,7 +137,7 @@ class InteractionLoader(BaseSceneLoader[list[Path], InteractionLoaderOptions]):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_YAW
 
     @classmethod
@@ -197,8 +201,8 @@ _SCHEMA = pl.Schema({
 
 
 if __name__ == "__main__":
-    from dronalize.datasets.interact import DESCRIPTOR
+    from dronalize.datasets.interact import DATASET_SPEC
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("interact", alternatives=[("interaction",)])
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

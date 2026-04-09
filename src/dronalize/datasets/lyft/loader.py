@@ -17,13 +17,17 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import RequireFrames
-from dronalize.processing.filters.cleanup import ExcludeCategories
-from dronalize.processing.filters.scene import MinimumAgents
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderOptions, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
+from dronalize.processing.filtering import Filter
+from dronalize.processing.filtering.agent import RequireFrames
+from dronalize.processing.filtering.cleanup import ExcludeCategories
+from dronalize.processing.filtering.scene import MinimumAgents
+from dronalize.processing.loading.base import (
+    BaseSceneLoader,
+    LoaderOptions,
+    LoaderSplitCapabilities,
+)
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
 from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import no_map, shared_map
 
@@ -32,8 +36,8 @@ if TYPE_CHECKING:
 
     from zarr import Array
 
-    from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
 
 
@@ -166,7 +170,7 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
         return self._source_count(total_scenes, self._batch_size)
 
     @override
-    def ingest(self, source: Source[_Source]) -> Iterable[IngestedData]:
+    def load_source(self, source: Source[_Source]) -> Iterable[LoadedSourceData]:
         start, end = source.data.interval
 
         # Now uses the lazy loader directly to ensure availability
@@ -191,13 +195,13 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
                 frame_offset=frame_start,
                 agent_offset=agent_start,
             )
-            yield IngestedData(
+            yield LoadedSourceData(
                 frame=df.lazy(), map_binding=MapBinding(map_resolver=self.map_resolver())
             )
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
 
     @classmethod
@@ -220,7 +224,7 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.relevant_area_extraction()
+        return MapConfig.scene_extent_extraction()
 
     @override
     def map_resolver(self) -> MapResolver:
@@ -346,8 +350,8 @@ def _scene_to_polars(
 
 
 if __name__ == "__main__":
-    from dronalize.datasets.lyft import DESCRIPTOR
+    from dronalize.datasets.lyft import DATASET_SPEC
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("lyft")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

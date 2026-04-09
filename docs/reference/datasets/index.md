@@ -34,7 +34,7 @@ will output the following information about the `a43` dataset:
 Dataset inspect: a43
                 ╷
   Dataset       │ a43
-  Capabilities  │  map   custom splits
+  Capabilities  │  map   custom split strategies
   Native schema │ positions_velocity_acceleration (6 features)
   Schema fields │ frame, id, x, y, vx, vy, ax, ay, agent_category
   Split support │ time, shuffled-time

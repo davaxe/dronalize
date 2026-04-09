@@ -1,29 +1,29 @@
-# Outputs, schemas, and formats
+# Exports, Trajectory Schemas, and Storage Backends
 
 <div class="section-intro" markdown="1">
-Output decisions in `dronalize` are easiest to understand as two separate choices: what each saved sample contains, and how those samples are stored on disk.
+Export decisions in `dronalize` are easiest to understand as two separate choices: what each saved scene contains, and how those scenes are stored on disk.
 </div>
 
-For exact writer fields and MDS-specific options, see the [writer reference](../reference/configuration/writer.md). For CLI usage, including `--output-format`, see [First run (CLI)](../start/first-run-cli.md).
+For exact export fields and MDS-specific options, see the [export reference](../reference/configuration/export.md) for the configuration. For CLI usage, including `--storage-backend`, see [First run (CLI)](../start/first-run-cli.md).
 
 ## Mental model
 
 There are two independent layers here:
 
-1. The **scene schema**, which decides what fields each sample contains
-2. The **output format**, which decides how those samples are written to disk
+1. The **trajectory schema**, which decides what fields each scene contains
+2. The **storage backend**, which decides how those scenes are written to disk
 
 That separation is important. In principle, the same schema could be written through different storage backends.
 
-## Scene schema
+## Trajectory schema
 
-The schema is the logical shape of each scene sample.
+The schema is the logical shape of each scene.
 
 It answers questions like:
 
-- does the sample include only position, or also velocity, acceleration, or yaw?
+- does the scene include only position, or also velocity, acceleration, or yaw?
 - what features will downstream code be able to read directly?
-- how small or rich should each saved sample be?
+- how small or rich should each saved scene be?
 
 Built-in schemas cover a few common use cases:
 
@@ -44,54 +44,54 @@ Choose the smallest schema that still matches your downstream task. Smaller sche
 | `canonical` | `x`,`y`,`vx`,`vy`,`ax`,`ay`,`yaw` | 7 |
 
 !!! note "Custom schemas"
-    If the built-in schemas are not a good fit, you can define a custom schema. The writer reference documents the exact syntax and required base fields.
+    If the built-in schemas are not a good fit, you can define a custom schema. The export reference documents the exact syntax and required base fields.
     
-## Output format
+## Storage backend
 
-The output format is the physical storage backend.
+The storage backend is the physical persistence layer.
 
 It answers questions like:
 
 - what files are written?
-- how are samples grouped on disk?
+- how are scenes grouped on disk?
 - which backend-specific options are available?
 
-### Available formats
+### Available backends
 
-The currently available formats are:
+The currently available backends are:
 
-- `mds`: the main go-to format, see [MDS docs](https://docs.mosaicml.com/projects/streaming/en/stable/index.html) for details,
-- `dummy`: a debug only format that doesn't actually write anything.
+- `mds`: the main persisted backend, see [MDS docs](https://docs.mosaicml.com/projects/streaming/en/stable/index.html) for details,
+- `null`: a debug-only backend that doesn't actually write anything.
 
 ## What this means in practice
 
-The schema and format should be thought about separately:
+The schema and storage backend should be thought about separately:
 
 - choose the schema based on model and feature needs
-- choose the format based on storage and data-loading needs
+- choose the storage backend based on storage and data-loading needs
 
-Today, format choice is simple because `mds` is the only real persisted backend. That means most practical output decisions still happen in the schema and writer settings, not in backend selection.
+Today, backend choice is simple because `mds` is the only real persisted backend. That means most practical export decisions still happen in the schema and export settings, not in backend selection.
 
 ## Precision and position offsets
 
-`precision` and `offset_positions` sit alongside schema choice because they affect how values are written, regardless of the storage backend.
+`precision` and `recenter_positions` sit alongside schema choice because they affect how values are written, regardless of the storage backend.
 
 `float32` is the practical default for most runs because it keeps output smaller. `float64` is useful when preserving numeric precision matters more than storage size.
 
-`offset_positions` recenters positions before writing while preserving the offset in the saved output. This is especially helpful when source coordinates are large and downstream models work better with local coordinates.
+`recenter_positions` recenters positions before writing while preserving the offset in the saved output. This is especially helpful when source coordinates are large and downstream models work better with local coordinates.
 
 !!! warning "Low precision without offsets"
-    If you use `float32` precision without `offset_positions`, be aware that large coordinates may lose precision when saved. This can lead to degraded model performance, especially for tasks that require fine-grained spatial understanding. This is particularly the case for datasets that uses [UTM](https://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system) coordinate system or similar, where coordinates can be in the millions. In those cases, enabling `offset_positions` is highly recommended to maintain data quality while still benefiting from reduced storage size.
+    If you use `float32` precision without `recenter_positions`, be aware that large coordinates may lose precision when saved. This can lead to degraded model performance, especially for tasks that require fine-grained spatial understanding. This is particularly the case for datasets that uses [UTM](https://en.wikipedia.org/wiki/Universal_Transverse_Mercator_coordinate_system) coordinate system or similar, where coordinates can be in the millions. In those cases, enabling `recenter_positions` is highly recommended to maintain data quality while still benefiting from reduced storage size.
 
 ## Typical setup
 
 ```toml
-[datasets.a43.writer]
+[datasets.a43.export]
 schema = "positions_velocity_yaw"
 precision = "float64"
-offset_positions = true
+recenter_positions = true
 
-[datasets.a43.writer.mds]
+[datasets.a43.export.mds]
 compression = "zstd:7"
 ```
 

@@ -12,7 +12,7 @@ dronalize inspect a43
 dronalize split-support a43
 ```
 
-These commands are backed directly by the dataset registry and descriptor metadata, so they are the best starting point when you are not sure which splits, map support, or loader capabilities a dataset exposes.
+These commands are backed directly by the dataset registry and dataset-spec metadata, so they are the best starting point when you are not sure which splits, map support, or loader capabilities a dataset exposes.
 
 ## Preview the effective configuration
 
@@ -20,8 +20,7 @@ These commands are backed directly by the dataset registry and descriptor metada
 dronalize show-config a43 --config config.toml
 ```
 
-`show-config` uses the same resolver path as `process`, but it is not a full command-line mirror. It supports config, split, schema, output-format, and worker overrides, but not run-only options such as `--input`, `--output`, `--force`, `--progress`, `--limit`, `--seed`, or `--include-map`.
-:
+`show-config` uses the same resolver path as `process`, but it is not a full command-line mirror. It supports config, split, schema, storage-backend, and worker overrides, but not run-only options such as `--input`, `--output`, `--force`, `--progress`, `--limit`, `--seed`, or `--include-map`.
 ## Plan a processing run
 
 
@@ -58,15 +57,15 @@ Processing Plan
   Dataset             │ a43
   Input directory     │ data\a44\raw
   Output directory    │ data\a43\processed
-  Output format       │ mds
-  Scene schema        │ positions_velocity_yaw (5 features)
+  Storage backend     │ mds
+  Trajectory schema   │ positions_velocity_yaw (5 features)
   Source window       │ 20/60 @ 10.0 Hz
   Effective window    │ 39/120 @ 20.0 Hz
   Resampling          │ 2:1 (cubic)
   Filtering           │ cleanup: cleanup_exclude | scene: scene_min_agents | agent: agent_frames, sample_floor
   Map                 │ enabled (circle (radius=60), min_distance=1, interp_distance=2.5)
   Execution           │ parallel (4 workers)
-  Split mode          │ shuffled-time
+  Split strategy      │ shuffled-time
   Time split settings │ segments=8, gap=2 frames
   Output ratio        │ train (70%), val (20%), test (10%)
 ```
@@ -77,10 +76,11 @@ Useful planning-time options in the current CLI:
 | Option | Effect |
 | --- | --- |
 | `--jobs` | Override worker count. Values above `1` enable parallel execution. |
-| `--scene-schema` | Change the persisted scene schema. |
-| `--output-format` | Choose `mds` or `dummy`. |
+| `--limit` | Stop after producing the requested number of scenes. |
+| `--scene-schema` | Change the persisted trajectory schema. |
+| `--storage-backend` | Choose `mds` or `null`. |
 | `--include-map/--no-map` | Force map inclusion on or off when supported. |
-| `--ratio`, `--gap`, `--segments` | Tune split behavior for compatible split modes. |
+| `--ratio`, `--gap`, `--segments` | Tune split behavior for compatible split strategies. |
 
 The checked-in `config.toml` in the repository root is a real example and can be used with both `show-config` and `process`.
 

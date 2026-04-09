@@ -1,30 +1,18 @@
 # `[loader]` section
 
 <div class="section-intro" markdown="1">
-The loader config describes how raw trajectory data becomes model-ready samples. In practice, it controls four things: sample length, optional temporal transforms such as windowing and resampling, optional filtering, and dataset-specific loader behavior.
+The loader config describes how raw trajectory data becomes model-ready scenes. In practice, it controls four things: scene-window length, optional temporal transforms such as windowing and resampling, optional filtering, and dataset-specific loader behavior.
 </div>
-
-## Mental model
-
-It is easiest to read the loader config in this order:
-
-1. Choose the sample shape with `input_len`, `output_len`, and `sample_time`.
-2. Optionally add `window` if each source should produce multiple overlapping samples.
-3. Optionally add `resampling` if the data should be interpolated to a different temporal resolution.
-4. Optionally add `filter` if rows, agents, or scenes should be removed before writing.
-5. Use `highway` or `options` only when a dataset needs more specific behavior.
-
-## Core loader keys
 
 | Key | Type | Description | Default |
 |---|---|---|---|
-| `input_len` | `int` | Number of observed frames per sample before resampling. | `dataset default` |
-| `output_len` | `int` | Number of predicted frames per sample before resampling. | `dataset default` |
+| `input_len` | `int` | Number of observed frames per scene window before resampling. | `dataset default` |
+| `output_len` | `int` | Number of predicted frames per scene window before resampling. | `dataset default` |
 | `sample_time` | `float` | Time between frames before resampling. | `dataset default` |
 | `window` | `table` | Sliding-window extraction settings. | `inherited` |
 | `resampling` | `table` | Temporal resampling and interpolation settings. | `inherited` |
 | `filter` | `table` | Cleanup and validation rules applied during loading. | `inherited` |
-| `highway` | `table` | Lane-change sampling controls for highway-style datasets. | `inherited` |
+| `lane_change_sampling` | `table` | Lane-change sampling controls for highway-style datasets. | `inherited` |
 | `options` | `table` | Dataset-dependent loader options validated against the selected dataset's option schema. | `none` |
 
 The `loader` block merges into the dataset's built-in loader config, so several effective defaults are dataset-specific rather than global.
@@ -42,7 +30,7 @@ output_len = 60
 sample_time = 0.1
 ```
 
-That defines one sample as:
+That defines one scene window as:
 
 - `20` observed frames
 - `60` future frames
@@ -50,7 +38,7 @@ That defines one sample as:
 
 ## `[loader.window]` section
 
-Use windowing when a longer recording should generate multiple overlapping samples.
+Use windowing when a longer recording should generate multiple overlapping scene windows.
 
 | Key | Type | Description | Default |
 |---|---|---|---|
@@ -72,11 +60,11 @@ size = 80
 step = 2
 ```
 
-This keeps the sample length at `80` total frames and slides the window forward by `2` frames each time.
+This keeps the scene-window length at `80` total frames and slides the window forward by `2` frames each time.
 
 ## `[loader.resampling]` section
 
-Use resampling when data should be interpolated to a different temporal resolution before samples are produced.
+Use resampling when data should be interpolated to a different temporal resolution before scenes are produced.
 
 | Key | Type | Description | Default |
 |---|---|---|---|
@@ -134,7 +122,7 @@ columns = ["ax", "ay"]
     
 ## `[loader.filter]` section
 
-Filtering is part of the loader because it decides what data survives preprocessing before samples are written.
+Filtering is part of the loader because it decides what data survives preprocessing before scenes are written.
 
 | Key | Type | Description | Default |
 |---|---|---|---|
@@ -146,19 +134,19 @@ Filtering is part of the loader because it decides what data survives preprocess
 
 The full filter rule catalog is documented on the dedicated [filter reference](filter.md) page.
 
-## `[loader.highway]` section
+## `[loader.lane_change_sampling]` section
 
-Use `highway` only for lane-change-oriented highway datasets that expose this behavior.
+Use `lane_change_sampling` only for lane-change-oriented highway datasets that expose this behavior.
 
-If a dataset does not support highway sampling, adding this block is a configuration error.
+If a dataset does not support lane-change sampling, adding this block is a configuration error.
 
 | Key | Type | Description | Default |
 |---|---|---|---|
 | `persist` | `int` | Number of frames a lane change must persist to count as a positive event. | `required` |
 | `margin_before` | `int` | Required number of frames before the lane change event. | `0` |
 | `margin_after` | `int` | Required number of frames after the lane change event. | `0` |
-| `required_lane_changes` | `int` | Minimum number of lane change events required for a positive sample. | `1` |
-| `negative_keep_every` | `int` | Keep every Nth negative sample. Set to `1` to keep all negatives. | `3` |
+| `required_lane_changes` | `int` | Minimum number of lane change events required for a positive scene window. | `1` |
+| `negative_keep_every` | `int` | Keep every Nth negative scene window. Set to `1` to keep all negatives. | `3` |
 
 ## `[loader.options]` section
 

@@ -10,8 +10,8 @@ from dronalize.processing.pipeline.spec import TrackColumns, TrajectorySpec
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.processing.loading.splits import SplitConfig
 
 
 def _base_spec(
@@ -41,7 +41,7 @@ def standard_trajectory_spec(
     return _base_spec(config, split_request=split_request, columns=columns, window_by=window_by)
 
 
-def highway_trajectory_spec(
+def lane_change_sampling_spec(
     config: LoaderConfig,
     *,
     split_request: SplitConfig | None = None,
@@ -49,12 +49,12 @@ def highway_trajectory_spec(
     columns: TrackColumns | None = None,
     window_by: str | Sequence[str] | None = None,
 ) -> TrajectorySpec:
-    """Build a spec for lane-change-aware highway window sampling."""
-    highway_params = config.highway
+    """Build a spec for lane-change-aware window sampling."""
+    sampling_config = config.lane_change_sampling
     base_spec = _base_spec(
         config, split_request=split_request, columns=columns, window_by=window_by
     )
-    if highway_params is None or highway_params.negative_keep_every == 1:
+    if sampling_config is None or sampling_config.negative_keep_every == 1:
         # If every negative sample is kept, there is no difference in output
         # selection between lane-change-aware sampling and standard sampling, so
         # skip the extension (which is more efficient).
@@ -62,10 +62,10 @@ def highway_trajectory_spec(
 
     return base_spec.with_columns(base_spec.columns.with_lane_id(lane_id)).with_extension(
         LaneChangeSamplingExtension(
-            negative_keep_every=highway_params.negative_keep_every,
-            min_lane_change_events=highway_params.required_lane_changes,
-            persist=highway_params.persist,
-            margin_before=highway_params.margin_before,
-            margin_after=highway_params.margin_after,
+            negative_keep_every=sampling_config.negative_keep_every,
+            min_lane_change_events=sampling_config.required_lane_changes,
+            persist=sampling_config.persist,
+            margin_before=sampling_config.margin_before,
+            margin_after=sampling_config.margin_after,
         )
     )

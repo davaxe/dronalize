@@ -1,7 +1,7 @@
 # Configuration Reference
 
 <div class="section-intro" markdown="1">
-This reference describes the TOML configuration surface used by `dronalize`. The file is validated before processing starts, with structured schema checks handling field types, nested table shapes, and mode-specific requirements so you can catch configuration issues early.
+This reference describes the TOML configuration surface used by `dronalize`. The file is validated before processing starts, with structured schema checks handling field types, nested table shapes, and section-specific requirements so you can catch configuration issues early.
 
 Dataset-specific defaults, capabilities, and dataset-owned configuration behavior are documented in the [dataset reference](../datasets/index.md).
 </div>
@@ -32,7 +32,7 @@ input_len = 20
 output_len = 60
 sample_time = 0.1
 
-[datasets.a43.writer]
+[datasets.a43.export]
 schema = "positions_velocity_yaw"
 precision = "float64"
 ```
@@ -41,7 +41,7 @@ In other words:
 
 - `[global.execution]` affects every dataset unless a dataset-specific block overrides it.
 - `[datasets.a43.loader]` affects only the `a43` dataset.
-- Nested tables continue from there, for example `[datasets.a43.loader.filter]` or `[datasets.a43.writer.mds]`.
+- Nested tables continue from there, for example `[datasets.a43.loader.filter]` or `[datasets.a43.export.mds]`.
 
 
 ## Available section roots
@@ -51,10 +51,10 @@ Inside either `global` or `datasets.<dataset-name>`, the current section roots a
 | Block | Purpose |
 | --- | --- |
 | `execution` | Worker count and executor chunking. |
-| `loader` | Horizons, sample time, windowing, resampling, filtering, highway settings, and dataset-specific loader options. |
+| `loader` | Horizons, sample time, windowing, resampling, filtering, lane-change sampling, and dataset-specific loader options. |
 | `map` | Map enablement and extraction settings. |
-| `writer` | Persisted scene schema, precision, offsets, and MDS backend tuning. |
-| `split` | Split mode, ratios, native split selection, and temporal split parameters. |
+| `export` | Persisted trajectory schema, precision, offsets, and MDS backend tuning. |
+| `split` | Split strategy, ratios, native split selection, and temporal split parameters. |
 
 !!! note "Section roots"
     In general, roots can be left unspecfied (not present in the file), but if
@@ -65,7 +65,7 @@ Inside either `global` or `datasets.<dataset-name>`, the current section roots a
 
 The reference pages describe the file format only, but the values are resolved in layers:
 
-1. Dataset descriptor defaults
+1. Dataset spec defaults
 2. `[global]`
 3. `[datasets.<dataset-name>]`
 
@@ -89,13 +89,13 @@ The `Default` column uses a few different notations:
 | Default notation | Meaning |
 | --- | --- |
 | A literal value such as `"float32"`, `0`, or `true` | The code supplies that concrete default directly. |
-| `dataset default` | The value comes from the dataset descriptor's built-in loader config. Different datasets may start with different values. |
+| `dataset default` | The value comes from the dataset spec's built-in loader config. Different datasets may start with different values. |
 | `inherited` | The value comes from the already-resolved parent runtime config. This is common for nested blocks that merge into existing defaults. |
 | `required` | You must provide the key when that table or mode is used. |
 | `required for ...` | The key is only mandatory in specific modes or shapes. |
 | `none` | No value is configured unless you add one. |
 
-Some pages also describe validation rules in notes below the table. Those notes are important because a key may be valid only together with a specific mode or sibling field.
+Some pages also describe validation rules in notes below the table. Those notes are important because a key may be valid only together with a specific strategy or sibling field.
 
 ## Common nesting notation
 
@@ -142,11 +142,11 @@ extraction = "circle"
 radius = 60.0
 
 [datasets.a43.split]
-mode = "shuffled-time"
+strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
 
-[datasets.a43.writer]
+[datasets.a43.export]
 schema = "positions_velocity_yaw"
 precision = "float64"
 ```

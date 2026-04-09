@@ -1,7 +1,6 @@
-from dronalize.datasets.a43.loader import A43Loader
-from dronalize.datasets.a43.maps.builder import A43MapBuilder
-from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.a43.loader import A43Loader as _Loader
+from dronalize.datasets.registry import DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader("a43", A43Loader, infer_capabilities=True)
+DATASET_SPEC = DatasetSpec.from_loader("a43", _Loader, infer_capabilities=True)
 
-__all__ = ["DESCRIPTOR", "A43Loader", "A43MapBuilder"]
+__all__ = ["DATASET_SPEC"]

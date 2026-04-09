@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.categories import DatasetSplit
-    from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
 
 
@@ -49,8 +49,8 @@ class InDLoader(LevelXDataLoader):
 
 
 if __name__ == "__main__":
-    from dronalize.datasets.ind import DESCRIPTOR
+    from dronalize.datasets.ind import DATASET_SPEC
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("ind")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

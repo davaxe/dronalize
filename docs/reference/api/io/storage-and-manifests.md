@@ -3,11 +3,9 @@ hide:
   - title
 ---
 
-# ::: dronalize.io.StorageWriter
+## ::: dronalize.io.DatasetWriter
 
-## ::: dronalize.io.SceneWriter
-
-## ::: dronalize.io.StorageManifest
+## ::: dronalize.io.DatasetManifest
 
 ## ::: dronalize.io.manifest_path
 

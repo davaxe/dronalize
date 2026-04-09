@@ -1,20 +1,44 @@
-"""Persisted storage contracts, encoders, and format backends."""
+"""Persisted storage contracts and export-facing configuration.
 
-from dronalize.io.config import MDSFormatConfig, WriterConfig
+## Import guide
+
+```python
+from dronalize.io import ExportConfig, DatasetManifest, DatasetWriter
+```
+
+This package groups the stable storage-side API:
+
+- [`ExportConfig`][dronalize.io.ExportConfig] and
+  [`MDSBackendConfig`][dronalize.io.MDSBackendConfig] for persisted output
+  settings
+- [`DatasetManifest`][dronalize.io.DatasetManifest] and manifest helpers for
+  dataset metadata on disk
+- [`DatasetWriter`][dronalize.io.DatasetWriter] for the writer protocol shared
+  by storage backends
+
+Reader and adapter layers live in sibling subpackages so optional dependencies
+remain lazy and clearly scoped.
+
+## Related modules
+
+- [`dronalize.io.readers`][] for framework-neutral persisted dataset readers
+- [`dronalize.io.adapters`][] for optional Torch and PyG adapter layers
+"""
+
+from dronalize.io.backends.base import DatasetWriter
+from dronalize.io.config import ExportConfig, MDSBackendConfig
 from dronalize.io.manifest import (
-    StorageManifest,
+    DatasetManifest,
     manifest_path,
     read_manifest,
     write_manifest,
 )
-from dronalize.io.writers.base import SceneWriter, StorageWriter
 
 __all__ = [
-    "MDSFormatConfig",
-    "SceneWriter",
-    "StorageManifest",
-    "StorageWriter",
-    "WriterConfig",
+    "DatasetManifest",
+    "DatasetWriter",
+    "ExportConfig",
+    "MDSBackendConfig",
     "manifest_path",
     "read_manifest",
     "write_manifest",

@@ -7,7 +7,7 @@ from collections import Counter
 
 import pytest
 
-from dronalize.processing.ingest.assigner import StatelessWeightedAssigner
+from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 
 
 def test_distribution_matches_weights() -> None:

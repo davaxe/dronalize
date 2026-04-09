@@ -10,8 +10,8 @@ from typing_extensions import Self
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.pipeline.extensions.base import TrajectoryPipelineExtension
 
 

@@ -22,8 +22,8 @@ class _DummyPlan:
     config: str = "dummy-config"
 
 
-def test_show_config_passes_custom_split_mode_args(monkeypatch: pytest.MonkeyPatch) -> None:
-    """CLI parsing should forward custom split-mode options to planning intact."""
+def test_show_config_passes_custom_split_strategy_args(monkeypatch: pytest.MonkeyPatch) -> None:
+    """CLI parsing should forward custom split-strategy options to planning intact."""
     captured: dict[str, object] = {}
 
     def _fake_plan_dataset(**kwargs: object) -> _DummyPlan:
@@ -97,12 +97,12 @@ def test_show_config_rejects_read_split_without_native_mode() -> None:
     assert "Traceback" not in result.output
 
 
-def test_show_config_rejects_ratio_without_split_mode() -> None:
-    """CLI validation should reject ratios when no custom split mode was selected."""
+def test_show_config_rejects_ratio_without_split_strategy() -> None:
+    """CLI validation should reject ratios when no custom split strategy was selected."""
     result = runner.invoke(app, ["show-config", "a43", "--ratio", "0.8", "0.1", "0.1"])
 
     assert result.exit_code == 2
-    assert "--ratio is only valid with custom split modes" in result.output
+    assert "--ratio is only valid with custom split strategies" in result.output
     assert "Traceback" not in result.output
 
 
@@ -142,7 +142,7 @@ def test_show_config_rejects_highway_config_for_unsupported_dataset_without_trac
     """Unsupported highway config should fail during planning with a clean CLI error."""
     config_path = tmp_path / "bad.toml"
     _ = config_path.write_text(
-        """[datasets.waymo.loader.highway]
+        """[datasets.waymo.loader.lane_change_sampling]
 persist = 2
 negative_keep_every = 3
 """,
@@ -152,5 +152,5 @@ negative_keep_every = 3
     result = runner.invoke(app, ["show-config", "waymo", "--config", str(config_path)])
 
     assert result.exit_code == 2
-    assert "waymo does not support highway sampling" in result.output
+    assert "waymo does not support lane-change sampling" in result.output
     assert "Traceback" not in result.output

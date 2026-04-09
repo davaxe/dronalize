@@ -1,4 +1,24 @@
-"""Lazy public exports for storage-reader adapters."""
+"""Optional framework adapters built on top of persisted dataset readers.
+
+## Import guide
+
+```python
+from dronalize.io.adapters import MDSTorchDataset, MDSHeteroDataset
+```
+
+This package groups higher-level dataset adapters for downstream ML code. The
+exports are loaded lazily so optional dependencies such as Torch or
+Torch-Geometric are only imported when their adapters are actually requested.
+
+Use [`dronalize.io.readers`][] when you want framework-neutral records. Use this
+package when you want those records exposed through Torch or PyG dataset
+surfaces.
+
+## Related modules
+
+- [`dronalize.io.readers`][] for framework-neutral persisted dataset readers
+- [`dronalize.io`][] for storage contracts and export configuration
+"""
 
 from __future__ import annotations
 
@@ -6,17 +26,29 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dronalize.io.adapters.pyg.mds import MDSHeteroDataset
+    from dronalize.io.adapters.pyg import MDSHeteroDataset, collate_hetero_with_time_padding
+    from dronalize.io.adapters.torch import MDSTorchDataset, TorchSceneRecord
 
-__all__ = ["MDSHeteroDataset"]
+__all__ = [
+    "MDSHeteroDataset",
+    "MDSTorchDataset",
+    "TorchSceneRecord",
+    "collate_hetero_with_time_padding",
+]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "MDSHeteroDataset": ("dronalize.io.adapters.pyg.mds", "MDSHeteroDataset"),
+    "MDSTorchDataset": ("dronalize.io.adapters.torch", "MDSTorchDataset"),
+    "TorchSceneRecord": ("dronalize.io.adapters.torch", "TorchSceneRecord"),
+    "MDSHeteroDataset": ("dronalize.io.adapters.pyg", "MDSHeteroDataset"),
+    "collate_hetero_with_time_padding": (
+        "dronalize.io.adapters.pyg",
+        "collate_hetero_with_time_padding",
+    ),
 }
 
 
 def __getattr__(name: str) -> object:
-    """Resolve optional dataset exports lazily."""
+    """Resolve optional adapter exports lazily."""
     if name not in _EXPORTS:
         msg = f"module '{__name__}' has no attribute '{name}'"
         raise AttributeError(msg)
@@ -28,5 +60,5 @@ def __getattr__(name: str) -> object:
 
 
 def __dir__() -> list[str]:
-    """Expose lazy dataset exports during interactive discovery."""
+    """Expose lazy adapter exports during interactive discovery."""
     return sorted(set(globals()) | set(__all__))

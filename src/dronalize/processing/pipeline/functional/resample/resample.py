@@ -31,7 +31,7 @@ def resample(
     Parameters
     ----------
     data : DataFrameT
-        Polars ``DataFrame`` or ``LazyFrame`` containing the trajectory data to
+        Polars `DataFrame` or `LazyFrame` containing the trajectory data to
         resample.
     spec : ResampleSpec | None, optional
         Resampling specification. When omitted, the default
@@ -40,13 +40,13 @@ def resample(
         Column containing monotonically increasing frame indices within each
         trajectory group.
     group_by : str or sequence of str or None, optional
-        Column or columns that define independent trajectories. When ``None``,
+        Column or columns that define independent trajectories. When `None`,
         the full table is treated as one trajectory.
 
     Returns
     -------
     DataFrameT
-        Resampled table of the same eager/lazy type as ``data``.
+        Resampled table of the same eager/lazy type as `data`.
     """
     resample_spec = spec or ResampleSpec()
     match resample_spec.method:

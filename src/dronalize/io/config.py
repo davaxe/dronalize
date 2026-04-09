@@ -1,4 +1,4 @@
-"""Writer-side configuration models and shared type aliases."""
+"""Export-side configuration models and shared type aliases."""
 
 from __future__ import annotations
 
@@ -7,15 +7,15 @@ from typing import ClassVar, Literal
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from dronalize.core.scene import CANONICAL, SceneSchema, get_scene_schema
-from dronalize.core.scene.schema import SceneSchemaDefinition
+from dronalize.core.scene import CANONICAL, TrajectorySchema, get_trajectory_schema
+from dronalize.core.scene.schema import TrajectorySchemaDefinition
 
 FloatDType = type[np.float32] | type[np.float64]
-WriterPrecision = Literal["float32", "float64"]
-SceneSchemaLike = SceneSchema | str | SceneSchemaDefinition
+ExportPrecision = Literal["float32", "float64"]
+TrajectorySchemaLike = TrajectorySchema | str | TrajectorySchemaDefinition
 
 
-class MDSFormatConfig(BaseModel):
+class MDSBackendConfig(BaseModel):
     """Backend-specific tuning for the Mosaic Streaming format."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -26,60 +26,64 @@ class MDSFormatConfig(BaseModel):
     exist_ok: bool = False
 
 
-class WriterConfig(BaseModel):
-    """Resolved runtime configuration shared by scene writers."""
+class ExportConfig(BaseModel):
+    """Resolved runtime export configuration shared by scene writers."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    scene_schema: SceneSchema = CANONICAL
-    precision: WriterPrecision = "float32"
-    offset_positions: bool = True
-    mds: MDSFormatConfig = Field(default_factory=MDSFormatConfig)
+    trajectory_schema: TrajectorySchema = CANONICAL
+    precision: ExportPrecision = "float32"
+    recenter_positions: bool = True
+    mds: MDSBackendConfig = Field(default_factory=MDSBackendConfig)
 
     @classmethod
     def create(
         cls,
-        scene_schema: SceneSchemaLike,
+        trajectory_schema: TrajectorySchemaLike,
         *,
-        precision: WriterPrecision = "float32",
-        offset_positions: bool = True,
-    ) -> WriterConfig:
-        """Create a writer configuration from a flexible schema reference.
+        precision: ExportPrecision = "float32",
+        recenter_positions: bool = True,
+    ) -> ExportConfig:
+        """Create an export configuration from a flexible schema reference.
 
         Parameters
         ----------
-        scene_schema : SceneSchemaLike
-            Persisted scene schema as a concrete ``SceneSchema``, registered
+        trajectory_schema : TrajectorySchemaLike
+            Persisted trajectory schema as a concrete `TrajectorySchema`, registered
             schema name, or inline schema-definition payload.
         precision : {"float32", "float64"}, optional
             Floating-point precision used for persisted feature tensors.
-        offset_positions : bool, optional
+        recenter_positions : bool, optional
             Whether position features should be stored relative to the scene
             mean position.
 
         Returns
         -------
-        WriterConfig
-            Fully resolved writer configuration.
+        ExportConfig
+            Fully resolved export configuration.
         """
-        resolved_schema = get_scene_schema(scene_schema)
+        resolved_schema = get_trajectory_schema(trajectory_schema)
         return cls(
-            scene_schema=resolved_schema, precision=precision, offset_positions=offset_positions
+            trajectory_schema=resolved_schema,
+            precision=precision,
+            recenter_positions=recenter_positions,
         )
 
-    def with_scene_schema(self, scene_schema: SceneSchemaLike) -> WriterConfig:
-        """Return a copy with a different persisted scene schema."""
-        return self.model_copy(update={"scene_schema": get_scene_schema(scene_schema)})
+    def with_trajectory_schema(self, trajectory_schema: TrajectorySchemaLike) -> ExportConfig:
+        """Return a copy with a different persisted trajectory schema."""
+        return self.model_copy(
+            update={"trajectory_schema": get_trajectory_schema(trajectory_schema)}
+        )
 
     @property
     def feature_columns(self) -> tuple[str, ...]:
         """Return the persisted feature columns in tensor order."""
-        return self.scene_schema.feature_columns()
+        return self.trajectory_schema.feature_columns()
 
     @property
     def feature_dim(self) -> int:
         """Return the number of persisted per-agent features."""
-        return self.scene_schema.feature_dim
+        return self.trajectory_schema.feature_dim
 
     @property
     def float_dtype(self) -> FloatDType:

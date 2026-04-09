@@ -8,11 +8,11 @@ from dataclasses import dataclass
 from multiprocessing.synchronize import Event
 from typing import Protocol
 
-from dronalize.io.writers.base import SceneWriter
+from dronalize.io.backends.base import DatasetWriter
 
 AnyEvent = Event | threading.Event
 
-WriterFactory = Callable[[int], SceneWriter]
+WriterFactory = Callable[[int], DatasetWriter]
 """Factory that creates a worker-local writer for a given worker ID."""
 
 
@@ -28,30 +28,30 @@ class Progress:
     active_workers: int
 
 
-class WritingExecutor(Protocol):
+class Executor(Protocol):
     """Protocol for executing a scene-writing run.
 
     Implementations consume sources from a loader, build scenes, and write
-    them through a worker-local `SceneWriter` created by `writer_factory`.
+    them through a worker-local `DatasetWriter` created by `writer_factory`.
     """
 
     def execute(
-        self, writer_factory: WriterFactory, finalize: Callable[[SceneWriter], None] | None = None
+        self, writer_factory: WriterFactory, finalize: Callable[[DatasetWriter], None] | None = None
     ) -> None:
         """Run the executor and write all produced scenes.
 
         Parameters
         ----------
         writer_factory : WriterFactory
-            Factory used to construct one `SceneWriter` per worker.
-        finalize : Callable[[SceneWriter], None] | None, optional
+            Factory used to construct one `DatasetWriter` per worker.
+        finalize : Callable[[DatasetWriter], None] | None, optional
             Optional writer finalization hook. When omitted, the executor uses
             the writer's default `finish_local()` and `finish_final()` methods.
         """
         ...
 
 
-class ObservableWritingExecutor(WritingExecutor, Protocol):
+class ObservableExecutor(Executor, Protocol):
     """Writing executor that exposes progress updates to callers."""
 
     def progress_event(self) -> AnyEvent:

@@ -8,7 +8,11 @@ import polars as pl
 
 import dronalize.processing.pipeline.transforms as tr
 from dronalize._internal.polars_ops import normalize_group_by
-from dronalize.processing.ingest.splits import ShuffledTimeBlockSplit, SplitConfig, TimeBlockSplit
+from dronalize.processing.loading.splits import (
+    ShuffledTimeBlockStrategy,
+    SplitConfig,
+    TimeBlockStrategy,
+)
 from dronalize.processing.pipeline._internal import SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.pipeline import Pipeline
 
@@ -64,8 +68,8 @@ def split_partition_pipeline(
     split_labels = {i: split.value for i, split in enumerate(request.active_splits())}
     group_cols = normalize_group_by(group_by)
 
-    match request.mode:
-        case TimeBlockSplit(gap=gap):
+    match request.strategy:
+        case TimeBlockStrategy(gap=gap):
             src_col = _RAW_SPLIT_PARTITION_COLUMN if partition_column else split_column
             return _finalize_split_pipeline(
                 Pipeline().then(
@@ -85,7 +89,7 @@ def split_partition_pipeline(
                 group_columns=group_cols,
             )
 
-        case ShuffledTimeBlockSplit(gap=gap, segments=segments):
+        case ShuffledTimeBlockStrategy(gap=gap, segments=segments):
             return _finalize_split_pipeline(
                 Pipeline().then(
                     tr.block_partition_shuffle(

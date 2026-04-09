@@ -10,8 +10,8 @@ from dronalize.processing.pipeline._internal import SCENE_ID_COLUMN, SPLIT_PARTI
 from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
-    from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.pipeline.spec import TrackColumns, TrajectorySpec
 
 

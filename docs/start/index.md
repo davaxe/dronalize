@@ -12,7 +12,8 @@ points to the practical pages you are likely to need next.
 | [Installation](installation.md) | Install the package and choose the optional extras you actually need. |
 | [First run (CLI)](first-run-cli.md) | Run the first preprocessing job and inspect the resulting output. |
 | [Python entry](python-entry.md) | Use the planning and preprocessing entry points from Python. |
-| [Contributing](contributing.md) | Set up a development environment and understand the contribution workflow. |
+| [Adding datasets](adding-datasets.md) | Read a practical guide to integrating a new dataset, then map that process onto `dronalize`. |
+| [Contributing](contributing/index.md) | Set up a development environment and understand the contribution workflow. |
 | [Changelog](changelog.md) | Review user-facing documentation and package changes. |
 | [Citation](citation.md) | Cite `dronalize` in academic or research work. |
 
@@ -26,4 +27,4 @@ points to the practical pages you are likely to need next.
 
 - [Concepts](../concepts/index.md)
 - [Configuration reference](../reference/configuration/index.md)
-- [Output formats](../outputs/index.md)
+- [Storage backends](../outputs/index.md)

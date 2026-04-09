@@ -10,19 +10,19 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import RequireFrames
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.filtering import Filter
+from dronalize.processing.filtering.agent import RequireFrames
+from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import no_map, shared_map
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
     from dronalize.processing.maps.resolver import MapResolver
 
@@ -105,10 +105,10 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
         return sum(len(dfs) for dfs in self._scene_cache)
 
     @override
-    def ingest(self, source: Source[tuple[int, str]]) -> Iterable[IngestedData]:
+    def load_source(self, source: Source[tuple[int, str]]) -> Iterable[LoadedSourceData]:
         index, token = source.data
         scenes = self._scene_cache[index][token].drop(["scene_token", "scene_name", "map"]).lazy()
-        yield IngestedData(
+        yield LoadedSourceData(
             scenes.filter(
                 ~pl.col("status").is_in(self._status_to_filter),
                 *[
@@ -120,7 +120,7 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
 
     @classmethod
@@ -503,8 +503,8 @@ _STATUS_MAPPING: dict[str, str] = {
 
 
 if __name__ == "__main__":
-    from dronalize.datasets.nuscenes import DESCRIPTOR
+    from dronalize.datasets.nuscenes import DATASET_SPEC
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("nuscenes")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

@@ -18,7 +18,7 @@ This page is still being prepared for the next release. The historical notes bel
 
 ## v1.1.1 - December 2024
 
-- Fixed minor preprocessing issues in the highway pipeline.
+- Fixed minor preprocessing issues in the lane-change sampling.
 - Shipped small documentation updates.
 
 ## v1.1.0 - September 2024

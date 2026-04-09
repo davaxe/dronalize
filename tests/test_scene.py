@@ -4,72 +4,72 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dronalize.core.errors import SceneSchemaError
+from dronalize.core.errors import TrajectorySchemaError
 from dronalize.core.scene import (
     CANONICAL,
     POSITIONS_ONLY,
     POSITIONS_YAW,
     Scene,
-    SceneField,
-    SceneSchema,
+    TrajectoryField,
+    TrajectorySchema,
 )
 from dronalize.core.scene.derivations import ConversionContext, plan_derivations
-from dronalize.io.encoding import scene_to_numpy_dict
+from dronalize.io.encoding import encode_scene_record
 
 
-def test_scene_schema_orders_fields() -> None:
+def test_trajectory_schema_orders_fields() -> None:
     """Test that field-based schema definitions normalize to canonical dataframe order."""
-    schema = SceneSchema.define(
+    schema = TrajectorySchema.define(
         name="custom",
         fields=(
-            SceneField.Y,
-            SceneField.FRAME,
-            SceneField.VY,
-            SceneField.ID,
-            SceneField.VX,
-            SceneField.X,
-            SceneField.AGENT_CATEGORY,
+            TrajectoryField.Y,
+            TrajectoryField.FRAME,
+            TrajectoryField.VY,
+            TrajectoryField.ID,
+            TrajectoryField.VX,
+            TrajectoryField.X,
+            TrajectoryField.AGENT_CATEGORY,
         ),
     )
 
     assert schema.semantic_fields() == ("frame", "id", "x", "y", "vx", "vy", "agent_category")
-    assert schema.column_for(SceneField.VX) == "vx"
+    assert schema.column_for(TrajectoryField.VX) == "vx"
     assert schema.dtype_for("vx") == pl.Float64()
-    assert schema.has(SceneField.FRAME, "id", "x", "y")
+    assert schema.has(TrajectoryField.FRAME, "id", "x", "y")
 
 
-def test_scene_schema_accepts_bitmasks() -> None:
+def test_trajectory_schema_accepts_bitmasks() -> None:
     """Test that schemas can be defined directly from an IntFlag bitmask."""
-    schema = SceneSchema.define(
+    schema = TrajectorySchema.define(
         "positions_velocity",
         fields=(
-            SceneField.FRAME
-            | SceneField.ID
-            | SceneField.X
-            | SceneField.Y
-            | SceneField.VX
-            | SceneField.VY
-            | SceneField.AGENT_CATEGORY
+            TrajectoryField.FRAME
+            | TrajectoryField.ID
+            | TrajectoryField.X
+            | TrajectoryField.Y
+            | TrajectoryField.VX
+            | TrajectoryField.VY
+            | TrajectoryField.AGENT_CATEGORY
         ),
     )
 
     assert schema.fields == (
-        SceneField.FRAME
-        | SceneField.ID
-        | SceneField.X
-        | SceneField.Y
-        | SceneField.VX
-        | SceneField.VY
-        | SceneField.AGENT_CATEGORY
+        TrajectoryField.FRAME
+        | TrajectoryField.ID
+        | TrajectoryField.X
+        | TrajectoryField.Y
+        | TrajectoryField.VX
+        | TrajectoryField.VY
+        | TrajectoryField.AGENT_CATEGORY
     )
     assert schema.semantic_fields() == ("frame", "id", "x", "y", "vx", "vy", "agent_category")
 
 
 def test_plan_derivations_bitmasks() -> None:
-    """Derivation planning should operate directly on SceneField bitmasks."""
+    """Derivation planning should operate directly on TrajectoryField bitmasks."""
     plan = plan_derivations(
-        SceneField.X | SceneField.Y,
-        SceneField.VX | SceneField.VY | SceneField.YAW,
+        TrajectoryField.X | TrajectoryField.Y,
+        TrajectoryField.VX | TrajectoryField.VY | TrajectoryField.YAW,
         ConversionContext(sample_time=1.0),
     )
 
@@ -77,10 +77,12 @@ def test_plan_derivations_bitmasks() -> None:
     assert tuple(rule.name for rule in plan) == ("velocity_from_position", "yaw_from_velocity")
 
 
-def test_scene_schema_requires_bases() -> None:
+def test_trajectory_schema_requires_bases() -> None:
     """Test that schemas must include the base frame, id, and position fields."""
-    with pytest.raises(SceneSchemaError, match="base fields"):
-        SceneSchema.define(name="invalid", fields=(SceneField.FRAME, SceneField.ID, SceneField.X))
+    with pytest.raises(TrajectorySchemaError, match="base fields"):
+        TrajectorySchema.define(
+            name="invalid", fields=(TrajectoryField.FRAME, TrajectoryField.ID, TrajectoryField.X)
+        )
 
 
 def test_scene_derives_kinematics() -> None:
@@ -148,7 +150,7 @@ def test_scene_requires_sample_time() -> None:
         schema=POSITIONS_ONLY,
     )
 
-    with pytest.raises(SceneSchemaError, match="No derivation plan"):
+    with pytest.raises(TrajectorySchemaError, match="No derivation plan"):
         scene.as_schema(CANONICAL)
 
 
@@ -159,8 +161,8 @@ def test_feature_columns_canonical_order() -> None:
     assert CANONICAL.feature_columns() == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
 
 
-def test_scene_to_numpy_dict_schema() -> None:
-    """NumPy conversion should derive feature width from the requested scene schema."""
+def test_encode_scene_record_schema() -> None:
+    """NumPy conversion should derive feature width from the requested trajectory schema."""
     scene = Scene(
         frame=pl.DataFrame({
             "frame": [0, 1, 2],
@@ -176,8 +178,8 @@ def test_scene_to_numpy_dict_schema() -> None:
         sample_time=1.0,
     )
 
-    canonical = scene_to_numpy_dict(scene, scene_schema=CANONICAL, dtype=np.float64)
-    positions_only = scene_to_numpy_dict(scene, scene_schema=POSITIONS_ONLY, dtype=np.float64)
+    canonical = encode_scene_record(scene, trajectory_schema=CANONICAL, dtype=np.float64)
+    positions_only = encode_scene_record(scene, trajectory_schema=POSITIONS_ONLY, dtype=np.float64)
 
     assert canonical["features"].shape == (1, 3, 7)
     assert positions_only["features"].shape == (1, 3, 2)

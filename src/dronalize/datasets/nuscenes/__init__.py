@@ -1,13 +1,12 @@
-from dronalize.datasets.nuscenes import scope as _scope
-from dronalize.datasets.nuscenes.loader import NuScenesLoader
-from dronalize.datasets.nuscenes.maps.builder import NuScenesMapBuilder
-from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.nuscenes import runtime_context as _runtime_context
+from dronalize.datasets.nuscenes.loader import NuScenesLoader as _Loader
+from dronalize.datasets.registry import DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "nuscenes",
-    NuScenesLoader,
-    execution_scope_fn=_scope.nuscenes_execution_scope,
+    _Loader,
+    runtime_context_fn=_runtime_context.nuscenes_runtime_context,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "NuScenesLoader", "NuScenesMapBuilder"]
+__all__ = ["DATASET_SPEC"]

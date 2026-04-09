@@ -1,18 +1,26 @@
 from dronalize.datasets.eth_ucy.loader import (
-    EthLoader,
-    HotelLoader,
-    UnivLoader,
-    Zara1Loader,
-    Zara2Loader,
+    EthLoader as _EthLoader,
 )
-from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.eth_ucy.loader import (
+    HotelLoader as _HotelLoader,
+)
+from dronalize.datasets.eth_ucy.loader import (
+    UnivLoader as _UnivLoader,
+)
+from dronalize.datasets.eth_ucy.loader import (
+    Zara1Loader as _Zara1Loader,
+)
+from dronalize.datasets.eth_ucy.loader import (
+    Zara2Loader as _Zara2Loader,
+)
+from dronalize.datasets.registry import DatasetSpec
 
-DESCRIPTORS = {
-    "eth": DatasetDescriptor.from_loader("eth", EthLoader, infer_capabilities=True),
-    "hotel": DatasetDescriptor.from_loader("hotel", HotelLoader, infer_capabilities=True),
-    "univ": DatasetDescriptor.from_loader("univ", UnivLoader, infer_capabilities=True),
-    "zara1": DatasetDescriptor.from_loader("zara1", Zara1Loader, infer_capabilities=True),
-    "zara2": DatasetDescriptor.from_loader("zara2", Zara2Loader, infer_capabilities=True),
+DATASET_SPECS = {
+    "eth": DatasetSpec.from_loader("eth", _EthLoader, infer_capabilities=True),
+    "hotel": DatasetSpec.from_loader("hotel", _HotelLoader, infer_capabilities=True),
+    "univ": DatasetSpec.from_loader("univ", _UnivLoader, infer_capabilities=True),
+    "zara1": DatasetSpec.from_loader("zara1", _Zara1Loader, infer_capabilities=True),
+    "zara2": DatasetSpec.from_loader("zara2", _Zara2Loader, infer_capabilities=True),
 }
 
-__all__ = ["DESCRIPTORS", "EthLoader", "HotelLoader", "UnivLoader", "Zara1Loader", "Zara2Loader"]
+__all__ = ["DATASET_SPECS"]

@@ -14,10 +14,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dronalize.core.categories import DatasetSplit  # noqa: TC001
 from dronalize.core.errors import ConfigurationError, LoaderConfigError, SplitError
-from dronalize.io.config import SceneSchemaLike, WriterPrecision  # noqa: TC001
-from dronalize.processing.filters.filter import AgentCheckSpecs, CleanupSpecs, SceneCheckSpecs
-from dronalize.processing.filters.filter import FilterSpec as RuntimeFilterSpec
-from dronalize.processing.ingest.splits import SplitModeName, SplitWeights  # noqa: TC001
+from dronalize.io.config import ExportPrecision, TrajectorySchemaLike  # noqa: TC001
+from dronalize.processing.filtering.filter import AgentCheckSpecs, CleanupSpecs, SceneCheckSpecs
+from dronalize.processing.filtering.filter import FilterSpec as RuntimeFilterSpec
+from dronalize.processing.loading.splits import SplitStrategyName, SplitWeights  # noqa: TC001
 from dronalize.processing.pipeline.functional.resample._common import AliasedResampling, ColumnOrder
 
 if TYPE_CHECKING:
@@ -114,7 +114,7 @@ class FileLoaderConfig(_FileModel):
     window: FileWindowConfig | None = None
     resampling: FileResamplingConfig | None = None
     filter: FileLoaderFilterConfig | None = None
-    highway: dict[str, Any] | None = None
+    lane_change_sampling: dict[str, Any] | None = None
     options: dict[str, Any] | None = None
 
 
@@ -124,7 +124,7 @@ class FileMapConfig(_FileModel):
     enabled: bool | None = None
     min_distance: float | None = None
     interp_distance: float | None = None
-    extraction: Literal["full", "relevant", "circle", "bounding_box"] | None = None
+    extraction: Literal["full", "scene_extent", "circle", "bounding_box"] | None = None
     padding: float | None = None
     radius: float | None = None
     width: float | None = None
@@ -132,8 +132,8 @@ class FileMapConfig(_FileModel):
 
     @model_validator(mode="after")
     def _validate_extraction(self) -> FileMapConfig:
-        if self.extraction == "relevant" and self.padding is None:
-            msg = "map padding is required when extraction='relevant'."
+        if self.extraction == "scene_extent" and self.padding is None:
+            msg = "map padding is required when extraction='scene_extent'."
             raise ConfigurationError(msg)
         if self.extraction == "circle" and self.radius is None:
             msg = "map radius is required when extraction='circle'."
@@ -150,7 +150,7 @@ class FileMapConfig(_FileModel):
 
 
 class FileMDSConfig(_FileModel):
-    """Mosaic Streaming writer settings loaded from project config files."""
+    """Mosaic Streaming backend settings loaded from project config files."""
 
     compression: str | None = None
     hashes: tuple[str, ...] | None = None
@@ -158,19 +158,19 @@ class FileMDSConfig(_FileModel):
     exist_ok: bool | None = None
 
 
-class FileWriterConfig(_FileModel):
-    """Writer settings loaded from project config files."""
+class FileExportConfig(_FileModel):
+    """Export settings loaded from project config files."""
 
-    scene_schema: SceneSchemaLike | None = Field(default=None, alias="schema")
-    precision: WriterPrecision | None = None
-    offset_positions: bool | None = None
+    trajectory_schema: TrajectorySchemaLike | None = Field(default=None, alias="schema")
+    precision: ExportPrecision | None = None
+    recenter_positions: bool | None = None
     mds: FileMDSConfig | None = None
 
 
 class FileSplitConfig(_FileModel):
     """Split settings loaded from project config files."""
 
-    mode: SplitModeName | None = None
+    strategy: SplitStrategyName | None = None
     ratio: SplitWeights | None = None
     gap: int | None = Field(default=None, ge=0)
     segments: int | None = Field(default=None, ge=1)
@@ -178,29 +178,29 @@ class FileSplitConfig(_FileModel):
 
     @model_validator(mode="after")
     def _validate_shape(self) -> FileSplitConfig:
-        if self.mode is None:
+        if self.strategy is None:
             if any(value is not None for value in (self.ratio, self.gap, self.segments, self.read)):
-                msg = "split mode is required when split settings are present."
+                msg = "split strategy is required when split settings are present."
                 raise SplitError(msg)
             return self
 
-        if self.mode in _MODES_REQUIRING_RATIO and self.ratio is None:
-            msg = f"split ratio is required when mode='{self.mode}'."
+        if self.strategy in _MODES_REQUIRING_RATIO and self.ratio is None:
+            msg = f"split ratio is required when strategy='{self.strategy}'."
             raise SplitError(msg)
-        if self.gap is not None and self.mode not in _MODES_WITH_GAP:
-            msg = "split gap is only valid for time and shuffled-time modes."
+        if self.gap is not None and self.strategy not in _MODES_WITH_GAP:
+            msg = "split gap is only valid for time and shuffled-time strategies."
             raise SplitError(msg)
-        if self.mode == "shuffled-time" and self.segments is None:
-            msg = "split segments are required when mode='shuffled-time'."
+        if self.strategy == "shuffled-time" and self.segments is None:
+            msg = "split segments are required when strategy='shuffled-time'."
             raise SplitError(msg)
-        if self.mode != "shuffled-time" and self.segments is not None:
-            msg = "split segments are only valid for mode='shuffled-time'."
+        if self.strategy != "shuffled-time" and self.segments is not None:
+            msg = "split segments are only valid for strategy='shuffled-time'."
             raise SplitError(msg)
-        if self.mode != "native" and self.read is not None:
-            msg = "split read is only valid for mode='native'."
+        if self.strategy != "native" and self.read is not None:
+            msg = "split read is only valid for strategy='native'."
             raise SplitError(msg)
-        if self.mode in {"native", "none"} and self.ratio is not None:
-            msg = f"split ratio is not valid when mode='{self.mode}'."
+        if self.strategy in {"native", "none"} and self.ratio is not None:
+            msg = f"split ratio is not valid when strategy='{self.strategy}'."
             raise SplitError(msg)
         return self
 
@@ -212,7 +212,7 @@ class FileDatasetConfig(_FileModel):
     map: FileMapConfig | None = None
     split: FileSplitConfig | None = None
     execution: FileExecutionConfig | None = None
-    writer: FileWriterConfig | None = None
+    export: FileExportConfig | None = None
 
 
 class ConfigFile(BaseModel):

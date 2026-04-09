@@ -1,10 +1,10 @@
-"""Enumerations for persisted output formats supported by Dronalize."""
+"""Enumerations for persisted storage backends supported by Dronalize."""
 
 from enum import Enum
 
 
-class OutputFormat(str, Enum):
-    """Supported persisted export formats."""
+class StorageBackend(str, Enum):
+    """Supported persisted storage backends."""
 
     MDS = "mds"
-    DUMMY = "dummy"
+    NULL = "null"

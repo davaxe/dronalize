@@ -11,12 +11,12 @@ scenes are built, how splits and filters behave, and how outputs are written.
 | --- | --- |
 | [Architecture](architecture.md) | Understand the main runtime flow from config resolution to output writing. |
 | [Configuration model](configuration-model.md) | Learn how dataset defaults, global config, and dataset-specific overrides combine. |
-| [Split strategies](split-strategies.md) | Compare the available split modes and when to use them. |
+| [Split strategies](split-strategies.md) | Compare the available split strategies and when to use them. |
 | [Filtering](filtering.md) | See how scene and agent-level filtering rules are applied. |
 | [Map processing](map-processing.md) | Understand map extraction and map graph handling. |
 | [Datasets](datasets.md) | See how built-in dataset support is organized. |
-| [Outputs and schemas](outputs-and-schemas.md) | Learn how scene schemas and writer outputs fit together. |
-| [Highway pipeline](highway.md) | Follow a concrete end-to-end example for one dataset family. |
+| [Outputs and schemas](outputs-and-schemas.md) | Learn how trajectory schemas and export outputs fit together. |
+| [Lane-change sampling](lane-change-sampling.md) | Follow a concrete end-to-end example for one dataset family. |
 
 ## Reading path
 

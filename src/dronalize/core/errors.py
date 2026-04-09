@@ -17,8 +17,8 @@ class LoaderConfigError(ConfigurationError, DronalizeError):
     """Raised when there is an issue with a loader configuration."""
 
 
-class SceneSchemaError(ConfigurationError, DronalizeError):
-    """Raised when a scene schema is invalid, unknown, or cannot be applied."""
+class TrajectorySchemaError(ConfigurationError, DronalizeError):
+    """Raised when a trajectory schema is invalid, unknown, or cannot be applied."""
 
 
 class MissingOptionalDependencyError(DronalizeError):
@@ -83,15 +83,15 @@ class SplitNotSupportedError(SplitError):
 
 
 class SplitStrategyNotSupportedError(SplitError):
-    """Raised when a loader does not implement the requested custom split mode."""
+    """Raised when a loader does not implement the requested custom split strategy."""
 
     def __init__(
         self, loader_name: str, strategy_name: str, supported_strategies: tuple[str, ...]
     ) -> None:
         supported_display = ", ".join(supported_strategies) if supported_strategies else "none"
         msg = (
-            f"{loader_name} does not support split mode '{strategy_name}'. "
-            f"Supported modes: {supported_display}."
+            f"{loader_name} does not support split strategy '{strategy_name}'. "
+            f"Supported strategies: {supported_display}."
         )
         super().__init__(msg)
         self.loader_name: str = loader_name
@@ -103,13 +103,13 @@ class SplitAssignmentError(SplitError):
     """Raised when runtime split-assignment data is missing or invalid."""
 
 
-class UnsupportedOutputFormatError(ValueError, DronalizeError):
-    """Raised when an unknown writer/output format is requested."""
+class UnsupportedStorageBackendError(ValueError, DronalizeError):
+    """Raised when an unknown storage backend is requested."""
 
-    def __init__(self, output_format: str, supported_formats: tuple[str, ...]) -> None:
-        supported = ", ".join(supported_formats)
+    def __init__(self, storage_backend: str, supported_backends: tuple[str, ...]) -> None:
+        supported = ", ".join(supported_backends)
         super().__init__(
-            f"Unsupported output format '{output_format}'. Supported formats: {supported}."
+            f"Unsupported storage backend '{storage_backend}'. Supported backends: {supported}."
         )
-        self.output_format: str = output_format
-        self.supported_formats: tuple[str, ...] = supported_formats
+        self.storage_backend: str = storage_backend
+        self.supported_backends: tuple[str, ...] = supported_backends

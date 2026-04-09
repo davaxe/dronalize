@@ -35,7 +35,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Resampling | Cubic 2:1 |
 | Windowing | 175-frame window, step 25 |
 | Filtering | Exclude trailers; prune agents with fewer than 6 samples |
-| Highway sampling | Require 3 lane changes; keep 1 in 3 negatives |
+| Lane-change sampling | Require 3 lane changes; keep 1 in 3 negatives |
 | Maps | Full map |
 
 ### Filtering details
@@ -47,7 +47,7 @@ These are the default Dronalize settings used when processing this dataset.
 
 ## Split support
 
-Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom modes, and any recommended strategy.
+Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom split strategies, and any recommended strategy.
 
 ```bash
 dronalize split-support highd

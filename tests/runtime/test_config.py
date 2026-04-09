@@ -7,30 +7,30 @@ from pydantic import ValidationError
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.models import Range
+from dronalize.processing.filtering import tol
 from dronalize.core.scene import (
     CANONICAL,
     POSITIONS_ONLY,
     POSITIONS_VELOCITY_ACCELERATION,
     POSITIONS_VELOCITY_YAW,
 )
-from dronalize.io import WriterConfig
-from dronalize.processing.filters import (
+from dronalize.io import ExportConfig
+from dronalize.processing.filtering import (
     AgentSelector,
     Filter,
     FilterSpec,
     agent,
-    base,
     cleanup,
     scene,
-    tol,
 )
-from dronalize.processing.ingest import BySceneSplit, LoaderConfig, SplitConfig, SplitWeights
+from dronalize.processing.filtering import base
+from dronalize.processing.loading import LoaderConfig, SceneSplitStrategy, SplitConfig, SplitWeights
 from dronalize.processing.maps import (
     BoundingBoxExtraction,
     CircularExtraction,
     FullMapExtraction,
     MapConfig,
-    RelevantAreaExtraction,
+    SceneExtentExtraction,
 )
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
 from dronalize.runtime import (
@@ -536,43 +536,43 @@ def test_runtime_config_deep_merge() -> None:
 
 
 def test_writer_schema_drives_layout() -> None:
-    """Writer config should derive schema and feature layout from the selected schema."""
-    default_config = WriterConfig()
-    positions_only = WriterConfig.create(scene_schema="positions_only")
-    positions_velocity_acceleration = WriterConfig.create(
-        scene_schema="positions_velocity_acceleration"
+    """Export config should derive schema and feature layout from the selected schema."""
+    default_config = ExportConfig()
+    positions_only = ExportConfig.create(trajectory_schema="positions_only")
+    positions_velocity_acceleration = ExportConfig.create(
+        trajectory_schema="positions_velocity_acceleration"
     )
-    positions_velocity_yaw = WriterConfig.create(scene_schema="positions_velocity_yaw")
+    positions_velocity_yaw = ExportConfig.create(trajectory_schema="positions_velocity_yaw")
 
-    assert default_config.scene_schema == CANONICAL
+    assert default_config.trajectory_schema == CANONICAL
     assert default_config.feature_dim == 7
     assert default_config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
 
-    assert positions_only.scene_schema == POSITIONS_ONLY
+    assert positions_only.trajectory_schema == POSITIONS_ONLY
     assert positions_only.feature_dim == 2
     assert positions_only.feature_columns == ("x", "y")
 
-    assert positions_velocity_acceleration.scene_schema == POSITIONS_VELOCITY_ACCELERATION
+    assert positions_velocity_acceleration.trajectory_schema == POSITIONS_VELOCITY_ACCELERATION
     assert positions_velocity_acceleration.feature_dim == 6
     assert positions_velocity_acceleration.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
 
-    assert positions_velocity_yaw.scene_schema == POSITIONS_VELOCITY_YAW
+    assert positions_velocity_yaw.trajectory_schema == POSITIONS_VELOCITY_YAW
     assert positions_velocity_yaw.feature_dim == 5
     assert positions_velocity_yaw.feature_columns == ("x", "y", "vx", "vy", "yaw")
 
 
 def test_runtime_config_merges_writer() -> None:
-    """Writer overrides should merge into the default writer config."""
+    """Export overrides should merge into the default export config."""
     default = _runtime_config()
 
     resolved = resolve_runtime_config(
         default=default,
-        overrides=_file_config({"writer": {"schema": "positions_only", "precision": "float64"}}),
+        overrides=_file_config({"export": {"schema": "positions_only", "precision": "float64"}}),
     )
 
-    assert resolved.writer.scene_schema == POSITIONS_ONLY
-    assert resolved.writer.precision == "float64"
-    assert resolved.writer.offset_positions is True
+    assert resolved.export.trajectory_schema == POSITIONS_ONLY
+    assert resolved.export.precision == "float64"
+    assert resolved.export.recenter_positions is True
 
 
 def test_runtime_config_merges_split() -> None:
@@ -583,14 +583,14 @@ def test_runtime_config_merges_split() -> None:
         default=default,
         overrides=_file_config({
             "split": {
-                "mode": "scene",
+                "strategy": "scene",
                 "ratio": {"train": 0.7, "val": 0.2, "test": 0.1},
             }
         }),
     )
 
     assert resolved.split == SplitConfig(
-        mode=BySceneSplit(), ratio=SplitWeights(train=0.7, val=0.2, test=0.1)
+        strategy=SceneSplitStrategy(), ratio=SplitWeights(train=0.7, val=0.2, test=0.1)
     )
 
 
@@ -841,7 +841,7 @@ extraction = "circle"
 radius = 60.0
 
 [datasets.a43.split]
-mode = "shuffled-time"
+strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
 gap = 2
@@ -864,7 +864,7 @@ gap = 2
         overrides.split
         == _file_config({
             "split": {
-                "mode": "shuffled-time",
+                "strategy": "shuffled-time",
                 "ratio": {"train": 0.7, "val": 0.2, "test": 0.1},
                 "segments": 8,
                 "gap": 2,
@@ -900,13 +900,13 @@ columns = ["ax", "ay"]
 
 
 def test_map_config_parses_relevant_area() -> None:
-    """Parse a dictionary with relevant mode to ensure proper union routing."""
-    config_dict = {"extraction": {"mode": "relevant", "padding": 1.3}}
+    """Parse a dictionary with scene-extent mode to ensure proper union routing."""
+    config_dict = {"extraction": {"mode": "scene_extent", "padding": 1.3}}
 
     config = MapConfig.model_validate(config_dict)
 
-    assert isinstance(config.extraction, RelevantAreaExtraction)
-    assert config.extraction.mode == "relevant"
+    assert isinstance(config.extraction, SceneExtentExtraction)
+    assert config.extraction.mode == "scene_extent"
     assert config.extraction.padding == pytest.approx(1.3)
 
 
@@ -922,82 +922,82 @@ def test_map_config_parses_full_map() -> None:
 
 def test_writer_schema_positions_only() -> None:
     """Verify initialization with the 'positions_only' shorthand string."""
-    config = WriterConfig.create("positions_only", precision="float64", offset_positions=False)
+    config = ExportConfig.create("positions_only", precision="float64", recenter_positions=False)
 
-    assert config.scene_schema == POSITIONS_ONLY
+    assert config.trajectory_schema == POSITIONS_ONLY
     assert config.feature_columns == ("x", "y")
     assert config.feature_dim == 2
 
 
 def test_writer_schema_predefined() -> None:
     """Ensure the config accepts a predefined schema object."""
-    config = WriterConfig(
-        scene_schema=POSITIONS_VELOCITY_ACCELERATION,
+    config = ExportConfig(
+        trajectory_schema=POSITIONS_VELOCITY_ACCELERATION,
         precision="float64",
-        offset_positions=False,
+        recenter_positions=False,
     )
 
-    assert config.scene_schema == POSITIONS_VELOCITY_ACCELERATION
+    assert config.trajectory_schema == POSITIONS_VELOCITY_ACCELERATION
     assert config.feature_columns == ("x", "y", "vx", "vy", "ax", "ay")
     assert config.feature_dim == 6
 
 
 def test_writer_schema_single_custom() -> None:
     """Check that a single custom field is accepted via structured definition."""
-    config = WriterConfig.create(
+    config = ExportConfig.create(
         {"name": "custom_vx", "fields": ["frame", "id", "x", "y", "vx", "agent_category"]},
         precision="float64",
-        offset_positions=False,
+        recenter_positions=False,
     )
 
     assert config.feature_columns == ("x", "y", "vx")
     assert config.feature_dim == 3
-    assert config.scene_schema.name == "custom_vx"
+    assert config.trajectory_schema.name == "custom_vx"
 
 
 def test_writer_schema_multiple_custom() -> None:
     """Validate that multiple custom fields generate a structured custom schema."""
-    config = WriterConfig.create(
+    config = ExportConfig.create(
         {
             "name": "custom_velocity_yaw",
             "fields": ["frame", "id", "x", "y", "vx", "vy", "yaw", "agent_category"],
         },
         precision="float64",
-        offset_positions=False,
+        recenter_positions=False,
     )
 
     assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
     assert config.feature_dim == 5
-    assert config.scene_schema.name == "custom_velocity_yaw"
+    assert config.trajectory_schema.name == "custom_velocity_yaw"
 
 
 def test_writer_schema_custom_order() -> None:
     """Confirm that structured custom schemas still use canonical field ordering."""
-    config = WriterConfig.create(
+    config = ExportConfig.create(
         {
             "name": "custom_yaw_velocity",
             "fields": ["frame", "id", "x", "y", "yaw", "vx", "vy", "agent_category"],
         },
         precision="float64",
-        offset_positions=False,
+        recenter_positions=False,
     )
 
     assert config.feature_columns == ("x", "y", "vx", "vy", "yaw")
     assert config.feature_dim == 5
-    assert config.scene_schema.name == "custom_yaw_velocity"
+    assert config.trajectory_schema.name == "custom_yaw_velocity"
 
 
 def test_writer_schema_rejects_string_shorthand() -> None:
     """Raise ValueError when using removed colon-separated schema shorthand."""
-    with pytest.raises(ValueError, match=r"Unknown scene schema 'vx:vy:yaw'"):
-        WriterConfig.create("vx:vy:yaw", precision="float64", offset_positions=False)
+    with pytest.raises(ValueError, match=r"Unknown trajectory schema 'vx:vy:yaw'"):
+        ExportConfig.create("vx:vy:yaw", precision="float64", recenter_positions=False)
 
 
 def test_writer_schema_rejects_invalid() -> None:
     """Raise ValueError when required base fields are missing from a custom schema."""
     with pytest.raises(ValueError, match=r"must include the base fields"):
-        WriterConfig.create(
+        ExportConfig.create(
             {"name": "custom_schema", "fields": ["x", "y", "ax"]},
             precision="float64",
-            offset_positions=False,
+            recenter_positions=False,
         )

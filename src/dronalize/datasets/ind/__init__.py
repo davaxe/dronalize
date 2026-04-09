@@ -1,13 +1,12 @@
-from dronalize.datasets.ind import scope as _scope
-from dronalize.datasets.ind.loader import InDLoader
-from dronalize.datasets.ind.maps.builder import InDMapBuilder
-from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.ind import runtime_context as _runtime_context
+from dronalize.datasets.ind.loader import InDLoader as _Loader
+from dronalize.datasets.registry import DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "ind",
-    InDLoader,
-    execution_scope_fn=_scope.ind_execution_scope,
+    _Loader,
+    runtime_context_fn=_runtime_context.ind_runtime_context,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "InDLoader", "InDMapBuilder"]
+__all__ = ["DATASET_SPEC"]

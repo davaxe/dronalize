@@ -1,12 +1,11 @@
-from dronalize.datasets.highd.loader import HighDLoader
-from dronalize.datasets.highd.maps.builder import HighDMapBuilder
-from dronalize.datasets.registry import DatasetCapabilities, DatasetDescriptor
+from dronalize.datasets.highd.loader import HighDLoader as _Loader
+from dronalize.datasets.registry import DatasetCapabilities, DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "highd",
-    HighDLoader,
-    capabilities=DatasetCapabilities.HIGHWAY_PIPELINE,
+    _Loader,
+    capabilities=DatasetCapabilities.LANE_CHANGE_SAMPLING,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "HighDLoader", "HighDMapBuilder"]
+__all__ = ["DATASET_SPEC"]

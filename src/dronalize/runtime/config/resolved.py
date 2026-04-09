@@ -7,10 +7,10 @@ from typing import ClassVar
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from dronalize.core.errors import ConfigurationError
-from dronalize.io.config import WriterConfig
-from dronalize.processing.ingest.base import LoaderOptions, NoLoaderOptions
-from dronalize.processing.ingest.config import LoaderConfig  # noqa: TC001
-from dronalize.processing.ingest.splits import SplitConfig
+from dronalize.io.config import ExportConfig
+from dronalize.processing.loading.base import LoaderOptions, NoLoaderOptions
+from dronalize.processing.loading.config import LoaderConfig  # noqa: TC001
+from dronalize.processing.loading.splits import SplitConfig
 from dronalize.processing.maps.config import MapConfig
 
 
@@ -50,4 +50,4 @@ class ResolvedConfig(BaseModel):
     map: MapConfig | None = Field(default_factory=MapConfig.default)
     split: SplitConfig = Field(default_factory=SplitConfig)
     execution: ResolvedExecutionConfig = Field(default_factory=ResolvedExecutionConfig)
-    writer: WriterConfig = Field(default_factory=WriterConfig)
+    export: ExportConfig = Field(default_factory=ExportConfig)

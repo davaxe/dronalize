@@ -9,7 +9,7 @@ The architecture of `dronalize` is designed to be modular, flexible, and extensi
   ![Design architecture](../assets/architecture-dark.svg#only-dark){ width="100%" }
   ![Design architecture](../assets/architecture-light.svg#only-light){ width="100%" }
   <figcaption>
-    High level architecture diagram. The <code>dronalize</code> library provides the main API and processing logic, while configuration files define the specific behavior for each run. The CLI is a thin wrapper around the core library for ease of use.
+    High-level architecture diagram. The <code>dronalize</code> library provides the main API and processing logic, while configuration files define the specific behavior for each run. The CLI is a thin wrapper around the core library for ease of use.
   </figcaption>
 </figure>
 
@@ -17,7 +17,7 @@ The architecture of `dronalize` is designed to be modular, flexible, and extensi
 
 Three things determine what a run does: the **dataset** selected, the **configuration** applied, and the **output** requested. The diagram captures these as three horizontal phases that always execute in the same order.
 
-Before any data is touched, a config resolution step merges dataset defaults, a TOML file, and CLI flags into a single resolved plan. That plan is then used to open a loader, assemble the processing pipeline, and prepare the writer. The actual data processing follows two nested loops: a **source loop** that iterates over raw files or recordings, and a **scene loop** inside it that handles each scene window produced from a source.
+Before any data is touched, a config resolution step merges dataset defaults, a TOML file, and CLI flags into a single resolved plan. That plan is then used to open a loader, assemble the processing pipeline, and prepare the export. The actual data processing follows two nested loops: a **source loop** that iterates over raw files or recordings, and a **scene loop** inside it that handles each scene window produced from a source.
 
 ## Config resolution
 
@@ -34,11 +34,11 @@ For a full description of the layering rules and override precedence, see the [c
 
 ## Dataset registry
 
-Each built-in dataset is described by a `DatasetDescriptor` — a small object that carries everything needed to process it: the loader factory, default loader and map configs, the native scene schema, and the split strategies it supports.
+Each built-in dataset is described by a `DatasetSpec` — a small object that carries everything needed to process it: the loader factory, default loader and map configs, the native trajectory schema, and the split strategies it supports.
 
 The registry is lazy: a dataset's module is only imported when it is first requested by name. This means optional dependencies for datasets you are not using — such as `protobuf` for Waymo or `zarr` for Lyft — do not need to be installed.
 
-Descriptors can be explored from Python via `dronalize.datasets.get()` or from the CLI with `dronalize inspect <dataset>` and `dronalize split-support <dataset>`.
+Dataset specs can be explored from Python via `dronalize.datasets.get()` or from the CLI with `dronalize inspect <dataset>` and `dronalize split-support <dataset>`.
 
 ## The processing pipeline
 
@@ -63,23 +63,23 @@ Steps not present in the config are skipped entirely, so the pipeline is always 
 
 Scene grouping hands off individual DataFrames to the scene loop, where each scene is finalized before writing:
 
-1. **Split assignment** — determines whether the scene belongs to `train`, `val`, or `test`. The mechanism depends on the split mode: time-based modes read a column written earlier in the pipeline, scene-based mode uses a stable hash of the scene identifier, and native or source modes use the partition already assigned to the source.
+1. **Split assignment** — determines whether the scene belongs to `train`, `val`, or `test`. The mechanism depends on the split strategy: time-based strategies read a column written earlier in the pipeline, the scene strategy uses a stable hash of the scene identifier, and native or source strategies use the partition already assigned to the source.
 2. **Map resolution** — attaches the map graph to the scene if the dataset supports it and maps are enabled. The graph is not materialized until it is needed for encoding.
 3. **Scene construction and schema conversion** — wraps the DataFrame in a `Scene` object. If the configured output schema requests fields not present in the dataset's native schema — for example, velocity from a positions-only source — those fields are derived here.
 
 ## Output
 
-Each finalized `Scene` is encoded into a dictionary of NumPy arrays and handed to a `SceneWriter`. The encoding step produces a dense `[agents, timesteps, features]` tensor, a matching presence mask, and optionally recenters positions around the scene mean when `offset_positions` is enabled.
+Each finalized `Scene` is encoded into a dictionary of NumPy arrays and handed to a `DatasetWriter`. The encoding step produces a dense `[agents, timesteps, features]` tensor, a matching presence mask, and optionally recenters positions around the scene mean when `recenter_positions` is enabled.
 
-The current stable output format is MDS (Mosaic Streaming), which writes binary shards with a per-split `index.json`. A `manifest.json` is written alongside the shards and records the schema name, feature columns, sequence lengths, precision, and whether map data is present. This manifest is the stable description of a processed dataset for downstream consumers.
+The current stable storage backend is MDS (Mosaic Streaming), which writes binary shards with a per-split `index.json`. A `manifest.json` is written alongside the shards and records the schema name, feature columns, sequence lengths, precision, and whether map data is present. This manifest is the stable description of a processed dataset for downstream consumers.
 
-The `dummy` writer skips all file I/O and is useful for validating a config or benchmarking the pipeline without writing output. See [outputs and schemas](outputs-and-schemas.md) for more on schema choice and writer options.
+The `null` export skips all file I/O and is useful for validating a config or benchmarking the pipeline without writing output. See [outputs and schemas](outputs-and-schemas.md) for more on schema choice and export options.
 
 ## Module map
 
 | Module | Responsibility |
 | --- | --- |
-| `dronalize.datasets` | Dataset registry, descriptors, and built-in dataset definitions |
+| `dronalize.datasets` | Dataset registry, specs, and built-in dataset definitions |
 | `dronalize.runtime` | Config resolution, execution planning, CLI, and run orchestration |
 | `dronalize.processing` | Pipeline, filters, resampling, map processing, and loader base classes |
 | `dronalize.core` | Scene data model, schema definitions, agent categories, and shared error types |

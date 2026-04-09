@@ -13,10 +13,10 @@ from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION
 from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
-from dronalize.processing.filters.agent import MinSamples
-from dronalize.processing.filters.filter import Filter
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import Source
+from dronalize.processing.filtering.agent import MinSamples
+from dronalize.processing.filtering.filter import Filter
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import Source
 from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps.graph import MapGraph
-    from dronalize.core.scene import Scene, SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import Scene, TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
 
 
@@ -120,7 +120,7 @@ class AD4CHELoader(LevelXDataLoader):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_ACCELERATION
 
     @classmethod
@@ -131,13 +131,13 @@ class AD4CHELoader(LevelXDataLoader):
             .with_resampling(ResampleSpec(up=1, down=3))
             .with_window(45)
             .with_filter(Filter.define_cleanup(MinSamples(minimum=4)))
-            .with_highway(required_lane_changes=5, negative_keep_every=3)
+            .with_lane_change_sampling(required_lane_changes=5, negative_keep_every=3)
         )
 
     @classmethod
     @override
     def default_map_config(cls) -> MapConfig:
-        return MapConfig.relevant_area_extraction(padding=1.15)
+        return MapConfig.scene_extent_extraction(padding=1.15)
 
     @override
     def map_resolver(self) -> MapResolver:
@@ -176,8 +176,8 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
 })
 
 if __name__ == "__main__":
-    from dronalize.datasets.ad4che import DESCRIPTOR
+    from dronalize.datasets.ad4che import DATASET_SPEC
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("ad4che")
-    _ = debug_descriptor(DESCRIPTOR, root, max_scenes=3, skip_scenes=40)
+    _ = debug_descriptor(DATASET_SPEC, root, max_scenes=3, skip_scenes=40)

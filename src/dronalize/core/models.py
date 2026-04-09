@@ -1,15 +1,37 @@
-"""Small shared validation models for ranges and tolerances."""
+"""Small shared validation models.
+
+## Import guide
+
+```python
+from dronalize.core.models import Range
+```
+
+`Range` is used in public configuration and validation models that need an
+optional integer minimum and maximum.
+
+## Related modules
+
+- [`dronalize.processing.filtering`][] for filter-specific tolerance models
+"""
 
 from __future__ import annotations
 
-from typing import Annotated, ClassVar, Literal
+from typing import ClassVar
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 from pydantic.config import ConfigDict
 
 
 class Range(BaseModel):
-    """Generic integer range with optional minimum and maximum."""
+    """Generic integer range with optional minimum and maximum.
+
+    Parameters
+    ----------
+    minimum : int | None, optional
+        Inclusive lower bound.
+    maximum : int | None, optional
+        Inclusive upper bound.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
@@ -28,42 +50,4 @@ class Range(BaseModel):
         return self.minimum, self.maximum
 
 
-class RelativeTolerance(BaseModel):
-    """Relative tolerance, e.g. fraction of invalid agents to tolerate."""
-
-    kind: Literal["relative"] = Field("relative", repr=False, init=False)
-    relative: float = Field(ge=0.0, le=1.0)
-
-
-class AbsoluteTolerance(BaseModel):
-    """Absolute integer tolerance, e.g. number of invalid agents to tolerate."""
-
-    kind: Literal["absolute"] = Field("absolute", repr=False, init=False)
-    absolute: int = Field(ge=0)
-
-
-class CombinedTolerance(BaseModel):
-    """Combined tolerance where both must be satisfied."""
-
-    kind: Literal["combined"] = Field("combined", repr=False, init=False)
-    absolute: int = Field(ge=0)
-    relative: float = Field(ge=0.0, le=1.0)
-
-
-Tolerance = Annotated[
-    RelativeTolerance | AbsoluteTolerance | CombinedTolerance, Field(discriminator="kind")
-]
-
-
-def tol(*, relative: float | None = None, absolute: int | None = None) -> Tolerance:
-    """Construct tolerance from simple relative and/or absolute values."""
-    match (relative, absolute):
-        case (None, None):
-            msg = "At least one of relative or absolute tolerance must be specified."
-            raise ValueError(msg)
-        case (None, int(absolute)):
-            return AbsoluteTolerance(absolute=absolute)
-        case (float(relative) | int(relative), None):
-            return RelativeTolerance(relative=relative)
-        case (float(relative) | int(relative), int(absolute)):
-            return CombinedTolerance(absolute=absolute, relative=relative)
+__all__ = ["Range"]

@@ -23,7 +23,7 @@ class UniDLoader(LevelXDataLoader):
 
 if __name__ == "__main__":
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-    from dronalize.datasets.unid import DESCRIPTOR
+    from dronalize.datasets.unid import DATASET_SPEC
 
     root = resolve_dataset_root_from_env("unid")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

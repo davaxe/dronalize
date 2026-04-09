@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dronalize.processing.ingest.splits import (
-    NativeSplit,
-    ShuffledTimeBlockSplit,
-    TimeBlockSplit,
-    Unsplit,
+from dronalize.processing.loading.splits import (
+    NativeSplitStrategy,
+    NoSplitStrategy,
+    ShuffledTimeBlockStrategy,
+    TimeBlockStrategy,
 )
 from dronalize.runtime.models import ProcessingSummary, SummarySection
 
@@ -16,15 +16,15 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.categories import DatasetSplit
-    from dronalize.processing.ingest.base import LoaderOptions
-    from dronalize.processing.ingest.config import LoaderConfig
+    from dronalize.processing.loading.base import LoaderOptions
+    from dronalize.processing.loading.config import LoaderConfig
     from dronalize.processing.maps.config import MapConfig
     from dronalize.runtime.models import DatasetPlan
 
 
 def summarize_plan(plan: DatasetPlan) -> ProcessingSummary:
     """Return a structured display summary for a dataset plan."""
-    loader, writer = plan.config.loader, plan.config.writer
+    loader, export = plan.config.loader, plan.config.export
 
     sections = (
         SummarySection(
@@ -33,8 +33,11 @@ def summarize_plan(plan: DatasetPlan) -> ProcessingSummary:
                 ("Dataset", plan.descriptor.name),
                 ("Input directory", str(plan.data_root)),
                 ("Output directory", str(plan.output_dir)),
-                ("Output format", plan.output_format.value),
-                ("Scene schema", f"{writer.scene_schema.name} ({writer.feature_dim} features)"),
+                ("Storage backend", plan.storage_backend.value),
+                (
+                    "Trajectory schema",
+                    f"{export.trajectory_schema.name} ({export.feature_dim} features)",
+                ),
             ),
         ),
         SummarySection(
@@ -54,7 +57,7 @@ def summarize_plan(plan: DatasetPlan) -> ProcessingSummary:
             title="Execution",
             rows=_non_empty_rows(
                 ("Execution", _execution_summary(plan)),
-                ("Source limit", str(plan.limit)) if plan.limit is not None else None,
+                ("Scene limit", str(plan.limit)) if plan.limit is not None else None,
                 ("Random seed", str(seed))
                 if (seed := plan.split_request.seed) is not None
                 else None,
@@ -129,8 +132,8 @@ def _map_extraction_summary(map_config: MapConfig) -> str:
     match extraction.mode:
         case "full":
             return "full map"
-        case "relevant":
-            return f"relevant area (padding={extraction.padding:g})"
+        case "scene_extent":
+            return f"scene extent (padding={extraction.padding:g})"
         case "circle":
             return f"circle (radius={extraction.radius:g})"
         case "bounding_box":
@@ -138,16 +141,16 @@ def _map_extraction_summary(map_config: MapConfig) -> str:
 
 
 def _split_summary_rows(plan: DatasetPlan) -> tuple[tuple[str, str], ...]:
-    if isinstance(plan.split_request.mode, NativeSplit):
+    if isinstance(plan.split_request.strategy, NativeSplitStrategy):
         splits = plan.loader_splits()
-        rows = [("Split mode", "native")]
+        rows = [("Split strategy", "native")]
         if splits:
             rows.append(("Read splits", _format_splits(splits)))
         return tuple(rows)
-    if isinstance(plan.split_request.mode, Unsplit):
+    if isinstance(plan.split_request.strategy, NoSplitStrategy):
         return ()
 
-    rows = [("Split mode", plan.split_request.mode_name)]
+    rows = [("Split strategy", plan.split_request.strategy_name)]
     if (details := _split_details_summary(plan)) is not None:
         rows.append(("Time split settings", details))
     rows.append(("Output ratio", _format_weighted_splits(plan.split_request.active())))
@@ -155,11 +158,11 @@ def _split_summary_rows(plan: DatasetPlan) -> tuple[tuple[str, str], ...]:
 
 
 def _split_details_summary(plan: DatasetPlan) -> str | None:
-    mode = plan.split_request.mode
-    if isinstance(mode, TimeBlockSplit):
-        return f"gap={mode.gap} frames"
-    if isinstance(mode, ShuffledTimeBlockSplit):
-        return f"segments={mode.segments}, gap={mode.gap} frames"
+    strategy = plan.split_request.strategy
+    if isinstance(strategy, TimeBlockStrategy):
+        return f"gap={strategy.gap} frames"
+    if isinstance(strategy, ShuffledTimeBlockStrategy):
+        return f"segments={strategy.segments}, gap={strategy.gap} frames"
     return None
 
 

@@ -17,9 +17,13 @@ nav = [
     { Installation = "start/installation.md" },
     { "First run (CLI)" = "start/first-run-cli.md" },
     { "Python entry" = "start/python-entry.md" },
-    { Contributing = "start/contributing.md" },
+    { "Adding datasets" = "start/adding-datasets.md" },
     { Changelog = "start/changelog.md" },
     { Citation = "start/citation.md" },
+    { Contributing = [
+        "start/contributing/index.md",
+        { "Adding new storage backends" = "start/contributing/storage.md" },
+    ] },
   ] },
 
   { Concepts = [
@@ -30,13 +34,13 @@ nav = [
     { Filtering = "concepts/filtering.md" },
     { "Map processing" = "concepts/map-processing.md" },
     { Datasets = "concepts/datasets.md" },
-    { "Outputs and schemas" = "concepts/outputs-and-schemas.md" },
-    { "Highway pipeline" = "concepts/highway.md" },
+    { "Exports, trajectory schemas, and storage backends" = "concepts/outputs-and-schemas.md" },
+    { "Lane-change sampling" = "concepts/lane-change-sampling.md" },
   ] },
 
-  { "Output formats" = [
+  { "Storage backends" = [
     "outputs/index.md",
-    { "Mosaic Data Shard (MDS) format" = "outputs/mds.md" },
+    { "Mosaic Data Shard (MDS)" = "outputs/mds.md" },
   ] },
 
   { "Configuration reference" = [
@@ -45,7 +49,7 @@ nav = [
     { "[loader] section" = "reference/configuration/loader.md" },
     { "[loader.filter] section" = "reference/configuration/filter.md" },
     { "[map] section" = "reference/configuration/map.md" },
-    { "[writer] section" = "reference/configuration/writer.md" },
+    { "[export] section" = "reference/configuration/export.md" },
     { "[split] section" = "reference/configuration/split.md" },
   ] },
 
@@ -81,31 +85,42 @@ nav = [
     "reference/api/index.md",
     { dronalize = [
       "reference/api/dronalize/index.md",
-      { "Processing configuration" = "reference/api/dronalize/configuration.md" },
-      { "Scene model" = "reference/api/dronalize/scenes.md" },
     ] },
     { "dronalize.core" = [
       "reference/api/core/index.md",
       { "Categories and splits" = "reference/api/core/categories-and-splits.md" },
+      { "Scene models and schemas" = "reference/api/core/scene.md" },
+      { "Map graphs" = "reference/api/core/maps.md" },
     ] },
     { "dronalize.datasets" = [
       "reference/api/datasets/index.md",
       { "Registry operations" = "reference/api/datasets/registry.md" },
-      { "Descriptors and capabilities" = "reference/api/datasets/descriptors.md" },
+      { "Dataset specs and capabilities" = "reference/api/datasets/descriptors.md" },
     ] },
     { "dronalize.runtime" = [
       "reference/api/runtime/index.md",
       { Configuration = "reference/api/runtime/configuration.md" },
       { "Planning and runs" = "reference/api/runtime/planning-and-runs.md" },
+      { "Executor internals" = "reference/api/runtime/executor.md" },
     ] },
     { "dronalize.io" = [
       "reference/api/io/index.md",
-      { "Writer configuration" = "reference/api/io/writer-configuration.md" },
+      { "Export configuration" = "reference/api/io/export-configuration.md" },
       { "Storage and manifests" = "reference/api/io/storage-and-manifests.md" },
+      { Readers = "reference/api/io/readers.md" },
+      { Adapters = "reference/api/io/adapters.md" },
     ] },
+    { "dronalize.processing" = [
+      "reference/api/processing/index.md",
+      { Configuration = "reference/api/processing/configuration.md" },
+      { Filtering = "reference/api/processing/filtering.md" },
+      { Pipeline = "reference/api/processing/pipeline.md" },
+      { Maps = "reference/api/processing/maps.md" },
+      { "Loader extension API" = "reference/api/processing/loading.md" },
+    ] },
+
     { "dronalize.plot" = [
       "reference/api/plot/index.md",
-      { "Plotting helpers" = "reference/api/plot/plotting.md" },
     ] },
   ] },
 ]
@@ -158,7 +173,7 @@ paths = ["src/dronalize"]
 allow_inspection =  true
 docstring_section_style =  "list"
 docstring_style = "numpy"
-inherited_members = true
+inherited_members = false
 line_length = 80
 separate_signature = true
 show_root_heading = true
@@ -170,8 +185,9 @@ signature_crossrefs = true
 show_if_no_docstring = false
 merge_init_into_class = true
 show_root_full_path = false
+modernize_annotations = true
 unwrap_annotated = true
-filters = ["!^__.*__$"]
+filters = ["!^__.*__$", "!^_.*"]
 
 [project.markdown_extensions.admonition]
 [project.markdown_extensions.abbr]

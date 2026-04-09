@@ -1,6 +1,6 @@
 """Public functional transforms used by trajectory-processing pipelines."""
 
-from dronalize.processing.filters import filter_scene
+from dronalize.processing.filtering import filter_scene
 from dronalize.processing.pipeline.functional.basic import (
     yaw_from_pos,
     yaw_from_pos_expr,

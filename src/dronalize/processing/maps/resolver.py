@@ -24,7 +24,7 @@ def no_map() -> MapResolver:
     Returns
     -------
     MapResolver
-        Resolver that always returns ``None``.
+        Resolver that always returns `None`.
 
     """
 
@@ -51,7 +51,7 @@ def shared_map(
     Returns
     -------
     MapResolver
-        Resolver that opens the shared-memory map, optionally applies ``f``,
+        Resolver that opens the shared-memory map, optionally applies `f`,
         and returns a detached copy.
 
     """

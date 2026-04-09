@@ -36,14 +36,15 @@ def _block_imports(*blocked: str) -> str:
     )
 
 
-def test_adapter_import_is_lazy() -> None:
-    """Importing `dronalize.io.adapters` should not require optional ML deps."""
+def test_reader_and_adapter_imports_are_lazy() -> None:
+    """Importing reader and adapter packages should not require optional ML deps."""
     proc = _run_python(
         _block_imports("torch", "torch_geometric", "streaming")
         + textwrap.dedent(
             """
             import dronalize.io
             import dronalize.io.adapters
+            import dronalize.io.readers
 
             print("ok")
             """
@@ -54,30 +55,10 @@ def test_adapter_import_is_lazy() -> None:
     assert proc.stdout.strip() == "ok"
 
 
-def test_mds_writer_install_hint() -> None:
-    """The MDS writer should explain which extra to install."""
+def test_pyg_adapter_install_hint() -> None:
+    """The PyG adapter should explain which extra to install."""
     proc = _run_python(
-        _block_imports("streaming")
-        + textwrap.dedent(
-            """
-            try:
-                from dronalize.io.writers.mds import MDSSceneWriter
-            except ModuleNotFoundError as exc:
-                print(exc)
-            else:
-                raise SystemExit(f"unexpected success: {MDSSceneWriter}")
-            """
-        )
-    )
-
-    assert proc.returncode == 0, proc.stderr
-    assert "pip install dronalize[storage-mds]" in proc.stdout
-
-
-def test_dataset_adapter_install_hint() -> None:
-    """The dataset adapter should explain which extra to install."""
-    proc = _run_python(
-        _block_imports("torch", "torch_geometric")
+        _block_imports("torch_geometric")
         + textwrap.dedent(
             """
             try:

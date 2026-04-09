@@ -1,4 +1,4 @@
-"""Registry for dataset descriptors."""
+"""Registry and descriptor models for built-in and custom datasets."""
 
 from __future__ import annotations
 
@@ -17,19 +17,19 @@ from dronalize.core.errors import (
     DatasetRegistryError,
     MissingOptionalDependencyError,
 )
-from dronalize.processing.ingest.base import NoLoaderOptions
-from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.loading.base import NoLoaderOptions
+from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.maps.config import MapConfig
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
-    from dronalize.core.scene.schema import SceneSchema
-    from dronalize.processing.ingest.base import BaseSceneLoader, LoaderOptions
-    from dronalize.processing.ingest.splits import SplitConfig, SplitModeName
+    from dronalize.core.scene.schema import TrajectorySchema
+    from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
+    from dronalize.processing.loading.splits import SplitConfig, SplitStrategyName
 
-_REGISTRY: dict[str, DatasetDescriptor] = {}
+_REGISTRY: dict[str, DatasetSpec] = {}
 
-ExecutionScope = Callable[[Path, LoaderConfig, MapConfig | None], AbstractContextManager[None]]
+RuntimeContext = Callable[[Path, LoaderConfig, MapConfig | None], AbstractContextManager[None]]
 
 
 class LoaderFactory(Protocol):
@@ -57,17 +57,24 @@ class DatasetCapabilities(IntFlag):
     """Expose native dataset splits that can be requested by name."""
     CUSTOM_SPLITS = auto()
     """Support custom split strategies defined by the loader."""
-    HIGHWAY_PIPELINE = auto()
-    """Recommend using the highway processing pipeline for this dataset."""
+    LANE_CHANGE_SAMPLING = auto()
+    """Expose lane-change sampling controls for this dataset."""
     EXECUTION_SCOPE = auto()
-    """Require a custom execution scope to manage dataset-specific resources."""
-    EXTRA_LOADER_ARGS = auto()
+    """Require a dataset-specific runtime context to manage shared resources."""
+    LOADER_OPTIONS = auto()
     """Loader can accept extra arguments for dataset-specific configuration."""
 
 
 @dataclass(frozen=True, slots=True)
-class DatasetDescriptor:
-    """Everything needed to fully process a single dataset."""
+class DatasetSpec:
+    """Everything needed to fully process a single dataset.
+
+    `DatasetSpec` is the public descriptor type used by the registry and the
+    runtime planner. It connects a dataset key to the loader factory, default
+    configs, native schema, optional runtime context, and split capability
+    metadata that the rest of the library needs in order to plan and execute a
+    processing run.
+    """
 
     name: str
     """Canonical slug, e.g. "ind", "argoverse2", or "waymo"."""
@@ -81,8 +88,8 @@ class DatasetDescriptor:
     default_map_config: MapConfig | None
     """Default map configuration for the dataset."""
 
-    native_schema: SceneSchema
-    """Native scene schema for the dataset."""
+    native_schema: TrajectorySchema
+    """Native trajectory schema for the dataset."""
 
     loader_options_type: type[LoaderOptions]
     """Typed dataset-specific loader options accepted by the loader factory."""
@@ -90,16 +97,16 @@ class DatasetDescriptor:
     default_loader_options: LoaderOptions
     """Default dataset-specific loader options for this dataset."""
 
-    execution_scope_fn: ExecutionScope | None = None
+    runtime_context_fn: RuntimeContext | None = None
     """Optional runtime context manager factory for dataset-specific resources."""
 
     predefined_splits: list[DatasetSplit] = field(default_factory=list)
     """Predefined splits exposed by the dataset, if any."""
 
-    supported_split_strategies: list[SplitModeName] = field(default_factory=list)
+    supported_split_strategies: list[SplitStrategyName] = field(default_factory=list)
     """Custom split strategies exposed by the loader, if any."""
 
-    recommended_split_strategy: SplitModeName | None = None
+    recommended_split_strategy: SplitStrategyName | None = None
     """Preferred custom split strategy for automatic selection, if any."""
 
     capabilities: DatasetCapabilities = field(default=DatasetCapabilities(0))
@@ -111,9 +118,9 @@ class DatasetDescriptor:
         return bool(self.capabilities & DatasetCapabilities.MAP_AVAILABLE)
 
     @property
-    def has_execution_scope(self) -> bool:
-        """Return whether dataset processing opens a dataset-specific execution scope."""
-        return self.execution_scope_fn is not None
+    def has_runtime_context(self) -> bool:
+        """Return whether dataset processing opens a dataset-specific runtime context."""
+        return self.runtime_context_fn is not None
 
     @classmethod
     def from_loader(
@@ -122,21 +129,27 @@ class DatasetDescriptor:
         loader_cls: type[BaseSceneLoader[Any, Any]],
         loader_factory: LoaderFactory | None = None,
         *,
-        execution_scope_fn: ExecutionScope | None = None,
+        runtime_context_fn: RuntimeContext | None = None,
         capabilities: DatasetCapabilities | None = None,
         infer_capabilities: bool = True,
-    ) -> DatasetDescriptor:
-        """Create a descriptor directly from a loader class."""
+    ) -> DatasetSpec:
+        """Create a dataset spec directly from a loader class.
+
+        This is the main helper for custom dataset integrations. It derives the
+        default config, native schema, split metadata, and loader-options model
+        from the loader class so callers only need to provide the dataset name
+        and any optional runtime context or capability overrides.
+        """
         resolved_factory = loader_cls if loader_factory is None else loader_factory
         descriptor = cls(
             name=name,
             loader_factory=cast("LoaderFactory", resolved_factory),
             default_loader_config=loader_cls.default_config(),
             default_map_config=loader_cls.default_map_config(),
-            native_schema=loader_cls.native_scene_schema(),
+            native_schema=loader_cls.native_trajectory_schema(),
             loader_options_type=loader_cls.loader_options_model(),
             default_loader_options=loader_cls.default_loader_options(),
-            execution_scope_fn=execution_scope_fn,
+            runtime_context_fn=runtime_context_fn,
             predefined_splits=list(loader_cls.predefined_splits()),
             supported_split_strategies=list(loader_cls.supported_split_strategies()),
             recommended_split_strategy=loader_cls.recommended_split_strategy(),
@@ -145,25 +158,25 @@ class DatasetDescriptor:
         return descriptor.infer_capabilities() if infer_capabilities else descriptor
 
     @contextmanager
-    def execution_scope(
+    def runtime_context(
         self, root: Path, loader_config: LoaderConfig, map_config: MapConfig | None
     ) -> Generator[None, None, None]:
-        """Execute the lifecycle context manager, if defined."""
-        if self.execution_scope_fn is not None:
-            with self.execution_scope_fn(root, loader_config, map_config):
+        """Open the dataset-specific runtime context, if one is defined."""
+        if self.runtime_context_fn is not None:
+            with self.runtime_context_fn(root, loader_config, map_config):
                 yield
         else:
             yield
 
-    def with_capabilities(self, *flags: DatasetCapabilities) -> DatasetDescriptor:
-        """Return a copy of this descriptor with additional capabilities."""
+    def with_capabilities(self, *flags: DatasetCapabilities) -> DatasetSpec:
+        """Return a copy of this dataset spec with additional capabilities."""
         combined = self.capabilities
         for flag in flags:
             combined |= flag
         return replace(self, capabilities=combined)
 
-    def infer_capabilities(self) -> DatasetDescriptor:
-        """Return a copy of this descriptor with inferred capabilities based on its properties."""
+    def infer_capabilities(self) -> DatasetSpec:
+        """Return a copy of this dataset spec with inferred capabilities based on its properties."""
         flags = DatasetCapabilities(0)
         if self.default_map_config is not None:
             flags |= DatasetCapabilities.MAP_AVAILABLE
@@ -171,15 +184,15 @@ class DatasetDescriptor:
             flags |= DatasetCapabilities.NATIVE_SPLITS
         if self.supported_split_strategies or self.recommended_split_strategy is not None:
             flags |= DatasetCapabilities.CUSTOM_SPLITS
-        if self.execution_scope_fn is not None:
+        if self.runtime_context_fn is not None:
             flags |= DatasetCapabilities.EXECUTION_SCOPE
         if self.loader_options_type is not NoLoaderOptions:
-            flags |= DatasetCapabilities.EXTRA_LOADER_ARGS
+            flags |= DatasetCapabilities.LOADER_OPTIONS
 
         return self.with_capabilities(flags)
 
-    def extend_inferred_capabilities(self, *flags: DatasetCapabilities) -> DatasetDescriptor:
-        """Return a copy of this descriptor with inferred capabilities extended by *flags*."""
+    def extend_inferred_capabilities(self, *flags: DatasetCapabilities) -> DatasetSpec:
+        """Return a copy of this dataset spec with inferred capabilities extended by *flags*."""
         inferred = self.infer_capabilities()
         return inferred.with_capabilities(*flags)
 
@@ -189,7 +202,7 @@ class DatasetDescriptor:
         *,
         loader_config: LoaderConfig,
         map_config: MapConfig | None,
-        output_schema: SceneSchema | None,
+        trajectory_schema: TrajectorySchema | None,
         loader_options: LoaderOptions,
         splits: Sequence[DatasetSplit] | None = None,
         split_request: SplitConfig | None = None,
@@ -212,7 +225,7 @@ class DatasetDescriptor:
                 splits=splits,
                 loader_options=loader_options,
             )
-        loader.set_output_schema(output_schema)
+        loader.set_trajectory_schema(trajectory_schema)
         return loader
 
 
@@ -221,7 +234,7 @@ class _BuiltinDatasetSpec:
     """Lazy import metadata for a built-in dataset."""
 
     module: str
-    export_name: str = "DESCRIPTOR"
+    export_name: str = "DATASET_SPEC"
     export_key: str | None = None
     optional_dependencies: tuple[str, ...] = ()
     extra: str | None = None
@@ -230,7 +243,7 @@ class _BuiltinDatasetSpec:
 def _builtin(
     module: str,
     *,
-    export_name: str = "DESCRIPTOR",
+    export_name: str = "DATASET_SPEC",
     export_key: str | None = None,
     optional_dependencies: tuple[str, ...] = (),
     extra: str | None = None,
@@ -250,11 +263,17 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     "apolloscape": _builtin("dronalize.datasets.apolloscape"),
     "argoverse1": _builtin("dronalize.datasets.argoverse1"),
     "argoverse2": _builtin("dronalize.datasets.argoverse2"),
-    "eth": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="eth"),
-    "hotel": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="hotel"),
-    "univ": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="univ"),
-    "zara1": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="zara1"),
-    "zara2": _builtin("dronalize.datasets.eth_ucy", export_name="DESCRIPTORS", export_key="zara2"),
+    "eth": _builtin("dronalize.datasets.eth_ucy", export_name="DATASET_SPECS", export_key="eth"),
+    "hotel": _builtin(
+        "dronalize.datasets.eth_ucy", export_name="DATASET_SPECS", export_key="hotel"
+    ),
+    "univ": _builtin("dronalize.datasets.eth_ucy", export_name="DATASET_SPECS", export_key="univ"),
+    "zara1": _builtin(
+        "dronalize.datasets.eth_ucy", export_name="DATASET_SPECS", export_key="zara1"
+    ),
+    "zara2": _builtin(
+        "dronalize.datasets.eth_ucy", export_name="DATASET_SPECS", export_key="zara2"
+    ),
     "exid": _builtin("dronalize.datasets.exid"),
     "highd": _builtin("dronalize.datasets.highd"),
     "i80": _builtin("dronalize.datasets.i80"),
@@ -278,8 +297,12 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
 }
 
 
-def register(descriptor: DatasetDescriptor) -> None:
-    """Register a dataset descriptor."""
+def register(descriptor: DatasetSpec) -> None:
+    """Register a dataset descriptor for later lookup by name.
+
+    This is the public entry point for custom dataset integrations that want to
+    participate in the normal planning and runtime flow.
+    """
     if descriptor.name in _REGISTRY and _REGISTRY[descriptor.name] != descriptor:
         msg = f"Dataset '{descriptor.name}' is already registered."
         raise DatasetRegistryError(msg)
@@ -287,8 +310,8 @@ def register(descriptor: DatasetDescriptor) -> None:
     _REGISTRY[descriptor.name] = descriptor
 
 
-def get(name: str) -> DatasetDescriptor:
-    """Get a dataset descriptor by name."""
+def get(name: str) -> DatasetSpec:
+    """Get a dataset spec by name."""
     if name in _REGISTRY:
         return _REGISTRY[name]
 
@@ -320,8 +343,8 @@ def _builtin_datasets() -> dict[str, _BuiltinDatasetSpec]:
 
 
 @functools.cache
-def _load_builtin_descriptor(name: str) -> DatasetDescriptor:
-    """Import and resolve a built-in descriptor by dataset name."""
+def _load_builtin_descriptor(name: str) -> DatasetSpec:
+    """Import and resolve a built-in dataset spec by dataset name."""
     spec = _builtin_datasets().get(name)
     if spec is None:
         raise DatasetNotFoundError(name, available())
@@ -348,8 +371,8 @@ def _load_builtin_descriptor(name: str) -> DatasetDescriptor:
             )
             raise DatasetRegistryError(msg) from exc
 
-    if not isinstance(descriptor, DatasetDescriptor):
-        msg = f"Built-in dataset '{name}' did not resolve to a DatasetDescriptor."
+    if not isinstance(descriptor, DatasetSpec):
+        msg = f"Built-in dataset '{name}' did not resolve to a DatasetSpec."
         raise DatasetRegistryError(msg)
 
     if descriptor.name != name:

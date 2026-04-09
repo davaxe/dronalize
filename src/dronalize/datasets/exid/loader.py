@@ -14,8 +14,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.categories import DatasetSplit
-    from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
 
 
@@ -68,7 +68,11 @@ class ExiDLoader(LevelXDataLoader):
     @classmethod
     @override
     def default_config(cls) -> LoaderConfig:
-        return super().default_config().with_highway(required_lane_changes=3, negative_keep_every=3)
+        return (
+            super()
+            .default_config()
+            .with_lane_change_sampling(required_lane_changes=3, negative_keep_every=3)
+        )
 
 
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
@@ -85,8 +89,8 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
 
 
 if __name__ == "__main__":
-    from dronalize.datasets.exid import DESCRIPTOR
+    from dronalize.datasets.exid import DATASET_SPEC
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("exid")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

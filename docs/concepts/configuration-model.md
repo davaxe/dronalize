@@ -4,7 +4,7 @@
 Configuration in `dronalize` is layered. Every run starts from dataset defaults, then optional shared settings are applied, then dataset-specific overrides refine the final behavior.
 </div>
 
-For exact TOML syntax and field tables, see the [configuration reference](../reference/configuration/index.md), [loader](../reference/configuration/loader.md), [map](../reference/configuration/map.md), [split](../reference/configuration/split.md), [writer](../reference/configuration/writer.md), [execution](../reference/configuration/execution.md), and [filter](../reference/configuration/filter.md) reference pages.
+For exact TOML syntax and field tables, see the [configuration reference](../reference/configuration/index.md), [loader](../reference/configuration/loader.md), [map](../reference/configuration/map.md), [split](../reference/configuration/split.md), [export](../reference/configuration/export.md), [execution](../reference/configuration/execution.md), and [filter](../reference/configuration/filter.md) reference pages.
 
 ## Mental model
 
@@ -58,14 +58,14 @@ In practice:
 | `loader` | Defines sample shape, temporal transforms, filtering, and dataset-specific loading behavior. |
 | `map` | Controls whether map context is included and how much of it is kept. |
 | `split` | Routes data into train, val, and test outputs. |
-| `writer` | Controls the saved schema, precision, and storage settings. |
+| `export` | Controls the saved schema, precision, and storage settings. |
 
 ## Practical workflow
 
 For most projects, the easiest approach is:
 
 1. Start with one dataset and no configuration or a minimal `loader` block.
-2. Add `split` and `writer` once you know how you want to train and save data. 
+2. Add `split` and `export` once you know how you want to train and save data. 
 3. Add `map` only if the dataset supports map context and you need it.
 4. Move repeated settings into `[global]` when multiple datasets should share them.
 

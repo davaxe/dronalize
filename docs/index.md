@@ -42,13 +42,13 @@ Install the package, inspect a dataset, and run the first preprocessing job.
 <div class="home-card" markdown="1">
 ### Configuration
 
-See how loader, map, split, and writer settings fit together in one TOML model.
+See how loader, map, split, and export settings fit together in one TOML model.
 
 [Open configuration](reference/configuration/index.md){ .md-button }
 </div>
 
 <div class="home-card" markdown="1">
-### Output format
+### Storage backends
 
 Read what gets written to disk, how manifests work, and how to load MDS outputs again.
 

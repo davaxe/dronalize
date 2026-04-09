@@ -9,8 +9,6 @@ hide:
 
 ## ::: dronalize.runtime.ProcessingSummary
 
-## ::: dronalize.runtime.Progress
-
 ## ::: dronalize.runtime.plan_dataset
 
 ## ::: dronalize.runtime.summarize_plan

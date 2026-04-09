@@ -6,10 +6,10 @@ from polars.testing import assert_series_equal
 
 from dronalize.core.maps import MapGraph
 from dronalize.core.scene import CANONICAL, POSITIONS_ONLY, Scene
-from dronalize.io import WriterConfig
-from dronalize.io.encoding import encode_map_from_scene, scene_sample_to_parts, scene_to_numpy_dict
-from dronalize.io.manifest import FORMAT_VERSION, StorageManifest, read_manifest, write_manifest
-from dronalize.processing.ingest import LoaderConfig
+from dronalize.io import ExportConfig
+from dronalize.io.encoding import encode_map_from_scene, encode_scene_record, scene_record_to_frame
+from dronalize.io.manifest import FORMAT_VERSION, DatasetManifest, read_manifest, write_manifest
+from dronalize.processing.loading import LoaderConfig
 
 
 def _scene(*, with_map: bool = True) -> Scene:
@@ -43,77 +43,77 @@ def _scene(*, with_map: bool = True) -> Scene:
 
 
 def test_manifest_matches_contract() -> None:
-    """Manifest generation should mirror the resolved writer contract."""
+    """Manifest generation should mirror the resolved export contract."""
     loader_config = LoaderConfig(input_len=2, output_len=1, sample_time=0.5)
-    writer_config = WriterConfig.create("canonical", precision="float64", offset_positions=False)
+    export_config = ExportConfig.create("canonical", precision="float64", recenter_positions=False)
 
-    manifest = StorageManifest.from_configs(
+    manifest = DatasetManifest.from_configs(
         loader_config=loader_config,
-        source_scene_schema=CANONICAL,
-        writer_config=writer_config,
+        source_trajectory_schema=CANONICAL,
+        export_config=export_config,
         has_map=True,
     )
 
     assert manifest.format_version == FORMAT_VERSION
-    assert manifest.source_scene_schema == "canonical"
-    assert manifest.scene_schema == "canonical"
+    assert manifest.source_trajectory_schema == "canonical"
+    assert manifest.trajectory_schema == "canonical"
     assert manifest.derived_features == ()
     assert manifest.feature_columns == ("x", "y", "vx", "vy", "ax", "ay", "yaw")
     assert manifest.input_len == 2
     assert manifest.output_len == 1
     assert manifest.precision == "float64"
-    assert manifest.offset_positions is False
+    assert manifest.recenter_positions is False
     assert manifest.has_map is True
 
 
 def test_manifest_lists_derived_fields() -> None:
     """Manifest should record which exported schema fields are derived."""
     loader_config = LoaderConfig(input_len=2, output_len=1, sample_time=0.5)
-    writer_config = WriterConfig.create("canonical", precision="float64", offset_positions=False)
+    export_config = ExportConfig.create("canonical", precision="float64", recenter_positions=False)
 
-    manifest = StorageManifest.from_configs(
+    manifest = DatasetManifest.from_configs(
         loader_config=loader_config,
-        source_scene_schema=POSITIONS_ONLY,
-        writer_config=writer_config,
+        source_trajectory_schema=POSITIONS_ONLY,
+        export_config=export_config,
         has_map=False,
     )
 
-    assert manifest.source_scene_schema == "positions_only"
-    assert manifest.scene_schema == "canonical"
+    assert manifest.source_trajectory_schema == "positions_only"
+    assert manifest.trajectory_schema == "canonical"
     assert manifest.derived_features == ("vx", "vy", "ax", "ay", "yaw")
 
 
 def test_manifest_reads_older_payloads() -> None:
     """Older manifests should default missing provenance fields sensibly."""
-    manifest = StorageManifest.from_json_dict({
+    manifest = DatasetManifest.from_json_dict({
         "format_version": 1,
-        "scene_schema": "canonical",
+        "trajectory_schema": "canonical",
         "feature_columns": ["x", "y", "vx", "vy", "ax", "ay", "yaw"],
         "input_len": 2,
         "output_len": 1,
         "precision": "float32",
-        "offset_positions": True,
+        "recenter_positions": True,
         "has_map": False,
         "sample_time": 1.0,
         "original_sample_time": 1.0,
     })
 
-    assert manifest.source_scene_schema == "canonical"
+    assert manifest.source_trajectory_schema == "canonical"
     assert manifest.derived_features == ()
 
 
 def test_manifest_roundtrip_preserves_derived_features(tmp_path: Path) -> None:
     """Writing and reading the current manifest format should preserve derived fields."""
-    manifest = StorageManifest(
+    manifest = DatasetManifest(
         format_version=FORMAT_VERSION,
-        source_scene_schema="positions_only",
-        scene_schema="canonical",
+        source_trajectory_schema="positions_only",
+        trajectory_schema="canonical",
         derived_features=("vx", "vy"),
         feature_columns=("x", "y", "vx", "vy"),
         input_len=2,
         output_len=1,
         precision="float32",
-        offset_positions=True,
+        recenter_positions=True,
         has_map=False,
         sample_time=1.0,
         original_sample_time=1.0,
@@ -126,7 +126,7 @@ def test_manifest_roundtrip_preserves_derived_features(tmp_path: Path) -> None:
 
 def test_scene_encoding_names() -> None:
     """Encoded scenes should use the new persisted field names."""
-    sample = scene_to_numpy_dict(_scene(), dtype=np.float32)
+    sample = encode_scene_record(_scene(), dtype=np.float32)
 
     assert sample["scene_number"] == 7
     assert sample["agent_types"].tolist() == [1, 2]
@@ -157,8 +157,8 @@ def test_empty_map_encoding() -> None:
 def test_scene_encoding_roundtrip() -> None:
     """Test that the inverse of encoding a scene sample is the original scene data."""
     scene = _scene()
-    sample = scene_to_numpy_dict(scene, dtype=np.float32)
-    reconstructed_scene = scene_sample_to_parts(
+    sample = encode_scene_record(scene, dtype=np.float32)
+    reconstructed_scene = scene_record_to_frame(
         sample, feature_columns=scene.schema.feature_columns()
     )
     frame = scene.frame.sort(by=["frame", "id"])

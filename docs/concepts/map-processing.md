@@ -21,13 +21,13 @@ Most of the time, the most important choice is the extraction mode.
 | Mode | When to use it |
 | --- | --- |
 | `full` | Keep the entire map when map size is manageable or you want maximum context. |
-| `relevant` | Keep only the map around the scene itself. Good when you want local context without choosing a fixed crop size. |
+| `scene_extent` | Keep only the map around the scene itself. Good when you want local context without choosing a fixed crop size. |
 | `circle` | Keep a fixed-radius area around the scene. Good when your model expects a consistent spatial extent. |
 | `bounding_box` | Keep a fixed-width, fixed-height area. Good when a rectangular crop fits downstream assumptions better than a circle. |
 
 As a rule of thumb:
 
-- choose `relevant` for adaptive local context
+- choose `scene_extent` for adaptive local context
 - choose `circle` or `bounding_box` for fixed-size context
 - choose `full` when cropping is unnecessary
 

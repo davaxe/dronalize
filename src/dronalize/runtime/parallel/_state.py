@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from multiprocessing.sharedctypes import Synchronized
     from multiprocessing.synchronize import Event, Lock
 
-    from dronalize.io.writers.base import SceneWriter
+    from dronalize.io.backends.base import DatasetWriter
 
 
 @dataclass(slots=True)
@@ -52,7 +52,7 @@ class ProgressState:
     Notes
     -----
     `processed_sources` counts sources whose processing function completed.
-    `processed_scenes` counts scenes as they are created inside workers.
+    `processed_scenes` counts scenes as workers claim scene numbers.
 
     The scene count reflects actual scene creation order across worker
     processes, which is generally not deterministic when multiprocessing is
@@ -88,14 +88,16 @@ class ProgressState:
             self.source_counter.value = 0
             self.update_event.clear()
 
-    def increment_scene(self) -> int:
-        """Increment the global scene counter and return the new value."""
+    def claim_scene(self, limit: int | None = None) -> int | None:
+        """Claim the next global scene number unless a scene limit was reached."""
         with self.scene_counter.get_lock():
+            if limit is not None and self.scene_counter.value >= limit:
+                return None
+            scene_number = self.scene_counter.value
             self.scene_counter.value += 1
-            update = self.scene_counter.value
 
         self.update_event.set()
-        return update
+        return scene_number
 
     def increment_source(self) -> int:
         """Increment the global source counter and return the new value."""
@@ -141,11 +143,16 @@ class SharedResources:
 
     registry: WorkerRegistry
     progress: ProgressState
+    scene_limit: int | None = None
 
     @classmethod
-    def create(cls) -> SharedResources:
+    def create(cls, *, scene_limit: int | None = None) -> SharedResources:
         """Create all shared resources required by the executor."""
-        return cls(registry=WorkerRegistry.create(), progress=ProgressState.create())
+        return cls(
+            registry=WorkerRegistry.create(),
+            progress=ProgressState.create(),
+            scene_limit=scene_limit,
+        )
 
     def reset(self) -> None:
         """Reset all shared counters and worker ID allocation."""
@@ -164,7 +171,7 @@ class WorkerRuntime:
     """Shared multiprocessing state used for progress and worker ID allocation."""
     worker_id: int
     """Stable integer ID assigned once to this worker process."""
-    writer: SceneWriter | None = None
+    writer: DatasetWriter | None = None
     """Optional writer used only by `execute()`."""
 
     def active_workers(self) -> int:

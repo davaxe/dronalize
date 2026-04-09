@@ -1,7 +1,7 @@
 # Filtering
 
 <div class="section-intro" markdown="1">
-Filtering decides what data is allowed to survive loading before samples are written. The core idea is to separate three different questions: what should be removed immediately, what makes a scene usable, and what makes agents inside that scene acceptable.
+Filtering decides what data is allowed to survive loading before scenes are written. The core idea is to separate three different questions: what should be removed immediately, what makes a scene usable, and what makes agents inside that scene acceptable.
 </div>
 
 For exact syntax, supported rule types, and option details, see the [filter reference](../reference/configuration/filter.md).

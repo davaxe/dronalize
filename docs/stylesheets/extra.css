@@ -443,15 +443,12 @@ code.doc-symbol-module {
     margin: 0;
 }
 
-.full-figure {
-    margin: 0;
-    width: 100%;
-}
-
 .full-figure figcaption {
-    margin-top: 0.75rem;
+    max-width: 100%;
+    width: 100%;
     text-align: left;
 }
+
 
 .summary-grid {
     display: grid;

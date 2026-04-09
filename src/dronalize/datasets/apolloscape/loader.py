@@ -11,18 +11,18 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_YAW
-from dronalize.processing.filters.agent import MinSamples
-from dronalize.processing.filters.filter import Filter
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.filtering.agent import MinSamples
+from dronalize.processing.filtering.filter import Filter
+from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
 
 
@@ -86,8 +86,8 @@ class ApolloScapeLoader(BaseSceneLoader):
         raise SplitNotSupportedError(type(self).__name__, split)
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
-        yield IngestedData(
+    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
+        yield LoadedSourceData(
             pl.scan_csv(source.data, has_header=False, schema=_DATA_SCHEMA, separator=" ").select(
                 *("frame", "id", "x", "y", "yaw"),
                 pl.col("agent_category").replace_strict({
@@ -109,7 +109,7 @@ class ApolloScapeLoader(BaseSceneLoader):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_YAW
 
     @classmethod
@@ -150,10 +150,10 @@ _DATA_SCHEMA: pl.Schema = pl.Schema({
 
 
 if __name__ == "__main__":
-    from dronalize.datasets.apolloscape import DESCRIPTOR
+    from dronalize.datasets.apolloscape import DATASET_SPEC
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("apollo")
-    scenes = debug_descriptor(DESCRIPTOR, root, step=150)
+    scenes = debug_descriptor(DATASET_SPEC, root, step=150)
     for scene in scenes:
         scene.frame.write_csv(f"debug_scene_{scene.scene_number}.csv")

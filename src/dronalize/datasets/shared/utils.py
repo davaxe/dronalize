@@ -11,7 +11,7 @@ from dronalize.processing.maps.config import (
     CircularExtraction,
     FullMapExtraction,
     MapExtraction,
-    RelevantAreaExtraction,
+    SceneExtentExtraction,
 )
 
 if TYPE_CHECKING:
@@ -84,7 +84,7 @@ def extract(
     extraction : MapExtraction
         The extraction mode configuration.
     relevant_positions : npt.NDArray[np.floating] | Scene, optional
-        Relevant positions to consider for `RelevantAreaExtraction` mode, either as a
+        Relevant positions to consider for `SceneExtentExtraction` mode, either as a
         NumPy array of shape (N, 2) or a `Scene` containing `x` and `y` columns.
 
     Returns
@@ -100,9 +100,9 @@ def extract(
             return graph.extract_bbox(center, width, height)
         case CircularExtraction(radius=radius):
             return graph.extract_radius(center, radius)
-        case RelevantAreaExtraction(padding=padding):
+        case SceneExtentExtraction(padding=padding):
             if relevant_positions is None:
-                msg = "relevant_positions must be provided for RelevantAreaExtraction"
+                msg = "relevant_positions must be provided for SceneExtentExtraction"
                 raise ValueError(msg)
             return graph.extract_relevant(relevant_positions, padding)
         case FullMapExtraction():

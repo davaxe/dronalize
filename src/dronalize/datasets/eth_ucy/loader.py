@@ -11,19 +11,19 @@ from typing_extensions import override
 import dronalize.processing.pipeline.transforms as tr
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import MinSamples
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.filtering import Filter
+from dronalize.processing.filtering.agent import MinSamples
+from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
 from dronalize.processing.pipeline.functional.resample._common import ResampleMethod
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
     from dronalize.processing.pipeline.pipeline import Pipeline
 
@@ -79,8 +79,8 @@ class _EthUcyLoader(BaseSceneLoader):
         return self._sources_from_split(split.value)
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
-        yield IngestedData(
+    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
+        yield LoadedSourceData(
             pl.scan_csv(
                 source.data,
                 has_header=False,
@@ -108,7 +108,7 @@ class _EthUcyLoader(BaseSceneLoader):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
 
     @override
@@ -237,11 +237,11 @@ class Zara2Loader(_EthUcyLoader):
 if __name__ == "__main__":
     import os
 
-    from dronalize.datasets.eth_ucy import DESCRIPTORS
+    from dronalize.datasets.eth_ucy import DATASET_SPECS
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     dataset_name = os.environ.get("ETH_UCY_DATASET", "hotel")
-    descriptor = DESCRIPTORS[dataset_name]
+    descriptor = DATASET_SPECS[dataset_name]
     root = resolve_dataset_root_from_env(
         "ethucy", dataset_name, alternatives=[("eth_ucy", dataset_name)]
     )

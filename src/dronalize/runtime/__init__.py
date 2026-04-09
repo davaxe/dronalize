@@ -1,4 +1,31 @@
-"""Runtime orchestration, configuration assembly, and CLI support."""
+"""Runtime planning, configuration assembly, and run-state models.
+
+## Import guide
+
+```python
+from dronalize.runtime import plan_dataset, summarize_plan
+from dronalize.runtime import ConfigResolver, ResolvedConfig
+```
+
+This package groups the public runtime API used by Python callers:
+
+- config authoring and resolved config models
+- config loading and resolution helpers
+- prepared planning and live run models
+- summary helpers for prepared runs
+
+Low-level executor protocols and concrete executors still exist, but they are
+documented as advanced runtime hooks in their dedicated modules rather than
+being part of this root package surface.
+
+## Related modules
+
+- [`dronalize.runtime.config`][] for configuration models and config-resolution
+  helpers
+- [`dronalize.runtime.executor`][dronalize.runtime.executor] for advanced
+  executor protocols and progress models
+- [`dronalize.datasets`][] for dataset descriptors consumed during planning
+"""
 
 from __future__ import annotations
 
@@ -18,7 +45,6 @@ from dronalize.runtime.config import (
 )
 
 if TYPE_CHECKING:
-    from dronalize.runtime.executor import Progress
     from dronalize.runtime.models import DatasetPlan, DatasetRun, ProcessingSummary
     from dronalize.runtime.planning import plan_dataset
     from dronalize.runtime.summary import summarize_plan
@@ -32,7 +58,6 @@ __all__ = [
     "FileExecutionConfig",
     "PlanOverrides",
     "ProcessingSummary",
-    "Progress",
     "ResolvedConfig",
     "ResolvedExecutionConfig",
     "load_project_config",
@@ -45,7 +70,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "DatasetPlan": ("dronalize.runtime.models", "DatasetPlan"),
     "DatasetRun": ("dronalize.runtime.models", "DatasetRun"),
     "ProcessingSummary": ("dronalize.runtime.models", "ProcessingSummary"),
-    "Progress": ("dronalize.runtime.executor", "Progress"),
     "plan_dataset": ("dronalize.runtime.planning", "plan_dataset"),
     "summarize_plan": ("dronalize.runtime.summary", "summarize_plan"),
 }

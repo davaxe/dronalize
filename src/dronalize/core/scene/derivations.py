@@ -10,14 +10,14 @@ from typing import Final
 import polars as pl
 
 from dronalize._internal.polars_ops import derivative, yaw_from_pos, yaw_from_vel
-from dronalize.core.errors import SceneSchemaError
-from dronalize.core.scene.schema import SceneField
+from dronalize.core.errors import TrajectorySchemaError
+from dronalize.core.scene.schema import TrajectoryField
 
-_POSITION_FIELDS: Final[SceneField] = SceneField.X | SceneField.Y
-_VELOCITY_FIELDS: Final[SceneField] = SceneField.VX | SceneField.VY
-_ACCELERATION_FIELDS: Final[SceneField] = SceneField.AX | SceneField.AY
-_YAW_FIELDS: Final[SceneField] = SceneField.YAW
-_KINEMATIC_FIELDS: Final[SceneField] = _VELOCITY_FIELDS | _ACCELERATION_FIELDS
+_POSITION_FIELDS: Final[TrajectoryField] = TrajectoryField.X | TrajectoryField.Y
+_VELOCITY_FIELDS: Final[TrajectoryField] = TrajectoryField.VX | TrajectoryField.VY
+_ACCELERATION_FIELDS: Final[TrajectoryField] = TrajectoryField.AX | TrajectoryField.AY
+_YAW_FIELDS: Final[TrajectoryField] = TrajectoryField.YAW
+_KINEMATIC_FIELDS: Final[TrajectoryField] = _VELOCITY_FIELDS | _ACCELERATION_FIELDS
 
 _DERIVATIVE_RENAME: Final[dict[int, list[str]]] = {1: ["vx", "vy"], 2: ["ax", "ay"]}
 _TMP_YAW_VELOCITY: Final[tuple[str, str]] = ("__scene_tmp_vx", "__scene_tmp_vy")
@@ -40,9 +40,9 @@ class DerivationRule:
 
     name: str
     """Unique name for this rule."""
-    requires: SceneField
+    requires: TrajectoryField
     """Fields required to apply this rule."""
-    outputs: SceneField
+    outputs: TrajectoryField
     """Fields added by applying this rule."""
     cost: int
     """Relative cost of applying this rule, used for derivation planning."""
@@ -51,7 +51,7 @@ class DerivationRule:
     needs_sample_time: bool = False
     """Flag to indicate if the rule requires sample time."""
 
-    def is_applicable(self, available: SceneField, context: ConversionContext) -> bool:
+    def is_applicable(self, available: TrajectoryField, context: ConversionContext) -> bool:
         """Return True if the rule can be applied in the current state."""
         has_inputs = (available & self.requires) == self.requires
         adds_new_fields = (available & self.outputs) != self.outputs
@@ -63,8 +63,8 @@ def apply_derivation_plan(
     data: pl.DataFrame,
     plan: Iterable[DerivationRule],
     context: ConversionContext,
-    input_fields: SceneField,
-) -> tuple[pl.DataFrame, SceneField]:
+    input_fields: TrajectoryField,
+) -> tuple[pl.DataFrame, TrajectoryField]:
     """Apply a derivation plan in order."""
     lf = data.lazy()
     output_fields = input_fields
@@ -84,7 +84,7 @@ def _rules_for_context(context: ConversionContext) -> tuple[DerivationRule, ...]
 
 @functools.lru_cache(maxsize=32)
 def plan_derivations(
-    available_fields: SceneField, required_fields: SceneField, context: ConversionContext
+    available_fields: TrajectoryField, required_fields: TrajectoryField, context: ConversionContext
 ) -> tuple[DerivationRule, ...] | None:
     """Return the lowest-cost derivation plan for reaching the required fields."""
     context = ConversionContext(context.sample_time, context.group_by)
@@ -95,7 +95,7 @@ def plan_derivations(
     rules = _rules_for_context(context)
 
     @functools.cache
-    def solve(state: SceneField) -> tuple[int, tuple[DerivationRule, ...] | None]:
+    def solve(state: TrajectoryField) -> tuple[int, tuple[DerivationRule, ...] | None]:
         if (state & required_fields) == required_fields:
             return 0, ()
 
@@ -127,7 +127,7 @@ def plan_derivations(
 def _require_sample_time(sample_time: float | None) -> float:
     if sample_time is None:
         msg = "Scene schema conversion requires sample_time to derive kinematics."
-        raise SceneSchemaError(msg)
+        raise TrajectorySchemaError(msg)
     return sample_time
 
 

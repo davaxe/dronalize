@@ -12,16 +12,16 @@ pl = pytest.importorskip("polars")
 
 from dronalize.core.maps import MapGraph
 from dronalize.core.scene import CANONICAL, Scene
-from dronalize.io import WriterConfig
+from dronalize.io import ExportConfig
 
 pytest.importorskip("torch")
 pytest.importorskip("streaming")
-pytest.importorskip("torch_geometric")
 
-from dronalize.io.adapters.mds import MDSDataset
-from dronalize.io.encoding import encode_map_from_scene, scene_to_numpy_dict
-from dronalize.io.writers.mds import MDSSceneWriter
-from dronalize.processing.ingest import LoaderConfig
+from dronalize.io.adapters import MDSTorchDataset
+from dronalize.io.backends.mds import MDSDatasetWriter
+from dronalize.io.encoding import encode_map_from_scene, encode_scene_record
+from dronalize.io.readers.mds import MDSReader
+from dronalize.processing import LoaderConfig
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -61,28 +61,28 @@ def _loader_config() -> LoaderConfig:
     return LoaderConfig(input_len=2, output_len=1, sample_time=1.0)
 
 
-def _writer_config() -> WriterConfig:
-    return WriterConfig.create("canonical", precision="float32", offset_positions=True)
+def _writer_config() -> ExportConfig:
+    return ExportConfig.create("canonical", precision="float32", recenter_positions=True)
 
 
 def _expected_sample() -> dict[str, Any]:
     scene = _scene()
     writer_config = _writer_config()
-    scene_sample = scene_to_numpy_dict(
+    scene_sample = encode_scene_record(
         scene,
         dtype=writer_config.float_dtype,
-        offset_position=writer_config.offset_positions,
-        scene_schema=writer_config.scene_schema,
+        recenter_position=writer_config.recenter_positions,
+        trajectory_schema=writer_config.trajectory_schema,
     )
     map_sample = encode_map_from_scene(
         scene,
         dtype=writer_config.float_dtype,
-        offset=scene_sample["global_origin"],
+        offset=scene_sample["position_offset"],
         return_empty=True,
     )
     return {
         "scene_number": int(scene_sample["scene_number"]),
-        "global_origin": scene_sample["global_origin"],
+        "position_offset": scene_sample["position_offset"],
         "agent_types": scene_sample["agent_types"],
         "features": scene_sample["features"],
         "mask": scene_sample["mask"],
@@ -108,7 +108,24 @@ def _assert_sample_equal(actual: dict[str, Any], expected: dict[str, Any]) -> No
 
 
 def _read_mds_sample(output_dir: Path) -> dict[str, Any]:
-    dataset = MDSDataset(path=output_dir, split="all")
+    reader = MDSReader(path=output_dir, split="all")
+    assert len(reader) == 1
+    sample = reader[0]
+    return {
+        "scene_number": int(sample.scene_number),
+        "position_offset": sample.position_offset.astype(np.float64, copy=False),
+        "agent_types": sample.agent_types.astype(np.int32, copy=False),
+        "features": np.concatenate((sample.input_features, sample.output_features), axis=1),
+        "mask": np.concatenate((sample.input_mask, sample.output_mask), axis=1),
+        "map_node_positions": sample.map_node_positions.astype(np.float32, copy=False),
+        "map_edge_indices": sample.map_edge_indices.astype(np.int32, copy=False),
+        "map_node_types": sample.map_node_types.astype(np.int32, copy=False),
+        "map_edge_types": sample.map_edge_types.astype(np.int32, copy=False),
+    }
+
+
+def _read_mds_torch_sample(output_dir: Path) -> dict[str, Any]:
+    dataset = MDSTorchDataset(path=output_dir, split="all")
     assert len(dataset) == 1
     sample = dataset[0]
     features = np.concatenate(
@@ -127,7 +144,38 @@ def _read_mds_sample(output_dir: Path) -> dict[str, Any]:
     )
     return {
         "scene_number": int(sample.scene_number),
-        "global_origin": sample.global_origin.numpy().astype(np.float64, copy=False),
+        "position_offset": sample.position_offset.numpy().astype(np.float64, copy=False),
+        "agent_types": sample.agent_types.numpy().astype(np.int32, copy=False),
+        "features": features,
+        "mask": mask,
+        "map_node_positions": sample.map_node_positions.numpy().astype(np.float32, copy=False),
+        "map_edge_indices": sample.map_edge_indices.numpy().astype(np.int32, copy=False),
+        "map_node_types": sample.map_node_types.numpy().astype(np.int32, copy=False),
+        "map_edge_types": sample.map_edge_types.numpy().astype(np.int32, copy=False),
+    }
+
+
+def _read_mds_torch_iterable_sample(output_dir: Path) -> dict[str, Any]:
+    dataset = MDSTorchDataset(path=output_dir, split="all", batch_size=1)
+    assert len(dataset) == 1
+    sample = next(iter(dataset))
+    features = np.concatenate(
+        (
+            sample.input_features.numpy().astype(np.float32, copy=False),
+            sample.output_features.numpy().astype(np.float32, copy=False),
+        ),
+        axis=1,
+    )
+    mask = np.concatenate(
+        (
+            sample.input_mask.numpy().astype(bool, copy=False),
+            sample.output_mask.numpy().astype(bool, copy=False),
+        ),
+        axis=1,
+    )
+    return {
+        "scene_number": int(sample.scene_number),
+        "position_offset": sample.position_offset.numpy().astype(np.float64, copy=False),
         "agent_types": sample.agent_types.numpy().astype(np.int32, copy=False),
         "features": features,
         "mask": mask,
@@ -139,14 +187,13 @@ def _read_mds_sample(output_dir: Path) -> dict[str, Any]:
 
 
 def test_mds_roundtrip(tmp_path: Path) -> None:
-    """Test consitent data between writing and reading a scene through MDS format."""
-    """MDS writer should roundtrip one scene through the produced shard files."""
+    """MDS writer should roundtrip one scene through the framework-neutral reader."""
     output_dir = tmp_path / "mds"
-    writer = MDSSceneWriter(
+    writer = MDSDatasetWriter(
         output_dir,
         config=_writer_config(),
         loader_config=_loader_config(),
-        source_scene_schema=CANONICAL,
+        source_trajectory_schema=CANONICAL,
         splits=None,
         parallel=False,
         has_map=True,
@@ -156,3 +203,41 @@ def test_mds_roundtrip(tmp_path: Path) -> None:
     writer.finish_local()
     writer.finish_final()
     _assert_sample_equal(_read_mds_sample(output_dir), _expected_sample())
+
+
+def test_mds_torch_dataset_roundtrip(tmp_path: Path) -> None:
+    """MDS Torch adapter should roundtrip one scene through the produced shard files."""
+    output_dir = tmp_path / "mds"
+    writer = MDSDatasetWriter(
+        output_dir,
+        config=_writer_config(),
+        loader_config=_loader_config(),
+        source_trajectory_schema=CANONICAL,
+        splits=None,
+        parallel=False,
+        has_map=True,
+    )
+
+    assert writer.write(_scene())
+    writer.finish_local()
+    writer.finish_final()
+    _assert_sample_equal(_read_mds_torch_sample(output_dir), _expected_sample())
+
+
+def test_mds_torch_iterable_dataset_roundtrip(tmp_path: Path) -> None:
+    """MDS Torch adapter should also roundtrip correctly through iterable access."""
+    output_dir = tmp_path / "mds"
+    writer = MDSDatasetWriter(
+        output_dir,
+        config=_writer_config(),
+        loader_config=_loader_config(),
+        source_trajectory_schema=CANONICAL,
+        splits=None,
+        parallel=False,
+        has_map=True,
+    )
+
+    assert writer.write(_scene())
+    writer.finish_local()
+    writer.finish_final()
+    _assert_sample_equal(_read_mds_torch_iterable_sample(output_dir), _expected_sample())

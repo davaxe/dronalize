@@ -12,13 +12,13 @@ import pytest
 from polars.testing import assert_frame_equal
 
 from dronalize.core.categories import AgentCategory
-from dronalize.processing.filters import Filter, cleanup
-from dronalize.processing.ingest import (
+from dronalize.processing.filtering import Filter, cleanup
+from dronalize.processing.loading import (
     LoaderConfig,
-    ShuffledTimeBlockSplit,
+    ShuffledTimeBlockStrategy,
     SplitConfig,
     SplitWeights,
-    TimeBlockSplit,
+    TimeBlockStrategy,
 )
 from dronalize.processing.pipeline import Pipeline
 from dronalize.processing.pipeline import transforms as transform
@@ -26,7 +26,10 @@ from dronalize.processing.pipeline._internal import SCENE_ID_COLUMN, SPLIT_PARTI
 from dronalize.processing.pipeline.extensions import LaneChangeSamplingExtension
 from dronalize.processing.pipeline.factory import trajectory_pipeline
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
-from dronalize.processing.pipeline.presets import highway_trajectory_spec, standard_trajectory_spec
+from dronalize.processing.pipeline.presets import (
+    lane_change_sampling_spec,
+    standard_trajectory_spec,
+)
 from dronalize.processing.pipeline.splitting import split_partition_pipeline
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -55,7 +58,7 @@ def trajectory_lf() -> pl.LazyFrame:
         "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
         "vx": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
         "vy": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-        "agent_category": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        "agent_category": int(AgentCategory.CAR),
     }).lazy()
 
 
@@ -353,7 +356,6 @@ def test_transform_second_derivative() -> None:
 def test_transform_filter_category(trajectory_lf: pl.LazyFrame) -> None:
     """Verify the filter transform removes agents that match the specified filtering category."""
     # Filter out agent_category == 1 -> should remove all
-
     config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filter(
         Filter.define(
             cleanup_rules=[cleanup.ExcludeCategories.define(categories=[AgentCategory.CAR])]
@@ -461,7 +463,7 @@ def test_block_partition_cumulative() -> None:
     }).lazy()
 
     split_request = SplitConfig(
-        mode=TimeBlockSplit(gap=0), ratio=SplitWeights.from_tuple((0.6, 0.2, 0.2))
+        strategy=TimeBlockStrategy(gap=0), ratio=SplitWeights.from_tuple((0.6, 0.2, 0.2))
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
@@ -487,7 +489,7 @@ def test_block_partition_cumulative_gap() -> None:
     }).lazy()
 
     split_request = SplitConfig(
-        mode=TimeBlockSplit(gap=2), ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0))
+        strategy=TimeBlockStrategy(gap=2), ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0))
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
@@ -513,7 +515,7 @@ def test_block_partition_shuffled() -> None:
     }).lazy()
 
     split_request = SplitConfig(
-        mode=ShuffledTimeBlockSplit(segments=5),
+        strategy=ShuffledTimeBlockStrategy(segments=5),
         ratio=SplitWeights.from_tuple((0.6, 0.2, 0.2)),
         seed=0,
     )
@@ -548,7 +550,7 @@ def test_block_partition_shuffled_gap() -> None:
     }).lazy()
 
     split_request = SplitConfig(
-        mode=ShuffledTimeBlockSplit(segments=2, gap=2),
+        strategy=ShuffledTimeBlockStrategy(segments=2, gap=2),
         ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
         seed=42,
     )
@@ -579,7 +581,7 @@ def test_pipeline_keeps_shuffled_segments() -> None:
         standard_trajectory_spec(
             LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
             split_request=SplitConfig(
-                mode=ShuffledTimeBlockSplit(segments=4),
+                strategy=ShuffledTimeBlockStrategy(segments=4),
                 ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
                 seed=0,
             ),
@@ -605,7 +607,7 @@ def test_pipeline_windows_within_segments() -> None:
         standard_trajectory_spec(
             LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step=2),
             split_request=SplitConfig(
-                mode=ShuffledTimeBlockSplit(segments=4),
+                strategy=ShuffledTimeBlockStrategy(segments=4),
                 ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
                 seed=0,
             ),
@@ -652,7 +654,7 @@ def test_pipeline_drops_internal_grouping_columns() -> None:
         standard_trajectory_spec(
             LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step=2),
             split_request=SplitConfig(
-                mode=ShuffledTimeBlockSplit(segments=4),
+                strategy=ShuffledTimeBlockStrategy(segments=4),
                 ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
                 seed=0,
             ),
@@ -670,8 +672,8 @@ def test_pipeline_drops_internal_grouping_columns() -> None:
 
 def test_highway_spec_lane_change_defaults() -> None:
     """The highway spec helper should configure lane-aware sampling succinctly."""
-    spec = highway_trajectory_spec(
-        LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_highway(
+    spec = lane_change_sampling_spec(
+        LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_lane_change_sampling(
             negative_keep_every=4, required_lane_changes=2, persist=2, margin_before=1
         ),
     )
@@ -721,10 +723,10 @@ def test_highway_sampling_thins_negatives() -> None:
         "lane_id": [1, 1, 1, 2, 2, 2, 2, 2],
     }).lazy()
     pipeline = trajectory_pipeline(
-        highway_trajectory_spec(
+        lane_change_sampling_spec(
             LoaderConfig(input_len=1, output_len=2, sample_time=1.0)
             .with_window(step=1)
-            .with_highway(negative_keep_every=2)
+            .with_lane_change_sampling(negative_keep_every=2)
         )
     )
 
@@ -744,10 +746,10 @@ def test_highway_sampling_requires_multiple_changes() -> None:
         "lane_id": [1, 1, 2, 2, 2, 3, 3, 3, 3, 3],
     }).lazy()
     pipeline = trajectory_pipeline(
-        highway_trajectory_spec(
+        lane_change_sampling_spec(
             LoaderConfig(input_len=1, output_len=3, sample_time=1.0)
             .with_window(step=1)
-            .with_highway(negative_keep_every=10, required_lane_changes=2)
+            .with_lane_change_sampling(negative_keep_every=10, required_lane_changes=2)
         ),
     )
 

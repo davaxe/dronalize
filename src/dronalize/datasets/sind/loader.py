@@ -10,19 +10,19 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import CANONICAL
-from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import RequireFrames
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.filtering import Filter
+from dronalize.processing.filtering.agent import RequireFrames
+from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
 
 
 # NOTE: The dataset directory layout may later be aligned with the upstream
@@ -74,7 +74,7 @@ class SindLoader(BaseSceneLoader):
             yield Source(identifier=subdir.name, data=subdir, map_key=str(map_location))
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
+    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
         subdir = source.data
         pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
         vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
@@ -117,7 +117,7 @@ class SindLoader(BaseSceneLoader):
             *("x", "y", "vx", "vy", "ax", "ay"),
         )
 
-        yield IngestedData(pl.concat([vehicle_df, pedestrian_df]))
+        yield LoadedSourceData(pl.concat([vehicle_df, pedestrian_df]))
 
     @override
     def num_sources(self) -> int | None:
@@ -127,7 +127,7 @@ class SindLoader(BaseSceneLoader):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
     @classmethod
@@ -189,7 +189,7 @@ _PEDESTRIAN_SCHEMA = pl.Schema({
 
 if __name__ == "__main__":
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-    from dronalize.datasets.sind import DESCRIPTOR
+    from dronalize.datasets.sind import DATASET_SPEC
 
     root = resolve_dataset_root_from_env("sind")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

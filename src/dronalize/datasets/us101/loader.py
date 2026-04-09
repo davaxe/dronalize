@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.categories import DatasetSplit
-    from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.config import MapConfig
 
 
@@ -44,7 +44,7 @@ class US101Loader(I80Loader):
 
 if __name__ == "__main__":
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-    from dronalize.datasets.us101 import DESCRIPTOR
+    from dronalize.datasets.us101 import DATASET_SPEC
 
     root = resolve_dataset_root_from_env("us101")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

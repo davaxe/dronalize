@@ -1,7 +1,6 @@
-from dronalize.datasets.registry import DatasetDescriptor
-from dronalize.datasets.waymo.loader import WaymoLoader
-from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
+from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.waymo.loader import WaymoLoader as _Loader
 
-DESCRIPTOR = DatasetDescriptor.from_loader("waymo", WaymoLoader, infer_capabilities=True)
+DATASET_SPEC = DatasetSpec.from_loader("waymo", _Loader, infer_capabilities=True)
 
-__all__ = ["DESCRIPTOR", "WaymoLoader", "WaymoMapBuilder"]
+__all__ = ["DATASET_SPEC"]

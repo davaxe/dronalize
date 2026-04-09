@@ -39,7 +39,7 @@ These are the default Dronalize settings used when processing this dataset.
 
 ## Split support
 
-Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom modes, and any recommended strategy.
+Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom split strategies, and any recommended strategy.
 
 ```bash
 dronalize split-support eth

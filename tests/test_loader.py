@@ -6,17 +6,17 @@ from typing_extensions import override
 
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError, SplitStrategyNotSupportedError
-from dronalize.core.scene import CANONICAL, POSITIONS_ONLY, SceneSchema
-from dronalize.processing.ingest import (
+from dronalize.core.scene import CANONICAL, POSITIONS_ONLY, TrajectorySchema
+from dronalize.processing.loading import (
     BaseSceneLoader,
-    BySourceSplit,
-    IngestedData,
+    LoadedSourceData,
     LoaderConfig,
     LoaderSplitCapabilities,
     Source,
+    SourceSplitStrategy,
     SplitConfig,
     SplitWeights,
-    TimeBlockSplit,
+    TimeBlockStrategy,
 )
 from dronalize.processing.pipeline import Pipeline
 
@@ -47,7 +47,7 @@ def _positions_only_scene_frame() -> pl.LazyFrame:
     }).lazy()
 
 
-class _NativeSplitLoader(BaseSceneLoader[str]):
+class _NativeSplitStrategyLoader(BaseSceneLoader[str]):
     @classmethod
     @override
     def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
@@ -64,9 +64,9 @@ class _NativeSplitLoader(BaseSceneLoader[str]):
         raise SplitNotSupportedError(type(self).__name__, split)
 
     @override
-    def ingest(self, source: Source[str]) -> list[IngestedData]:
+    def load_source(self, source: Source[str]) -> list[LoadedSourceData]:
         _ = source
-        return [IngestedData(_canonical_frame())]
+        return [LoadedSourceData(_canonical_frame())]
 
     @override
     def pipeline(self) -> Pipeline:
@@ -79,19 +79,19 @@ class _NativeSplitLoader(BaseSceneLoader[str]):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
 
-class _UnsplitLoader(BaseSceneLoader[str]):
+class _NoSplitStrategyLoader(BaseSceneLoader[str]):
     @override
     def discover_sources(self) -> list[Source[str]]:
         return [Source(identifier="only", data="only")]
 
     @override
-    def ingest(self, source: Source[str]) -> list[IngestedData]:
+    def load_source(self, source: Source[str]) -> list[LoadedSourceData]:
         _ = source
-        return [IngestedData(_canonical_frame())]
+        return [LoadedSourceData(_canonical_frame())]
 
     @override
     def pipeline(self) -> Pipeline:
@@ -104,19 +104,19 @@ class _UnsplitLoader(BaseSceneLoader[str]):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
 
-class _PositionsOnlyLoader(_UnsplitLoader):
+class _PositionsOnlyLoader(_NoSplitStrategyLoader):
     @override
-    def ingest(self, source: Source[str]) -> list[IngestedData]:
+    def load_source(self, source: Source[str]) -> list[LoadedSourceData]:
         _ = source
-        return [IngestedData(_positions_only_scene_frame())]
+        return [LoadedSourceData(_positions_only_scene_frame())]
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
 
 
@@ -128,9 +128,9 @@ class _DefaultPipelineBlockSplitLoader(BaseSceneLoader[str]):
         return [Source(identifier="only", data="only")]
 
     @override
-    def ingest(self, source: Source[str]) -> list[IngestedData]:
+    def load_source(self, source: Source[str]) -> list[LoadedSourceData]:
         _ = source
-        return [IngestedData(_canonical_frame(n_frames=6))]
+        return [LoadedSourceData(_canonical_frame(n_frames=6))]
 
     @classmethod
     @override
@@ -139,13 +139,13 @@ class _DefaultPipelineBlockSplitLoader(BaseSceneLoader[str]):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
 
 def test_unsplit_loader_rejects_splits() -> None:
     """Loaders without native dataset partitions should reject split filtering."""
-    loader = _UnsplitLoader(splits=DatasetSplit.TRAIN)
+    loader = _NoSplitStrategyLoader(splits=DatasetSplit.TRAIN)
 
     with pytest.raises(SplitNotSupportedError):
         _ = list(loader.sources())
@@ -159,7 +159,7 @@ def test_default_pipeline_block_split() -> None:
     split_loader = _DefaultPipelineBlockSplitLoader(
         loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
         split_request=SplitConfig(
-            mode=TimeBlockSplit(gap=0), ratio=SplitWeights(train=0.5, val=0.5, test=0.0)
+            strategy=TimeBlockStrategy(gap=0), ratio=SplitWeights(train=0.5, val=0.5, test=0.0)
         ),
     )
 
@@ -173,12 +173,12 @@ def test_default_pipeline_block_split() -> None:
 
 
 def test_loader_rejects_bad_split_request() -> None:
-    """Direct loader construction should validate unsupported custom split modes."""
+    """Direct loader construction should validate unsupported custom split strategies."""
     with pytest.raises(SplitStrategyNotSupportedError):
-        _UnsplitLoader(
+        _NoSplitStrategyLoader(
             loader_config=LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
             split_request=SplitConfig(
-                mode=BySourceSplit(), ratio=SplitWeights(train=1.0, val=0.0, test=0.0)
+                strategy=SourceSplitStrategy(), ratio=SplitWeights(train=1.0, val=0.0, test=0.0)
             ),
         )
 
@@ -186,7 +186,8 @@ def test_loader_rejects_bad_split_request() -> None:
 def test_positions_only_loader_native_schema() -> None:
     """Native schemas should be preserved when no output schema is requested."""
     loader = _PositionsOnlyLoader(
-        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0), output_schema=None
+        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0),
+        trajectory_schema=None,
     )
 
     scene = next(iter(loader.scenes()))
@@ -196,13 +197,14 @@ def test_positions_only_loader_native_schema() -> None:
     assert scene.frame["x"].to_list() == pytest.approx([0.0, 1.0, 2.0])
 
 
-def test_loader_output_schema_helpers() -> None:
+def test_loader_trajectory_schema_helpers() -> None:
     """Schema helpers should reflect the effective requested output schema."""
     loader = _PositionsOnlyLoader(
-        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0), output_schema=None
+        loader_config=LoaderConfig(input_len=2, output_len=1, sample_time=1.0),
+        trajectory_schema=None,
     )
 
-    assert loader.requested_scene_schema is None
-    assert loader.output_scene_schema == POSITIONS_ONLY
-    assert loader.requires_scene_fields("x", "y") is True
-    assert loader.requires_scene_fields("vx") is False
+    assert loader.requested_trajectory_schema is None
+    assert loader.effective_trajectory_schema == POSITIONS_ONLY
+    assert loader.requires_trajectory_fields("x", "y") is True
+    assert loader.requires_trajectory_fields("vx") is False

@@ -1,13 +1,12 @@
-from dronalize.datasets.registry import DatasetDescriptor
-from dronalize.datasets.round import scope as _scope
-from dronalize.datasets.round.loader import RounDLoader
-from dronalize.datasets.round.maps.builder import RounDMapBuilder
+from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.round import runtime_context as _runtime_context
+from dronalize.datasets.round.loader import RounDLoader as _Loader
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "round",
-    RounDLoader,
-    execution_scope_fn=_scope.round_execution_scope,
+    _Loader,
+    runtime_context_fn=_runtime_context.round_runtime_context,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "RounDLoader", "RounDMapBuilder"]
+__all__ = ["DATASET_SPEC"]

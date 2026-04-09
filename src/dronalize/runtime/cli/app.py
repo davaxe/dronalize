@@ -19,8 +19,8 @@ from dronalize.core.errors import (
     MissingOptionalDependencyError,
     SplitError,
 )
-from dronalize.io.formats import OutputFormat
-from dronalize.processing.ingest.splits import SplitModeName
+from dronalize.io.formats import StorageBackend
+from dronalize.processing.loading.splits import SplitStrategyName
 from dronalize.runtime.cli.formatting import (
     PLAN_NOTICE,
     build_available_datasets_table,
@@ -43,9 +43,9 @@ OutputDir = Annotated[
     typer.Option("--output", "-o", help="Directory to save the processed dataset."),
 ]
 Split = Annotated[
-    SplitModeName | None,
+    SplitStrategyName | None,
     typer.Option(
-        "--split", "-s", help="Split mode to use.", show_default=False, rich_help_panel="Split"
+        "--split", "-s", help="Split strategy to use.", show_default=False, rich_help_panel="Split"
     ),
 ]
 ReadSplit = Annotated[
@@ -73,7 +73,7 @@ Progress = Annotated[
     bool, typer.Option("--progress/--no-progress", help="Show progress during processing.")
 ]
 Limit = Annotated[
-    int | None, typer.Option("--limit", "-l", help="Limit the number of samples to process.")
+    int | None, typer.Option("--limit", "-l", help="Limit the number of scenes to process.")
 ]
 Seed = Annotated[
     int | None,
@@ -82,17 +82,20 @@ Seed = Annotated[
         help="Random seed used by custom split assignment and other randomized operations.",
     ),
 ]
-OutputFormatOption = Annotated[
-    OutputFormat, typer.Option("--output-format", help="Output format for processed data.")
+StorageBackendOption = Annotated[
+    StorageBackend,
+    typer.Option("--storage-backend", help="Storage backend for processed data."),
 ]
-SceneSchema = Annotated[
-    str | None, typer.Option("--scene-schema", help="Scene schema to persist in writer output.")
+TrajectorySchema = Annotated[
+    str | None, typer.Option("--scene-schema", help="Scene schema to persist in exported output.")
 ]
 SplitRatio = Annotated[
     tuple[float, float, float] | None,
     typer.Option(
         "--ratio",
-        help="Train/val/test ratio used by source, scene, time, and shuffled-time split modes.",
+        help=(
+            "Train/val/test ratio used by source, scene, time, and shuffled-time split strategies."
+        ),
         rich_help_panel="Split",
     ),
 ]
@@ -108,7 +111,7 @@ SplitSegments = Annotated[
     int | None,
     typer.Option(
         "--segments",
-        help="Number of contiguous temporal segments used by shuffled-time split mode.",
+        help="Number of contiguous temporal segments used by shuffled-time split strategy.",
         rich_help_panel="Split",
     ),
 ]
@@ -138,8 +141,8 @@ def process(
     progress: Progress = True,
     limit: Limit = None,
     seed: Seed = None,
-    output_format: OutputFormatOption = OutputFormat.MDS,
-    scene_schema: SceneSchema = None,
+    storage_backend: StorageBackendOption = StorageBackend.MDS,
+    trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,
     segments: SplitSegments = None,
@@ -160,8 +163,8 @@ def process(
             jobs=jobs,
             limit=limit,
             seed=seed,
-            output_format=output_format,
-            scene_schema=scene_schema,
+            storage_backend=storage_backend,
+            trajectory_schema=trajectory_schema,
             ratio=ratio,
             gap=gap,
             segments=segments,
@@ -218,8 +221,8 @@ def show_config(
     read_split: ReadSplit = None,
     config: Config = None,
     jobs: Jobs = None,
-    output_format: OutputFormatOption = OutputFormat.MDS,
-    scene_schema: SceneSchema = None,
+    storage_backend: StorageBackendOption = StorageBackend.MDS,
+    trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,
     segments: SplitSegments = None,
@@ -242,8 +245,8 @@ def show_config(
             split=split,
             read_split=read_split,
             jobs=jobs,
-            output_format=output_format,
-            scene_schema=scene_schema,
+            storage_backend=storage_backend,
+            trajectory_schema=trajectory_schema,
             ratio=ratio,
             gap=gap,
             segments=segments,

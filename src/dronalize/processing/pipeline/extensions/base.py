@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from dronalize.processing.ingest.config import LoaderConfig
+    from dronalize.processing.loading.config import LoaderConfig
     from dronalize.processing.pipeline.pipeline import Pipeline
 
 

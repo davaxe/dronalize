@@ -9,12 +9,12 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import CANONICAL
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import MinSamples
-from dronalize.processing.filters.cleanup import ExcludeCategories
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import IngestedData, Source
+from dronalize.processing.filtering import Filter
+from dronalize.processing.filtering.agent import MinSamples
+from dronalize.processing.filtering.cleanup import ExcludeCategories
+from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
@@ -22,8 +22,8 @@ from dronalize.processing.pipeline.functional.resample import ResampleSpec
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.scene import SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
 
 
 class LevelXDataLoader(BaseSceneLoader):
@@ -148,7 +148,7 @@ class LevelXDataLoader(BaseSceneLoader):
             )
 
     @override
-    def ingest(self, source: Source[Path]) -> Iterable[IngestedData]:
+    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
         tracks = source.data / f"{source.identifier:0>2}_tracks.csv"
         meta = source.data / f"{source.identifier:0>2}_tracksMeta.csv"
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
@@ -163,7 +163,7 @@ class LevelXDataLoader(BaseSceneLoader):
                 (pl.col("x") + source.metadata["utm_x0"]).alias("x"),
                 (pl.col("y") + source.metadata["utm_y0"]).alias("y"),
             )
-        yield IngestedData(combined)
+        yield LoadedSourceData(combined)
 
     @override
     def num_sources(self) -> int | None:
@@ -171,7 +171,7 @@ class LevelXDataLoader(BaseSceneLoader):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
     @classmethod

@@ -14,12 +14,12 @@ if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
     from dronalize.core.scene import Scene
-    from dronalize.datasets.registry import DatasetDescriptor
-    from dronalize.processing.ingest.loader import SceneLoader
+    from dronalize.datasets.registry import DatasetSpec
+    from dronalize.processing.loading.base import BaseSceneLoader
 
 
 def debug_visualize_scenes(
-    source: SceneLoader,
+    source: BaseSceneLoader[Any, Any],
     *,
     max_scenes: int = 1,
     skip_scenes: int = 0,
@@ -101,7 +101,7 @@ def resolve_dataset_root_from_env(
 
 
 def debug_descriptor(
-    descriptor: DatasetDescriptor,
+    descriptor: DatasetSpec,
     root: Path,
     *,
     max_scenes: int = 3,
@@ -117,10 +117,10 @@ def debug_descriptor(
         loader_config=loader_config,
         loader_options=loader_options,
         map_config=map_config,
-        output_schema=None,
+        trajectory_schema=None,
     )
-    loader.set_output_schema(CANONICAL)
-    with descriptor.execution_scope(root, loader_config, map_config):
+    loader.set_trajectory_schema(CANONICAL)
+    with descriptor.runtime_context(root, loader_config, map_config):
         return debug_visualize_scenes(
             loader, max_scenes=max_scenes, skip_scenes=skip_scenes, step=step
         )

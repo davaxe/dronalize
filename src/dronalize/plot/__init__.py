@@ -1,4 +1,29 @@
-"""Optional visualization utilities for trajectories and map graphs."""
+"""Optional plotting helpers for trajectory and map inspection.
+
+## Import guide
+
+```python
+from dronalize.plot import plot_map_graph, plot_trajectories, plot_trajectories_on_map
+```
+
+Plotting helpers are loaded lazily so importing `dronalize.plot` does not pull
+in optional visualization dependencies until one of the plotting functions is
+used.
+
+The package exposes three focused entry points:
+
+- [`plot_trajectories`][dronalize.plot.plot_trajectories] for trajectory-only
+  inspection
+- [`plot_map_graph`][dronalize.plot.plot_map_graph] for lane-graph or road-graph
+  inspection
+- [`plot_trajectories_on_map`][dronalize.plot.plot_trajectories_on_map] for
+  combined trajectory and map overlays
+
+## Related modules
+
+- [`dronalize.core.scene`][] for scene types commonly visualized here
+- [`dronalize.core.maps`][] for map graph types consumed by map plots
+"""
 
 from __future__ import annotations
 

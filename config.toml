@@ -59,19 +59,19 @@ enabled = true
 extraction = "circle"
 radius = 60.0
 
-[datasets.a43.writer]
+[datasets.a43.export]
 schema = "positions_velocity_yaw"
 precision = "float64"
-offset_positions = true
+recenter_positions = true
 
-[datasets.a43.writer.mds]
+[datasets.a43.export.mds]
 compression = "zstd:7"
 hashes = ["sha1", "xxh64"]
 size_limit = 33554432
 exist_ok = true
 
 [datasets.a43.split]
-mode = "shuffled-time"
+strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
 gap = 2

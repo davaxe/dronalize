@@ -6,10 +6,10 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
-from dronalize.io.config import SceneSchemaLike  # noqa: TC001
-from dronalize.processing.ingest.splits import (  # noqa: TC001
-    NativeSplitSelection,
-    SplitModeName,
+from dronalize.io.config import TrajectorySchemaLike  # noqa: TC001
+from dronalize.processing.loading.splits import (  # noqa: TC001
+    NativeSplitStrategySelection,
+    SplitStrategyName,
 )
 
 
@@ -18,10 +18,10 @@ class PlanOverrides(BaseModel):
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
-    scene_schema: SceneSchemaLike | None = None
+    trajectory_schema: TrajectorySchemaLike | None = None
     jobs: int | None = None
-    split: SplitModeName | None = None
-    read_split: NativeSplitSelection = None
+    split: SplitStrategyName | None = None
+    read_split: NativeSplitStrategySelection = None
     ratio: tuple[float, float, float] | None = None
     gap: int | None = None
     segments: int | None = None

@@ -1,14 +1,37 @@
-"""Built-in dataset registry and lazy dataset package exports."""
+"""Dataset registry and dataset-descriptor surface.
 
-from __future__ import annotations
+## Import guide
 
-import importlib
-import pkgutil
+```python
+from dronalize.datasets import available, get, register, DatasetSpec
+```
+
+This package is the canonical entry point for dataset discovery and custom
+dataset registration.
+
+- [`available`][dronalize.datasets.available] lists registered and built-in
+  dataset keys
+- [`get`][dronalize.datasets.get] resolves one dataset descriptor by name
+- [`register`][dronalize.datasets.register] adds a custom
+  [`DatasetSpec`][dronalize.datasets.DatasetSpec] to the active registry
+- [`DatasetSpec`][dronalize.datasets.DatasetSpec] and
+  [`DatasetCapabilities`][dronalize.datasets.DatasetCapabilities] describe the
+  processing contract that the runtime planner consumes
+
+Built-in dataset package roots remain importable, but the registry is the main
+public interface for selecting datasets.
+
+## Related modules
+
+- [`dronalize.processing.loading`][] for the advanced loader API
+- [`dronalize.runtime`][] for planning APIs that consume
+  [`DatasetSpec`][dronalize.datasets.DatasetSpec]
+"""
 
 from dronalize.datasets.registry import (
     DatasetCapabilities,
-    DatasetDescriptor,
-    ExecutionScope,
+    DatasetSpec,
+    RuntimeContext,
     available,
     get,
     register,
@@ -16,31 +39,9 @@ from dronalize.datasets.registry import (
 
 __all__ = [
     "DatasetCapabilities",
-    "DatasetDescriptor",
-    "ExecutionScope",
+    "DatasetSpec",
+    "RuntimeContext",
     "available",
     "get",
     "register",
 ]
-
-_DATASET_MODULES = {
-    module_info.name
-    for module_info in pkgutil.iter_modules(__path__)
-    if module_info.name not in {"registry", "shared"}
-}
-
-
-def __getattr__(name: str) -> object:
-    """Lazily expose dataset submodules from the package root."""
-    if name in _DATASET_MODULES:
-        module = importlib.import_module(f"{__name__}.{name}")
-        globals()[name] = module
-        return module
-
-    msg = f"module '{__name__}' has no attribute '{name}'"
-    raise AttributeError(msg)
-
-
-def __dir__() -> list[str]:
-    """Expose lazy dataset modules during interactive discovery."""
-    return sorted(set(globals()) | _DATASET_MODULES)

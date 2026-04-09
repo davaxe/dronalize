@@ -14,20 +14,24 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filters import Filter
-from dronalize.processing.filters.agent import RequireFrames
-from dronalize.processing.filters.cleanup import ExcludeCategories
-from dronalize.processing.ingest.base import BaseSceneLoader, LoaderOptions, LoaderSplitCapabilities
-from dronalize.processing.ingest.config import LoaderConfig
-from dronalize.processing.ingest.loader import IngestedData, MapBinding, Source
+from dronalize.processing.filtering import Filter
+from dronalize.processing.filtering.agent import RequireFrames
+from dronalize.processing.filtering.cleanup import ExcludeCategories
+from dronalize.processing.loading.base import (
+    BaseSceneLoader,
+    LoaderOptions,
+    LoaderSplitCapabilities,
+)
+from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
 from dronalize.processing.maps.config import MapConfig
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps.graph import MapGraph
-    from dronalize.core.scene import Scene, SceneSchema
-    from dronalize.processing.ingest.splits import SplitConfig
+    from dronalize.core.scene import Scene, TrajectorySchema
+    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
 
 
@@ -108,7 +112,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
         return self._sources_from_dir(self._data_root / "test")
 
     @override
-    def ingest(self, source: Source[list[Path]]) -> Iterable[IngestedData]:
+    def load_source(self, source: Source[list[Path]]) -> Iterable[LoadedSourceData]:
         # Build a mapping from parquet file path to its co-located JSON map path.
         # Each parquet lives in a subdirectory like <scenario_id>/<scenario_id>.parquet
         # alongside a <scenario_id>.json map file.
@@ -132,7 +136,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
 
         for (file_id,), group in batch_lf.collect().group_by(["file_id"]):
             map_path = file_to_map.get(str(file_id))
-            yield IngestedData(
+            yield LoadedSourceData(
                 frame=group.lazy().drop("file_id"), map_binding=MapBinding(map_key=map_path)
             )
 
@@ -143,7 +147,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
 
     @classmethod
     @override
-    def native_scene_schema(cls) -> SceneSchema:
+    def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_YAW
 
     @classmethod
@@ -226,8 +230,8 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
 
 
 if __name__ == "__main__":
-    from dronalize.datasets.argoverse2 import DESCRIPTOR
+    from dronalize.datasets.argoverse2 import DATASET_SPEC
     from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
 
     root = resolve_dataset_root_from_env("argoverse2")
-    _ = debug_descriptor(DESCRIPTOR, root)
+    _ = debug_descriptor(DATASET_SPEC, root)

@@ -1,11 +1,10 @@
-from dronalize.datasets.interact.loader import InteractionLoader
-from dronalize.datasets.interact.maps.builder import InteractMapBuilder
-from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.interact.loader import InteractionLoader as _Loader
+from dronalize.datasets.registry import DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "interact",
-    InteractionLoader,
+    _Loader,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "InteractMapBuilder", "InteractionLoader"]
+__all__ = ["DATASET_SPEC"]

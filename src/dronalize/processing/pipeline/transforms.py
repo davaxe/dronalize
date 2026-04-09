@@ -12,8 +12,8 @@ from dronalize.processing.pipeline.functional.resample import ResampleSpec
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.processing.filters import Filter
-    from dronalize.processing.filters.apply import FilterMode
+    from dronalize.processing.filtering import Filter
+    from dronalize.processing.filtering.apply import FilterMode
     from dronalize.processing.pipeline.pipeline import FlatMapTransform, Transform
 
 
@@ -28,7 +28,7 @@ def filter_scene(
 ) -> Transform:
     """Create a filtering transform.
 
-    Wraps `dronalize.processing.filters.filter_scene`.
+    Wraps [`dronalize.processing.filtering.filter_scene`][].
 
     Parameters
     ----------

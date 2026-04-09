@@ -5,6 +5,6 @@ hide:
 
 # ::: dronalize.datasets.DatasetCapabilities
 
-## ::: dronalize.datasets.DatasetDescriptor
+## ::: dronalize.datasets.DatasetSpec
 
-## ::: dronalize.datasets.ExecutionScope
+## ::: dronalize.datasets.RuntimeContext

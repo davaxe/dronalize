@@ -13,8 +13,8 @@ from dronalize.processing.pipeline.pipeline import Pipeline
 from dronalize.processing.pipeline.splitting import apply_split_partition
 
 if TYPE_CHECKING:
-    from dronalize.processing.filters import Filter
-    from dronalize.processing.ingest.config import WindowConfig
+    from dronalize.processing.filtering import Filter
+    from dronalize.processing.loading.config import WindowConfig
     from dronalize.processing.pipeline.functional.resample import ResampleSpec
     from dronalize.processing.pipeline.spec import TrajectorySpec
 

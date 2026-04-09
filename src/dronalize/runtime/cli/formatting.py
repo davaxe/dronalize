@@ -15,25 +15,25 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from dronalize.datasets.registry import DatasetDescriptor
-    from dronalize.processing.ingest.config import LoaderConfig
-    from dronalize.processing.ingest.splits import SplitModeName
+    from dronalize.datasets.registry import DatasetSpec
+    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.processing.loading.splits import SplitStrategyName
     from dronalize.processing.maps.config import MapConfig
     from dronalize.runtime.models import ProcessingSummary
 
 _DATASET_SPLIT_DISPLAY_ORDER = {DatasetSplit.TRAIN: 0, DatasetSplit.VAL: 1, DatasetSplit.TEST: 2}
-_CUSTOM_SPLIT_MODES: tuple[SplitModeName, ...] = (
+_CUSTOM_SPLIT_STRATEGIES: tuple[SplitStrategyName, ...] = (
     "source",
     "scene",
     "time",
     "shuffled-time",
 )
-_CUSTOM_SPLIT_MODE_DESCRIPTIONS: dict[SplitModeName, str] = {
+_CUSTOM_SPLIT_STRATEGY_DESCRIPTIONS: dict[SplitStrategyName, str] = {
     "source": "Assign complete sources such as recordings to a single split.",
     "scene": "Assign individual scenes while keeping each scene fully intact.",
     "time": "Split long recordings into chronological train/val/test blocks.",
     "shuffled-time": "Split long recordings into multiple temporal segments before routing.",
-    "auto": "Resolve the recommended custom split mode automatically.",
+    "auto": "Resolve the recommended custom split strategy automatically.",
     "native": "Use dataset-defined train/val/test partitions as-is.",
     "none": "Process all data without split routing.",
 }
@@ -43,10 +43,10 @@ PLAN_NOTICE = (
 _CAPABILITY_BADGES: tuple[tuple[DatasetCapabilities, str, str], ...] = (
     (DatasetCapabilities.MAP_AVAILABLE, "green", "map"),
     (DatasetCapabilities.NATIVE_SPLITS, "cyan", "native splits"),
-    (DatasetCapabilities.CUSTOM_SPLITS, "blue", "custom splits"),
-    (DatasetCapabilities.HIGHWAY_PIPELINE, "magenta", "highway pipeline"),
-    (DatasetCapabilities.EXECUTION_SCOPE, "yellow", "execution scope"),
-    (DatasetCapabilities.EXTRA_LOADER_ARGS, "red", "loader options"),
+    (DatasetCapabilities.CUSTOM_SPLITS, "blue", "custom split strategies"),
+    (DatasetCapabilities.LANE_CHANGE_SAMPLING, "magenta", "lane-change sampling"),
+    (DatasetCapabilities.EXECUTION_SCOPE, "yellow", "runtime context"),
+    (DatasetCapabilities.LOADER_OPTIONS, "red", "loader options"),
 )
 
 
@@ -62,9 +62,7 @@ def build_processing_summary_table(summary: ProcessingSummary) -> Table:
     return table
 
 
-def build_available_datasets_table(
-    descriptors: Sequence[DatasetDescriptor], *, details: bool
-) -> Table:
+def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, details: bool) -> Table:
     """Return a table describing the available datasets."""
     table = Table(
         title="Available datasets",
@@ -77,8 +75,8 @@ def build_available_datasets_table(
     table.add_column("Dataset", style="bright_cyan", no_wrap=True)
     if details:
         table.caption = (
-            " Native splits are listed first, followed by custom modes.\n"
-            " [yellow]*[/yellow] marks the recommended custom mode."
+            " Native splits are listed first, followed by custom split strategies.\n"
+            " [yellow]*[/yellow] marks the recommended custom strategy."
         )
         table.caption_justify = "left"
         table.caption_style = "dim"
@@ -107,7 +105,7 @@ def build_available_datasets_table(
     return table
 
 
-def build_dataset_inspect_tables(descriptor: DatasetDescriptor) -> tuple[Table, ...]:
+def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     """Return the tables used by the `inspect` command."""
     config = descriptor.default_loader_config
     map_config = descriptor.default_map_config
@@ -163,19 +161,19 @@ def build_dataset_inspect_tables(descriptor: DatasetDescriptor) -> tuple[Table, 
     return tuple(tables)
 
 
-def build_split_support_tables(descriptor: DatasetDescriptor) -> tuple[Table, ...]:
+def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     """Return the tables used by the `split-support` command."""
     summary = _detail_table(title=f"Split support: {descriptor.name}")
     summary.add_row("Dataset", descriptor.name)
     summary.add_row("Native splits", _format_split_list(descriptor.predefined_splits))
     summary.add_row(
-        "Custom modes",
+        "Custom strategies",
         _format_mode_list(
             descriptor.supported_split_strategies, descriptor.recommended_split_strategy
         ),
     )
     summary.add_row(
-        "Recommended custom mode",
+        "Recommended custom strategy",
         descriptor.recommended_split_strategy or "[dim]none[/dim]",
     )
 
@@ -192,24 +190,24 @@ def build_split_support_tables(descriptor: DatasetDescriptor) -> tuple[Table, ..
         native_table.add_row(split.value, _format_flag(enabled=split in supported_splits))
 
     custom_table = Table(
-        title="Custom split modes",
+        title="Custom split strategies",
         box=box.MINIMAL_DOUBLE_HEAD,
         title_justify="left",
         header_style="bold",
     )
-    custom_table.add_column("Mode", style="bright_cyan", no_wrap=True)
+    custom_table.add_column("Strategy", style="bright_cyan", no_wrap=True)
     custom_table.add_column("Supported", justify="center")
     custom_table.add_column("Recommended", justify="center")
     custom_table.add_column("Details", style="bright_magenta")
 
     supported_strategies = set(descriptor.supported_split_strategies)
-    for mode in _CUSTOM_SPLIT_MODES:
-        row_style = "" if mode in supported_strategies else "dim"
+    for strategy in _CUSTOM_SPLIT_STRATEGIES:
+        row_style = "" if strategy in supported_strategies else "dim"
         custom_table.add_row(
-            mode,
-            _format_flag(enabled=mode in supported_strategies),
-            _format_flag(enabled=mode == descriptor.recommended_split_strategy),
-            _CUSTOM_SPLIT_MODE_DESCRIPTIONS[mode],
+            strategy,
+            _format_flag(enabled=strategy in supported_strategies),
+            _format_flag(enabled=strategy == descriptor.recommended_split_strategy),
+            _CUSTOM_SPLIT_STRATEGY_DESCRIPTIONS[strategy],
             style=row_style,
         )
 
@@ -234,8 +232,8 @@ def _detail_table(title: str, *, caption: str | None = None) -> Table:
 
 def _format_split_support(
     predefined_splits: list[DatasetSplit],
-    supported_split_strategies: list[SplitModeName],
-    recommended_split_strategy: SplitModeName | None,
+    supported_split_strategies: list[SplitStrategyName],
+    recommended_split_strategy: SplitStrategyName | None,
 ) -> str:
     """Return a compact summary of native and custom split support."""
     native = ", ".join(split.value for split in _sorted_splits(predefined_splits))
@@ -281,10 +279,10 @@ def _format_split_list(predefined_splits: list[DatasetSplit]) -> str:
 
 
 def _format_mode_list(
-    supported_split_strategies: list[SplitModeName],
-    recommended_split_strategy: SplitModeName | None,
+    supported_split_strategies: list[SplitStrategyName],
+    recommended_split_strategy: SplitStrategyName | None,
 ) -> str:
-    """Return a readable list of supported custom split modes."""
+    """Return a readable list of supported custom split strategies."""
     if not supported_split_strategies:
         return "[dim]none[/dim]"
     return _format_supported_modes(supported_split_strategies, recommended_split_strategy)
@@ -343,8 +341,8 @@ def _format_map_extraction(map_config: MapConfig) -> str:
     match extraction.mode:
         case "full":
             return "full map"
-        case "relevant":
-            return f"relevant area (padding={extraction.padding:g})"
+        case "scene_extent":
+            return f"scene extent (padding={extraction.padding:g})"
         case "circle":
             return f"circle (radius={extraction.radius:g})"
         case "bounding_box":
@@ -357,7 +355,7 @@ def _format_optional_float(value: float | None) -> str:
 
 
 def _format_supported_modes(
-    supported_modes: list[SplitModeName], recommended_mode: SplitModeName | None
+    supported_modes: list[SplitStrategyName], recommended_mode: SplitStrategyName | None
 ) -> str:
     return ", ".join(
         f"{mode}[yellow]*[/yellow]" if mode == recommended_mode else mode
@@ -365,7 +363,7 @@ def _format_supported_modes(
     )
 
 
-def _loader_option_rows(descriptor: DatasetDescriptor) -> list[tuple[str, str]]:
+def _loader_option_rows(descriptor: DatasetSpec) -> list[tuple[str, str]]:
     """Return typed loader option fields and their defaults."""
     default_values = descriptor.default_loader_options.model_dump(exclude_defaults=False)
     rows: list[tuple[str, str]] = []

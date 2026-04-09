@@ -1,11 +1,10 @@
-from dronalize.datasets.argoverse2.loader import Argoverse2Loader
-from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
-from dronalize.datasets.registry import DatasetDescriptor
+from dronalize.datasets.argoverse2.loader import Argoverse2Loader as _Loader
+from dronalize.datasets.registry import DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "argoverse2",
-    Argoverse2Loader,
+    _Loader,
     infer_capabilities=True,
 )
 
-__all__ = ["DESCRIPTOR", "Argoverse2Loader", "Argoverse2MapBuilder"]
+__all__ = ["DATASET_SPEC"]

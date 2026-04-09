@@ -16,11 +16,11 @@ if TYPE_CHECKING:
 
     from rich.progress import Progress as RichProgress
 
-    from dronalize.runtime.executor import ObservableWritingExecutor, Progress
+    from dronalize.runtime.executor import ObservableExecutor, Progress
 
 
 def run_with_rich_progress(
-    executor: ObservableWritingExecutor, run: Callable[[], None], *, enable: bool = True
+    executor: ObservableExecutor, run: Callable[[], None], *, enable: bool = True
 ) -> None:
     """Execute a run while rendering Rich progress for an observable executor."""
     if not enable:
@@ -47,9 +47,9 @@ class _ProgressMonitor:
     """Background monitor that projects executor progress onto Rich."""
 
     def __init__(
-        self, executor: ObservableWritingExecutor, rich_progress: RichProgress, task_id: rp.TaskID
+        self, executor: ObservableExecutor, rich_progress: RichProgress, task_id: rp.TaskID
     ) -> None:
-        self._executor: ObservableWritingExecutor = executor
+        self._executor: ObservableExecutor = executor
         self._rich_progress: RichProgress = rich_progress
         self._task_id: rp.TaskID = task_id
         self._stop_event: threading.Event = threading.Event()
@@ -99,11 +99,15 @@ class _ProgressMonitor:
 
     def _render(self, progress: Progress) -> None:
         """Project a `Progress` snapshot onto the Rich task state."""
-        total = progress.total_sources
-        completed = progress.processed_sources
+        if progress.total_scenes is not None:
+            total = progress.total_scenes
+            completed = progress.processed_scenes
+        else:
+            total = progress.total_sources
+            completed = progress.processed_sources
         workers = progress.active_workers if progress.running else 0
 
-        if not progress.running and total is None:
+        if not progress.running and (total is None or completed < total):
             total = completed
 
         self._rich_progress.update(
@@ -145,16 +149,14 @@ if __name__ == "__main__":
         path = Path()
 
     plan = plan_dataset(
-        dataset="hotel",
-        input_dir=Path(path) / "data" / "hotel",
-        output_dir=Path("test_output"),
-        split="source",
-        output_format="dummy",
+        dataset="round",
+        input_dir=Path(path) / "rounD",
+        output_dir=Path("test_output1"),
+        storage_backend="mds",
         config_path=None,
         jobs=1,
-        limit=None,
+        limit=500,
         seed=20,
-        ratio=(0.8, 0.1, 0.1),
     )
     with plan.open() as run:
         run_with_rich_progress(run.executor, run.run, enable=True)

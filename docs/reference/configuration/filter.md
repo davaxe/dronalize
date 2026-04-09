@@ -2,7 +2,7 @@
 # `[loader.filter]` section
 
 <div class="section-intro" markdown="1">
-The filter config is nested under `loader` because it runs during data loading. It is used to remove unwanted rows, reject invalid scenes, and prune invalid agents before samples are written.
+The filter config is nested under `loader` because it runs during data loading. It is used to remove unwanted rows, reject invalid scenes, and prune invalid agents before scenes are written.
 </div>
 
 ## Filter shape

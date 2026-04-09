@@ -74,19 +74,24 @@ class DatasetSplit(str, Enum):
     """Enum representing the available dataset splits."""
 
     TRAIN = "train"
+    """Training split partition, used for model training."""
     VAL = "val"
+    """Validation split partition, used for model validation."""
     TEST = "test"
+    """Test split partition, used for final model evaluation."""
 
 
 AgentCategoryLike = int | str | AgentCategory
+"""Type for specifying a single agent category."""
 AgentCategoryInput = AgentCategoryLike | Iterable[AgentCategoryLike]
+"""Input type for specifying one or more agent categories."""
 
-T = TypeVar("T", bound=Collection[AgentCategory])
+_T = TypeVar("_T", bound=Collection[AgentCategory])
 
 
 def coerce_agent_categories(
-    value: AgentCategoryInput, collection: Callable[[Iterable[AgentCategory]], T]
-) -> T:
+    value: AgentCategoryInput, collection: Callable[[Iterable[AgentCategory]], _T]
+) -> _T:
     """Convert one or many agent-category values into a normalized collection."""
     values = [value] if isinstance(value, (str, int, AgentCategory)) else value
     return collection(AgentCategory.from_value(item) for item in values)

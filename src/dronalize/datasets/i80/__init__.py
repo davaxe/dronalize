@@ -1,14 +1,13 @@
-from dronalize.datasets.i80.loader import I80Loader
-from dronalize.datasets.i80.maps.builder import I80MapBuilder
-from dronalize.datasets.i80.scope import i80_execution_scope
-from dronalize.datasets.registry import DatasetCapabilities, DatasetDescriptor
+from dronalize.datasets.i80.loader import I80Loader as _Loader
+from dronalize.datasets.i80.runtime_context import i80_runtime_context
+from dronalize.datasets.registry import DatasetCapabilities, DatasetSpec
 
-DESCRIPTOR = DatasetDescriptor.from_loader(
+DATASET_SPEC = DatasetSpec.from_loader(
     "i80",
-    I80Loader,
-    capabilities=DatasetCapabilities.HIGHWAY_PIPELINE,
+    _Loader,
+    capabilities=DatasetCapabilities.LANE_CHANGE_SAMPLING,
     infer_capabilities=True,
-    execution_scope_fn=i80_execution_scope,
+    runtime_context_fn=i80_runtime_context,
 )
 
-__all__ = ["DESCRIPTOR", "I80Loader", "I80MapBuilder"]
+__all__ = ["DATASET_SPEC"]

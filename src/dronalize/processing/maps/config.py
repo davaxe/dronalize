@@ -7,10 +7,10 @@ from typing import Annotated, ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class RelevantAreaExtraction(BaseModel):
-    """Configuration for extraction around relevant scene positions."""
+class SceneExtentExtraction(BaseModel):
+    """Configuration for extraction around the scene trajectory extent."""
 
-    mode: Literal["relevant"] = Field("relevant", repr=False, init=False)
+    mode: Literal["scene_extent"] = Field("scene_extent", repr=False, init=False)
     padding: float = Field(gt=1.0, default=1.2)
 
 
@@ -36,7 +36,7 @@ class FullMapExtraction(BaseModel):
 
 
 MapExtraction = Annotated[
-    CircularExtraction | BoundingBoxExtraction | FullMapExtraction | RelevantAreaExtraction,
+    CircularExtraction | BoundingBoxExtraction | FullMapExtraction | SceneExtentExtraction,
     Field(discriminator="mode"),
 ]
 
@@ -47,8 +47,11 @@ class MapConfig(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     min_distance: float | None = Field(gt=0, default=1.75)
+    """Minimum allowed distance (in meters) between connected nodes."""
     interp_distance: float | None = Field(gt=0, default=3.0)
+    """Target distance (in meters) between interpolated nodes along edges."""
     extraction: MapExtraction = Field(default_factory=FullMapExtraction)
+    """Map extraction mode and parameters."""
 
     @model_validator(mode="after")
     def _validate_distances(self) -> MapConfig:
@@ -80,17 +83,17 @@ class MapConfig(BaseModel):
         )
 
     @classmethod
-    def relevant_area_extraction(
+    def scene_extent_extraction(
         cls,
         padding: float = 1.15,
         min_distance: float | None = 1.75,
         interp_distance: float | None = 3.0,
     ) -> MapConfig:
-        """Return a map configuration extracted around relevant scene positions."""
+        """Return a map configuration cropped to the scene trajectory extent."""
         return cls(
             min_distance=min_distance,
             interp_distance=interp_distance,
-            extraction=RelevantAreaExtraction(padding=padding),
+            extraction=SceneExtentExtraction(padding=padding),
         )
 
     @classmethod

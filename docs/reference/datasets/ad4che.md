@@ -35,12 +35,12 @@ These are the default Dronalize settings used when processing this dataset.
 | Resampling | Linear 1:3 |
 | Windowing | 210-frame window, step 45 |
 | Filtering | Drop short tracks with fewer than 4 samples |
-| Highway sampling | Require 5 lane changes; keep 1 in 3 negative scenes |
+| Lane-change sampling | Require 5 lane changes; keep 1 in 3 negative scenes |
 | Maps | Relevant area (padding 1.15) |
 
 ## Split support
 
-Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom modes, and any recommended strategy.
+Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom split strategies, and any recommended strategy.
 
 ```bash
 dronalize split-support ad4che

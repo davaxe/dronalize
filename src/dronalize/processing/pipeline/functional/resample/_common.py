@@ -112,8 +112,8 @@ class ResampleSpec(BaseModel):
     ) -> ResampleSpec:
         """Return a copy with default derivative-output columns added.
 
-        By default this method adds first-order outputs ``("vx", "vy")`` and
-        second-order outputs ``("ax", "ay")``.
+        By default this method adds first-order outputs `("vx", "vy")` and
+        second-order outputs `("ax", "ay")`.
 
         """
         new = self
@@ -263,7 +263,7 @@ def build_plan(
 def segment_data(
     data: DataFrameT, *, frame_column: str, group_by: Sequence[str], max_gap: int, sort: bool
 ) -> DataFrameT:
-    """Annotate contiguous trajectory segments separated by gaps larger than ``max_gap``."""
+    """Annotate contiguous trajectory segments separated by gaps larger than `max_gap`."""
     if sort:
         data = data.sort([*group_by, frame_column])
     expr = (pl.col(frame_column).diff() > max_gap).fill_null(value=False).cum_sum()

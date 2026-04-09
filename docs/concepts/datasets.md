@@ -13,7 +13,7 @@ Each built-in dataset comes with a starting point for processing, including:
 - default loader behavior
 - optional map support
 - supported split strategies
-- a native scene schema
+- a native trajectory schema
 - any dataset-specific loader behavior
 
 This is why configuration often starts small: the dataset already provides sensible defaults.

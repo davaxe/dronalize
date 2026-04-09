@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from dronalize.datasets.round.loader import RounDLoader as _Loader
 from dronalize.datasets.round.maps.builder import RounDMapBuilder as _MapBuilder
-from dronalize.processing.ingest.config import LoaderConfig
+from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.maps.config import MapConfig
 
 if TYPE_CHECKING:

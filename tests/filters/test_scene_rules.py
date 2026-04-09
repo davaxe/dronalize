@@ -3,7 +3,7 @@ from polars.testing import assert_frame_equal
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.models import Range
-from dronalize.processing.filters import AgentSelector, Filter, filter_scene, scene
+from dronalize.processing.filtering import AgentSelector, Filter, filter_scene, scene
 
 
 def test_scene_frames_use_coverage() -> None:

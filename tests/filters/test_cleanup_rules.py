@@ -2,7 +2,7 @@ import polars as pl
 from polars.testing import assert_frame_equal
 
 from dronalize.core.categories import AgentCategory
-from dronalize.processing.filters import AgentSelector, Filter, agent, cleanup, filter_scene
+from dronalize.processing.filtering import AgentSelector, Filter, agent, cleanup, filter_scene
 
 
 def test_exclude_categories_removes_matching_rows() -> None:

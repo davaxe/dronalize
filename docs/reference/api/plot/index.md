@@ -2,19 +2,8 @@
     options:
         members: false
 
-Import from:
+## ::: dronalize.plot.plot_map_graph
 
-```python
-from dronalize.plot import ...
-```
+## ::: dronalize.plot.plot_trajectories
 
-Optional visualization utilities for trajectories and map graphs.
-
-## Use this package for
-
-- [Plotting helpers](plotting.md) for maps, trajectories, and combined overlays
-
-## See also
-
-- [dronalize](../dronalize/index.md)
-- [API reference](../index.md)
+## ::: dronalize.plot.plot_trajectories_on_map
