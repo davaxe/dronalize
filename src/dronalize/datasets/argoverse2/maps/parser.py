@@ -21,7 +21,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from dronalize.core.maps.edge_types import EdgeType
+from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
     from dronalize.processing.maps.builder import Point

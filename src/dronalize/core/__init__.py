@@ -23,6 +23,7 @@ from dronalize.core.categories import (
     AgentCategoryInput,
     AgentCategoryLike,
     DatasetSplit,
+    EdgeType,
 )
 
-__all__ = ["AgentCategory", "AgentCategoryInput", "AgentCategoryLike", "DatasetSplit"]
+__all__ = ["AgentCategory", "AgentCategoryInput", "AgentCategoryLike", "DatasetSplit", "EdgeType"]

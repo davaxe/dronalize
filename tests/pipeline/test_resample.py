@@ -4,8 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
-from pydantic import ValidationError
-from scipy.interpolate import CubicHermiteSpline, CubicSpline
+from scipy.interpolate import CubicSpline, PchipInterpolator
 
 from dronalize.core.errors import LoaderConfigError
 from dronalize.processing.pipeline.functional.resample import ResampleMethod, ResampleSpec, resample
@@ -17,52 +16,10 @@ def test_spec_simplifies_ratio() -> None:
     assert (spec.up, spec.down) == (2, 1)
 
 
-def test_spec_rejects_derivative_lengths() -> None:
-    """Derivative column groups must align with the position dimensionality."""
-    with pytest.raises(ValidationError) as exc_info:
-        _ = ResampleSpec(
-            method=ResampleMethod.HERMITE,
-            position_columns=dict.fromkeys(("x", "y")),
-            input_derivatives={1: dict.fromkeys(("vx",))},
-        )
-    assert "must match position_columns length" in str(exc_info.value)
-    assert isinstance(exc_info.value.errors()[0]["ctx"]["error"], LoaderConfigError)
-
-
-def test_linear_rejects_derivatives() -> None:
-    """Linear resampling rejects derivative inputs and outputs."""
-    with pytest.raises(ValidationError) as exc_info:
-        _ = ResampleSpec(
-            method=ResampleMethod.LINEAR, output_derivatives={1: dict.fromkeys(("vx", "vy"))}
-        )
-    assert "does not support derivative" in str(exc_info.value)
-    error = exc_info.value.errors()[0]
-    assert "ctx" in error
-    ctx = error["ctx"]
-    assert isinstance(ctx["error"], LoaderConfigError)
-
-
-def test_hermite_requires_first_order() -> None:
-    """Hermite resampling requires first-order derivative constraints."""
-    with pytest.raises(ValidationError) as exc_info:
-        _ = ResampleSpec(method=ResampleMethod.HERMITE)
-    assert "Hermite resampling requires exactly first-order derivative inputs" in str(
-        exc_info.value
-    )
-    error = exc_info.value.errors()[0]
-    assert "ctx" in error
-    ctx = error["ctx"]
-    assert isinstance(ctx["error"], LoaderConfigError)
-
-
-def test_cubic_rejects_derivatives() -> None:
-    """Cubic spline resampling no longer switches implicitly to Hermite."""
-    with pytest.raises(ValidationError) as exc_info:
-        _ = ResampleSpec(
-            method=ResampleMethod.CUBIC, input_derivatives={1: dict.fromkeys(("vx", "vy"))}
-        )
-    assert "does not accept input_derivatives" in str(exc_info.value)
-    assert isinstance(exc_info.value.errors()[0]["ctx"]["error"], LoaderConfigError)
+def test_linear_rejects_emitted_derivatives() -> None:
+    """Linear resampling does not expose derivative outputs."""
+    with pytest.raises(LoaderConfigError, match="does not support emitting derivatives"):
+        _ = ResampleSpec(method=ResampleMethod.LINEAR, emit_velocity=True)
 
 
 def test_linear_no_resampling_preserves_cols() -> None:
@@ -77,8 +34,7 @@ def test_linear_no_resampling_preserves_cols() -> None:
 
     result = resample(df, ResampleSpec())
 
-    expected = df
-    assert_frame_equal(result, expected)
+    assert_frame_equal(result, df)
 
 
 def test_downsample_by_two() -> None:
@@ -96,26 +52,8 @@ def test_downsample_by_two() -> None:
     assert result["y"].to_list() == [0.0, 20.0, 40.0]
 
 
-def test_upsample_by_two_preserves_cols() -> None:
-    """Linear upsampling interpolates positions and forward-fills carried columns."""
-    df = pl.DataFrame({
-        "frame": [0, 1, 2],
-        "x": [0.0, 2.0, 4.0],
-        "y": [0.0, 0.0, 0.0],
-        "vx": [1.0, 5.0, 9.0],
-        "agent_category": [5, 5, 5],
-    })
-
-    result = resample(df, ResampleSpec(up=2, down=1))
-
-    assert result["frame"].to_list() == [0, 1, 2, 3, 4]
-    assert result["x"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0]
-    assert result["vx"].to_list() == [1.0, 1.0, 5.0, 5.0, 9.0]
-    assert result["agent_category"].to_list() == [5, 5, 5, 5, 5]
-
-
-def test_resample_preserves_columns() -> None:
-    """Resampling implicitly carries every non-generated column."""
+def test_upsample_by_two_preserves_non_coordinate_columns() -> None:
+    """Linear upsampling interpolates coordinates and forward-fills carried columns."""
     df = pl.DataFrame({
         "frame": [0, 1, 2],
         "x": [0.0, 2.0, 4.0],
@@ -126,7 +64,8 @@ def test_resample_preserves_columns() -> None:
 
     result = resample(df, ResampleSpec(up=2, down=1))
 
-    assert result.columns == ["frame", "x", "y", "yaw", "agent_category"]
+    assert result["frame"].to_list() == [0, 1, 2, 3, 4]
+    assert result["x"].to_list() == [0.0, 1.0, 2.0, 3.0, 4.0]
     assert result["yaw"].to_list() == [0.0, 0.0, 1.0, 1.0, 2.0]
     assert result["agent_category"].to_list() == [5, 5, 5, 5, 5]
 
@@ -164,8 +103,8 @@ def test_gap_segmentation_avoids_crossing() -> None:
     assert result["label"].to_list() == ["a", "a", "a", "b", "b", "b"]
 
 
-def test_cubic_derivative_names() -> None:
-    """Spline methods emit requested derivative columns with user-provided names."""
+def test_cubic_emits_velocity_and_acceleration() -> None:
+    """Cubic resampling emits standard velocity and acceleration columns."""
     df = pl.DataFrame({"frame": [0, 1], "x": [0.0, 1.0]})
 
     result = resample(
@@ -174,37 +113,84 @@ def test_cubic_derivative_names() -> None:
             up=4,
             down=1,
             method=ResampleMethod.CUBIC,
-            position_columns=dict.fromkeys(("x",)),
-            output_derivatives={1: dict.fromkeys(("dx",))},
+            coordinates=("x",),
+            emit_acceleration=True,
+            emit_velocity=True,
         ),
     )
-    x_cubic = CubicSpline(df["frame"], df["x"], bc_type="natural")
-    x_evaluated = x_cubic(np.linspace(0, 1, 5))
-    dx_evaluated = x_cubic(np.linspace(0, 1, 5), 1)
+    interpolator = CubicSpline(df["frame"], df["x"], bc_type="natural")
+    evaluated_x = interpolator(np.linspace(0, 1, 5))
+    evaluated_vx = interpolator(np.linspace(0, 1, 5), 1)
+    evaluated_ax = interpolator(np.linspace(0, 1, 5), 2)
+
+    assert result.columns == ["frame", "x", "vx", "ax"]
     assert result["frame"].to_list() == [0, 1, 2, 3, 4]
-    assert result["x"].to_list() == pytest.approx(x_evaluated.tolist())
-    assert result["dx"].to_list() == pytest.approx(dx_evaluated.tolist())
+    assert result["x"].to_list() == pytest.approx(evaluated_x.tolist())
+    assert result["vx"].to_list() == pytest.approx(evaluated_vx.tolist())
+    assert result["ax"].to_list() == pytest.approx(evaluated_ax.tolist())
 
 
-def test_hermite_uses_input_derivatives() -> None:
-    """Hermite can reuse input derivative columns while also emitting higher orders."""
-    df = pl.DataFrame({"frame": [0, 1], "x": [0.0, 1.0], "vx": [0.0, 0.0]})
+def test_pchip_emits_velocity_columns() -> None:
+    """PCHIP resampling can emit velocity columns from the interpolator."""
+    df = pl.DataFrame({"frame": [0, 1, 2], "x": [0.0, 1.0, 1.5]})
 
     result = resample(
         df,
         ResampleSpec(
-            up=4,
+            up=2, down=1, method=ResampleMethod.PCHIP, coordinates=("x",), emit_velocity=True
+        ),
+    )
+    interpolator = PchipInterpolator(df["frame"], df["x"])
+    sample_points = np.arange(5, dtype=np.float64) * 0.5
+
+    assert result.columns == ["frame", "x", "vx"]
+    assert result["x"].to_list() == pytest.approx(interpolator(sample_points).tolist())
+    assert result["vx"].to_list() == pytest.approx(interpolator(sample_points, nu=1).tolist())
+
+
+def test_cubic_velocity_respects_sample_time() -> None:
+    """Derivative outputs are scaled using the configured sample time."""
+    df = pl.DataFrame({"frame": [0, 1], "x": [0.0, 1.0]})
+
+    result = resample(
+        df,
+        ResampleSpec(
+            up=2,
             down=1,
-            method=ResampleMethod.HERMITE,
-            position_columns=dict.fromkeys(("x",)),
-            input_derivatives={1: dict.fromkeys(("vx",))},
-            output_derivatives={1: dict.fromkeys(("vx",)), 2: dict.fromkeys(("ax",))},
+            method=ResampleMethod.CUBIC,
+            coordinates=("x",),
+            emit_velocity=True,
+            sample_time=0.5,
+        ),
+    )
+    interpolator = CubicSpline(np.array([0.0, 0.5]), np.array([0.0, 1.0]), bc_type="natural")
+    sample_points = np.array([0.0, 0.25, 0.5])
+
+    assert result["frame"].to_list() == [0, 1, 2]
+    assert result["x"].to_list() == pytest.approx(interpolator(sample_points).tolist())
+    assert result["vx"].to_list() == pytest.approx(interpolator(sample_points, 1).tolist())
+
+
+def test_single_point_derivatives_are_nan() -> None:
+    """Derivative outputs for single-point segments are undefined and stay NaN."""
+    df = pl.DataFrame({"frame": [3], "x": [4.0]})
+
+    result = resample(
+        df,
+        ResampleSpec(
+            up=2,
+            down=1,
+            method=ResampleMethod.CUBIC,
+            coordinates=("x",),
+            emit_velocity=True,
+            emit_acceleration=True,
         ),
     )
 
-    assert result["x"].to_list() == pytest.approx([0.0, 0.15625, 0.5, 0.84375, 1.0])
-    assert result["vx"].to_list() == pytest.approx([0.0, 1.125, 1.5, 1.125, 0.0])
-    assert result["ax"].to_list() == pytest.approx([6.0, 3.0, 0.0, -3.0, -6.0])
+    assert result["frame"].to_list() == [6]
+    assert result["x"].to_list() == [4.0]
+    assert np.isnan(result["vx"].item())
+    assert np.isnan(result["ax"].item())
 
 
 def test_lazyframe_input_matches_eager() -> None:
@@ -221,44 +207,3 @@ def test_lazyframe_input_matches_eager() -> None:
     lazy = resample(df.lazy(), spec).collect()
 
     assert_frame_equal(eager, lazy)
-
-
-def test_advanced_dataframe_single() -> None:
-    """Test that a more complex resampling scenario matches SciPy's direct interpolation."""
-    n = 40
-    t = np.linspace(0, 2 * np.pi, n, dtype=np.float64)
-    x = np.cos(3 * t)
-    y = np.sin(4 * t + np.pi / 3)
-    dx = -3 * np.sin(3 * t)
-    dy = 4 * np.cos(4 * t + np.pi / 3)
-    df = pl.DataFrame({"frame": np.arange(n), "x": x, "y": y, "vx": dx, "vy": dy})
-    result = resample(
-        df,
-        ResampleSpec(
-            up=4,
-            down=1,
-            method=ResampleMethod.HERMITE,
-            position_columns=dict.fromkeys(("x", "y")),
-            input_derivatives={1: dict.fromkeys(("vx", "vy"))},
-            output_derivatives={1: dict.fromkeys(("vx", "vy")), 2: dict.fromkeys(("ax", "ay"))},
-        ),
-    )
-
-    t = np.arange(n)
-    n_new = (40 - 1) * 4 + 1
-    t_new = np.arange(n_new, dtype=np.float64) * 0.25
-    x_cubic = CubicHermiteSpline(t, x, dx, axis=0)
-    y_cubic = CubicHermiteSpline(t, y, dy, axis=0)
-    x_evaluated = x_cubic(t_new)
-    y_evaluated = y_cubic(t_new)
-    dx_evaluated = x_cubic(t_new, nu=1)
-    dy_evaluated = y_cubic(t_new, nu=1)
-    ax_evaluated = x_cubic(t_new, nu=2)
-    ay_evaluated = y_cubic(t_new, nu=2)
-    assert result["frame"].to_list() == list(range(4 * n - 3))
-    assert np.isclose(result["x"].to_numpy(), x_evaluated).all()
-    assert np.isclose(result["y"].to_numpy(), y_evaluated).all()
-    assert np.isclose(result["vx"].to_numpy(), dx_evaluated).all()
-    assert np.isclose(result["vy"].to_numpy(), dy_evaluated).all()
-    assert np.isclose(result["ax"].to_numpy(), ax_evaluated).all()
-    assert np.isclose(result["ay"].to_numpy(), ay_evaluated).all()

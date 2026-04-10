@@ -8,21 +8,18 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION
 from dronalize.datasets.highd.maps.builder import HighDMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
-from dronalize.processing.maps.config import MapConfig
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
-    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.config import LoaderConfig
-    from dronalize.processing.loading.splits import SplitConfig
+    from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.models import LoaderRequest
 
 
 class HighDLoader(LevelXDataLoader):
@@ -30,32 +27,13 @@ class HighDLoader(LevelXDataLoader):
 
     def __init__(
         self,
+        *,
         data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the highD loader.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Root directory of the extracted highD dataset.
-        loader_config : LoaderConfig, optional
-            Loader configuration override.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. This dataset does not define predefined
-            splits, so `None` processes all sources.
-
-        """
-        super().__init__(
-            Path(data_root) / "data",
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-        )
+        """Initialize the highD loader."""
+        super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
 
     @staticmethod
     @override
@@ -102,26 +80,13 @@ class HighDLoader(LevelXDataLoader):
     @staticmethod
     @override
     def location_id_select(meta_df: pl.DataFrame, path: Path) -> str:
+        _ = meta_df
         return str(path)
 
     @classmethod
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_ACCELERATION
-
-    @classmethod
-    @override
-    def default_map_config(cls) -> MapConfig:
-        return MapConfig.full_map(interp_distance=10)
-
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return (
-            super()
-            .default_config()
-            .with_lane_change_sampling(required_lane_changes=3, negative_keep_every=3)
-        )
 
     @override
     def map_resolver(self) -> MapResolver:
@@ -153,11 +118,3 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float64,
     "yAcceleration": pl.Float64,
 })
-
-
-if __name__ == "__main__":
-    from dronalize.datasets.highd import DATASET_SPEC
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-
-    root = resolve_dataset_root_from_env("highd")
-    _ = debug_descriptor(DATASET_SPEC, root)

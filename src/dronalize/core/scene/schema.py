@@ -193,12 +193,10 @@ _BASE_FIELDS: Final[TrajectoryField] = (
 )
 
 POSITIONS_ONLY: Final[TrajectorySchema] = TrajectorySchema.define(
-    "positions_only",
-    fields=_BASE_FIELDS,
+    "positions_only", fields=_BASE_FIELDS
 )
 POSITIONS_YAW: Final[TrajectorySchema] = TrajectorySchema.define(
-    "positions_yaw",
-    fields=_BASE_FIELDS | TrajectoryField.YAW,
+    "positions_yaw", fields=_BASE_FIELDS | TrajectoryField.YAW
 )
 POSITIONS_VELOCITY: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_velocity", fields=_BASE_FIELDS | TrajectoryField.VX | TrajectoryField.VY

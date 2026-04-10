@@ -8,25 +8,21 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION
 from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
-from dronalize.processing.filtering.agent import MinSamples
-from dronalize.processing.filtering.filter import Filter
-from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.loading.loader import Source
-from dronalize.processing.maps.config import MapConfig
-from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.splits import SplitConfig
+    from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.models import LoaderRequest
 
 
 class AD4CHELoader(LevelXDataLoader):
@@ -34,31 +30,14 @@ class AD4CHELoader(LevelXDataLoader):
 
     def __init__(
         self,
+        *,
         data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the trajectory data loader for the AD4CHE dataset.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Path to the directory containing the .csv data files.
-        loader_config : LoaderConfig, optional
-            Loader configuration. If None, the default configuration is used.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. This dataset does not define predefined
-            splits, so `None` processes all sources.
-
-        """
+        """Initialize the AD4CHE loader."""
         super().__init__(
-            Path(data_root) / "AD4CHE_Data_V1.0",
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
+            data_root=Path(data_root) / "AD4CHE_Data_V1.0", request=request, resources=resources
         )
 
     @override
@@ -123,28 +102,12 @@ class AD4CHELoader(LevelXDataLoader):
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_ACCELERATION
 
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return (
-            LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
-            .with_resampling(ResampleSpec(up=1, down=3))
-            .with_window(45)
-            .with_filter(Filter.define_cleanup(MinSamples(minimum=4)))
-            .with_lane_change_sampling(required_lane_changes=5, negative_keep_every=3)
-        )
-
-    @classmethod
-    @override
-    def default_map_config(cls) -> MapConfig:
-        return MapConfig.scene_extent_extraction(padding=1.15)
-
     @override
     def map_resolver(self) -> MapResolver:
         def _resolver(scene: Scene) -> MapGraph | None:
             if scene.map_key is None or self.map_config is None:
                 return None
-            path = self._data_root / scene.map_key
+            path = self.root / scene.map_key
             map_graph = AD4CHEMapBuilder(path).build(
                 self.map_config.min_distance, self.map_config.interp_distance
             )
@@ -153,9 +116,8 @@ class AD4CHELoader(LevelXDataLoader):
         return _resolver
 
     def _recordings(self) -> Iterable[tuple[int, Path]]:
-        """Yield discovered recording identifiers with their directories and metadata files."""
-        for subdir in sorted(path for path in self._data_root.iterdir() if path.is_dir()):
-            # subdir is on format DJI_XXXX
+        """Yield discovered recording identifiers with their directories."""
+        for subdir in sorted(path for path in self.root.iterdir() if path.is_dir()):
             number_str = subdir.name.split("_")[-1]
             yield int(number_str), subdir
 
@@ -174,10 +136,3 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "xAcceleration": pl.Float64,
     "yAcceleration": pl.Float64,
 })
-
-if __name__ == "__main__":
-    from dronalize.datasets.ad4che import DATASET_SPEC
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-
-    root = resolve_dataset_root_from_env("ad4che")
-    _ = debug_descriptor(DATASET_SPEC, root, max_scenes=3, skip_scenes=40)

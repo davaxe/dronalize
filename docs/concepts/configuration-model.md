@@ -11,43 +11,49 @@ For exact TOML syntax and field tables, see the [configuration reference](../ref
 Think of configuration as three layers:
 
 1. Built-in dataset defaults
-2. `[global]` settings shared across datasets
+2. optional `profiles` composed in declared order
 3. `[datasets.<name>]` settings for one dataset only
 
 This lets you keep a common baseline while still handling dataset-specific differences cleanly.
 
 ## How to organize a config file
 
-Use `[global]` when the same setting should apply everywhere.
+Use `[profiles.<name>]` when the same setting should be reusable across datasets.
 
 ```toml
-[global.execution]
+[profiles.fast.execution]
 jobs = "auto"
 ```
 
-Use `[datasets.<name>]` when one dataset needs different behavior.
+Then opt a dataset into that profile when needed.
 
 ```toml
+[datasets.a43]
+extends = ["fast"]
+
 [datasets.a43.loader]
-input_len = 20
-output_len = 60
+history_frames = 20
+future_frames = 60
 sample_time = 0.1
 ```
 
 You can combine both:
 
 ```toml
-[global.execution]
+[profiles.fast.execution]
 jobs = "auto"
 
+[datasets.a43]
+extends = ["fast"]
+
 [datasets.a43.loader]
-input_len = 20
-output_len = 60
+history_frames = 20
+future_frames = 60
 ```
 
 In practice:
 
-- `global` is a shared policy
+- `profiles` are reusable policies
 - `datasets.<name>` is a local exception
 
 ## What the main sections do
@@ -67,7 +73,7 @@ For most projects, the easiest approach is:
 1. Start with one dataset and no configuration or a minimal `loader` block.
 2. Add `split` and `export` once you know how you want to train and save data. 
 3. Add `map` only if the dataset supports map context and you need it.
-4. Move repeated settings into `[global]` when multiple datasets should share them.
+4. Move repeated settings into `profiles` when multiple datasets should share them.
 
 Many nested sections merge into inherited defaults rather than forcing you to redefine everything. That makes it practical to override only the parts you want to change.
 
@@ -80,31 +86,34 @@ Many nested sections merge into inherited defaults rather than forcing you to re
 
 This example demonstrates how to configure settings for multiple datasets in the
 same file. It first sets a shared execution policy, then defines specific loader
-settings for two datasets, `a43` and `argoverse1`. The `argoverse1` loader also
-includes dataset-specific `loader.options` and a resampling block to match the
+settings for two datasets, `a43` and `argoverse1`. The `argoverse1` dataset also
+includes dataset-specific `dataset` config and a resampling block to match the
 sample time of `a43`.
 
-The `a43` dataset overrides the global execution policy by setting `jobs` to 1, which means it will not use parallel processing.
+The `a43` dataset overrides the shared execution policy by setting `jobs` to 1, which means it will not use parallel processing.
 This can be useful if a dataset is known to be small and parallel processing would not provide significant speedup.
 
 ```toml
-[global.execution]
+[profiles.fast.execution]
 jobs = "auto"
+
+[datasets.a43]
+extends = ["fast"]
 
 [datasets.a43.execution]
 jobs = 1
 
 [datasets.a43.loader]
-input_len = 20
-output_len = 60
+history_frames = 20
+future_frames = 60
 sample_time = 0.1
 
 [datasets.argoverse1.loader]
-input_len = 6
-output_len = 10
+history_frames = 6
+future_frames = 10
 sample_time = 0.5
 
-[datasets.argoverse1.loader.options]
+[datasets.argoverse1.dataset]
 file_batch_size = 8
 
 [datasets.argoverse1.loader.resampling]

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.config.sections import ScenesConfig
     from dronalize.processing.pipeline.pipeline import Pipeline
 
 
@@ -37,8 +37,8 @@ class PipelineBuildContext(Protocol):
     """Builder surface exposed to pipeline extensions."""
 
     @property
-    def config(self) -> LoaderConfig:
-        """Return the loader configuration."""
+    def scenes(self) -> ScenesConfig | None:
+        """Return the active scene-processing configuration."""
         ...
 
     @property
@@ -76,8 +76,8 @@ class PipelineBuildContext(Protocol):
         """Attach transforms after window extraction."""
         ...
 
-    def add_post_filter(self, pipeline: Pipeline) -> None:
-        """Attach transforms after scene filtering."""
+    def add_post_screening(self, pipeline: Pipeline) -> None:
+        """Attach transforms after scene screening."""
         ...
 
 

@@ -10,7 +10,7 @@ import polars as pl
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal.typing import DataFrameT
+    from dronalize.core.typing import DataFrameT
 
 
 def cumulative_blocks(

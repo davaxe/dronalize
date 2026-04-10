@@ -13,9 +13,9 @@ from dronalize.core.categories import AgentCategory
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal.typing import FloatDType
-    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
+    from dronalize.core.typing import FloatDType
     from dronalize.io.manifest import (
         MapRecord,
         MapRecordF32,
@@ -84,11 +84,11 @@ def encode_scene_record(
         scene = scene.as_schema(trajectory_schema)
 
     data = scene.frame
-    input_len = scene.input_len
-    output_len = scene.output_len
+    history_frames = scene.history_frames
+    future_frames = scene.future_frames
     feature_columns = scene.schema.feature_columns()
 
-    time_steps = input_len + output_len
+    time_steps = history_frames + future_frames
     start_frame = data["frame"].min()
     unique_ids: list[int] = data["id"].unique().to_list()
     num_agents = len(unique_ids)

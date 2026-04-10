@@ -5,13 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from dronalize._internal.polars_ops import normalize_group_by
+from dronalize.core.polars_ops import normalize_group_by
 from dronalize.processing.pipeline._internal import SCENE_ID_COLUMN, SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
-    from dronalize.processing.loading.config import LoaderConfig
-    from dronalize.processing.loading.splits import SplitConfig
+    from dronalize.config.sections import ScenesConfig
+    from dronalize.processing.models import PipelinePlan, SplitRequest
     from dronalize.processing.pipeline.spec import TrackColumns, TrajectorySpec
 
 
@@ -22,12 +22,17 @@ class TrajectoryPipelineBuilder:
     spec: TrajectorySpec
     pre_window: Pipeline = field(default_factory=Pipeline)
     post_window: Pipeline = field(default_factory=Pipeline)
-    post_filter: Pipeline = field(default_factory=Pipeline)
+    post_screening: Pipeline = field(default_factory=Pipeline)
 
     @property
-    def config(self) -> LoaderConfig:
-        """Return the loader configuration for this pipeline."""
-        return self.spec.config
+    def plan(self) -> PipelinePlan:
+        """Return the pipeline plan for this pipeline."""
+        return self.spec.plan
+
+    @property
+    def scenes(self) -> ScenesConfig:
+        """Return the active scene-processing configuration."""
+        return self.spec.plan.scenes
 
     @property
     def columns(self) -> TrackColumns:
@@ -35,9 +40,9 @@ class TrajectoryPipelineBuilder:
         return self.spec.columns
 
     @property
-    def split_request(self) -> SplitConfig | None:
+    def split_request(self) -> SplitRequest | None:
         """Return the active split request, if any."""
-        return self.spec.split_request
+        return self.spec.plan.split
 
     @property
     def scene_id_column(self) -> str:
@@ -47,13 +52,14 @@ class TrajectoryPipelineBuilder:
     @property
     def has_window(self) -> bool:
         """Return whether the base pipeline will apply window extraction."""
-        return self.spec.config.window is not None
+        return self.scenes.window is not None
 
     def split_columns(self) -> list[str]:
         """Return grouping columns introduced by block-based splitting."""
         return (
             [SPLIT_PARTITION_COLUMN]
-            if self.spec.split_request and self.spec.split_request.uses_block_split
+            if self.split_request is not None
+            and self.split_request.strategy in {"time", "shuffled-time"}
             else []
         )
 
@@ -80,6 +86,6 @@ class TrajectoryPipelineBuilder:
         """Compose transforms immediately after window extraction."""
         self.post_window = self.post_window.compose(pipeline)
 
-    def add_post_filter(self, pipeline: Pipeline) -> None:
-        """Compose transforms after scene filtering."""
-        self.post_filter = self.post_filter.compose(pipeline)
+    def add_post_screening(self, pipeline: Pipeline) -> None:
+        """Compose transforms after scene screening."""
+        self.post_screening = self.post_screening.compose(pipeline)

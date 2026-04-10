@@ -91,7 +91,7 @@ schema = "positions_velocity_yaw"
 precision = "float64"
 recenter_positions = true
 
-[datasets.a43.export.mds]
+[datasets.a43.export.backends.mds]
 compression = "zstd:7"
 ```
 

@@ -1,9 +1,3 @@
-# ::: dronalize.runtime.executor.Executor
+# ::: dronalize.runtime.api.process_dataset
 
-## ::: dronalize.runtime.executor.ObservableExecutor
-
-## ::: dronalize.runtime.executor.Progress
-
-## ::: dronalize.runtime.sequential.SequentialExecutor
-
-## ::: dronalize.runtime.parallel.ParallelExecutor
+::: dronalize.runtime.api.resolve_job

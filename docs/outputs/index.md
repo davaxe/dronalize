@@ -37,8 +37,8 @@ without having to read the scene records themselves.
 | `trajectory_schema` | `str` | Schema actually written to disk. |
 | `derived_features` | `list[str]` | Feature columns derived during schema conversion rather than read directly from the source. |
 | `feature_columns` | `list[str]` | Ordered list of column names in the feature tensor. |
-| `input_len` | `int` | Number of observation frames. |
-| `output_len` | `int` | Number of prediction frames. |
+| `history_frames` | `int` | Number of history frames. |
+| `future_frames` | `int` | Number of future frames. |
 | `precision` | `str` | Floating-point precision: `"float32"` or `"float64"`. |
 | `recenter_positions` | `bool` | Whether positions were recentered before writing. |
 | `has_map` | `bool` | Whether map data is present in the output. |
@@ -53,6 +53,6 @@ from dronalize.io import read_manifest
 
 manifest = read_manifest(Path("output/train"))
 print(manifest.feature_columns)  # ('x', 'y', 'vx', 'vy', 'yaw')
-print(manifest.input_len, manifest.output_len)
+print(manifest.history_frames, manifest.future_frames)
 print(manifest.has_map)
 ```

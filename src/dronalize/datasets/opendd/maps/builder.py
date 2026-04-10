@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from typing_extensions import Self, override
 
-from dronalize.core.maps.edge_types import EdgeType
+from dronalize.core.categories import EdgeType
 from dronalize.processing.maps.builder import BaseMapBuilder, Point
 
 if TYPE_CHECKING:

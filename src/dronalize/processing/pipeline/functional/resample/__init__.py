@@ -1,8 +1,9 @@
 """Public API for temporal trajectory resampling."""
 
 from dronalize.processing.pipeline.functional.resample._common import (
-    ColumnOrder,
-    DerivativeOrderMap,
+    CoordinateColumns,
+    DerivativeColumns,
+    EmittedDerivative,
     ResampleMethod,
     ResamplePlan,
     ResampleSpec,
@@ -10,8 +11,9 @@ from dronalize.processing.pipeline.functional.resample._common import (
 from dronalize.processing.pipeline.functional.resample.resample import resample
 
 __all__ = [
-    "ColumnOrder",
-    "DerivativeOrderMap",
+    "CoordinateColumns",
+    "DerivativeColumns",
+    "EmittedDerivative",
     "ResampleMethod",
     "ResamplePlan",
     "ResampleSpec",

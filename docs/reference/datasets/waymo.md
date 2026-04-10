@@ -12,6 +12,13 @@ The Waymo Open Motion Dataset is a large-scale benchmark for interactive motion 
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
 
+!!! info "Extra dependencies"
+    This dataset requires the `waymo` extra to be installed. You can do this with pip (or your package manager of choice):
+
+    ```bash
+    pip install dronalize[waymo]
+    ``` 
+
 ## Dataset facts
 
 | Field               | Value                           | Notes                                                         |

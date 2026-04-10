@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, overload
 import numpy as np
 from typing_extensions import Unpack
 
-from dronalize._internal.optional import raise_missing_optional_dependency
+from dronalize.core.optional import raise_missing_optional_dependency
 from dronalize.io.records import RawSceneRecord
 
 try:
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
-__all__ = ["MDSReader", "MDSReaderInitArgs"]
+__all__ = ["MDSReader", "MDSReaderInitArgs", "Stream"]
 
 
 class MDSReaderInitArgs(TypedDict, total=False):
@@ -104,7 +104,7 @@ class MDSReader:
 
     @staticmethod
     def _convert_record(record: dict[str, Any]) -> RawSceneRecord:
-        input_len = int(record["input_len"])
+        history_frames = int(record["history_frames"])
         features = np.asarray(record["features"])
         mask = np.asarray(record["mask"], dtype=bool)
 
@@ -123,10 +123,10 @@ class MDSReader:
             scene_number=int(record["scene_number"]),
             position_offset=np.asarray(record["position_offset"], dtype=np.float64),
             agent_types=np.asarray(record["agent_types"], dtype=np.int32),
-            input_features=features[:, :input_len],
-            input_mask=mask[:, :input_len],
-            output_features=features[:, input_len:],
-            output_mask=mask[:, input_len:],
+            input_features=features[:, :history_frames],
+            input_mask=mask[:, :history_frames],
+            output_features=features[:, history_frames:],
+            output_mask=mask[:, history_frames:],
             map_node_positions=map_node_positions,
             map_edge_indices=map_edge_indices,
             map_node_types=map_node_types,

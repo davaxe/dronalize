@@ -11,14 +11,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from dronalize.core.scene import Scene
-    from dronalize.io.manifest import DatasetManifest
 
 
 @runtime_checkable
 class DatasetWriter(Protocol):
     """Protocol for writing processed scenes to persisted storage."""
-
-    manifest: DatasetManifest
 
     def write(self, scene: Scene) -> bool:
         """Write one processed scene and return whether it was accepted."""

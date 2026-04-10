@@ -3,14 +3,13 @@
 ## Import guide
 
 ```python
-from dronalize.processing import LoaderConfig, WindowConfig, MapConfig
-from dronalize.processing import filtering, maps, pipeline
+from dronalize.processing import maps, pipeline, screening
 ```
 
-Use this package for the processing config models that most callers need
-directly, and then drop into the focused subpackages for the richer APIs:
+Use this package as a lightweight namespace for the focused processing
+subpackages:
 
-- [`filtering`][dronalize.processing.filtering] for filter containers and
+- [`screening`][dronalize.processing.screening] for screen containers and
   grouped rule families
 - [`maps`][dronalize.processing.maps] for map builders, extraction config, and
   resolver helpers
@@ -27,16 +26,6 @@ surface.
 - [`dronalize.runtime`][] for runtime config resolution and planning
 """
 
-from dronalize.processing import filtering, maps, pipeline
-from dronalize.processing.loading import LaneChangeSamplingConfig, LoaderConfig, WindowConfig
-from dronalize.processing.maps import MapConfig
+from dronalize.processing import maps, pipeline, screening
 
-__all__ = [
-    "LaneChangeSamplingConfig",
-    "LoaderConfig",
-    "MapConfig",
-    "WindowConfig",
-    "filtering",
-    "maps",
-    "pipeline",
-]
+__all__ = ["maps", "pipeline", "screening"]

@@ -10,7 +10,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.errors import TrajectorySchemaError
-from dronalize.core.maps.graph import MapGraph
+from dronalize.core.map_graph import MapGraph
 from dronalize.core.scene.derivations import (
     ConversionContext,
     apply_derivation_plan,
@@ -36,10 +36,10 @@ class Scene:
     """DataFrame containing the scene data."""
     scene_number: int
     """Unique scene number assigned during processing."""
-    input_len: int
-    """Number of observed frames."""
-    output_len: int
-    """Number of predicted frames."""
+    history_frames: int
+    """Number of history frames."""
+    future_frames: int
+    """Number of future frames."""
     schema: TrajectorySchema
     """Schema describing which fields this scene currently provides."""
     sample_time: float | None = None
@@ -57,8 +57,8 @@ class Scene:
         frame: pl.DataFrame,
         scene_number: int,
         *,
-        input_len: int,
-        output_len: int,
+        history_frames: int,
+        future_frames: int,
         schema: TrajectorySchema,
         sample_time: float | None = None,
         map_key: MapKey = None,
@@ -73,8 +73,8 @@ class Scene:
         return cls(
             frame=frame,
             scene_number=scene_number,
-            input_len=input_len,
-            output_len=output_len,
+            history_frames=history_frames,
+            future_frames=future_frames,
             schema=schema,
             sample_time=sample_time,
             map_key=map_key,
@@ -124,8 +124,8 @@ class Scene:
         return (
             "Scene("
             f"scene_number={self.scene_number}, "
-            f"input_len={self.input_len}, "
-            f"output_len={self.output_len}, "
+            f"history_frames={self.history_frames}, "
+            f"future_frames={self.future_frames}, "
             f"schema={self.schema.name}, "
             f"map_key={self.map_key!r}, "
             f"frame=DataFrame({rows} rows x {cols} cols)"

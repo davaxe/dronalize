@@ -8,50 +8,37 @@ from typing import TYPE_CHECKING
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-from scipy.interpolate import CubicHermiteSpline, CubicSpline, PchipInterpolator, PPoly
+from scipy.interpolate import CubicSpline, PchipInterpolator, PPoly
 
 from dronalize.processing.pipeline.functional.resample._common import (
     SEGMENT_COLUMN,
     ResamplePlan,
     ResampleSpec,
-    build_plan,
     not_packed_columns,
     packed_struct_expression,
     segment_data,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from dronalize._internal.typing import DataFrameT
+    from dronalize.core.typing import DataFrameT
 
 Interpolator = PPoly
-InterpolatorFactory = Callable[
-    [npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64] | None], Interpolator
-]
+InterpolatorFactory = Callable[[npt.NDArray[np.float64], npt.NDArray[np.float64]], Interpolator]
 
 
 def spline_resample(
     data: DataFrameT,
     spec: ResampleSpec,
+    plan: ResamplePlan,
     *,
-    frame_column: str = "frame",
-    group_by: str | Sequence[str] | None = None,
     interpolator_factory: InterpolatorFactory,
 ) -> DataFrameT:
     """Resample trajectory data with a SciPy spline interpolator."""
-    plan = build_plan(spec, frame_column=frame_column, group_by=group_by)
-
-    if spec.no_resampling and not plan.output_derivatives:
-        base = data.sort([*plan.group_by, frame_column]) if spec.sort else data
-        return base.drop(SEGMENT_COLUMN, strict=False)
+    if spec.no_resampling and not plan.emit_velocity and not plan.emit_acceleration:
+        return data.sort([*plan.group_by, plan.frame_column]).drop(SEGMENT_COLUMN, strict=False)
 
     segmented = segment_data(
-        data,
-        frame_column=frame_column,
-        group_by=plan.group_by,
-        max_gap=spec.max_gap,
-        sort=spec.sort,
+        data, frame_column=plan.frame_column, group_by=plan.group_by, max_gap=spec.max_gap
     )
 
     return (
@@ -80,44 +67,24 @@ def spline_resample(
 
 
 def _output_dtype(plan: ResamplePlan) -> dict[str, type[pl.DataType]]:
-    dtype: dict[str, type[pl.DataType]] = dict.fromkeys(plan.packed_columns, pl.Float64)
-    dtype[plan.frame_column] = pl.Int64
-    for columns in plan.output_derivatives.values():
-        dtype.update(dict.fromkeys(columns, pl.Float64))
-
+    dtype: dict[str, type[pl.DataType]] = {plan.frame_column: pl.Int64}
+    for column in (*plan.coordinates, *plan.velocity_columns, *plan.acceleration_columns):
+        dtype[column] = pl.Float64
     return dtype
 
 
 def cubic_spline_interpolator_factory(
-    time_old: npt.NDArray[np.float64],
-    position_old: npt.NDArray[np.float64],
-    derivative_old: npt.NDArray[np.float64] | None = None,
+    time_old: npt.NDArray[np.float64], coordinates_old: npt.NDArray[np.float64]
 ) -> Interpolator:
     """Build a natural cubic-spline interpolator for one trajectory segment."""
-    _ = derivative_old
-    return CubicSpline(time_old, position_old, axis=0, bc_type="natural")
+    return CubicSpline(time_old, coordinates_old, axis=0, bc_type="natural")
 
 
 def pchip_interpolator_factory(
-    time_old: npt.NDArray[np.float64],
-    position_old: npt.NDArray[np.float64],
-    derivative_old: npt.NDArray[np.float64] | None = None,
+    time_old: npt.NDArray[np.float64], coordinates_old: npt.NDArray[np.float64]
 ) -> Interpolator:
     """Build a monotone PCHIP interpolator for one trajectory segment."""
-    _ = derivative_old
-    return PchipInterpolator(time_old, position_old, axis=0)
-
-
-def cubic_hermite_interpolator_factory(
-    time_old: npt.NDArray[np.float64],
-    position_old: npt.NDArray[np.float64],
-    derivative_old: npt.NDArray[np.float64] | None = None,
-) -> Interpolator:
-    """Build a cubic-Hermite interpolator for one trajectory segment."""
-    if derivative_old is None:
-        msg = "Hermite resampling requires first-order derivative inputs."
-        raise ValueError(msg)
-    return CubicHermiteSpline(time_old, position_old, dydx=derivative_old, axis=0)
+    return PchipInterpolator(time_old, coordinates_old, axis=0)
 
 
 def _resample_segment(
@@ -148,26 +115,17 @@ def _resample_segment(
 def _resample_single_point(
     name: str, df: pl.DataFrame, plan: ResamplePlan, *, up: int, down: int
 ) -> pl.Series:
-    out: dict[str, object] = {}
-    output_order = tuple(plan.emitted_columns.keys())
-
     frames_old = df[plan.frame_column].to_numpy().astype(np.float64, copy=False)
-    out[plan.frame_column] = (frames_old * (up / down)).astype(np.int64)
+    coordinates_old = df.select(tuple(plan.coordinates)).to_numpy().astype(np.float64, copy=False)
+    out: dict[str, object] = {plan.frame_column: (frames_old * (up / down)).astype(np.int64)}
 
-    positions = df.select(tuple(plan.position_columns)).to_numpy().astype(np.float64, copy=False)
-    for i, column in enumerate(plan.position_columns):
-        out[column] = positions[:, i]
+    for index, column in enumerate(plan.coordinates):
+        out[column] = coordinates_old[:, index]
+    for columns in (plan.velocity_columns, plan.acceleration_columns):
+        for column in columns:
+            out[column] = np.full(df.height, np.nan, dtype=np.float64)
 
-    for order, columns in plan.output_derivatives.items():
-        if plan.input_derivatives.get(order) == columns:
-            values = df.select(tuple(columns)).to_numpy().astype(np.float64, copy=False)
-        else:
-            values = np.full((df.height, len(columns)), np.nan, dtype=np.float64)
-
-        for i, column in enumerate(columns):
-            out[column] = values[:, i]
-
-    return pl.DataFrame(out).select(output_order).to_struct(name)
+    return pl.DataFrame(out).select(plan.emitted_columns).to_struct(name)
 
 
 def _resample_multi_point(
@@ -182,6 +140,7 @@ def _resample_multi_point(
 ) -> pl.Series:
     frame_old = df[plan.frame_column].to_numpy().astype(np.float64, copy=False)
     time_old = frame_old * sample_time
+    coordinates_old = df.select(tuple(plan.coordinates)).to_numpy().astype(np.float64, copy=False)
 
     step_frames = down / up
     step_time = step_frames * sample_time
@@ -189,27 +148,23 @@ def _resample_multi_point(
     time_end = float(time_old[-1])
     n_new = int(np.floor((time_end - time_start) / step_time)) + 1
     time_new = time_start + np.arange(n_new, dtype=np.float64) * step_time
-    position_old = df.select(tuple(plan.position_columns)).to_numpy().astype(np.float64, copy=False)
+    interpolator = interpolator_factory(time_old, coordinates_old)
 
-    first_derivative_columns = plan.input_derivatives.get(1)
-    first_derivative_old = (
-        df.select(tuple(first_derivative_columns)).to_numpy().astype(np.float64, copy=False)
-        if first_derivative_columns
-        else None
-    )
+    out: dict[str, object] = {
+        plan.frame_column: np.arange(n_new, dtype=np.int64) + int(frame_old[0] * up / down)
+    }
+    coordinates_new = interpolator(time_new)
+    for index, column in enumerate(plan.coordinates):
+        out[column] = coordinates_new[:, index]
 
-    interpolator = interpolator_factory(time_old, position_old, first_derivative_old)
-    evaluated = {order: interpolator(time_new, nu=order) for order in plan.evaluation_orders}
+    if plan.emit_velocity:
+        velocity = interpolator(time_new, nu=1)
+        for index, column in enumerate(plan.velocity_columns):
+            out[column] = velocity[:, index]
 
-    out: dict[str, object] = {}
-    output_order = tuple(plan.emitted_columns.keys())
-    out[plan.frame_column] = np.arange(n_new, dtype=np.int64) + int(frame_old[0] * up / down)
-    for i, column in enumerate(plan.position_columns):
-        out[column] = evaluated[0][:, i]
+    if plan.emit_acceleration:
+        acceleration = interpolator(time_new, nu=2)
+        for index, column in enumerate(plan.acceleration_columns):
+            out[column] = acceleration[:, index]
 
-    for order, columns in plan.output_derivatives.items():
-        values = evaluated[order]
-        for i, column in enumerate(columns):
-            out[column] = values[:, i]
-
-    return pl.DataFrame(out).select(output_order).to_struct(name)
+    return pl.DataFrame(out).select(plan.emitted_columns).to_struct(name)

@@ -21,12 +21,12 @@ Before any data is touched, a config resolution step merges dataset defaults, a 
 
 ## Config resolution
 
-Every run starts from the dataset's built-in defaults. The TOML config file can override them, first through a `[global]` block that applies everywhere, then through a `[datasets.<name>]` block that applies only to one dataset. CLI flags are applied last.
+Every run starts from the dataset's built-in declarative defaults. A TOML config file can then compose reusable `[profiles.<name>]` fragments and a `[datasets.<name>]` entry for the selected dataset. Typed runtime overrides from the CLI or Python request model are applied last.
 
-The `ConfigResolver` in `dronalize.runtime` handles this merge and produces a single resolved config used for the rest of the run. The same resolver is used whether the run is started from the CLI or from Python via `plan_dataset()`.
+The runtime resolves that layered declarative config first, then compiles it into the execution-ready settings used by loaders, pipelines, and writers. The same resolution and compilation path is used whether the run starts from the CLI or Python.
 
 !!! note "Dataset defaults as the foundation"
-    Many values — such as `input_len`, `output_len`, and `sample_time` — come from the
+    Many values — such as `history_frames`, `future_frames`, and `sample_time` — come from the
     dataset's own built-in loader config, not from a package-level constant. Omitting a field
     from your config file leaves the dataset's defaults intact. Check the [dataset reference](../reference/datasets/index.md) or use `dronalize inspect <dataset>` to see what a dataset starts with.
 

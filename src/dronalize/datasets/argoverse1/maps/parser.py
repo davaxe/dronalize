@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from typing import TYPE_CHECKING
 
-from dronalize.core.maps.edge_types import EdgeType
+from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
     from collections.abc import Callable

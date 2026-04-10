@@ -1,29 +1,24 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
-from typing_extensions import override
+from typing_extensions import Self, override
 
-from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import CANONICAL
 from dronalize.datasets.shared import utils
-from dronalize.processing.filtering import Filter
-from dronalize.processing.filtering.agent import MinSamples
-from dronalize.processing.filtering.cleanup import ExcludeCategories
 from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
-from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.splits import SplitConfig
+    from dronalize.processing.loading.resources import DatasetResources
+    from dronalize.processing.models import LoaderRequest
 
 
 class LevelXDataLoader(BaseSceneLoader):
@@ -43,10 +38,8 @@ class LevelXDataLoader(BaseSceneLoader):
     def __init__(
         self,
         data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
     ) -> None:
         """Initialize the loader for an X-level dataset (e.g., rounD, inD).
 
@@ -54,20 +47,19 @@ class LevelXDataLoader(BaseSceneLoader):
         ----------
         data_root : Path or str
             Root directory containing the extracted recording CSV files.
-        loader_config : LoaderConfig, optional
-            Loader configuration. If None, the default configuration is used.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. X-level datasets do not define predefined
-            splits, so `None` processes all sources.
 
         """
-        super().__init__(
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-        )
-        self._data_root: Path = Path(data_root)
+        super().__init__(data_root=data_root, request=request, resources=resources)
+
+    @classmethod
+    @override
+    def unified_factory(
+        cls,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> Self:
+        return cls(data_root=data_root, request=request, resources=resources)
 
     @staticmethod
     def meta_data_select() -> list[pl.Expr]:
@@ -124,7 +116,7 @@ class LevelXDataLoader(BaseSceneLoader):
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
         for recording_id in self._recording_ids():
-            recording_meta = self._data_root / f"{recording_id:0>2}_recordingMeta.csv"
+            recording_meta = self.root / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
             location_id = self.location_id_select(recording_meta_data, recording_meta)
             columns = recording_meta_data.columns
@@ -142,7 +134,7 @@ class LevelXDataLoader(BaseSceneLoader):
 
             yield Source(
                 identifier=recording_id,
-                data=self._data_root,
+                data=self.root,
                 map_key=str(location_id),
                 metadata=metadata,
             )
@@ -174,41 +166,17 @@ class LevelXDataLoader(BaseSceneLoader):
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return (
-            LoaderConfig(input_len=50, output_len=125, sample_time=0.04)
-            .with_resampling(
-                ResampleSpec
-                .cubic(up=2, down=1)
-                .with_output_derivative(1, "vx", "vy")
-                .with_output_derivative(2, "ax", "ay")
-            )
-            .with_window(25)
-            .with_filter(
-                Filter.define_cleanup(
-                    ExcludeCategories.define(categories=[AgentCategory.TRAILER]),
-                    MinSamples(minimum=6),
-                )
-            )
-        )
-
-    @classmethod
-    @override
-    def default_map_config(cls) -> MapConfig:
-        return MapConfig.full_map()
-
     @override
     def map_resolver(self) -> MapResolver:
-        if self._shared_memory_name is None or self.map_config is None:
+        shared_maps = self.resources.shared_maps
+        if not isinstance(shared_maps, str) or self.map_config is None:
             return no_map()
-        return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
+        return shared_map(shared_maps, utils.extract_fn(self.map_config.extraction))
 
     def _recording_ids(self) -> list[int]:
         """Return sorted recording identifiers discovered from metadata files."""
         recording_ids: list[int] = []
-        for recording_meta in sorted(self._data_root.glob("*_recordingMeta.csv")):
+        for recording_meta in sorted(self.root.glob("*_recordingMeta.csv")):
             prefix, _, _ = recording_meta.stem.partition("_")
             recording_ids.append(int(prefix))
         return recording_ids

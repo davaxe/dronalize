@@ -1,4 +1,4 @@
-# Configuration Reference
+# Configuration reference
 
 <div class="section-intro" markdown="1">
 This reference describes the TOML configuration surface used by `dronalize`. The file is validated before processing starts, with structured schema checks handling field types, nested table shapes, and section-specific requirements so you can catch configuration issues early.
@@ -10,13 +10,13 @@ Dataset-specific defaults, capabilities, and dataset-owned configuration behavio
 
 Authoring config has two top-level entry points:
 
-- `global` for settings that apply to every dataset
+- `profiles.<name>` for reusable config fragments
 - `datasets.<dataset-name>` for settings that apply only to one dataset key
 
 Minimal shape:
 
 ```toml
-[global]
+[profiles.<profile-name>]
 
 [datasets.<dataset-name>]
 ```
@@ -24,40 +24,44 @@ Minimal shape:
 Most useful config lives in nested blocks under one of those roots:
 
 ```toml
-[global.execution]
+[profiles.fast.runtime]
 jobs = 4
 
-[datasets.a43.loader]
-input_len = 20
-output_len = 60
+[datasets.a43]
+extends = ["fast"]
+
+[datasets.a43.scenes]
+history_frames = 20
+future_frames = 60
 sample_time = 0.1
 
-[datasets.a43.export]
+[datasets.a43.output]
 schema = "positions_velocity_yaw"
 precision = "float64"
 ```
 
 In other words:
 
-- `[global.execution]` affects every dataset unless a dataset-specific block overrides it.
-- `[datasets.a43.loader]` affects only the `a43` dataset.
-- Nested tables continue from there, for example `[datasets.a43.loader.filter]` or `[datasets.a43.export.mds]`.
-
+- `[profiles.fast.execution]` defines reusable execution settings.
+- `[datasets.a43]` can opt into one or more profiles with `extends = [...]`.
+- `[datasets.a43.scenes]` affects only the `a43` dataset.
 
 ## Available section roots
 
-Inside either `global` or `datasets.<dataset-name>`, the current section roots are:
+Inside either `profiles.<profile-name>` or `datasets.<dataset-name>`, the current section roots are:
 
 | Block | Purpose |
 | --- | --- |
-| `execution` | Worker count and executor chunking. |
-| `loader` | Horizons, sample time, windowing, resampling, filtering, lane-change sampling, and dataset-specific loader options. |
-| `map` | Map enablement and extraction settings. |
-| `export` | Persisted trajectory schema, precision, offsets, and MDS backend tuning. |
-| `split` | Split strategy, ratios, native split selection, and temporal split parameters. |
+| [`runtime`](./runtime.md) | Worker count and executor chunking. |
+| [`scenes`](./scenes.md) | Scene window length, sampling time, and related settings. |
+| [`screening`](./screening.md) | Scene + agent screening and cleanup. |
+| [`map`](./map.md) | Map enablement and extraction settings. |
+| [`output`](./output.md) | Persisted trajectory schema, precision, offsets, storage backend tuning. |
+| [`split`](./split.md) | Split strategy, ratios, native split selection, and temporal split parameters. |
+| [`dataset`](./dataset.md) | Dataset-specific options that don't fit into the other categories. |
 
 !!! note "Section roots"
-    In general, roots can be left unspecfied (not present in the file), but if
+    In general, roots can be left unspecified (not present in the file), but if
     added they must be filled with valid keys and values for all of their
     required fields.
 
@@ -66,8 +70,9 @@ Inside either `global` or `datasets.<dataset-name>`, the current section roots a
 The reference pages describe the file format only, but the values are resolved in layers:
 
 1. Dataset spec defaults
-2. `[global]`
+2. inherited profiles in declared order
 3. `[datasets.<dataset-name>]`
+4. runtime overrides (very limited set of fields that can be overridden at runtime)
 
 That matters because many fields do not start from a single hard-coded default. Instead, they begin from the dataset's built-in runtime config and are then overridden or merged by the configuration file.
 
@@ -101,39 +106,21 @@ Some pages also describe validation rules in notes below the table. Those notes 
 
 The page titles use TOML path notation:
 
-- `[loader]` means the table directly under `[global]` or `[datasets.<dataset-name>]`
-- `[loader.resampling]` means a nested table inside `loader`
-- `[[loader.filter.agent]]` means an array-of-tables entry, so you can define that block more than once
-
-For example:
-
-```toml
-[datasets.a43.loader.filter]
-mode = "extend"
-
-[[datasets.a43.loader.filter.agent]]
-type = "min_samples"
-minimum = 8
-rule_id = "sample_floor"
-
-[[datasets.a43.loader.filter.agent]]
-type = "window"
-start_frame = 0
-end_frame = 19
-min_fraction = 0.8
-```
-
-This creates one `loader.filter` table with two separate `agent` rule entries.
+- `[scenes]` means the table directly under a dataset entry such as `[datasets.<dataset-name>.scenes]` or `[profiles.<profile-name>.scenes]`
+- `[scenes.resample]` means a nested table inside `scenes` section, i.e., `[datasets.<dataset-name>.scenes.resample]`
 
 ## Example
 
 ```toml
-[global.execution]
+[profile.global.runtime]
 jobs = "auto"
 
-[datasets.a43.loader]
-input_len = 20
-output_len = 60
+[datasets.a43]
+uses = ["global"]
+
+[datasets.a43.scenes]
+history_frames = 20
+future_frames = 60
 sample_time = 0.1
 
 [datasets.a43.map]
@@ -146,7 +133,7 @@ strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
 
-[datasets.a43.export]
+[datasets.a43.output]
 schema = "positions_velocity_yaw"
 precision = "float64"
 ```

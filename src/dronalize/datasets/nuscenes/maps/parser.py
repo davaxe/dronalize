@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from typing_extensions import Self
 
-from dronalize.core.maps.edge_types import EdgeType
+from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

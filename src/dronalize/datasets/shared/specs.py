@@ -1,0 +1,98 @@
+"""Small helpers for explicit dataset spec definitions."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from dronalize.config.sections import (
+    ScreeningConfig,
+    LaneChangeConfig,
+    MinSamplesSpec,
+    PruneByRuleSpec,
+    ResampleConfig,
+    ScenesConfig,
+    WindowConfig,
+)
+
+if TYPE_CHECKING:
+    from dronalize.config.base import ResampleMethod
+
+
+def minimum_samples_screening(minimum: int) -> ScreeningConfig:
+    """Return the standard cleanup-only screening used by built-in dataset specs."""
+    return ScreeningConfig(
+        cleanup={"min_samples": PruneByRuleSpec(agent_rule=MinSamplesSpec(minimum=minimum))}
+    )
+
+
+def lane_change_sampling(
+    *,
+    persist: int = 2,
+    margin_before: int = 0,
+    margin_after: int = 0,
+    required_lane_changes: int = 1,
+    negative_keep_every: int = 3,
+) -> LaneChangeConfig:
+    """Return a lane-change sampling config with explicit defaults."""
+    return LaneChangeConfig(
+        persist=persist,
+        margin_before=margin_before,
+        margin_after=margin_after,
+        required_lane_changes=required_lane_changes,
+        negative_keep_every=negative_keep_every,
+    )
+
+
+def resample_config(
+    *,
+    method: ResampleMethod,
+    up: int,
+    down: int = 1,
+    emit_velocity: bool = False,
+    emit_acceleration: bool = False,
+) -> ResampleConfig:
+    """Return a temporal resampling config."""
+    return ResampleConfig(
+        method=method,
+        up=up,
+        down=down,
+        emit_velocity=emit_velocity,
+        emit_acceleration=emit_acceleration,
+    )
+
+
+def spline_resample(
+    up: int,
+    down: int = 1,
+    *,
+    emit_velocity: bool = True,
+    emit_acceleration: bool = True,
+) -> ResampleConfig:
+    """Return the default cubic resampling config used by most trajectory datasets."""
+    return resample_config(
+        method="cubic",
+        up=up,
+        down=down,
+        emit_velocity=emit_velocity,
+        emit_acceleration=emit_acceleration,
+    )
+
+
+def scenes_config(
+    *,
+    history_frames: int,
+    future_frames: int,
+    sample_time: float,
+    window_step: int | None = None,
+    resample: ResampleConfig | None = None,
+    lane_change: LaneChangeConfig | None = None,
+) -> ScenesConfig:
+    """Build an explicit `ScenesConfig` while keeping specs concise."""
+    return ScenesConfig(
+        history_frames=history_frames,
+        future_frames=future_frames,
+        sample_time=sample_time,
+        window=WindowConfig(step=window_step) if window_step is not None else None,
+        resample=resample,
+        lane_change=lane_change,
+    )

@@ -12,33 +12,33 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.filtering import Filter
-from dronalize.processing.filtering.agent import RequireFrames
 from dronalize.processing.loading.base import (
     BaseSceneLoader,
     LoaderOptions,
     LoaderSplitCapabilities,
 )
-from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
-from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.splits import SplitConfig
+    from dronalize.processing.loading.resources import DatasetResources
+    from dronalize.processing.models import LoaderRequest
+
+
+_NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
 class Argoverse1LoaderOptions(LoaderOptions):
-    """Loader options for the Argoverse 1 dataset."""
+    """Dataset-owned config for the Argoverse 1 loader."""
 
     file_batch_size: int = Field(default=10, ge=1)
 
 
 class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
-    """Loader for Argoverse 1 trajectory data stored in CSV format."""
+    """Loader for Argoverse 1 forecasting trajectories."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
         supports_scene_split=True
@@ -46,53 +46,21 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
 
     def __init__(
         self,
-        data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
         *,
-        loader_options: Argoverse1LoaderOptions | None = None,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the Argoverse 1 loader.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Root directory of the Argoverse 1 forecasting dataset. It should
-            contain `forecasting_train_v1.1/`, `forecasting_val_v1.1/`, and
-            `forecasting_test_v1.1/`.
-        loader_options : Argoverse1LoaderOptions, optional
-            Dataset-specific loader options. `file_batch_size` controls how
-            many CSV files are read in each batch.
-        loader_config : LoaderConfig, optional
-            Loader configuration override.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Optional selection of predefined dataset splits. `None` processes
-            all available sources.
-        """
-        super().__init__(
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-            loader_options=loader_options,
-        )
-        self._data_root: Path = Path(data_root)
-        self._batch_size: int = self.loader_options.file_batch_size
-        self._train_dir: Path = self._data_root / "forecasting_train_v1.1" / "train" / "data"
-        self._val_dir: Path = self._data_root / "forecasting_val_v1.1" / "val" / "data"
-        self._test_dir: Path = self._data_root / "forecasting_test_v1.1" / "test_obs" / "data"
+        """Initialize the Argoverse 1 loader."""
+        super().__init__(data_root=data_root, request=request, resources=resources)
+        self._train_dir: Path = self.root / "forecasting_train_v1.1" / "train" / "data"
+        self._val_dir: Path = self.root / "forecasting_val_v1.1" / "val" / "data"
+        self._test_dir: Path = self.root / "forecasting_test_v1.1" / "test_obs" / "data"
 
     @classmethod
     @override
     def loader_options_model(cls) -> type[Argoverse1LoaderOptions]:
         return Argoverse1LoaderOptions
-
-    @classmethod
-    @override
-    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
-        return (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
     @override
     def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
@@ -134,54 +102,43 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         )
 
         for _, group in batch_lf.collect().group_by(["file_id"]):
-            map_key = str(group["map"].first())
             yield LoadedSourceData(
-                frame=group.drop("file_id").lazy(), map_binding=MapBinding(map_key=map_key)
+                frame=group.drop("file_id").lazy(),
+                map_binding=MapBinding(map_key=str(group["map"].first())),
             )
 
     @override
     def num_sources(self) -> int | None:
-        splits = self.splits if self.splits is not None else self.predefined_splits()
-        return sum(self._count_sources_for_split(split) for split in splits)
+        return sum(
+            self._count_sources_for_split(split) for split in self.native_splits or _NATIVE_SPLITS
+        )
 
     @classmethod
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
 
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(input_len=20, output_len=30, sample_time=0.1).with_filter(
-            Filter.define(agent_rules=[RequireFrames.define(frames=[19])])
-        )
-
-    @classmethod
-    @override
-    def default_map_config(cls) -> MapConfig:
-        return MapConfig.scene_extent_extraction()
-
     @override
     def map_resolver(self) -> MapResolver:
-        if self._shared_memory_name is None or self.map_config is None:
+        shared_maps = self.resources.shared_maps
+        if not isinstance(shared_maps, dict) or self.map_config is None:
             return no_map()
-        return shared_map(self._shared_memory_name, utils.extract_fn(self.map_config.extraction))
+        return shared_map(shared_maps, utils.extract_fn(self.map_config.extraction))
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         if not data_dir.is_dir():
             return
-        files: list[Path] = sorted(data_dir.glob("*.csv"))
-        for start in range(0, len(files), self._batch_size):
-            batch_files = files[start : start + self._batch_size]
-            yield Source(identifier=start, data=batch_files)
+        files = sorted(data_dir.glob("*.csv"))
+        for start in range(0, len(files), self.loader_options.file_batch_size):
+            yield Source(
+                identifier=start, data=files[start : start + self.loader_options.file_batch_size]
+            )
 
     def _count_sources(self, data_dir: Path) -> int:
         if not data_dir.is_dir():
             return 0
         num_files = sum(1 for _ in data_dir.glob("*.csv"))
-        if num_files == 0:
-            return 0
-        batches, extra = divmod(num_files, self._batch_size)
+        batches, extra = divmod(num_files, self.loader_options.file_batch_size)
         return batches + int(extra > 0)
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:
@@ -200,11 +157,3 @@ _SCHEMA: pl.Schema = pl.Schema({
     "Y": pl.Float64,
     "CITY_NAME": pl.String,
 })
-
-
-if __name__ == "__main__":
-    from dronalize.datasets.argoverse1 import DATASET_SPEC
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-
-    root = resolve_dataset_root_from_env("argoverse1")
-    _ = debug_descriptor(DATASET_SPEC, root)

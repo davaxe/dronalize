@@ -13,11 +13,10 @@ from typing import TYPE_CHECKING
 import numpy as np
 from typing_extensions import override
 
-from dronalize._internal.optional import raise_missing_optional_dependency
 from dronalize.core.errors import ConfigurationError
+from dronalize.core.optional import raise_missing_optional_dependency
 from dronalize.io.backends.base import DatasetWriter
 from dronalize.io.encoding import encode_map_from_scene, encode_scene_record
-from dronalize.io.manifest import DatasetManifest, write_manifest
 
 try:
     from streaming import MDSWriter
@@ -30,31 +29,24 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
 
     from dronalize.core.categories import DatasetSplit
-    from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.io.config import ExportConfig
-    from dronalize.processing.loading.config import LoaderConfig
+    from dronalize.core.scene import Scene
+    from dronalize.runtime.plans import OutputPlan
 
 
 def _create_writer(
     parallel_group: int | None,
     *,
     output_dir: Path,
-    config: ExportConfig,
-    loader_config: LoaderConfig,
-    source_trajectory_schema: TrajectorySchema,
+    config: OutputPlan,
     splits: Iterable[DatasetSplit] | None,
     parallel: bool,
-    has_map: bool,
 ) -> MDSDatasetWriter:
     return MDSDatasetWriter(
         output_dir=output_dir,
         config=config,
-        loader_config=loader_config,
-        source_trajectory_schema=source_trajectory_schema,
         splits=splits,
         parallel=parallel,
         parallel_group=parallel_group,
-        has_map=has_map,
     )
 
 
@@ -65,52 +57,32 @@ class MDSDatasetWriter(DatasetWriter):
         self,
         output_dir: Path,
         *,
-        config: ExportConfig,
-        loader_config: LoaderConfig,
-        source_trajectory_schema: TrajectorySchema,
+        config: OutputPlan,
         splits: Iterable[DatasetSplit] | None,
         parallel: bool,
-        has_map: bool,
         parallel_group: int | str | None = None,
     ) -> None:
         self._base_output_dir: Path = Path(output_dir)
-        self._config: ExportConfig = config
-        self._loader_config: LoaderConfig = loader_config
+        self._config: OutputPlan = config
         self._splits: tuple[DatasetSplit, ...] | None = (
             tuple(dict.fromkeys(splits)) if splits is not None else None
         )
         self._parallel: bool = parallel
         self._parallel_group: str | int | None = parallel_group
         self._writers: dict[DatasetSplit | None, MDSWriter] | None = None
-        self.manifest: DatasetManifest = DatasetManifest.from_configs(
-            loader_config=loader_config,
-            source_trajectory_schema=source_trajectory_schema,
-            export_config=config,
-            has_map=has_map,
-        )
 
     @override
     @classmethod
     def as_factory(
         cls,
         output_dir: Path,
-        config: ExportConfig,
-        loader_config: LoaderConfig,
-        source_trajectory_schema: TrajectorySchema,
+        config: OutputPlan,
         splits: Iterable[DatasetSplit] | None,
         parallel: bool,
-        has_map: bool,
     ) -> Callable[[int | None], MDSDatasetWriter]:
         """Create a worker-local factory for MDS scene writers."""
         return functools.partial(
-            _create_writer,
-            output_dir=output_dir,
-            config=config,
-            loader_config=loader_config,
-            source_trajectory_schema=source_trajectory_schema,
-            splits=splits,
-            parallel=parallel,
-            has_map=has_map,
+            _create_writer, output_dir=output_dir, config=config, splits=splits, parallel=parallel
         )
 
     @staticmethod
@@ -120,8 +92,7 @@ class MDSDatasetWriter(DatasetWriter):
         splits: tuple[DatasetSplit, ...] | None,
         parallel: bool,
         parallel_group: int | str | None,
-        manifest: DatasetManifest,
-        config: ExportConfig,
+        config: OutputPlan,
     ) -> dict[DatasetSplit | None, MDSWriter]:
         writers: dict[DatasetSplit | None, MDSWriter] = {}
         for split in splits or [None]:
@@ -138,13 +109,12 @@ class MDSDatasetWriter(DatasetWriter):
                 path_str = final_dir.as_posix()
             writers[split] = MDSWriter(
                 out=path_str,
-                columns=_mds_columns(config.precision),
+                columns=_mds_columns(config.inner.precision),
                 compression=config.mds.compression,
-                hashes=list(config.mds.hashes) if config.mds.hashes is not None else None,
+                hashes=(list(config.mds.hashes) if config.mds.hashes is not None else None),
                 size_limit=config.mds.size_limit,
                 exist_ok=config.mds.exist_ok,
             )
-            write_manifest(split_dir, manifest)
         return writers
 
     @override
@@ -156,11 +126,9 @@ class MDSDatasetWriter(DatasetWriter):
                 splits=self._splits,
                 parallel=self._parallel,
                 parallel_group=self._parallel_group,
-                manifest=self.manifest,
                 config=self._config,
             )
 
-        np_dtype = self._config.float_dtype
         split: DatasetSplit | None = scene.split_assignment
         if split not in self._writers:
             msg = (
@@ -172,21 +140,21 @@ class MDSDatasetWriter(DatasetWriter):
         scene = scene.with_split_assignment(split) if split is not None else scene
         scene_sample = encode_scene_record(
             scene,
-            dtype=np_dtype,
+            dtype=self._config.precision(),
             recenter_position=self._config.recenter_positions,
             trajectory_schema=self._config.trajectory_schema,
         )
         map_sample = encode_map_from_scene(
             scene,
-            dtype=np_dtype,
+            dtype=self._config.precision(),
             offset=scene_sample["position_offset"] if self._config.recenter_positions else None,
             return_empty=True,
         )
 
         self._writers[split].write({
             "scene_number": int(scene_sample["scene_number"]),
-            "input_len": scene.input_len,
-            "output_len": scene.output_len,
+            "history_frames": scene.history_frames,
+            "future_frames": scene.future_frames,
             "position_offset": scene_sample["position_offset"],
             "agent_types": scene_sample["agent_types"],
             "features": scene_sample["features"],
@@ -222,8 +190,8 @@ def _mds_columns(dtype: str) -> dict[str, str]:
     """Return the MDS column schema for one encoded scene sample."""
     return {
         "scene_number": "int",
-        "input_len": "int",
-        "output_len": "int",
+        "history_frames": "int",
+        "future_frames": "int",
         "position_offset": "ndarray:float64:2",
         "agent_types": "ndarray:int32",
         "features": f"ndarray:{dtype}",

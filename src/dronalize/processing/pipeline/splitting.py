@@ -7,17 +7,15 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 import dronalize.processing.pipeline.transforms as tr
-from dronalize._internal.polars_ops import normalize_group_by
-from dronalize.processing.loading.splits import (
-    ShuffledTimeBlockStrategy,
-    SplitConfig,
-    TimeBlockStrategy,
-)
+from dronalize.config.sections import ShuffledTimeSplitConfig, TimeSplitConfig
+from dronalize.core.polars_ops import normalize_group_by
 from dronalize.processing.pipeline._internal import SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from dronalize.processing.models import SplitRequest
 
 _RAW_SPLIT_ASSIGNMENT_COLUMN = "_split_assignment"
 _RAW_SPLIT_PARTITION_COLUMN = "_split_partition_raw"
@@ -57,7 +55,7 @@ def _finalize_split_pipeline(
 
 
 def split_partition_pipeline(
-    request: SplitConfig,
+    request: SplitRequest,
     *,
     time_column: str = "frame",
     group_by: str | Sequence[str] | None = None,
@@ -67,63 +65,62 @@ def split_partition_pipeline(
     """Build a pipeline for partition-based splitting."""
     split_labels = {i: split.value for i, split in enumerate(request.active_splits())}
     group_cols = normalize_group_by(group_by)
+    config = request.config
 
-    match request.strategy:
-        case TimeBlockStrategy(gap=gap):
-            src_col = _RAW_SPLIT_PARTITION_COLUMN if partition_column else split_column
-            return _finalize_split_pipeline(
-                Pipeline().then(
-                    tr.block_partition_cumulative(
-                        weights=request.active_weights(),
-                        time_column=time_column,
-                        group_by=group_by,
-                        gap=gap,
-                        partition_column=src_col,
-                    )
-                ),
-                split_labels=split_labels,
-                split_source_column=src_col,
-                split_column=split_column,
-                partition_source_column=src_col if partition_column else None,
-                partition_column=partition_column,
-                group_columns=group_cols,
-            )
+    if isinstance(config, TimeSplitConfig):
+        src_col = _RAW_SPLIT_PARTITION_COLUMN if partition_column else split_column
+        return _finalize_split_pipeline(
+            Pipeline().then(
+                tr.block_partition_cumulative(
+                    weights=request.active_weights(),
+                    time_column=time_column,
+                    group_by=group_by,
+                    gap=config.gap,
+                    partition_column=src_col,
+                )
+            ),
+            split_labels=split_labels,
+            split_source_column=src_col,
+            split_column=split_column,
+            partition_source_column=src_col if partition_column else None,
+            partition_column=partition_column,
+            group_columns=group_cols,
+        )
 
-        case ShuffledTimeBlockStrategy(gap=gap, segments=segments):
-            return _finalize_split_pipeline(
-                Pipeline().then(
-                    tr.block_partition_shuffle(
-                        weights=request.active_weights(),
-                        segments=segments,
-                        time_column=time_column,
-                        group_by=group_by,
-                        gap=gap,
-                        assignment_column=_RAW_SPLIT_ASSIGNMENT_COLUMN,
-                        segment_column=_RAW_SPLIT_SEGMENT_COLUMN,
-                        seed=request.seed,
-                    )
-                ),
-                split_labels=split_labels,
-                split_source_column=_RAW_SPLIT_ASSIGNMENT_COLUMN,
-                split_column=split_column,
-                partition_source_column=_RAW_SPLIT_SEGMENT_COLUMN,
-                partition_column=partition_column,
-                group_columns=group_cols,
-            )
+    if isinstance(config, ShuffledTimeSplitConfig):
+        return _finalize_split_pipeline(
+            Pipeline().then(
+                tr.block_partition_shuffle(
+                    weights=request.active_weights(),
+                    segments=config.segments,
+                    time_column=time_column,
+                    group_by=group_by,
+                    gap=config.gap,
+                    assignment_column=_RAW_SPLIT_ASSIGNMENT_COLUMN,
+                    segment_column=_RAW_SPLIT_SEGMENT_COLUMN,
+                    seed=request.seed,
+                )
+            ),
+            split_labels=split_labels,
+            split_source_column=_RAW_SPLIT_ASSIGNMENT_COLUMN,
+            split_column=split_column,
+            partition_source_column=_RAW_SPLIT_SEGMENT_COLUMN,
+            partition_column=partition_column,
+            group_columns=group_cols,
+        )
 
-        case _:
-            return Pipeline()
+    return Pipeline()
 
 
 def apply_split_partition(
     pipeline: Pipeline,
     *,
-    split_request: SplitConfig | None,
+    split_request: SplitRequest | None,
     time_column: str,
     group_by: str | Sequence[str] | None,
 ) -> Pipeline:
     """Attach block-based split partitioning to the pipeline when requested."""
-    if split_request and split_request.uses_block_split:
+    if split_request is not None and split_request.uses_time_partition():
         return pipeline.compose(
             split_partition_pipeline(
                 split_request,

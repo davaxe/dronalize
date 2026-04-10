@@ -5,13 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Generic
 
-from dronalize._internal.typing import SourceId, SourceT
+from dronalize.core.typing import SourceId, SourceT
 
 if TYPE_CHECKING:
     import polars as pl
 
     from dronalize.core.categories import DatasetSplit
-    from dronalize.processing.maps.resolver import MapKey, MapResolver
+    from dronalize.processing.maps.resolver import MapKey
 
 
 @dataclass(slots=True)
@@ -34,15 +34,16 @@ class SceneIdentifier:
 class MapBinding:
     """Loader-side map attachment carried alongside ingested or processed data.
 
-    A binding can provide a stable map key, a resolver, or both. The base
-    loader combines this with any source-level map key before constructing the
-    final `Scene`.
+    The binding intentionally stays lightweight. Datasets can attach a stable
+    map key and any extra metadata required by their loader-specific
+    `resolve_map()` implementation, while the runtime owns final scene
+    construction and map attachment.
     """
 
     map_key: MapKey = None
     """Stable map identifier for the scene, if one is known at ingest time."""
-    map_resolver: MapResolver | None = None
-    """Resolver that can materialize the map graph for the scene."""
+    metadata: dict[str, Any] = field(default_factory=dict)
+    """Loader-local metadata needed to resolve the scene map."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -51,6 +52,7 @@ class LoadedSourceData:
 
     frame: pl.LazyFrame
     map_binding: MapBinding = field(default_factory=MapBinding)
+    predefined_split: DatasetSplit | None = None
 
 
 @dataclass(slots=True, frozen=True)

@@ -12,6 +12,13 @@ AD4CHE is an aerial congestion dataset for highway and expressway traffic in Chi
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
 
+!!! info "Extra dependencies"
+    This dataset requires the `ad4che` extra to be installed. You can do this with pip (or your package manager of choice):
+
+    ```bash
+    pip install dronalize[ad4che]
+    ```
+
 ## Dataset facts
 
 | Field               | Value                             | Notes                                                                     |

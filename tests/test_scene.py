@@ -96,8 +96,8 @@ def test_scene_derives_kinematics() -> None:
             "agent_category": [0, 0, 0],
         }),
         scene_number=7,
-        input_len=2,
-        output_len=1,
+        history_frames=2,
+        future_frames=1,
         schema=POSITIONS_ONLY,
         sample_time=1.0,
     )
@@ -123,8 +123,8 @@ def test_scene_derives_yaw_without_sample_time() -> None:
             "agent_category": [0, 0, 0],
         }),
         scene_number=9,
-        input_len=2,
-        output_len=1,
+        history_frames=2,
+        future_frames=1,
         schema=POSITIONS_ONLY,
     )
 
@@ -145,8 +145,8 @@ def test_scene_requires_sample_time() -> None:
             "agent_category": [0, 0],
         }),
         scene_number=1,
-        input_len=1,
-        output_len=1,
+        history_frames=1,
+        future_frames=1,
         schema=POSITIONS_ONLY,
     )
 
@@ -172,8 +172,8 @@ def test_encode_scene_record_schema() -> None:
             "agent_category": [0, 0, 0],
         }),
         scene_number=3,
-        input_len=2,
-        output_len=1,
+        history_frames=2,
+        future_frames=1,
         schema=POSITIONS_ONLY,
         sample_time=1.0,
     )

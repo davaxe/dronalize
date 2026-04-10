@@ -45,12 +45,13 @@ nav = [
 
   { "Configuration reference" = [
     "reference/configuration/index.md",
-    { "[execution] section" = "reference/configuration/execution.md" },
-    { "[loader] section" = "reference/configuration/loader.md" },
-    { "[loader.filter] section" = "reference/configuration/filter.md" },
+    { "[runtime] section" = "reference/configuration/runtime.md" },
+    { "[scenes] section" = "reference/configuration/scenes.md" },
+    { "[screening] section" = "reference/configuration/screening.md" },
     { "[map] section" = "reference/configuration/map.md" },
-    { "[export] section" = "reference/configuration/export.md" },
+    { "[output] section" = "reference/configuration/output.md" },
     { "[split] section" = "reference/configuration/split.md" },
+    { "[dataset] section" = "reference/configuration/dataset.md" },
   ] },
 
   { "Dataset reference" = [

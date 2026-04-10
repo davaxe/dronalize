@@ -1,5 +1,5 @@
 """Derivative transforms re-exported for functional pipelines."""
 
-from dronalize._internal.polars_ops import derivative
+from dronalize.core.polars_ops import derivative
 
 __all__ = ["derivative"]

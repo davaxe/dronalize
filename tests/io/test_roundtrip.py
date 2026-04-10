@@ -10,9 +10,10 @@ import pytest
 
 pl = pytest.importorskip("polars")
 
-from dronalize.core.maps import MapGraph
+from dronalize.config.sections.output import OutputConfig
+from dronalize.core.map_graph import MapGraph
 from dronalize.core.scene import CANONICAL, Scene
-from dronalize.io import ExportConfig
+from dronalize.runtime.plans import OutputPlan
 
 pytest.importorskip("torch")
 pytest.importorskip("streaming")
@@ -21,7 +22,6 @@ from dronalize.io.adapters import MDSTorchDataset
 from dronalize.io.backends.mds import MDSDatasetWriter
 from dronalize.io.encoding import encode_map_from_scene, encode_scene_record
 from dronalize.io.readers.mds import MDSReader
-from dronalize.processing import LoaderConfig
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -48,8 +48,8 @@ def _scene() -> Scene:
             "agent_category": [1, 1, 1, 2, 2, 2],
         }),
         scene_number=7,
-        input_len=2,
-        output_len=1,
+        history_frames=2,
+        future_frames=1,
         schema=CANONICAL,
         sample_time=1.0,
         map_key="toy-map",
@@ -57,12 +57,12 @@ def _scene() -> Scene:
     )
 
 
-def _loader_config() -> LoaderConfig:
-    return LoaderConfig(input_len=2, output_len=1, sample_time=1.0)
-
-
-def _writer_config() -> ExportConfig:
-    return ExportConfig.create("canonical", precision="float32", recenter_positions=True)
+def _writer_config() -> OutputPlan:
+    return OutputPlan(
+        inner=OutputConfig(
+            trajectory_schema="canonical", precision="float32", recenter_positions=True
+        )
+    )
 
 
 def _expected_sample() -> dict[str, Any]:
@@ -70,13 +70,13 @@ def _expected_sample() -> dict[str, Any]:
     writer_config = _writer_config()
     scene_sample = encode_scene_record(
         scene,
-        dtype=writer_config.float_dtype,
+        dtype=writer_config.precision(),
         recenter_position=writer_config.recenter_positions,
         trajectory_schema=writer_config.trajectory_schema,
     )
     map_sample = encode_map_from_scene(
         scene,
-        dtype=writer_config.float_dtype,
+        dtype=writer_config.precision(),
         offset=scene_sample["position_offset"],
         return_empty=True,
     )
@@ -192,11 +192,8 @@ def test_mds_roundtrip(tmp_path: Path) -> None:
     writer = MDSDatasetWriter(
         output_dir,
         config=_writer_config(),
-        loader_config=_loader_config(),
-        source_trajectory_schema=CANONICAL,
         splits=None,
         parallel=False,
-        has_map=True,
     )
 
     assert writer.write(_scene())
@@ -211,11 +208,8 @@ def test_mds_torch_dataset_roundtrip(tmp_path: Path) -> None:
     writer = MDSDatasetWriter(
         output_dir,
         config=_writer_config(),
-        loader_config=_loader_config(),
-        source_trajectory_schema=CANONICAL,
         splits=None,
         parallel=False,
-        has_map=True,
     )
 
     assert writer.write(_scene())
@@ -230,11 +224,8 @@ def test_mds_torch_iterable_dataset_roundtrip(tmp_path: Path) -> None:
     writer = MDSDatasetWriter(
         output_dir,
         config=_writer_config(),
-        loader_config=_loader_config(),
-        source_trajectory_schema=CANONICAL,
         splits=None,
         parallel=False,
-        has_map=True,
     )
 
     assert writer.write(_scene())

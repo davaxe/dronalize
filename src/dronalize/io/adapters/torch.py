@@ -39,27 +39,27 @@ class TorchSceneRecord:
     input_features: torch.Tensor
     """Input features for each agent.
 
-    Shaped `(num_agents, input_len, feature_dim)` with `float32` or `float64`
+    Shaped `(num_agents, history_frames, feature_dim)` with `float32` or `float64`
     dtype. The specific features and their order are determined by the dataset's
     trajectory schema.
     """
     input_mask: torch.Tensor
     """Boolean mask indicating valid input timesteps for each agent.
 
-    Shaped `(num_agents, input_len)` with `bool` dtype. `True` values indicate
+    Shaped `(num_agents, history_frames)` with `bool` dtype. `True` values indicate
     valid timesteps.
     """
     output_features: torch.Tensor
     """Output features for each agent.
 
-    Shaped `(num_agents, output_len, feature_dim)` with `float32` or `float64`
+    Shaped `(num_agents, future_frames, feature_dim)` with `float32` or `float64`
     dtype. The specific features and their order are determined by the dataset's
     trajectory schema.
     """
     output_mask: torch.Tensor
     """Boolean mask indicating valid output timesteps for each agent.
 
-    Shaped `(num_agents, output_len)` with `bool` dtype. `True` values indicate
+    Shaped `(num_agents, future_frames)` with `bool` dtype. `True` values indicate
     valid timesteps.
     """
     map_node_positions: torch.Tensor

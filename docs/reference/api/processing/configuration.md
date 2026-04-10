@@ -1,7 +1,7 @@
-## ::: dronalize.processing.LoaderConfig
+# ::: dronalize.processing.loading.LoaderOptions
 
-## ::: dronalize.processing.WindowConfig
+::: dronalize.processing.loading.LoaderSplitCapabilities
 
-## ::: dronalize.processing.LaneChangeSamplingConfig
+::: dronalize.processing.pipeline.functional.resample.ResampleMethod
 
-## ::: dronalize.processing.MapConfig
+::: dronalize.processing.pipeline.functional.resample.ResampleSpec

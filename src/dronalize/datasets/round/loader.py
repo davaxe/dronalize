@@ -8,51 +8,19 @@ from typing import TYPE_CHECKING
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-
-    from dronalize.core.categories import DatasetSplit
-    from dronalize.processing.loading.config import LoaderConfig
-    from dronalize.processing.loading.splits import SplitConfig
-    from dronalize.processing.maps.config import MapConfig
+    from dronalize.processing.loading.resources import DatasetResources
+    from dronalize.processing.models import LoaderRequest
 
 
 class RounDLoader(LevelXDataLoader):
-    """Trajectory data loader for the rounD dataset.
-
-    The rounD (roundabouts Drone) dataset was recorded at roundabouts in Germany
-    using drone footage. It contains naturalistic trajectories of various
-    traffic participants, including cars, trucks, buses, motorcycles, bicycles,
-    and pedestrians navigating through roundabouts of varying sizes and layouts.
-
-    This loader inherits all trajectory processing logic from
-    `XLevelDataLoader`, as the rounD dataset follows the same CSV format used
-    across the X-level dataset family.
-
-    """
+    """Loader for the rounD dataset."""
 
     def __init__(
         self,
-        data_root: str | Path,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
+        *,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
     ) -> None:
         """Initialize the rounD loader."""
-        super().__init__(
-            Path(data_root) / "data",
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-        )
-
-
-if __name__ == "__main__":
-    from dronalize.datasets.round import DATASET_SPEC
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-
-    root = resolve_dataset_root_from_env("rounD")
-    scenes = debug_descriptor(DATASET_SPEC, root, step=350)
-    for scene in scenes:
-        scene.frame.write_csv(f"debug_scene_{scene.scene_number}.csv")
+        super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)

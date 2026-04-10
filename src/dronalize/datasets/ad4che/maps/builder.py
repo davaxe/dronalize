@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from dronalize.core.maps.edge_types import EdgeType
+from dronalize.core.categories import EdgeType
 from dronalize.processing.maps.builder import BaseMapBuilder
 
 if TYPE_CHECKING:

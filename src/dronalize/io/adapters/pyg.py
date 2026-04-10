@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from torch.utils.data import IterableDataset
 from typing_extensions import Unpack, override
 
-from dronalize._internal.optional import raise_missing_optional_dependency
+from dronalize.core.optional import raise_missing_optional_dependency
 
 try:
     from torch_geometric.data import Batch, Dataset, HeteroData
@@ -94,10 +94,14 @@ def collate_hetero_with_time_padding(samples: Sequence[HeteroData]) -> Batch:
         msg = "`samples` must contain at least one HeteroData object."
         raise ValueError(msg)
 
-    max_input_len = max(int(sample["agent"].x.size(1)) for sample in samples)
-    max_output_len = max(int(sample["agent"].y.size(1)) for sample in samples)
+    max_history_frames = max(int(sample["agent"].x.size(1)) for sample in samples)
+    max_future_frames = max(int(sample["agent"].y.size(1)) for sample in samples)
     padded_samples: list[BaseData] = [
-        _pad_hetero_time_axes(sample, input_len=max_input_len, output_len=max_output_len)
+        _pad_hetero_time_axes(
+            sample,
+            history_frames=max_history_frames,
+            future_frames=max_future_frames,
+        )
         for sample in samples
     ]
     return Batch.from_data_list(padded_samples)
@@ -129,12 +133,18 @@ def _convert_to_hetero(sample: TorchSceneRecord) -> HeteroData:
     return data
 
 
-def _pad_hetero_time_axes(sample: HeteroData, *, input_len: int, output_len: int) -> HeteroData:
+def _pad_hetero_time_axes(
+    sample: HeteroData, *, history_frames: int, future_frames: int
+) -> HeteroData:
     padded = sample.clone()
-    padded["agent"].x = _pad_along_dim(sample["agent"].x, target=input_len, dim=1)
-    padded["agent"].x_mask = _pad_along_dim(sample["agent"].x_mask, target=input_len, dim=1)
-    padded["agent"].y = _pad_along_dim(sample["agent"].y, target=output_len, dim=1)
-    padded["agent"].y_mask = _pad_along_dim(sample["agent"].y_mask, target=output_len, dim=1)
+    padded["agent"].x = _pad_along_dim(sample["agent"].x, target=history_frames, dim=1)
+    padded["agent"].x_mask = _pad_along_dim(
+        sample["agent"].x_mask, target=history_frames, dim=1
+    )
+    padded["agent"].y = _pad_along_dim(sample["agent"].y, target=future_frames, dim=1)
+    padded["agent"].y_mask = _pad_along_dim(
+        sample["agent"].y_mask, target=future_frames, dim=1
+    )
     return padded
 
 

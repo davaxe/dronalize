@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize._internal.polars_ops import normalize_group_by
+from dronalize.core.polars_ops import normalize_group_by
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize._internal.typing import DataFrameT
+    from dronalize.core.typing import DataFrameT
 
 
 def valid_lane_change(

@@ -2,35 +2,7 @@ import math
 
 import polars as pl
 
-from dronalize.processing.pipeline.functional.basic import collect, lazy, yaw_from_pos, yaw_from_vel
-
-
-def test_lazy_from_dataframe() -> None:
-    """Converting a DataFrame to lazy returns a LazyFrame."""
-    df = pl.DataFrame({"a": [1, 2, 3]})
-    result = lazy(df)
-    assert isinstance(result, pl.LazyFrame)
-
-
-def test_lazy_from_lazyframe_is_noop() -> None:
-    """Calling lazy on a LazyFrame returns the same object."""
-    lf = pl.DataFrame({"a": [1, 2, 3]}).lazy()
-    result = lazy(lf)
-    assert result is lf
-
-
-def test_collect_from_lazyframe() -> None:
-    """Collecting a LazyFrame returns a DataFrame."""
-    lf = pl.DataFrame({"a": [1, 2, 3]}).lazy()
-    result = collect(lf)
-    assert isinstance(result, pl.DataFrame)
-
-
-def test_collect_from_dataframe_is_noop() -> None:
-    """Calling collect on a DataFrame returns the same object."""
-    df = pl.DataFrame({"a": [1, 2, 3]})
-    result = collect(df)
-    assert result is df
+from dronalize.core.polars_ops import yaw_from_pos, yaw_from_vel
 
 
 def test_yaw_from_vel_east() -> None:

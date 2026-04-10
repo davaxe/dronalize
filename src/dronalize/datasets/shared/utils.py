@@ -5,19 +5,19 @@ from typing import TYPE_CHECKING, Any, overload
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.core.scene import Scene
-from dronalize.processing.maps.config import (
+from dronalize.config.sections import (
     BoundingBoxExtraction,
     CircularExtraction,
     FullMapExtraction,
     MapExtraction,
     SceneExtentExtraction,
 )
+from dronalize.core.scene import Scene
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
 
 
 def extract_fn(extraction: MapExtraction) -> Callable[[Scene, MapGraph], MapGraph]:

@@ -12,6 +12,13 @@ The Lyft Level 5 motion prediction dataset is a large-scale self-driving benchma
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
 
+!!! info "Extra dependencies"
+    This dataset requires the `lyft` extra to be installed. You can do this with pip (or your package manager of choice):
+
+    ```bash
+    pip install dronalize[lyft]
+    ```
+
 ## Dataset facts
 
 | Field               | Value                                | Notes                                                        |

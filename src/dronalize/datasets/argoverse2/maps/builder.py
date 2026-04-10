@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import override
 
-from dronalize.core.maps.edge_types import EdgeType
+from dronalize.core.categories import EdgeType
 from dronalize.datasets.argoverse2.maps import parser
 from dronalize.processing.maps.builder import BaseMapBuilder, Point
 

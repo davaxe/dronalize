@@ -9,8 +9,8 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import override
 
-from dronalize._internal.typing import T_co
 from dronalize.core.categories import DatasetSplit
+from dronalize.core.typing import T_co
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

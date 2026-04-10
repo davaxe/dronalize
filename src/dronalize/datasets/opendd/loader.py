@@ -10,25 +10,20 @@ from typing import TYPE_CHECKING, ClassVar
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filtering import Filter
-from dronalize.processing.filtering.agent import RequireFrames
 from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.maps.config import MapConfig
-from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.models import LoaderRequest
 
 
 def _table_query(table_name: str) -> str:
@@ -50,42 +45,15 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         supports_source_split=True
     )
 
-    def __init__(
-        self,
-        data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        *,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
-    ) -> None:
-        """Initialize the multi-database OpenDD loader.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Root directory containing the extracted OpenDD SQLite files.
-        loader_config : LoaderConfig, optional
-            Loader configuration override.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. This dataset does not define predefined
-            splits, so `None` processes all sources.
-
-        """
-        super().__init__(
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-        )
-        self._data_root: Path = Path(data_root)
+    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
+        """Initialize the multi-database OpenDD loader."""
+        super().__init__(data_root=data_root, request=request)
 
     def _db_paths(self) -> Iterable[Path]:
-        for db_file in self._data_root.rglob("trajectories_*_v3.sqlite"):
-            level = len(db_file.relative_to(self._data_root).parts)
-            if level > 3:
-                continue
-            yield db_file
+        for db_file in self.root.rglob("trajectories_*_v3.sqlite"):
+            level = len(db_file.relative_to(self.root).parts)
+            if level <= 3:
+                yield db_file
 
     @override
     def discover_sources(self) -> Iterable[Source[tuple[Path, str]]]:
@@ -106,7 +74,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         with sqlite3.connect(db_path) as connection:
             yield LoadedSourceData(
                 pl
-                .read_database(_table_query(table_name), connection)
+                .read_database(_table_query(table_name), connection)  # pyright: ignore[reportUnknownMemberType]
                 .lazy()
                 .with_columns(
                     ((pl.col("TIMESTAMP") * 1000).round(4).rank(method="dense") - 1)
@@ -137,27 +105,11 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
 
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return (
-            LoaderConfig(input_len=60, output_len=150, sample_time=1 / 30)
-            .with_resampling(ResampleSpec(up=1, down=3))
-            .with_window(75)
-            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[59])]))
-        )
-
-    @classmethod
-    @override
-    def default_map_config(cls) -> MapConfig:
-        return MapConfig.default()
-
     @override
     def map_resolver(self) -> MapResolver:
         def _resolver(scene: Scene) -> MapGraph | None:
             if scene.map_key is None or self.map_config is None:
                 return None
-
             return utils.extract_based_on_scene(
                 self._get_map(
                     scene.map_key, self.map_config.min_distance, self.map_config.interp_distance
@@ -171,7 +123,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     @staticmethod
     @functools.lru_cache(maxsize=10)
     def _get_map(key: str, min_distance: float | None, interp_distance: float | None) -> MapGraph:
-        database: str = Path(key).name
+        database = Path(key).name
         map_path = Path(key) / f"map_{database}" / f"map_{database}.sqlite"
         return OpenDDMapBuilder.from_sqlite_file(map_path).build(min_distance, interp_distance)
 
@@ -188,11 +140,3 @@ def _count_tables(db_path: Path) -> int:
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table';"
         ).fetchone()
     return row[0] if row is not None else 0
-
-
-if __name__ == "__main__":
-    from dronalize.datasets.opendd import DATASET_SPEC
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-
-    root = resolve_dataset_root_from_env("opendd")
-    _ = debug_descriptor(DATASET_SPEC, root)

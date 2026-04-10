@@ -83,7 +83,7 @@ class LaneChangeSamplingExtension:
                 pl.all().exclude(_LANE_CHANGE_EVENT_COLUMN, _SCENE_LANE_CHANGE_COUNT_COLUMN)
             )
 
-        builder.add_post_filter(
+        builder.add_post_screening(
             Pipeline()
             .then(_label_scenes, name="label_lane_change_scenes")
             .then(_sample_scenes, name="sample_lane_change_scenes")

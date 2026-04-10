@@ -72,8 +72,8 @@ Every sample written to a shard contains the following fields.
 | Field | dtype | Shape | Description |
 | --- | --- | --- | --- |
 | `scene_number` | `int` | scalar | Global scene index assigned during processing. |
-| `input_len` | `int` | scalar | Number of observation frames in this scene. |
-| `output_len` | `int` | scalar | Number of prediction frames in this scene. |
+| `history_frames` | `int` | scalar | Number of history frames in this scene. |
+| `future_frames` | `int` | scalar | Number of future frames in this scene. |
 | `position_offset` | `float64` | `[2]` | The `(x, y)` offset subtracted from all positions before writing when `recenter_positions = true`. Zero otherwise. |
 | `agent_types` | `int32` | `[A]` | Integer agent category for each agent. |
 | `features` | `float32` or `float64` | `[A, T, F]` | Per-agent feature tensor in canonical column order. |
@@ -86,7 +86,7 @@ Every sample written to a shard contains the following fields.
 **Dimension key:**
 
 - `A` — number of agents in the scene (varies per sample)
-- `T` — total timesteps: `input_len + output_len` (fixed for a given dataset and config)
+- `T` — total timesteps: `history_frames + future_frames` (fixed for a given dataset and config)
 - `F` — number of feature columns determined by the configured schema
 - `N` — number of map nodes (varies per sample)
 - `E` — number of map edges (varies per sample)
@@ -106,7 +106,7 @@ same normalized scene records.
 
 ## Configuration
 
-MDS-specific export settings are controlled under `[export.mds]` in the config file. The
+MDS-specific export settings are controlled under `[export.backends.mds]` in the config file. The
 main `[export]` block controls schema, precision, and position offsetting.
 
 For the full field reference see the [export configuration](../reference/configuration/export.md)
@@ -120,7 +120,7 @@ schema = "positions_velocity_yaw"
 precision = "float32"
 recenter_positions = true
 
-[datasets.a43.export.mds]
+[datasets.a43.export.backends.mds]
 compression = "zstd:7"
 size_limit = 67108864
 exist_ok = false

@@ -7,7 +7,7 @@ ApolloScape is an urban trajectory benchmark built around heterogeneous traffic 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Urban</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
-  <div class="summary-item"><span>Capture platform</span><strong>Benchmark</strong></div>
+  <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>None</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>

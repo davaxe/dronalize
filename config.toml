@@ -1,77 +1,140 @@
-# Example config for one dataset using the explicit TOML-facing schema.
-# This file is intended to be a real, loadable example.
+# Proposed next-generation config layout
+#
+# This file is intentionally a design proposal for a cleaner public config model.
+# It is not required to match the current parser.
+#
+# Design goals:
+# - keep reusable profiles and per-dataset entries
+# - move filtering out of the scene-loading branch
+# - give dataset-specific loader extras a first-class home
+# - rename sections toward user-facing concepts instead of implementation terms
+# - group related settings by how users think about a preprocessing run
 
-[global.execution]
-jobs = 4
+
+# --------------------------------------------------------------------------------------
+# Shared profiles
+# --------------------------------------------------------------------------------------
+
+[profiles.fast.runtime]
+jobs = "auto"
 chunksize = 64
 
-[datasets.a43.loader]
-input_len = 20
-output_len = 60
-sample_time = 0.1
-
-[datasets.a43.loader.window]
-size = 80
-step = 2
-
-[datasets.a43.loader.resampling]
-up = 2
-down = 1
-method = "cubic"
-max_gap = 4
-sort = true
-position_columns = ["x", "y"]
-
-[[datasets.a43.loader.resampling.output_derivatives]]
-order = 1
-columns = ["vx", "vy"]
-
-[[datasets.a43.loader.resampling.output_derivatives]]
-order = 2
-columns = ["ax", "ay"]
-
-[datasets.a43.loader.filter]
-mode = "extend"
-
-[[datasets.a43.loader.filter.cleanup]]
-type = "exclude"
-categories = ["STATIC_OBJECT", "UNIMPORTANT"]
-
-[[datasets.a43.loader.filter.scene]]
-type = "min_agents"
-minimum = 2
-
-[[datasets.a43.loader.filter.agent]]
-type = "frames"
-frames = [19]
-rule_id = "agent_frames"
-tolerance = { kind = "combined", absolute = 1, relative = 0.05 }
-
-[[datasets.a43.loader.filter.agent]]
-type = "min_samples"
-minimum = 8
-rule_id = "sample_floor"
-
-[datasets.a43.map]
-min_distance = 1.0
-interp_distance = 2.5
-enabled = true
-extraction = "circle"
-radius = 60.0
-
-[datasets.a43.export]
+[profiles.high_precision.output]
 schema = "positions_velocity_yaw"
 precision = "float64"
 recenter_positions = true
 
-[datasets.a43.export.mds]
-compression = "zstd:7"
-hashes = ["sha1", "xxh64"]
-size_limit = 33554432
-exist_ok = true
+[profiles.basic_screening.screening.cleanup.remove_animals]
+rule = "exclude"
+categories = ["ANIMAL"]
+
+[profiles.basic_screening.screening.cleanup.remove_unimportant]
+rule = "exclude"
+categories = ["UNIMPORTANT"]
+
+# --------------------------------------------------------------------------------------
+# Dataset: a43
+# --------------------------------------------------------------------------------------
+
+[datasets.a43]
+uses = ["fast", "high_precision", "basic_screening"]
+
+
+# Runtime ------------------------------------------------------------------------------
+
+# [datasets.a43.runtime]
+# jobs = 1
+
+
+# Scenes -------------------------------------------------------------------------------
+#
+# This section answers:
+# - what does one scene look like?
+# - how are scenes sampled from raw data?
+# - should trajectories be resampled before scene construction?
+
+[datasets.a43.scenes]
+history_frames = 20
+future_frames = 60
+sample_time = 0.1
+
+[datasets.a43.scenes.window]
+step = 2
+
+[datasets.a43.scenes.resample]
+up = 2
+down = 1
+method = "cubic"
+max_gap = 4
+coordinates = ["x", "y"]
+emit_velocity = true
+emit_acceleration = true
+
+
+# Screening -------------------------------------------------------------------------------
+#
+# Screening is separated from scene sampling so it reads as an independent policy layer.
+# The three namespaces below stay because they are genuinely distinct:
+# - cleanup: row/agent removal before validation
+# - scene: whole-scene acceptance rules
+# - agent: per-agent validity rules
+
+[datasets.a43.screening]
+mode = "extend"
+remove = ["remove_unimportant"]  # from the basic_screening profile
+
+[datasets.a43.screening.cleanup.trim_static]
+rule = "exclude"
+categories = ["STATIC_OBJECT", "UNIMPORTANT"]
+
+[datasets.a43.screening.scene.min_context]
+rule = "agent_range"
+minimum = 2
+
+[datasets.a43.screening.agent.anchor_present]
+rule = "frames"
+frames = [19]
+tolerance = { absolute = 1, relative = 0.05 }
+selector = { mode = "include", categories = ["CAR"] }
+
+[datasets.a43.screening.agent.sample_floor]
+rule = "min_samples"
+minimum = 8
+
+
+# Dataset ------------------------------------------------------------------------------
+#
+# Dataset-owned extras live here. This section is for loader-specific parameters that do
+# not belong in the shared public config surface.
+#
+# [datasets.a43.dataset]
+# some_dataset_flag = true
+# custom_threshold = 12
+
+
+# Split --------------------------------------------------------------------------------
 
 [datasets.a43.split]
 strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
 gap = 2
+
+
+# Map ----------------------------------------------------------------------------------
+
+[datasets.a43.map]
+min_distance = 1.0
+interp_distance = 2.5
+
+[datasets.a43.map.extraction]
+mode = "circle"
+radius = 60.0
+
+# Output -------------------------------------------------------------------------------
+
+[datasets.a43.output.mds]
+compression = "zstd:7"
+hashes = ["sha1", "xxh64"]
+size_limit = 33554432
+exist_ok = true

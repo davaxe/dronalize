@@ -2,35 +2,28 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import CANONICAL
-from dronalize.processing.filtering import Filter
-from dronalize.processing.filtering.agent import RequireFrames
 from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.splits import SplitConfig
-
-
-# NOTE: The dataset directory layout may later be aligned with the upstream
-# one in repo: https://github.com/SOTIF-AVLab/SinD
+    from dronalize.processing.loading.resources import DatasetResources
+    from dronalize.processing.models import LoaderRequest
 
 
 class SindLoader(BaseSceneLoader):
-    """Loader for the SIND dataset."""
+    """Loader for the SinD dataset."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
         supports_source_split=True
@@ -38,40 +31,22 @@ class SindLoader(BaseSceneLoader):
 
     def __init__(
         self,
+        *,
         data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the SindLoader.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Path to the directory containing the SIND dataset.
-        loader_config : LoaderConfig, optional
-            Loader configuration override.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. This dataset does not define predefined
-            splits, so `None` processes all sources.
-
-        """
-        super().__init__(
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-        )
-        self._data_root: Path = Path(data_root) / "data"
+        """Initialize the SinD loader."""
+        super().__init__(data_root=data_root, request=request, resources=resources)
 
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
-        if not self._data_root.is_dir():
+        if not self.root.is_dir():
             return
-        for subdir in sorted(path for path in self._data_root.iterdir() if path.is_dir()):
-            map_location = self._resolve_map_key(subdir.name)
-            yield Source(identifier=subdir.name, data=subdir, map_key=str(map_location))
+        for subdir in sorted(path for path in self.root.iterdir() if path.is_dir()):
+            yield Source(
+                identifier=subdir.name, data=subdir, map_key=str(self._resolve_map_key(subdir.name))
+            )
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
@@ -121,34 +96,21 @@ class SindLoader(BaseSceneLoader):
 
     @override
     def num_sources(self) -> int | None:
-        if not self._data_root.is_dir():
+        if not self.root.is_dir():
             return 0
-        return sum(1 for path in self._data_root.iterdir() if path.is_dir())
+        return sum(1 for path in self.root.iterdir() if path.is_dir())
 
     @classmethod
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return (
-            LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
-            .with_window(25)
-            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[19])]))
-        )
-
-    @classmethod
-    @override
-    def default_map_config(cls) -> MapConfig:
-        return MapConfig.full_map()
-
     @override
     def map_resolver(self) -> MapResolver:
-        if self._shared_memory_name is None:
+        shared_maps = self.resources.shared_maps
+        if not isinstance(shared_maps, dict):
             return no_map()
-        return shared_map(self._shared_memory_name)
+        return shared_map(shared_maps)
 
     @staticmethod
     def _resolve_map_key(path_name: str) -> str:
@@ -185,11 +147,3 @@ _PEDESTRIAN_SCHEMA = pl.Schema({
     "ax": pl.Float64,
     "ay": pl.Float64,
 })
-
-
-if __name__ == "__main__":
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-    from dronalize.datasets.sind import DATASET_SPEC
-
-    root = resolve_dataset_root_from_env("sind")
-    _ = debug_descriptor(DATASET_SPEC, root)

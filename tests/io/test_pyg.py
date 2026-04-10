@@ -13,22 +13,22 @@ from dronalize.io.adapters import collate_hetero_with_time_padding
 
 def _sample(
     *,
-    input_len: int,
-    output_len: int,
+    history_frames: int,
+    future_frames: int,
     agent_count: int,
     map_node_count: int,
     scene_number: int,
 ) -> HeteroData:
     data = HeteroData()
 
-    data["agent"].x = torch.arange(agent_count * input_len, dtype=torch.float32).reshape(
-        agent_count, input_len, 1
+    data["agent"].x = torch.arange(agent_count * history_frames, dtype=torch.float32).reshape(
+        agent_count, history_frames, 1
     )
-    data["agent"].x_mask = torch.ones((agent_count, input_len), dtype=torch.bool)
-    data["agent"].y = torch.arange(agent_count * output_len, dtype=torch.float32).reshape(
-        agent_count, output_len, 1
+    data["agent"].x_mask = torch.ones((agent_count, history_frames), dtype=torch.bool)
+    data["agent"].y = torch.arange(agent_count * future_frames, dtype=torch.float32).reshape(
+        agent_count, future_frames, 1
     )
-    data["agent"].y_mask = torch.ones((agent_count, output_len), dtype=torch.bool)
+    data["agent"].y_mask = torch.ones((agent_count, future_frames), dtype=torch.bool)
     data["agent"].agent_type = torch.arange(agent_count, dtype=torch.int64)
     data["agent"].num_nodes = agent_count
 
@@ -50,8 +50,12 @@ def _sample(
 
 def test_collate_hetero_with_time_padding() -> None:
     """Validate collate function."""
-    first = _sample(input_len=2, output_len=1, agent_count=2, map_node_count=1, scene_number=7)
-    second = _sample(input_len=3, output_len=2, agent_count=1, map_node_count=2, scene_number=8)
+    first = _sample(
+        history_frames=2, future_frames=1, agent_count=2, map_node_count=1, scene_number=7
+    )
+    second = _sample(
+        history_frames=3, future_frames=2, agent_count=1, map_node_count=2, scene_number=8
+    )
 
     batch = collate_hetero_with_time_padding([first, second])
 

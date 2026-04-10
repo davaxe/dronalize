@@ -1,32 +1,20 @@
-# ::: dronalize.processing.filtering
-    options:
-        members: false
+# ::: dronalize.processing.screening
 
-## ::: dronalize.processing.filtering.Filter
+  options:
+    members: false
 
-## ::: dronalize.processing.filtering.FilterSpec
+::: dronalize.processing.screening.Screen
 
-## ::: dronalize.processing.filtering.AgentSelector
+::: dronalize.processing.screening.screen_scene
 
-## ::: dronalize.processing.filtering.Tolerance
+::: dronalize.processing.screening.AgentSelector
 
-## ::: dronalize.processing.filtering.AbsoluteTolerance
+::: dronalize.processing.screening.Tolerance
 
-## ::: dronalize.processing.filtering.RelativeTolerance
+::: dronalize.processing.screening.tol
 
-## ::: dronalize.processing.filtering.CombinedTolerance
+::: dronalize.processing.screening.agent.AgentCheckRule
 
-## ::: dronalize.processing.filtering.tol
+::: dronalize.processing.screening.scene.SceneCheckRule
 
-## ::: dronalize.processing.filtering.filter_scene
-
-## ::: dronalize.processing.filtering.merge_filters
-
-## ::: dronalize.processing.filtering.cleanup
-
-## ::: dronalize.processing.filtering.scene
-
-## ::: dronalize.processing.filtering.agent
-    options:
-      filters:
-        - "!^invalid_agent_tolerance_expr$"
+::: dronalize.processing.screening.cleanup.CleanupRule

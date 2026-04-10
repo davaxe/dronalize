@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from dronalize._internal.optional import require_optional
+from dronalize.core.optional import require_optional
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

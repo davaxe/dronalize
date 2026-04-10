@@ -11,26 +11,26 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
-from dronalize.processing.filtering import Filter
-from dronalize.processing.filtering.agent import RequireFrames
 from dronalize.processing.loading.base import (
     BaseSceneLoader,
     LoaderOptions,
     LoaderSplitCapabilities,
 )
-from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.splits import SplitConfig
-    from dronalize.processing.maps.config import MapConfig
+    from dronalize.processing.loading.resources import DatasetResources
+    from dronalize.processing.models import LoaderRequest
+
+
+_NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
 class InteractionLoaderOptions(LoaderOptions):
-    """Loader options for the INTERACTION dataset."""
+    """Dataset-owned config for the INTERACTION loader."""
 
     file_batch_size: int = Field(default=100, ge=1)
 
@@ -44,73 +44,40 @@ class InteractionLoader(BaseSceneLoader[list[Path], InteractionLoaderOptions]):
 
     def __init__(
         self,
-        data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
         *,
-        loader_options: InteractionLoaderOptions | None = None,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the INTERACTION loader.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Root directory of the INTERACTION dataset. It should contain
-            `train/`, `val/`, `test_multi-agent/`, and
-            `test_conditional-multi-agent/`.
-        loader_config : LoaderConfig, optional
-            Loader configuration override.
-        map_config : MapConfig, optional
-            Map configuration override.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Optional selection of predefined dataset splits. `None` processes
-            all available sources.
-        loader_options : InteractionLoaderOptions, optional
-            Dataset-specific loader options. `file_batch_size` controls how
-            many CSV files are read in each batch.
-        """
-        super().__init__(
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-            loader_options=loader_options,
-        )
-        self._data_root: Path = Path(data_root)
-        self._file_batch_size: int = self.loader_options.file_batch_size
+        """Initialize the INTERACTION loader."""
+        super().__init__(data_root=data_root, request=request, resources=resources)
 
     @classmethod
     @override
     def loader_options_model(cls) -> type[InteractionLoaderOptions]:
         return InteractionLoaderOptions
 
-    @classmethod
-    @override
-    def predefined_splits(cls) -> tuple[DatasetSplit, ...]:
-        return (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
-
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         if not data_dir.is_dir():
             return
         csv_files = sorted(data_dir.rglob("*.csv"))
-        for start in range(0, len(csv_files), self._file_batch_size):
-            batch_files = csv_files[start : start + self._file_batch_size]
-            yield Source(f"{data_dir.name}_b{start}", batch_files)
+        for start in range(0, len(csv_files), self.loader_options.file_batch_size):
+            yield Source(
+                f"{data_dir.name}_b{start}",
+                csv_files[start : start + self.dataset_config.file_batch_size],
+            )
 
     @override
     def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
         if split is DatasetSplit.TRAIN:
-            yield from self._sources_from_dir(self._data_root / "train")
+            yield from self._sources_from_dir(self.root / "train")
             return
         if split is DatasetSplit.VAL:
-            yield from self._sources_from_dir(self._data_root / "val")
+            yield from self._sources_from_dir(self.root / "val")
             return
         if split is DatasetSplit.TEST:
-            yield from self._sources_from_dir(self._data_root / "test_multi-agent")
-            yield from self._sources_from_dir(self._data_root / "test_conditional-multi-agent")
-            return
+            yield from self._sources_from_dir(self.root / "test_multi-agent")
+            yield from self._sources_from_dir(self.root / "test_conditional-multi-agent")
 
     @override
     def load_source(self, source: Source[list[Path]]) -> Iterable[LoadedSourceData]:
@@ -132,20 +99,14 @@ class InteractionLoader(BaseSceneLoader[list[Path], InteractionLoaderOptions]):
 
     @override
     def num_sources(self) -> int | None:
-        splits = self.splits if self.splits is not None else self.predefined_splits()
-        return sum(self._count_sources_for_split(split) for split in splits)
+        return sum(
+            self._count_sources_for_split(split) for split in self.native_splits or _NATIVE_SPLITS
+        )
 
     @classmethod
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_YAW
-
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return LoaderConfig(input_len=10, output_len=30, sample_time=0.1).with_filter(
-            Filter.define(agent_rules=[RequireFrames.define(frames=[19])])
-        )
 
     @staticmethod
     def _map_agent_category() -> pl.Expr:
@@ -167,18 +128,16 @@ class InteractionLoader(BaseSceneLoader[list[Path], InteractionLoaderOptions]):
         if not data_dir.is_dir():
             return 0
         num_files = sum(1 for _ in data_dir.rglob("*.csv"))
-        if num_files == 0:
-            return 0
-        batches, extra = divmod(num_files, self._file_batch_size)
+        batches, extra = divmod(num_files, self.loader_options.file_batch_size)
         return batches + int(extra > 0)
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:
         if split is DatasetSplit.TRAIN:
-            return self._count_sources(self._data_root / "train")
+            return self._count_sources(self.root / "train")
         if split is DatasetSplit.VAL:
-            return self._count_sources(self._data_root / "val")
-        return self._count_sources(self._data_root / "test_multi-agent") + self._count_sources(
-            self._data_root / "test_conditional-multi-agent"
+            return self._count_sources(self.root / "val")
+        return self._count_sources(self.root / "test_multi-agent") + self._count_sources(
+            self.root / "test_conditional-multi-agent"
         )
 
 
@@ -198,11 +157,3 @@ _SCHEMA = pl.Schema({
     "track_to_predict": pl.Float64,
     "interesting_agent": pl.Float64,
 })
-
-
-if __name__ == "__main__":
-    from dronalize.datasets.interact import DATASET_SPEC
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-
-    root = resolve_dataset_root_from_env("interact", alternatives=[("interaction",)])
-    _ = debug_descriptor(DATASET_SPEC, root)

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     import polars as pl
 
-    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
 
 Chart = alt.Chart | alt.LayerChart
 

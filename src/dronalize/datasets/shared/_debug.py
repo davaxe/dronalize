@@ -7,8 +7,16 @@ from typing import TYPE_CHECKING, Any
 
 import altair as alt
 
+from dronalize.config.sections import (
+    DatasetConfig,
+    OutputConfig,
+    SplitConfig,
+    effective_scene_window,
+)
 from dronalize.core.scene.schema import CANONICAL
 from dronalize.plot import plot_trajectories, plot_trajectories_on_map
+from dronalize.processing.loading.base import NoLoaderOptions
+from dronalize.runtime._internal.scene import SceneBuilder
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
@@ -16,6 +24,7 @@ if TYPE_CHECKING:
     from dronalize.core.scene import Scene
     from dronalize.datasets.registry import DatasetSpec
     from dronalize.processing.loading.base import BaseSceneLoader
+    from dronalize.processing.models import LoaderRequest
 
 
 def debug_visualize_scenes(
@@ -35,13 +44,23 @@ def debug_visualize_scenes(
     trajectory_kwargs: dict[str, Any] | None = None,
     overlay_kwargs: dict[str, Any] | None = None,
 ) -> list[Scene]:
+    """Render a small sample of scenes produced by a loader."""
     _ = alt.renderers.enable("browser")
 
     trajectory_kwargs = {} if trajectory_kwargs is None else dict(trajectory_kwargs)
     overlay_kwargs = {} if overlay_kwargs is None else dict(overlay_kwargs)
     scenes_list: list[Scene] = []
-
-    scenes: Iterator[Scene] = iter(source.scenes())
+    history_frames, future_frames, sample_time = effective_scene_window(source.scenes_config)
+    builder = SceneBuilder(
+        spec=_debug_spec(loader=source, target_schema=CANONICAL.name),
+        split_request=source.split_config,
+        source_schema=type(source).native_trajectory_schema(),
+        target_schema=CANONICAL,
+        history_frames=history_frames,
+        future_frames=future_frames,
+        sample_time=sample_time,
+    )
+    scenes: Iterator[Scene] = _iter_debug_scenes(loader=source, builder=builder)
     for scene in islice(scenes, skip_scenes, skip_scenes + max_scenes * step, step):
         title_parts: list[str] = []
         if title_prefix:
@@ -107,20 +126,50 @@ def debug_descriptor(
     max_scenes: int = 3,
     skip_scenes: int = 0,
     step: int = 1,
+    request: LoaderRequest | None = None,
 ) -> list[Scene]:
     """Build a loader from its descriptor and visualize a scene sample."""
-    loader_config = descriptor.default_loader_config
-    loader_options = descriptor.default_loader_options
-    map_config = descriptor.default_map_config
-    loader = descriptor.build_loader(
-        root,
-        loader_config=loader_config,
-        loader_options=loader_options,
-        map_config=map_config,
-        trajectory_schema=None,
-    )
-    loader.set_trajectory_schema(CANONICAL)
-    with descriptor.runtime_context(root, loader_config, map_config):
+    loader_request = request or descriptor.default_loader_request()
+    with descriptor.open_resources(root, loader_request) as resources:
+        loader = descriptor.build_loader(root=root, request=loader_request, resources=resources)
         return debug_visualize_scenes(
             loader, max_scenes=max_scenes, skip_scenes=skip_scenes, step=step
         )
+
+
+def _iter_debug_scenes(
+    *, loader: BaseSceneLoader[Any, Any], builder: SceneBuilder
+) -> Iterator[Scene]:
+    scene_number = 0
+    for source in loader.all_sources():
+        for prepared in builder.prepare_source(loader, source):
+            yield builder.create_scene(loader, prepared, source, scene_number)
+            scene_number += 1
+
+
+def _debug_spec(loader: BaseSceneLoader[Any, Any], *, target_schema: str) -> DatasetSpec:
+    from dronalize.datasets.registry import DatasetSpec  # noqa: PLC0415
+
+    dataset_block = loader.loader_options
+    dataset_payload = (
+        None
+        if isinstance(dataset_block, NoLoaderOptions)
+        else dataset_block.model_dump(exclude_defaults=False)
+    )
+    return DatasetSpec(
+        name=f"debug::{type(loader).__name__}",
+        loader_factory=type(loader).unified_factory,
+        default_config=DatasetConfig(
+            scenes=loader.scenes_config,
+            screening=loader.screening_config,
+            output=OutputConfig(trajectory_schema=target_schema),
+            map=loader.map_config or DatasetConfig.model_fields["map"].get_default(),
+            split=SplitConfig(loader.split_config.config)
+            if loader.split_config is not None
+            else SplitConfig.model_validate({"strategy": "none"}),
+            dataset=dataset_payload,
+        ),
+        native_schema=type(loader).native_trajectory_schema(),
+        dataset_options_model=type(loader).loader_options_model(),
+        has_map=loader.map_config is not None,
+    )

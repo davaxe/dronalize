@@ -2,31 +2,27 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION, Scene
 from dronalize.datasets.a43.maps.builder import A43MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.filtering import Filter
-from dronalize.processing.filtering.agent import RequireFrames
 from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.loading.config import LoaderConfig
 from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.maps.config import MapConfig
 from dronalize.processing.maps.resolver import MapResolver
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
-    from dronalize.core.maps.graph import MapGraph
+    from dronalize.core.map_graph import MapGraph
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.splits import SplitConfig
     from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.models import LoaderRequest
 
 
 class A43Loader(BaseSceneLoader):
@@ -36,38 +32,20 @@ class A43Loader(BaseSceneLoader):
         supports_block_split=True
     )
 
-    def __init__(
-        self,
-        data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
-    ) -> None:
+    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
         """Initialize the A43 dataset loader.
 
         Parameters
         ----------
         data_root : Path or str
             Root directory containing the extracted A43 CSV files.
-        loader_config : LoaderConfig, optional
-            Loader configuration override.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Dataset split selection. This dataset does not define predefined
-            splits, so `None` processes all sources.
 
         """
-        super().__init__(
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-        )
-        self._data_root: Path = Path(data_root)
+        super().__init__(data_root=data_root, request=request)
 
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
-        for i, csv_file in enumerate(self._data_root.glob("*.csv")):
+        for i, csv_file in enumerate(self.root.glob("*.csv")):
             yield Source(identifier=i, data=csv_file, map_key=csv_file.stem)
 
     @override
@@ -93,26 +71,12 @@ class A43Loader(BaseSceneLoader):
 
     @override
     def num_sources(self) -> int | None:
-        return sum(1 for f in self._data_root.rglob("*.csv") if f.is_file())
+        return sum(1 for f in self.root.rglob("*.csv") if f.is_file())
 
     @classmethod
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_ACCELERATION
-
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return (
-            LoaderConfig(input_len=20, output_len=50, sample_time=0.1)
-            .with_window(25)
-            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[19])]))
-        )
-
-    @classmethod
-    @override
-    def default_map_config(cls) -> MapConfig:
-        return MapConfig.full_map()
 
     @override
     def map_resolver(self) -> MapResolver:
@@ -127,11 +91,3 @@ class A43Loader(BaseSceneLoader):
             return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
 
         return _resolver
-
-
-if __name__ == "__main__":
-    from dronalize.datasets.a43 import DATASET_SPEC
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-
-    root = resolve_dataset_root_from_env("A43")
-    _ = debug_descriptor(DATASET_SPEC, root)

@@ -1,5 +1,4 @@
 # pyright: standard
-# ruff: noqa: PLC2701
 """Tests for the composable Pipeline infrastructure."""
 
 from __future__ import annotations
@@ -11,25 +10,25 @@ import polars as pl
 import pytest
 from polars.testing import assert_frame_equal
 
-from dronalize.core.categories import AgentCategory
-from dronalize.processing.filtering import Filter, cleanup
-from dronalize.processing.loading import (
-    LoaderConfig,
-    ShuffledTimeBlockStrategy,
+from dronalize.config.sections import (
+    LaneChangeConfig,
+    ScenesConfig,
+    ShuffledTimeSplitConfig,
     SplitConfig,
     SplitWeights,
-    TimeBlockStrategy,
+    TimeSplitConfig,
+    WindowConfig,
 )
+from dronalize.core.categories import AgentCategory
+from dronalize.processing.screening import Screen, cleanup
+from dronalize.processing.models import PipelinePlan, SplitRequest
 from dronalize.processing.pipeline import Pipeline
 from dronalize.processing.pipeline import transforms as transform
 from dronalize.processing.pipeline._internal import SCENE_ID_COLUMN, SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.extensions import LaneChangeSamplingExtension
 from dronalize.processing.pipeline.factory import trajectory_pipeline
 from dronalize.processing.pipeline.functional.resample import ResampleSpec
-from dronalize.processing.pipeline.presets import (
-    lane_change_sampling_spec,
-    standard_trajectory_spec,
-)
+from dronalize.processing.pipeline.spec import lane_change_sampling, standard
 from dronalize.processing.pipeline.splitting import split_partition_pipeline
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -353,15 +352,12 @@ def test_transform_second_derivative() -> None:
     assert "d2_x" in result.columns
 
 
-def test_transform_filter_category(trajectory_lf: pl.LazyFrame) -> None:
-    """Verify the filter transform removes agents that match the specified filtering category."""
-    # Filter out agent_category == 1 -> should remove all
-    config = LoaderConfig(input_len=3, output_len=3, sample_time=0.1).with_filter(
-        Filter.define(
-            cleanup_rules=[cleanup.ExcludeCategories.define(categories=[AgentCategory.CAR])]
-        )
+def test_transform_screen_category(trajectory_lf: pl.LazyFrame) -> None:
+    """Verify the screening transform removes agents that match the specified category."""
+    screen_def = Screen.define(
+        cleanup_rules=[cleanup.ExcludeCategories.define(categories=[AgentCategory.CAR])]
     )
-    fn = transform.filter_scene(config.filter)
+    fn = transform.screen_scene(screen_def)
     result = fn(trajectory_lf).collect()
     # All agents have category 1 (CAR), so cleanup removes every row.
     assert result.shape[0] == 0
@@ -369,8 +365,7 @@ def test_transform_filter_category(trajectory_lf: pl.LazyFrame) -> None:
 
 def test_transform_resample_identity(simple_lf: pl.LazyFrame) -> None:
     """Ensure resampling with identical rates accurately preserves the row count."""
-    config = LoaderConfig(input_len=2, output_len=2, sample_time=1.0)
-    fn = transform.resample(config.resampling, group_by="id")
+    fn = transform.resample(ResampleSpec(), group_by="id")
     result = fn(simple_lf).collect()
     # 1:1 resampling should preserve row count
     assert result.shape[0] == simple_lf.collect().shape[0]
@@ -383,10 +378,7 @@ def test_transform_resample_downsample() -> None:
         "x": [float(i) for i in range(10)],
         "y": [0.0] * 10,
     }).lazy()
-    config = LoaderConfig(input_len=5, output_len=5, sample_time=0.1).with_resampling(
-        ResampleSpec(up=1, down=2)
-    )
-    fn = transform.resample(spec=config.resampling)
+    fn = transform.resample(spec=ResampleSpec(up=1, down=2))
     result = fn(lf).collect()
     assert result.shape[0] == 5
 
@@ -410,7 +402,7 @@ def test_pipeline_filter_then_yaw() -> None:
 
 
 def test_pipeline_integration_complex() -> None:
-    """Execute a complex pipeline with filtering, mapping, fan-out, and renaming."""
+    """Execute a complex pipeline with screening, mapping, fan-out, and renaming."""
     lf = pl.DataFrame({
         "frame": [0, 1, 2, 3, 0, 1, 2, 3],
         "id": [1, 1, 1, 1, 2, 2, 2, 2],
@@ -462,8 +454,8 @@ def test_block_partition_cumulative() -> None:
         "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
     }).lazy()
 
-    split_request = SplitConfig(
-        strategy=TimeBlockStrategy(gap=0), ratio=SplitWeights.from_tuple((0.6, 0.2, 0.2))
+    split_request = SplitRequest.from_config(
+        SplitConfig(root=TimeSplitConfig(gap=0, ratio=SplitWeights(train=0.6, val=0.2, test=0.2)))
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
@@ -488,8 +480,8 @@ def test_block_partition_cumulative_gap() -> None:
         "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
     }).lazy()
 
-    split_request = SplitConfig(
-        strategy=TimeBlockStrategy(gap=2), ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0))
+    split_request = SplitRequest.from_config(
+        SplitConfig(root=TimeSplitConfig(gap=2, ratio=SplitWeights(train=0.5, val=0.5, test=0.0)))
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
@@ -514,9 +506,12 @@ def test_block_partition_shuffled() -> None:
         "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
     }).lazy()
 
-    split_request = SplitConfig(
-        strategy=ShuffledTimeBlockStrategy(segments=5),
-        ratio=SplitWeights.from_tuple((0.6, 0.2, 0.2)),
+    split_request = SplitRequest.from_config(
+        SplitConfig(
+            root=ShuffledTimeSplitConfig(
+                segments=5, ratio=SplitWeights(train=0.6, val=0.2, test=0.2)
+            )
+        ),
         seed=0,
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
@@ -549,10 +544,12 @@ def test_block_partition_shuffled_gap() -> None:
         "value": [11, 12, 13, 14, 20, 21, 22, 23, 24, 25],
     }).lazy()
 
-    split_request = SplitConfig(
-        strategy=ShuffledTimeBlockStrategy(segments=2, gap=2),
-        ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
-        seed=42,
+    split_request = SplitRequest.from_config(
+        SplitConfig(
+            root=ShuffledTimeSplitConfig(
+                segments=2, gap=2, ratio=SplitWeights(train=0.5, val=0.5, test=0.0)
+            )
+        )
     )
     fn = split_partition_pipeline(request=split_request, time_column="frame")
     result = fn.execute_single(lf).collect()
@@ -578,12 +575,17 @@ def test_pipeline_keeps_shuffled_segments() -> None:
         "y": [0.0] * 8,
     }).lazy()
     pipeline = trajectory_pipeline(
-        standard_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=1, sample_time=1.0),
-            split_request=SplitConfig(
-                strategy=ShuffledTimeBlockStrategy(segments=4),
-                ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
-                seed=0,
+        standard(
+            PipelinePlan(
+                scenes=ScenesConfig(history_frames=1, future_frames=1, sample_time=1.0),
+                split=SplitRequest.from_config(
+                    SplitConfig(
+                        root=ShuffledTimeSplitConfig(
+                            segments=4, ratio=SplitWeights(train=0.5, val=0.5, test=0.0)
+                        )
+                    ),
+                    seed=0,
+                ),
             ),
         )
     )
@@ -604,13 +606,23 @@ def test_pipeline_windows_within_segments() -> None:
         "y": [0.0] * 8,
     }).lazy()
     pipeline = trajectory_pipeline(
-        standard_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step=2),
-            split_request=SplitConfig(
-                strategy=ShuffledTimeBlockStrategy(segments=4),
-                ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
-                seed=0,
-            ),
+        standard(
+            PipelinePlan(
+                scenes=ScenesConfig(
+                    history_frames=1,
+                    future_frames=1,
+                    sample_time=1.0,
+                    window=WindowConfig(step=2),
+                ),
+                split=SplitRequest.from_config(
+                    SplitConfig(
+                        root=ShuffledTimeSplitConfig(
+                            segments=4, ratio=SplitWeights(train=0.5, val=0.5, test=0.0)
+                        )
+                    ),
+                    seed=0,
+                ),
+            )
         )
     )
 
@@ -630,8 +642,15 @@ def test_pipeline_drops_window_index_from_output() -> None:
         "y": [0.0] * 4,
     }).lazy()
     pipeline = trajectory_pipeline(
-        standard_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step=2)
+        standard(
+            PipelinePlan(
+                scenes=ScenesConfig(
+                    history_frames=1,
+                    future_frames=1,
+                    sample_time=1.0,
+                    window=WindowConfig(step=2),
+                )
+            )
         )
     )
 
@@ -651,13 +670,23 @@ def test_pipeline_drops_internal_grouping_columns() -> None:
         "y": [0.0] * 8,
     }).lazy()
     pipeline = trajectory_pipeline(
-        standard_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_window(step=2),
-            split_request=SplitConfig(
-                strategy=ShuffledTimeBlockStrategy(segments=4),
-                ratio=SplitWeights.from_tuple((0.5, 0.5, 0.0)),
-                seed=0,
-            ),
+        standard(
+            PipelinePlan(
+                scenes=ScenesConfig(
+                    history_frames=1,
+                    future_frames=1,
+                    sample_time=1.0,
+                    window=WindowConfig(step=2),
+                ),
+                split=SplitRequest.from_config(
+                    SplitConfig(
+                        root=ShuffledTimeSplitConfig(
+                            segments=4, ratio=SplitWeights(train=0.5, val=0.5, test=0.0)
+                        )
+                    ),
+                    seed=0,
+                ),
+            )
         )
     )
 
@@ -672,10 +701,17 @@ def test_pipeline_drops_internal_grouping_columns() -> None:
 
 def test_highway_spec_lane_change_defaults() -> None:
     """The highway spec helper should configure lane-aware sampling succinctly."""
-    spec = lane_change_sampling_spec(
-        LoaderConfig(input_len=1, output_len=1, sample_time=1.0).with_lane_change_sampling(
-            negative_keep_every=4, required_lane_changes=2, persist=2, margin_before=1
-        ),
+    spec = lane_change_sampling(
+        PipelinePlan(
+            scenes=ScenesConfig(
+                history_frames=1,
+                future_frames=1,
+                sample_time=1.0,
+                lane_change=LaneChangeConfig(
+                    negative_keep_every=4, required_lane_changes=2, persist=2, margin_before=1
+                ),
+            )
+        )
     )
 
     assert spec.columns.lane_id == "lane_id"
@@ -686,7 +722,9 @@ def test_highway_spec_lane_change_defaults() -> None:
 
 def test_standard_spec_policy() -> None:
     """The standard spec helper should not attach an extension by default."""
-    spec = standard_trajectory_spec(LoaderConfig(input_len=1, output_len=1, sample_time=1.0))
+    spec = standard(
+        PipelinePlan(scenes=ScenesConfig(history_frames=1, future_frames=1, sample_time=1.0))
+    )
 
     assert spec.extension is None
 
@@ -702,8 +740,11 @@ def test_window_by_keeps_groups() -> None:
     }).lazy()
 
     pipeline = trajectory_pipeline(
-        standard_trajectory_spec(
-            LoaderConfig(input_len=1, output_len=1, sample_time=1.0), window_by="recording"
+        standard(
+            PipelinePlan(
+                scenes=ScenesConfig(history_frames=1, future_frames=1, sample_time=1.0)
+            ),
+            window_by="recording",
         )
     )
 
@@ -723,10 +764,16 @@ def test_highway_sampling_thins_negatives() -> None:
         "lane_id": [1, 1, 1, 2, 2, 2, 2, 2],
     }).lazy()
     pipeline = trajectory_pipeline(
-        lane_change_sampling_spec(
-            LoaderConfig(input_len=1, output_len=2, sample_time=1.0)
-            .with_window(step=1)
-            .with_lane_change_sampling(negative_keep_every=2)
+        lane_change_sampling(
+            PipelinePlan(
+                scenes=ScenesConfig(
+                    history_frames=1,
+                    future_frames=2,
+                    sample_time=1.0,
+                    window=WindowConfig(step=1),
+                    lane_change=LaneChangeConfig(persist=1, negative_keep_every=2),
+                )
+            )
         )
     )
 
@@ -746,11 +793,19 @@ def test_highway_sampling_requires_multiple_changes() -> None:
         "lane_id": [1, 1, 2, 2, 2, 3, 3, 3, 3, 3],
     }).lazy()
     pipeline = trajectory_pipeline(
-        lane_change_sampling_spec(
-            LoaderConfig(input_len=1, output_len=3, sample_time=1.0)
-            .with_window(step=1)
-            .with_lane_change_sampling(negative_keep_every=10, required_lane_changes=2)
-        ),
+        lane_change_sampling(
+            PipelinePlan(
+                scenes=ScenesConfig(
+                    history_frames=1,
+                    future_frames=3,
+                    sample_time=1.0,
+                    window=WindowConfig(step=1),
+                    lane_change=LaneChangeConfig(
+                        persist=1, negative_keep_every=10, required_lane_changes=2
+                    ),
+                )
+            )
+        )
     )
 
     results = list(pipeline.execute(lf, collect=True))

@@ -18,11 +18,10 @@ dependencies = [
     "numpy>=1.24.0",
     "polars>=1.0.0",
     "scipy>=1.10.0",
-    "torch>=2.0.0",
-    "mosaicml-streaming>=0.13.0",
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
     "tomli>=2.0.1; python_version < '3.11'",
+    "deepmerge>=2.0",
 ]
 
 [project.scripts]
@@ -36,7 +35,9 @@ plot = ["altair>=5.0.0"]
 lyft = ["zarr<3", "numcodecs<=0.13.1", "protobuf>=4.25.8"]
 waymo = ["protobuf>=4.25.8"]
 ad4che = ["opencv-python"]
-pyg = ["torch-geometric>=2.7.0"]
+storage-mds = ["mosaicml-streaming>=0.13.0"]
+torch = ["torch>=2.0.0"]
+pyg = ["torch>=2.0.0", "torch-geometric>=2.7.0"]
 
 all_datasets = ["dronalize[ad4che, waymo, lyft]"]
 
@@ -48,7 +49,7 @@ dev = [
     "scipy-stubs",
     "ipython",
     "tomli>=2.0.1",
-    "dronalize[plot,storage-mds,pyg,ad4che,cli,lyft,waymo]",
+    "dronalize[plot,storage-mds,torch,pyg,ad4che,cli,lyft,waymo]",
 ]
 tools = [
     "mkdocs-material>=9.6.0",
@@ -92,12 +93,15 @@ ignore = [
     "T201", "S101", "TRY003", "D100", "B008", "PLR0904",
     "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
     "DOC402", "CPY001", "D104", "TD005", "S405", "S314",
-    "RUF067", "PLC2801", "S608", "S311", "T203", "S603", "S404",
+    "RUF067", "PLC2801", "S608", "S311", "T203", "S603", "S404", "D101",
 ]
 pydocstyle = { convention = "numpy" }
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ANN", "B026", "D", "PLC0415", "PLC2701", "PLR6301"]
 
 [tool.ruff.format]
 quote-style = "double"

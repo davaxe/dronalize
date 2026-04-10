@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, TypedDict
 
 from typing_extensions import Self, override
 
-from dronalize.core.maps.edge_types import EdgeType
+from dronalize.core.categories import EdgeType
 from dronalize.datasets.nuscenes.maps import parser
 from dronalize.processing.maps.builder import BaseMapBuilder
 

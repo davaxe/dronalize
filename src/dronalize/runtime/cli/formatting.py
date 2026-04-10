@@ -2,156 +2,159 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
+from pydantic import BaseModel
 from rich import box
 from rich.table import Table
 
-from dronalize.core.categories import DatasetSplit
-from dronalize.datasets.registry import DatasetCapabilities
+from dronalize.config.sections import (
+    NativeSplitConfig,
+    NoSplitConfig,
+    SceneSplitConfig,
+    ShuffledTimeSplitConfig,
+    SourceSplitConfig,
+    SplitConfig,
+    SplitConfigUnion,
+    TimeSplitConfig,
+    effective_scene_window,
+)
+from dronalize.core.scene import get_trajectory_schema
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from pydantic import BaseModel
-
+    from dronalize.config.sections import MapConfig, ScenesConfig, ScreeningConfig
     from dronalize.datasets.registry import DatasetSpec
-    from dronalize.processing.loading.config import LoaderConfig
-    from dronalize.processing.loading.splits import SplitStrategyName
-    from dronalize.processing.maps.config import MapConfig
-    from dronalize.runtime.models import ProcessingSummary
+    from dronalize.runtime.plans import RunPlan
 
-_DATASET_SPLIT_DISPLAY_ORDER = {DatasetSplit.TRAIN: 0, DatasetSplit.VAL: 1, DatasetSplit.TEST: 2}
-_CUSTOM_SPLIT_STRATEGIES: tuple[SplitStrategyName, ...] = (
-    "source",
-    "scene",
-    "time",
-    "shuffled-time",
-)
-_CUSTOM_SPLIT_STRATEGY_DESCRIPTIONS: dict[SplitStrategyName, str] = {
-    "source": "Assign complete sources such as recordings to a single split.",
-    "scene": "Assign individual scenes while keeping each scene fully intact.",
-    "time": "Split long recordings into chronological train/val/test blocks.",
-    "shuffled-time": "Split long recordings into multiple temporal segments before routing.",
-    "auto": "Resolve the recommended custom split strategy automatically.",
-    "native": "Use dataset-defined train/val/test partitions as-is.",
-    "none": "Process all data without split routing.",
-}
 PLAN_NOTICE = (
     "\n[bold yellow]This is the processing plan. No changes have been made yet.[/bold yellow]"
 )
-_CAPABILITY_BADGES: tuple[tuple[DatasetCapabilities, str, str], ...] = (
-    (DatasetCapabilities.MAP_AVAILABLE, "green", "map"),
-    (DatasetCapabilities.NATIVE_SPLITS, "cyan", "native splits"),
-    (DatasetCapabilities.CUSTOM_SPLITS, "blue", "custom split strategies"),
-    (DatasetCapabilities.LANE_CHANGE_SAMPLING, "magenta", "lane-change sampling"),
-    (DatasetCapabilities.EXECUTION_SCOPE, "yellow", "runtime context"),
-    (DatasetCapabilities.LOADER_OPTIONS, "red", "loader options"),
-)
 
 
-def build_processing_summary_table(summary: ProcessingSummary) -> Table:
-    """Return a display table for a prepared processing summary."""
+def build_processing_summary_table(job: RunPlan) -> Table:
+    """Build a rich table summarizing one resolved processing job."""
     table = Table(
-        title=summary.title, show_header=False, box=box.MINIMAL_DOUBLE_HEAD, title_justify="left"
+        title=f"Processing plan: {job.dataset}",
+        show_header=False,
+        box=box.MINIMAL_DOUBLE_HEAD,
+        title_justify="left",
     )
     table.add_column(style="bright_cyan", justify="left", no_wrap=True)
     table.add_column(style="bright_magenta")
-    for label, value in summary.rows:
+    for label, value in summarize_job(job):
         table.add_row(label, value)
     return table
 
 
+def summarize_job(job: RunPlan) -> tuple[tuple[str, str], ...]:
+    """Return label/value rows for a resolved job summary."""
+    output_config = job.output.inner
+    return (
+        ("Dataset", job.dataset),
+        ("Input", str(job.data_root)),
+        ("Output", str(job.output_dir)),
+        ("Backend", job.storage_backend.value),
+        ("Workers", str(job.runtime.jobs)),
+        ("Limit", "none" if job.limit is None else str(job.limit)),
+        ("Schema", get_trajectory_schema(output_config.trajectory_schema).name),
+        ("Map", "yes" if job.map is not None else "no"),
+        ("Split strategy", _run_plan_split_strategy(job)),
+        ("Split details", _split_detail(job)),
+        ("Options", _format_options(job.loader.dataset)),
+    )
+
+
 def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, details: bool) -> Table:
-    """Return a table describing the available datasets."""
+    """Build a rich table showing the available dataset registry entries."""
     table = Table(
         title="Available datasets",
         box=box.MINIMAL_DOUBLE_HEAD,
         show_edge=True,
-        show_lines=False,
         header_style="bold",
         row_styles=["", "dim"],
     )
     table.add_column("Dataset", style="bright_cyan", no_wrap=True)
     if details:
-        table.caption = (
-            " Native splits are listed first, followed by custom split strategies.\n"
-            " [yellow]*[/yellow] marks the recommended custom strategy."
-        )
-        table.caption_justify = "left"
-        table.caption_style = "dim"
         table.add_column("Window @ Hz", justify="right", style="bright_magenta", no_wrap=True)
         table.add_column("Map", justify="center")
-        table.add_column("Split support", style="bright_blue")
+        table.add_column("Native splits", style="bright_blue")
+        table.add_column("Time split", justify="center")
 
     for descriptor in descriptors:
         if not details:
             table.add_row(descriptor.name)
             continue
 
-        cfg = descriptor.default_loader_config
-        window = f"{cfg.input_len:>2}/{cfg.output_len:<3} @ {1 / cfg.sample_time:>4.1f}Hz"
+        cfg = descriptor.default_config.scenes
+        window = _format_base_window(cfg.history_frames, cfg.future_frames, cfg.sample_time)
         has_map = "[green]yes[/green]" if descriptor.has_map else "[dim]no[/dim]"
+        native_splits = (
+            ", ".join(split.value for split in descriptor.native_splits) or "[dim]none[/dim]"
+        )
         table.add_row(
             descriptor.name,
             window,
             has_map,
-            _format_split_support(
-                descriptor.predefined_splits,
-                descriptor.supported_split_strategies,
-                descriptor.recommended_split_strategy,
-            ),
+            native_splits,
+            _format_flag(enabled=descriptor.time_split_support is not None),
         )
     return table
 
 
 def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
-    """Return the tables used by the `inspect` command."""
-    config = descriptor.default_loader_config
-    map_config = descriptor.default_map_config
+    """Build one or more inspection tables for a dataset descriptor."""
+    scenes = descriptor.default_config.scenes
+    screening_config = descriptor.default_config.screening
+    map_config = descriptor.default_config.map if descriptor.has_map else None
+    output_config = descriptor.default_config.output
+    split_config = descriptor.default_config.split
 
     overview = _detail_table(title=f"Dataset inspect: {descriptor.name}")
     overview.add_row("Dataset", descriptor.name)
-    overview.add_row("Capabilities", _format_capabilities(descriptor.capabilities))
     overview.add_row(
         "Native schema",
         f"{descriptor.native_schema.name} ({descriptor.native_schema.feature_dim} features)",
     )
     overview.add_row("Schema fields", ", ".join(descriptor.native_schema.semantic_fields()))
     overview.add_row(
-        "Split support",
-        _format_split_support(
-            descriptor.predefined_splits,
-            descriptor.supported_split_strategies,
-            descriptor.recommended_split_strategy,
-        ),
+        "Native splits",
+        ", ".join(split.value for split in descriptor.native_splits) or "[dim]none[/dim]",
     )
+    overview.add_row("Time split", _format_flag(enabled=descriptor.time_split_support is not None))
+    overview.add_row("Map", _format_flag(enabled=descriptor.has_map))
 
-    loader_defaults = _detail_table(title="Default loader config")
-    loader_defaults.add_row(
+    scene_defaults = _detail_table(title="Default scene settings")
+    scene_defaults.add_row(
         "Source window",
-        _format_base_window(config.input_len, config.output_len, config.sample_time),
+        _format_base_window(scenes.history_frames, scenes.future_frames, scenes.sample_time),
     )
-    loader_defaults.add_row(
-        "Effective window",
-        (
-            f"{config.resampled_input_len}/{config.resampled_output_len}"
-            f" @ {1 / config.post_sample_time:.1f} Hz"
-        ),
+    scene_defaults.add_row("Effective window", _format_effective_window(scenes))
+    scene_defaults.add_row("Resampling", _format_resampling(scenes))
+    scene_defaults.add_row("Windowing", _format_windowing(scenes))
+    scene_defaults.add_row("Screening rules", _format_screening_rules(screening_config))
+    scene_defaults.add_row("Dataset config", _format_options(descriptor.default_dataset_options()))
+
+    output_defaults = _detail_table(title="Default output settings")
+    output_defaults.add_row("Schema", get_trajectory_schema(output_config.trajectory_schema).name)
+    output_defaults.add_row("Precision", output_config.precision)
+    output_defaults.add_row(
+        "Recenter positions", _format_flag(enabled=output_config.recenter_positions)
     )
-    loader_defaults.add_row("Resampling", _format_resampling(config))
-    loader_defaults.add_row("Windowing", _format_windowing(config))
-    loader_defaults.add_row("Filter rules", _format_filter_rules(config))
-    loader_defaults.add_row("Options", _format_options(descriptor.default_loader_options))
 
-    tables: list[Table] = [overview, loader_defaults]
-    if loader_options := _loader_option_rows(descriptor):
-        loader_option_table = _detail_table(title="Loader-specific Options")
-        for name, default in loader_options:
-            loader_option_table.add_row(name, default)
-        tables.append(loader_option_table)
+    split_defaults = _detail_table(title="Default split settings")
+    for label, value in _split_config_rows(split_config):
+        split_defaults.add_row(label, value)
 
-    map_defaults = _detail_table(title="Default map config")
+    tables: list[Table] = [overview, scene_defaults, output_defaults, split_defaults]
+    if descriptor.dataset_options_model.model_fields:
+        option_table = _detail_table(title="Dataset Config")
+        for name, default in _loader_option_rows(descriptor):
+            option_table.add_row(name, default)
+        tables.append(option_table)
+
+    map_defaults = _detail_table(title="Default map settings")
     map_defaults.add_row("Enabled", _format_flag(enabled=map_config is not None))
     if map_config is not None:
         map_defaults.add_row("Extraction", _format_map_extraction(map_config))
@@ -162,60 +165,39 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
 
 
 def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
-    """Return the tables used by the `split-support` command."""
+    """Build rich tables describing split support for one dataset."""
     summary = _detail_table(title=f"Split support: {descriptor.name}")
     summary.add_row("Dataset", descriptor.name)
-    summary.add_row("Native splits", _format_split_list(descriptor.predefined_splits))
     summary.add_row(
-        "Custom strategies",
-        _format_mode_list(
-            descriptor.supported_split_strategies, descriptor.recommended_split_strategy
-        ),
+        "Native splits",
+        ", ".join(split.value for split in descriptor.native_splits) or "[dim]none[/dim]",
     )
-    summary.add_row(
-        "Recommended custom strategy",
-        descriptor.recommended_split_strategy or "[dim]none[/dim]",
-    )
+    summary.add_row("Scene split", "[green]yes[/green]")
+    summary.add_row("Source split", "[green]yes[/green]")
+    summary.add_row("Time split", _format_flag(enabled=descriptor.time_split_support is not None))
+    return (summary,)
 
-    native_table = Table(
-        title="Native split matrix",
-        box=box.MINIMAL_DOUBLE_HEAD,
-        title_justify="left",
-        header_style="bold",
-    )
-    native_table.add_column("Split", style="bright_cyan", no_wrap=True)
-    native_table.add_column("Supported", justify="center")
-    supported_splits = set(descriptor.predefined_splits)
-    for split in _sorted_splits(list(DatasetSplit)):
-        native_table.add_row(split.value, _format_flag(enabled=split in supported_splits))
 
-    custom_table = Table(
-        title="Custom split strategies",
-        box=box.MINIMAL_DOUBLE_HEAD,
-        title_justify="left",
-        header_style="bold",
-    )
-    custom_table.add_column("Strategy", style="bright_cyan", no_wrap=True)
-    custom_table.add_column("Supported", justify="center")
-    custom_table.add_column("Recommended", justify="center")
-    custom_table.add_column("Details", style="bright_magenta")
-
-    supported_strategies = set(descriptor.supported_split_strategies)
-    for strategy in _CUSTOM_SPLIT_STRATEGIES:
-        row_style = "" if strategy in supported_strategies else "dim"
-        custom_table.add_row(
-            strategy,
-            _format_flag(enabled=strategy in supported_strategies),
-            _format_flag(enabled=strategy == descriptor.recommended_split_strategy),
-            _CUSTOM_SPLIT_STRATEGY_DESCRIPTIONS[strategy],
-            style=row_style,
+def _split_detail(job: RunPlan) -> str:
+    split = job.loader.split
+    if split is None or split.strategy == "none":
+        return "all data"
+    if split.strategy == "native":
+        selected = split.read or job.descriptor.native_splits
+        return ", ".join(s.value for s in selected) if selected else "all native splits"
+    if split.strategy in {"scene", "source"}:
+        return ", ".join(f"{s.value}={w:.2f}" for s, w in split.active())
+    if split.strategy == "time":
+        return f"{', '.join(f'{s.value}={w:.2f}' for s, w in split.active())}; gap={split.gap}"
+    if split.strategy == "shuffled-time":
+        return (
+            f"{', '.join(f'{s.value}={w:.2f}' for s, w in split.active())}; "
+            f"gap={split.gap}; segments={split.segments}"
         )
-
-    return summary, native_table, custom_table
+    return str(split.strategy)
 
 
 def _detail_table(title: str, *, caption: str | None = None) -> Table:
-    """Return a standard two-column detail table."""
     table = Table(
         title=title,
         show_header=False,
@@ -230,113 +212,64 @@ def _detail_table(title: str, *, caption: str | None = None) -> Table:
     return table
 
 
-def _format_split_support(
-    predefined_splits: list[DatasetSplit],
-    supported_split_strategies: list[SplitStrategyName],
-    recommended_split_strategy: SplitStrategyName | None,
-) -> str:
-    """Return a compact summary of native and custom split support."""
-    native = ", ".join(split.value for split in _sorted_splits(predefined_splits))
-    custom = _format_supported_modes(supported_split_strategies, recommended_split_strategy)
-    if native and custom:
-        return f"{native} [dim]|[/dim] {custom}"
-    if native:
-        return native
-    if custom:
-        return custom
-    return "-"
-
-
 def _format_flag(*, enabled: bool) -> str:
-    """Return a consistent yes/no flag for terminal output."""
     return "[green]yes[/green]" if enabled else "[dim]no[/dim]"
 
 
-def _format_capabilities(capabilities: DatasetCapabilities) -> str:
-    """Return a compact badge row describing enabled dataset capabilities."""
-    badges = [
-        f"[black on {color}] {label} [/]"
-        for flag, color, label in _CAPABILITY_BADGES
-        if capabilities & flag
-    ]
-    return " ".join(badges) if badges else "[dim]none[/dim]"
+def _format_base_window(history_frames: int, future_frames: int, sample_time: float) -> str:
+    return f"{history_frames}/{future_frames} @ {1 / sample_time:.1f} Hz"
 
 
-def _sorted_splits(predefined_splits: list[DatasetSplit]) -> list[DatasetSplit]:
-    """Return predefined splits in stable train/val/test display order."""
-    return sorted(
-        predefined_splits,
-        key=lambda split: _DATASET_SPLIT_DISPLAY_ORDER.get(
-            split, len(_DATASET_SPLIT_DISPLAY_ORDER)
-        ),
-    )
+def _format_effective_window(config: ScenesConfig) -> str:
+    history_frames, future_frames, sample_time = effective_scene_window(config)
+    return f"{history_frames}/{future_frames} @ {1 / sample_time:.1f} Hz"
 
 
-def _format_split_list(predefined_splits: list[DatasetSplit]) -> str:
-    """Return a readable list of predefined dataset splits."""
-    splits = _sorted_splits(predefined_splits)
-    return ", ".join(split.value for split in splits) if splits else "[dim]none[/dim]"
-
-
-def _format_mode_list(
-    supported_split_strategies: list[SplitStrategyName],
-    recommended_split_strategy: SplitStrategyName | None,
-) -> str:
-    """Return a readable list of supported custom split strategies."""
-    if not supported_split_strategies:
-        return "[dim]none[/dim]"
-    return _format_supported_modes(supported_split_strategies, recommended_split_strategy)
-
-
-def _format_base_window(input_len: int, output_len: int, sample_time: float) -> str:
-    """Return the original un-resampled sequence summary."""
-    return f"{input_len}/{output_len} @ {1 / sample_time:.1f} Hz"
-
-
-def _format_resampling(config: LoaderConfig) -> str:
-    """Return a short description of the active resampling configuration."""
-    spec = config.resampling
-    if spec is None or spec.no_resampling:
+def _format_resampling(config: ScenesConfig) -> str:
+    spec = config.resample
+    if spec is None or (spec.up == 1 and spec.down == 1):
         return "none"
-    return f"{spec.up}:{spec.down} ({spec.method.value})"
+    emit: list[str] = []
+    if spec.emit_velocity:
+        emit.append("velocity")
+    if spec.emit_acceleration:
+        emit.append("acceleration")
+    extras = "" if not emit else f"; emit={', '.join(emit)}"
+    return f"{spec.up}:{spec.down} ({spec.method}){extras}"
 
 
-def _format_windowing(config: LoaderConfig) -> str:
-    """Return a short description of the active sliding-window configuration."""
+def _format_windowing(config: ScenesConfig) -> str:
     window = config.window
     if window is None:
         return "disabled"
-    return f"{window.size} frames, step {window.step}"
+    total_frames = config.history_frames + config.future_frames
+    return f"{total_frames} frames, step {window.step}"
 
 
-def _format_filter_rules(config: LoaderConfig) -> str:
-    """Return a readable summary of configured filter rules."""
-    scene_filter = config.filter
-    if scene_filter is None:
+def _format_screening_rules(config: ScreeningConfig | None) -> str:
+    if config is None:
         return "none"
-
     groups: list[str] = []
-    if scene_filter.cleanup_rules:
-        groups.append("cleanup: " + ", ".join(rule.name() for rule in scene_filter.cleanup_rules))
-    if scene_filter.scene_rules:
-        groups.append("scene: " + ", ".join(rule.name() for rule in scene_filter.scene_rules))
-    if scene_filter.agent_rules:
-        groups.append("agent: " + ", ".join(rule.name() for rule in scene_filter.agent_rules))
+    if config.cleanup:
+        groups.append("cleanup: " + ", ".join(config.cleanup))
+    if config.scene:
+        groups.append("scene: " + ", ".join(config.scene))
+    if config.agent:
+        groups.append("agent: " + ", ".join(config.agent))
     return " | ".join(groups) if groups else "none"
 
 
-def _format_options(options: BaseModel) -> str:
-    """Return a readable summary of loader options."""
-    options_dict: dict[str, Any] = {}
-    if hasattr(options, "model_dump"):
-        options_dict = options.model_dump(exclude_defaults=False)
+def _format_options(options: BaseModel | object | None) -> str:
+    if not isinstance(options, BaseModel):
+        return "none"
+
+    options_dict = options.model_dump(exclude_defaults=False)
     if not options_dict:
         return "none"
     return ", ".join(f"{key}={value!r}" for key, value in sorted(options_dict.items()))
 
 
 def _format_map_extraction(map_config: MapConfig) -> str:
-    """Return a readable summary of the default map extraction mode."""
     extraction = map_config.extraction
     match extraction.mode:
         case "full":
@@ -350,25 +283,57 @@ def _format_map_extraction(map_config: MapConfig) -> str:
 
 
 def _format_optional_float(value: float | None) -> str:
-    """Return a compact float or a dimmed placeholder."""
     return f"{value:g}" if value is not None else "[dim]none[/dim]"
 
 
-def _format_supported_modes(
-    supported_modes: list[SplitStrategyName], recommended_mode: SplitStrategyName | None
-) -> str:
-    return ", ".join(
-        f"{mode}[yellow]*[/yellow]" if mode == recommended_mode else mode
-        for mode in supported_modes
-    )
-
-
 def _loader_option_rows(descriptor: DatasetSpec) -> list[tuple[str, str]]:
-    """Return typed loader option fields and their defaults."""
-    default_values = descriptor.default_loader_options.model_dump(exclude_defaults=False)
+    default_values = descriptor.default_dataset_options().model_dump(exclude_defaults=False)
     rows: list[tuple[str, str]] = []
-    for name, field in descriptor.loader_options_type.model_fields.items():
+    for name, field in descriptor.dataset_options_model.model_fields.items():
         value = default_values.get(name)
         default = "[yellow]required[/yellow]" if field.is_required() else repr(value)
         rows.append((name, default))
     return rows
+
+
+def _run_plan_split_strategy(job: RunPlan) -> str:
+    split = job.loader.split
+    return "none" if split is None else str(split.strategy)
+
+
+def _split_config_rows(split_config: SplitConfig) -> tuple[tuple[str, str], ...]:
+    split_root = split_config.root
+    rows: list[tuple[str, str]] = [("Strategy", split_root.strategy)]
+    rows.extend(_split_config_detail_rows(split_root))
+    return tuple(rows)
+
+
+def _split_config_detail_rows(split_config: SplitConfigUnion) -> list[tuple[str, str]]:
+    match split_config:
+        case NoSplitConfig():
+            return [("Selection", "all data")]
+        case NativeSplitConfig(splits=splits):
+            ordered = sorted(splits, key=_split_sort_key)
+            selected = ", ".join(split.value for split in ordered)
+            return [("Native splits", selected)]
+        case SceneSplitConfig(ratio=ratio) | SourceSplitConfig(ratio=ratio):
+            return [("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test))]
+        case TimeSplitConfig(ratio=ratio, gap=gap):
+            return [
+                ("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test)),
+                ("Gap", str(gap)),
+            ]
+        case ShuffledTimeSplitConfig(ratio=ratio, gap=gap, segments=segments):
+            return [
+                ("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test)),
+                ("Gap", str(gap)),
+                ("Segments", str(segments)),
+            ]
+
+
+def _format_ratio(train: float, val: float, test: float) -> str:
+    return f"train={train:g}, val={val:g}, test={test:g}"
+
+
+def _split_sort_key(split: object) -> str:
+    return getattr(split, "value", str(split))

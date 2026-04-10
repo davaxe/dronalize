@@ -25,24 +25,24 @@ The registry returns a `DatasetSpec`, which carries loader defaults, native sche
 from pathlib import Path
 
 from dronalize.datasets import get
-from dronalize.runtime import ConfigResolver, load_project_config
+from dronalize.runtime.config import load_project_config, resolve_dataset_config
 
 dataset_spec = get("a43")
-file_config = load_project_config(Path("config.toml"))
-resolved = ConfigResolver().resolve(descriptor=dataset_spec, file_config=file_config)
+project_config = load_project_config(Path("config.toml"))
+resolved = resolve_dataset_config(project=project_config, descriptor=dataset_spec)
 
 print(resolved.export.trajectory_schema.name)
 print(resolved.execution.jobs)
 ```
 
-This gives you the same resolver path the CLI uses when it combines dataset-spec defaults with the authoring config file.
+This gives you the same declarative config-resolution path the CLI uses before a job is compiled for execution.
 
 ## Construct processing config directly
 
 ```python
 from dronalize.processing import LoaderConfig, MapConfig
 
-loader = LoaderConfig(input_len=20, output_len=30, sample_time=0.1)
+loader = LoaderConfig(history_frames=20, future_frames=30, sample_time=0.1)
 map_config = MapConfig.default()
 ```
 

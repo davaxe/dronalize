@@ -2,38 +2,39 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, cast
 
 import polars as pl
+from pydantic import Field
 from typing_extensions import override
 
-from dronalize.core.categories import AgentCategory, DatasetSplit
+from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.filtering import Filter
-from dronalize.processing.filtering.agent import RequireFrames
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
-from dronalize.processing.loading.config import LoaderConfig
+from dronalize.processing.loading.base import (
+    BaseSceneLoader,
+    DatasetOptionsModel,
+    LoaderSplitCapabilities,
+)
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import no_map, shared_map
-from dronalize.processing.pipeline.functional.resample import ResampleSpec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.splits import SplitConfig
-    from dronalize.processing.maps.config import MapConfig
+    from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.models import LoaderRequest
 
 
-class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
-    """Loader for nuScenes trajectories.
+class NuScenesLoaderOptions(DatasetOptionsModel):
+    drop_status: list[str] = Field(default_factory=lambda: ["parked", "undefined"])
+    drop_full_category_regex: list[str] = Field(default_factory=lambda: ["object"])
 
-    The loader preprocesses the global nuScenes tables once, joins them into a
-    scene-level trajectory table, and then caches one DataFrame per scene for
-    efficient access during ingestion.
-    """
+
+class NuScenesLoader(BaseSceneLoader[tuple[int, str], NuScenesLoaderOptions]):
+    """Loader for nuScenes trajectories."""
 
     split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
         supports_source_split=True
@@ -41,35 +42,15 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
 
     def __init__(
         self,
+        *,
         data_root: Path | str,
-        loader_config: LoaderConfig | None = None,
-        map_config: MapConfig | None = None,
-        splits: Iterable[DatasetSplit] | DatasetSplit | None = None,
-        split_request: SplitConfig | None = None,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the nuScenes loader.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Root directory of the extracted nuScenes dataset.
-        loader_config : LoaderConfig, optional
-            Loader configuration override.
-        splits : Iterable[DatasetSplit] | DatasetSplit | None, optional
-            Optional selection of predefined dataset splits. This loader does
-            not expose predefined splits, so `None` processes all sources.
-        """
-        super().__init__(
-            loader_config=loader_config,
-            map_config=map_config,
-            splits=splits,
-            split_request=split_request,
-        )
-        self._data_root: Path = Path(data_root)
+        """Initialize the nuScenes loader."""
+        super().__init__(data_root=data_root, request=request, resources=resources)
         self._data_dirs: list[Path] = self._find_data_dir()
         self._dfs: list[dict[str, pl.LazyFrame]] = []
-
-        # Cache for the processed data: {scene_token: DataFrame}
         self._scene_cache: list[dict[str, pl.DataFrame]] = []
         self._schemas: dict[str, pl.Schema | None] = _SCHEMAS
 
@@ -79,26 +60,22 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     def _find_data_dir(self) -> list[Path]:
         required_files = set(_SCHEMAS.keys())
         paths: list[Path] = []
-        max_level = 3
-        current_root = self._data_root
-        for level in range(max_level + 1):
+        for level in range(4):
             pattern = "*/" * level + "*"
-
-            for path in current_root.glob(pattern):
+            for path in self.root.glob(pattern):
                 if path.is_dir():
                     files = {p.stem for p in path.glob("*.json")}
                     if required_files.issubset(files):
                         paths.append(path)
-
         return paths
 
     @override
     def discover_sources(self) -> Iterable[Source[tuple[int, str]]]:
         for i, dfs in enumerate(self._scene_cache):
             for token, df in dfs.items():
-                scene_name: str = df.item(0, "scene_name")
-                map_name: str = df.item(0, "map")
-                yield Source(identifier=scene_name, data=(i, token), map_key=map_name)
+                yield Source(
+                    identifier=df.item(0, "scene_name"), data=(i, token), map_key=df.item(0, "map")
+                )
 
     @override
     def num_sources(self) -> int | None:
@@ -110,10 +87,10 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
         scenes = self._scene_cache[index][token].drop(["scene_token", "scene_name", "map"]).lazy()
         yield LoadedSourceData(
             scenes.filter(
-                ~pl.col("status").is_in(self._status_to_filter),
+                ~pl.col("status").is_in(self.loader_options.drop_status),
                 *[
-                    ~pl.col("full_category").str.contains(category)
-                    for category in self._full_category_contains
+                    ~pl.col("full_category").str.contains(regex)
+                    for regex in self.loader_options.drop_full_category_regex
                 ],
             ).drop(["status", "full_category", "full_status"])
         )
@@ -123,24 +100,14 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
 
-    @classmethod
-    @override
-    def default_config(cls) -> LoaderConfig:
-        return (
-            LoaderConfig(input_len=4, output_len=12, sample_time=0.5)
-            .with_resampling(ResampleSpec(up=5, down=1))
-            .with_window(step=1)
-            .with_filter(Filter.define(agent_rules=[RequireFrames.define(frames=[3])]))
-        )
-
     @override
     def map_resolver(self) -> MapResolver:
-        if self._shared_memory_name is None:
+        shared_maps = self.resources.shared_maps
+        if not isinstance(shared_maps, dict):
             return no_map()
-        return shared_map(self._shared_memory_name)
+        return shared_map(shared_maps)
 
     def _load_tables(self) -> None:
-        """Load all required tables using the generic loader."""
         for data_dir in self._data_dirs:
             data_dict: dict[str, pl.LazyFrame] = {}
             for name, schema in self._schemas.items():
@@ -148,14 +115,9 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
             self._dfs.append(data_dict)
 
     def _precompute_global_data(self) -> None:
-        # 1. Build the global timeline (Sample + Scene + Log)
         for dfs in self._dfs:
             timeline_lf = build_scene_timeline(dfs["sample"], dfs["scene"], dfs["log"])
-
-            # 2. Process Ego
             ego_lf = extract_ego_tracks(timeline_lf, dfs["sample_data"], dfs["ego_pose"])
-
-            # 3. Process Agents (with explicit mappings passed in)
             agents_lf = extract_agent_tracks(
                 timeline_lf,
                 dfs["sample_annotation"],
@@ -167,9 +129,6 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
                 default_agent_category=AgentCategory.UNKNOWN,
                 default_status="unknown",
             )
-
-            # 4. Align columns and merge
-            # Ensure agents have the exact same column order as ego
             agents_lf = agents_lf.select(ego_lf.collect_schema().names())
             combined_df = (
                 pl
@@ -177,61 +136,22 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str]]):
                 .sort(["scene_token", "frame", "id"])
                 .collect(engine="streaming")
             )
-
             self._scene_cache.append(
                 cast(
                     "dict[str, pl.DataFrame]", combined_df.partition_by("scene_token", as_dict=True)
                 )
             )
 
-        self._status_to_filter: list[str] = ["parked", "undefined"]
-        self._full_category_contains: list[str] = ["object"]
-
 
 def load_cached_table(name: str, base_dir: Path, schema: pl.Schema | None = None) -> pl.LazyFrame:
-    """Load a table from Parquet if available/enabled, otherwise falls back to JSON.
-
-    Parameters
-    ----------
-    name : str
-        Name of the JSON file to read without extension (e.g., "scene").
-    base_dir : Path
-        Base directory where the JSON file is located.
-    schema : pl.Schema, optional
-        Schema to use for reading the JSON file.
-
-    Returns
-    -------
-    pl.LazyFrame
-        LazyFrame of the loaded table.
-
-    """
-    json_path = base_dir / f"{name}.json"
-
-    # Fallback to JSON
-    lf = pl.read_json(json_path, schema=schema)
-    return lf.lazy()
+    """Load one nuScenes table from JSON."""
+    return pl.read_json(base_dir / f"{name}.json", schema=schema).lazy()
 
 
 def build_scene_timeline(
     sample_lf: pl.LazyFrame, scene_lf: pl.LazyFrame, log_lf: pl.LazyFrame
 ) -> pl.LazyFrame:
-    """Build a frame-indexed scene timeline table.
-
-    Parameters
-    ----------
-    sample_lf : pl.LazyFrame
-        Sample data LazyFrame.
-    scene_lf : pl.LazyFrame
-        Scene LazyFrame.
-    log_lf : pl.LazyFrame
-        Log LazyFrame.
-
-    Returns
-    -------
-    pl.LazyFrame
-        Timeline table containing scene, sample, and log metadata.
-    """
+    """Build a frame-indexed scene timeline table."""
     return (
         sample_lf
         .join(scene_lf, left_on="scene_token", right_on="token")
@@ -262,27 +182,7 @@ def extract_ego_tracks(
     ego_id: int = 0,
     ego_category: int = AgentCategory.CAR,
 ) -> pl.LazyFrame:
-    """Extract ego track from relevant dataframes.
-
-    Parameters
-    ----------
-    timeline_lf : pl.LazyFrame
-        Timeline LazyFrame for a scene, as returned by `build_scene_timeline`.
-    sample_data_lf : pl.LazyFrame
-        Sample data LazyFrame.
-    ego_pose_lf : pl.LazyFrame
-        Ego pose LazyFrame.
-    ego_id : int, optional
-        Ego agent ID. Defaults to 0.
-    ego_category : int, optional
-        Ego agent category. Defaults to `AgentCategory.CAR`.
-
-    Returns
-    -------
-    pl.LazyFrame
-        LazyFrame containing the track of the ego vehicle.
-
-    """
+    """Extract ego tracks from the global tables."""
     return (
         timeline_lf
         .join(sample_data_lf.select(["sample_token", "ego_pose_token"]), on="sample_token")
@@ -313,37 +213,7 @@ def extract_agent_tracks(
     default_agent_category: int = AgentCategory.UNKNOWN,
     default_status: str = "unknown",
 ) -> pl.LazyFrame:
-    """Extract agent tracks from relevant tables.
-
-    Parameters
-    ----------
-    timeline_lf : pl.LazyFrame
-        Timeline LazyFrame, as returned by `build_scene_timeline`.
-    annotation_lf : pl.LazyFrame
-        Sample annotation LazyFrame.
-    instance_lf : pl.LazyFrame
-        Instance LazyFrame.
-    category_lf : pl.LazyFrame
-        Category LazyFrame.
-    attribute_lf : pl.LazyFrame
-        Attribute LazyFrame.
-    category_mapping : dict[str, int]
-        Mapping from category names to integer categories.
-    status_mapping : dict[str, str]
-        Mapping from status names to string statuses.
-    default_agent_category : int, optional
-        Default integer category for unmapped categories.
-        Defaults to `AgentCategory.UNKNOWN`.
-    default_status : str, optional
-        Default string status for unmapped statuses. Defaults to "unknown".
-
-    Returns
-    -------
-    pl.LazyFrame
-        LazyFrame containing agent tracks.
-
-    """
-    # 1. Prepare small lookup tables
+    """Extract agent tracks from the global tables."""
     attr_lookup = attribute_lf.select([
         pl.col("token").alias("attr_token"),
         pl.col("name").alias("attr_name"),
@@ -352,8 +222,6 @@ def extract_agent_tracks(
         pl.col("token").alias("cat_token"),
         pl.col("name").alias("cat_name"),
     ])
-
-    # 2. Main join
     raw_agents = (
         annotation_lf
         .join(timeline_lf, on="sample_token")
@@ -372,10 +240,6 @@ def extract_agent_tracks(
             pl.col("attr_name").fill_null("unknown").alias("full_status"),
         )
     )
-
-    # 3. Apply Mappings
-    # We use replace_strict with a default=None to catch unmapped values as nulls
-    # before filling them with the integer default.
     return raw_agents.with_columns([
         pl
         .col("full_category")
@@ -460,7 +324,6 @@ _SCHEMAS: dict[str, pl.Schema | None] = {
 }
 
 _FULL_CATEGORY_MAPPING: dict[str, int] = {
-    # Vehicles
     "vehicle.car": AgentCategory.CAR,
     "vehicle.ego.car": AgentCategory.CAR,
     "vehicle.van": AgentCategory.VAN,
@@ -473,15 +336,13 @@ _FULL_CATEGORY_MAPPING: dict[str, int] = {
     "vehicle.bicycle": AgentCategory.BICYCLE,
     "vehicle.emergency.ambulance": AgentCategory.CAR,
     "vehicle.emergency.police": AgentCategory.CAR,
-    # Humans
     "human.pedestrian.adult": AgentCategory.PEDESTRIAN,
     "human.pedestrian.child": AgentCategory.PEDESTRIAN,
     "human.pedestrian.construction_worker": AgentCategory.PEDESTRIAN,
     "human.pedestrian.police_officer": AgentCategory.PEDESTRIAN,
     "human.pedestrian.stroller": AgentCategory.PEDESTRIAN,
     "human.pedestrian.wheelchair": AgentCategory.PEDESTRIAN,
-    "human.pedestrian": AgentCategory.PEDESTRIAN,  # Catch-all
-    # Static / Other
+    "human.pedestrian": AgentCategory.PEDESTRIAN,
     "static_object.bicycle_rack": AgentCategory.STATIC_OBJECT,
     "movable_object.barrier": AgentCategory.MOVEABLE_OBJECT,
     "movable_object.debris": AgentCategory.MOVEABLE_OBJECT,
@@ -500,11 +361,3 @@ _STATUS_MAPPING: dict[str, str] = {
     "cycle.with_rider": "moving",
     "cycle.without_rider": "stopped",
 }
-
-
-if __name__ == "__main__":
-    from dronalize.datasets.nuscenes import DATASET_SPEC
-    from dronalize.datasets.shared._debug import debug_descriptor, resolve_dataset_root_from_env
-
-    root = resolve_dataset_root_from_env("nuscenes")
-    _ = debug_descriptor(DATASET_SPEC, root)

@@ -8,7 +8,7 @@ import numpy as np
 from scipy.interpolate import BSpline
 from typing_extensions import Self, override
 
-from dronalize.core.maps.edge_types import EdgeType
+from dronalize.core.categories import EdgeType
 from dronalize.datasets.nuscenes.maps.builder import NuScenesMapBuilder
 from dronalize.datasets.nuscenes.maps.parser import NuScenesMap
 

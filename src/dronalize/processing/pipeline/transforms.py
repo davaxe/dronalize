@@ -12,28 +12,28 @@ from dronalize.processing.pipeline.functional.resample import ResampleSpec
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.processing.filtering import Filter
-    from dronalize.processing.filtering.apply import FilterMode
+    from dronalize.processing.screening import Screen
+    from dronalize.processing.screening.apply import ScreeningMode
     from dronalize.processing.pipeline.pipeline import FlatMapTransform, Transform
 
 
-def filter_scene(
-    scene_filter: Filter | None = None,
+def screen_scene(
+    scene_screening: Screen | None = None,
     *,
     group_by: str | Sequence[str] | None = None,
     agent_id: str = "id",
     frame_column: str = "frame",
     category_column: str = "agent_category",
-    mode: FilterMode = "filtered",
+    mode: ScreeningMode = "screened",
 ) -> Transform:
-    """Create a filtering transform.
+    """Create a screening transform.
 
-    Wraps [`dronalize.processing.filtering.filter_scene`][].
+    Wraps [`dronalize.processing.screening.screen_scene`][].
 
     Parameters
     ----------
-    scene_filter : Filter, optional
-        Filter specification containing cleanup and check rules.
+    scene_screening : Screen, optional
+        Screening specification containing cleanup and check rules.
     group_by : str or Sequence[str], optional
         Column(s) that define independent scenes inside the frame.
     agent_id : str, optional
@@ -42,15 +42,15 @@ def filter_scene(
         Column name for frame indices.
     category_column : str, optional
         Column name for agent categories.
-    mode : {"filtered", "diagnose"}, optional
-        Whether to return only valid scenes or annotate all cleaned scenes.
+    mode : {"screened", "diagnose"}, optional
+        Whether to return only passing scenes or annotate all cleaned scenes.
 
     """
 
-    def _filter(df: pl.LazyFrame) -> pl.LazyFrame:
-        return f.filter_scene(
+    def _screen(df: pl.LazyFrame) -> pl.LazyFrame:
+        return f.screen_scene(
             df,
-            scene_filter=scene_filter,
+            scene_screening=scene_screening,
             group_by=group_by,
             agent_id=agent_id,
             frame_column=frame_column,
@@ -58,9 +58,9 @@ def filter_scene(
             mode=mode,
         )
 
-    _filter.__name__ = "filter"
-    _filter.__qualname__ = "transforms.filter"
-    return _filter
+    _screen.__name__ = "screen"
+    _screen.__qualname__ = "transforms.screen"
+    return _screen
 
 
 def require_min(group_by: str | Sequence[str], minimum: int = 2) -> Transform:
