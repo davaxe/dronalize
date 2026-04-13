@@ -24,7 +24,7 @@ from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, So
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.maps.resolver import MapResolver

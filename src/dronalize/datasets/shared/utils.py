@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, overload
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.config.sections import (
+from dronalize.config.models import (
     BoundingBoxExtraction,
     CircularExtraction,
     FullMapExtraction,
@@ -17,7 +17,7 @@ from dronalize.core.scene import Scene
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.maps import MapGraph
 
 
 def extract_fn(extraction: MapExtraction) -> Callable[[Scene, MapGraph], MapGraph]:

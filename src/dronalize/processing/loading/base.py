@@ -22,9 +22,9 @@ from dronalize.processing.pipeline.factory import trajectory_pipeline
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.sections import MapConfig, ScenesConfig, ScreeningConfig
+    from dronalize.config.models import MapConfig, ScenesConfig, ScreeningConfig
     from dronalize.core.categories import DatasetSplit
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
     from dronalize.processing.models import LoaderRequest
@@ -128,7 +128,8 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         resources: DatasetResources | None = None,
     ) -> Self:
         """Unified factory method for constructing this loader from a loader request."""
-        return cls(data_root=data_root, request=request, resources=resources)
+        _ = resources  # ingore because most loaders dont use resources
+        return cls(data_root=data_root, request=request)
 
     @classmethod
     @abstractmethod
@@ -149,7 +150,7 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         return trajectory_pipeline(
             spec.lane_change_sampling(plan)
             if self.scenes_config.lane_change is not None
-            else spec.standard(plan)
+            else spec.standard(plan),
         )
 
     def discover_sources(self) -> Iterable[Source[SourceT]]:

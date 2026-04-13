@@ -7,9 +7,16 @@ class StorageBackend(str, Enum):
     """Supported persisted storage backends."""
 
     MDS = "mds"
+    """MDS storage backend.
+
+    ??? warning "Extra dependencies"
+        Using MDS requires installing the `dronalize[mds]` extra:
+
+        ```sh
+        pip install dronalize[mds]
+        ```
+    """
+    PICKLE = "pickle"
+    """Pickle storage backend. Requires no extra dependencies."""
     NULL = "null"
-
-
-def parse_storage_backend(value: StorageBackend | str) -> StorageBackend:
-    """Normalize a storage-backend identifier into the canonical enum value."""
-    return value if isinstance(value, StorageBackend) else StorageBackend(value)
+    """Null storage backend that discards all data. Useful for testing."""

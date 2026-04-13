@@ -3,6 +3,6 @@
     options:
         members: false
 
-::: dronalize.io.readers.MDSReader
+## ::: dronalize.io.readers.PickleReader
 
-::: dronalize.io.readers.MDSReaderInitArgs
+## ::: dronalize.io.readers.MDSReader

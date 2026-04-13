@@ -21,7 +21,7 @@ class PruneByRule(CleanupRuleBase):
     """Remove rows for agents that fail the given screening rule."""
 
     agent_rule: AgentCheckRule
-    rule: Literal["prune_by_rule"] = Field("prune_by_rule", repr=False, init=False)
+    rule: Literal["prune_by"] = Field("prune_by", repr=False, init=False)
 
     @override
     def expr(self, ctx: ScreeningContext) -> pl.Expr:

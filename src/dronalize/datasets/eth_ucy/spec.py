@@ -1,4 +1,4 @@
-from dronalize.config.sections import DatasetConfig
+from dronalize.config.models import DatasetConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.eth_ucy.loader import (
     EthLoader,

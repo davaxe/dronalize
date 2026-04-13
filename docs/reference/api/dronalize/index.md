@@ -1,4 +1,0 @@
-# ::: dronalize
-
-    options:
-        members: false

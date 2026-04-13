@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from dronalize.config.sections import ScenesConfig
+    from dronalize.config.models import ScenesConfig
     from dronalize.processing.pipeline.pipeline import Pipeline
 
 

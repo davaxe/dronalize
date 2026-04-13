@@ -7,8 +7,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.config.sections import MapConfig
-from dronalize.core.map_graph import MapGraph
+from dronalize.config.models import MapConfig
+from dronalize.core.maps import MapGraph
 from dronalize.processing.loading.resources import EMPTY_DATASET_RESOURCES, DatasetResources
 
 if TYPE_CHECKING:

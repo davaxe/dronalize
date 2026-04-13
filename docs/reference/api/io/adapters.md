@@ -1,12 +1,15 @@
 # ::: dronalize.io.adapters
-
     options:
         members: false
 
-::: dronalize.io.adapters.MDSTorchDataset
+## ::: dronalize.io.adapters.TorchSceneDataset
 
-::: dronalize.io.adapters.TorchSceneRecord
+## ::: dronalize.io.adapters.IterableTorchSceneDataset
 
-::: dronalize.io.adapters.MDSHeteroDataset
+## ::: dronalize.io.adapters.TorchSceneRecord
 
-::: dronalize.io.adapters.collate_hetero_with_time_padding
+## ::: dronalize.io.adapters.HeteroSceneDataset
+
+## ::: dronalize.io.adapters.IterableHeteroSceneDataset
+
+## ::: dronalize.io.adapters.collate_hetero_with_time_padding

@@ -4,12 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, Generic, TypedDict
-
-import numpy as np
-import numpy.typing as npt
-
-from dronalize.core.typing import FloatScalarT
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -17,33 +12,6 @@ if TYPE_CHECKING:
 
 FORMAT_VERSION: int = 1
 MANIFEST_FILENAME: str = "manifest.json"
-
-
-class MapRecord(TypedDict, Generic[FloatScalarT]):
-    """Simple persisted representation of one scene's map payload."""
-
-    map_node_positions: npt.NDArray[FloatScalarT]
-    map_edge_indices: npt.NDArray[np.int32]
-    map_node_types: npt.NDArray[np.int32]
-    map_edge_types: npt.NDArray[np.int32]
-
-
-class SceneRecord(TypedDict, Generic[FloatScalarT]):
-    """Simple persisted representation of one scene."""
-
-    scene_number: int
-    position_offset: npt.NDArray[np.float64]
-    agent_types: npt.NDArray[np.int32]
-    features: npt.NDArray[FloatScalarT]
-    mask: npt.NDArray[np.bool_]
-
-
-SceneRecordF32 = SceneRecord[np.float32]
-SceneRecordF64 = SceneRecord[np.float64]
-AnySceneRecord = SceneRecord[np.float32] | SceneRecord[np.float64]
-MapRecordF32 = MapRecord[np.float32]
-MapRecordF64 = MapRecord[np.float64]
-AnyMapRecord = MapRecord[np.float32] | MapRecord[np.float64]
 
 
 @dataclass(slots=True, frozen=True)
@@ -76,9 +44,7 @@ class DatasetManifest:
                 payload.get("source_trajectory_schema", payload["trajectory_schema"])
             ),
             trajectory_schema=str(payload["trajectory_schema"]),
-            derived_features=tuple(
-                payload.get("derived_features", payload.get("derived_trajectory_fields", ()))
-            ),
+            derived_features=tuple(payload.get("derived_features", ())),
             feature_columns=tuple(payload["feature_columns"]),
             history_frames=int(payload["history_frames"]),
             future_frames=int(payload["future_frames"]),
@@ -91,7 +57,18 @@ class DatasetManifest:
 
 
 def manifest_path(root: Path) -> Path:
-    """Return the manifest path for one storage root."""
+    """Return the manifest path for one storage root.
+
+    Parameters
+    ----------
+    root: Path
+        The root directory of the processed dataset.
+
+    Returns
+    -------
+    Path
+        The path to the manifest file.
+    """
     return root / MANIFEST_FILENAME
 
 
@@ -104,6 +81,17 @@ def write_manifest(root: Path, manifest: DatasetManifest) -> None:
 
 
 def read_manifest(root: Path) -> DatasetManifest:
-    """Read a previously written storage manifest."""
+    """Read and parse the storage manifest for one output root.
+
+    Parameters
+    ----------
+    root: Path
+        The root directory of the processed dataset.
+
+    Returns
+    -------
+    DatasetManifest
+        The parsed dataset manifest.
+    """
     payload = json.loads(manifest_path(root).read_text(encoding="utf-8"))
     return DatasetManifest.from_json_dict(payload)

@@ -7,7 +7,7 @@ from collections.abc import Callable
 from multiprocessing.synchronize import Event
 from typing import TYPE_CHECKING, Protocol
 
-from dronalize.io.backends.base import DatasetWriter
+from dronalize.io.base import DatasetWriter
 
 if TYPE_CHECKING:
     from dronalize.runtime._internal.state import Progress

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import copy
+from collections.abc import Mapping, MutableMapping
 from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeAlias, TypeVar
 
-from deepmerge import always_merger
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
@@ -27,6 +28,8 @@ ResampleMethod: TypeAlias = Literal["linear", "cubic", "pchip"]
 
 
 class ConfigBase(BaseModel):
+    """Shared base class for all config models."""
+
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
     @override
@@ -41,6 +44,7 @@ class FullConfig(ConfigBase):
 
 
 FullConfigT = TypeVar("FullConfigT", bound=ConfigBase)
+V = TypeVar("V")
 
 
 class PartialConfig(BaseModel, Generic[FullConfigT]):
@@ -83,7 +87,7 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         else:
             base = target.model_dump()
         patch = self.model_dump(exclude_unset=True, exclude_none=exclude_none)
-        merged = always_merger.merge(base, patch)
+        merged = _deep_merge(base, patch)
         return self.full_config_type.model_validate(merged)
 
     @classmethod
@@ -91,3 +95,19 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         """Create a PartialConfig instance from a FullConfig instance."""
         data = full_config.model_dump()
         return cls.model_validate(data)
+
+
+def _deep_merge(
+    base: MutableMapping[str, V],
+    patch: Mapping[str, V],
+) -> MutableMapping[str, V]:
+    """Recursively merge two mappings."""
+    for key, patch_value in patch.items():
+        base_value = base.get(key)
+
+        if isinstance(base_value, MutableMapping) and isinstance(patch_value, Mapping):
+            _ = _deep_merge(base_value, patch_value)  # pyright: ignore[reportUnknownArgumentType]
+        else:
+            base[key] = copy.deepcopy(patch_value)
+
+    return base

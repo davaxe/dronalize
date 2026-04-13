@@ -12,9 +12,8 @@ from dronalize.processing.pipeline.functional.resample import ResampleSpec
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.processing.screening import Screen
-    from dronalize.processing.screening.apply import ScreeningMode
     from dronalize.processing.pipeline.pipeline import FlatMapTransform, Transform
+    from dronalize.processing.screening import Screen
 
 
 def screen_scene(
@@ -24,7 +23,7 @@ def screen_scene(
     agent_id: str = "id",
     frame_column: str = "frame",
     category_column: str = "agent_category",
-    mode: ScreeningMode = "screened",
+    mark_passed_agents: bool = False,
 ) -> Transform:
     """Create a screening transform.
 
@@ -42,8 +41,8 @@ def screen_scene(
         Column name for frame indices.
     category_column : str, optional
         Column name for agent categories.
-    mode : {"screened", "diagnose"}, optional
-        Whether to return only passing scenes or annotate all cleaned scenes.
+    mark_passed_agents : bool, optional
+        Whether to retain an internal per-agent passed marker for runtime transport.
 
     """
 
@@ -55,7 +54,7 @@ def screen_scene(
             agent_id=agent_id,
             frame_column=frame_column,
             category_column=category_column,
-            mode=mode,
+            mark_passed_agents=mark_passed_agents,
         )
 
     _screen.__name__ = "screen"

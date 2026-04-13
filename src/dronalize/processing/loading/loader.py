@@ -63,6 +63,7 @@ class PreparedSceneData:
     stable_identifier: SceneIdentifier
     map_binding: MapBinding = field(default_factory=MapBinding)
     predefined_split: DatasetSplit | None = None
+    passed_agent_ids: frozenset[int] | None = None
 
 
 @dataclass(slots=True, frozen=True)

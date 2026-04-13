@@ -1,4 +1,16 @@
-"""MosaicML Streaming writer backend for persisted scene datasets."""
+"""Mosaic Streaming writer backend.
+
+This backend writes processed scenes as MosaicML Streaming shards. It is the
+shard-based option intended for training pipelines that benefit from streaming,
+compression, and the upstream ``StreamingDataset`` reader surface.
+
+Notes
+-----
+- requires the optional `dronalize[mds]` extra
+- writes data into split subdirectories such as ``train`` or ``unsplit``
+- when running in parallel, each worker writes to its own temporary subfolder
+  and the backend merges the shard indexes at the end of the run
+"""
 
 from __future__ import annotations
 
@@ -10,19 +22,19 @@ from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import numpy as np
 from typing_extensions import override
 
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.optional import raise_missing_optional_dependency
-from dronalize.io.backends.base import DatasetWriter
-from dronalize.io.encoding import encode_map_from_scene, encode_scene_record
+from dronalize.io.base import DatasetWriter, split_directory_name
+from dronalize.io.encoding import encode_unsplit_scene_record
+from dronalize.io.encoding.mds import encode_mds_sample, mds_columns
 
 try:
     from streaming import MDSWriter
     from streaming.base.util import merge_index
 except ModuleNotFoundError as error:
-    raise_missing_optional_dependency(error, feature="The MDS scene writer", extra="storage-mds")
+    raise_missing_optional_dependency(error, feature="The MDS scene writer", extra="mds")
 
 
 if TYPE_CHECKING:
@@ -30,7 +42,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import Scene
-    from dronalize.runtime.plans import OutputPlan
+    from dronalize.runtime.types import OutputPlan
 
 
 def _create_writer(
@@ -96,7 +108,7 @@ class MDSDatasetWriter(DatasetWriter):
     ) -> dict[DatasetSplit | None, MDSWriter]:
         writers: dict[DatasetSplit | None, MDSWriter] = {}
         for split in splits or [None]:
-            split_dir = output_dir / split.value if split else output_dir / "all"
+            split_dir = output_dir / split_directory_name(split)
             group_name = (
                 parallel_group if parallel_group not in {None, ""} else mp.current_process().name
             )
@@ -109,7 +121,7 @@ class MDSDatasetWriter(DatasetWriter):
                 path_str = final_dir.as_posix()
             writers[split] = MDSWriter(
                 out=path_str,
-                columns=_mds_columns(config.inner.precision),
+                columns=mds_columns(config.inner.precision),
                 compression=config.mds.compression,
                 hashes=(list(config.mds.hashes) if config.mds.hashes is not None else None),
                 size_limit=config.mds.size_limit,
@@ -118,7 +130,7 @@ class MDSDatasetWriter(DatasetWriter):
         return writers
 
     @override
-    def write(self, scene: Scene) -> bool:
+    def write(self, scene: Scene) -> None:
         """Encode and write one scene to the split-specific shard."""
         if self._writers is None:
             self._writers = self._init_writers(
@@ -137,31 +149,15 @@ class MDSDatasetWriter(DatasetWriter):
             )
             raise ConfigurationError(msg)
 
-        scene = scene.with_split_assignment(split) if split is not None else scene
-        scene_sample = encode_scene_record(
-            scene,
+        encoded_scene = encode_unsplit_scene_record(
+            scene.with_split_assignment(split) if split is not None else scene,
             dtype=self._config.precision(),
             recenter_position=self._config.recenter_positions,
             trajectory_schema=self._config.trajectory_schema,
         )
-        map_sample = encode_map_from_scene(
-            scene,
-            dtype=self._config.precision(),
-            offset=scene_sample["position_offset"] if self._config.recenter_positions else None,
-            return_empty=True,
+        self._writers[split].write(
+            dict(encode_mds_sample(encoded_scene, observation_length=scene.history_frames))
         )
-
-        self._writers[split].write({
-            "scene_number": int(scene_sample["scene_number"]),
-            "history_frames": scene.history_frames,
-            "future_frames": scene.future_frames,
-            "position_offset": scene_sample["position_offset"],
-            "agent_types": scene_sample["agent_types"],
-            "features": scene_sample["features"],
-            "mask": scene_sample["mask"].astype(np.uint8),
-            **map_sample,
-        })
-        return True
 
     @override
     def finish_local(self) -> None:
@@ -180,27 +176,12 @@ class MDSDatasetWriter(DatasetWriter):
         if self._splits:
             for split in self._splits:
                 with _suppress_output():
-                    merge_index(str(self._base_output_dir / split.value), keep_local=True)
+                    merge_index(
+                        str(self._base_output_dir / split_directory_name(split)), keep_local=True
+                    )
             return
         with _suppress_output():
-            merge_index(str(self._base_output_dir / "all"), keep_local=True)
-
-
-def _mds_columns(dtype: str) -> dict[str, str]:
-    """Return the MDS column schema for one encoded scene sample."""
-    return {
-        "scene_number": "int",
-        "history_frames": "int",
-        "future_frames": "int",
-        "position_offset": "ndarray:float64:2",
-        "agent_types": "ndarray:int32",
-        "features": f"ndarray:{dtype}",
-        "mask": "ndarray:uint8",
-        "map_node_positions": f"ndarray:{dtype}",
-        "map_edge_indices": "ndarray:int32",
-        "map_node_types": "ndarray:int32",
-        "map_edge_types": "ndarray:int32",
-    }
+            merge_index(str(self._base_output_dir / split_directory_name(None)), keep_local=True)
 
 
 @contextmanager

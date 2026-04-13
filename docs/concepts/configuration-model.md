@@ -1,123 +1,135 @@
 # Configuration model
 
 <div class="section-intro" markdown="1">
-Configuration in `dronalize` is layered. Every run starts from dataset defaults, then optional shared settings are applied, then dataset-specific overrides refine the final behavior.
+Configuration in `dronalize` is layered. Every run starts from dataset defaults, then optional
+profiles are applied, then dataset-local TOML settings refine the result, and finally runtime
+overrides can change selected fields for one run.
 </div>
 
-For exact TOML syntax and field tables, see the [configuration reference](../reference/configuration/index.md), [loader](../reference/configuration/loader.md), [map](../reference/configuration/map.md), [split](../reference/configuration/split.md), [export](../reference/configuration/export.md), [execution](../reference/configuration/execution.md), and [filter](../reference/configuration/filter.md) reference pages.
+For exact field tables and TOML syntax, see the [configuration reference](../reference/configuration/index.md).
 
 ## Mental model
 
-Think of configuration as three layers:
+Think of one resolved dataset config as four layers:
 
-1. Built-in dataset defaults
-2. optional `profiles` composed in declared order
-3. `[datasets.<name>]` settings for one dataset only
+1. built-in dataset defaults from the `DatasetSpec`
+2. profile fragments from `[profiles.<name>]`
+3. one dataset entry under `[datasets.<name>]`
+4. runtime overrides from the CLI or `RuntimeOverride`
 
-This lets you keep a common baseline while still handling dataset-specific differences cleanly.
+Profiles are opted into with `uses`, in the order they should be applied.
 
-## How to organize a config file
-
-Use `[profiles.<name>]` when the same setting should be reusable across datasets.
-
-```toml
-[profiles.fast.execution]
-jobs = "auto"
-```
-
-Then opt a dataset into that profile when needed.
-
-```toml
-[datasets.a43]
-extends = ["fast"]
-
-[datasets.a43.loader]
-history_frames = 20
-future_frames = 60
-sample_time = 0.1
-```
-
-You can combine both:
-
-```toml
-[profiles.fast.execution]
-jobs = "auto"
-
-[datasets.a43]
-extends = ["fast"]
-
-[datasets.a43.loader]
-history_frames = 20
-future_frames = 60
-```
-
-In practice:
-
-- `profiles` are reusable policies
-- `datasets.<name>` is a local exception
-
-## What the main sections do
+## Current top-level sections
 
 | Section | Purpose |
 | --- | --- |
-| `execution` | Controls how work is distributed. |
-| `loader` | Defines sample shape, temporal transforms, filtering, and dataset-specific loading behavior. |
-| `map` | Controls whether map context is included and how much of it is kept. |
-| `split` | Routes data into train, val, and test outputs. |
-| `export` | Controls the saved schema, precision, and storage settings. |
+| `runtime` | Worker count and execution tuning. |
+| `scenes` | Scene window shape, sliding-window extraction, resampling, and lane-change sampling. |
+| `screening` | Cleanup rules, scene checks, and agent checks. |
+| `map` | Map extraction mode and geometry density. |
+| `split` | Train, val, and test routing. |
+| `output` | Output schema, precision, recentering, and MDS-specific tuning. |
+| `dataset` | Dataset-owned options validated by the selected dataset integration. |
 
-## Practical workflow
+## Profiles and dataset entries
 
-For most projects, the easiest approach is:
-
-1. Start with one dataset and no configuration or a minimal `loader` block.
-2. Add `split` and `export` once you know how you want to train and save data. 
-3. Add `map` only if the dataset supports map context and you need it.
-4. Move repeated settings into `profiles` when multiple datasets should share them.
-
-Many nested sections merge into inherited defaults rather than forcing you to redefine everything. That makes it practical to override only the parts you want to change.
-
-!!! note "CLI overrides"
-    The CLI also support overriding a specific subset of config values without editing the
-    file. This is useful for quick experiments or when you want to keep a single
-    config file but run with different settings.
-
-## Multi-dataset configuration example
-
-This example demonstrates how to configure settings for multiple datasets in the
-same file. It first sets a shared execution policy, then defines specific loader
-settings for two datasets, `a43` and `argoverse1`. The `argoverse1` dataset also
-includes dataset-specific `dataset` config and a resampling block to match the
-sample time of `a43`.
-
-The `a43` dataset overrides the shared execution policy by setting `jobs` to 1, which means it will not use parallel processing.
-This can be useful if a dataset is known to be small and parallel processing would not provide significant speedup.
+Use profiles for shared policy:
 
 ```toml
-[profiles.fast.execution]
+[profiles.fast.runtime]
+jobs = "auto"
+```
+
+Then opt a dataset into that profile:
+
+```toml
+[datasets.a43]
+uses = ["fast"]
+```
+
+Add dataset-local settings where the dataset should differ:
+
+```toml
+[datasets.a43.scenes]
+history_frames = 20
+future_frames = 60
+sample_time = 0.1
+```
+
+You can combine multiple profiles:
+
+```toml
+[profiles.fast.runtime]
 jobs = "auto"
 
+[profiles.high_precision.output]
+schema = "positions_velocity_yaw"
+precision = "float64"
+
 [datasets.a43]
-extends = ["fast"]
+uses = ["fast", "high_precision"]
+```
 
-[datasets.a43.execution]
-jobs = 1
+## Example
 
-[datasets.a43.loader]
+```toml
+[profiles.fast.runtime]
+jobs = "auto"
+
+[profiles.high_precision.output]
+schema = "positions_velocity_yaw"
+precision = "float64"
+recenter_positions = true
+
+[datasets.a43]
+uses = ["fast", "high_precision"]
+
+[datasets.a43.scenes]
 history_frames = 20
 future_frames = 60
 sample_time = 0.1
 
-[datasets.argoverse1.loader]
-history_frames = 6
-future_frames = 10
-sample_time = 0.5
+[datasets.a43.scenes.window]
+step = 2
 
-[datasets.argoverse1.dataset]
-file_batch_size = 8
+[datasets.a43.split]
+strategy = "shuffled-time"
+ratio = { train = 0.7, val = 0.2, test = 0.1 }
+segments = 8
+gap = 2
 
-[datasets.argoverse1.loader.resampling]
-method = "cubic"
-up = 5
-down = 1
+[datasets.a43.map.extraction]
+mode = "circle"
+radius = 60.0
 ```
+
+## How merging works
+
+The merge behavior depends on the section:
+
+- nested config sections such as `scenes`, `runtime`, `map`, and `output` merge into inherited values
+- `split` is replaced as one unit
+- `screening` can either replace or extend inherited named rules
+- `dataset` is dataset-owned and validated by the selected dataset integration
+
+That makes it practical to change only the pieces you care about while keeping the dataset's built-in
+defaults intact.
+
+## Runtime overrides
+
+The CLI and Python runtime can override a focused subset of values without editing the TOML file:
+
+- split strategy and split-specific parameters
+- worker count
+- output schema
+- map inclusion
+
+This is useful for quick experiments, but the stable baseline should still live in the dataset's
+default config and your TOML file.
+
+## Practical workflow
+
+1. Start from the dataset defaults and inspect them with `dronalize inspect <dataset>`.
+2. Add a minimal `[datasets.<name>]` entry that changes only what your project needs.
+3. Move repeated policy into profiles and opt datasets in with `uses`.
+4. Use CLI overrides for temporary run-to-run experiments, not for long-term project config.

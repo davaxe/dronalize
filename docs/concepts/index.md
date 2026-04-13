@@ -1,27 +1,27 @@
 # Concepts
 
 <div class="section-intro" markdown="1">
-This section explains the processing model behind `dronalize`: how configuration is resolved, how
-scenes are built, how splits and filters behave, and how outputs are written.
+This section explains the current processing model behind `dronalize`: how runs are resolved, how
+scenes are built, how screening and splits behave, and how outputs are written.
 </div>
 
 ## In this section
 
 | Page | Use it for |
 | --- | --- |
-| [Architecture](architecture.md) | Understand the main runtime flow from config resolution to output writing. |
-| [Configuration model](configuration-model.md) | Learn how dataset defaults, global config, and dataset-specific overrides combine. |
-| [Split strategies](split-strategies.md) | Compare the available split strategies and when to use them. |
-| [Filtering](filtering.md) | See how scene and agent-level filtering rules are applied. |
-| [Map processing](map-processing.md) | Understand map extraction and map graph handling. |
-| [Datasets](datasets.md) | See how built-in dataset support is organized. |
-| [Outputs and schemas](outputs-and-schemas.md) | Learn how trajectory schemas and export outputs fit together. |
-| [Lane-change sampling](lane-change-sampling.md) | Follow a concrete end-to-end example for one dataset family. |
+| [Architecture](architecture.md) | Understand the runtime flow from dataset lookup to backend writing. |
+| [Configuration model](configuration-model.md) | Learn how dataset defaults, profiles, dataset entries, and runtime overrides combine. |
+| [Datasets](datasets.md) | See what a dataset key means and what a `DatasetSpec` provides. |
+| [Split strategies](split-strategies.md) | Compare the supported split strategies and when to use them. |
+| [Screening](filtering.md) | Understand cleanup, scene checks, and agent checks in the current config model. |
+| [Map processing](map-processing.md) | Understand map inclusion, extraction, and geometry controls. |
+| [Outputs and schemas](outputs-and-schemas.md) | Separate schema choice from backend choice. |
+| [Lane-change sampling](lane-change-sampling.md) | Follow the current lane-change-aware window selection model. |
 
 ## Reading path
 
 Start with [Architecture](architecture.md), then [Configuration model](configuration-model.md),
-and then whichever page matches the part of the pipeline you are changing or trying to understand.
+then whichever page matches the part of the runtime you are changing or trying to understand.
 
 ## Related sections
 

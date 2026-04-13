@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from multiprocessing.sharedctypes import Synchronized
     from multiprocessing.synchronize import Event, Lock
 
-    from dronalize.io.backends.base import DatasetWriter
+    from dronalize.io.base import DatasetWriter
     from dronalize.processing.loading.base import BaseSceneLoader
     from dronalize.runtime._internal.scene import SceneBuilder
 

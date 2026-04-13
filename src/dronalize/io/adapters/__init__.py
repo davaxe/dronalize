@@ -3,7 +3,7 @@
 ## Import guide
 
 ```python
-from dronalize.io.adapters import MDSTorchDataset, MDSHeteroDataset
+from dronalize.io.adapters import HeteroSceneDataset, TorchSceneDataset
 ```
 
 This package groups higher-level dataset adapters for downstream ML code. The
@@ -26,20 +26,30 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dronalize.io.adapters.pyg import MDSHeteroDataset, collate_hetero_with_time_padding
-    from dronalize.io.adapters.torch import MDSTorchDataset, TorchSceneRecord
+    from dronalize.io.adapters.pyg import (
+        HeteroSceneDataset,
+        IterableHeteroSceneDataset,
+        collate_hetero_with_time_padding,
+    )
+    from dronalize.io.adapters.torch import (
+        IterableTorchSceneDataset,
+        TorchSceneDataset,
+        TorchSceneRecord,
+    )
 
 __all__ = [
-    "MDSHeteroDataset",
-    "MDSTorchDataset",
+    "HeteroSceneDataset",
+    "IterableHeteroSceneDataset",
+    "IterableTorchSceneDataset",
+    "TorchSceneDataset",
     "TorchSceneRecord",
     "collate_hetero_with_time_padding",
 ]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "MDSTorchDataset": ("dronalize.io.adapters.torch", "MDSTorchDataset"),
+    "TorchSceneDataset": ("dronalize.io.adapters.torch", "TorchSceneDataset"),
     "TorchSceneRecord": ("dronalize.io.adapters.torch", "TorchSceneRecord"),
-    "MDSHeteroDataset": ("dronalize.io.adapters.pyg", "MDSHeteroDataset"),
+    "HeteroSceneDataset": ("dronalize.io.adapters.pyg", "HeteroSceneDataset"),
     "collate_hetero_with_time_padding": (
         "dronalize.io.adapters.pyg",
         "collate_hetero_with_time_padding",

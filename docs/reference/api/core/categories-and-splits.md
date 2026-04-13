@@ -1,9 +1,9 @@
-# ::: dronalize.core.AgentCategory
+## ::: dronalize.core.AgentCategory
 
-::: dronalize.core.DatasetSplit
+## ::: dronalize.core.DatasetSplit
 
-::: dronalize.core.EdgeType
+## ::: dronalize.core.EdgeType
 
-::: dronalize.core.AgentCategoryLike
+## ::: dronalize.core.AgentCategoryLike
 
-::: dronalize.core.AgentCategoryInput
+## ::: dronalize.core.AgentCategoryInput

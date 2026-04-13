@@ -1,4 +1,4 @@
-from dronalize.config.sections import DatasetConfig, FullMapExtraction, MapConfig
+from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.argoverse2.loader import Argoverse2Loader, Argoverse2LoaderOptions
 from dronalize.datasets.registry import DatasetSpec

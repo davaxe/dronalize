@@ -15,7 +15,7 @@ from dronalize.datasets.shared import utils
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
 
 if TYPE_CHECKING:
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.maps.resolver import MapResolver

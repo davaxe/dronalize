@@ -15,7 +15,7 @@ from dronalize.core.categories import EdgeType
 if TYPE_CHECKING:
     from types import ModuleType
 
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.maps import MapGraph
 
 Chart = alt.Chart | alt.LayerChart
 

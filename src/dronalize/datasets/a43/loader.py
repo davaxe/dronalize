@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.maps.resolver import MapResolver
     from dronalize.processing.models import LoaderRequest

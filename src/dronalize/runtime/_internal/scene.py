@@ -10,18 +10,19 @@ from dronalize.core.errors import SplitAssignmentError
 from dronalize.core.scene import Scene
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 from dronalize.processing.loading.loader import PreparedSceneData, SceneIdentifier, Source
+from dronalize.processing.screening.apply import AGENT_PASS_COLUMN
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.map_graph import MapGraph
+    from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
     from dronalize.datasets.registry import DatasetSpec
     from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
     from dronalize.processing.maps.resolver import MapKey, MapResolver
     from dronalize.processing.models import SplitRequest
     from dronalize.processing.pipeline.pipeline import Pipeline
-    from dronalize.runtime.plans import RunPlan
+    from dronalize.runtime.types import RunPlan
 
 
 @dataclass(slots=True)
@@ -75,11 +76,23 @@ class SceneBuilder:
         source_local_scene_index = 0
         for data in loader.load_source(source):
             effective_split = data.predefined_split or source.predefined_split
-            for frame in self._pipeline.execute(data.frame, collect=True, filter_empty=True):
+            for processed_frame in self._pipeline.execute(
+                data.frame, collect=True, filter_empty=True
+            ):
+                passed_agent_ids: frozenset[int] | None = None
+                frame = processed_frame
+                if AGENT_PASS_COLUMN in frame.columns:
+                    passed_ids = (
+                        frame.filter(frame[AGENT_PASS_COLUMN]).get_column("id").unique().to_list()
+                    )
+                    passed_agent_ids = frozenset(int(agent_id) for agent_id in passed_ids)
+                    frame = frame.drop(AGENT_PASS_COLUMN)
+
                 yield PreparedSceneData(
                     frame=frame,
                     map_binding=data.map_binding,
                     predefined_split=effective_split,
+                    passed_agent_ids=passed_agent_ids,
                     stable_identifier=SceneIdentifier(
                         source_identifier=source.identifier,
                         source_local_scene_index=source_local_scene_index,
@@ -89,7 +102,7 @@ class SceneBuilder:
 
     def create_scene(
         self,
-        loader: BaseSceneLoader[Any, LoaderOptions],
+        loader: BaseSceneLoader[Any, Any],
         data: PreparedSceneData,
         source: Source[Any],
         scene_number: int,
@@ -104,6 +117,7 @@ class SceneBuilder:
             sample_time=self.sample_time,
             map_key=map_key,
             map_resolver=map_resolver,
+            passed_agent_ids=data.passed_agent_ids,
             split_assignment=self._resolve_split_assignment(data, source),
         )
         if self.target_schema == self.source_schema:

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import altair as alt
 
-from dronalize.config.sections import (
+from dronalize.config.models import (
     DatasetConfig,
     OutputConfig,
     SplitConfig,
@@ -54,7 +54,7 @@ def debug_visualize_scenes(
     builder = SceneBuilder(
         spec=_debug_spec(loader=source, target_schema=CANONICAL.name),
         split_request=source.split_config,
-        source_schema=type(source).native_trajectory_schema(),
+        source_schema=source.native_trajectory_schema(),
         target_schema=CANONICAL,
         history_frames=history_frames,
         future_frames=future_frames,
@@ -169,7 +169,7 @@ def _debug_spec(loader: BaseSceneLoader[Any, Any], *, target_schema: str) -> Dat
             else SplitConfig.model_validate({"strategy": "none"}),
             dataset=dataset_payload,
         ),
-        native_schema=type(loader).native_trajectory_schema(),
+        native_schema=loader.native_trajectory_schema(),
         dataset_options_model=type(loader).loader_options_model(),
         has_map=loader.map_config is not None,
     )

@@ -3,29 +3,25 @@
 ## Import guide
 
 ```python
-from dronalize.io import ExportConfig, DatasetManifest, DatasetWriter
+from dronalize.io import DatasetManifest, SceneRecord, read_manifest
 ```
 
-This package groups the stable storage-side API:
-
-- [`ExportConfig`][dronalize.io.ExportConfig] and
-  [`MDSBackendConfig`][dronalize.io.MDSBackendConfig] for persisted output
-  settings
-- [`DatasetManifest`][dronalize.io.DatasetManifest] and manifest helpers for
-  dataset metadata on disk
-- [`DatasetWriter`][dronalize.io.DatasetWriter] for the writer protocol shared
-  by storage backends
-
-Reader and adapter layers live in sibling subpackages so optional dependencies
-remain lazy and clearly scoped.
+Output configuration models live under [`dronalize.config.models`][] so the
+runtime and CLI share one canonical configuration surface.
 
 ## Related modules
 
-- [`dronalize.io.readers`][] for framework-neutral persisted dataset readers
 - [`dronalize.io.adapters`][] for optional Torch and PyG adapter layers
 """
 
-from dronalize.io.backends.base import DatasetWriter
-from dronalize.io.manifest import DatasetManifest, manifest_path, read_manifest, write_manifest
+from dronalize.io.formats import StorageBackend
+from dronalize.io.manifest import DatasetManifest, manifest_path, read_manifest
+from dronalize.io.records import SceneRecord
 
-__all__ = ["DatasetManifest", "DatasetWriter", "manifest_path", "read_manifest", "write_manifest"]
+__all__ = [
+    "DatasetManifest",
+    "SceneRecord",
+    "StorageBackend",
+    "manifest_path",
+    "read_manifest",
+]

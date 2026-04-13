@@ -10,7 +10,7 @@ from dronalize.processing.pipeline._internal import SCENE_ID_COLUMN, SPLIT_PARTI
 from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
-    from dronalize.config.sections import ScenesConfig
+    from dronalize.config.models import ScenesConfig
     from dronalize.processing.models import PipelinePlan, SplitRequest
     from dronalize.processing.pipeline.spec import TrackColumns, TrajectorySpec
 

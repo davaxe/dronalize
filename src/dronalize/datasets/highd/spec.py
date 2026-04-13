@@ -1,4 +1,4 @@
-from dronalize.config.sections import DatasetConfig, FullMapExtraction, MapConfig
+from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.highd.loader import HighDLoader
 from dronalize.datasets.registry import DatasetSpec
 from dronalize.datasets.shared.specs import (

@@ -1,51 +1,76 @@
 # Python entry
 
 <div class="section-intro" markdown="1">
-The public Python surface is organized around package namespaces rather than root-level shortcuts. Start with the dataset registry, runtime config API, processing config models, and the scene or map types you actually need.
+The Python surface is organized around explicit package namespaces. In practice, most code starts
+with `dronalize.datasets`, `dronalize.config`, and `dronalize.runtime`.
 </div>
 
 ## Inspect a dataset programmatically
 
-<div class="command-block" markdown="1">
 ```python
 from dronalize.datasets import get
 
-dataset_spec = get("a43")
-print(dataset_spec.name)
-print(dataset_spec.has_map)
-print(dataset_spec.supported_split_strategies)
+spec = get("a43")
+print(spec.name)
+print(spec.has_map)
+print(spec.native_schema.name)
+print(spec.native_splits)
 ```
-</div>
 
-The registry returns a `DatasetSpec`, which carries loader defaults, native schema information, split support, and optional capabilities.
+`get()` returns a `DatasetSpec`, which is the same descriptor the CLI uses for `inspect` and
+`split-support`.
 
-## Resolve a config file in Python
+## Resolve a config file
 
 ```python
 from pathlib import Path
 
+from dronalize.config import load_project_config
 from dronalize.datasets import get
-from dronalize.runtime.config import load_project_config, resolve_dataset_config
 
-dataset_spec = get("a43")
-project_config = load_project_config(Path("config.toml"))
-resolved = resolve_dataset_config(project=project_config, descriptor=dataset_spec)
+spec = get("a43")
+project = load_project_config(Path("config.toml"))
+resolved = project.resolve("a43", spec.default_config)
 
-print(resolved.export.trajectory_schema.name)
-print(resolved.execution.jobs)
+print(resolved.scenes.history_frames, resolved.scenes.future_frames)
+print(resolved.output.precision)
+print(resolved.split.root.strategy)
 ```
 
-This gives you the same declarative config-resolution path the CLI uses before a job is compiled for execution.
+Use `resolve()` when you want the final dataset config with built-in defaults applied. The lower
+level `extract()` helper only returns the authored dataset entry from the file, not the fully merged
+result.
 
-## Construct processing config directly
+## Plan or run a job
 
 ```python
-from dronalize.processing import LoaderConfig, MapConfig
+from pathlib import Path
 
-loader = LoaderConfig(history_frames=20, future_frames=30, sample_time=0.1)
-map_config = MapConfig.default()
+from dronalize.runtime import ProcessRequest, process_dataset, resolve_job
+
+request = ProcessRequest(
+    dataset="a43",
+    input_dir=Path("data/a43/raw"),
+    output_dir=Path("data/a43/processed"),
+    storage_backend="pickle",
+)
+
+job = resolve_job(request)
+print(job.effective_sample_time)
+
+result = process_dataset(request)
+print(result.processed_scenes)
 ```
 
-## Scene-schema helpers
+Use `resolve_job()` when you want a dry planning step. Use `process_dataset()` when you want to
+execute the job.
 
-The `dronalize.core.scene` package exports built-in schema constants and lookup helpers such as `CANONICAL`, `POSITIONS_VELOCITY_YAW`, and `get_trajectory_schema`. Map graph types live separately in `dronalize.core.maps`.
+## Schema and record helpers
+
+The `dronalize.core.scene` package exports the built-in schema constants and lookup helpers such as
+`CANONICAL`, `POSITIONS_VELOCITY_YAW`, and `get_trajectory_schema`.
+
+For persisted outputs:
+
+- `dronalize.io.readers` provides framework-neutral readers
+- `dronalize.io.adapters` provides optional Torch and PyG dataset adapters

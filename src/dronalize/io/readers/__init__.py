@@ -1,14 +1,14 @@
 """Framework-neutral readers for persisted dataset outputs.
 
+All readers in this package share the same output contract: they yield
+[`SceneRecord`][dronalize.io.SceneRecord] instances, which are
+storage-agnostic in-memory representations of scene records.
+
 ## Import guide
 
 ```python
-from dronalize.io.readers import MDSReader, MDSReaderInitArgs
+from dronalize.io.readers import MDSReader, MDSReaderInitArgs, PickleReader, SceneReader
 ```
-
-Reader symbols are loaded lazily so importing this package does not eagerly pull
-in optional storage dependencies. Use this package when you want NumPy-backed
-records rather than framework-specific dataset adapters.
 
 ## Related modules
 
@@ -23,13 +23,17 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from dronalize.io.base import DatasetReader
     from dronalize.io.readers.mds import MDSReader, MDSReaderInitArgs
+    from dronalize.io.readers.pickle import PickleReader
 
-__all__ = ["MDSReader", "MDSReaderInitArgs"]
+__all__ = ["DatasetReader", "MDSReader", "MDSReaderInitArgs", "PickleReader"]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
+    "SceneReader": ("dronalize.io.readers.base", "SceneReader"),
     "MDSReader": ("dronalize.io.readers.mds", "MDSReader"),
     "MDSReaderInitArgs": ("dronalize.io.readers.mds", "MDSReaderInitArgs"),
+    "PickleReader": ("dronalize.io.readers.pickle", "PickleReader"),
 }
 
 

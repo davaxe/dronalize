@@ -1,85 +1,102 @@
 # Adding datasets
 
 <div class="section-intro" markdown="1">
-This page is a focused guide for advanced users who want to add a custom dataset to
-`dronalize`. The stable extension surface is the dataset registry plus the loader API
-under `dronalize.processing.loading`.
+The stable extension surface for new datasets is the dataset registry plus the loader API in
+`dronalize.processing.loading`. The goal of a dataset integration is to turn raw sources into the
+shared scene model and let the common runtime handle screening, splitting, schema conversion, and
+writing.
 </div>
 
 ## Start with the dataset contract
 
-Before writing code, pin down the dataset contract:
+Before writing code, pin down:
 
-- what the raw sources are: files, directories, archives, or database records
-- whether the data is already split into scenes, recordings, or sequences
-- which trajectory fields are available
-- whether timestamps are frame-based, wall-clock-based, or irregular
-- whether maps, agent categories, or split annotations are included
+- what counts as one raw source: file, directory, archive member, or database row
+- whether the dataset already has native train, val, or test partitions
+- which trajectory fields are present in the native data
+- whether timestamps are regular enough for windowing and resampling
+- whether map data exists, and if it is scene-local or shared across many scenes
+- whether the dataset needs custom options under `[datasets.<name>.dataset]`
 
-These answers determine the loader shape, default config, schema, and optional capabilities.
+These answers determine the loader shape, the `DatasetSpec`, and the default config you should
+publish.
 
 ## Implement a loader
 
-Subclass `BaseSceneLoader` and implement the dataset-specific pieces only:
-
-- default loader config
-- native trajectory schema
-- source discovery
-- source loading
-- scene preparation
-- optional map handling
-- optional native split support
-
-Import from:
+Subclass `BaseSceneLoader` and implement the dataset-specific pieces only.
 
 ```python
-from dronalize.processing.loading import BaseSceneLoader
+from dronalize.processing.loading import BaseSceneLoader, LoadedSourceData, Source
 ```
 
-The loader should normalize raw records into the shared scene representation and let
-the common processing pipeline handle filtering, resampling, split assignment, and export.
+In practice, a loader needs to:
 
-## Define and register a descriptor
+- implement `native_trajectory_schema()`
+- implement `load_source()`
+- implement either `discover_sources()` or `sources_for_split()`
+
+Most loaders can inherit the default pipeline behavior from `BaseSceneLoader`. That gives you the
+standard `scenes`, `screening`, `split`, `map`, and lane-change handling automatically.
+
+If your dataset needs dataset-owned config, define a typed options model and let the loader read it
+from `self.dataset_config`. Those values come from `[datasets.<name>.dataset]`.
+
+## Register a `DatasetSpec`
 
 Wrap the loader in a `DatasetSpec` and register it:
 
 ```python
+from dronalize.config.models import DatasetConfig, ScenesConfig
 from dronalize.datasets import DatasetSpec, register
 
-register(DatasetSpec.from_loader("my_dataset", MyLoader, infer_capabilities=True))
+register(
+    DatasetSpec(
+        name="my_dataset",
+        loader_factory=MyLoader.unified_factory,
+        default_config=DatasetConfig(
+            scenes=ScenesConfig(history_frames=20, future_frames=30, sample_time=0.1),
+        ),
+        native_schema=MyLoader.native_trajectory_schema(),
+    )
+)
 ```
 
-`DatasetSpec` is the public contract that exposes defaults, supported split strategies,
-map support, loader options, and optional runtime context.
+Add the other `DatasetSpec` fields only when the dataset actually supports them:
 
-## Add optional capabilities deliberately
+- `native_splits` when the raw dataset ships with fixed partitions
+- `has_map` when map data is available
+- `dataset_options_model` when `[datasets.<name>.dataset]` should be typed and validated
+- `resources_factory` when a run should build or cache shared resources such as maps once
+- `time_split_support` when time-based split strategies are valid for the dataset
 
-Start with the minimal integration that produces correct scenes. Add advanced support
-only when the dataset actually has it and the loader implementation is clear:
+## Keep responsibilities clean
 
-- map or lane-graph support
-- native train/val/test splits
-- dataset-specific loader options
-- runtime context for shared resources
+Put dataset-specific logic in the loader:
 
-## Keep the split of responsibilities clean
-
-Put dataset-specific concerns in the loader:
-
-- source layout
-- parsing and normalization
+- source discovery
+- raw parsing and normalization
 - coordinate conventions
 - dataset-specific metadata
+- map lookup details
 
-Leave shared concerns to the common runtime:
+Leave shared runtime behavior to the library:
 
-- config merging
-- split-policy wiring
-- filtering and resampling
-- export layout
+- config layering and override handling
+- screening and resampling
+- split assignment
+- schema conversion
+- backend writing and manifest creation
+
+## Practical guidance
+
+- Start with the smallest correct integration.
+- Reuse the common pipeline unless the dataset genuinely needs a custom one.
+- Add map support only when you can resolve maps reliably for each scene.
+- Add native split support only when the dataset really defines stable partitions.
+- Use dataset-owned config only for options that do not belong in the shared public config model.
 
 ## See also
 
-- [Loader extension API](../reference/api/processing/loading.md)
-- [Dataset specs and capabilities](../reference/api/datasets/descriptors.md)
 - [Architecture](../concepts/architecture.md)
+- [Datasets](../concepts/datasets.md)
+- [Configuration model](../concepts/configuration-model.md)

@@ -2,7 +2,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from dronalize.config.sections import (
+from dronalize.config.models import (
     DatasetConfig,
     FullMapExtraction,
     MapConfig,

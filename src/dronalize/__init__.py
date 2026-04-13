@@ -1,15 +1,6 @@
 """Top-level package namespace for the `dronalize` library.
 
-## Import guide
-
-```python
-import dronalize
-
-from dronalize import datasets, runtime, processing, io, plot
-from dronalize.core import AgentCategory, DatasetSplit
-```
-
-This module intentionally stays small. It does not provide convenience aliases
+This module is intentionally small. It does not provide convenience aliases
 for the main Python API. Instead, the public surface is organized around
 explicit package namespaces so imports stay predictable and module ownership
 remains clear.
@@ -22,6 +13,15 @@ Use the package namespaces directly:
 - [`dronalize.io`][] for export config, manifests, readers, and adapters
 - [`dronalize.core.scene`][] and [`dronalize.core.maps`][] for shared domain types
 - [`dronalize.plot`][] for optional visualization helpers
+
+# Import guide
+
+```python
+import dronalize
+
+from dronalize import datasets, runtime, processing, io, plot
+from dronalize.core import AgentCategory, DatasetSplit
+```
 
 """
 

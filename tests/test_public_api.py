@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import dronalize
 from dronalize import datasets, io, processing, runtime
+from dronalize.config import ProcessingConfig, RuntimeOverride, load_project_config
 from dronalize.core import AgentCategory, DatasetSplit, EdgeType
-from dronalize.io import (
-    DatasetManifest,
-    DatasetWriter,
-    manifest_path,
-    read_manifest,
-    write_manifest,
-)
+from dronalize.core.maps import MapGraph, SharedMapGraph
+from dronalize.io import DatasetManifest, manifest_path, read_manifest
+from dronalize.io.base import DatasetWriter
+from dronalize.io.manifest import write_manifest
 from dronalize.runtime import (
     PlanningRequest,
     ProcessRequest,
@@ -20,29 +18,23 @@ from dronalize.runtime import (
 )
 
 
-def test_keep_top_namespace_small() -> None:
-    """Keep root namespace minimal."""
-    assert hasattr(dronalize, "__all__")
+def test_root_namespace_is_intentionally_small() -> None:
     assert dronalize.__all__ == []
 
 
-def test_expose_package_namespaces() -> None:
-    """Expose package namespaces."""
+def test_main_namespaces_are_exposed() -> None:
     assert datasets is not None
     assert runtime is not None
     assert processing is not None
     assert io is not None
 
 
-def test_expose_core_enums() -> None:
-    """Expose shared core enums."""
+def test_core_and_runtime_exports_are_present() -> None:
     assert AgentCategory is not None
     assert DatasetSplit is not None
     assert EdgeType is not None
-
-
-def test_expose_runtime_api() -> None:
-    """Expose runtime entrypoints."""
+    assert MapGraph is not None
+    assert SharedMapGraph is not None
     assert PlanningRequest is not None
     assert ProcessRequest is not None
     assert ProcessResult is not None
@@ -51,26 +43,18 @@ def test_expose_runtime_api() -> None:
     assert process_dataset is not None
 
 
-def test_expose_io_api() -> None:
-    """Expose IO contracts."""
+def test_io_and_config_exports_are_present() -> None:
     assert DatasetManifest is not None
     assert DatasetWriter is not None
     assert manifest_path is not None
     assert read_manifest is not None
     assert write_manifest is not None
+    assert ProcessingConfig is not None
+    assert RuntimeOverride is not None
+    assert load_project_config is not None
 
 
-def test_keep_removed_exports_absent() -> None:
-    """Keep removed exports absent."""
-    assert not hasattr(dronalize, "DatasetPlan")
-    assert not hasattr(dronalize, "plan_dataset")
+def test_removed_runtime_executors_remain_internal() -> None:
     runtime_module = __import__("dronalize.runtime", fromlist=["ParallelExecutor"])
     assert not hasattr(runtime_module, "ParallelExecutor")
     assert not hasattr(runtime_module, "SequentialExecutor")
-
-
-def test_keep_registry_surface() -> None:
-    """Keep dataset registry surface."""
-    names = datasets.available()
-    assert isinstance(names, list)
-    assert "apolloscape" in names

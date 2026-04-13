@@ -1,52 +1,61 @@
 # Map processing
 
 <div class="section-intro" markdown="1">
-Map processing is optional. When a dataset supports maps, the main decisions are whether to include map context at all, how much geometry to keep, and how tightly to crop the map around each scene.
+Map handling in `dronalize` has two separate concerns: whether a run should include maps at all,
+and how much map geometry should be kept around each scene.
 </div>
 
-For exact settings and extraction fields, see the [map reference](../reference/configuration/map.md). For dataset support, see the [dataset reference](../reference/datasets/index.md).
+For exact settings, see the [map reference](../reference/configuration/map.md). For dataset support,
+see the [dataset reference](../reference/datasets/index.md).
 
-## Mental model
+## Inclusion vs. configuration
 
-Map configuration answers three questions:
+Map inclusion is a runtime decision:
 
-1. Should maps be included?
-2. How dense or simplified should the geometry be?
-3. How much of the map should be kept around each scene?
+- if a dataset does not support maps, the runtime ignores map settings
+- if a dataset supports maps, `--include-map` and `--no-map` can force inclusion on or off
 
-Most of the time, the most important choice is the extraction mode.
+The `[map]` section does not turn maps on or off. It only configures how maps are extracted when
+maps are included.
 
-## Choosing an extraction mode
+## Extraction modes
+
+Extraction is configured under `[datasets.<name>.map.extraction]`.
 
 | Mode | When to use it |
 | --- | --- |
-| `full` | Keep the entire map when map size is manageable or you want maximum context. |
-| `scene_extent` | Keep only the map around the scene itself. Good when you want local context without choosing a fixed crop size. |
-| `circle` | Keep a fixed-radius area around the scene. Good when your model expects a consistent spatial extent. |
-| `bounding_box` | Keep a fixed-width, fixed-height area. Good when a rectangular crop fits downstream assumptions better than a circle. |
+| `full` | Keep the whole map when size is manageable or you want maximum context. |
+| `scene_extent` | Crop adaptively around the scene trajectory extent. |
+| `circle` | Keep a fixed-radius area around the scene. |
+| `bounding_box` | Keep a fixed-width, fixed-height area around the scene. |
 
 As a rule of thumb:
 
-- choose `scene_extent` for adaptive local context
-- choose `circle` or `bounding_box` for fixed-size context
-- choose `full` when cropping is unnecessary
+- use `scene_extent` for adaptive local context
+- use `circle` or `bounding_box` when downstream code expects a consistent spatial extent
+- use `full` when cropping is unnecessary or the map is already small
 
-## Geometry controls
+## Geometry density
 
-`min_distance` and `interp_distance` control how detailed the retained map geometry is.
+`min_distance` and `interp_distance` control how dense the retained geometry is.
 
 - `min_distance` removes overly dense points
-- `interp_distance` controls how geometry is reconstructed between retained points
+- `interp_distance` controls the spacing used when geometry is reconstructed
 
-These settings matter most when map size, smoothness, or storage cost becomes important. Otherwise, dataset defaults are often a good starting point.
+These settings matter most for storage size, rendering cost, and graph density. If you do not have
+a reason to tune them, dataset defaults are usually a good starting point.
 
 ## Typical setup
 
 ```toml
 [datasets.a43.map]
-enabled = true
-extraction = "circle"
+min_distance = 1.0
+interp_distance = 2.5
+
+[datasets.a43.map.extraction]
+mode = "circle"
 radius = 60.0
 ```
 
-This is a common pattern when you want map context, but only within a fixed area around each scene.
+This keeps map context within a fixed radius around each scene while simplifying the geometry to the
+requested point density.

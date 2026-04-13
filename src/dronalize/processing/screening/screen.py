@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, TypeVar
+from typing import TYPE_CHECKING, Annotated, Generic, TypeVar
 
-from pydantic import BaseModel, BeforeValidator
+from pydantic import BaseModel, BeforeValidator, TypeAdapter
+from typing_extensions import override
 
 from dronalize.processing.screening.agent import AgentCheckRule
 from dronalize.processing.screening.base import AgentCheckRuleBase, Rule
@@ -15,11 +17,11 @@ from dronalize.processing.screening.scene import SceneCheckRule
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.sections import ScreeningConfig
+    from dronalize.config.models import ScreeningConfig
 
 
-RuleT = TypeVar("RuleT", bound=Rule)
-RuleSpecT = TypeVar("RuleSpecT", bound=BaseModel)
+_RuleT = TypeVar("_RuleT", bound=Rule)
+_RuleSpecT = TypeVar("_RuleSpecT", bound=BaseModel)
 AgentCheckSpecs = Annotated[tuple[AgentCheckRule, ...], BeforeValidator(tuple)]
 CleanupSpecs = Annotated[tuple[CleanupRule, ...], BeforeValidator(tuple)]
 SceneCheckSpecs = Annotated[tuple[SceneCheckRule, ...], BeforeValidator(tuple)]
@@ -73,40 +75,43 @@ class Screen:
         )
 
 
-class _AgentCheckRuleCompiler(BaseModel):
-    value: AgentCheckRule
+class _RuleCompiler(ABC, Generic[_RuleT]):
+    @classmethod
+    @abstractmethod
+    def adapter(cls) -> TypeAdapter[_RuleT]:
+        """Return the TypeAdapter used to validate rule specs."""
+        ...
 
     @classmethod
-    def compile(cls, entries: dict[str, RuleSpecT]) -> tuple[AgentCheckRule, ...]:
-        compiled: list[AgentCheckRule] = []
+    def compile(cls, entries: dict[str, _RuleSpecT]) -> tuple[_RuleT, ...]:
+        compiled: list[_RuleT] = []
         for name, spec in entries.items():
-            rule = cls.model_validate(spec.model_dump())
+            payload = spec.model_dump(exclude_none=True)
+            rule = cls.adapter().validate_python(payload)
             rule = rule.model_copy(update={"rule_id": name, "enabled": True})
-            compiled.append(rule.value)
+            compiled.append(rule)
         return tuple(compiled)
 
 
-class _SceneCheckRuleCompiler(BaseModel):
-    value: SceneCheckRule
-
+class _CleanupRuleCompiler(_RuleCompiler[CleanupRule]):
     @classmethod
-    def compile(cls, entries: dict[str, RuleSpecT]) -> tuple[SceneCheckRule, ...]:
-        compiled: list[SceneCheckRule] = []
-        for name, spec in entries.items():
-            rule = cls.model_validate(spec.model_dump())
-            rule = rule.model_copy(update={"rule_id": name, "enabled": True})
-            compiled.append(rule.value)
-        return tuple(compiled)
+    @override
+    def adapter(cls) -> TypeAdapter[CleanupRule]:
+        """Return the TypeAdapter used to validate cleanup rule specs."""
+        return TypeAdapter(CleanupRule)
 
 
-class _CleanupRuleCompiler(BaseModel):
-    value: CleanupRule
-
+class _SceneCheckRuleCompiler(_RuleCompiler[SceneCheckRule]):
     @classmethod
-    def compile(cls, entries: dict[str, RuleSpecT]) -> tuple[CleanupRule, ...]:
-        compiled: list[CleanupRule] = []
-        for name, spec in entries.items():
-            rule = cls.model_validate(spec.model_dump())
-            rule = rule.model_copy(update={"rule_id": name, "enabled": True})
-            compiled.append(rule.value)
-        return tuple(compiled)
+    @override
+    def adapter(cls) -> TypeAdapter[SceneCheckRule]:
+        """Return the TypeAdapter used to validate scene check rule specs."""
+        return TypeAdapter(SceneCheckRule)
+
+
+class _AgentCheckRuleCompiler(_RuleCompiler[AgentCheckRule]):
+    @classmethod
+    @override
+    def adapter(cls) -> TypeAdapter[AgentCheckRule]:
+        """Return the TypeAdapter used to validate agent check rule specs."""
+        return TypeAdapter(AgentCheckRule)

@@ -23,7 +23,7 @@ class ProcessRequest(BaseModel):
     dataset: str
     input_dir: Path
     output_dir: Path
-    storage_backend: StorageBackend | str = StorageBackend.MDS
+    storage_backend: StorageBackend | str = StorageBackend.PICKLE
     config_path: Path | None = None
     overrides: RuntimeOverride = Field(default_factory=RuntimeOverride)
     include_map: bool | None = None

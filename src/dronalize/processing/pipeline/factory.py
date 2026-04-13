@@ -7,15 +7,15 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 import dronalize.processing.pipeline.transforms as tr
-from dronalize.processing.screening.screen import Screen
 from dronalize.processing.pipeline._internal import SPLIT_PARTITION_COLUMN
 from dronalize.processing.pipeline.builder import TrajectoryPipelineBuilder
 from dronalize.processing.pipeline.functional.resample import ResampleMethod, ResampleSpec
 from dronalize.processing.pipeline.pipeline import Pipeline
 from dronalize.processing.pipeline.splitting import apply_split_partition
+from dronalize.processing.screening.screen import Screen
 
 if TYPE_CHECKING:
-    from dronalize.config.sections import ResampleConfig, ScenesConfig, WindowConfig
+    from dronalize.config.models import ResampleConfig, ScenesConfig, WindowConfig
     from dronalize.processing.pipeline.spec import TrajectorySpec
 
 
@@ -55,6 +55,7 @@ def trajectory_pipeline(spec: TrajectorySpec) -> Pipeline:
         agent_id_column=spec.columns.agent_id,
         frame_column=spec.columns.frame,
         category_column=spec.columns.category,
+        mark_passed_agents=True,
     )
     pipeline = pipeline.compose(builder.post_screening)
     return _apply_resample_and_yield(
@@ -123,6 +124,7 @@ def _apply_screening(
     agent_id_column: str,
     frame_column: str,
     category_column: str,
+    mark_passed_agents: bool,
 ) -> Pipeline:
     if screening_spec is not None:
         return pipeline.then(
@@ -132,6 +134,7 @@ def _apply_screening(
                 agent_id=agent_id_column,
                 frame_column=frame_column,
                 category_column=category_column,
+                mark_passed_agents=mark_passed_agents,
             )
         )
     return pipeline

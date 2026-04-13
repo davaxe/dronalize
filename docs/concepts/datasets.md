@@ -1,43 +1,56 @@
 # Datasets
 
 <div class="section-intro" markdown="1">
-A dataset key in `dronalize` is more than a name. It selects a built-in dataset definition with defaults, capabilities, expected input structure, and supported processing behaviors.
+A dataset key in `dronalize` is not just a name. It resolves to a `DatasetSpec`, which defines how
+that dataset is discovered, loaded, configured, and processed.
 </div>
 
-For the full dataset list and dataset-specific details, see the [dataset reference](../reference/datasets/index.md).
+For the full built-in dataset list and dataset-specific notes, see the
+[dataset reference](../reference/datasets/index.md).
 
-## What a dataset definition gives you
+## What a `DatasetSpec` provides
 
-Each built-in dataset comes with a starting point for processing, including:
+Each `DatasetSpec` carries the dataset integration contract:
 
-- default loader behavior
-- optional map support
-- supported split strategies
-- a native trajectory schema
-- any dataset-specific loader behavior
+- `default_config` for the dataset's starting point
+- `native_schema` for the loader's physical trajectory fields
+- `native_splits` when the dataset ships with fixed partitions
+- `has_map` for map availability
+- `dataset_options_model` for typed `[datasets.<name>.dataset]` config
+- `resources_factory` for run-scoped shared resources such as maps
+- `time_split_support` when block-based time splits are valid
 
-This is why configuration often starts small: the dataset already provides sensible defaults.
+This is why configuration often starts small: the dataset already provides a meaningful default
+window, schema, screening policy, and map setup.
+
+## Registry behavior
+
+The registry is lazy. Built-in dataset modules are imported only when a dataset is first requested.
+That keeps optional dependencies isolated.
+
+In practice:
+
+- `dronalize.datasets.get("waymo")` requires the `waymo` extra
+- `dronalize.datasets.available()` only lists built-ins whose optional dependencies are installed
+- the CLI commands `available`, `inspect`, and `split-support` are direct views of the registry
 
 ## Why dataset choice matters
 
-Different datasets support different workflows.
+Different datasets support different workflows. Common differences are:
 
-Common differences include:
+- native benchmark splits vs. source discovery only
+- map support vs. no map support
+- time-based split support vs. only scene or source routing
+- dataset-owned config options
+- lane-change-aware defaults for some highway datasets
 
-- some datasets include map context and some do not
-- some expose native train, val, and test splits
-- some work best with time-based splitting, while others support scene-based or source-based splitting
-- some expose dataset-specific loader options or highway-style sampling behavior
-
-In other words, choosing a dataset key also chooses the set of features you can reasonably use.
+So choosing a dataset key also chooses the capabilities you can rely on.
 
 ## Practical workflow
 
-When starting a new dataset:
+When starting with a dataset:
 
-1. Check the dataset page for its domain, disk layout, and benchmark context.
-2. Use `dronalize inspect <dataset>` to see defaults such as schema, filter rules, and map settings.
-3. Use `dronalize split-support <dataset>` before deciding on a split strategy.
-4. Override only the parts that matter for your project.
-
-This keeps your config focused on project-specific choices instead of repeating built-in defaults.
+1. Run `dronalize inspect <dataset>` to see its defaults and capabilities.
+2. Run `dronalize split-support <dataset>` before choosing a split strategy.
+3. Keep your TOML focused on project-specific changes instead of repeating built-in defaults.
+4. Use `show-config` or `resolve_job()` to verify the fully merged result before execution.

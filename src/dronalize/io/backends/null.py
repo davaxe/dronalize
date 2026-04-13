@@ -1,4 +1,10 @@
-"""No-op storage backend used for tests and dry-run style execution."""
+"""No-op writer backend.
+
+The ``null`` backend executes the full runtime, counts accepted scenes, and
+intentionally skips all persisted scene output. It is useful for tests, dry
+runs, configuration validation, and measuring pipeline cost without storage
+I/O.
+"""
 
 from __future__ import annotations
 
@@ -10,8 +16,7 @@ from typing import TYPE_CHECKING, final
 from typing_extensions import override
 
 from dronalize.core.categories import DatasetSplit
-from dronalize.io.backends.base import DatasetWriter
-from dronalize.io.manifest import FORMAT_VERSION, DatasetManifest
+from dronalize.io.base import DatasetWriter
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -20,44 +25,11 @@ if TYPE_CHECKING:
     from dronalize.core.scene import Scene
 
 
-def create_writer(*, log: bool, identifier: int | None = None) -> NullWriter:
-    """Construct a `NullWriter` instance directly.
-
-    Parameters
-    ----------
-    log : bool
-        Whether `finish_final()` should print aggregated counts.
-    identifier : int | None, optional
-        Optional identifier attached to the writer instance.
-
-    Returns
-    -------
-    NullWriter
-        Configured null writer instance.
-    """
-    return NullWriter(identifier, log=log)
-
-
 @final
 class NullWriter(DatasetWriter):
     """No-op writer used by tests and dry-run execution paths."""
 
     _counts_shared: dict[str, Synchronized[int]] | None = None
-
-    manifest: DatasetManifest = DatasetManifest(
-        format_version=FORMAT_VERSION,
-        source_trajectory_schema="null",
-        trajectory_schema="null",
-        derived_features=(),
-        feature_columns=(),
-        history_frames=0,
-        future_frames=0,
-        precision="float32",
-        recenter_positions=False,
-        has_map=False,
-        sample_time=1.0,
-        original_sample_time=1.0,
-    )
 
     def __init__(
         self,
@@ -86,12 +58,11 @@ class NullWriter(DatasetWriter):
         return functools.partial(cls, log=log, count_shared=cls._counts_shared)
 
     @override
-    def write(self, scene: Scene) -> bool:
+    def write(self, scene: Scene) -> None:
         """Count one scene without writing any output."""
         effective_split = scene.split_assignment
         self._count["scenes"] += 1
         self._count[effective_split.value if effective_split else "unsplit"] += 1
-        return True
 
     @override
     def finish_local(self) -> None:
@@ -116,3 +87,7 @@ class NullWriter(DatasetWriter):
             for split, count in split_counts.items():
                 pct = (count / total * 100) if total > 0 else 0.0
                 print(f"  {split:<12} {count:>10,}  ({pct:6.2f}%)")
+
+            for k in self._count_shared or {}:
+                with self._count_shared[k].get_lock():
+                    self._count_shared[k].value = 0

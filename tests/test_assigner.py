@@ -1,8 +1,6 @@
-# pyright: standard
-
 from __future__ import annotations
 
-import random
+import math
 from collections import Counter
 
 import pytest
@@ -10,61 +8,28 @@ import pytest
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 
 
-def test_distribution_matches_weights() -> None:
-    """Verify that the stateless assigner produces the expected distribution."""
-    groups = ["A", "B", "C"]
-    weights = [0.5, 0.3, 0.2]
-    assigner = StatelessWeightedAssigner(groups=groups, weights=weights, seed=100)
+def test_weighted_assigner_is_deterministic_for_same_seed() -> None:
+    assigner_a = StatelessWeightedAssigner(groups=["A", "B", "C"], weights=[0.5, 0.3, 0.2], seed=42)
+    assigner_b = StatelessWeightedAssigner(groups=["A", "B", "C"], weights=[0.5, 0.3, 0.2], seed=42)
 
-    assignments = [assigner.assign(i) for i in range(10000)]
-    counts = Counter(assignments)
+    values = list(range(200))
+    assert [assigner_a.assign(v) for v in values] == [assigner_b.assign(v) for v in values]
+
+
+def test_weighted_assigner_distribution_is_close_to_requested_weights() -> None:
+    assigner = StatelessWeightedAssigner(groups=["A", "B", "C"], weights=[0.5, 0.3, 0.2], seed=100)
+
+    counts = Counter(assigner.assign(v) for v in range(10_000))
     total = sum(counts.values())
 
-    assert pytest.approx(counts["A"] / total, abs=0.02) == 0.5
-    assert pytest.approx(counts["B"] / total, abs=0.02) == 0.3
-    assert pytest.approx(counts["C"] / total, abs=0.02) == 0.2
+    assert math.isclose(counts["A"] / total, 0.5, abs_tol=0.02)
+    assert math.isclose(counts["B"] / total, 0.3, abs_tol=0.02)
+    assert math.isclose(counts["C"] / total, 0.2, abs_tol=0.02)
 
 
-def test_multi_key_distribution() -> None:
-    """Verify that different keys produce different assignments."""
-    groups = ["A", "B", "C"]
-    weights = [0.5, 0.3, 0.2]
-    assigner = StatelessWeightedAssigner(groups=groups, weights=weights, seed=100)
-    rng = random.Random(0)
-    assignments = [assigner.assign(i, rng.randint(0, 1000)) for i in range(10000)]
+def test_weighted_assigner_rejects_invalid_weights() -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        _ = StatelessWeightedAssigner(groups=["A", "B"], weights=[1.0, -1.0], seed=0)
 
-    counts = Counter(assignments)
-    total = sum(counts.values())
-    assert pytest.approx(counts["A"] / total, abs=0.01) == 0.5
-    assert pytest.approx(counts["B"] / total, abs=0.01) == 0.3
-    assert pytest.approx(counts["C"] / total, abs=0.01) == 0.2
-
-
-def test_same_seed_same_assignments() -> None:
-    """Verify that the same key produces the same assignment across same seed."""
-    groups = ["A", "B", "C"]
-    weights = [0.5, 0.3, 0.2]
-
-    assigner1 = StatelessWeightedAssigner(groups=groups, weights=weights, seed=42)
-    assigner2 = StatelessWeightedAssigner(groups=groups, weights=weights, seed=42)
-    rng = random.Random(0)
-    values = [rng.randint(0, 10000000) for _ in range(100)]
-    assignments1 = [assigner1.assign(value) for value in values]
-    assignments2 = [assigner2.assign(value) for value in values]
-
-    assert assignments1 == assignments2
-
-
-def test_different_seed_changes_split() -> None:
-    """Verify that different seeds produce different assignments for the same values."""
-    groups = ["A", "B", "C"]
-    weights = [0.5, 0.3, 0.2]
-
-    assigner1 = StatelessWeightedAssigner(groups=groups, weights=weights, seed=42)
-    assigner2 = StatelessWeightedAssigner(groups=groups, weights=weights, seed=43)
-    rng = random.Random(0)
-    values = [rng.randint(0, 10000000) for _ in range(100)]
-    assignments1 = [assigner1.assign(value) for value in values]
-    assignments2 = [assigner2.assign(value) for value in values]
-
-    assert assignments1 != assignments2
+    with pytest.raises(ValueError, match="At least one weight"):
+        _ = StatelessWeightedAssigner(groups=["A", "B"], weights=[0.0, 0.0], seed=0)

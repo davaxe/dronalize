@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from dronalize.config.base import PartialConfig
-from dronalize.config.sections import (
+from dronalize.config.models import (
     PartialDatasetConfig,
     PartialOutputConfig,
     PartialRuntimeConfig,
@@ -17,6 +17,8 @@ SplitStrategy = Literal["none", "native", "scene", "source", "time", "shuffled-t
 
 
 class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
+    """Runtime overrides for dataset processing."""
+
     runtime: PartialRuntimeConfig | None = None
     split: SplitConfig | None = None
     output: PartialOutputConfig | None = None
@@ -27,7 +29,7 @@ class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
         cls,
         split_strategy: SplitStrategy | None,
         read_split: list[DatasetSplit] | None,
-        jobs: int | None,
+        jobs: int | Literal["auto"] | None,
         trajectory_schema: str | None,
         ratio: tuple[float, float, float] | None,
         gap: int | None,
@@ -51,9 +53,10 @@ class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
         read_split: list of DatasetSplit or None
             The dataset splits to read from the dataset. Only applicable if
             split_strategy is "native". If None, no override is applied.
-        jobs: int or None
+        jobs: int or Literal["auto"] or None
             The number of parallel jobs to use for loading and processing the
-            dataset. If None, no override is applied.
+            dataset. If None, no override is applied. If set to "auto", the
+            number of jobs will be set to the number of CPU cores.
         trajectory_schema: str or None
             The trajectory schema to use for the output trajectories. If None,
             no override is applied.

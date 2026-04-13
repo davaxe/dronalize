@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from dronalize.config.sections import (
+from dronalize.config.models import (
     NativeSplitConfig,
     NoSplitConfig,
     SceneSplitConfig,
@@ -18,10 +18,10 @@ from dronalize.core.categories import DatasetSplit
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from dronalize.config.sections import (
-        ScreeningConfig,
+    from dronalize.config.models import (
         MapConfig,
         ScenesConfig,
+        ScreeningConfig,
         SplitConfig,
         SplitConfigUnion,
     )

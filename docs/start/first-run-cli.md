@@ -1,10 +1,12 @@
 # First run (CLI)
 
 <div class="section-intro" markdown="1">
-The current Typer application exposes five commands: `available`, `inspect`, `show-config`, `split-support`, and `process`. The shortest reliable workflow is to inspect first, preview the effective plan, and only then execute a job.
+The current CLI exposes five commands: `available`, `inspect`, `show-config`, `split-support`, and
+`process`. A good first run is: inspect the dataset, preview the resolved config, then run
+`process --plan` before writing anything.
 </div>
 
-## Inspect the surface
+## Inspect the registry
 
 ```bash
 dronalize available
@@ -12,22 +14,32 @@ dronalize inspect a43
 dronalize split-support a43
 ```
 
-These commands are backed directly by the dataset registry and dataset-spec metadata, so they are the best starting point when you are not sure which splits, map support, or loader capabilities a dataset exposes.
+`available` lists the datasets that are usable in the current environment. `inspect` shows a
+dataset's defaults, native schema, split support, map support, and dataset-owned options.
+`split-support` shows which split strategies are available for that dataset.
 
-## Preview the effective configuration
+!!! note "`available` and `inspect` reflect the current environment"
+
+    The dataset registry only exposes entries whose optional dependencies are currently available.
+    If a dataset is missing, check the installation instructions and make sure you have the right
+    extras installed.
+    
+    It does **not** validate that the dataset's expected input files are actually present. If the dataset is listed but you get an error when you try to process, check that the input path is correct and contains the expected files.
+
+## Preview the resolved config
 
 ```bash
 dronalize show-config a43 --config config.toml
 ```
 
-`show-config` uses the same resolver path as `process`, but it is not a full command-line mirror. It supports config, split, schema, storage-backend, and worker overrides, but not run-only options such as `--input`, `--output`, `--force`, `--progress`, `--limit`, `--seed`, or `--include-map`.
-## Plan a processing run
+`show-config` resolves the same dataset defaults, profile fragments, dataset entry, and CLI
+overrides that `process` uses, but it stops before execution. Use it when you want to confirm the
+effective `scenes`, `screening`, `split`, `map`, `output`, and dataset-specific settings.
 
+## Plan a processing run
 
 === ":material-linux: Bash"
 
-    Run the command in Bash using `\` for line continuation:
-    
     ```bash
     dronalize process a43 \
         --input data/a43/raw \
@@ -37,53 +49,46 @@ dronalize show-config a43 --config config.toml
     ```
 
 === ":fontawesome-brands-windows: PowerShell"
-    
-    Run the same command in PowerShell, using backticks  for line continuation:
-    
+
     ```ps1
     dronalize process a43 `
-        --input data/a44/raw `
+        --input data/a43/raw `
         --output data/a43/processed `
         --config config.toml `
         --plan
     ```
 
-Output from either command should look something like this:
+`--plan` resolves the full run and prints a summary without executing it. The summary includes the
+dataset, paths, backend, worker count, schema, map usage, split strategy, and any dataset-owned
+options that affect the run.
 
-```
-This is the processing plan. No changes have been made yet.
-Processing Plan
-                      ╷
-  Dataset             │ a43
-  Input directory     │ data\a44\raw
-  Output directory    │ data\a43\processed
-  Storage backend     │ mds
-  Trajectory schema   │ positions_velocity_yaw (5 features)
-  Source window       │ 20/60 @ 10.0 Hz
-  Effective window    │ 39/120 @ 20.0 Hz
-  Resampling          │ 2:1 (cubic)
-  Filtering           │ cleanup: cleanup_exclude | scene: scene_min_agents | agent: agent_frames, sample_floor
-  Map                 │ enabled (circle (radius=60), min_distance=1, interp_distance=2.5)
-  Execution           │ parallel (4 workers)
-  Split strategy      │ shuffled-time
-  Time split settings │ segments=8, gap=2 frames
-  Output ratio        │ train (70%), val (20%), test (10%)
-```
+The `process` command currently defaults to the `pickle` backend. Choose a different backend
+explicitly when needed:
 
+- `pickle` for the simplest persisted output with no extra dependency
+- `mds` for Mosaic Streaming shards, which requires `dronalize[mds]`
+- `null` to execute the pipeline without writing any dataset files
 
-Useful planning-time options in the current CLI:
+## Useful options
 
 | Option | Effect |
 | --- | --- |
+| `--storage-backend` | Choose `pickle`, `mds`, or `null`. |
+| `--scene-schema` | Override the output trajectory schema for this run. |
 | `--jobs` | Override worker count. Values above `1` enable parallel execution. |
 | `--limit` | Stop after producing the requested number of scenes. |
-| `--scene-schema` | Change the persisted trajectory schema. |
-| `--storage-backend` | Choose `mds` or `null`. |
-| `--include-map/--no-map` | Force map inclusion on or off when supported. |
+| `--split` | Override the split strategy for the run. |
+| `--read-split` | Select native dataset partitions when `--split native` is used. |
 | `--ratio`, `--gap`, `--segments` | Tune split behavior for compatible split strategies. |
+| `--include-map/--no-map` | Force map inclusion on or off for datasets that support maps. |
 
-The checked-in `config.toml` in the repository root is a real example and can be used with both `show-config` and `process`.
+## Execute the run
 
-## Execute the plan
+When the plan looks right, rerun the same command without `--plan`. If `--force` is omitted, the
+CLI prints the summary again and asks for confirmation before processing starts.
 
-When the plan looks right, rerun the same command without `--plan`. If `--force` is omitted, a summary will be printed and a prompt for confirmation will appear before any processing starts.
+After a successful run, check the output directory:
+
+- `manifest.json` at the dataset root describes the produced dataset
+- split subdirectories such as `train`, `val`, `test`, or `unsplit` contain the backend-specific
+  data files

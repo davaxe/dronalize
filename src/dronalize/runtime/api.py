@@ -11,8 +11,8 @@ from dronalize.runtime._internal.runner import open_job
 from dronalize.runtime.types import ProcessResult
 
 if TYPE_CHECKING:
-    from dronalize.runtime.plans import RunPlan
     from dronalize.runtime.request import ProcessRequest
+    from dronalize.runtime.types import RunPlan
 
 
 def resolve_job(request: ProcessRequest) -> RunPlan:

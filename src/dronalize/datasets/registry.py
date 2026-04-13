@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import ValidationError
 
-from dronalize.config.sections import DatasetConfig, MapConfig, ScenesConfig
+from dronalize.config.models import DatasetConfig, MapConfig, ScenesConfig
 from dronalize.core.errors import (
     DatasetNotFoundError,
     DatasetRegistryError,

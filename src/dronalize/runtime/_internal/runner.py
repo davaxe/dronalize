@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
     from dronalize.processing.loading.loader import Source
     from dronalize.runtime._internal.executor import ObservableExecutor
-    from dronalize.runtime.plans import RunPlan
+    from dronalize.runtime.types import RunPlan
 
 
 @dataclass(slots=True)

@@ -1,4 +1,4 @@
-from dronalize.config.sections import DatasetConfig, MapConfig, SceneExtentExtraction
+from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.registry import DatasetSpec
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config

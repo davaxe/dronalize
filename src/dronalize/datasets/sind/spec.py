@@ -2,7 +2,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from dronalize.config.sections import (
+from dronalize.config.models import (
     DatasetConfig,
     FullMapExtraction,
     MapConfig,
@@ -41,9 +41,7 @@ DATASET_SPEC = DatasetSpec(
     name="sind",
     loader_factory=SindLoader.unified_factory,
     default_config=DatasetConfig(
-        scenes=scenes_config(
-            history_frames=20, future_frames=50, sample_time=0.1, window_step=25
-        ),
+        scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=25),
         screening=minimum_samples_screening(2),
         map=MapConfig(extraction=FullMapExtraction()),
     ),

@@ -20,10 +20,6 @@ nav = [
     { "Adding datasets" = "start/adding-datasets.md" },
     { Changelog = "start/changelog.md" },
     { Citation = "start/citation.md" },
-    { Contributing = [
-        "start/contributing/index.md",
-        { "Adding new storage backends" = "start/contributing/storage.md" },
-    ] },
   ] },
 
   { Concepts = [
@@ -31,16 +27,23 @@ nav = [
     { Architecture = "concepts/architecture.md" },
     { "Configuration model" = "concepts/configuration-model.md" },
     { "Split strategies" = "concepts/split-strategies.md" },
-    { Filtering = "concepts/filtering.md" },
+    { "Screening scenes" = "concepts/screening.md" },
     { "Map processing" = "concepts/map-processing.md" },
     { Datasets = "concepts/datasets.md" },
-    { "Exports, trajectory schemas, and storage backends" = "concepts/outputs-and-schemas.md" },
     { "Lane-change sampling" = "concepts/lane-change-sampling.md" },
   ] },
 
-  { "Storage backends" = [
-    "outputs/index.md",
-    { "Mosaic Data Shard (MDS)" = "outputs/mds.md" },
+  { "Data formats" = [
+    "formats/index.md",
+    { "Scene schema" = "formats/schema.md" },
+    { Manifest = "formats/manifest.md" },
+    { "Reading datasets" = "formats/reading.md" },
+    { "Storage backends" = [
+      "formats/backends/index.md",
+      { "MDS backend" = "formats/backends/mds.md" },
+      { "Pickle backend" = "formats/backends/pickle.md" },
+      { "Null backend" = "formats/backends/null.md" },
+    ] },
   ] },
 
   { "Configuration reference" = [
@@ -82,16 +85,27 @@ nav = [
     { zara2 = "reference/datasets/zara2.md" },
   ] },
 
+
   { "API reference" = [
     "reference/api/index.md",
-    { dronalize = [
-      "reference/api/dronalize/index.md",
-    ] },
     { "dronalize.core" = [
       "reference/api/core/index.md",
       { "Categories and splits" = "reference/api/core/categories-and-splits.md" },
       { "Scene models and schemas" = "reference/api/core/scene.md" },
       { "Map graphs" = "reference/api/core/maps.md" },
+    ] },
+    { "dronalize.config" = [
+      "reference/api/config/index.md",
+      { "Project configuration" = "reference/api/config/project.md" },
+      { "Configuration models" = [
+        "reference/api/config/models/index.md",
+        { "Runtime" = "reference/api/config/models/runtime.md" },
+        { "Scene" = "reference/api/config/models/scene.md" },
+        { "Screening" = "reference/api/config/models/screening.md" },
+        { "Map" = "reference/api/config/models/map.md" },
+        { "Output" = "reference/api/config/models/output.md" },
+        { "Split" = "reference/api/config/models/split.md" },
+      ] },
     ] },
     { "dronalize.datasets" = [
       "reference/api/datasets/index.md",
@@ -100,21 +114,17 @@ nav = [
     ] },
     { "dronalize.runtime" = [
       "reference/api/runtime/index.md",
-      { Configuration = "reference/api/runtime/configuration.md" },
       { "Planning and runs" = "reference/api/runtime/planning-and-runs.md" },
       { "Executor internals" = "reference/api/runtime/executor.md" },
     ] },
     { "dronalize.io" = [
       "reference/api/io/index.md",
-      { "Export configuration" = "reference/api/io/export-configuration.md" },
-      { "Storage and manifests" = "reference/api/io/storage-and-manifests.md" },
       { Readers = "reference/api/io/readers.md" },
-      { Adapters = "reference/api/io/adapters.md" },
+      { "PyTorch adapters" = "reference/api/io/adapters.md" },
     ] },
     { "dronalize.processing" = [
       "reference/api/processing/index.md",
-      { Configuration = "reference/api/processing/configuration.md" },
-      { Filtering = "reference/api/processing/filtering.md" },
+      { Screening = "reference/api/processing/screening.md" },
       { Pipeline = "reference/api/processing/pipeline.md" },
       { Maps = "reference/api/processing/maps.md" },
       { "Loader extension API" = "reference/api/processing/loading.md" },
@@ -131,20 +141,20 @@ variant = "modern"
 font.text = "Source Sans 3"
 font.code = "IBM Plex Mono"
 features = [
-    "navigation.tabs",
-    "navigation.tabs.sticky",
-    "navigation.sections",
-    "navigation.indexes",
-    "navigation.instant",
-    "navigation.instant.progress",
-    "navigation.instant.preview",
-    "navigation.path",
-    "navigation.tracking",
-    "navigation.top",
-    "toc.follow",
-    "search.highlight",
-    "content.code.copy",
-    "navigation.footer"
+  "navigation.tabs",
+  "navigation.tabs.sticky",
+  "navigation.sections",
+  "navigation.indexes",
+  "navigation.instant",
+  "navigation.instant.progress",
+  "navigation.instant.preview",
+  "navigation.path",
+  "navigation.tracking",
+  "navigation.top",
+  "toc.follow",
+  "search.highlight",
+  "content.code.copy",
+  "navigation.footer",
 ]
 
 [project.theme.icon]
@@ -171,9 +181,9 @@ toggle.name = "Switch to light mode"
 paths = ["src/dronalize"]
 
 [project.plugins.mkdocstrings.handlers.python.options]
-allow_inspection =  true
-docstring_section_style =  "list"
-docstring_style = "numpy"
+allow_inspection = true
+docstring_section_style = "list"
+docstring_style = "auto"
 inherited_members = false
 line_length = 80
 separate_signature = true

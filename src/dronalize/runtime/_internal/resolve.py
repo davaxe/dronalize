@@ -5,21 +5,21 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import dronalize.core.errors as dronalize_exceptions
-from dronalize.config.project import ProjectConfig
+from dronalize.config.project import ProcessingConfig
 from dronalize.config.reader import load_project_config
 from dronalize.io.formats import StorageBackend
-from dronalize.runtime.plans import (
+from dronalize.runtime.request import PlanningRequest
+from dronalize.runtime.types import (
     OutputPlan,
     RunPlan,
     compile_effective_scene_metrics,
     compile_loader_request,
 )
-from dronalize.runtime.request import PlanningRequest
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.config.sections import DatasetConfig
+    from dronalize.config.models import DatasetConfig
     from dronalize.datasets.registry import DatasetSpec
     from dronalize.runtime.request import ProcessRequest
 
@@ -89,7 +89,7 @@ def _resolve_dataset_config(*, descriptor: DatasetSpec, planning: PlanningReques
     return cli_override.apply_to(None).apply_to(config)
 
 
-def _load_project_config(config_path: Path | None) -> ProjectConfig:
+def _load_project_config(config_path: Path | None) -> ProcessingConfig:
     if config_path is None:
-        return ProjectConfig()
+        return ProcessingConfig()
     return load_project_config(config_path)

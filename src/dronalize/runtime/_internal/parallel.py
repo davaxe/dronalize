@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from multiprocessing.synchronize import Event
 
     from dronalize.core.typing import P
-    from dronalize.io.backends.base import DatasetWriter
+    from dronalize.io.base import DatasetWriter
     from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
     from dronalize.processing.loading.loader import Source
     from dronalize.runtime._internal.scene import SceneBuilder
@@ -112,7 +112,7 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         processed_scenes = 0
         for scene in ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, args.source):
             _ctx.shared.progress.record_split(scene.split_assignment)
-            _ = _ctx.writer.write(scene)
+            _ctx.writer.write(scene)
             processed_scenes += 1
         _ = _ctx.shared.progress.increment_source()
         return processed_scenes

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
     from dronalize.core.scene import Scene
-    from dronalize.io.backends.base import DatasetWriter
+    from dronalize.io.base import DatasetWriter
     from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
     from dronalize.processing.loading.loader import Source
     from dronalize.runtime._internal.scene import SceneBuilder
@@ -46,7 +46,7 @@ class SequentialExecutor(ObservableExecutor):
     ) -> None:
         writer = writer_factory(0)
         for scene in self._generate_and_track():
-            _ = writer.write(scene)
+            writer.write(scene)
         if finalize is not None:
             finalize(writer)
         else:

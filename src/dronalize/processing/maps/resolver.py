@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from dronalize.core.map_graph import MapGraph
+from dronalize.core.maps import MapGraph
 
 if TYPE_CHECKING:
     from dronalize.core.scene.model import Scene

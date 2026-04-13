@@ -1,59 +1,73 @@
 # Installation
 
 <div class="section-intro" markdown="1">
-Dronalize now ships its default processing stack in the core package. Start with the base install, then add only the optional extras you actually need for CLI convenience, plotting, PyG adapters, or dataset-specific loaders.
+The base package is intentionally small. Start there, then add extras for the CLI, MDS storage,
+Torch or PyG adapters, or dataset-specific loaders only when you need them.
 </div>
 
 ## Requirements
 
 - Python `>=3.10`
-- A local environment with `pip` or `uv`
-- Dataset-specific extras only for the datasets you plan to preprocess
+- `pip` or `uv`
 
-## Install profiles
+## Common installs
 
 ```bash
 pip install dronalize
 pip install "dronalize[cli]"
-pip install "dronalize[plot]"
+pip install "dronalize[cli,mds]"
+pip install "dronalize[torch]"
+pip install "dronalize[pyg]"
 ```
 
-The base install already includes:
+Combine extras as needed in one install command.
 
-- the runtime planning and processing stack
-- the default MDS writer backend
-- the framework-neutral MDS reader `dronalize.io.readers.mds.MDSReader`
-- the Torch adapter `dronalize.io.adapters.MDSTorchDataset`
-- PyTorch, which is required by the MDS backend
+## What the base package includes
 
-The current optional extras are:
+The base install already gives you:
+
+- the dataset registry and runtime planning API
+- the processing pipeline and built-in scene/schema types
+- the `pickle` storage backend
+- the framework-neutral `PickleReader`
+
+The base install does not include the practical CLI dependencies, the MDS backend, or the optional
+Torch and PyG adapters.
+
+## Optional extras
 
 | Extra | Purpose |
 | --- | --- |
-| `cli` | Installs Typer and Rich for the command-line application. |
-| `plot` | Installs Altair for map and trajectory plotting helpers. |
-| `pyg` | Adds PyTorch Geometric for the MDS PyG dataset adapter. |
+| `cli` | Enables the Typer and Rich command-line interface. |
+| `mds` | Enables the `mds` writer backend and `MDSReader`. |
+| `torch` | Enables Torch-based dataset adapters such as `TorchSceneDataset`. |
+| `pyg` | Enables PyTorch Geometric adapters such as `HeteroSceneDataset`. |
+| `plot` | Installs Altair-based plotting helpers. |
 | `lyft`, `waymo`, `ad4che` | Add dataset-specific optional dependencies. |
-| `all_datasets` | Convenience extra for the dataset-specific extras. |
+| `all_datasets` | Convenience extra for all dataset-specific extras. |
+
+## Readers and adapters
+
+| Surface | Extra |
+| --- | --- |
+| `dronalize.io.readers.PickleReader` | none |
+| `dronalize.io.readers.MDSReader` | `mds` |
+| `dronalize.io.adapters.TorchSceneDataset` | `torch` |
+| `dronalize.io.adapters.HeteroSceneDataset` | `pyg` |
 
 ## Dataset extras
 
-Use the base install unless a dataset explicitly needs an extra:
+Most built-in datasets work with the base install. The dataset registry only exposes entries whose
+optional dependencies are currently available, so `dronalize available` reflects the environment
+you actually installed.
 
-| Dataset or feature | Extra |
+Use a dataset extra only when a dataset needs one:
+
+| Dataset | Extra |
 | --- | --- |
-| `dronalize.io.readers.mds.MDSReader` | none |
-| `dronalize.io.adapters.MDSTorchDataset` | none |
-| `a43`, `apolloscape`, `argoverse1`, `argoverse2`, `eth`, `exid`, `highd`, `hotel`, `i80`, `ind`, `interact`, `nuscenes`, `opendd`, `round`, `sind`, `unid`, `univ`, `us101`, `vod`, `zara1`, `zara2` | none |
 | `waymo` | `waymo` |
 | `lyft` | `lyft` |
 | `ad4che` | `ad4che` |
-| `dronalize.io.adapters.MDSHeteroDataset` | `pyg` |
-
-Use `MDSReader` when you want framework-neutral `RawSceneRecord` objects. Use
-`MDSTorchDataset` when you want an iterable Torch dataset surface over the same scene records.
-Add the `pyg` extra only if you want `MDSHeteroDataset`, which converts them into PyTorch
-Geometric `HeteroData` objects.
 
 ## Working with `uv`
 
@@ -62,13 +76,24 @@ uv sync --group dev --group tools
 uv run dronalize available
 ```
 
-The repository already tracks a `uv.lock`, so `uv` is the most direct way to reproduce the local docs and development environment.
+The repository tracks a `uv.lock`, so `uv` is the most direct way to reproduce the local
+development and documentation environment.
 
 ## Verify the install
+
+```bash
+python -c "import dronalize"
+```
+
+If you installed the CLI extra, also verify:
 
 ```bash
 dronalize available
 dronalize inspect a43
 ```
 
-If the CLI is not installed, the Python package can still be imported and used programmatically.
+If you installed the MDS extra, a quick import check is:
+
+```bash
+python -c "from dronalize.io.readers import MDSReader"
+```

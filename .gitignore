@@ -2,6 +2,7 @@
 .vscode
 .zed
 old
+output/
 data/
 lightning_logs/
 wandb/

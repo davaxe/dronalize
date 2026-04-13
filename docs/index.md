@@ -3,66 +3,69 @@ hide:
   - navigation
   - toc
   - path
-  # - footer
 ---
-#
-<div align="center">
-<img alt="Dronalize logo" src=assets/dronalize-header.png width="800px" style="max-width: 100%;">
-<p class="eyebrow">Trajectory preprocessing toolkit</p>
-</div>
-<div class="home-shell" markdown="1">
-<section class="home-hero" markdown="1">
-
-Preprocess motion-forecasting datasets into a common scene format with one CLI and one config
-model. Inspect a dataset, run preprocessing, write MDS output, and load it back from Python.
-
-<div class="home-link-row" markdown="1">
-[Installation](start/index.md){ .md-button .md-button--primary }
-[First run](start/first-run-cli.md){ .md-button }
-[Python entry](start/python-entry.md){ .md-button }
+<div class="landing", markdown>
+<div class="hero">
+  <img alt="Dronalize logo" src="assets/dronalize-header.png" class="hero__image">
+  <p class="hero__eyebrow">Trajectory preprocessing toolkit</p>
+  <h1 class="hero__title">Prepare trajectory data consistently and at scale</h1>
 </div>
 
-<div class="home-command" markdown="1">
-```bash
+`dronalize` is a toolbox designed to streamline the development process for researchers working with trajectory datasets in behavior prediction problems. Originally developed for drone-captured bird’s-eye-view datasets, it has since evolved to support a wide range of popular benchmarks in motion forecasting.
+
+High-level features include:
+
+- ...
+- ...
+
+The package can be installed via `pip` or `uv`:
+```sh
 pip install dronalize
-dronalize inspect a43
 ```
+
+or using `uv`:
+
+```sh
+uv pip install dronalize
+```
+
+## Navigation
+
+<div class="grid cards" markdown>
+
+-   [:material-clock-fast:{ .lg .middle } __Quick start__](quick-start.md)
+
+    ---
+
+    New to Zarr? Check out the quick start guide. It contains a brief
+    introduction to Zarr's main concepts and links to additional tutorials.
+
+
+-   [:material-book-open:{ .lg .middle } __User guide__](user-guide/installation.md)
+
+    ---
+
+    A detailed guide for how to use Zarr-Python.
+
+
+-   [:material-api:{ .lg .middle } __API Reference__](api/zarr/open.md)
+
+    ---
+
+    The reference guide contains a detailed description of the functions, modules,
+    and objects included in Zarr. The reference describes how the methods work and
+    which parameters can be used. It assumes that you have an understanding of the
+    key concepts.
+
+
+-   [:material-account-group:{ .lg .middle } __Contributor's Guide__](contributing.md)
+
+    ---
+
+    Want to contribute to Zarr? We welcome contributions in the form of bug reports,
+    bug fixes, documentation, enhancement proposals and more. The contributing guidelines
+    will guide you through the process of improving Zarr.
+
 </div>
-</section>
-
-<section class="home-grid" markdown="1">
-<div class="home-card" markdown="1">
-### Start
-
-Install the package, inspect a dataset, and run the first preprocessing job.
-
-[Open start](start/index.md){ .md-button }
-</div>
-
-<div class="home-card" markdown="1">
-### Configuration
-
-See how loader, map, split, and export settings fit together in one TOML model.
-
-[Open configuration](reference/configuration/index.md){ .md-button }
-</div>
-
-<div class="home-card" markdown="1">
-### Storage backends
-
-Read what gets written to disk, how manifests work, and how to load MDS outputs again.
-
-[Open outputs](outputs/index.md){ .md-button }
-</div>
-
-<div class="home-card" markdown="1">
-### Reference
-
-Browse supported datasets and the current public Python-facing API surface.
-
-[Dataset reference](reference/datasets/index.md){ .md-button }
-[API reference](reference/api/index.md){ .md-button }
-</div>
-</section>
 
 </div>

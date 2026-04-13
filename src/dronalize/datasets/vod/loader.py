@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dronalize.datasets.nuscenes.loader import NuScenesLoader
+from typing_extensions import override
+
+from dronalize.datasets.nuscenes.loader import NuScenesLoader, NuScenesLoaderOptions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,4 +27,9 @@ class VodLoader(NuScenesLoader):
     ) -> None:
         """Initialize the VOD loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
-        self._full_category_contains = ["vehicle.ego"]
+
+    @override
+    @classmethod
+    def default_loader_options(cls) -> NuScenesLoaderOptions:
+        # vod contains dulplicate ego vehicle data
+        return NuScenesLoaderOptions(drop_full_category_regex=["vehicle.ego"])

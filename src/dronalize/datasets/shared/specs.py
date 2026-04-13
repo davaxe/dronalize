@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dronalize.config.sections import (
-    ScreeningConfig,
+from dronalize.config.models import (
     LaneChangeConfig,
     MinSamplesSpec,
     PruneByRuleSpec,
     ResampleConfig,
     ScenesConfig,
+    ScreeningConfig,
     WindowConfig,
 )
 

@@ -7,7 +7,7 @@ SIND is a drone dataset for signalized intersections in China. It combines multi
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Urban</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
-  <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
+  <div class="summary-item"><span>Capture platform</span><strong>Drone + camera</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>

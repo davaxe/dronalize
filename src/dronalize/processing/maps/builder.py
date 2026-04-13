@@ -15,7 +15,7 @@ import numpy.typing as npt
 from typing_extensions import Self, override
 
 from dronalize.core.categories import EdgeType
-from dronalize.core.map_graph import MapGraph
+from dronalize.core.maps import MapGraph
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

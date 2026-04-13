@@ -8,7 +8,7 @@ import polars as pl
 from pydantic import Field, model_validator
 from typing_extensions import override
 
-from dronalize.config.sections import Range  # noqa: TC001
+from dronalize.config.models import Range  # noqa: TC001
 from dronalize.core.categories import AgentCategory, AgentCategoryInput
 from dronalize.processing.screening.base import RuleId, SceneCheckRuleBase
 from dronalize.processing.screening.context import (

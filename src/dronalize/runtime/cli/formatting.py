@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from rich import box
 from rich.table import Table
 
-from dronalize.config.sections import (
+from dronalize.config.models import (
     NativeSplitConfig,
     NoSplitConfig,
     SceneSplitConfig,
@@ -24,9 +24,9 @@ from dronalize.core.scene import get_trajectory_schema
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.config.sections import MapConfig, ScenesConfig, ScreeningConfig
+    from dronalize.config.models import MapConfig, ScenesConfig, ScreeningConfig
     from dronalize.datasets.registry import DatasetSpec
-    from dronalize.runtime.plans import RunPlan
+    from dronalize.runtime.types import RunPlan
 
 PLAN_NOTICE = (
     "\n[bold yellow]This is the processing plan. No changes have been made yet.[/bold yellow]"

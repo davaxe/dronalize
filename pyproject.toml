@@ -21,7 +21,6 @@ dependencies = [
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
     "tomli>=2.0.1; python_version < '3.11'",
-    "deepmerge>=2.0",
 ]
 
 [project.scripts]
@@ -35,7 +34,7 @@ plot = ["altair>=5.0.0"]
 lyft = ["zarr<3", "numcodecs<=0.13.1", "protobuf>=4.25.8"]
 waymo = ["protobuf>=4.25.8"]
 ad4che = ["opencv-python"]
-storage-mds = ["mosaicml-streaming>=0.13.0"]
+mds = ["mosaicml-streaming>=0.13.0"]
 torch = ["torch>=2.0.0"]
 pyg = ["torch>=2.0.0", "torch-geometric>=2.7.0"]
 
@@ -49,7 +48,7 @@ dev = [
     "scipy-stubs",
     "ipython",
     "tomli>=2.0.1",
-    "dronalize[plot,storage-mds,torch,pyg,ad4che,cli,lyft,waymo]",
+    "dronalize[plot,mds,torch,pyg,ad4che,cli,lyft,waymo]",
 ]
 tools = [
     "mkdocs-material>=9.6.0",
@@ -101,23 +100,11 @@ pydocstyle = { convention = "numpy" }
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["ANN", "B026", "D", "PLC0415", "PLC2701", "PLR6301"]
+"tests/**/*.py" = ["D"]
+"test_*.py" = ["INP001"]
 
 [tool.ruff.format]
 quote-style = "double"
-
-[tool.pyrefly]
-project-includes = [
-    "**/*.py*",
-    "**/*.ipynb",
-]
-project-excludes = [
-    "**/protos/**",
-    # "tests/*",
-    # "examples/*",
-    "**/*_pb2.py",
-    "**/*_pb2.pyi",
-]
 
 [tool.basedpyright]
 pythonVersion = "3.10"

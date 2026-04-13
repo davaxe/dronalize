@@ -7,11 +7,7 @@ import contextlib
 from pydantic import Field
 
 from dronalize.config.base import ConfigBase
-from dronalize.config.sections import DatasetConfig, PartialDatasetConfig, PartialDatasetConfigBase
-
-# --------------------------------------------------------------------------------------
-# Dataset entry
-# --------------------------------------------------------------------------------------
+from dronalize.config.models import DatasetConfig, PartialDatasetConfig, PartialDatasetConfigBase
 
 
 class PartialDatasetEntryConfig(PartialDatasetConfigBase):
@@ -32,13 +28,19 @@ class PartialDatasetEntryConfig(PartialDatasetConfigBase):
         )
 
 
-# --------------------------------------------------------------------------------------
-# Root file
-# --------------------------------------------------------------------------------------
+class ProcessingConfig(ConfigBase):
+    """Root config model for processing jobs.
 
+    This model is designed to be loaded from a TOML file with potentially
+    incomplete dataset entries, which can be resolved to complete
+    [`DatasetConfig`][dronalize.config.models.DatasetConfig]s using the
+    `resolve` method.
 
-class ProjectConfig(ConfigBase):
-    """Partial root public TOML schema."""
+    To load a `ProcessingConfig` from a TOML file, use the
+    [`load_project_config`][dronalize.config.reader.load_project_config]
+    function.
+
+    """
 
     profiles: dict[str, PartialDatasetConfig] = Field(default_factory=dict)
     datasets: dict[str, PartialDatasetEntryConfig] = Field(default_factory=dict)
@@ -68,6 +70,13 @@ class ProjectConfig(ConfigBase):
 
     def extract(self, dataset: str) -> DatasetConfig | None:
         """Extract the dataset config for a specific dataset without resolution.
+
+        There are two failure modes for this method that both result in `None`
+        being returned:
+
+        1. the dataset is not found in the file, and
+        2. the dataset is found but resolution fails due to incomplete config
+           values.
 
         Parameters
         ----------

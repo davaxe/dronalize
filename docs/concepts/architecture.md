@@ -1,87 +1,140 @@
 # Architecture
 
 <div class="section-intro" markdown="1">
-The architecture of `dronalize` is designed to be modular, flexible, and extensible.
+`dronalize` is built around one idea: datasets stay dataset-specific at the edges, while the middle
+of the runtime stays shared. A run resolves configuration, opens one dataset loader, turns raw
+sources into normalized scenes, and hands those scenes to a storage backend.
 </div>
-
 
 <figure markdown="block" class="full-figure">
   ![Design architecture](../assets/architecture-dark.svg#only-dark){ width="100%" }
   ![Design architecture](../assets/architecture-light.svg#only-light){ width="100%" }
   <figcaption>
-    High-level architecture diagram. The <code>dronalize</code> library provides the main API and processing logic, while configuration files define the specific behavior for each run. The CLI is a thin wrapper around the core library for ease of use.
+    High-level architecture diagram. The CLI and Python API both resolve the same runtime plan and
+    execute the same loader, scene-building, and writing flow.
   </figcaption>
 </figure>
 
-## How the pieces fit together
+## Main runtime objects
 
-Three things determine what a run does: the **dataset** selected, the **configuration** applied, and the **output** requested. The diagram captures these as three horizontal phases that always execute in the same order.
+Four public objects define most of the runtime:
 
-Before any data is touched, a config resolution step merges dataset defaults, a TOML file, and CLI flags into a single resolved plan. That plan is then used to open a loader, assemble the processing pipeline, and prepare the export. The actual data processing follows two nested loops: a **source loop** that iterates over raw files or recordings, and a **scene loop** inside it that handles each scene window produced from a source.
+- `DatasetSpec` describes one dataset integration
+- `ProcessingConfig` represents the optional TOML file
+- `ProcessRequest` describes one requested run
+- `RunPlan` is the execution-ready result after config resolution and planning
 
-## Config resolution
+The CLI is a thin layer that builds a `ProcessRequest`, resolves a `RunPlan`, and then either
+prints it or executes it.
 
-Every run starts from the dataset's built-in declarative defaults. A TOML config file can then compose reusable `[profiles.<name>]` fragments and a `[datasets.<name>]` entry for the selected dataset. Typed runtime overrides from the CLI or Python request model are applied last.
+## Resolution flow
 
-The runtime resolves that layered declarative config first, then compiles it into the execution-ready settings used by loaders, pipelines, and writers. The same resolution and compilation path is used whether the run starts from the CLI or Python.
+Every run starts by looking up a dataset key in the registry. That returns a `DatasetSpec` with the
+dataset defaults, native schema, native split support, map support, and any dataset-owned config
+model.
 
-!!! note "Dataset defaults as the foundation"
-    Many values — such as `history_frames`, `future_frames`, and `sample_time` — come from the
-    dataset's own built-in loader config, not from a package-level constant. Omitting a field
-    from your config file leaves the dataset's defaults intact. Check the [dataset reference](../reference/datasets/index.md) or use `dronalize inspect <dataset>` to see what a dataset starts with.
+The runtime then resolves configuration in this order:
 
-For a full description of the layering rules and override precedence, see the [configuration model](configuration-model.md).
+1. the dataset's built-in `default_config`
+2. any profiles named in `[datasets.<name>].uses`
+3. the dataset-local TOML entry in `[datasets.<name>]`
+4. runtime overrides from the CLI or `RuntimeOverride`
 
-## Dataset registry
+That produces one resolved `DatasetConfig`. The runtime compiles it into narrower subsystem plans:
 
-Each built-in dataset is described by a `DatasetSpec` — a small object that carries everything needed to process it: the loader factory, default loader and map configs, the native trajectory schema, and the split strategies it supports.
+- a loader-facing `LoaderRequest`
+- an `OutputPlan`
+- effective scene metrics after any resampling
 
-The registry is lazy: a dataset's module is only imported when it is first requested by name. This means optional dependencies for datasets you are not using — such as `protobuf` for Waymo or `zarr` for Lyft — do not need to be installed.
+The result is a `RunPlan`, which is what both `resolve_job()` and `process_dataset()` work with.
 
-Dataset specs can be explored from Python via `dronalize.datasets.get()` or from the CLI with `dronalize inspect <dataset>` and `dronalize split-support <dataset>`.
+## Dataset boundary
 
-## The processing pipeline
+The dataset boundary is the loader API in `dronalize.processing.loading`.
 
-Once a plan is resolved and a run is opened, processing follows the two loops shown in the diagram.
+A loader is responsible for:
+
+- discovering raw sources
+- reading one source into one or more Polars `LazyFrame` objects
+- attaching lightweight map bindings when needed
+- exposing dataset-specific options and map resolution behavior
+
+The shared runtime is responsible for everything after that:
+
+- screening
+- split routing
+- resampling
+- scene numbering
+- schema conversion
+- backend writing
+
+## Execution flow
+
+After planning, `open_job()` does three things:
+
+1. opens any run-scoped shared resources declared by the `DatasetSpec`
+2. builds the loader
+3. chooses a sequential or parallel executor
+
+Execution then follows two nested loops.
 
 ### Source loop
 
-The loader discovers raw input sources — usually files or directories — and iterates over them one at a time. For datasets with predefined splits such as Argoverse 2 or Waymo, sources are drawn from the relevant partition directories. For others, all files are discovered together and split assignment happens further down the pipeline.
+The loader yields `Source` objects. A source is a stable unit of raw input, usually a file or a
+directory-backed sample group. If the dataset has native splits, the runtime can iterate those
+partitions directly. Otherwise it uses `discover_sources()`.
 
-Each source is read into a Polars `LazyFrame` and passed through a composable `Pipeline` — a chain of lazy transforms built once per run from the resolved loader config. The pipeline steps that are active depend entirely on what was configured:
+For each source, the loader returns one or more `LoadedSourceData` objects. Each one contains:
 
-| Step | What it does | Conditional? |
-| --- | --- | --- |
-| Temporal windowing | Slides a fixed-length window over the source, producing multiple overlapping scene candidates | Only when `window` is configured |
-| Filtering | Removes rows, rejects scenes failing quality rules, and prunes invalid agents | Only when `filter` is configured |
-| Resampling | Interpolates trajectories to a different temporal resolution | Only when `resampling` is configured |
-| Scene grouping | Partitions the processed frame into one DataFrame per scene | Always |
-
-Steps not present in the config are skipped entirely, so the pipeline is always the minimal one the current run requires. The `Pipeline` itself is immutable and composable — each active step appends a transform to the chain, and the chain is executed lazily until scene grouping collects the results.
+- a Polars `LazyFrame`
+- an optional `MapBinding`
+- an optional predefined split
 
 ### Scene loop
 
-Scene grouping hands off individual DataFrames to the scene loop, where each scene is finalized before writing:
+The loader's pipeline is built once and reused. The default pipeline can apply:
 
-1. **Split assignment** — determines whether the scene belongs to `train`, `val`, or `test`. The mechanism depends on the split strategy: time-based strategies read a column written earlier in the pipeline, the scene strategy uses a stable hash of the scene identifier, and native or source strategies use the partition already assigned to the source.
-2. **Map resolution** — attaches the map graph to the scene if the dataset supports it and maps are enabled. The graph is not materialized until it is needed for encoding.
-3. **Scene construction and schema conversion** — wraps the DataFrame in a `Scene` object. If the configured output schema requests fields not present in the dataset's native schema — for example, velocity from a positions-only source — those fields are derived here.
+- time partitioning for `time` and `shuffled-time` splits
+- sliding-window extraction
+- screening
+- resampling
+- final grouping into one scene frame at a time
 
-## Output
+The `SceneBuilder` then turns each prepared frame into a `Scene` by:
 
-Each finalized `Scene` is encoded into a dictionary of NumPy arrays and handed to a `DatasetWriter`. The encoding step produces a dense `[agents, timesteps, features]` tensor, a matching presence mask, and optionally recenters positions around the scene mean when `recenter_positions` is enabled.
+1. assigning a split
+2. attaching a lazy map resolver when maps are enabled
+3. converting the scene to the requested output schema if needed
 
-The current stable storage backend is MDS (Mosaic Streaming), which writes binary shards with a per-split `index.json`. A `manifest.json` is written alongside the shards and records the schema name, feature columns, sequence lengths, precision, and whether map data is present. This manifest is the stable description of a processed dataset for downstream consumers.
+The split assignment strategy depends on the configured mode:
 
-The `null` export skips all file I/O and is useful for validating a config or benchmarking the pipeline without writing output. See [outputs and schemas](outputs-and-schemas.md) for more on schema choice and export options.
+- `native` uses the dataset's predefined partitions
+- `scene` hashes the stable per-source scene identifier
+- `source` hashes the source identifier
+- `time` and `shuffled-time` read the partition column produced earlier in the pipeline
+
+## Output flow
+
+Each final `Scene` is encoded into the shared record layout and passed to a dataset writer. The
+writer comes from the backend registry in `dronalize.io.backends`.
+
+The built-in backends are:
+
+- `pickle` for one pickled `SceneRecord` per scene
+- `mds` for Mosaic Streaming shards
+- `null` for runs that should execute but not persist scenes
+
+Regardless of backend, the runtime writes one `manifest.json` at the dataset root. That manifest is
+the stable description of the produced dataset: schema, feature columns, sample time, derived
+features, map presence, and precision.
 
 ## Module map
 
 | Module | Responsibility |
 | --- | --- |
 | `dronalize.datasets` | Dataset registry, specs, and built-in dataset definitions |
-| `dronalize.runtime` | Config resolution, execution planning, CLI, and run orchestration |
-| `dronalize.processing` | Pipeline, filters, resampling, map processing, and loader base classes |
-| `dronalize.core` | Scene data model, schema definitions, agent categories, and shared error types |
-| `dronalize.io` | Writers, output encoding, manifest I/O, and storage protocols |
-| `dronalize.plot` | Optional visualization helpers for trajectories and map graphs |
+| `dronalize.config` | TOML loading and runtime override helpers |
+| `dronalize.runtime` | Request models, planning, execution, and the CLI |
+| `dronalize.processing` | Loader API, pipeline assembly, screening, resampling, and map helpers |
+| `dronalize.core` | Scene types, map graph types, schemas, categories, and shared errors |
+| `dronalize.io` | Encoding, manifests, backends, readers, and optional adapters |

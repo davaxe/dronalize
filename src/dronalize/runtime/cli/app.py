@@ -1,4 +1,4 @@
-"""Typer application for the optional dronalize CLI."""
+"""Typer application for the otional dronalze CLI."""
 
 # ruff: noqa: PLC0415
 from __future__ import annotations
@@ -32,7 +32,7 @@ from dronalize.runtime.cli.formatting import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from dronalize.runtime.plans import RunPlan
+    from dronalize.runtime.types import RunPlan
 
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
 _T = TypeVar("_T")
@@ -85,7 +85,12 @@ Seed = Annotated[
     ),
 ]
 StorageBackendOption = Annotated[
-    StorageBackend, typer.Option("--storage-backend", help="Storage backend for processed data.")
+    StorageBackend,
+    typer.Option(
+        "--storage-backend",
+        "--sb",
+        help="Storage backend for processed data.",
+    ),
 ]
 TrajectorySchema = Annotated[
     str | None, typer.Option("--scene-schema", help="Scene schema to persist in exported output.")
@@ -137,7 +142,7 @@ def process(
     progress: Progress = True,
     limit: Limit = None,
     seed: Seed = None,
-    storage_backend: StorageBackendOption = StorageBackend.MDS,
+    storage_backend: StorageBackendOption = StorageBackend.PICKLE,
     trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,

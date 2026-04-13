@@ -10,7 +10,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.errors import TrajectorySchemaError
-from dronalize.core.map_graph import MapGraph
+from dronalize.core.maps import MapGraph
 from dronalize.core.scene.derivations import (
     ConversionContext,
     apply_derivation_plan,
@@ -48,6 +48,8 @@ class Scene:
     """Stable map identifier for the scene, if one exists."""
     map_resolver: MapResolver | None = field(default=None, compare=False, repr=False)
     """Resolver attached by the loader to materialize the scene map on demand."""
+    passed_agent_ids: frozenset[int] | None = None
+    """Optional set of agents that passed screening and are retained for outputs."""
     split_assignment: DatasetSplit | None = None
     """Split assignment for this scene (train/val/test)."""
 
@@ -64,6 +66,7 @@ class Scene:
         map_key: MapKey = None,
         map_resolver: MapResolver | None = None,
         split_assignment: DatasetSplit | None = None,
+        passed_agent_ids: frozenset[int] | None = None,
         cast_schema: bool = True,
     ) -> Scene:
         """Create a scene with optional schema casting."""
@@ -79,6 +82,7 @@ class Scene:
             sample_time=sample_time,
             map_key=map_key,
             map_resolver=map_resolver,
+            passed_agent_ids=passed_agent_ids,
             split_assignment=split_assignment,
         )
 
