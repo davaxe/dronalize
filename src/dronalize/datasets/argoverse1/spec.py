@@ -25,6 +25,10 @@ def open_argoverse1_resources(
 ) -> Generator[DatasetResources, None, None]:
     """Build shared Argoverse 1 maps once per run."""
     _ = scenes
+    if map_config is None:
+        yield DatasetResources()
+        return
+
     with open_named_shared_map_resources(
         map_config=map_config,
         named_paths=(

@@ -13,9 +13,10 @@ DATASET_SPEC = DatasetSpec(
     loader_factory=AD4CHELoader.unified_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
-            history_frames=60,
+            history_frames=61,
             future_frames=150,
             sample_time=1 / 30,
+            window_step=25,
             resample=resample_config(method="linear", up=1, down=3),
             lane_change=lane_change_sampling(required_lane_changes=5, negative_keep_every=3),
         ),

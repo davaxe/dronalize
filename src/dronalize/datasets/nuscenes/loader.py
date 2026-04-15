@@ -42,7 +42,6 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str], NuScenesLoaderOptions]):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
@@ -56,6 +55,16 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str], NuScenesLoaderOptions]):
 
         self._load_tables()
         self._precompute_global_data()
+
+    @classmethod
+    @override
+    def unified_factory(
+        cls,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> NuScenesLoader:
+        return cls(data_root, request, resources)
 
     def _find_data_dir(self) -> list[Path]:
         required_files = set(_SCHEMAS.keys())
@@ -103,9 +112,14 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str], NuScenesLoaderOptions]):
     @override
     def map_resolver(self) -> MapResolver:
         shared_maps = self.resources.shared_maps
-        if not isinstance(shared_maps, dict):
+        if not shared_maps or self.map_config is None:
             return no_map()
         return shared_map(shared_maps)
+
+    @classmethod
+    @override
+    def loader_options_model(cls) -> type[NuScenesLoaderOptions]:
+        return NuScenesLoaderOptions
 
     def _load_tables(self) -> None:
         for data_dir in self._data_dirs:

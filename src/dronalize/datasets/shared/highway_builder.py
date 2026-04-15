@@ -119,6 +119,10 @@ class HighwayLaneMapBuilder(BaseMapBuilder):
             self._data = self._data.with_columns(
                 pl.col(self._lane_id_col).replace_strict(mapping).alias(self._lane_id_col)
             )
+            self._lane_description = LaneDescription(
+                ids=list(range(len(self._lane_description.ids))),
+                direction=self._lane_description.direction,
+            )
 
         lane_centers = self._get_lane_centers(self._data, bin_size=self._bin_size)
         if self._smoothing_factor is not None:

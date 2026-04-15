@@ -38,7 +38,9 @@ cli = ["typer>=0.24.1", "rich>=14.3.3"]
 
 [dependency-groups]
 test = [
+    "coverage>=7.13.5",
     "pytest>=7.0",
+    "pytest-cov>=5.0",
 ]
 
 lint = [
@@ -71,21 +73,36 @@ dev = [
 packages = ["src/dronalize"]
 
 [tool.hatch.build.targets.sdist]
-exclude = [
-    "tests",
-    "examples",
-]
+exclude = ["tests", "examples"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "src/dronalize"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
-python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["--doctest-modules", "-ra"]
+addopts = ["-ra", "-q"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "dataset(name): marks tests that require a specific dataset (deselect with '-m \"not dataset\"')",
+]
 filterwarnings = [
     "ignore:.*torch_geometric\\.distributed.*:DeprecationWarning",
     "ignore:.*torch\\.jit\\.script.*:DeprecationWarning",
 ]
+
+[tool.coverage.run]
+source = ["src/dronalize"]
+branch = true
+omit = [
+    "src/dronalize/datasets/*/protos/*.py",
+    "src/dronalize/datasets/shared/_debug.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.ruff]
 # Exclude proto compiled files from linting and formatting
@@ -108,8 +125,7 @@ pydocstyle = { convention = "numpy" }
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["D"]
-"test_*.py" = ["INP001"]
+"tests/**/*.py" = ["D", "INP001"]
 
 [tool.ruff.format]
 quote-style = "double"

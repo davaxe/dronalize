@@ -46,7 +46,6 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
@@ -56,6 +55,16 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         self._train_dir: Path = self.root / "forecasting_train_v1.1" / "train" / "data"
         self._val_dir: Path = self.root / "forecasting_val_v1.1" / "val" / "data"
         self._test_dir: Path = self.root / "forecasting_test_v1.1" / "test_obs" / "data"
+
+    @classmethod
+    @override
+    def unified_factory(
+        cls,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> Argoverse1Loader:
+        return cls(data_root, request, resources)
 
     @classmethod
     @override

@@ -27,13 +27,13 @@ class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
     @classmethod
     def from_inputs(
         cls,
-        split_strategy: SplitStrategy | None,
-        read_split: list[DatasetSplit] | None,
-        jobs: int | Literal["auto"] | None,
-        trajectory_schema: str | None,
-        ratio: tuple[float, float, float] | None,
-        gap: int | None,
-        segments: int | None,
+        split_strategy: SplitStrategy | None = None,
+        read_split: list[DatasetSplit] | None = None,
+        jobs: int | Literal["auto"] | None = None,
+        trajectory_schema: str | None = None,
+        ratio: tuple[float, float, float] | None = None,
+        gap: int | None = None,
+        segments: int | None = None,
     ) -> RuntimeOverride:
         """Construct a runtime override from raw inputs.
 

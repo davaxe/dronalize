@@ -31,7 +31,6 @@ class SindLoader(BaseSceneLoader):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
@@ -39,18 +38,32 @@ class SindLoader(BaseSceneLoader):
         """Initialize the SinD loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
 
+    @classmethod
+    @override
+    def unified_factory(
+        cls,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> SindLoader:
+        return cls(data_root, request, resources)
+
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
-        if not self.root.is_dir():
+        data_root: Path = self.root / "data"
+        if not data_root.is_dir():
             return
-        for subdir in sorted(path for path in self.root.iterdir() if path.is_dir()):
+        for subdir in sorted(p for p in data_root.iterdir() if p.is_dir()):
             yield Source(
-                identifier=subdir.name, data=subdir, map_key=str(self._resolve_map_key(subdir.name))
+                identifier=subdir.name,
+                data=subdir,
+                map_key=str(self._resolve_map_key(subdir.parent.name)),
             )
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
         subdir = source.data
+        print(f"Loading source from {subdir}...")
         pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
         vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
         vehicle_df = pl.scan_csv(vehicle_data_path, schema_overrides=_VEHICLE_SCHEMA).select(

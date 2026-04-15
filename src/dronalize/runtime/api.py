@@ -11,6 +11,9 @@ from dronalize.runtime._internal.runner import open_job
 from dronalize.runtime.types import ProcessResult
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    from dronalize.core.scene import Scene
     from dronalize.runtime.request import ProcessRequest
     from dronalize.runtime.types import RunPlan
 
@@ -40,3 +43,9 @@ def run_job(job: RunPlan) -> ProcessResult:
             processed_scenes=progress.processed_scenes,
             split_counts=progress.split_counts,
         )
+
+
+def run_job_yield(job: RunPlan) -> Iterator[Scene]:
+    """Execute one resolved job and yield generated scenes."""
+    with open_job(job) as run:
+        yield from run.executor.execute_yield()

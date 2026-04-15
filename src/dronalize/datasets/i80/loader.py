@@ -40,6 +40,16 @@ class I80Loader(BaseSceneLoader):
         """Initialize the I-80 dataset loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
 
+    @classmethod
+    @override
+    def unified_factory(
+        cls,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> I80Loader:
+        return cls(data_root=data_root, request=request, resources=resources)
+
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
         for i, csv_file in enumerate(sorted(self.root.rglob("trajectories*.csv"))):

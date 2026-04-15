@@ -71,7 +71,6 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
@@ -79,6 +78,16 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
         """Initialize the Lyft loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
         self._data: dict[DatasetSplit, _ArrayData] = {}
+
+    @classmethod
+    @override
+    def unified_factory(
+        cls,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> LyftLoader:
+        return cls(data_root, request, resources)
 
     @classmethod
     @override

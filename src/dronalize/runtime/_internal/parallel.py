@@ -70,6 +70,16 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         )
 
     @override
+    def execute_yield(self) -> Iterator[Scene]:
+        for scenes in self._execute_parallel(
+            self._process_fn_yield,
+            self._sources,
+            _init_worker,
+            self._shared,
+        ):
+            yield from scenes
+
+    @override
     def progress(self) -> Progress:
         with self._shared.progress.snapshot_lock:
             return Progress(
@@ -110,6 +120,17 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
             processed_scenes += 1
         _ = _ctx.shared.progress.increment_source()
         return processed_scenes
+
+    @staticmethod
+    def _process_fn_yield(source: Source[Any]) -> list[Scene]:
+        if _ctx.loader is None or _ctx.builder is None:
+            msg = "Loader runtime was not initialized for this worker process."
+            raise ValueError(msg)
+        scenes = list(ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source))
+        for scene in scenes:
+            _ctx.shared.progress.record_split(scene.split_assignment)
+        _ = _ctx.shared.progress.increment_source()
+        return scenes
 
     @staticmethod
     def _generate_scenes(

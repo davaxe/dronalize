@@ -40,5 +40,5 @@ class US101MapBuilder(HighwayLaneMapBuilder):
         )
         super().__init__(data, bin_size=10.0, include_outer_borders=True, smoothing=3.0)
         self._lane_description: LaneDescription | None = LaneDescription(
-            ids=list(range(1, 6)), direction=[True] * 5
+            ids=list(range(1, 9)), direction=[True] * 8
         )

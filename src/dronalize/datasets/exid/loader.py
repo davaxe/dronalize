@@ -20,7 +20,6 @@ class ExiDLoader(LevelXDataLoader):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,

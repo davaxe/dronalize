@@ -20,7 +20,6 @@ class VodLoader(NuScenesLoader):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
@@ -28,8 +27,18 @@ class VodLoader(NuScenesLoader):
         """Initialize the VOD loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
 
-    @override
     @classmethod
+    @override
+    def unified_factory(
+        cls,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> VodLoader:
+        return cls(data_root=data_root, request=request, resources=resources)
+
+    @classmethod
+    @override
     def default_loader_options(cls) -> NuScenesLoaderOptions:
-        # vod contains dulplicate ego vehicle data
+        # VOD data contains two identical instances of the ego vehicle
         return NuScenesLoaderOptions(drop_full_category_regex=["vehicle.ego"])

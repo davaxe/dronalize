@@ -11,11 +11,11 @@ from dronalize.runtime._internal.executor import ObservableExecutor, WriterFacto
 from dronalize.runtime._internal.state import Progress
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Iterator
 
     from dronalize.core.scene import Scene
     from dronalize.io.base import DatasetWriter
-    from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
+    from dronalize.processing.loading.base import BaseSceneLoader
     from dronalize.processing.loading.loader import Source
     from dronalize.runtime._internal.scene import SceneBuilder
 
@@ -23,13 +23,13 @@ if TYPE_CHECKING:
 class SequentialExecutor(ObservableExecutor):
     def __init__(
         self,
-        loader: BaseSceneLoader[Any, LoaderOptions],
+        loader: BaseSceneLoader[Any, Any],
         builder: SceneBuilder,
         sources: Iterable[Source[Any]],
         *,
         limit: int | None = None,
     ) -> None:
-        self._loader: BaseSceneLoader[Any, LoaderOptions] = loader
+        self._loader: BaseSceneLoader[Any, Any] = loader
         self._builder: SceneBuilder = builder
         self._sources: Iterable[Source[Any]] = sources
         self._limit: int | None = limit
@@ -52,6 +52,10 @@ class SequentialExecutor(ObservableExecutor):
         else:
             writer.finish_local()
             writer.finish_final()
+
+    @override
+    def execute_yield(self) -> Iterator[Scene]:
+        yield from self._generate_and_track()
 
     @override
     def progress(self) -> Progress:

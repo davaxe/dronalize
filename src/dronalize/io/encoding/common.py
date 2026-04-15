@@ -116,7 +116,6 @@ def encode_unsplit_scene_record(
     data = scene.frame
     feature_columns = scene.schema.feature_columns()
     time_steps = scene.history_frames + scene.future_frames
-
     start_frame = data["frame"].min()
     unique_ids: list[int] = data["id"].unique().to_list()
     sorted_ids = sorted(unique_ids)

@@ -130,8 +130,9 @@ class StopLineType(IntEnum):
 
     TURN_STOP = auto()
     STOP_SIGN = auto()
-    PEDESTRIAN_CROSSING = auto()
+    PED_CROSSING = auto()
     TRAFFIC_LIGHT = auto()
+    YIELD = auto()
 
 
 class SegmentDividerType(IntEnum):
@@ -387,8 +388,7 @@ class StopLine:
             return False
 
         return not (
-            self.stop_line_type == StopLineType.PEDESTRIAN_CROSSING
-            and not allow_pedestrian_crossings
+            self.stop_line_type == StopLineType.PED_CROSSING and not allow_pedestrian_crossings
         )
 
 
