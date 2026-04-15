@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
-from typing_extensions import Self, override
+from typing_extensions import Self, TypedDict, override
 
 from dronalize.core.categories import EdgeType
 from dronalize.datasets.nuscenes.maps import parser

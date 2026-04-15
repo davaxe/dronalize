@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypedDict
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
+from typing_extensions import TypedDict
 
 from dronalize.io.records import (
     SceneRecord,

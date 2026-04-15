@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, TypedDict, overload
+from typing import TYPE_CHECKING, Any, Generic, overload
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
+from typing_extensions import TypedDict
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.typing import FloatScalarT

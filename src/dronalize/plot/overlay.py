@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import altair as alt  # Optional dependency, checked at import time (in __init__.py)
+import altair as alt
 
 from dronalize.plot.map import _build_map_graph_layers, _empty_chart
 from dronalize.plot.trajectory import _build_trajectory_layers, _sample_trajectory_groups

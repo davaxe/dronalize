@@ -1,4 +1,4 @@
-"""Multiprocessing executor for internal runtime execution."""
+"""Multiprocessing executor for internal runtime exection."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import functools
 import multiprocessing as mp
 from collections import deque
 from multiprocessing.util import Finalize
-from typing import TYPE_CHECKING, Any, Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from typing_extensions import override
 
@@ -28,12 +28,7 @@ if TYPE_CHECKING:
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene])
-_S = TypeVar("_S")
 _ctx: state.WorkerRuntime
-
-
-class _SceneProcessArgs(NamedTuple, Generic[SourceT]):
-    source: Source[SourceT]
 
 
 class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
@@ -64,11 +59,10 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
     def execute(
         self, writer_factory: WriterFactory, finalize: Callable[[DatasetWriter], None] | None = None
     ) -> None:
-        payloads = (_SceneProcessArgs(source) for source in self._sources)
         _ = deque(
             self._execute_parallel(
                 self._process_fn_write,
-                payloads,
+                self._sources,
                 _init_write_worker,
                 *(self._shared, self._loader, self._builder, writer_factory, finalize),
             ),
@@ -102,7 +96,7 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
             return self._shared.progress.split_counts()
 
     @staticmethod
-    def _process_fn_write(args: _SceneProcessArgs[_S]) -> int:
+    def _process_fn_write(source: Source[Any]) -> int:
         if _ctx.writer is None:
             msg = "DatasetWriter was not initialized for this worker process."
             raise ValueError(msg)
@@ -110,7 +104,7 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
             msg = "Loader runtime was not initialized for this worker process."
             raise ValueError(msg)
         processed_scenes = 0
-        for scene in ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, args.source):
+        for scene in ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source):
             _ctx.shared.progress.record_split(scene.split_assignment)
             _ctx.writer.write(scene)
             processed_scenes += 1
@@ -119,7 +113,7 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
 
     @staticmethod
     def _generate_scenes(
-        loader: BaseSceneLoader[_S, Any], builder: SceneBuilder, source: Source[_S]
+        loader: BaseSceneLoader[Any, Any], builder: SceneBuilder, source: Source[Any]
     ) -> Iterator[Scene]:
         for processed in builder.prepare_source(loader, source):
             scene_number = _ctx.shared.progress.claim_scene(_ctx.shared.scene_limit)
@@ -129,8 +123,8 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
 
     def _execute_parallel(
         self,
-        process_fn: Callable[[_SceneProcessArgs[_S]], ReturnT],
-        payloads: Iterable[_SceneProcessArgs[_S]],
+        process_fn: Callable[[Source[SourceT]], ReturnT],
+        payloads: Iterable[Source[SourceT]],
         initializer: Callable[P, object],
         *args: P.args,
         **kwargs: P.kwargs,

@@ -7,7 +7,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Final
 
-import altair as alt  # Optional dependency, checked at import time (in __init__.py)
+import altair as alt
 import polars as pl
 
 from dronalize.core.categories import EdgeType

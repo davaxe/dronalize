@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from itertools import chain, repeat
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import override
+from typing_extensions import TypedDict, override
 
 from dronalize.core.categories import EdgeType
 from dronalize.datasets.argoverse1.maps import parser, utils

@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence  # noqa: TC003
 from dataclasses import dataclass
 from enum import IntFlag, auto
-from typing import Final, TypedDict
+from typing import Final
 
 import polars as pl
+from typing_extensions import TypedDict
 
 from dronalize.core.errors import TrajectorySchemaError
 

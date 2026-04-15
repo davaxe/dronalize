@@ -8,11 +8,11 @@ from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from itertools import starmap
 from math import ceil
-from typing import TYPE_CHECKING, Protocol, TypedDict
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Self, override
+from typing_extensions import Self, TypedDict, override
 
 from dronalize.core.categories import EdgeType
 from dronalize.core.maps import MapGraph

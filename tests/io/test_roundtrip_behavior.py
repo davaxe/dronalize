@@ -15,10 +15,12 @@ from dronalize.io.manifest import write_manifest
 from dronalize.io.readers import PickleReader
 from dronalize.io.records import join_raw_scene_record, split_unsplit_raw_scene_record
 from dronalize.runtime.types import OutputPlan
-from tests.support import assert_scene_record_equal, make_scene
+from tests.support import assert_scene_record_equal
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from dronalize.core.scene import Scene
 
 
 def _output_plan() -> OutputPlan:
@@ -29,9 +31,7 @@ def _output_plan() -> OutputPlan:
     )
 
 
-def test_unsplit_split_helpers_roundtrip_record_contents() -> None:
-    scene = make_scene()
-
+def test_unsplit_split_helpers_roundtrip_record_contents(scene: Scene) -> None:
     split = encode_scene_record(scene, dtype=np.float64)
     unsplit = encode_unsplit_scene_record(scene, dtype=np.float64)
 
@@ -44,21 +44,21 @@ def test_unsplit_split_helpers_roundtrip_record_contents() -> None:
     np.testing.assert_allclose(split.output_features, rebuilt.output_features)
 
 
-def test_encode_scene_record_uses_passed_agent_ids() -> None:
-    scene = replace(make_scene(), passed_agent_ids=frozenset({10}))
+def test_encode_scene_record_uses_passed_agent_ids(scene: Scene) -> None:
+    scene = replace(scene, passed_agent_ids=frozenset({10}))
     record = encode_scene_record(scene, dtype=np.float32)
 
     np.testing.assert_array_equal(record.passed_agent_mask, np.array([True, False]))
 
 
-def test_pickle_writer_roundtrip_preserves_scene_record_contract(tmp_path: Path) -> None:
+def test_pickle_writer_roundtrip_preserves_scene_record_contract(
+    tmp_path: Path, scene: Scene
+) -> None:
     output_dir = tmp_path / "pickle"
     writer = PickleWriter(output_dir=output_dir, config=_output_plan(), splits=None)
 
-    scene = make_scene()
     expected = encode_scene_record(scene, dtype=np.float32)
-
-    assert writer.write(scene)
+    writer.write(scene)
     writer.finish_local()
     writer.finish_final()
 
@@ -67,10 +67,10 @@ def test_pickle_writer_roundtrip_preserves_scene_record_contract(tmp_path: Path)
     assert_scene_record_equal(reader[0], expected)
 
 
-def test_mds_encoder_decoder_roundtrip_preserves_data_without_streaming_dependency() -> None:
-    scene = make_scene()
+def test_mds_encoder_decoder_roundtrip_preserves_data_without_streaming_dependency(
+    scene: Scene,
+) -> None:
     unsplit = encode_unsplit_scene_record(scene, dtype=np.float32)
-
     sample = encode_mds_sample(unsplit, observation_length=scene.history_frames)
     decoded = decode_mds_sample(sample)
     expected = encode_scene_record(scene, dtype=np.float32)

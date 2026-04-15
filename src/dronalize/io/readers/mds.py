@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypedDict, overload
+from typing import TYPE_CHECKING, Any, overload
 
-from typing_extensions import Unpack, override
+from typing_extensions import TypedDict, Unpack, override
 
 from dronalize.core.optional import raise_missing_optional_dependency
 from dronalize.io.base import DatasetReader, split_directory_name
