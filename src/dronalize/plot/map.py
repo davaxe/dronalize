@@ -13,6 +13,7 @@ import polars as pl
 from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from types import ModuleType
 
     from dronalize.core.maps import MapGraph
@@ -28,6 +29,7 @@ def plot_map_graph(
     *,
     include_nodes: bool = False,
     disable_max_rows: bool = True,
+    save_path: Path | None = None,
     **kwargs: Any,  # noqa: ANN401
 ) -> Chart:
     """Plot a map graph using Altair.
@@ -65,7 +67,7 @@ def plot_map_graph(
         graph, alt=alt, alpha=alpha, include_nodes=include_nodes
     )
 
-    return (
+    chart = (
         alt
         .layer(*layers)
         .add_params(edge_selection)
@@ -76,6 +78,9 @@ def plot_map_graph(
         .configure_legend(labelFontSize=14, titleFontSize=16)
         .interactive()
     )
+    if save_path is not None:
+        chart.save(save_path)
+    return chart
 
 
 def _empty_chart(alt: ModuleType, message: str) -> alt.Chart:

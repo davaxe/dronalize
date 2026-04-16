@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from dronalize.processing.pipeline.functional.resample._common import (
     ResampleMethod,
     ResampleSpec,
-    build_plan,
+    resolve_request,
 )
 from dronalize.processing.pipeline.functional.resample._linear import linear_resample
 from dronalize.processing.pipeline.functional.resample._spline import (
@@ -52,7 +52,7 @@ def resample(
         Resampled table of the same eager/lazy type as `data`.
     """
     resample_spec = spec or ResampleSpec()
-    plan = build_plan(resample_spec, frame_column=frame_column, group_by=group_by)
+    plan = resolve_request(resample_spec, frame_column=frame_column, group_by=group_by)
     match resample_spec.method:
         case ResampleMethod.LINEAR:
             return linear_resample(data=data, spec=resample_spec, plan=plan)

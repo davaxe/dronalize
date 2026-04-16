@@ -10,7 +10,8 @@ from pydantic import Field
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.scene import POSITIONS_VELOCITY_YAW
+from dronalize.core.polars_ops import yaw_from_vel_expr
+from dronalize.core.scene.schema import POSITIONS_VELOCITY_YAW
 from dronalize.processing.loading.base import (
     BaseSceneLoader,
     LoaderOptions,
@@ -85,11 +86,16 @@ class InteractionLoader(BaseSceneLoader[list[Path], InteractionLoaderOptions]):
             pl
             .scan_csv(source.data, include_file_paths="file_id", schema=_SCHEMA)
             .drop("track_to_predict", "interesting_agent", "width", "length", "timestamp_ms")
-            .rename({"psi_rad": "yaw", "frame_id": "frame", "track_id": "id"})
+            .rename({"frame_id": "frame", "track_id": "id", "psi_rad": "yaw_rad"})
             .with_columns(
                 pl.col("file_id").cast(pl.Categorical).to_physical(),
                 pl.col("case_id").cast(pl.UInt32),
                 self._map_agent_category().alias("agent_category"),
+                pl
+                .when(pl.col("yaw_rad").is_null())
+                .then(yaw_from_vel_expr())
+                .otherwise(pl.col("yaw_rad"))
+                .alias("yaw"),
             )
             .drop("agent_type")
         )

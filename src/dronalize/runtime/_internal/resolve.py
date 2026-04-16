@@ -8,10 +8,9 @@ import dronalize.core.errors as dronalize_exceptions
 from dronalize.config.project import ProcessingConfig
 from dronalize.config.reader import load_project_config
 from dronalize.io.formats import StorageBackend
-from dronalize.runtime.request import PlanningRequest
 from dronalize.runtime.types import (
+    ExecutionPlan,
     OutputPlan,
-    RunPlan,
     compile_effective_scene_metrics,
     compile_loader_request,
 )
@@ -20,23 +19,19 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.config.models import DatasetConfig
+    from dronalize.config.runtime import RuntimeOverride
     from dronalize.datasets.registry import DatasetSpec
-    from dronalize.runtime.request import ProcessRequest
+    from dronalize.runtime.types import ExecutionRequest
 
 
-def build_job(*, descriptor: DatasetSpec, request: ProcessRequest) -> RunPlan:
+def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> ExecutionPlan:
     """Build a full runtime plan from a public process request."""
     _validate_input_path(request)
     include_map = request.include_map
     storage_backend = _resolve_storage_backend(request.storage_backend)
-    planning = PlanningRequest(
-        descriptor=descriptor,
-        config_path=request.config_path,
-        overrides=request.overrides,
-        seed=request.seed,
-        include_map=include_map,
+    resolved_config = _resolve_dataset_config(
+        descriptor=descriptor, config_path=request.config_path, cli_override=request.overrides
     )
-    resolved_config = _resolve_dataset_config(descriptor=descriptor, planning=planning)
     loader_request = compile_loader_request(
         descriptor=descriptor,
         resolved_config=resolved_config,
@@ -46,9 +41,8 @@ def build_job(*, descriptor: DatasetSpec, request: ProcessRequest) -> RunPlan:
     effective_history_frames, effective_future_frames, effective_sample_time = (
         compile_effective_scene_metrics(resolved_config)
     )
-    return RunPlan(
+    return ExecutionPlan(
         descriptor=descriptor,
-        planning=planning,
         data_root=request.input_dir,
         output_dir=request.output_dir,
         storage_backend=storage_backend,
@@ -65,7 +59,7 @@ def build_job(*, descriptor: DatasetSpec, request: ProcessRequest) -> RunPlan:
     )
 
 
-def _validate_input_path(request: ProcessRequest) -> None:
+def _validate_input_path(request: ExecutionRequest) -> None:
     if not request.input_dir.exists() and request.input_dir_exists:
         msg = f"Input directory {request.input_dir} does not exist."
         raise FileNotFoundError(msg)
@@ -80,12 +74,13 @@ def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBa
         ) from exc
 
 
-def _resolve_dataset_config(*, descriptor: DatasetSpec, planning: PlanningRequest) -> DatasetConfig:
+def _resolve_dataset_config(
+    *, descriptor: DatasetSpec, config_path: Path | None, cli_override: RuntimeOverride
+) -> DatasetConfig:
 
-    cli_override = planning.overrides
-    project = _load_project_config(planning.config_path)
+    project = _load_project_config(config_path)
     defaults = descriptor.default_config
-    config = project.resolve(planning.descriptor.name, defaults)
+    config = project.resolve(descriptor.name, defaults)
     return cli_override.apply_to(None).apply_to(config)
 
 

@@ -8,6 +8,7 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
+from dronalize.core.polars_ops import yaw_from_pos_expr
 from dronalize.core.scene import CANONICAL
 from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
 from dronalize.processing.loading.loader import LoadedSourceData, Source
@@ -50,20 +51,17 @@ class SindLoader(BaseSceneLoader):
 
     @override
     def discover_sources(self) -> Iterable[Source[Path]]:
-        data_root: Path = self.root / "data"
-        if not data_root.is_dir():
-            return
-        for subdir in sorted(p for p in data_root.iterdir() if p.is_dir()):
-            yield Source(
-                identifier=subdir.name,
-                data=subdir,
-                map_key=str(self._resolve_map_key(subdir.parent.name)),
-            )
+        for region in sorted(p for p in self.root.iterdir() if p.is_dir()):
+            for data_dir in sorted(p for p in region.iterdir() if p.is_dir()):
+                yield Source(
+                    identifier=data_dir.name,
+                    data=data_dir,
+                    map_key=str(region.name),
+                )
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
         subdir = source.data
-        print(f"Loading source from {subdir}...")
         pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
         vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
         vehicle_df = pl.scan_csv(vehicle_data_path, schema_overrides=_VEHICLE_SCHEMA).select(
@@ -101,7 +99,7 @@ class SindLoader(BaseSceneLoader):
                 "animal": AgentCategory.ANIMAL.value,
             })
             .alias("agent_category"),
-            pl.lit(None).alias("yaw"),
+            yaw_from_pos_expr().alias("yaw"),
             *("x", "y", "vx", "vy", "ax", "ay"),
         )
 
@@ -121,19 +119,9 @@ class SindLoader(BaseSceneLoader):
     @override
     def map_resolver(self) -> MapResolver:
         shared_maps = self.resources.shared_maps
-        if not isinstance(shared_maps, dict):
+        if not shared_maps or self.map_config is None:
             return no_map()
         return shared_map(shared_maps)
-
-    @staticmethod
-    def _resolve_map_key(path_name: str) -> str:
-        if path_name.startswith("changchun"):
-            return "changchun"
-        if path_name.startswith("xian"):
-            return "xian"
-        if "NR" in path_name:
-            return "nr_ll2"
-        return "map_relink_law_save"
 
 
 _VEHICLE_SCHEMA = pl.Schema({

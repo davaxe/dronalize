@@ -13,6 +13,10 @@
     background: var(--drona-header-bg);
 }
 
+.md-typeset h1#__skip {
+    display: none;
+}
+
 .md-header__title,
 .md-header__button,
 .md-tabs__item,

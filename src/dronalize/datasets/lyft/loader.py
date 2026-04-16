@@ -173,7 +173,7 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
     @override
     def map_resolver(self) -> MapResolver:
         shared_maps = self.resources.shared_maps
-        if not isinstance(shared_maps, str) or self.map_config is None:
+        if not shared_maps or self.map_config is None:
             return no_map()
         return shared_map(shared_maps, utils.extract_fn(self.map_config.extraction))
 

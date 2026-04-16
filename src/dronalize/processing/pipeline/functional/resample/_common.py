@@ -137,7 +137,7 @@ class ResamplePlan:
         return (self.frame_column, *self.coordinates)
 
 
-def build_plan(
+def resolve_request(
     spec: ResampleSpec, *, frame_column: str, group_by: str | Sequence[str] | None
 ) -> ResamplePlan:
     """Normalize a resampling specification into an execution plan."""

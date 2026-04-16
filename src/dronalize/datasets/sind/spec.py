@@ -22,13 +22,16 @@ def open_sind_resources(
 ) -> Generator[DatasetResources, None, None]:
     """Build shared SinD maps once per run."""
     _ = scenes
+    if map_config is None:
+        yield DatasetResources()
+        return
     with open_named_shared_map_resources(
         map_config=map_config,
         named_paths=(
-            ("changchun", root / "maps" / "Changchun_Pudong.osm"),
-            ("xian", root / "maps" / "Xi'an_Shanglin.osm"),
-            ("nr_ll2", root / "maps" / "NR_ll2.osm"),
-            ("map_relink_law_save", root / "maps" / "map_relink_law_save.osm"),
+            ("Changchun", root / "Changchun" / "Changchun_Pudong.osm"),
+            ("Xi'an", root / "Xi'an" / "Xi'an_Shanglin.osm"),
+            ("Chongqing", root / "Chongqing" / "NR_ll2.osm"),
+            ("Tianjin", root / "Tianjin" / "map_relink_law_save.osm"),
         ),
         build_map=lambda path, config: SindMapBuilder(path).build(
             config.min_distance, config.interp_distance

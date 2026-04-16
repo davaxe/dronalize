@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from dronalize.processing.maps.resolver import MapKey, MapResolver
     from dronalize.processing.models import SplitRequest
     from dronalize.processing.pipeline.pipeline import Pipeline
-    from dronalize.runtime.types import RunPlan
+    from dronalize.runtime.types import ExecutionPlan
 
 
 @dataclass(slots=True)
@@ -41,16 +41,16 @@ class SceneBuilder:
     _source_assigner: StatelessWeightedAssigner[DatasetSplit] | None = None
 
     @classmethod
-    def from_job(cls, job: RunPlan) -> SceneBuilder:
+    def from_plan(cls, plan: ExecutionPlan) -> SceneBuilder:
         """Build a runtime scene builder from one resolved run plan."""
         return cls(
-            spec=job.descriptor,
-            split_request=job.loader.split,
-            source_schema=job.descriptor.native_schema,
-            target_schema=job.output.trajectory_schema,
-            history_frames=job.effective_history_frames,
-            future_frames=job.effective_future_frames,
-            sample_time=job.effective_sample_time,
+            spec=plan.descriptor,
+            split_request=plan.loader.split,
+            source_schema=plan.descriptor.native_schema,
+            target_schema=plan.output.trajectory_schema,
+            history_frames=plan.effective_history_frames,
+            future_frames=plan.effective_future_frames,
+            sample_time=plan.effective_sample_time,
         )
 
     def __post_init__(self) -> None:

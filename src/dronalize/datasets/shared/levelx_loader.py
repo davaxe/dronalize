@@ -78,6 +78,7 @@ class LevelXDataLoader(BaseSceneLoader):
                 "pedestrian": AgentCategory.PEDESTRIAN.value,
                 "van": AgentCategory.VAN.value,
                 "truck_bus": AgentCategory.TRUCK.value,
+                "animal": AgentCategory.ANIMAL.value,
             })
             .cast(pl.Int32())
             .alias("agent_category"),
@@ -144,6 +145,8 @@ class LevelXDataLoader(BaseSceneLoader):
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
         tracks = source.data / f"{source.identifier:0>2}_tracks.csv"
         meta = source.data / f"{source.identifier:0>2}_tracksMeta.csv"
+        raw_meta = pl.read_csv(meta)
+        print(raw_meta.select("class").unique())
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
             *self.meta_data_select()
         )

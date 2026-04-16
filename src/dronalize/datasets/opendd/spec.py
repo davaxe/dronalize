@@ -18,7 +18,7 @@ DATASET_SPEC = DatasetSpec(
             window_step=75,
             resample=resample_config(method="linear", up=1, down=3),
         ),
-        screening=minimum_samples_screening(4),
+        screening=minimum_samples_screening(6),
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=OpenDDLoader.native_trajectory_schema(),

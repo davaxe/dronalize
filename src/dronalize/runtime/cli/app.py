@@ -32,7 +32,8 @@ from dronalize.runtime.cli.formatting import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from dronalize.runtime.types import RunPlan
+    from dronalize.runtime.types import ExecutionPlan
+
 
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
 _T = TypeVar("_T")
@@ -148,14 +149,14 @@ def process(
     gap: SplitGap = None,
     segments: SplitSegments = None,
     force: Force = False,
-    plan: Plan = False,
+    plan_mode: Plan = False,
     include_map: IncludeMap = None,
 ) -> None:
     """[bold]Process a specified dataset[/bold]."""
-    from dronalize.runtime._internal.runner import open_job
-    from dronalize.runtime.api import run_job
+    from dronalize.runtime._internal.runner import open_execution_session
+    from dronalize.runtime.api import execute_plan
 
-    job = _run_cli_action(
+    plan = _run_cli_action(
         lambda: _resolve_cli_job(
             dataset=dataset,
             input_dir=input_dir,
@@ -172,35 +173,35 @@ def process(
             include_map=include_map,
             limit=limit,
             seed=seed,
-            input_dir_exists=not plan,
+            input_dir_exists=not plan_mode,
         )
     )
 
-    if plan:
+    if plan_mode:
         rprint(PLAN_NOTICE)
-        rprint(build_processing_summary_table(job))
+        rprint(build_processing_summary_table(plan))
         return
 
     if not force:
-        rprint("\n", build_processing_summary_table(job))
+        rprint("\n", build_processing_summary_table(plan))
         _ = typer.confirm("Proceed with this processing plan?", abort=True)
 
     if not progress:
-        _ = _run_cli_action(lambda: run_job(job))
+        _ = _run_cli_action(lambda: execute_plan(plan))
         return
 
     from dronalize.io.backends.registry import build_writer_factory
     from dronalize.runtime.cli.progress import run_with_rich_progress
 
-    with open_job(job) as run:
+    with open_execution_session(plan) as run:
         run_with_rich_progress(
             run.executor,
             lambda: _run_cli_action(
-                lambda: run.executor.execute(writer_factory=build_writer_factory(job))
+                lambda: run.executor.execute(writer_factory=build_writer_factory(plan))
             ),
             enable=True,
         )
-        job.write_manifests()
+        plan.write_manifests()
 
 
 @app.command()
@@ -333,11 +334,11 @@ def _resolve_cli_job(
     limit: int | None = None,
     seed: int | None = None,
     input_dir_exists: bool = True,
-) -> RunPlan:
-    from dronalize.runtime import ProcessRequest, resolve_job
+) -> ExecutionPlan:
+    from dronalize.runtime import ExecutionRequest, resolve_request
 
-    return resolve_job(
-        ProcessRequest(
+    return resolve_request(
+        ExecutionRequest(
             dataset=dataset,
             input_dir=input_dir,
             output_dir=output_dir,

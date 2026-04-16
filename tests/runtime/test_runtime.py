@@ -6,7 +6,7 @@ import pytest
 
 from dronalize.core.errors import DatasetNotFoundError, UnsupportedStorageBackendError
 from dronalize.io import StorageBackend, read_manifest
-from dronalize.runtime import ProcessRequest, process_dataset, resolve_job
+from dronalize.runtime import ExecutionRequest, execute_request, resolve_request
 from tests.support import DemoOptions, demo_descriptor
 
 if TYPE_CHECKING:
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from dronalize.datasets import DatasetSpec
 
 
-def _request(tmp_path: Path, **kwargs: object) -> ProcessRequest:
+def _request(tmp_path: Path, **kwargs: object) -> ExecutionRequest:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
     input_dir.mkdir()
@@ -26,7 +26,7 @@ def _request(tmp_path: Path, **kwargs: object) -> ProcessRequest:
         "storage_backend": StorageBackend.NULL,
     }
     base.update(cast("dict[str, str | Path | StorageBackend | bool]", kwargs))
-    return ProcessRequest.model_validate(base)
+    return ExecutionRequest.model_validate(base)
 
 
 def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -43,15 +43,15 @@ def test_resolve_job_compiles_runtime_and_loader_requests(
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
 
-    job = resolve_job(_request(tmp_path, include_map=False))
+    plan = resolve_request(_request(tmp_path, include_map=False))
 
-    assert job.dataset == "demo"
-    assert job.storage_backend == StorageBackend.NULL
-    dataset_options = cast("DemoOptions", job.loader.dataset)
+    assert plan.dataset == "demo"
+    assert plan.storage_backend == StorageBackend.NULL
+    dataset_options = cast("DemoOptions", plan.loader.dataset)
     assert dataset_options.batch_size == 2
-    assert job.map is None
-    assert job.effective_history_frames == 2
-    assert job.effective_future_frames == 1
+    assert plan.map is None
+    assert plan.effective_history_frames == 2
+    assert plan.effective_future_frames == 1
 
 
 def test_resolve_job_rejects_unknown_storage_backend(
@@ -60,14 +60,14 @@ def test_resolve_job_rejects_unknown_storage_backend(
     _patch_get_demo_descriptor(monkeypatch)
 
     with pytest.raises(UnsupportedStorageBackendError, match="Unsupported storage backend"):
-        _ = resolve_job(_request(tmp_path, storage_backend="bad-backend"))
+        _ = resolve_request(_request(tmp_path, storage_backend="bad-backend"))
 
 
 def test_process_dataset_surfaces_unknown_dataset_errors(tmp_path: Path) -> None:
     request = _request(tmp_path, dataset="this-dataset-does-not-exist")
 
     with pytest.raises(DatasetNotFoundError):
-        _ = process_dataset(request)
+        _ = execute_request(request)
 
 
 def test_run_job_executes_and_writes_manifest(
@@ -76,7 +76,7 @@ def test_run_job_executes_and_writes_manifest(
     _patch_get_demo_descriptor(monkeypatch)
 
     request = _request(tmp_path)
-    result = process_dataset(request)
+    result = execute_request(request)
 
     assert result.dataset == "demo"
     assert result.storage_backend == StorageBackend.NULL

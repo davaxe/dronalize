@@ -47,9 +47,11 @@ __all__ = [
 ]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
+    "IterableTorchSceneDataset": ("dronalize.io.adapters.torch", "IterableTorchSceneDataset"),
     "TorchSceneDataset": ("dronalize.io.adapters.torch", "TorchSceneDataset"),
     "TorchSceneRecord": ("dronalize.io.adapters.torch", "TorchSceneRecord"),
     "HeteroSceneDataset": ("dronalize.io.adapters.pyg", "HeteroSceneDataset"),
+    "IterableHeteroSceneDataset": ("dronalize.io.adapters.pyg", "IterableHeteroSceneDataset"),
     "collate_hetero_with_time_padding": (
         "dronalize.io.adapters.pyg",
         "collate_hetero_with_time_padding",

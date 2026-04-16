@@ -3,7 +3,12 @@
 ## Import guide
 
 ```python
-from dronalize.io import DatasetManifest, SceneRecord, read_manifest
+from dronalize.io import (
+    DatasetManifest,
+    SceneRecord,
+    read_manifest,
+    write_manifest,
+)
 ```
 
 Output configuration models live under [`dronalize.config.models`][] so the
@@ -15,7 +20,7 @@ runtime and CLI share one canonical configuration surface.
 """
 
 from dronalize.io.formats import StorageBackend
-from dronalize.io.manifest import DatasetManifest, manifest_path, read_manifest
+from dronalize.io.manifest import DatasetManifest, manifest_path, read_manifest, write_manifest
 from dronalize.io.records import SceneRecord
 
 __all__ = [
@@ -24,4 +29,5 @@ __all__ = [
     "StorageBackend",
     "manifest_path",
     "read_manifest",
+    "write_manifest",
 ]

@@ -46,7 +46,7 @@ class TorchSceneRecord:
 
 
 class TorchSceneDataset(Dataset[TorchSceneRecord], Generic[ReaderT]):
-    """Iterable Torch dataset wrapper over any `SceneReader[SceneRecord]`.
+    """Map-style Torch dataset wrapper over any `DatasetReader[SceneRecord]`.
 
     The dataset yields `TorchSceneRecord` instances converted from the wrapped
     reader's canonical `SceneRecord` outputs.
@@ -101,7 +101,7 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
 
 
 class IterableTorchSceneDataset(TorchSceneDataset[ReaderT], IterableDataset[TorchSceneRecord]):
-    """Iterable Torch dataset wrapper over any `SceneReader[SceneRecord]`.
+    """Iterable Torch dataset wrapper over any `DatasetReader[SceneRecord]`.
 
     !!! tip "Iterable vs. Map-style"
         This dataset is identical to `TorchSceneDataset`, but also inherits from

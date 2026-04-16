@@ -23,6 +23,9 @@ def open_lyft_resources(
 ) -> Generator[DatasetResources, None, None]:
     """Build the shared Lyft map once per run."""
     _ = scenes
+    if map_config is None:
+        yield DatasetResources()
+        return
     with open_single_shared_map_resource(
         map_config=map_config,
         map_path=root / "semantic_map" / "semantic_map.pb",

@@ -26,43 +26,43 @@ if TYPE_CHECKING:
 
     from dronalize.config.models import MapConfig, ScenesConfig, ScreeningConfig
     from dronalize.datasets.registry import DatasetSpec
-    from dronalize.runtime.types import RunPlan
+    from dronalize.runtime.types import ExecutionPlan
 
 PLAN_NOTICE = (
     "\n[bold yellow]This is the processing plan. No changes have been made yet.[/bold yellow]"
 )
 
 
-def build_processing_summary_table(job: RunPlan) -> Table:
+def build_processing_summary_table(plan: ExecutionPlan) -> Table:
     """Build a rich table summarizing one resolved processing job."""
     table = Table(
-        title=f"Processing plan: {job.dataset}",
+        title=f"Processing plan: {plan.dataset}",
         show_header=False,
         box=box.MINIMAL_DOUBLE_HEAD,
         title_justify="left",
     )
     table.add_column(style="bright_cyan", justify="left", no_wrap=True)
     table.add_column(style="bright_magenta")
-    for label, value in summarize_job(job):
+    for label, value in summarize_job(plan):
         table.add_row(label, value)
     return table
 
 
-def summarize_job(job: RunPlan) -> tuple[tuple[str, str], ...]:
+def summarize_job(plan: ExecutionPlan) -> tuple[tuple[str, str], ...]:
     """Return label/value rows for a resolved job summary."""
-    output_config = job.output.inner
+    output_config = plan.output.inner
     return (
-        ("Dataset", job.dataset),
-        ("Input", str(job.data_root)),
-        ("Output", str(job.output_dir)),
-        ("Backend", job.storage_backend.value),
-        ("Workers", str(job.runtime.jobs)),
-        ("Limit", "none" if job.limit is None else str(job.limit)),
+        ("Dataset", plan.dataset),
+        ("Input", str(plan.data_root)),
+        ("Output", str(plan.output_dir)),
+        ("Backend", plan.storage_backend.value),
+        ("Workers", str(plan.runtime.jobs)),
+        ("Limit", "none" if plan.limit is None else str(plan.limit)),
         ("Schema", get_trajectory_schema(output_config.trajectory_schema).name),
-        ("Map", "yes" if job.map is not None else "no"),
-        ("Split strategy", _run_plan_split_strategy(job)),
-        ("Split details", _split_detail(job)),
-        ("Options", _format_options(job.loader.dataset)),
+        ("Map", "yes" if plan.map is not None else "no"),
+        ("Split strategy", _run_plan_split_strategy(plan)),
+        ("Split details", _split_detail(plan)),
+        ("Options", _format_options(plan.loader.dataset)),
     )
 
 
@@ -178,12 +178,12 @@ def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     return (summary,)
 
 
-def _split_detail(job: RunPlan) -> str:
-    split = job.loader.split
+def _split_detail(plan: ExecutionPlan) -> str:
+    split = plan.loader.split
     if split is None or split.strategy == "none":
         return "all data"
     if split.strategy == "native":
-        selected = split.read or job.descriptor.native_splits
+        selected = split.read or plan.descriptor.native_splits
         return ", ".join(s.value for s in selected) if selected else "all native splits"
     if split.strategy in {"scene", "source"}:
         return ", ".join(f"{s.value}={w:.2f}" for s, w in split.active())
@@ -296,8 +296,8 @@ def _loader_option_rows(descriptor: DatasetSpec) -> list[tuple[str, str]]:
     return rows
 
 
-def _run_plan_split_strategy(job: RunPlan) -> str:
-    split = job.loader.split
+def _run_plan_split_strategy(plan: ExecutionPlan) -> str:
+    split = plan.loader.split
     return "none" if split is None else str(split.strategy)
 
 

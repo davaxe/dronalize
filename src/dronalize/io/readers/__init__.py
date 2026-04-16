@@ -7,7 +7,7 @@ storage-agnostic in-memory representations of scene records.
 ## Import guide
 
 ```python
-from dronalize.io.readers import MDSReader, MDSReaderInitArgs, PickleReader, SceneReader
+from dronalize.io.readers import DatasetReader, MDSReader, MDSReaderInitArgs, PickleReader
 ```
 
 ## Related modules
@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 __all__ = ["DatasetReader", "MDSReader", "MDSReaderInitArgs", "PickleReader"]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "SceneReader": ("dronalize.io.readers.base", "SceneReader"),
+    "DatasetReader": ("dronalize.io.base", "DatasetReader"),
     "MDSReader": ("dronalize.io.readers.mds", "MDSReader"),
     "MDSReaderInitArgs": ("dronalize.io.readers.mds", "MDSReaderInitArgs"),
     "PickleReader": ("dronalize.io.readers.pickle", "PickleReader"),

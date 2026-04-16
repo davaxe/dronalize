@@ -87,50 +87,50 @@ nav = [
 
 
   { "API reference" = [
-    "reference/api/index.md",
-    { "dronalize.core" = [
+    { Overview = "reference/api/index.md" },
+    { "Core types" = [
       "reference/api/core/index.md",
-      { "Categories and splits" = "reference/api/core/categories-and-splits.md" },
+      { Enums = "reference/api/core/categories-and-splits.md" },
       { "Scene models and schemas" = "reference/api/core/scene.md" },
       { "Map graphs" = "reference/api/core/maps.md" },
     ] },
-    { "dronalize.config" = [
+    { Configuration = [
       "reference/api/config/index.md",
       { "Project configuration" = "reference/api/config/project.md" },
-      { "Configuration models" = [
-        "reference/api/config/models/index.md",
-        { "Runtime" = "reference/api/config/models/runtime.md" },
-        { "Scene" = "reference/api/config/models/scene.md" },
-        { "Screening" = "reference/api/config/models/screening.md" },
-        { "Map" = "reference/api/config/models/map.md" },
-        { "Output" = "reference/api/config/models/output.md" },
-        { "Split" = "reference/api/config/models/split.md" },
-      ] },
+      { "Dataset models" = "reference/api/config/models/dataset.md" },
+      { "Scene models" = "reference/api/config/models/scene.md" },
+      { "Screening models" = "reference/api/config/models/screening.md" },
+      { "Map models" = "reference/api/config/models/map.md" },
+      { "Output models" = "reference/api/config/models/output.md" },
+      { "Split models" = "reference/api/config/models/split.md" },
+      { "Runtime models" = "reference/api/config/models/runtime.md" },
     ] },
-    { "dronalize.datasets" = [
+    { Datasets = [
       "reference/api/datasets/index.md",
       { "Registry operations" = "reference/api/datasets/registry.md" },
       { "Dataset specs and capabilities" = "reference/api/datasets/descriptors.md" },
     ] },
-    { "dronalize.runtime" = [
+    { Runtime = [
       "reference/api/runtime/index.md",
-      { "Planning and runs" = "reference/api/runtime/planning-and-runs.md" },
-      { "Executor internals" = "reference/api/runtime/executor.md" },
+      { "Requests, plans, and results" = "reference/api/runtime/planning-and-runs.md" },
+      { "Execution functions" = "reference/api/runtime/executor.md" },
     ] },
-    { "dronalize.io" = [
-      "reference/api/io/index.md",
-      { Readers = "reference/api/io/readers.md" },
-      { "PyTorch adapters" = "reference/api/io/adapters.md" },
-    ] },
-    { "dronalize.processing" = [
+    { Processing = [
       "reference/api/processing/index.md",
       { Screening = "reference/api/processing/screening.md" },
       { Pipeline = "reference/api/processing/pipeline.md" },
-      { Maps = "reference/api/processing/maps.md" },
+      { "Map processing" = "reference/api/processing/maps.md" },
       { "Loader extension API" = "reference/api/processing/loading.md" },
     ] },
-
-    { "dronalize.plot" = [
+    { "I/O" = [
+      "reference/api/io/index.md",
+      { "Storage and manifests" = "reference/api/io/storage-and-manifests.md" },
+      { Readers = "reference/api/io/readers.md" },
+      { "Framework adapters" = "reference/api/io/adapters.md" },
+      { "Backend extension API" = "reference/api/io/backends.md" },
+      { "Encoding helpers" = "reference/api/io/encoding.md" },
+    ] },
+    { Plotting = [
       "reference/api/plot/index.md",
     ] },
   ] },

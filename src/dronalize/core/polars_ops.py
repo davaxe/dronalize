@@ -94,7 +94,9 @@ def derivative(
 
         current_exprs = next_order_exprs
 
-    return data.with_columns(all_expressions)
+    # null values means that only there is non enough data to compute the
+    # derivative, so we can safely fill them with 0.0
+    return data.with_columns(all_expressions).fill_null(0.0)
 
 
 def normalize_group_by(group_by: str | Sequence[str] | None) -> tuple[str, ...]:

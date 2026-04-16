@@ -4,14 +4,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
+from pydantic import BaseModel, ConfigDict, Field
 
 from dronalize.config.models import MapConfig, effective_scene_window
+from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
+from dronalize.io.formats import StorageBackend
 from dronalize.io.manifest import DatasetManifest, write_manifest
 from dronalize.processing.models import LoaderRequest, SplitRequest
 
@@ -25,12 +29,10 @@ if TYPE_CHECKING:
         RuntimeConfig,
     )
     from dronalize.datasets.registry import DatasetSpec
-    from dronalize.io.formats import StorageBackend
-    from dronalize.runtime.request import PlanningRequest
 
 
 @dataclass(frozen=True, slots=True)
-class ProcessResult:
+class ExecutionResult:
     """Final result of a processing run."""
 
     dataset: str
@@ -70,15 +72,19 @@ class OutputPlan:
 
 
 @dataclass(frozen=True, slots=True)
-class RunPlan:
+class ExecutionPlan:
     """Initial compiled runtime plan.
 
-    This is intentionally transitional: the full resolved config can still be
-    attached while the runtime is migrated toward narrower subsystem plans.
+    !!! info "Do not construct this directly"
+        This is not meant to be directly constructed. Instead, it should be
+        built using the
+        [`resolve_request`][dronalize.runtime.api.resolve_request] function,
+        which takes [`ExecutionRequest`][dronalize.runtime.ExecutionRequest] and
+        produces a fully resolved plan ready for execution.
+
     """
 
     descriptor: DatasetSpec
-    planning: PlanningRequest
     data_root: Path
     output_dir: Path
     storage_backend: StorageBackend
@@ -169,6 +175,23 @@ def compile_loader_request(
         map=map_config,
         native_splits=descriptor.native_splits or None,
     )
+
+
+class ExecutionRequest(BaseModel):
+    """Normalized user request for one dataset processing job."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    dataset: str
+    input_dir: Path
+    output_dir: Path
+    storage_backend: StorageBackend | str = StorageBackend.PICKLE
+    config_path: Path | None = None
+    overrides: RuntimeOverride = Field(default_factory=RuntimeOverride)
+    include_map: bool | None = None
+    limit: int | None = None
+    seed: int | None = None
+    input_dir_exists: bool = True
 
 
 def compile_effective_scene_metrics(config: DatasetConfig) -> tuple[int, int, float]:
