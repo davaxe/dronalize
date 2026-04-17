@@ -52,15 +52,10 @@ dronalize split-support eth
 ## Expected structure
 
 ```text
-ethucy/
-├── eth/
-│   ├── train/
-│   ├── val/
-│   └── test/
-├── hotel/
-├── univ/
-├── zara1/
-└── zara2/
+eth/
+├── train/
+├── val/
+└── test/
 ```
 
 ## Notes

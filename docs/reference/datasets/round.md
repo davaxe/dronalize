@@ -59,7 +59,7 @@ dronalize split-support round
 ## Expected structure
 
 ```text
-rounD/
+round/
 ├── data/
 │   ├── 01_recordingMeta.csv
 │   ├── 01_tracks.csv

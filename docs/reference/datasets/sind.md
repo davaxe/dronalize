@@ -52,14 +52,27 @@ dronalize split-support sind
 ## Expected structure
 
 ```text
-SIND/
-├── data/
+sind/
+├── Chanchun/
+│   ├── changchun_pudong_507_009/
+│   ├── changchun_pudong_507_010/
+│   ├── ...
+│   └── Chanchun_Pudom.osm
+├── Chongqing/
 │   ├── 6_22_NR_1/
 │   ├── 6_22_NR_2/
 │   ├── ...
-│   └── xian_415_n5/
-└── maps/
-    ├── Changchun_Pudong.osm
-    ├── map_relink_law_save.osm
-    └── ...
+│   └── NR_ll2.osm
+├── Tianjin/
+│   ├── 7_28_1/
+│   ├── 8_2_1/
+│   ├── ...
+│   └── map_relink_law_save.osm
+└── Xi'an/
+    ├── xian_412_m1/
+    ├── xian_412_m2/
+    ├── ...
+    └── Xi'an_Shanglin.osm
+
+
 ```

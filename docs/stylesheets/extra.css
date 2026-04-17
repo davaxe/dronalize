@@ -17,6 +17,10 @@
     display: none;
 }
 
+.md-typeset h2 {
+    border-bottom: 1px var(--md-default-fg-color--lightest) solid;
+}
+
 .md-header__title,
 .md-header__button,
 .md-tabs__item,

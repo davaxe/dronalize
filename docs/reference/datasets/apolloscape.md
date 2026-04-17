@@ -52,7 +52,7 @@ dronalize split-support apolloscape
 ## Expected structure
 
 ```text
-apollo/
+apolloscape/
 ├── prediction_train/
 │   ├── result_9048_1.frame.txt
 │   ├── result_9048_3.frame.txt

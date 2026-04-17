@@ -60,7 +60,7 @@ dronalize split-support exid
 ## Expected structure
 
 ```text
-exiD/
+exid/
 ├── data/
 │   ├── 01_recordingMeta.csv
 │   ├── 01_tracks.csv

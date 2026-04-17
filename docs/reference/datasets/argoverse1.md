@@ -52,7 +52,7 @@ dronalize split-support argoverse1
 ## Expected structure
 
 ```text
-argoverse/
+argoverse1/
 ├── forecasting_train_v1.1/
 │   └── train/
 │       └── data/

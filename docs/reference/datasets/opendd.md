@@ -52,7 +52,7 @@ dronalize split-support opendd
 ## Expected structure
 
 ```text
-openDD/
+opendd/
 ├── opendd_v3-rdb1/
 │   ├── rdb1/
 │   │   └── map_rdb1/

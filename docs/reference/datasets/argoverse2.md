@@ -59,7 +59,7 @@ dronalize split-support argoverse2
 ## Expected structure
 
 ```text
-av2/
+argoverse2/
 ├── train/
 │   ├── ...
 │   └── ffffe3df-8d26-42c3-9e7a-59de044736a0/

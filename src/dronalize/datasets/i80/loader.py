@@ -61,8 +61,8 @@ class I80Loader(BaseSceneLoader):
             pl.scan_csv(source.data).select(
                 pl.col("Vehicle_ID").alias("id"),
                 pl.col("Frame_ID").alias("frame"),
-                pl.col("Local_X").alias("x"),
-                pl.col("Local_Y").alias("y"),
+                pl.col("Local_X").alias("x").mul(0.3048),
+                pl.col("Local_Y").alias("y").mul(0.3048),
                 pl
                 .col("v_Class")
                 .replace_strict({

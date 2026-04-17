@@ -52,9 +52,8 @@ dronalize split-support hotel
 ## Expected structure
 
 ```text
-ethucy/
-└── hotel/
-    ├── train/
-    ├── val/
-    └── test/
+hotel/
+├── train/
+├── val/
+└── test/
 ```

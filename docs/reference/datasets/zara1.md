@@ -52,9 +52,8 @@ dronalize split-support zara1
 ## Expected structure
 
 ```text
-ethucy/
-└── zara1/
-    ├── train/
-    ├── val/
-    └── test/
+zara1/
+├── train/
+├── val/
+└── test/
 ```

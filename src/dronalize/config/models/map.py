@@ -11,7 +11,7 @@ class SceneExtentExtraction(FullConfig):
     """Configuration for extraction around the scene trajectory extent."""
 
     mode: Literal["scene_extent"] = Field("scene_extent", repr=False, init=False)
-    padding: float = Field(gt=1.0, default=1.15)
+    padding: float = Field(gt=1.0, default=1.05)
 
 
 class CircularExtraction(FullConfig):
@@ -44,8 +44,8 @@ MapExtraction = Annotated[
 class MapConfig(FullConfig):
     """Configuration for map data processing."""
 
-    min_distance: float | None = Field(gt=0, default=1.75)
-    interp_distance: float | None = Field(gt=0, default=3.0)
+    min_distance: float | None = Field(gt=0, default=1.5)
+    interp_distance: float | None = Field(gt=0, default=4.0)
     extraction: MapExtraction = Field(default_factory=FullMapExtraction)
 
     @model_validator(mode="after")

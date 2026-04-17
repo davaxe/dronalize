@@ -50,11 +50,21 @@ class A43Loader(BaseSceneLoader):
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
+        dt = 0.1
+        eps = 1e-9
         yield LoadedSourceData(
-            pl.scan_csv(source.data).select(
+            pl
+            .scan_csv(source.data)
+            .with_columns(t0=pl.col("tseconds").min())
+            .with_columns(
+                frame=(
+                    (((pl.col("tseconds") - pl.col("t0")) / dt) + 0.5 + eps).floor().cast(pl.Int64)
+                )
+            )
+            .select(
                 pl.col("ID").alias("id"),
-                pl.col("tseconds").round(1).rank("dense").sub(1).alias("frame").cast(pl.Int64),
-                *("x", "y", "vy", "vx", "ax", "ay"),
+                pl.col("frame"),
+                *[pl.col(c) for c in ("x", "y", "vy", "vx", "ax", "ay")],
                 pl
                 .col("VehicleCategory")
                 .replace_strict({

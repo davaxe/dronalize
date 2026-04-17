@@ -52,9 +52,8 @@ dronalize split-support univ
 ## Expected structure
 
 ```text
-ethucy/
-└── univ/
-    ├── train/
-    ├── val/
-    └── test/
+univ/
+├── train/
+├── val/
+└── test/
 ```

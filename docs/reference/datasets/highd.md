@@ -60,7 +60,7 @@ dronalize split-support highd
 ## Expected structure
 
 ```text
-highD/
+highd/
 └── data/
     ├── 01_recordingMeta.csv
     ├── 01_tracks.csv

@@ -59,7 +59,7 @@ dronalize split-support unid
 ## Expected structure
 
 ```text
-uniD/
+unid/
 ├── data/
 │   ├── 01_recordingMeta.csv
 │   ├── 01_tracks.csv

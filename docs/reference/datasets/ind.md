@@ -59,7 +59,7 @@ dronalize split-support ind
 ## Expected structure
 
 ```text
-inD/
+ind/
 ├── data/
 │   ├── 01_recordingMeta.csv
 │   ├── 01_tracks.csv

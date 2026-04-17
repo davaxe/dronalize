@@ -7,7 +7,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from dronalize.plot import plot_trajectories, plot_trajectories_on_map
+from dronalize.plot import plot_scene
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -82,6 +82,11 @@ def assert_basic_scene_sanity(scene: Scene) -> None:
         assert float(x_span) > 0.0 or float(y_span) > 0.0, (
             "degenerate scene with zero coordinate span"
         )
+
+    duplicate_frames = (
+        frame.group_by("id", "frame").agg(count=pl.count()).filter(pl.col("count") > 1)
+    )
+    assert duplicate_frames.is_empty(), "found duplicate frames for some agents"
 
 
 def assert_basic_map_sanity(graph: MapGraph | None, *, expect_map: bool) -> None:
@@ -214,20 +219,18 @@ def save_scene_artifacts(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     frame = scene.frame.select("frame", "id", "x", "y")
-    _ = plot_trajectories(
-        frame,
-        group_by="id",
-        title="trajectories (scene {scene.scene_number})",
+    _ = plot_scene(
+        scene,
+        show_map=False,
         save_path=out_dir / "trajectories.html",
+        aspect="equal",
     )
 
     if graph is not None and (graph.num_nodes > 0 or graph.num_edges > 0):
-        _ = plot_trajectories_on_map(
-            frame,
-            graph=graph,
-            group_by="id",
-            title="overlay (scene {scene.scene_number})",
+        _ = plot_scene(
+            scene,
             save_path=out_dir / "overlay.html",
+            aspect="equal",
         )
 
     summary_frame = frame.select(

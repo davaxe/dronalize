@@ -1,28 +1,24 @@
-"""Optional plotting helpers for trajectory and map inspection.
+"""Optional plotting helpers for scene inspection.
 
 ## Import guide
 
 ```python
-from dronalize.plot import plot_map_graph, plot_trajectories, plot_trajectories_on_map
+from dronalize.plot import plot_scene
 ```
 
 Plotting helpers are loaded lazily so importing `dronalize.plot` does not pull
-in optional visualization dependencies until one of the plotting functions is
-used.
+in optional visualization dependencies until plotting is requested.
 
-The package exposes three focused entry points:
+The package exposes one scene-oriented entrypoint:
 
-- [`plot_trajectories`][dronalize.plot.plot_trajectories] for trajectory-only
-  inspection
-- [`plot_map_graph`][dronalize.plot.plot_map_graph] for lane-graph or road-graph
-  inspection
-- [`plot_trajectories_on_map`][dronalize.plot.plot_trajectories_on_map] for
-  combined trajectory and map overlays
+- [`plot_scene`][dronalize.plot.plot_scene] for plotting a
+  [`Scene`][dronalize.core.scene.Scene] or
+  [`SceneRecord`][dronalize.io.SceneRecord]
 
 ## Related modules
 
-- [`dronalize.core.scene`][] for scene types commonly visualized here
-- [`dronalize.core.maps`][] for map graph types consumed by map plots
+- [`dronalize.core.scene`][] for scene containers commonly visualized here
+- [`dronalize.io`][] for persisted scene-record containers also accepted here
 """
 
 from __future__ import annotations
@@ -31,16 +27,12 @@ import importlib
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dronalize.plot.map import plot_map_graph
-    from dronalize.plot.overlay import plot_trajectories_on_map
-    from dronalize.plot.trajectory import plot_trajectories
+    from dronalize.plot.scene import plot_scene
 
-__all__ = ["plot_map_graph", "plot_trajectories", "plot_trajectories_on_map"]
+__all__ = ["plot_scene"]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "plot_map_graph": ("dronalize.plot.map", "plot_map_graph"),
-    "plot_trajectories": ("dronalize.plot.trajectory", "plot_trajectories"),
-    "plot_trajectories_on_map": ("dronalize.plot.overlay", "plot_trajectories_on_map"),
+    "plot_scene": ("dronalize.plot.scene", "plot_scene"),
 }
 
 
