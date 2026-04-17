@@ -1,3 +1,5 @@
+"""Split strategy configuration models."""
+
 from __future__ import annotations
 
 from typing import Annotated, Literal
@@ -13,8 +15,11 @@ class SplitWeights(FullConfig):
     """Weights used when routing data into train/val/test splits."""
 
     train: float = Field(ge=0, default=0.0)
+    """Weight assigned to the training split."""
     val: float = Field(ge=0, default=0.0)
+    """Weight assigned to the validation split."""
     test: float = Field(ge=0, default=0.0)
+    """Weight assigned to the test split."""
 
     @model_validator(mode="after")
     def _validate_sum(self) -> SplitWeights:
@@ -31,17 +36,22 @@ class TimeSplitConfig(FullConfig):
     """Time-block split specification."""
 
     gap: int = Field(ge=0, default=0)
+    """Number of scenes to leave between adjacent temporal split partitions."""
     strategy: Literal["time"] = Field("time", repr=False, init=False)
     ratio: SplitWeights = Field(default_factory=SplitWeights)
+    """Relative train/validation/test allocation for the time-based split."""
 
 
 class ShuffledTimeSplitConfig(FullConfig):
     """Shuffled time-block split specification."""
 
     segments: int = Field(ge=1)
+    """Number of time segments created before shuffling them across splits."""
     gap: int = Field(ge=0, default=0)
+    """Number of scenes to leave between adjacent temporal split partitions."""
     strategy: Literal["shuffled-time"] = Field("shuffled-time", repr=False, init=False)
     ratio: SplitWeights = Field(default_factory=SplitWeights)
+    """Relative train/validation/test allocation for the shuffled time split."""
 
 
 class SceneSplitConfig(FullConfig):
@@ -49,6 +59,7 @@ class SceneSplitConfig(FullConfig):
 
     strategy: Literal["scene"] = Field("scene", repr=False, init=False)
     ratio: SplitWeights = Field(default_factory=SplitWeights)
+    """Relative train/validation/test allocation for random scene assignment."""
 
 
 class SourceSplitConfig(FullConfig):
@@ -56,6 +67,7 @@ class SourceSplitConfig(FullConfig):
 
     strategy: Literal["source"] = Field("source", repr=False, init=False)
     ratio: SplitWeights = Field(default_factory=SplitWeights)
+    """Relative train/validation/test allocation for source-level assignment."""
 
 
 class NativeSplitConfig(FullConfig):
@@ -67,6 +79,7 @@ class NativeSplitConfig(FullConfig):
         max_length=3,
         min_length=1,
     )
+    """Native dataset split labels to read from the source dataset."""
 
 
 class NoSplitConfig(FullConfig):
@@ -88,3 +101,6 @@ SplitConfigUnion = Annotated[
 
 class SplitConfig(RootModel[SplitConfigUnion]):
     """Split configuration wrapper model for discriminated union behavior."""
+
+    root: SplitConfigUnion
+    """Concrete split strategy configuration selected for the dataset."""

@@ -29,7 +29,7 @@ The base install already gives you:
 - the dataset registry and runtime planning API
 - the processing pipeline and built-in scene/schema types
 - the `pickle` storage backend
-- the framework-neutral `PickleReader`
+- the framework-neutral [`PickleReader`][dronalize.io.readers.PickleReader]
 
 The base install does not include the practical CLI dependencies, the MDS backend, or the optional
 Torch and PyG adapters.
@@ -39,9 +39,9 @@ Torch and PyG adapters.
 | Extra | Purpose |
 | --- | --- |
 | `cli` | Enables the Typer and Rich command-line interface. |
-| `mds` | Enables the `mds` writer backend and `MDSReader`. |
-| `torch` | Enables Torch-based dataset adapters such as `TorchSceneDataset`. |
-| `pyg` | Enables PyTorch Geometric adapters such as `HeteroSceneDataset`. |
+| `mds` | Enables the `mds` writer backend and [`MDSReader`][dronalize.io.readers.MDSReader]. |
+| `torch` | Enables Torch-based dataset adapters such as [`TorchSceneDataset`][dronalize.io.adapters.TorchSceneDataset]. |
+| `pyg` | Enables PyTorch Geometric adapters such as [`HeteroSceneDataset`][dronalize.io.adapters.HeteroSceneDataset]. |
 | `plot` | Installs Altair-based plotting helpers. |
 | `lyft`, `waymo`, `ad4che` | Add dataset-specific optional dependencies. |
 | `all_datasets` | Convenience extra for all dataset-specific extras. |
@@ -50,10 +50,10 @@ Torch and PyG adapters.
 
 | Surface | Extra |
 | --- | --- |
-| `dronalize.io.readers.PickleReader` | none |
-| `dronalize.io.readers.MDSReader` | `mds` |
-| `dronalize.io.adapters.TorchSceneDataset` | `torch` |
-| `dronalize.io.adapters.HeteroSceneDataset` | `pyg` |
+| [`dronalize.io.readers.PickleReader`][dronalize.io.readers.PickleReader] | none |
+| [`dronalize.io.readers.MDSReader`][dronalize.io.readers.MDSReader] | `mds` |
+| [`dronalize.io.adapters.TorchSceneDataset`][dronalize.io.adapters.TorchSceneDataset] | `torch` |
+| [`dronalize.io.adapters.HeteroSceneDataset`][dronalize.io.adapters.HeteroSceneDataset] | `pyg` |
 
 ## Dataset extras
 

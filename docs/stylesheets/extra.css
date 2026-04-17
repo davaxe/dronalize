@@ -223,7 +223,7 @@
 
 .hero {
     text-align: center;
-    padding: 2rem 1rem 1.1rem;
+    padding: 3rem 1rem 0.5rem;
 }
 
 .hero__image {
@@ -233,17 +233,39 @@
 }
 
 .hero__eyebrow {
-    margin: 1rem 0 0;
-    font-size: 0.72rem;
+    margin: 0.7rem 0 0;
+    font-size: 0.86rem;
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--md-default-fg-color--light);
 }
 
-.hero__title {
-    margin: 0.7rem 0 0;
-    font-size: 1.5rem;
-    line-height: 1.1;
-    color: hsla(var(--md-hue), 0%, 100%, 1);
+.hero__badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.3rem;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    padding-bottom: 1rem;
+    list-style: none;
+    border-bottom: 2px solid var(--md-typeset-table-color);
+}
+
+.hero__badge {
+    display: inline-flex;
+    align-items: center;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.hero__badge:hover {
+    transform: translateY(-1px);
+    opacity: 0.92;
+}
+
+.hero__badge img {
+    display: block;
+    height: 0.9rem;
+    box-shadow: var(--md-shadow-z1);
 }

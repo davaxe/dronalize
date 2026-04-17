@@ -8,7 +8,7 @@ from dronalize.config.models import (
     MapConfig,
     ScenesConfig,
 )
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.round.loader import RounDLoader
 from dronalize.datasets.round.maps.builder import RounDMapBuilder
 from dronalize.datasets.shared.resources import open_named_shared_map_resources
@@ -60,4 +60,5 @@ DATASET_SPEC = DatasetSpec(
     native_schema=RounDLoader.native_trajectory_schema(),
     resources_factory=open_round_resources,
     has_map=True,
+    split_support=DatasetSplitSupport(scene=True, source=True),
 )

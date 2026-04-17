@@ -20,5 +20,7 @@ class DatasetResources:
 
     shared_maps: dict[MapKey, str] | str | None = None
 
-
-EMPTY_DATASET_RESOURCES = DatasetResources()
+    @classmethod
+    def empty(cls) -> DatasetResources:
+        """Create an empty DatasetResources instance."""
+        return cls()

@@ -1,14 +1,15 @@
 # Manifest
 
 <div class="section-intro" markdown="1">
-The manifest is the stable metadata contract for a processed dataset. It records how scenes were
+The manifest is the stable human readable metadata contract for a processed dataset. It records how scenes were
 produced so downstream readers can interpret feature tensors correctly without inspecting scene
 files directly.
 </div>
 
 ## Location
 
-`dronalize` writes one `manifest.json` at the output root directory.
+`dronalize` writes one `manifest.json` at the output root directory. The parsed
+Python representation is [`DatasetManifest`][dronalize.io.DatasetManifest].
 
 Typical layout:
 
@@ -51,8 +52,6 @@ The manifest enables robust downstream loading by making key assumptions explici
 - numeric and coordinate conventions are known (`precision`, `recenter_positions`)
 - map availability is explicit (`has_map`)
 
-This keeps training and evaluation pipelines reproducible across environments and over time.
-
 ## Read it programmatically
 
 ```python
@@ -65,3 +64,5 @@ print(manifest.trajectory_schema)
 print(manifest.feature_columns)
 print(manifest.history_frames, manifest.future_frames)
 ```
+
+See [`read_manifest()`][dronalize.io.read_manifest] for the full reader API.

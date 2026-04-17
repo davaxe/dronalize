@@ -1,6 +1,6 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.ad4che.loader import AD4CHELoader
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import (
     lane_change_sampling,
     minimum_samples_screening,
@@ -24,5 +24,6 @@ DATASET_SPEC = DatasetSpec(
         screening=minimum_samples_screening(4),
     ),
     native_schema=AD4CHELoader.native_trajectory_schema(),
+    split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
     has_map=True,
 )

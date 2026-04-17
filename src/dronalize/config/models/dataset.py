@@ -1,3 +1,5 @@
+"""Full dataset configuration models."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -21,12 +23,19 @@ class DatasetConfig(FullConfig):
     """Full dataset/profile-style configuration schema."""
 
     scenes: ScenesConfig
+    """Scene construction and temporal sampling settings."""
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
+    """Runtime execution settings such as worker count and chunk size."""
     screening: ScreeningConfig | None = Field(default=None)
+    """Optional screening rules applied before scenes are emitted."""
     output: OutputConfig = Field(default_factory=OutputConfig)
+    """Output encoding, schema, and backend-specific writer settings."""
     map: MapConfig = Field(default_factory=MapConfig)
+    """Map extraction and interpolation settings for generated scenes."""
     split: SplitConfig = Field(default_factory=lambda: SplitConfig(NoSplitConfig()))
+    """Dataset split strategy applied when routing scenes into partitions."""
     dataset: dict[str, Any] | None = Field(default=None)
+    """Dataset-specific loader options forwarded to the selected dataset plugin."""
 
 
 class PartialDatasetConfigBase(ConfigBase):
@@ -35,13 +44,20 @@ class PartialDatasetConfigBase(ConfigBase):
     This base is reused by authored dataset entries and profile fragments.
     """
 
-    scenes: PartialScenesConfig | None = None
-    runtime: PartialRuntimeConfig | None = None
-    screening: PartialScreeningConfig | None = None
-    output: PartialOutputConfig | None = None
-    map: PartialMapConfig | None = None
-    split: SplitConfig | None = None
-    dataset: dict[str, Any] | None = None
+    scenes: PartialScenesConfig | None = Field(default=None)
+    """Partial scene construction overrides to merge into the target config."""
+    runtime: PartialRuntimeConfig | None = Field(default=None)
+    """Partial runtime execution overrides to merge into the target config."""
+    screening: PartialScreeningConfig | None = Field(default=None)
+    """Partial screening rule overrides to merge into the target config."""
+    output: PartialOutputConfig | None = Field(default=None)
+    """Partial output writer overrides to merge into the target config."""
+    map: PartialMapConfig | None = Field(default=None)
+    """Partial map extraction overrides to merge into the target config."""
+    split: SplitConfig | None = Field(default=None)
+    """Replacement split strategy for the target dataset config."""
+    dataset: dict[str, Any] | None = Field(default=None)
+    """Dataset-specific loader option overrides for the target config."""
 
 
 class PartialDatasetConfig(PartialDatasetConfigBase, PartialConfig[DatasetConfig]):

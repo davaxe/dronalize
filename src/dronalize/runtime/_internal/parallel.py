@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.typing import P
     from dronalize.io.base import DatasetWriter
-    from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
+    from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
     from dronalize.processing.loading.loader import Source
     from dronalize.runtime._internal.scene import SceneBuilder
 
@@ -45,7 +45,7 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         if workers is not None and workers <= 1:
             msg = "number of processes must be greater than 1 for parallel execution."
             raise ValueError(msg)
-        self._loader: BaseSceneLoader[SourceT, LoaderOptions] = loader
+        self._loader: BaseSceneLoader[SourceT, DatasetOptionsModel] = loader
         self._builder: SceneBuilder = builder
         self._sources: Iterable[Source[SourceT]] = sources
         self._shared: state.SharedResources = state.SharedResources.create(scene_limit=limit)
@@ -187,7 +187,7 @@ def _init_worker(shared: state.SharedResources, *, with_finalize: bool = True) -
 
 def _init_write_worker(
     shared: state.SharedResources,
-    loader: BaseSceneLoader[Any, LoaderOptions],
+    loader: BaseSceneLoader[Any, DatasetOptionsModel],
     builder: SceneBuilder,
     writer_factory: Callable[[int], DatasetWriter],
     finalize: Callable[[DatasetWriter], None] | None,

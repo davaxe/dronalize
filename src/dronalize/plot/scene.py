@@ -11,18 +11,27 @@ import polars as pl
 
 from dronalize.core.categories import AgentCategory, EdgeType
 from dronalize.core.maps import MapGraph
-from dronalize.core.optional import require_optional
+from dronalize.core.optional import raise_missing_optional_dependency
 from dronalize.core.scene import Scene
+
+try:
+    import altair as alt
+except ModuleNotFoundError as error:
+    raise_missing_optional_dependency(error, feature="Scene plotting", extra="plot")
 
 if TYPE_CHECKING:
     from pathlib import Path
     from types import ModuleType
 
-    import altair as alt
-
     from dronalize.io import SceneRecord
 
 AspectMode = Literal["auto", "equal"]
+"""Aspect-ratio modes supported by [`plot_scene`][dronalize.plot.plot_scene].
+
+`"auto"` uses the default plotting dimensions unless explicit dimensions are
+supplied, while `"equal"` computes plot bounds so one data unit in x matches
+one data unit in y.
+"""
 
 _DEFAULT_WIDTH: Final[int] = 800
 _DEFAULT_HEIGHT: Final[int] = 450
@@ -51,14 +60,48 @@ def plot_scene(
     max_agents: int | None = None,
     agent_sample_seed: int | None = None,
     include_map_nodes: bool = False,
-    disable_max_rows: bool = True,
     save_path: Path | str | None = None,
 ) -> alt.Chart | alt.LayerChart:
-    """Plot one scene or scene record using Altair."""
-    alt = require_optional("altair", extra="plot")
+    """Plot one scene or scene record using Altair.
 
-    if disable_max_rows:
-        alt.data_transformers.disable_max_rows()
+    Parameters
+    ----------
+    data : Scene or SceneRecord
+        The scene or scene record to plot.
+    show_map : bool, optional
+        Whether to include the map graph in the plot regardess of map data
+        presence. Defaults to `True`.
+    aspect : AspectMode, optional
+        Aspect ratio mode for the plot. `"auto"` (default) automatically adjusts
+        the aspect ratio based on data bounds, while `"equal" forces a 1:1
+        aspect ratio regardless of data. Ignored if both width and height are
+        specified.
+    width : int, optional
+        Width of the plot in pixels. If `None`, width is determined by aspect
+        mode.
+    height : int, optional
+        Height of the plot in pixels. If `None`, height is determined by aspect
+        mode.
+    max_agents : int, optional
+        Maximum number of unique agents to plot. If the scene contains more than
+        this number, a random sample of agents will be plotted. If `None`
+        (default) all agents will be plotted.
+    agent_sample_seed : int, optional
+        Random seed for reproducible agent sampling when `max_agents` is set.
+    include_map_nodes : bool, optional
+        Whether to include node markers when plotting the map graph. Defaults to
+        `False`.
+    save_path : Path or str, optional
+        Path to save the plot (json, html, png, etc.). If `None` (default), the
+        plot is not saved to disk.
+
+    Returns
+    -------
+    alt.Chart or alt.LayerChart
+        An Altair chart object representing the plotted scene, that can be
+        further customized or saved by the caller.
+    """
+    _ = alt.data_transformers.enable("vegafusion")  # pyright: ignore[reportUnknownVariableType]
 
     normalized = _normalize_plot_input(
         data,

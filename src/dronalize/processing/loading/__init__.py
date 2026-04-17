@@ -2,11 +2,9 @@
 
 from dronalize.processing.loading.base import (
     BaseSceneLoader,
-    LoaderOptions,
-    LoaderSplitCapabilities,
+    DatasetOptionsModel,
 )
 from dronalize.processing.loading.loader import (
-    BlockSplitSupport,
     LoadedSourceData,
     MapBinding,
     PreparedSceneData,
@@ -16,11 +14,9 @@ from dronalize.processing.loading.resources import DatasetResources
 
 __all__ = [
     "BaseSceneLoader",
-    "BlockSplitSupport",
+    "DatasetOptionsModel",
     "DatasetResources",
     "LoadedSourceData",
-    "LoaderOptions",
-    "LoaderSplitCapabilities",
     "MapBinding",
     "PreparedSceneData",
     "Source",

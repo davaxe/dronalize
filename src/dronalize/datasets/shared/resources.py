@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from dronalize.config.models import MapConfig
 from dronalize.core.maps import MapGraph
-from dronalize.processing.loading.resources import EMPTY_DATASET_RESOURCES, DatasetResources
+from dronalize.processing.loading.resources import DatasetResources
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
@@ -28,7 +28,7 @@ def open_named_shared_map_resources(
 ) -> Generator[DatasetResources, None, None]:
     """Open shared-memory map resources keyed by explicit names."""
     if map_config is None:
-        yield EMPTY_DATASET_RESOURCES
+        yield DatasetResources()
         return
 
     handles: list[SharedMemory] = []
@@ -55,7 +55,7 @@ def open_single_shared_map_resource(
 ) -> Generator[DatasetResources, None, None]:
     """Open a single shared-memory map resource."""
     if map_config is None:
-        yield EMPTY_DATASET_RESOURCES
+        yield DatasetResources()
         return
 
     handle = build_map(map_path, map_config).to_shared()

@@ -26,6 +26,18 @@ if TYPE_CHECKING:
     from dronalize.processing.screening.context import ScreeningContext
 
 
+class MinDistance(AgentCheckRuleBase):
+    """Require a minimum total distance traveled per agent."""
+
+    minimum: float = Field(gt=0)
+    rule: Literal["min_distance"] = Field("min_distance", repr=False, init=False)
+
+    @override
+    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+        """Return the per-agent pass expression for the minimum distance."""
+        ...
+
+
 class RequireFrames(AgentCheckRuleBase):
     """Require each retained agent to cover specific relative frames."""
 
@@ -214,6 +226,11 @@ AgentCheckRule = Annotated[
     | MinSpan,
     Field(discriminator="rule"),
 ]
+"""Discriminated union of executable agent-scoped screening rule types.
+
+Each variant encapsulates the Polars expression needed to evaluate one
+per-agent screening rule against a screening context.
+"""
 
 __all__ = [
     "AgentCheckRule",

@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.loading.base import BaseSceneLoader
-    from dronalize.processing.loading.loader import BlockSplitSupport
 
 
 _REGISTRY: dict[str, DatasetSpec] = {}
@@ -36,6 +35,20 @@ _REGISTRY: dict[str, DatasetSpec] = {}
 ResourcesFactory = Callable[
     [Path, ScenesConfig, MapConfig | None], AbstractContextManager[DatasetResources]
 ]
+"""Factory signature for dataset-scoped shared resources.
+
+A resources factory receives the dataset root plus the resolved scene and map
+configuration for a run, then returns a context manager that owns shared state
+such as cached metadata tables, shared-memory map stores, or handles reused
+across loader instances.
+"""
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class DatasetSplitSupport:
+    scene: bool = True
+    source: bool = False
+    time_block: bool = False
 
 
 class LoaderFactory(Protocol):
@@ -63,7 +76,7 @@ class DatasetSpec:
     dataset_options_model: type[DatasetOptionsModel] = NoDatasetOptions
     resources_factory: ResourcesFactory | None = None
     has_map: bool = False
-    time_split_support: BlockSplitSupport | None = None
+    split_support: DatasetSplitSupport = DatasetSplitSupport()
 
     def default_dataset_options(self) -> DatasetOptionsModel:
         """Return the default typed dataset-owned config block."""
@@ -153,7 +166,7 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     "highd": _builtin("dronalize.datasets.highd"),
     "i80": _builtin("dronalize.datasets.i80"),
     "ind": _builtin("dronalize.datasets.ind"),
-    "interact": _builtin("dronalize.datasets.interact"),
+    "interaction": _builtin("dronalize.datasets.interaction"),
     "lyft": _builtin(
         "dronalize.datasets.lyft",
         optional_dependencies=("zarr", "numcodecs", "google.protobuf"),

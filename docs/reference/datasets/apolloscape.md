@@ -20,7 +20,7 @@ ApolloScape is an urban trajectory benchmark built around heterogeneous traffic 
 | Domain              | Urban traffic                                  | Built for city-scene trajectory prediction.                            |
 | Capture platform    | Processed benchmark release                    | Distributed as trajectory files rather than raw sensor recordings.      |
 | Primary agent types | Vehicles, pedestrians, bicycles or motorcycles | Emphasizes heterogeneous traffic.                                      |
-| Map context         | Scene context through benchmark sequences      | Best known through the TrafficPredict benchmark setup.                 |
+| Map context         | None handled by current loader                | The current Dronalize ApolloScape loader does not resolve maps.       |
 | Geographic coverage | Urban Chinese road scenes                      | Focused on dense mixed-traffic environments.                           |
 | Data format         | Text trajectory files                          | Split into benchmark train and evaluation directories.                 |
 
@@ -35,7 +35,29 @@ These are the default Dronalize settings used when processing this dataset.
 | Resampling | Cubic 5:1 |
 | Windowing | 10-frame window, step 1 |
 | Filtering | Prune agents with fewer than 2 samples |
-| Maps | Full map |
+| Maps | Disabled |
+
+## Version
+
+Dronalize does not currently rely on a stable release version marker for ApolloScape. The current loader paths and inspected raw layout do not expose a dataset version beyond the benchmark split directories.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `1` | `CAR` | Numeric category mapping from the ApolloScape trajectory files. |
+| `2` | `TRUCK` | Numeric category mapping from the ApolloScape trajectory files. |
+| `3` | `PEDESTRIAN` | Numeric category mapping from the ApolloScape trajectory files. |
+| `4` | `BICYCLE` | Numeric category mapping from the ApolloScape trajectory files. |
+| `5` | `UNKNOWN` | Numeric category mapping from the ApolloScape trajectory files. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| Not applicable | Not applicable | The current Dronalize ApolloScape loader does not resolve maps. |
 
 ## Split support
 
@@ -57,6 +79,8 @@ apolloscape/
 │   ├── result_9048_1.frame.txt
 │   ├── result_9048_3.frame.txt
 │   └── ...
+├── val_split/
+│   └── ...
 └── prediction_test/
-    └── prediction_test.txt
+    └── prediction_test.txt  # present in the raw benchmark, not used by the current loader
 ```

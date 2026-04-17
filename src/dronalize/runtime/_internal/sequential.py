@@ -45,13 +45,15 @@ class SequentialExecutor(ObservableExecutor):
         self, writer_factory: WriterFactory, finalize: Callable[[DatasetWriter], None] | None = None
     ) -> None:
         writer = writer_factory(0)
-        for scene in self._generate_and_track():
-            writer.write(scene)
-        if finalize is not None:
-            finalize(writer)
-        else:
-            writer.finish_local()
-            writer.finish_final()
+        try:
+            for scene in self._generate_and_track():
+                writer.write(scene)
+        finally:
+            if finalize is not None:
+                finalize(writer)
+            else:
+                writer.finish_local()
+                writer.finish_final()
 
     @override
     def execute_yield(self) -> Iterator[Scene]:

@@ -8,6 +8,7 @@ from pydantic import Field
 
 from dronalize.config.base import ConfigBase
 from dronalize.config.models import DatasetConfig, PartialDatasetConfig, PartialDatasetConfigBase
+from dronalize.core.errors import ConfigurationError
 
 
 class PartialDatasetEntryConfig(PartialDatasetConfigBase):
@@ -63,7 +64,7 @@ class ProcessingConfig(ConfigBase):
             profile = self.profiles.get(use)
             if profile is None:
                 msg = f"Profile '{use}' not found for dataset '{dataset}'"
-                raise ValueError(msg)
+                raise ConfigurationError(msg)
             dataset_config = profile.apply_to(dataset_config)
 
         return partial.partial_config().apply_to(dataset_config)

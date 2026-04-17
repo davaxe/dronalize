@@ -67,14 +67,6 @@ class PreparedSceneData:
 
 
 @dataclass(slots=True, frozen=True)
-class BlockSplitSupport:
-    """Loader metadata required to apply block-based split strategies."""
-
-    time_column: str = "frame"
-    group_columns: str | tuple[str, ...] | None = None
-
-
-@dataclass(slots=True, frozen=True)
 class Source(Generic[SourceT]):
     """Lightweight unit of raw input that yields one or more scenes."""
 

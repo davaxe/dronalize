@@ -34,8 +34,46 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 20 obs / 50 pred @ 10 Hz |
 | Resampling | None |
 | Windowing | 70-frame window, step 25 |
-| Filtering | Require last observation frame (19) |
+| Filtering | Prune agents with fewer than 2 samples |
 | Maps | Full map |
+
+## Version
+
+Dronalize does not currently rely on a stable release version marker for SinD. The inspected raw layout does not expose a dataset version beyond the city and recording directories.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `motorcycle` | `MOTORCYCLE` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
+| `car` | `CAR` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
+| `truck` | `TRUCK` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
+| `tricycle` | `TRICYCLE` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
+| `bus` | `BUS` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
+| `bicycle` | `BICYCLE` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
+| `pedestrian` | `PEDESTRIAN` | Pedestrian-track category mapping from `Ped_smoothed_tracks.csv`. |
+| `animal` | `ANIMAL` | Pedestrian-track category mapping from `Ped_smoothed_tracks.csv`. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `road_border` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `fence` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `wall` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `curbstone` | `CURB` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `stop_line` | `STOP` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `regulatory_element` | `REGULATORY` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `virtual` | `VIRTUAL` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `pedestrian_marking` | `PEDESTRIAN_MARKING` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `bike_marking` | `BIKE_MARKING` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `guard_rail` | `GUARD_RAIL` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `line_thin` without `subtype=dashed` | `LINE_THIN` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| `line_thick` without `subtype=dashed` | `LINE_THICK` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
 
 ## Split support
 

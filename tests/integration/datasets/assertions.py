@@ -83,9 +83,7 @@ def assert_basic_scene_sanity(scene: Scene) -> None:
             "degenerate scene with zero coordinate span"
         )
 
-    duplicate_frames = (
-        frame.group_by("id", "frame").agg(count=pl.count()).filter(pl.col("count") > 1)
-    )
+    duplicate_frames = frame.group_by("id", "frame").agg(count=pl.len()).filter(pl.col("count") > 1)
     assert duplicate_frames.is_empty(), "found duplicate frames for some agents"
 
 

@@ -1,6 +1,6 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.highd.loader import HighDLoader
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import (
     lane_change_sampling,
     minimum_samples_screening,
@@ -25,4 +25,5 @@ DATASET_SPEC = DatasetSpec(
     ),
     native_schema=HighDLoader.native_trajectory_schema(),
     has_map=True,
+    split_support=DatasetSplitSupport(scene=True, source=True),
 )

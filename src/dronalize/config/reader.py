@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from dronalize.config.project import ProcessingConfig
+from dronalize.config.file import ProcessingConfig
+from dronalize.core.errors import ConfigurationError
 
 try:
     import tomllib
@@ -32,5 +33,9 @@ def load_project_config(path: Path) -> ProcessingConfig:
         The parsed project configuration, fully validated and ready for use.
     """
     with path.open("rb") as handle:
-        data = tomllib.load(handle)
+        try:
+            data = tomllib.load(handle)
+        except tomllib.TOMLDecodeError as exc:
+            msg = f"Invalid TOML in config file '{path}': {exc}"
+            raise ConfigurationError(msg) from exc
     return ProcessingConfig.model_validate(data)

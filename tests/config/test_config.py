@@ -6,6 +6,7 @@ import pytest
 
 from dronalize.config import ProcessingConfig, RuntimeOverride, load_project_config
 from dronalize.config.models import DatasetConfig
+from dronalize.core.errors import ConfigurationError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -47,7 +48,7 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
         )
     )
 
-    with pytest.raises(ValueError, match="Profile 'missing' not found"):
+    with pytest.raises(ConfigurationError, match="Profile 'missing' not found"):
         _ = cfg.resolve(
             "demo",
             DatasetConfig.model_validate({
@@ -69,7 +70,7 @@ def test_load_project_config_surfaces_invalid_toml(tmp_path: Path) -> None:
         """,
     )
 
-    with pytest.raises(ValueError, match=r".+"):
+    with pytest.raises(ConfigurationError, match="Invalid TOML in config file"):
         _ = load_project_config(path)
 
 

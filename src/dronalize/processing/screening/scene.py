@@ -137,6 +137,11 @@ SceneCheckRule = Annotated[
     AgentRange | CategoryRange | RequireFrames | RequireWindow | MaxMissingFrames,
     Field(discriminator="rule"),
 ]
+"""Discriminated union of executable scene-scoped screening rule types.
+
+These rule objects evaluate aggregate properties of a cleaned scene such as
+frame coverage, retained-agent counts, or per-category count ranges.
+"""
 
 __all__ = [
     "AgentRange",

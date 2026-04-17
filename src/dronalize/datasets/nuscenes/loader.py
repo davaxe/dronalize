@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, cast
 
 import polars as pl
 from pydantic import Field
@@ -13,7 +13,6 @@ from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.processing.loading.base import (
     BaseSceneLoader,
     DatasetOptionsModel,
-    LoaderSplitCapabilities,
 )
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import no_map, shared_map
@@ -35,10 +34,6 @@ class NuScenesLoaderOptions(DatasetOptionsModel):
 
 class NuScenesLoader(BaseSceneLoader[tuple[int, str], NuScenesLoaderOptions]):
     """Loader for nuScenes trajectories."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True
-    )
 
     def __init__(
         self,

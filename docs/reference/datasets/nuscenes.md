@@ -34,8 +34,56 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 16 obs / 60 pred @ 10 Hz |
 | Resampling | Linear 5:1 |
 | Windowing | 16-frame window, step 1 |
-| Filtering | Require last observation frame (3) |
-| Maps | Full map |
+| Filtering | Drop parked and undefined actors, ignore categories matching `object`, and prune agents with fewer than 2 samples |
+| Maps | Relevant area (padding 1.15) |
+
+## Version
+
+Dronalize currently targets nuScenes `v1.0` metadata together with the `v1.3` map expansion, matching the inspected `v1.0-trainval_meta`, `v1.0-test_meta`, and `nuScenes-map-expansion-v1.3` layout.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `vehicle.car` | `CAR` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.ego.car` | `CAR` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.van` | `VAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.construction` | `VAN` | Construction vehicles are merged into the shared van category. |
+| `vehicle.bus.bendy` | `BUS` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.bus.rigid` | `BUS` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.truck` | `TRUCK` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.trailer` | `TRAILER` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.motorcycle` | `MOTORCYCLE` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.bicycle` | `BICYCLE` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `vehicle.emergency.ambulance` | `CAR` | Emergency road vehicles are currently merged into the shared car category. |
+| `vehicle.emergency.police` | `CAR` | Emergency road vehicles are currently merged into the shared car category. |
+| `human.pedestrian.adult` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `human.pedestrian.child` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `human.pedestrian.construction_worker` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `human.pedestrian.police_officer` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `human.pedestrian.stroller` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `human.pedestrian.wheelchair` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `human.pedestrian` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `static_object.bicycle_rack` | `STATIC_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `movable_object.barrier` | `MOVEABLE_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `movable_object.debris` | `MOVEABLE_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `movable_object.pushable_pullable` | `MOVEABLE_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `movable_object.trafficcone` | `MOVEABLE_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| `animal` | `ANIMAL` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `SegmentDividerType.NIL` | `VIRTUAL` | nuScenes divider mapping in the parser. |
+| `SegmentDividerType.SINGLE_SOLID_WHITE` | `LINE_THIN` | nuScenes divider mapping in the parser. |
+| `SegmentDividerType.SINGLE_SOLID_YELLOW` | `LINE_THIN` | nuScenes divider mapping in the parser. |
+| `SegmentDividerType.SINGLE_ZIGZAG_WHITE` | `REGULATORY` | nuScenes divider mapping in the parser. |
+| `SegmentDividerType.DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` | nuScenes divider mapping in the parser. |
+| `SegmentDividerType.DOUBLE_DASHED_WHITE` | `LINE_THIN_DOUBLE_DASHED` | nuScenes divider mapping in the parser. |
+| Lane polygon outline | Not emitted | The current nuScenes builder keeps `lane_polygon_edge=None`. |
 
 ## Split support
 

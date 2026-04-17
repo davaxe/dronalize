@@ -8,7 +8,7 @@ from dronalize.config.models import (
     MapConfig,
     ScenesConfig,
 )
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_single_shared_map_resource
 from dronalize.datasets.shared.specs import (
     lane_change_sampling,
@@ -17,7 +17,6 @@ from dronalize.datasets.shared.specs import (
 )
 from dronalize.datasets.us101.loader import US101Loader
 from dronalize.datasets.us101.maps.builder import US101MapBuilder
-from dronalize.processing.loading.loader import BlockSplitSupport
 from dronalize.processing.loading.resources import DatasetResources
 
 
@@ -57,5 +56,5 @@ DATASET_SPEC = DatasetSpec(
     native_schema=US101Loader.native_trajectory_schema(),
     resources_factory=open_us101_resources,
     has_map=True,
-    time_split_support=BlockSplitSupport(),
+    split_support=DatasetSplitSupport(scene=True, time_block=True),
 )

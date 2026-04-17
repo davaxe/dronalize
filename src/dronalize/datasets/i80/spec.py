@@ -10,14 +10,13 @@ from dronalize.config.models import (
 )
 from dronalize.datasets.i80.loader import I80Loader
 from dronalize.datasets.i80.maps.builder import I80MapBuilder
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_single_shared_map_resource
 from dronalize.datasets.shared.specs import (
     lane_change_sampling,
     minimum_samples_screening,
     scenes_config,
 )
-from dronalize.processing.loading.loader import BlockSplitSupport
 from dronalize.processing.loading.resources import DatasetResources
 
 
@@ -57,5 +56,5 @@ DATASET_SPEC = DatasetSpec(
     native_schema=I80Loader.native_trajectory_schema(),
     resources_factory=open_i80_resources,
     has_map=True,
-    time_split_support=BlockSplitSupport(),
+    split_support=DatasetSplitSupport(scene=True, time_block=True),
 )

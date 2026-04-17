@@ -5,7 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import dronalize.core.errors as dronalize_exceptions
-from dronalize.config.project import ProcessingConfig
+from dronalize.config.file import ProcessingConfig
+from dronalize.config.models.split import (
+    NativeSplitConfig,
+    SceneSplitConfig,
+    ShuffledTimeSplitConfig,
+    SourceSplitConfig,
+    SplitConfig,
+    TimeSplitConfig,
+)
 from dronalize.config.reader import load_project_config
 from dronalize.io.formats import StorageBackend
 from dronalize.runtime.types import (
@@ -41,6 +49,9 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
     effective_history_frames, effective_future_frames, effective_sample_time = (
         compile_effective_scene_metrics(resolved_config)
     )
+    if not _validate_split_support(descriptor, resolved_config.split):
+        msg = f"Dataset {descriptor.name} does not support the requested split configuration."
+        raise dronalize_exceptions.ConfigurationError(msg)
     return ExecutionPlan(
         descriptor=descriptor,
         data_root=request.input_dir,
@@ -57,6 +68,23 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
         seed=request.seed,
         resolved_config=resolved_config,
     )
+
+
+def _validate_split_support(spec: DatasetSpec, config: SplitConfig | None) -> bool:
+    if config is None:
+        return True
+    support = spec.split_support
+    match config.root:
+        case NativeSplitConfig():
+            return bool(spec.native_splits)
+        case TimeSplitConfig() | ShuffledTimeSplitConfig():
+            return support.time_block
+        case SceneSplitConfig():
+            return support.scene
+        case SourceSplitConfig():
+            return support.source
+        case _:
+            return True
 
 
 def _validate_input_path(request: ExecutionRequest) -> None:

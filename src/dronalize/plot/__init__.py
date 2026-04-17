@@ -24,15 +24,19 @@ The package exposes one scene-oriented entrypoint:
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from dronalize.plot.scene import plot_scene
 
-__all__ = ["plot_scene"]
+AspectMode = Literal["auto", "equal"]
+"""Aspect-ratio modes accepted by [`plot_scene`][dronalize.plot.plot_scene]."""
+
+__all__ = ["AspectMode", "plot_scene"]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
     "plot_scene": ("dronalize.plot.scene", "plot_scene"),
+    "AspectMode": ("dronalize.plot.scene", "AspectMode"),
 }
 
 

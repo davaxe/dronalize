@@ -37,6 +37,24 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Keep agents with at least 2 samples |
 | Maps | Disabled |
 
+## Version
+
+Dronalize does not currently rely on a dataset-specific version marker for UNIV. The raw layout used by the loader does not expose a stable release version.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| Any tracked actor | `PEDESTRIAN` | The ETH/UCY loaders normalize every trajectory to the pedestrian category. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| Not applicable | Not applicable | Dronalize does not resolve maps for this dataset. |
+
 ## Split support
 
 Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom split strategies, and any recommended strategy.

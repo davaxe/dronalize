@@ -34,15 +34,48 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 99 obs / 250 pred @ 50 Hz |
 | Resampling | Cubic 2:1 |
 | Windowing | 175-frame window, step 25 |
-| Filtering | Exclude trailers; prune agents with fewer than 6 samples |
+| Filtering | Prune agents with fewer than 2 samples |
 | Maps | Full map |
 
-### Filtering details
+## Version
 
-| Scope | Rule | Effect |
-| ----- | ---- | ------ |
-| Cleanup | Exclude categories | Remove trailer tracks. |
-| Cleanup | Minimum samples | Prune agents with fewer than 6 samples. |
+Dronalize currently targets inD `v1.1`, matching the inspected `inD-dataset-v1.1.zip` distribution name.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `car` | `CAR` | Shared LevelX category mapping from `class`. |
+| `truck` | `TRUCK` | Shared LevelX category mapping from `class`. |
+| `bus` | `BUS` | Shared LevelX category mapping from `class`. |
+| `trailer` | `TRAILER` | Shared LevelX category mapping from `class`. |
+| `motorcycle` | `MOTORCYCLE` | Shared LevelX category mapping from `class`. |
+| `bicycle` | `BICYCLE` | Shared LevelX category mapping from `class`. |
+| `pedestrian` | `PEDESTRIAN` | Shared LevelX category mapping from `class`. |
+| `van` | `VAN` | Shared LevelX category mapping from `class`. |
+| `truck_bus` | `TRUCK` | Shared LevelX category mapping that collapses the combined label into `TRUCK`. |
+| `animal` | `ANIMAL` | Shared LevelX category mapping from `class`. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `road_border` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `fence` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `wall` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `curbstone` | `CURB` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `stop_line` | `STOP` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `regulatory_element` | `REGULATORY` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `virtual` | `VIRTUAL` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `pedestrian_marking` | `PEDESTRIAN_MARKING` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `bike_marking` | `BIKE_MARKING` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `guard_rail` | `GUARD_RAIL` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `line_thin` without `subtype=dashed` | `LINE_THIN` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| `line_thick` without `subtype=dashed` | `LINE_THICK` | Shared Lanelet2/OSM mapping used by the InD map builder. |
 
 ## Split support
 

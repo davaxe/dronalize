@@ -72,6 +72,11 @@ class IncludeCategories(CleanupRuleBase):
 CleanupRule = Annotated[
     PruneByRule | ExcludeCategories | IncludeCategories, Field(discriminator="rule")
 ]
+"""Discriminated union of executable cleanup-rule types.
+
+Cleanup rules run before screening checks and determine which scene rows are
+retained for subsequent scene- and agent-level evaluation.
+"""
 
 __all__ = [
     "CleanupRule",

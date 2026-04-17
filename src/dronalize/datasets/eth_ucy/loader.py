@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -10,7 +10,7 @@ from typing_extensions import override
 import dronalize.processing.pipeline.transforms as tr
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -27,10 +27,6 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 class _EthUcyLoader(BaseSceneLoader):
     """Loader for ETH/UCY pedestrian trajectory datasets."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True
-    )
 
     def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
         """Initialize one ETH/UCY dataset loader."""

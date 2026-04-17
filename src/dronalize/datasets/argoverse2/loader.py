@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from pydantic import Field
@@ -16,8 +16,7 @@ from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import (
     BaseSceneLoader,
-    LoaderOptions,
-    LoaderSplitCapabilities,
+    DatasetOptionsModel,
 )
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
 
@@ -34,7 +33,7 @@ if TYPE_CHECKING:
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
-class Argoverse2LoaderOptions(LoaderOptions):
+class Argoverse2LoaderOptions(DatasetOptionsModel):
     """Dataset-owned config for the Argoverse 2 loader."""
 
     file_batch_size: int = Field(default=100, ge=1)
@@ -42,10 +41,6 @@ class Argoverse2LoaderOptions(LoaderOptions):
 
 class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
     """Loader for Argoverse 2 trajectory data stored in Parquet files."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True
-    )
 
     def __init__(
         self,

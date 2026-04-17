@@ -64,7 +64,7 @@ class AgentCategory(IntEnum):
     """Enumeration of categories of agents / objects.
 
     !!! note "Dataset-dependent categories"
-        Agent categories are not standardized across datasets, and are mapped
+        Specific categories differ across datasets, and are mapped
         from their original dataset-specific labels into this shared set of
         categories as closely as possible.
 

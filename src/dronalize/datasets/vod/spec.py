@@ -8,7 +8,7 @@ from dronalize.config.models import (
     SceneExtentExtraction,
     ScenesConfig,
 )
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_single_shared_map_resource
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 from dronalize.datasets.vod.loader import VodLoader
@@ -46,4 +46,5 @@ DATASET_SPEC = DatasetSpec(
     native_schema=VodLoader.native_trajectory_schema(),
     resources_factory=open_vod_resources,
     has_map=True,
+    split_support=DatasetSplitSupport(scene=True, source=True),
 )

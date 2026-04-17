@@ -13,7 +13,7 @@ from dronalize.runtime._internal.sequential import SequentialExecutor
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
 
-    from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
+    from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
     from dronalize.processing.loading.loader import Source
     from dronalize.runtime._internal.executor import ObservableExecutor
     from dronalize.runtime.types import ExecutionPlan
@@ -32,14 +32,14 @@ def open_execution_session(plan: ExecutionPlan) -> Generator[ExecutionSession, N
         loader = plan.descriptor.build_loader(
             root=plan.data_root, request=plan.loader, resources=resources
         )
-        sources = tuple(iter_sources(loader, plan))
+        sources = iter_sources(loader, plan)
         builder = SceneBuilder.from_plan(plan)
         executor = _build_executor(plan, loader, builder, sources)
         yield ExecutionSession(job=plan, executor=executor)
 
 
 def iter_sources(
-    loader: BaseSceneLoader[Any, LoaderOptions], plan: ExecutionPlan
+    loader: BaseSceneLoader[Any, DatasetOptionsModel], plan: ExecutionPlan
 ) -> Iterable[Source[Any]]:
     """Yield runtime source objects for one loader and resolved job."""
     split = plan.loader.split
@@ -59,9 +59,9 @@ def iter_sources(
 
 def _build_executor(
     job: ExecutionPlan,
-    loader: BaseSceneLoader[Any, LoaderOptions],
+    loader: BaseSceneLoader[Any, DatasetOptionsModel],
     builder: SceneBuilder,
-    sources: tuple[Source[Any], ...],
+    sources: Iterable[Source[Any]],
 ) -> ObservableExecutor:
     if job.parallel:
         return ParallelExecutor(

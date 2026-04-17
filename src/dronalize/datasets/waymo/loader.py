@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -14,7 +14,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
 
 if TYPE_CHECKING:
@@ -31,10 +31,6 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 class WaymoLoader(BaseSceneLoader):
     """Loader for Waymo scenarios stored in TFRecord format."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True
-    )
 
     def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
         """Initialize the Waymo loader."""

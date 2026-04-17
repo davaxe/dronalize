@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -14,7 +14,7 @@ from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -40,10 +40,6 @@ def _table_query(table_name: str) -> str:
 
 class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     """Loader for OpenDD data split across multiple SQLite databases."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True
-    )
 
     def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
         """Initialize the multi-database OpenDD loader."""

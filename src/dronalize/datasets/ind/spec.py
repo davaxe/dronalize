@@ -10,7 +10,7 @@ from dronalize.config.models import (
 )
 from dronalize.datasets.ind.loader import InDLoader
 from dronalize.datasets.ind.maps.builder import InDMapBuilder
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_named_shared_map_resources
 from dronalize.datasets.shared.specs import (
     minimum_samples_screening,
@@ -59,4 +59,5 @@ DATASET_SPEC = DatasetSpec(
     native_schema=InDLoader.native_trajectory_schema(),
     resources_factory=open_ind_resources,
     has_map=True,
+    split_support=DatasetSplitSupport(scene=True, source=True),
 )

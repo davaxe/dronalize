@@ -19,18 +19,24 @@ sources into normalized scenes, and hands those scenes to a storage backend.
 
 Four public objects define most of the runtime:
 
-- `DatasetSpec` describes one dataset integration
-- `ProcessingConfig` represents the optional TOML file
-- `ProcessRequest` describes one requested run
-- `RunPlan` is the execution-ready result after config resolution and planning
+- [`DatasetSpec`][dronalize.datasets.DatasetSpec] describes one dataset integration
+- [`ProcessingConfig`][dronalize.config.ProcessingConfig] represents the
+  optional TOML file
+- [`ExecutionRequest`][dronalize.runtime.ExecutionRequest] describes one
+  requested run
+- [`ExecutionPlan`][dronalize.runtime.ExecutionPlan] is the execution-ready
+  result after config resolution and planning
 
-The CLI is a thin layer that builds a `ProcessRequest`, resolves a `RunPlan`, and then either
-prints it or executes it.
+The CLI is a thin layer that builds an
+[`ExecutionRequest`][dronalize.runtime.ExecutionRequest], resolves an
+[`ExecutionPlan`][dronalize.runtime.ExecutionPlan], and then either prints it or
+executes it.
 
 ## Resolution flow
 
-Every run starts by looking up a dataset key in the registry. That returns a `DatasetSpec` with the
-dataset defaults, native schema, native split support, map support, and any dataset-owned config
+Every run starts by looking up a dataset key in the registry. That returns a
+[`DatasetSpec`][dronalize.datasets.DatasetSpec] with the dataset defaults,
+native schema, native split support, map support, and any dataset-owned config
 model.
 
 The runtime then resolves configuration in this order:
@@ -38,15 +44,20 @@ The runtime then resolves configuration in this order:
 1. the dataset's built-in `default_config`
 2. any profiles named in `[datasets.<name>].uses`
 3. the dataset-local TOML entry in `[datasets.<name>]`
-4. runtime overrides from the CLI or `RuntimeOverride`
+4. runtime overrides from the CLI or
+   [`RuntimeOverride`][dronalize.config.RuntimeOverride]
 
-That produces one resolved `DatasetConfig`. The runtime compiles it into narrower subsystem plans:
+That produces one resolved [`DatasetConfig`][dronalize.config.models.DatasetConfig].
+The runtime compiles it into narrower subsystem plans:
 
-- a loader-facing `LoaderRequest`
+- a loader-facing [`LoaderRequest`][dronalize.processing.models.LoaderRequest]
 - an `OutputPlan`
 - effective scene metrics after any resampling
 
-The result is a `RunPlan`, which is what both `resolve_job()` and `process_dataset()` work with.
+The result is an [`ExecutionPlan`][dronalize.runtime.ExecutionPlan], which is
+what [`resolve_request()`][dronalize.runtime.resolve_request],
+[`execute_request()`][dronalize.runtime.execute_request], and
+[`execute_plan()`][dronalize.runtime.execute_plan] work with.
 
 ## Dataset boundary
 
@@ -70,9 +81,10 @@ The shared runtime is responsible for everything after that:
 
 ## Execution flow
 
-After planning, `open_job()` does three things:
+After planning, execution does three things:
 
-1. opens any run-scoped shared resources declared by the `DatasetSpec`
+1. opens any run-scoped shared resources declared by the
+   [`DatasetSpec`][dronalize.datasets.DatasetSpec]
 2. builds the loader
 3. chooses a sequential or parallel executor
 
@@ -80,14 +92,17 @@ Execution then follows two nested loops.
 
 ### Source loop
 
-The loader yields `Source` objects. A source is a stable unit of raw input, usually a file or a
-directory-backed sample group. If the dataset has native splits, the runtime can iterate those
+The loader yields [`Source`][dronalize.processing.loading.Source] objects. A
+source is a stable unit of raw input, usually a file or a directory-backed
+sample group. If the dataset has native splits, the runtime can iterate those
 partitions directly. Otherwise it uses `discover_sources()`.
 
-For each source, the loader returns one or more `LoadedSourceData` objects. Each one contains:
+For each source, the loader returns one or more
+[`LoadedSourceData`][dronalize.processing.loading.LoadedSourceData] objects.
+Each one contains:
 
 - a Polars `LazyFrame`
-- an optional `MapBinding`
+- an optional [`MapBinding`][dronalize.processing.loading.MapBinding]
 - an optional predefined split
 
 ### Scene loop
@@ -100,7 +115,8 @@ The loader's pipeline is built once and reused. The default pipeline can apply:
 - resampling
 - final grouping into one scene frame at a time
 
-The `SceneBuilder` then turns each prepared frame into a `Scene` by:
+The scene-building step then turns each prepared frame into a
+[`Scene`][dronalize.core.scene.Scene] by:
 
 1. assigning a split
 2. attaching a lazy map resolver when maps are enabled
@@ -115,12 +131,13 @@ The split assignment strategy depends on the configured mode:
 
 ## Output flow
 
-Each final `Scene` is encoded into the shared record layout and passed to a dataset writer. The
-writer comes from the backend registry in `dronalize.io.backends`.
+Each final [`Scene`][dronalize.core.scene.Scene] is encoded into the shared
+record layout and passed to a dataset writer. The writer comes from the backend
+registry in `dronalize.io.backends`.
 
 The built-in backends are:
 
-- `pickle` for one pickled `SceneRecord` per scene
+- `pickle` for one pickled [`SceneRecord`][dronalize.io.SceneRecord] per scene
 - `mds` for Mosaic Streaming shards
 - `null` for runs that should execute but not persist scenes
 

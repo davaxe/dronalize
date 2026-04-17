@@ -17,6 +17,7 @@ Trade-offs:
 
 - many small files for larger datasets
 - not optimized for large-scale streaming training workflows
+- no compression support
 
 ## Output directory structure
 
@@ -46,7 +47,8 @@ output/
     └── ...
 ```
 
-Each `.pkl` file contains one framework-neutral `SceneRecord`.
+Each `.pkl` file contains one framework-neutral
+[`SceneRecord`][dronalize.io.SceneRecord].
 
 ## Reading Pickle output
 

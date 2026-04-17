@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.errors import DatasetNotFoundError, UnsupportedStorageBackendError
 from dronalize.io import StorageBackend, read_manifest
 from dronalize.runtime import ExecutionRequest, execute_request, resolve_request
@@ -19,18 +20,18 @@ def _request(tmp_path: Path, **kwargs: object) -> ExecutionRequest:
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"
     input_dir.mkdir()
-    base: dict[str, str | Path | StorageBackend | bool] = {
+    base: dict[str, object] = {
         "dataset": "demo",
         "input_dir": input_dir,
         "output_dir": output_dir,
         "storage_backend": StorageBackend.NULL,
     }
-    base.update(cast("dict[str, str | Path | StorageBackend | bool]", kwargs))
+    base.update(kwargs)
     return ExecutionRequest.model_validate(base)
 
 
 def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
-    descriptor: DatasetSpec = demo_descriptor()
+    descriptor = demo_descriptor()
 
     def provider(_name: str) -> DatasetSpec:
         return descriptor
@@ -83,5 +84,34 @@ def test_run_job_executes_and_writes_manifest(
     assert result.processed_sources == 1
 
     manifest = read_manifest(result.output_dir)
+    assert manifest.history_frames == 2
+    assert manifest.future_frames == 1
+
+
+def test_parallel_execution_smoke_processes_demo_dataset(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_get_demo_descriptor(monkeypatch)
+
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+
+    request = ExecutionRequest(
+        dataset="demo",
+        input_dir=input_dir,
+        output_dir=output_dir,
+        storage_backend=StorageBackend.NULL,
+        overrides=RuntimeOverride.from_inputs(jobs=2),
+    )
+
+    result = execute_request(request)
+
+    assert result.dataset == "demo"
+    assert result.processed_sources == 1
+    assert result.processed_scenes == 1
+    assert result.split_counts["unsplit"] == 1
+
+    manifest = read_manifest(output_dir)
     assert manifest.history_frames == 2
     assert manifest.future_frames == 1

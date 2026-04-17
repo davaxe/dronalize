@@ -2,9 +2,9 @@
 
 <div class="section-intro" markdown="1">
 The stable extension surface for new datasets is the dataset registry plus the loader API in
-`dronalize.processing.loading`. The goal of a dataset integration is to turn raw sources into the
-shared scene model and let the common runtime handle screening, splitting, schema conversion, and
-writing.
+[`dronalize.processing.loading`][dronalize.processing.loading]. The goal of a
+dataset integration is to turn raw sources into the shared scene model and let
+the common runtime handle screening, splitting, schema conversion, and writing.
 </div>
 
 ## Start with the dataset contract
@@ -18,12 +18,14 @@ Before writing code, pin down:
 - whether map data exists, and if it is scene-local or shared across many scenes
 - whether the dataset needs custom options under `[datasets.<name>.dataset]`
 
-These answers determine the loader shape, the `DatasetSpec`, and the default config you should
-publish.
+These answers determine the loader shape, the
+[`DatasetSpec`][dronalize.datasets.DatasetSpec], and the default config you
+should publish.
 
 ## Implement a loader
 
-Subclass `BaseSceneLoader` and implement the dataset-specific pieces only.
+Subclass [`BaseSceneLoader`][dronalize.processing.loading.BaseSceneLoader] and
+implement the dataset-specific pieces only.
 
 ```python
 from dronalize.processing.loading import BaseSceneLoader, LoadedSourceData, Source
@@ -35,15 +37,18 @@ In practice, a loader needs to:
 - implement `load_source()`
 - implement either `discover_sources()` or `sources_for_split()`
 
-Most loaders can inherit the default pipeline behavior from `BaseSceneLoader`. That gives you the
-standard `scenes`, `screening`, `split`, `map`, and lane-change handling automatically.
+Most loaders can inherit the default pipeline behavior from
+[`BaseSceneLoader`][dronalize.processing.loading.BaseSceneLoader]. That gives
+you the standard `scenes`, `screening`, `split`, `map`, and lane-change
+handling automatically.
 
 If your dataset needs dataset-owned config, define a typed options model and let the loader read it
 from `self.dataset_config`. Those values come from `[datasets.<name>.dataset]`.
 
-## Register a `DatasetSpec`
+## Register a [`DatasetSpec`][dronalize.datasets.DatasetSpec]
 
-Wrap the loader in a `DatasetSpec` and register it:
+Wrap the loader in a [`DatasetSpec`][dronalize.datasets.DatasetSpec] and
+register it:
 
 ```python
 from dronalize.config.models import DatasetConfig, ScenesConfig
@@ -61,7 +66,8 @@ register(
 )
 ```
 
-Add the other `DatasetSpec` fields only when the dataset actually supports them:
+Add the other [`DatasetSpec`][dronalize.datasets.DatasetSpec] fields only when
+the dataset actually supports them:
 
 - `native_splits` when the raw dataset ships with fixed partitions
 - `has_map` when map data is available

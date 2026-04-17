@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -11,7 +11,7 @@ from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION, Scene
 from dronalize.datasets.a43.maps.builder import A43MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import MapResolver
 
@@ -27,10 +27,6 @@ if TYPE_CHECKING:
 
 class A43Loader(BaseSceneLoader):
     """Scene loader for the A43 dataset."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_block_split=True
-    )
 
     def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
         """Initialize the A43 dataset loader.

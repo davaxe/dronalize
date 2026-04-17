@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar, Generic, cast
 
@@ -13,7 +12,7 @@ from typing_extensions import Self, TypeVar
 
 from dronalize.core.errors import LoaderConfigError, SplitNotSupportedError
 from dronalize.core.typing import SourceT
-from dronalize.processing.loading.resources import EMPTY_DATASET_RESOURCES, DatasetResources
+from dronalize.processing.loading.resources import DatasetResources
 from dronalize.processing.maps.resolver import MapResolver, no_map
 from dronalize.processing.models import PipelinePlan, SplitRequest
 from dronalize.processing.pipeline import spec
@@ -41,24 +40,34 @@ class NoDatasetOptions(DatasetOptionsModel):
     """Empty dataset config for datasets without dataset-owned settings."""
 
 
-LoaderOptions = DatasetOptionsModel
-NoLoaderOptions = NoDatasetOptions
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class LoaderSplitCapabilities:
-    """Legacy marker kept only until the dataset library is migrated."""
-
-    supports_source_split: bool = False
-    supports_scene_split: bool = False
-    supports_block_split: bool = False
-
-
 _LoaderOptionsT = TypeVar("_LoaderOptionsT", bound=DatasetOptionsModel, default=NoDatasetOptions)
 
 
 class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
-    """Base class for turning raw dataset sources into canonical trajectory frames."""
+    """Base class for turning raw dataset sources into canonical trajectory frames.
+
+    Parameters
+    ----------
+    data_root : Path or str
+        The root directory of the dataset, which may be used for source
+        discovery or as a base path for source data.
+    request : LoaderRequest
+        The full loader request, which may be used to configure loading behavior
+        and is retained for potential use by subclasses.
+    resources : DatasetResources, optional
+        Optional shared resources for loading, which may be used by loaders that
+        need to share expensive resources like maps across multiple sources or
+        splits.
+
+    Notes
+    -----
+    - `SourceT` is the type of the raw source data used by this loader, such as
+      a file path or database query.
+    - `_LoaderOptionsT` is the type of the dataset-specific options for this
+      loader, which must be a subclass of `DatasetOptionsModel` and defaults to
+      `NoDatasetOptions` for loaders without dataset-specific options.
+
+    """
 
     def __init__(
         self,
@@ -67,7 +76,6 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize one loader from a narrow loader-facing request."""
         self.root: Path = Path(data_root)
         self.request: LoaderRequest = request
         self.scenes_config: ScenesConfig = request.scenes
@@ -75,9 +83,7 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         self.split_config: SplitRequest | None = request.split
         self.map_config: MapConfig | None = request.map
         self.native_splits: tuple[DatasetSplit, ...] | None = request.native_splits
-        self.resources: DatasetResources = (
-            EMPTY_DATASET_RESOURCES if resources is None else resources
-        )
+        self.resources: DatasetResources = DatasetResources() if resources is None else resources
         options = self.coerce_loader_options(request.dataset)
         self.dataset_config: _LoaderOptionsT = options
         self.loader_options: _LoaderOptionsT = options
@@ -128,7 +134,7 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         resources: DatasetResources | None = None,
     ) -> Self:
         """Unified factory method for constructing this loader from a loader request."""
-        _ = resources  # ingore because most loaders dont use resources
+        _ = resources
         return cls(data_root=data_root, request=request)
 
     @classmethod

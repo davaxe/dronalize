@@ -1,16 +1,18 @@
 # Datasets
 
 <div class="section-intro" markdown="1">
-A dataset key in `dronalize` is not just a name. It resolves to a `DatasetSpec`, which defines how
-that dataset is discovered, loaded, configured, and processed.
+A dataset key in `dronalize` is not just a name. It resolves to a
+[`DatasetSpec`][dronalize.datasets.DatasetSpec], which defines how that dataset
+is discovered, loaded, configured, and processed.
 </div>
 
 For the full built-in dataset list and dataset-specific notes, see the
 [dataset reference](../reference/datasets/index.md).
 
-## What a `DatasetSpec` provides
+## What a [`DatasetSpec`][dronalize.datasets.DatasetSpec] provides
 
-Each `DatasetSpec` carries the dataset integration contract:
+Each [`DatasetSpec`][dronalize.datasets.DatasetSpec] carries the dataset
+integration contract:
 
 - `default_config` for the dataset's starting point
 - `native_schema` for the loader's physical trajectory fields
@@ -18,7 +20,7 @@ Each `DatasetSpec` carries the dataset integration contract:
 - `has_map` for map availability
 - `dataset_options_model` for typed `[datasets.<name>.dataset]` config
 - `resources_factory` for run-scoped shared resources such as maps
-- `time_split_support` when block-based time splits are valid
+- `split_support` when scene-, source-, or time-based split modes are valid
 
 This is why configuration often starts small: the dataset already provides a meaningful default
 window, schema, screening policy, and map setup.
@@ -30,8 +32,10 @@ That keeps optional dependencies isolated.
 
 In practice:
 
-- `dronalize.datasets.get("waymo")` requires the `waymo` extra
-- `dronalize.datasets.available()` only lists built-ins whose optional dependencies are installed
+- [`dronalize.datasets.get("waymo")`][dronalize.datasets.get] requires the
+  `waymo` extra
+- [`dronalize.datasets.available()`][dronalize.datasets.available] only lists
+  built-ins whose optional dependencies are installed
 - the CLI commands `available`, `inspect`, and `split-support` are direct views of the registry
 
 ## Why dataset choice matters

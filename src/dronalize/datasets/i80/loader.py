@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -10,7 +10,7 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
@@ -25,10 +25,6 @@ if TYPE_CHECKING:
 
 class I80Loader(BaseSceneLoader):
     """Scene loader for the I-80 dataset."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_block_split=True
-    )
 
     def __init__(
         self,

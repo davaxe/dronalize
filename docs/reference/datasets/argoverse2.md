@@ -34,15 +34,50 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 50 obs / 60 pred @ 10 Hz |
 | Resampling | None |
 | Windowing | None |
-| Filtering | Exclude static, unknown, and unimportant actors; require last observation frame (49) |
+| Filtering | Prune agents with fewer than 2 samples |
 | Maps | Full map |
 
-### Filtering details
+## Version
 
-| Scope | Rule | Effect |
-| ----- | ---- | ------ |
-| Cleanup | Exclude categories | Remove static, unknown, and unimportant actors. |
-| Agent | Require frame 49 | Keep agents present at the last observation frame. |
+Dronalize does not currently infer a stable upstream release version for Argoverse 2 from the motion-forecasting directory layout. The loader relies on the standard train/val/test structure rather than on a versioned dataset root.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `static` | `STATIC_OBJECT` | Direct category mapping from `object_type`. |
+| `riderless_bicycle` | `STATIC_OBJECT` | The current loader groups riderless bicycles with static objects. |
+| `construction` | `STATIC_OBJECT` | The current loader groups construction objects with static objects. |
+| `vehicle` | `CAR` | Direct category mapping from `object_type`. |
+| `motorcyclist` | `MOTORCYCLE` | Direct category mapping from `object_type`. |
+| `cyclist` | `BICYCLE` | Direct category mapping from `object_type`. |
+| `bus` | `BUS` | Direct category mapping from `object_type`. |
+| `pedestrian` | `PEDESTRIAN` | Direct category mapping from `object_type`. |
+| `background` | `UNIMPORTANT` | The loader keeps the source distinction but maps it into the shared unimportant category. |
+| `unknown` | `UNKNOWN` | Direct category mapping from `object_type`. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `SOLID_WHITE` | `LINE_THIN` | Argoverse 2 lane-boundary mapping in the parser. |
+| `SOLID_YELLOW` | `LINE_THIN` | Argoverse 2 lane-boundary mapping in the parser. |
+| `DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` | Argoverse 2 lane-boundary mapping in the parser. |
+| `DOUBLE_SOLID_YELLOW` | `LINE_THIN_DOUBLE` | Argoverse 2 lane-boundary mapping in the parser. |
+| `DASHED_WHITE` | `LINE_THIN_DASHED` | Argoverse 2 lane-boundary mapping in the parser. |
+| `DASHED_YELLOW` | `LINE_THIN_DASHED` | Argoverse 2 lane-boundary mapping in the parser. |
+| `DOUBLE_DASH_WHITE` | `LINE_THIN_DOUBLE_DASHED` | Argoverse 2 lane-boundary mapping in the parser. |
+| `DOUBLE_DASH_YELLOW` | `LINE_THIN_DOUBLE_DASHED` | Argoverse 2 lane-boundary mapping in the parser. |
+| `DASH_SOLID_WHITE` | `LINE_THIN_DASHED` | Mixed dash-solid boundaries are currently normalized to dashed thin lines. |
+| `DASH_SOLID_YELLOW` | `LINE_THIN_DASHED` | Mixed dash-solid boundaries are currently normalized to dashed thin lines. |
+| `SOLID_DASH_WHITE` | `LINE_THIN_DASHED` | Mixed solid-dash boundaries are currently normalized to dashed thin lines. |
+| `SOLID_DASH_YELLOW` | `LINE_THIN_DASHED` | Mixed solid-dash boundaries are currently normalized to dashed thin lines. |
+| `SOLID_BLUE` | `LINE_THICK` | Argoverse 2 lane-boundary mapping in the parser. |
+| `NONE` | `VIRTUAL` | Parsed as no-marking and then treated as virtual in the builder. |
+| `UNKNOWN` | `VIRTUAL` | Parsed as no-marking and then treated as virtual in the builder. |
+| Pedestrian crossing edge | `PEDESTRIAN_MARKING` | The builder emits pedestrian crossing edges as pedestrian markings. |
 
 ## Split support
 

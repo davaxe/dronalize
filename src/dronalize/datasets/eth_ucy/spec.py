@@ -7,7 +7,7 @@ from dronalize.datasets.eth_ucy.loader import (
     Zara1Loader,
     Zara2Loader,
 )
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import (
     minimum_samples_screening,
     resample_config,
@@ -33,6 +33,7 @@ DATASET_SPECS = {
         default_config=_DEFAULT_CONFIG,
         native_schema=EthLoader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
+        split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "hotel": DatasetSpec(
         name="hotel",
@@ -40,6 +41,7 @@ DATASET_SPECS = {
         default_config=_DEFAULT_CONFIG,
         native_schema=HotelLoader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
+        split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "univ": DatasetSpec(
         name="univ",
@@ -47,6 +49,7 @@ DATASET_SPECS = {
         default_config=_DEFAULT_CONFIG,
         native_schema=UnivLoader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
+        split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "zara1": DatasetSpec(
         name="zara1",
@@ -54,6 +57,7 @@ DATASET_SPECS = {
         default_config=_DEFAULT_CONFIG,
         native_schema=Zara1Loader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
+        split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "zara2": DatasetSpec(
         name="zara2",
@@ -61,5 +65,6 @@ DATASET_SPECS = {
         default_config=_DEFAULT_CONFIG,
         native_schema=Zara2Loader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
+        split_support=DatasetSplitSupport(scene=True, source=True),
     ),
 }

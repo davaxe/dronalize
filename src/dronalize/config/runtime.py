@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
+from pydantic import Field
+
 from dronalize.config.base import PartialConfig
 from dronalize.config.models import (
     PartialDatasetConfig,
@@ -14,15 +16,28 @@ if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
 
 SplitStrategy = Literal["none", "native", "scene", "source", "time", "shuffled-time"]
+"""Supported runtime split-strategy override names accepted by the CLI layer.
+
+The string values map directly to the concrete split config models in
+[`dronalize.config.models.split`][].
+"""
 
 
 class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
-    """Runtime overrides for dataset processing."""
+    """User-supplied overrides layered on top of a dataset's base config.
+
+    `RuntimeOverride` is the bridge between unstructured runtime inputs such as
+    CLI flags and the strongly typed configuration models used by the execution
+    pipeline. It only carries override fields that are safe to merge into an
+    existing dataset config at run time.
+    """
 
     runtime: PartialRuntimeConfig | None = None
     split: SplitConfig | None = None
     output: PartialOutputConfig | None = None
-    full_config_type: type[PartialDatasetConfig] = PartialDatasetConfig
+    full_config_type: type[PartialDatasetConfig] = Field(
+        default=PartialDatasetConfig, init=False, repr=False
+    )
 
     @classmethod
     def from_inputs(

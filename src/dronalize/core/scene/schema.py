@@ -196,16 +196,24 @@ _BASE_FIELDS: Final[TrajectoryField] = (
 POSITIONS_ONLY: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_only", fields=_BASE_FIELDS
 )
+"""Built-in schema containing only positions and the required identifier fields."""
+
 POSITIONS_YAW: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_yaw", fields=_BASE_FIELDS | TrajectoryField.YAW
 )
+"""Built-in schema extending positions with yaw orientation."""
+
 POSITIONS_VELOCITY: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_velocity", fields=_BASE_FIELDS | TrajectoryField.VX | TrajectoryField.VY
 )
+"""Built-in schema extending positions with planar velocity components."""
+
 POSITIONS_VELOCITY_YAW: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_velocity_yaw",
     fields=(_BASE_FIELDS | TrajectoryField.VX | TrajectoryField.VY | TrajectoryField.YAW),
 )
+"""Built-in schema combining positions, velocity, and yaw orientation."""
+
 POSITIONS_VELOCITY_ACCELERATION: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_velocity_acceleration",
     fields=_BASE_FIELDS
@@ -214,6 +222,8 @@ POSITIONS_VELOCITY_ACCELERATION: Final[TrajectorySchema] = TrajectorySchema.defi
     | TrajectoryField.AX
     | TrajectoryField.AY,
 )
+"""Built-in schema combining positions, velocity, and acceleration."""
+
 CANONICAL: Final[TrajectorySchema] = TrajectorySchema.define(
     "canonical",
     fields=_BASE_FIELDS
@@ -223,6 +233,7 @@ CANONICAL: Final[TrajectorySchema] = TrajectorySchema.define(
     | TrajectoryField.AY
     | TrajectoryField.YAW,
 )
+"""Most feature-complete built-in trajectory schema exported by the package."""
 
 TRAJECTORY_SCHEMAS: Final[dict[str, TrajectorySchema]] = {
     schema.name: schema
@@ -235,6 +246,7 @@ TRAJECTORY_SCHEMAS: Final[dict[str, TrajectorySchema]] = {
         CANONICAL,
     )
 }
+"""Registry of built-in trajectory schemas keyed by their stable public names."""
 
 
 def available_trajectory_schemas() -> tuple[TrajectorySchema, ...]:

@@ -34,8 +34,40 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 20 obs / 50 pred @ 10 Hz |
 | Resampling | Linear 1:3 |
 | Windowing | 210-frame window, step 75 |
-| Filtering | Require last observation frame (59) |
+| Filtering | Prune agents with fewer than 6 samples |
 | Maps | Full map |
+
+## Version
+
+Dronalize currently targets the OpenDD `v3` SQLite layout, matching both the loader glob `trajectories_*_v3.sqlite` and the inspected `opendd_v3-rdb*` directories.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `Car` | `CAR` | Direct category mapping from `CLASS`. |
+| `Medium Vehicle` | `CAR` | Medium vehicles are merged into the car category. |
+| `Heavy Vehicle` | `TRUCK` | Heavy vehicles are merged into the truck category. |
+| `Trailer` | `TRUCK` | Trailers are merged into the truck category. |
+| `Bus` | `BUS` | Direct category mapping from `CLASS`. |
+| `Motorcycle` | `MOTORCYCLE` | Direct category mapping from `CLASS`. |
+| `Pedestrian` | `PEDESTRIAN` | Direct category mapping from `CLASS`. |
+| `Bicycle` | `BICYCLE` | Direct category mapping from `CLASS`. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `CURB` | `CURB` | Direct map-marking mapping from the OpenDD SQLite map tables. |
+| `CURB_TRAVERSABLE` | `CURB` | Traversable curbs are merged into the curb category. |
+| `SHORT_DASHED_LINE` | `LINE_THIN_DASHED` | Direct map-marking mapping from the OpenDD SQLite map tables. |
+| `LONG_DASHED_LINE` | `LINE_THIN_DASHED` | Direct map-marking mapping from the OpenDD SQLite map tables. |
+| `SINGLE_SOLID_LINE` | `LINE_THIN` | Direct map-marking mapping from the OpenDD SQLite map tables. |
+| `NO_MARKING` | `VIRTUAL` | Used for boundaries that should not render as painted or physical edges. |
+| `SHADED_AREA_MARKING` | `VIRTUAL` | Used for shaded areas that should not render as painted or physical edges. |
+| `GUARDRAIL` | `GUARD_RAIL` | Direct map-marking mapping from the OpenDD SQLite map tables. |
 
 ## Split support
 

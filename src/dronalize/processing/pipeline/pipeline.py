@@ -13,10 +13,19 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 Transform = Callable[[pl.LazyFrame], pl.LazyFrame]
-"""A 1:1 transformation from one LazyFrame to another."""
+"""Signature for a one-to-one LazyFrame transformation used in a pipeline step.
+
+Functions of this shape accept one input frame and return one transformed
+output frame.
+"""
 
 FlatMapTransform = Callable[[pl.LazyFrame], Iterable[pl.LazyFrame]]
-"""A 1:N transformation that maps one LazyFrame to an iterable of LazyFrames."""
+"""Signature for a one-to-many LazyFrame transformation used in a flat-map step.
+
+Flat-map transforms let a single input frame fan out into zero or more output
+frames while staying inside the same immutable
+[`Pipeline`][dronalize.processing.pipeline.Pipeline].
+"""
 
 
 @dataclass(frozen=True, slots=True)

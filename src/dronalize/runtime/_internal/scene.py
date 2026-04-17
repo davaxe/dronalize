@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
     from dronalize.datasets.registry import DatasetSpec
-    from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
+    from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
     from dronalize.processing.maps.resolver import MapKey, MapResolver
     from dronalize.processing.models import SplitRequest
     from dronalize.processing.pipeline.pipeline import Pipeline
@@ -68,7 +68,7 @@ class SceneBuilder:
             )
 
     def prepare_source(
-        self, loader: BaseSceneLoader[Any, LoaderOptions], source: Source[Any]
+        self, loader: BaseSceneLoader[Any, DatasetOptionsModel], source: Source[Any]
     ) -> Iterable[PreparedSceneData]:
         if self._pipeline is None:
             self._pipeline = loader.pipeline()
@@ -172,7 +172,9 @@ class SceneBuilder:
 
     @staticmethod
     def _resolve_scene_map(
-        loader: BaseSceneLoader[Any, LoaderOptions], source: Source[Any], data: PreparedSceneData
+        loader: BaseSceneLoader[Any, DatasetOptionsModel],
+        source: Source[Any],
+        data: PreparedSceneData,
     ) -> tuple[MapKey, MapResolver | None]:
         if loader.map_config is None:
             return None, None

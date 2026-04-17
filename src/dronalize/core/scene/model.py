@@ -23,9 +23,20 @@ if TYPE_CHECKING:
 
 
 MapKey = str | None
-"""Stable identifier for the map associated with a scene."""
+"""Stable identifier for the map associated with a scene.
+
+Loaders typically populate this with a dataset-native lane graph or HD map
+identifier. `None` indicates that the scene either has no map or that the map
+should be resolved without a per-scene key.
+"""
+
 MapResolver = Callable[["Scene"], MapGraph | None]
-"""Callable that materializes a map graph for a scene when needed."""
+"""Callable signature used to materialize a scene's map graph lazily.
+
+Resolvers are attached to [`Scene`][dronalize.core.scene.Scene] instances so
+map loading can be deferred until a consumer explicitly requests it through
+[`Scene.resolve_map()`][dronalize.core.scene.Scene.resolve_map].
+"""
 
 
 @dataclass(slots=True, frozen=True)

@@ -70,7 +70,7 @@ nav = [
     { hotel = "reference/datasets/hotel.md" },
     { i80 = "reference/datasets/i80.md" },
     { ind = "reference/datasets/ind.md" },
-    { interact = "reference/datasets/interact.md" },
+    { interaction = "reference/datasets/interaction.md" },
     { lyft = "reference/datasets/lyft.md" },
     { nuscenes = "reference/datasets/nuscenes.md" },
     { opendd = "reference/datasets/opendd.md" },
@@ -128,7 +128,6 @@ nav = [
       { Readers = "reference/api/io/readers.md" },
       { "Framework adapters" = "reference/api/io/adapters.md" },
       { "Backend extension API" = "reference/api/io/backends.md" },
-      { "Encoding helpers" = "reference/api/io/encoding.md" },
     ] },
     { Plotting = [
       "reference/api/plot/index.md",

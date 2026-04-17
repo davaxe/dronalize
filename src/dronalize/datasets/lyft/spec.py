@@ -11,7 +11,7 @@ from dronalize.config.models import (
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.lyft.loader import LyftLoader, LyftLoaderOptions
 from dronalize.datasets.lyft.maps.builder import LyftMapBuilder
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_single_shared_map_resource
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 from dronalize.processing.loading.resources import DatasetResources
@@ -50,4 +50,5 @@ DATASET_SPEC = DatasetSpec(
     dataset_options_model=LyftLoaderOptions,
     resources_factory=open_lyft_resources,
     has_map=True,
+    split_support=DatasetSplitSupport(scene=True),
 )

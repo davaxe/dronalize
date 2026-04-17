@@ -37,12 +37,49 @@ These are the default Dronalize settings used when processing this dataset.
 
 | Setting | Default |
 | ------- | ------- |
-| Source sequence | 10 obs / 80 pred @ 10 Hz |
-| Effective sequence | 10 obs / 80 pred @ 10 Hz |
+| Source sequence | 11 obs / 80 pred @ 10 Hz |
+| Effective sequence | 11 obs / 80 pred @ 10 Hz |
 | Resampling | None |
 | Windowing | None |
-| Filtering | Require last observation frame (9) |
-| Maps | Full map |
+| Filtering | Prune agents with fewer than 2 samples |
+| Maps | Relevant area (padding 1.15) |
+
+## Version
+
+Dronalize does not currently infer a stable Motion Dataset release number from the Waymo raw layout. The TFRecord directory structure identifies the split layout, but not the exact upstream release revision.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `0` | `UNKNOWN` | Waymo object type mapping from the lean scenario proto. |
+| `1` | `CAR` | Waymo object type mapping from the lean scenario proto. |
+| `2` | `PEDESTRIAN` | Waymo object type mapping from the lean scenario proto. |
+| `3` | `BICYCLE` | Waymo object type mapping from the lean scenario proto. |
+| `4` | `UNKNOWN` | The current loader does not assign a more specific shared category for this object type. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `RoadLine.TYPE_UNKNOWN` | `VIRTUAL` | Waymo road-line mapping in the map builder. |
+| `RoadLine.TYPE_BROKEN_SINGLE_WHITE` | `LINE_THIN_DASHED` | Waymo road-line mapping in the map builder. |
+| `RoadLine.TYPE_BROKEN_SINGLE_YELLOW` | `LINE_THIN_DASHED` | Waymo road-line mapping in the map builder. |
+| `RoadLine.TYPE_SOLID_SINGLE_WHITE` | `LINE_THIN` | Waymo road-line mapping in the map builder. |
+| `RoadLine.TYPE_SOLID_SINGLE_YELLOW` | `LINE_THIN` | Waymo road-line mapping in the map builder. |
+| `RoadLine.TYPE_SOLID_DOUBLE_WHITE` | `LINE_THIN_DOUBLE` | Waymo road-line mapping in the map builder. |
+| `RoadLine.TYPE_SOLID_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE` | Waymo road-line mapping in the map builder. |
+| `RoadLine.TYPE_PASSING_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE` | Waymo road-line mapping in the map builder. |
+| `RoadLine.TYPE_BROKEN_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE_DASHED` | Waymo road-line mapping in the map builder. |
+| `RoadEdge.TYPE_UNKNOWN` | `VIRTUAL` | Waymo road-edge mapping in the map builder. |
+| `RoadEdge.TYPE_ROAD_EDGE_BOUNDARY` | `ROAD_BORDER` | Waymo road-edge mapping in the map builder. |
+| `RoadEdge.TYPE_ROAD_EDGE_MEDIAN` | `GUARD_RAIL` | Waymo road-edge mapping in the map builder. |
+| Crosswalk polygon | `PEDESTRIAN_MARKING` | The builder emits crosswalk polygons as pedestrian markings. |
+| Speed-bump polygon | `REGULATORY` | The builder emits speed bumps as regulatory map elements. |
+| Lane-center polyline | `VIRTUAL` | Lane centerlines are represented as virtual edges. |
+| Driveway polygon | `VIRTUAL` | Driveways are represented as virtual edges. |
 
 ## Split support
 

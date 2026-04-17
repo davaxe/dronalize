@@ -43,7 +43,27 @@ These are the default Dronalize settings used when processing this dataset.
 | Windowing | 210-frame window, step 45 |
 | Filtering | Drop short tracks with fewer than 4 samples |
 | Lane-change sampling | Require 5 lane changes; keep 1 in 3 negative scenes |
-| Maps | Relevant area (padding 1.15) |
+| Maps | Full map |
+
+## Version
+
+Dronalize currently targets AD4CHE `v1.0`, matching the inspected `AD4CHE_Data_V1.0` directory layout and the `AD4CHE_V1.0.zip` archive name.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `car` | `CAR` | Direct category mapping from `class`. |
+| `truck` | `TRUCK` | Direct category mapping from `class`. |
+| `bus` | `BUS` | Direct category mapping from `class`. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| Extracted lane-image border contour | `LINE_THICK_DASHED` | The current builder traces borders from the segmented lane image rather than from typed vector map labels. |
 
 ## Split support
 

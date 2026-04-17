@@ -34,8 +34,30 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 20 obs / 30 pred @ 10 Hz |
 | Resampling | None |
 | Windowing | None |
-| Filtering | Require last observation frame (19) |
+| Filtering | Prune agents with fewer than 2 samples |
 | Maps | Relevant area (padding 1.15) |
+
+## Version
+
+Dronalize currently targets Argoverse 1 `v1.1`, matching the `forecasting_train_v1.1`, `forecasting_val_v1.1`, and `forecasting_test_v1.1` directories expected by the loader.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `OBJECT_TYPE = AV` | `CAR` | The ego autonomous vehicle is normalized to the shared car category. |
+| `OBJECT_TYPE = OTHERS` | `UNKNOWN` | The loader does not derive a more specific shared category from this label. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| Non-intersection lane segment with left and right neighbors | `LINE_THIN` | The parser treats a bordered lane between neighbors as a lane separator. |
+| Non-intersection lane segment without left or right neighbors | `LINE_THIN` | The parser still treats an isolated non-intersection center boundary as a thin line. |
+| Non-intersection outer border without an adjacent neighbor | `CURB` | The parser treats the outside border of a non-intersection lane as a curb. |
+| Intersection border | `VIRTUAL` | Intersection borders are treated as virtual / no-marking boundaries. |
 
 ## Split support
 

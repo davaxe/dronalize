@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import Self, override
@@ -8,7 +8,7 @@ from typing_extensions import Self, override
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import CANONICAL
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
@@ -30,10 +30,6 @@ class LevelXDataLoader(BaseSceneLoader):
 
     With no changes this supports: rounD, inD, exiD, uniD, and sinD.
     """
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True
-    )
 
     def __init__(
         self,
@@ -145,8 +141,6 @@ class LevelXDataLoader(BaseSceneLoader):
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
         tracks = source.data / f"{source.identifier:0>2}_tracks.csv"
         meta = source.data / f"{source.identifier:0>2}_tracksMeta.csv"
-        raw_meta = pl.read_csv(meta)
-        print(raw_meta.select("class").unique())
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
             *self.meta_data_select()
         )

@@ -11,7 +11,7 @@ from dronalize.config.models import (
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.argoverse1.loader import Argoverse1Loader, Argoverse1LoaderOptions
 from dronalize.datasets.argoverse1.maps.builder import Argoverse1MapBuilder
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_named_shared_map_resources
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 from dronalize.processing.loading.resources import DatasetResources
@@ -61,5 +61,6 @@ DATASET_SPEC = DatasetSpec(
     native_splits=_NATIVE_SPLITS,
     dataset_options_model=Argoverse1LoaderOptions,
     resources_factory=open_argoverse1_resources,
+    split_support=DatasetSplitSupport(scene=True),
     has_map=True,
 )

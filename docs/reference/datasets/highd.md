@@ -34,16 +34,31 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 99 obs / 250 pred @ 50 Hz |
 | Resampling | Cubic 2:1 |
 | Windowing | 175-frame window, step 25 |
-| Filtering | Exclude trailers; prune agents with fewer than 6 samples |
+| Filtering | Prune agents with fewer than 2 samples |
 | Lane-change sampling | Require 3 lane changes; keep 1 in 3 negatives |
 | Maps | Full map |
 
-### Filtering details
+## Version
 
-| Scope | Rule | Effect |
-| ----- | ---- | ------ |
-| Cleanup | Exclude categories | Remove trailer tracks. |
-| Cleanup | Minimum samples | Prune agents with fewer than 6 samples. |
+Dronalize does not currently rely on a stable release version marker for highD. The inspected raw layout does not expose a dataset version beyond the recording bundle itself.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `Car` | `CAR` | Direct category mapping from `class`. |
+| `Truck` | `TRUCK` | Direct category mapping from `class`. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| First or last entry in `upperLaneMarkings` | `ROAD_BORDER` | The outermost upper-carriageway markings are treated as road borders. |
+| Interior entry in `upperLaneMarkings` | `LINE_THIN_DASHED` | Intermediate upper-carriageway markings are treated as dashed lane separators. |
+| First or last entry in `lowerLaneMarkings` | `ROAD_BORDER` | The outermost lower-carriageway markings are treated as road borders. |
+| Interior entry in `lowerLaneMarkings` | `LINE_THIN_DASHED` | Intermediate lower-carriageway markings are treated as dashed lane separators. |
 
 ## Split support
 

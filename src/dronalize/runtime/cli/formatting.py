@@ -98,7 +98,7 @@ def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, detail
             window,
             has_map,
             native_splits,
-            _format_flag(enabled=descriptor.time_split_support is not None),
+            _format_flag(enabled=descriptor.split_support.time_block),
         )
     return table
 
@@ -122,7 +122,7 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
         "Native splits",
         ", ".join(split.value for split in descriptor.native_splits) or "[dim]none[/dim]",
     )
-    overview.add_row("Time split", _format_flag(enabled=descriptor.time_split_support is not None))
+    overview.add_row("Supported split modes", _format_split_modes(descriptor))
     overview.add_row("Map", _format_flag(enabled=descriptor.has_map))
 
     scene_defaults = _detail_table(title="Default scene settings")
@@ -172,9 +172,7 @@ def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
         "Native splits",
         ", ".join(split.value for split in descriptor.native_splits) or "[dim]none[/dim]",
     )
-    summary.add_row("Scene split", "[green]yes[/green]")
-    summary.add_row("Source split", "[green]yes[/green]")
-    summary.add_row("Time split", _format_flag(enabled=descriptor.time_split_support is not None))
+    summary.add_row("Supported split modes", _format_split_modes(descriptor))
     return (summary,)
 
 
@@ -214,6 +212,19 @@ def _detail_table(title: str, *, caption: str | None = None) -> Table:
 
 def _format_flag(*, enabled: bool) -> str:
     return "[green]yes[/green]" if enabled else "[dim]no[/dim]"
+
+
+def _format_split_modes(descriptor: DatasetSpec) -> str:
+    modes: list[str] = []
+    if descriptor.native_splits:
+        modes.append("native")
+    if descriptor.split_support.scene:
+        modes.append("scene")
+    if descriptor.split_support.source:
+        modes.append("source")
+    if descriptor.split_support.time_block:
+        modes.extend(["time", "shuffled-time"])
+    return ", ".join(modes) if modes else "[dim]none[/dim]"
 
 
 def _format_base_window(history_frames: int, future_frames: int, sample_time: float) -> str:

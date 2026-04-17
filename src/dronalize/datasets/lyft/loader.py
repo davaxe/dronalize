@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -18,8 +18,7 @@ from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import (
     BaseSceneLoader,
-    LoaderOptions,
-    LoaderSplitCapabilities,
+    DatasetOptionsModel,
 )
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import no_map, shared_map
@@ -39,7 +38,7 @@ if TYPE_CHECKING:
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
 
 
-class LyftLoaderOptions(LoaderOptions):
+class LyftLoaderOptions(DatasetOptionsModel):
     """Dataset-owned config for the Lyft loader."""
 
     scene_batch_size: int = Field(default=100, ge=1)
@@ -64,10 +63,6 @@ class _ArrayData:
 
 class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
     """Loader for Lyft Level 5 scenes stored in Zarr format."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True
-    )
 
     def __init__(
         self,

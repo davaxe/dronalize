@@ -34,8 +34,56 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 5 obs / 30 pred @ 10 Hz |
 | Resampling | None |
 | Windowing | 35-frame window, step 5 |
-| Filtering | Require last observation frame (4) |
-| Maps | Full map |
+| Filtering | Drop parked and undefined actors, remove duplicate `vehicle.ego` instances, and prune agents with fewer than 2 samples |
+| Maps | Relevant area (padding 1.15) |
+
+## Version
+
+Dronalize currently targets VoD `v1.0`, matching the inspected `v1.0-trainval` and `v1.0-test` layout.
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `vehicle.car` | `CAR` | VoD reuses the nuScenes category mapping. |
+| `vehicle.ego.car` | `CAR` | VoD reuses the nuScenes category mapping; duplicate `vehicle.ego` rows are filtered by default loader options. |
+| `vehicle.van` | `VAN` | VoD reuses the nuScenes category mapping. |
+| `vehicle.construction` | `VAN` | VoD reuses the nuScenes category mapping. |
+| `vehicle.bus.bendy` | `BUS` | VoD reuses the nuScenes category mapping. |
+| `vehicle.bus.rigid` | `BUS` | VoD reuses the nuScenes category mapping. |
+| `vehicle.truck` | `TRUCK` | VoD reuses the nuScenes category mapping. |
+| `vehicle.trailer` | `TRAILER` | VoD reuses the nuScenes category mapping. |
+| `vehicle.motorcycle` | `MOTORCYCLE` | VoD reuses the nuScenes category mapping. |
+| `vehicle.bicycle` | `BICYCLE` | VoD reuses the nuScenes category mapping. |
+| `vehicle.emergency.ambulance` | `CAR` | VoD reuses the nuScenes category mapping. |
+| `vehicle.emergency.police` | `CAR` | VoD reuses the nuScenes category mapping. |
+| `human.pedestrian.adult` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
+| `human.pedestrian.child` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
+| `human.pedestrian.construction_worker` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
+| `human.pedestrian.police_officer` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
+| `human.pedestrian.stroller` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
+| `human.pedestrian.wheelchair` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
+| `human.pedestrian` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
+| `static_object.bicycle_rack` | `STATIC_OBJECT` | VoD reuses the nuScenes category mapping. |
+| `movable_object.barrier` | `MOVEABLE_OBJECT` | VoD reuses the nuScenes category mapping. |
+| `movable_object.debris` | `MOVEABLE_OBJECT` | VoD reuses the nuScenes category mapping. |
+| `movable_object.pushable_pullable` | `MOVEABLE_OBJECT` | VoD reuses the nuScenes category mapping. |
+| `movable_object.trafficcone` | `MOVEABLE_OBJECT` | VoD reuses the nuScenes category mapping. |
+| `animal` | `ANIMAL` | VoD reuses the nuScenes category mapping. |
+
+### Map types
+
+| Dataset type | Dronalize type | Notes |
+| ------------ | -------------- | ----- |
+| `SegmentDividerType.NIL` | `VIRTUAL` | VoD reuses the nuScenes divider mapping. |
+| `SegmentDividerType.SINGLE_SOLID_WHITE` | `LINE_THIN` | VoD reuses the nuScenes divider mapping. |
+| `SegmentDividerType.SINGLE_SOLID_YELLOW` | `LINE_THIN` | VoD reuses the nuScenes divider mapping. |
+| `SegmentDividerType.SINGLE_ZIGZAG_WHITE` | `REGULATORY` | VoD reuses the nuScenes divider mapping. |
+| `SegmentDividerType.DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` | VoD reuses the nuScenes divider mapping. |
+| `SegmentDividerType.DOUBLE_DASHED_WHITE` | `LINE_THIN_DOUBLE_DASHED` | VoD reuses the nuScenes divider mapping. |
+| Lane polygon outline | `LINE_THIN` | Unlike nuScenes, the VoD builder sets `lane_polygon_edge=LINE_THIN`. |
 
 ## Split support
 

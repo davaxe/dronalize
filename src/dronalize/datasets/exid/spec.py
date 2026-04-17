@@ -10,7 +10,7 @@ from dronalize.config.models import (
 )
 from dronalize.datasets.exid.loader import ExiDLoader
 from dronalize.datasets.exid.maps.builder import ExiDMapBuilder
-from dronalize.datasets.registry import DatasetSpec
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_named_shared_map_resources
 from dronalize.datasets.shared.specs import (
     lane_change_sampling,
@@ -62,4 +62,5 @@ DATASET_SPEC = DatasetSpec(
     native_schema=ExiDLoader.native_trajectory_schema(),
     resources_factory=open_exid_resources,
     has_map=True,
+    split_support=DatasetSplitSupport(scene=True, source=True),
 )

@@ -70,7 +70,7 @@ jobs:
         run: uv sync --group typecheck
 
       - name: Run basedpyright
-        run: uv run basedpyright src/dronalize/core src/dronalize/processing src/dronalize/config src/dronalize/runtime/_internal
+        run: uv run basedpyright src/dronalize/core src/dronalize/processing src/dronalize/config src/dronalize/runtime src/dronalize/io src/dronalize/datasets
 
   build:
     name: Build package
