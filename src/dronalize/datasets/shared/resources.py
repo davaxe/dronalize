@@ -48,10 +48,7 @@ def open_named_shared_map_resources(
 
 @contextmanager
 def open_single_shared_map_resource(
-    *,
-    map_config: MapConfig | None,
-    map_path: Path,
-    build_map: MapBuilder,
+    *, map_config: MapConfig | None, map_path: Path, build_map: MapBuilder
 ) -> Generator[DatasetResources, None, None]:
     """Open a single shared-memory map resource."""
     if map_config is None:

@@ -1,8 +1,4 @@
-from dronalize.config.models import (
-    DatasetConfig,
-    FullMapExtraction,
-    MapConfig,
-)
+from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.a43.loader import A43Loader
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config

@@ -22,12 +22,7 @@ from dronalize.processing.models import LoaderRequest, SplitRequest
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.config.models import (
-        DatasetConfig,
-        MDSOutputConfig,
-        OutputConfig,
-        RuntimeConfig,
-    )
+    from dronalize.config.models import DatasetConfig, MDSOutputConfig, OutputConfig, RuntimeConfig
     from dronalize.datasets.registry import DatasetSpec
 
 

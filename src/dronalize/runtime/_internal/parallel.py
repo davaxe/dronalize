@@ -72,10 +72,7 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
     @override
     def execute_yield(self) -> Iterator[Scene]:
         for scenes in self._execute_parallel(
-            self._process_fn_yield,
-            self._sources,
-            _init_worker,
-            self._shared,
+            self._process_fn_yield, self._sources, _init_worker, self._shared
         ):
             yield from scenes
 

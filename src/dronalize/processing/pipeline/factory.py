@@ -1,200 +1,105 @@
-"""Pipeline assebly helpers fr trajectory processing."""
+"""Pipeline assembly helpers for trajectory processing."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import polars as pl
-
-import dronalize.processing.pipeline.transforms as tr
-from dronalize.processing.pipeline._internal import SPLIT_PARTITION_COLUMN
-from dronalize.processing.pipeline.builder import TrajectoryPipelineBuilder
-from dronalize.processing.pipeline.functional.resample import ResampleMethod, ResampleSpec
+from dronalize.processing.columns import TrajectoryColumns
+from dronalize.processing.pipeline.contributions import (
+    PipelineStage,
+    StageContributions,
+    get_stage_pipelines,
+)
+from dronalize.processing.pipeline.extensions.lane_change import LaneChangeSamplingExtension
 from dronalize.processing.pipeline.pipeline import Pipeline
-from dronalize.processing.pipeline.splitting import apply_split_partition
-from dronalize.processing.screening.screen import Screen
+from dronalize.processing.pipeline.spec import TrajectorySpec, compile_build_context
+from dronalize.processing.pipeline.stages import (
+    build_output_stage,
+    build_scene_id_stage,
+    build_screening_stage,
+    build_split_stage,
+    build_window_stage,
+)
 
 if TYPE_CHECKING:
-    from dronalize.config.models import ResampleConfig, ScenesConfig, WindowConfig
-    from dronalize.processing.pipeline.spec import TrajectorySpec
+    from collections.abc import Sequence
+
+    from dronalize.processing.models import PipelinePlan
 
 
 def trajectory_pipeline(spec: TrajectorySpec) -> Pipeline:
     """Build a trajectory-processing pipeline from a declarative spec."""
-    builder = TrajectoryPipelineBuilder(spec)
-    scenes_config = builder.scenes
-
-    if spec.extension is not None:
-        spec.extension.extend(builder)
-
-    scene_id_column = builder.scene_id_column if builder.uses_scene_id() else None
-    pipeline = apply_split_partition(
-        Pipeline(),
-        split_request=builder.split_request,
-        time_column=spec.columns.frame,
-        group_by=spec.window_by,
+    initial_ctx = compile_build_context(spec, require_scene_id=False)
+    contributions = (
+        spec.extension.compile(initial_ctx) if spec.extension is not None else StageContributions()
     )
-    pipeline = pipeline.compose(builder.pre_window)
-    pipeline = _apply_window(
-        pipeline,
-        frame_column=spec.columns.frame,
-        window_group_columns=builder.window_group_columns(),
-        window_spec=scenes_config.window,
-        window_size=_total_frames(scenes_config),
-    )
-    pipeline = pipeline.compose(builder.post_window)
-    pipeline = _attach_scene_id(
-        pipeline, scene_key_columns=builder.scene_key_columns(), scene_id_column=scene_id_column
-    )
-    pipeline = _apply_screening(
-        pipeline,
-        screening_spec=(
-            Screen.from_config(spec.plan.screening) if spec.plan.screening is not None else None
-        ),
-        scene_id_column=scene_id_column,
-        agent_id_column=spec.columns.agent_id,
-        frame_column=spec.columns.frame,
-        category_column=spec.columns.category,
-        mark_passed_agents=True,
-    )
-    pipeline = pipeline.compose(builder.post_screening)
-    return _apply_resample_and_yield(
-        pipeline,
-        frame_column=spec.columns.frame,
-        agent_id_column=spec.columns.agent_id,
-        scene_id_column=scene_id_column,
-        resampling=_compile_resample_config(scenes_config, scenes_config.resample),
-        drop=_factory_generated_drop_columns(builder, scene_id_column=scene_id_column),
-    )
+    ctx = compile_build_context(spec, require_scene_id=contributions.require_scene_id)
+
+    pipeline = Pipeline()
+    pipeline = pipeline.compose(build_split_stage(ctx))
+
+    for stage_pipeline in get_stage_pipelines(contributions, PipelineStage.PRE_WINDOW):
+        pipeline = pipeline.compose(stage_pipeline)
+
+    pipeline = pipeline.compose(build_window_stage(ctx))
+
+    for stage_pipeline in get_stage_pipelines(contributions, PipelineStage.POST_WINDOW):
+        pipeline = pipeline.compose(stage_pipeline)
+
+    pipeline = pipeline.compose(build_scene_id_stage(ctx))
+    pipeline = pipeline.compose(build_screening_stage(ctx))
+
+    for stage_pipeline in get_stage_pipelines(contributions, PipelineStage.POST_SCREENING):
+        pipeline = pipeline.compose(stage_pipeline)
+
+    return pipeline.compose(build_output_stage(ctx))
 
 
-def _total_frames(config: ScenesConfig) -> int:
-    return config.history_frames + config.future_frames
-
-
-def _attach_scene_id(
-    pipeline: Pipeline, *, scene_key_columns: list[str], scene_id_column: str | None
-) -> Pipeline:
-    if scene_id_column is None:
-        return pipeline
-
-    def _with_scene_id(df: pl.LazyFrame) -> pl.LazyFrame:
-        return (
-            df
-            .with_row_index("_scene_row_order")
-            .with_columns(
-                pl.col("_scene_row_order").min().over(scene_key_columns).alias("_scene_first_row")
-            )
-            .with_columns(
-                (pl.col("_scene_first_row").rank("dense") - 1)
-                .cast(pl.UInt32)
-                .alias(scene_id_column)
-            )
-            .drop("_scene_row_order", "_scene_first_row")
-        )
-
-    return pipeline.then(_with_scene_id, name="attach_scene_id")
-
-
-def _apply_window(
-    pipeline: Pipeline,
+def standard(
+    plan: PipelinePlan,
     *,
-    frame_column: str,
-    window_group_columns: list[str],
-    window_spec: WindowConfig | None,
-    window_size: int,
-) -> Pipeline:
-    if window_spec is None:
-        return pipeline
-    return pipeline.then(
-        tr.window(
-            window_size,
-            window_spec.step,
-            group_by=window_group_columns or None,
-            sliding_col=frame_column,
+    columns: TrajectoryColumns | None = None,
+    window_by: str | Sequence[str] | None = None,
+) -> TrajectorySpec:
+    """Build the default trajectory pipeline specification."""
+    return _base_spec(plan, columns=columns, window_by=window_by)
+
+
+def lane_change_sampling(
+    plan: PipelinePlan,
+    *,
+    columns: TrajectoryColumns | None = None,
+    lane_id: str = "lane_id",
+    window_by: str | Sequence[str] | None = None,
+) -> TrajectorySpec:
+    """Build a spec for lane-change-aware window sampling."""
+    sampling_config = plan.scenes.lane_change
+    base_spec = _base_spec(plan, columns=columns, window_by=window_by)
+    if sampling_config is None or sampling_config.negative_keep_every == 1:
+        # If every negative sample is kept, there is no difference in output
+        # selection between lane-change-aware sampling and standard sampling, so
+        # skip the extension (which is more efficient).
+        return base_spec
+
+    return base_spec.with_extension(
+        LaneChangeSamplingExtension(
+            lane_id_column=lane_id,
+            negative_keep_every=sampling_config.negative_keep_every,
+            min_lane_change_events=sampling_config.required_lane_changes,
+            persist=sampling_config.persist,
+            margin_before=sampling_config.margin_before,
+            margin_after=sampling_config.margin_after,
         )
     )
 
 
-def _apply_screening(
-    pipeline: Pipeline,
+def _base_spec(
+    plan: PipelinePlan,
     *,
-    screening_spec: Screen | None,
-    scene_id_column: str | None,
-    agent_id_column: str,
-    frame_column: str,
-    category_column: str,
-    mark_passed_agents: bool,
-) -> Pipeline:
-    if screening_spec is not None:
-        return pipeline.then(
-            tr.screen_scene(
-                screening_spec,
-                group_by=scene_id_column,
-                agent_id=agent_id_column,
-                frame_column=frame_column,
-                category_column=category_column,
-                mark_passed_agents=mark_passed_agents,
-            )
-        )
-    return pipeline
-
-
-def _apply_resample_and_yield(
-    pipeline: Pipeline,
-    *,
-    frame_column: str,
-    agent_id_column: str,
-    scene_id_column: str | None,
-    resampling: ResampleSpec | None,
-    drop: list[str] | None = None,
-) -> Pipeline:
-    pipeline = pipeline.then(
-        tr.resample(
-            spec=resampling,
-            frame_column=frame_column,
-            group_by=(
-                [scene_id_column, agent_id_column]
-                if scene_id_column is not None
-                else [agent_id_column]
-            ),
-        )
-    )
-    if scene_id_column is not None:
-        pipeline = pipeline.then_flat_map(tr.group_by_yield(scene_id_column))
-    if drop is not None:
-        pipeline = pipeline.then(tr.select(pl.all().exclude(drop)))
-    return pipeline
-
-
-def _factory_generated_drop_columns(
-    builder: TrajectoryPipelineBuilder, *, scene_id_column: str | None
-) -> list[str] | None:
-    drop_columns: list[str] = []
-
-    if builder.has_window:
-        drop_columns.append("window_index")
-    if builder.split_columns():
-        drop_columns.append(SPLIT_PARTITION_COLUMN)
-    if scene_id_column is not None:
-        drop_columns.append(scene_id_column)
-
-    return drop_columns or None
-
-
-def _compile_resample_config(
-    scenes_config: ScenesConfig, resample_config: ResampleConfig | None
-) -> ResampleSpec | None:
-    if resample_config is None:
-        return None
-
-    return ResampleSpec(
-        up=resample_config.up,
-        down=resample_config.down,
-        sample_time=scenes_config.sample_time,
-        coordinates=resample_config.coordinates,
-        method=ResampleMethod(resample_config.method),
-        max_gap=resample_config.max_gap,
-        emit_velocity=resample_config.emit_velocity,
-        emit_acceleration=resample_config.emit_acceleration,
+    columns: TrajectoryColumns | None = None,
+    window_by: str | Sequence[str] | None,
+) -> TrajectorySpec:
+    """Build the shared, extension-free portion of a trajectory spec."""
+    return TrajectorySpec(
+        plan=plan, columns=TrajectoryColumns() if columns is None else columns, window_by=window_by
     )

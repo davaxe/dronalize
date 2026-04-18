@@ -62,9 +62,7 @@ def collate_hetero_with_time_padding(samples: Sequence[HeteroData]) -> Batch:
     max_future_frames = max(int(sample["agent"].y.size(1)) for sample in samples)
     padded_samples: list[BaseData] = [
         _pad_hetero_time_axes(
-            sample,
-            history_frames=max_history_frames,
-            future_frames=max_future_frames,
+            sample, history_frames=max_history_frames, future_frames=max_future_frames
         )
         for sample in samples
     ]

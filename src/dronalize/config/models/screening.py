@@ -61,6 +61,14 @@ class _AgentRuleSpecBase(FullConfig):
     """Optional tolerance thresholds used to relax rule comparisons."""
 
 
+class MinDistanceSpec(_AgentRuleSpecBase):
+    """Require a minimum distance between first and last observations."""
+
+    rule: Literal["min_distance"] = Field("min_distance", repr=False, init=False)
+    minimum: float = Field(ge=0.0)
+    """Minimum distance between first and last observations for each selected agent."""
+
+
 class RequireFramesSpec(_AgentRuleSpecBase):
     """Require listed frame IDs to exist for each selected agent."""
 
@@ -148,7 +156,8 @@ AgentCheckSpec = Annotated[
     | MinConsecutiveFramesSpec
     | StartsByFrameSpec
     | EndsAfterFrameSpec
-    | MinSpanSpec,
+    | MinSpanSpec
+    | MinDistanceSpec,
     Field(discriminator="rule"),
 ]
 """Discriminated union of all declarative per-agent screening rule models.
@@ -249,8 +258,7 @@ class IncludeCategoriesSpec(FullConfig):
 
 
 CleanupSpec = Annotated[
-    ExcludeCategoriesSpec | IncludeCategoriesSpec | PruneByRuleSpec,
-    Field(discriminator="rule"),
+    ExcludeCategoriesSpec | IncludeCategoriesSpec | PruneByRuleSpec, Field(discriminator="rule")
 ]
 """Discriminated union of all declarative cleanup actions applied before screening.
 

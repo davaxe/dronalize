@@ -87,11 +87,7 @@ Seed = Annotated[
 ]
 StorageBackendOption = Annotated[
     StorageBackend,
-    typer.Option(
-        "--storage-backend",
-        "--sb",
-        help="Storage backend for processed data.",
-    ),
+    typer.Option("--storage-backend", "--sb", help="Storage backend for processed data."),
 ]
 TrajectorySchema = Annotated[
     str | None, typer.Option("--scene-schema", help="Scene schema to persist in exported output.")

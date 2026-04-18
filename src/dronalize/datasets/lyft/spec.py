@@ -2,12 +2,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from dronalize.config.models import (
-    DatasetConfig,
-    MapConfig,
-    SceneExtentExtraction,
-    ScenesConfig,
-)
+from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction, ScenesConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.lyft.loader import LyftLoader, LyftLoaderOptions
 from dronalize.datasets.lyft.maps.builder import LyftMapBuilder

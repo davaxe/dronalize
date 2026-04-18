@@ -5,12 +5,14 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence  # noqa: TC003
 from dataclasses import dataclass
 from enum import IntFlag, auto
-from typing import Final
+from typing import Final, Literal, cast
 
 import polars as pl
 from typing_extensions import TypedDict
 
 from dronalize.core.errors import TrajectorySchemaError
+
+FieldStr = Literal["frame", "id", "agent_category", "x", "y", "vx", "vy", "ax", "ay", "yaw"]
 
 
 class TrajectoryField(IntFlag):
@@ -52,12 +54,12 @@ class TrajectoryField(IntFlag):
         """Yield individual TrajectoryField members present in this combination."""
         return (field for field in TrajectoryField if _contains_fields(self, field))
 
-    def to_str(self) -> str:
+    def to_str(self) -> FieldStr:
         """Return the canonical physical column name for this TrajectoryField."""
         if self.name is None:
             msg = f"Field combinations cannot be converted to strings: {self}"
             raise TrajectorySchemaError(msg)
-        return self.name.lower()
+        return cast("FieldStr", self.name.lower())
 
 
 _FIELD_DTYPES: Final[dict[TrajectoryField, pl.DataType]] = {

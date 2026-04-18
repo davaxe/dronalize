@@ -2,12 +2,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from dronalize.config.models import (
-    DatasetConfig,
-    FullMapExtraction,
-    MapConfig,
-    ScenesConfig,
-)
+from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig, ScenesConfig
 from dronalize.datasets.i80.loader import I80Loader
 from dronalize.datasets.i80.maps.builder import I80MapBuilder
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport

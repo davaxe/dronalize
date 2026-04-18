@@ -59,7 +59,7 @@ register(
         name="my_dataset",
         loader_factory=MyLoader.unified_factory,
         default_config=DatasetConfig(
-            scenes=ScenesConfig(history_frames=20, future_frames=30, sample_time=0.1),
+            scenes=ScenesConfig(history_frames=20, future_frames=30, sample_time=0.1)
         ),
         native_schema=MyLoader.native_trajectory_schema(),
     )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Literal, cast, overload
+from typing import TYPE_CHECKING, Literal, overload
 
 import polars as pl
 from typing_extensions import override
@@ -198,79 +198,6 @@ class Pipeline:
                 continue
 
             yield df_collected
-
-    @overload
-    def execute_single(
-        self,
-        df: pl.LazyFrame | pl.DataFrame,
-        *,
-        collect: Literal[False] = False,
-        filter_empty: bool = True,
-    ) -> pl.LazyFrame: ...
-
-    @overload
-    def execute_single(
-        self,
-        df: pl.LazyFrame | pl.DataFrame,
-        *,
-        collect: Literal[True],
-        filter_empty: Literal[False] = False,
-    ) -> pl.DataFrame: ...
-
-    @overload
-    def execute_single(
-        self, df: pl.LazyFrame, *, collect: Literal[True], filter_empty: Literal[True]
-    ) -> pl.DataFrame | None: ...
-
-    def execute_single(
-        self, df: pl.LazyFrame | pl.DataFrame, *, collect: bool = False, filter_empty: bool = True
-    ) -> pl.LazyFrame | pl.DataFrame | None:
-        """
-        Execute the pipeline expecting exactly one output.
-
-        This is a convenience wrapper for pipelines that contain no flat-map steps.
-
-        Parameters
-        ----------
-        df : pl.LazyFrame or pl.DataFrame
-            Input data. DataFrames will be converted to LazyFrames before
-            processing.
-        collect : bool, optional
-            If True, collect the resulting LazyFrame.
-        filter_empty : bool, optional
-            If True and collect=True, return None if the collected
-            DataFrame is empty.
-
-        Returns
-        -------
-        pl.LazyFrame | pl.DataFrame | None
-            The single resulting frame. May return None if
-            collect=True and filter_empty=True and the result is empty.
-
-        Raises
-        ------
-        ValueError
-            If the pipeline produces zero or more than one output.
-        """
-        results = list(self.execute(df, collect=collect, filter_empty=False))
-
-        if len(results) != 1:
-            msg = (
-                f"Pipeline.execute_single() expected exactly 1 output, "
-                f"got {len(results)}. Use execute() for flat-map pipelines."
-            )
-            raise ValueError(msg)
-
-        result = results[0]
-
-        if not collect:
-            return result
-
-        result = cast("pl.DataFrame", result)  # type checker cannot infer this
-        if filter_empty and result.height == 0:
-            return None
-
-        return result
 
     # -- common polars patterns ---------------------------------------------
 

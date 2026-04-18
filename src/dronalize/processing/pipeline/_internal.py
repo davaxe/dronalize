@@ -2,3 +2,4 @@
 
 SPLIT_PARTITION_COLUMN = "_split_partition"
 SCENE_ID_COLUMN = "_scene_id"
+WINDOW_INDEX_COLUMN = "window_index"

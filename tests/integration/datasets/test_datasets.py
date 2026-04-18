@@ -48,9 +48,7 @@ def test_datasets(
         graph = scene.resolve_map()
         assert_basic_map_sanity(graph, expect_map=scene.has_map())
         record = encode_scene_record(
-            scene,
-            dtype=np.float32,
-            trajectory_schema=plan.output.trajectory_schema,
+            scene, dtype=np.float32, trajectory_schema=plan.output.trajectory_schema
         )
         assert_record_sanity(record, scene)
         save_scene_artifacts(

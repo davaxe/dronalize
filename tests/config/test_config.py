@@ -52,11 +52,7 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
         _ = cfg.resolve(
             "demo",
             DatasetConfig.model_validate({
-                "scenes": {
-                    "history_frames": 1,
-                    "future_frames": 1,
-                    "sample_time": 0.1,
-                }
+                "scenes": {"history_frames": 1, "future_frames": 1, "sample_time": 0.1}
             }),
         )
 

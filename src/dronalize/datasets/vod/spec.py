@@ -2,12 +2,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from dronalize.config.models import (
-    DatasetConfig,
-    MapConfig,
-    SceneExtentExtraction,
-    ScenesConfig,
-)
+from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction, ScenesConfig
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_single_shared_map_resource
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config

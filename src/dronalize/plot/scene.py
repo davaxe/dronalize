@@ -104,9 +104,7 @@ def plot_scene(
     _ = alt.data_transformers.enable("vegafusion")  # pyright: ignore[reportUnknownVariableType]
 
     normalized = _normalize_plot_input(
-        data,
-        max_agents=max_agents,
-        agent_sample_seed=agent_sample_seed,
+        data, max_agents=max_agents, agent_sample_seed=agent_sample_seed
     )
 
     chart = _build_scene_chart(
@@ -150,18 +148,13 @@ def _build_scene_chart(
 
     if show_map and not data.map_edges.is_empty():
         map_layers, edge_selection = _build_map_layers(
-            data.map_edges,
-            alt=alt,
-            include_nodes=include_map_nodes,
+            data.map_edges, alt=alt, include_nodes=include_map_nodes
         )
         layers.extend(map_layers)
         params.append(edge_selection)
 
     if not data.trajectories.is_empty():
-        trajectory_layers, trajectory_params = _build_trajectory_layers(
-            data.trajectories,
-            alt=alt,
-        )
+        trajectory_layers, trajectory_params = _build_trajectory_layers(data.trajectories, alt=alt)
         layers.extend(trajectory_layers)
         params.extend(trajectory_params)
 
@@ -183,30 +176,16 @@ def _build_scene_chart(
 
 
 def _normalize_plot_input(
-    data: Scene | SceneRecord,
-    *,
-    max_agents: int | None,
-    agent_sample_seed: int | None,
+    data: Scene | SceneRecord, *, max_agents: int | None, agent_sample_seed: int | None
 ) -> PlotSceneData:
     """Normalize a scene-like input to the plotting payload."""
     if isinstance(data, Scene):
-        return _normalize_scene(
-            data,
-            max_agents=max_agents,
-            agent_sample_seed=agent_sample_seed,
-        )
-    return _normalize_scene_record(
-        data,
-        max_agents=max_agents,
-        agent_sample_seed=agent_sample_seed,
-    )
+        return _normalize_scene(data, max_agents=max_agents, agent_sample_seed=agent_sample_seed)
+    return _normalize_scene_record(data, max_agents=max_agents, agent_sample_seed=agent_sample_seed)
 
 
 def _normalize_scene(
-    scene: Scene,
-    *,
-    max_agents: int | None,
-    agent_sample_seed: int | None,
+    scene: Scene, *, max_agents: int | None, agent_sample_seed: int | None
 ) -> PlotSceneData:
     """Convert a `Scene` into the normalized plotting payload."""
     trajectories = scene.frame.select(
@@ -223,9 +202,7 @@ def _normalize_scene(
         .alias("agent_type")
     ).drop("agent_category")
     trajectories = _sample_agents(
-        trajectories,
-        max_agents=max_agents,
-        agent_sample_seed=agent_sample_seed,
+        trajectories, max_agents=max_agents, agent_sample_seed=agent_sample_seed
     )
     trajectories = _add_segments(trajectories)
 
@@ -233,17 +210,12 @@ def _normalize_scene(
     map_edges = _map_graph_to_edge_frame(graph)
 
     return PlotSceneData(
-        scene_number=scene.scene_number,
-        trajectories=trajectories,
-        map_edges=map_edges,
+        scene_number=scene.scene_number, trajectories=trajectories, map_edges=map_edges
     )
 
 
 def _normalize_scene_record(
-    record: SceneRecord,
-    *,
-    max_agents: int | None,
-    agent_sample_seed: int | None,
+    record: SceneRecord, *, max_agents: int | None, agent_sample_seed: int | None
 ) -> PlotSceneData:
     """Convert a `SceneRecord` into the normalized plotting payload."""
     features = np.concatenate((record.input_features, record.output_features), axis=1)
@@ -286,9 +258,7 @@ def _normalize_scene_record(
         orient="row",
     )
     trajectories = _sample_agents(
-        trajectories,
-        max_agents=max_agents,
-        agent_sample_seed=agent_sample_seed,
+        trajectories, max_agents=max_agents, agent_sample_seed=agent_sample_seed
     )
     trajectories = _add_segments(trajectories)
 
@@ -307,10 +277,7 @@ def _normalize_scene_record(
 
 
 def _sample_agents(
-    trajectories: pl.DataFrame,
-    *,
-    max_agents: int | None,
-    agent_sample_seed: int | None,
+    trajectories: pl.DataFrame, *, max_agents: int | None, agent_sample_seed: int | None
 ) -> pl.DataFrame:
     """Optionally subsample plotted agents."""
     if max_agents is None or trajectories.is_empty():
@@ -401,9 +368,7 @@ def _resolve_plot_dimensions(
         return _DEFAULT_WIDTH, _DEFAULT_HEIGHT
 
     x_min, x_max, y_min, y_max = _collect_plot_bounds(
-        trajectories=trajectories,
-        map_edges=map_edges,
-        show_map=show_map,
+        trajectories=trajectories, map_edges=map_edges, show_map=show_map
     )
     x_span = max(x_max - x_min, 1.0)
     y_span = max(y_max - y_min, 1.0)
@@ -415,10 +380,7 @@ def _resolve_plot_dimensions(
 
 
 def _collect_plot_bounds(
-    *,
-    trajectories: pl.DataFrame,
-    map_edges: pl.DataFrame,
-    show_map: bool,
+    *, trajectories: pl.DataFrame, map_edges: pl.DataFrame, show_map: bool
 ) -> tuple[float, float, float, float]:
     """Return combined x/y bounds across plotted layers."""
     x_values: list[float] = []
@@ -522,10 +484,7 @@ def _build_trajectory_layers(
 
 
 def _build_map_layers(
-    map_edges: pl.DataFrame,
-    *,
-    alt: ModuleType,
-    include_nodes: bool,
+    map_edges: pl.DataFrame, *, alt: ModuleType, include_nodes: bool
 ) -> tuple[list[alt.Chart], Any]:
     """Build Altair layers for a normalized edge dataframe."""
     color_dict, width_dict, dash_dict = _get_altair_style_dicts()
@@ -551,21 +510,14 @@ def _build_map_layers(
                 "edge_type:N",
                 scale=alt.Scale(domain=present_types, range=plot_color),
                 legend=alt.Legend(
-                    title="Edge Type",
-                    symbolType="stroke",
-                    symbolStrokeWidth=3,
-                    orient="right",
+                    title="Edge Type", symbolType="stroke", symbolStrokeWidth=3, orient="right"
                 ),
             ),
             size=alt.Size(
-                "edge_type:N",
-                scale=alt.Scale(domain=present_types, range=plot_width),
-                legend=None,
+                "edge_type:N", scale=alt.Scale(domain=present_types, range=plot_width), legend=None
             ),
             strokeDash=alt.StrokeDash(
-                "edge_type:N",
-                scale=alt.Scale(domain=present_types, range=plot_dash),
-                legend=None,
+                "edge_type:N", scale=alt.Scale(domain=present_types, range=plot_dash), legend=None
             ),
             opacity=alt.when(edge_selection).then(alt.value(0.7)).otherwise(alt.value(0.05)),
             tooltip=[

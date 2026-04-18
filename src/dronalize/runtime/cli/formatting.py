@@ -91,7 +91,7 @@ def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, detail
         window = _format_base_window(cfg.history_frames, cfg.future_frames, cfg.sample_time)
         has_map = "[green]yes[/green]" if descriptor.has_map else "[dim]no[/dim]"
         native_splits = (
-            ", ".join(split.value for split in descriptor.native_splits) or "[dim]none[/dim]"
+            ", ".join(split.value for split in descriptor.native_splits or ()) or "[dim]none[/dim]"
         )
         table.add_row(
             descriptor.name,
@@ -120,7 +120,7 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     overview.add_row("Schema fields", ", ".join(descriptor.native_schema.semantic_fields()))
     overview.add_row(
         "Native splits",
-        ", ".join(split.value for split in descriptor.native_splits) or "[dim]none[/dim]",
+        ", ".join(split.value for split in descriptor.native_splits or ()) or "[dim]none[/dim]",
     )
     overview.add_row("Supported split modes", _format_split_modes(descriptor))
     overview.add_row("Map", _format_flag(enabled=descriptor.has_map))
@@ -170,7 +170,7 @@ def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     summary.add_row("Dataset", descriptor.name)
     summary.add_row(
         "Native splits",
-        ", ".join(split.value for split in descriptor.native_splits) or "[dim]none[/dim]",
+        ", ".join(split.value for split in descriptor.native_splits or ()) or "[dim]none[/dim]",
     )
     summary.add_row("Supported split modes", _format_split_modes(descriptor))
     return (summary,)
@@ -330,10 +330,7 @@ def _split_config_detail_rows(split_config: SplitConfigUnion) -> list[tuple[str,
         case SceneSplitConfig(ratio=ratio) | SourceSplitConfig(ratio=ratio):
             return [("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test))]
         case TimeSplitConfig(ratio=ratio, gap=gap):
-            return [
-                ("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test)),
-                ("Gap", str(gap)),
-            ]
+            return [("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test)), ("Gap", str(gap))]
         case ShuffledTimeSplitConfig(ratio=ratio, gap=gap, segments=segments):
             return [
                 ("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test)),

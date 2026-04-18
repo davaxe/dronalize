@@ -10,10 +10,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.loading.base import (
-    BaseSceneLoader,
-    DatasetOptionsModel,
-)
+from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import no_map, shared_map
 

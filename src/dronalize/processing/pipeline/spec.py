@@ -3,31 +3,112 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from typing_extensions import Self
 
-from dronalize.processing.pipeline.extensions import LaneChangeSamplingExtension
+from dronalize.core.polars_ops import normalize_group_by
+from dronalize.processing.columns import TrajectoryColumns
+from dronalize.processing.pipeline._internal import (
+    SCENE_ID_COLUMN,
+    SPLIT_PARTITION_COLUMN,
+    WINDOW_INDEX_COLUMN,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.processing.models import PipelinePlan
-    from dronalize.processing.pipeline.extensions.base import TrajectoryPipelineExtension
+    from dronalize.config.models import ScenesConfig
+    from dronalize.processing.models import PipelinePlan, SplitRequest
+    from dronalize.processing.pipeline.contributions import StageContributions
 
 
 @dataclass(frozen=True, slots=True)
-class TrackColumns:
-    """Column names used by the trajectory-processing pipeline."""
+class BuildContext:
+    """Execution-ready context with all derived pipeline state precompiled."""
 
-    frame: str = "frame"
-    agent_id: str = "id"
-    category: str = "agent_category"
-    lane_id: str | None = None
+    spec: TrajectorySpec
+    split_columns: tuple[str, ...]
+    window_group_columns: tuple[str, ...]
+    scene_key_columns: tuple[str, ...]
+    scene_id_column: str | None
+    drop_columns: tuple[str, ...]
 
-    def with_lane_id(self, lane_id: str) -> Self:
-        """Return a copy with the given lane-id column configured."""
-        return replace(self, lane_id=lane_id)
+    @property
+    def frame_column(self) -> str:
+        """Return the frame column configured by the trajectory spec."""
+        return self.spec.frame_column
+
+    @property
+    def agent_id_column(self) -> str:
+        """Return the agent-ID column configured by the trajectory spec."""
+        return self.spec.agent_id_column
+
+    @property
+    def category_column(self) -> str:
+        """Return the category column configured by the trajectory spec."""
+        return self.spec.category_column
+
+    @property
+    def has_window(self) -> bool:
+        """Return whether the pipeline will build sliding-window scenes."""
+        return self.scenes.window is not None
+
+    @property
+    def split_request(self) -> SplitRequest | None:
+        """Return the active split request, if the plan uses one."""
+        return self.plan.split
+
+    @property
+    def scenes(self) -> ScenesConfig:
+        """Return the scene-construction config from the pipeline plan."""
+        return self.plan.scenes
+
+    @property
+    def plan(self) -> PipelinePlan:
+        """Return the pipeline plan owned by this build context."""
+        return self.spec.plan
+
+
+def compile_build_context(spec: TrajectorySpec, *, require_scene_id: bool = False) -> BuildContext:
+    """Compile immutable derived pipeline state from a declarative spec."""
+    plan = spec.plan
+    scenes = plan.scenes
+    split_request = plan.split
+    has_window = scenes.window is not None
+    split_columns = (
+        (SPLIT_PARTITION_COLUMN,)
+        if split_request is not None and split_request.strategy in {"time", "shuffled-time"}
+        else ()
+    )
+    window_group_columns = (*normalize_group_by(spec.window_by), *split_columns)
+    scene_key_columns = (
+        (*window_group_columns, WINDOW_INDEX_COLUMN) if has_window else window_group_columns
+    )
+    scene_id_column = SCENE_ID_COLUMN if (scene_key_columns or require_scene_id) else None
+
+    drop_columns = (
+        *((WINDOW_INDEX_COLUMN,) if has_window else ()),
+        *split_columns,
+        *((scene_id_column,) if scene_id_column is not None else ()),
+    )
+
+    return BuildContext(
+        spec=spec,
+        split_columns=split_columns,
+        window_group_columns=window_group_columns,
+        scene_key_columns=scene_key_columns,
+        scene_id_column=scene_id_column,
+        drop_columns=drop_columns,
+    )
+
+
+class TrajectoryPipelineExtension(Protocol):
+    """Protocol for extensions that contribute stage-local pipeline transforms."""
+
+    def compile(self, ctx: BuildContext) -> StageContributions:
+        """Compile this extension against an immutable build context."""
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,13 +116,9 @@ class TrajectorySpec:
     """Declarative specification for building a trajectory-processing pipeline."""
 
     plan: PipelinePlan
-    columns: TrackColumns = field(default_factory=TrackColumns)
+    columns: TrajectoryColumns = field(default_factory=TrajectoryColumns)
     window_by: str | Sequence[str] | None = None
     extension: TrajectoryPipelineExtension | None = None
-
-    def with_columns(self, columns: TrackColumns) -> Self:
-        """Return a copy with the given trajectory column mapping configured."""
-        return replace(self, columns=columns)
 
     def with_window_by(self, window_by: str | Sequence[str] | None) -> Self:
         """Return a copy with the given pre-window grouping configured."""
@@ -51,46 +128,17 @@ class TrajectorySpec:
         """Return a copy with the given pipeline extension configured."""
         return replace(self, extension=extension)
 
+    @property
+    def frame_column(self) -> str:
+        """Return the name of the frame column."""
+        return self.columns.frame
 
-def _base_spec(
-    plan: PipelinePlan, *, columns: TrackColumns | None, window_by: str | Sequence[str] | None
-) -> TrajectorySpec:
-    """Build the shared, extension-free portion of a trajectory spec."""
-    return TrajectorySpec(plan=plan, columns=columns or TrackColumns(), window_by=window_by)
+    @property
+    def agent_id_column(self) -> str:
+        """Return the name of the agent ID column."""
+        return self.columns.agent_id
 
-
-def standard(
-    plan: PipelinePlan,
-    *,
-    columns: TrackColumns | None = None,
-    window_by: str | Sequence[str] | None = None,
-) -> TrajectorySpec:
-    """Build the default trajectory pipeline specification."""
-    return _base_spec(plan, columns=columns, window_by=window_by)
-
-
-def lane_change_sampling(
-    plan: PipelinePlan,
-    *,
-    lane_id: str = "lane_id",
-    columns: TrackColumns | None = None,
-    window_by: str | Sequence[str] | None = None,
-) -> TrajectorySpec:
-    """Build a spec for lane-change-aware window sampling."""
-    sampling_config = plan.scenes.lane_change
-    base_spec = _base_spec(plan, columns=columns, window_by=window_by)
-    if sampling_config is None or sampling_config.negative_keep_every == 1:
-        # If every negative sample is kept, there is no difference in output
-        # selection between lane-change-aware sampling and standard sampling, so
-        # skip the extension (which is more efficient).
-        return base_spec
-
-    return base_spec.with_columns(base_spec.columns.with_lane_id(lane_id)).with_extension(
-        LaneChangeSamplingExtension(
-            negative_keep_every=sampling_config.negative_keep_every,
-            min_lane_change_events=sampling_config.required_lane_changes,
-            persist=sampling_config.persist,
-            margin_before=sampling_config.margin_before,
-            margin_after=sampling_config.margin_after,
-        )
-    )
+    @property
+    def category_column(self) -> str:
+        """Return the name of the agent category column."""
+        return self.columns.category

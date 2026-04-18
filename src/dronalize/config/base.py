@@ -97,10 +97,7 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         return cls.model_validate(data)
 
 
-def _deep_merge(
-    base: MutableMapping[str, V],
-    patch: Mapping[str, V],
-) -> MutableMapping[str, V]:
+def _deep_merge(base: MutableMapping[str, V], patch: Mapping[str, V]) -> MutableMapping[str, V]:
     """Recursively merge two mappings."""
     for key, patch_value in patch.items():
         base_value = base.get(key)

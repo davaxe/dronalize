@@ -2,12 +2,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from dronalize.config.models import (
-    DatasetConfig,
-    MapConfig,
-    SceneExtentExtraction,
-    ScenesConfig,
-)
+from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction, ScenesConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.argoverse1.loader import Argoverse1Loader, Argoverse1LoaderOptions
 from dronalize.datasets.argoverse1.maps.builder import Argoverse1MapBuilder
@@ -32,14 +27,8 @@ def open_argoverse1_resources(
     with open_named_shared_map_resources(
         map_config=map_config,
         named_paths=(
-            (
-                "MIA",
-                root / "hd_maps" / "map_files" / "pruned_argoverse_MIA_10316_vector_map.xml",
-            ),
-            (
-                "PIT",
-                root / "hd_maps" / "map_files" / "pruned_argoverse_PIT_10314_vector_map.xml",
-            ),
+            ("MIA", root / "hd_maps" / "map_files" / "pruned_argoverse_MIA_10316_vector_map.xml"),
+            ("PIT", root / "hd_maps" / "map_files" / "pruned_argoverse_PIT_10314_vector_map.xml"),
         ),
         build_map=lambda path, config: Argoverse1MapBuilder.from_xml_file(path).build(
             config.min_distance, config.interp_distance

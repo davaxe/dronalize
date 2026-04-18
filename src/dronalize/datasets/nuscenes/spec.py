@@ -2,12 +2,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
-from dronalize.config.models import (
-    DatasetConfig,
-    MapConfig,
-    SceneExtentExtraction,
-    ScenesConfig,
-)
+from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction, ScenesConfig
 from dronalize.datasets.nuscenes.loader import NuScenesLoader, NuScenesLoaderOptions
 from dronalize.datasets.nuscenes.maps.builder import NuScenesMapBuilder
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport

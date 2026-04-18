@@ -47,7 +47,7 @@ class ExcludeCategories(CleanupRuleBase):
     @override
     def expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression that excludes selected categories."""
-        return ~pl.col(ctx.category_column).is_in(self.categories)
+        return ~pl.col(ctx.columns.category).is_in(self.categories)
 
 
 class IncludeCategories(CleanupRuleBase):
@@ -66,7 +66,7 @@ class IncludeCategories(CleanupRuleBase):
     @override
     def expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression that keeps selected categories."""
-        return pl.col(ctx.category_column).is_in(self.categories)
+        return pl.col(ctx.columns.category).is_in(self.categories)
 
 
 CleanupRule = Annotated[

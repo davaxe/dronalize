@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import polars as pl
-import pytest
 
 from dronalize.processing.pipeline import Pipeline
 
@@ -26,15 +25,10 @@ def test_pipeline_compose_and_rshift_preserve_step_order() -> None:
     shifted = first >> second
 
     data = pl.DataFrame({"x": [1]})
-    assert composed.execute_single(data, collect=True)["x"].to_list() == [4]
-    assert shifted.execute_single(data, collect=True)["x"].to_list() == [4]
-
-
-def test_execute_single_rejects_flat_map_outputs() -> None:
-    pipeline = Pipeline().then_flat_map(lambda df: [df, df], name="duplicate")
-
-    with pytest.raises(ValueError, match="expected exactly 1 output"):
-        _ = pipeline.execute_single(pl.DataFrame({"x": [1]}), collect=True)
+    composed_result = next(composed.execute(data, collect=True))
+    shifted_result = next(shifted.execute(data, collect=True))
+    assert composed_result["x"].to_list() == [4]
+    assert shifted_result["x"].to_list() == [4]
 
 
 def test_execute_collect_filters_empty_frames_by_default() -> None:

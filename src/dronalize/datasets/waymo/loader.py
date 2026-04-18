@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-import dronalize.processing.pipeline.transforms as tr
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
@@ -23,7 +22,6 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.models import LoaderRequest
-    from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -64,16 +62,12 @@ class WaymoLoader(BaseSceneLoader):
         for scenario_index, raw_data in enumerate(_read_tfrecord(source.data)):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
             yield LoadedSourceData(
-                frame=_scenario_to_polars(scenario).lazy(),
+                frame=_scenario_to_polars(scenario).lazy().with_columns(pl.col("id").add(1)),
                 map_binding=MapBinding(
                     map_key=f"{source.identifier}:{scenario_index}",
                     metadata={"raw_map": raw_data} if self._include_map else {},
                 ),
             )
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return super().pipeline().then(tr.with_columns(pl.col("id") + 1))
 
     @classmethod
     @override

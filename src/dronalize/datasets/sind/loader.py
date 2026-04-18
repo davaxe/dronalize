@@ -49,11 +49,7 @@ class SindLoader(BaseSceneLoader):
     def discover_sources(self) -> Iterable[Source[Path]]:
         for region in sorted(p for p in self.root.iterdir() if p.is_dir()):
             for data_dir in sorted(p for p in region.iterdir() if p.is_dir()):
-                yield Source(
-                    identifier=data_dir.name,
-                    data=data_dir,
-                    map_key=str(region.name),
-                )
+                yield Source(identifier=data_dir.name, data=data_dir, map_key=str(region.name))
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:

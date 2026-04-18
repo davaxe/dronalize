@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-import dronalize.processing.pipeline.transforms as tr
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.processing.loading.base import BaseSceneLoader
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
 
     from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.models import LoaderRequest
-    from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -58,15 +56,8 @@ class _EthUcyLoader(BaseSceneLoader):
             ).with_columns(
                 ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
                 pl.col("id").cast(pl.Int32),
+                agent_category=pl.lit(AgentCategory.PEDESTRIAN),
             )
-        )
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return (
-            super()
-            .pipeline()
-            .then(tr.with_columns(agent_category=pl.lit(AgentCategory.PEDESTRIAN)))
         )
 
     @classmethod

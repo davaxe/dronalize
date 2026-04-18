@@ -37,10 +37,7 @@ def _assert_finite(array: npt.NDArray[np.floating[Any]], name: str) -> None:
 
 
 def _assert_edge_index_bounds(
-    edge_indices: npt.NDArray[np.int32],
-    num_nodes: int,
-    *,
-    name: str,
+    edge_indices: npt.NDArray[np.int32], num_nodes: int, *, name: str
 ) -> None:
     if edge_indices.shape[1] == 0:
         return
@@ -120,11 +117,7 @@ def assert_basic_map_sanity(graph: MapGraph | None, *, expect_map: bool) -> None
     if graph.num_nodes > 0:
         _assert_finite(graph.node_positions, "map node_positions")
 
-    _assert_edge_index_bounds(
-        graph.edge_indices,
-        graph.num_nodes,
-        name="map edge_indices",
-    )
+    _assert_edge_index_bounds(graph.edge_indices, graph.num_nodes, name="map edge_indices")
 
 
 def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
@@ -196,11 +189,7 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
     _assert_shape(record.map_edge_types, (map_num_edges,), "map_edge_types")
 
     _assert_finite(record.map_node_positions, "map_node_positions")
-    _assert_edge_index_bounds(
-        record.map_edge_indices,
-        map_num_nodes,
-        name="map_edge_indices",
-    )
+    _assert_edge_index_bounds(record.map_edge_indices, map_num_nodes, name="map_edge_indices")
 
     has_record_map = map_num_nodes > 0 or map_num_edges > 0
     if not scene.has_map():
@@ -208,28 +197,16 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
 
 
 def save_scene_artifacts(
-    scene: Scene,
-    graph: MapGraph | None,
-    out_dir: Path,
-    case: DatasetCase,
+    scene: Scene, graph: MapGraph | None, out_dir: Path, case: DatasetCase
 ) -> None:
     """Save scene artifacts like trajectories and maps for debugging."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
     frame = scene.frame.select("frame", "id", "x", "y")
-    _ = plot_scene(
-        scene,
-        show_map=False,
-        save_path=out_dir / "trajectories.html",
-        aspect="equal",
-    )
+    _ = plot_scene(scene, show_map=False, save_path=out_dir / "trajectories.html", aspect="equal")
 
     if graph is not None and (graph.num_nodes > 0 or graph.num_edges > 0):
-        _ = plot_scene(
-            scene,
-            save_path=out_dir / "overlay.html",
-            aspect="equal",
-        )
+        _ = plot_scene(scene, save_path=out_dir / "overlay.html", aspect="equal")
 
     summary_frame = frame.select(
         pl.col("x").min().alias("x_min"),

@@ -14,10 +14,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import (
-    BaseSceneLoader,
-    DatasetOptionsModel,
-)
+from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
 
 if TYPE_CHECKING:

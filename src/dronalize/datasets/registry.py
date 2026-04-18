@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import importlib
 import importlib.util
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,7 +72,7 @@ class DatasetSpec:
     loader_factory: LoaderFactory
     default_config: DatasetConfig
     native_schema: TrajectorySchema
-    native_splits: tuple[DatasetSplit, ...] = ()
+    native_splits: tuple[DatasetSplit, ...] | None = None
     dataset_options_model: type[DatasetOptionsModel] = NoDatasetOptions
     resources_factory: ResourcesFactory | None = None
     has_map: bool = False
@@ -82,7 +82,7 @@ class DatasetSpec:
         """Return the default typed dataset-owned config block."""
         return self.dataset_options_model()
 
-    def parse_dataset_config(self, payload: dict[str, object] | None) -> DatasetOptionsModel:
+    def parse_dataset_config(self, payload: Mapping[str, object] | None) -> DatasetOptionsModel:
         """Parse and validate dataset-owned config from plain data."""
         try:
             return self.dataset_options_model.model_validate(payload or {})

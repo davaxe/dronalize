@@ -62,11 +62,7 @@ def resample_config(
 
 
 def spline_resample(
-    up: int,
-    down: int = 1,
-    *,
-    emit_velocity: bool = True,
-    emit_acceleration: bool = True,
+    up: int, down: int = 1, *, emit_velocity: bool = True, emit_acceleration: bool = True
 ) -> ResampleConfig:
     """Return the default cubic resampling config used by most trajectory datasets."""
     return resample_config(

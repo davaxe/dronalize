@@ -31,10 +31,7 @@ def _all_methods_spec(**kwargs: Unpack[_ResampleArgs]) -> list[ResampleSpec]:
     ]
 
 
-@pytest.mark.parametrize(
-    "spec",
-    _all_methods_spec(up=2, down=1, sample_time=1.0),
-)
+@pytest.mark.parametrize("spec", _all_methods_spec(up=2, down=1, sample_time=1.0))
 def test_resample_simple(spec: ResampleSpec, scene_df_presets: DataFramePresets) -> None:
     # preset has 3 samples with no gaps
     df = scene_df_presets["single_agent"]()
@@ -47,13 +44,7 @@ def test_resample_simple(spec: ResampleSpec, scene_df_presets: DataFramePresets)
 
 
 @pytest.mark.parametrize(
-    "spec",
-    _all_methods_spec(
-        up=2,
-        down=1,
-        emit_velocity=True,
-        emit_acceleration=True,
-    ),
+    "spec", _all_methods_spec(up=2, down=1, emit_velocity=True, emit_acceleration=True)
 )
 def test_resample_simple_add_derivatives(
     spec: ResampleSpec, scene_df_presets: DataFramePresets

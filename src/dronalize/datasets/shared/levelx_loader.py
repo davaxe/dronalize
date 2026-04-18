@@ -131,10 +131,7 @@ class LevelXDataLoader(BaseSceneLoader):
                 metadata["utm_y0"] = utm_y0
 
             yield Source(
-                identifier=recording_id,
-                data=self.root,
-                map_key=str(location_id),
-                metadata=metadata,
+                identifier=recording_id, data=self.root, map_key=str(location_id), metadata=metadata
             )
 
     @override

@@ -16,10 +16,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import (
-    BaseSceneLoader,
-    DatasetOptionsModel,
-)
+from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import no_map, shared_map
 

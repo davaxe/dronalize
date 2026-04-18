@@ -12,11 +12,16 @@ from typing_extensions import Self, TypeVar
 
 from dronalize.core.errors import LoaderConfigError, SplitNotSupportedError
 from dronalize.core.typing import SourceT
+from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.resources import DatasetResources
 from dronalize.processing.maps.resolver import MapResolver, no_map
 from dronalize.processing.models import PipelinePlan, SplitRequest
-from dronalize.processing.pipeline import spec
-from dronalize.processing.pipeline.factory import trajectory_pipeline
+from dronalize.processing.pipeline.factory import (
+    lane_change_sampling,
+    standard,
+    trajectory_pipeline,
+)
+from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -27,7 +32,6 @@ if TYPE_CHECKING:
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
     from dronalize.processing.models import LoaderRequest
-    from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 class DatasetOptionsModel(BaseModel):
@@ -149,14 +153,17 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
     def pipeline(self) -> Pipeline:
         """Return the processing pipeline for this loader."""
         plan = PipelinePlan(
-            scenes=self.scenes_config,
-            screening=self.screening_config,
-            split=self.split_config,
+            scenes=self.scenes_config, screening=self.screening_config, split=self.split_config
         )
-        return trajectory_pipeline(
-            spec.lane_change_sampling(plan)
+        columns = TrajectoryColumns.from_schema(self.native_trajectory_schema())
+        return Pipeline().then(
+            lambda df: df.match_to_schema(
+                self.native_trajectory_schema().physical, extra_columns="ignore"
+            )
+        ) >> trajectory_pipeline(
+            lane_change_sampling(plan, columns=columns)
             if self.scenes_config.lane_change is not None
-            else spec.standard(plan),
+            else standard(plan, columns=columns)
         )
 
     def discover_sources(self) -> Iterable[Source[SourceT]]:

@@ -12,20 +12,6 @@ if TYPE_CHECKING:
     from dronalize.core.typing import DataFrameT
 
 
-def lazy(data: pl.DataFrame | pl.LazyFrame) -> pl.LazyFrame:
-    """Convert a DataFrame to a LazyFrame if necessary."""
-    if isinstance(data, pl.DataFrame):
-        return data.lazy()
-    return data
-
-
-def collect(data: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame:
-    """Resolve a LazyFrame to a DataFrame if necessary."""
-    if isinstance(data, pl.LazyFrame):
-        return data.collect()
-    return data
-
-
 def yaw_from_vel(
     data: DataFrameT, vx_col: str = "vx", vy_col: str = "vy", yaw_col: str = "yaw"
 ) -> DataFrameT:
