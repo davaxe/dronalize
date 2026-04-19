@@ -23,8 +23,9 @@ The package exposes one scene-oriented entrypoint:
 
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING, Literal
+
+from dronalize._lazy import lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
     from dronalize.plot.scene import plot_scene
@@ -42,16 +43,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 
 def __getattr__(name: str) -> object:
     """Resolve plotting helpers lazily to avoid importing optional deps eagerly."""
-    if name not in _EXPORTS:
-        msg = f"module '{__name__}' has no attribute '{name}'"
-        raise AttributeError(msg)
-
-    module_name, export_name = _EXPORTS[name]
-    value = getattr(importlib.import_module(module_name), export_name)
-    globals()[name] = value
-    return value
+    return resolve_lazy_export(globals(), _EXPORTS, module_name=__name__, name=name)
 
 
 def __dir__() -> list[str]:
     """Expose lazy plotting exports during interactive discovery."""
-    return sorted(set(globals()) | set(__all__))
+    return lazy_dir(globals(), exported_names=list(_EXPORTS))

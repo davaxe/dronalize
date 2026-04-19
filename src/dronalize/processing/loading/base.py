@@ -16,11 +16,7 @@ from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.resources import DatasetResources
 from dronalize.processing.maps.resolver import MapResolver, no_map
 from dronalize.processing.models import PipelinePlan, SplitRequest
-from dronalize.processing.pipeline.factory import (
-    lane_change_sampling,
-    standard,
-    trajectory_pipeline,
-)
+from dronalize.processing.pipeline import spec
 from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
@@ -160,10 +156,10 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
             lambda df: df.match_to_schema(
                 self.native_trajectory_schema().physical, extra_columns="ignore"
             )
-        ) >> trajectory_pipeline(
-            lane_change_sampling(plan, columns=columns)
+        ) >> spec.trajectory_pipeline(
+            spec.lane_change_sampling(plan, columns=columns)
             if self.scenes_config.lane_change is not None
-            else standard(plan, columns=columns)
+            else spec.standard(plan, columns=columns)
         )
 
     def discover_sources(self) -> Iterable[Source[SourceT]]:

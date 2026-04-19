@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal
 import polars as pl
 import polars.selectors as cs
 
-from dronalize.core.polars_ops import normalize_group_by
+from dronalize.core.functional.basic import normalize_group_by
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

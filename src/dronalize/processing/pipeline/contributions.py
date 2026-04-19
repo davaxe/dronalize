@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from dronalize.processing.pipeline.pipeline import Pipeline
+from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 class PipelineStage(Enum):
@@ -22,12 +20,10 @@ class PipelineStage(Enum):
 class StageContributions:
     """Declarative stage-local contributions produced by one extension."""
 
-    transforms: dict[PipelineStage, tuple[Pipeline, ...]] = field(default_factory=dict)
+    transforms: dict[PipelineStage, Pipeline] = field(default_factory=dict)
     require_scene_id: bool = False
 
 
-def get_stage_pipelines(
-    contributions: StageContributions, stage: PipelineStage
-) -> tuple[Pipeline, ...]:
+def get_stage_pipelines(contributions: StageContributions, stage: PipelineStage) -> Pipeline:
     """Return the pipelines contributed to one stage."""
-    return contributions.transforms.get(stage, ())
+    return contributions.transforms.get(stage, Pipeline())

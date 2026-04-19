@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
 from dataclasses import fields
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -20,10 +19,24 @@ from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsMod
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
 
-DataFrameBuilder = Callable[[Iterable["AgentData"]], pl.DataFrame]
+class DataFrameBuilder:
+    def __init__(self) -> None:
+        self.data_frames: list[pl.DataFrame] = []
+
+    def add_agent_data(self, agent_data: AgentData) -> None:
+        if len(self.data_frames) == 0:
+            self.next_frame()
+        df = make_scene_df(agent_data)
+        self.data_frames[-1] = pl.concat([self.data_frames[-1], df], how="vertical")
+
+    def next_frame(self) -> None:
+        self.data_frames.append(pl.DataFrame())
+
+    def build(self) -> pl.DataFrame:
+        return combine_df(*self.data_frames)
 
 
 class AgentData(TypedDict):
@@ -37,6 +50,7 @@ class AgentData(TypedDict):
     ax: NotRequired[Sequence[float]]
     ay: NotRequired[Sequence[float]]
     yaw: NotRequired[Sequence[float]]
+    lane_id: NotRequired[Sequence[int]]
 
 
 class DemoOptions(DatasetOptionsModel):
@@ -62,18 +76,21 @@ class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
         _ = source
-        frame = pl.DataFrame({
-            "frame": [0, 1, 2],
-            "id": [1, 1, 1],
-            "x": [0.0, 1.0, 2.0],
-            "y": [0.0, 0.0, 0.0],
-            "vx": [1.0, 1.0, 1.0],
-            "vy": [0.0, 0.0, 0.0],
-            "ax": [0.0, 0.0, 0.0],
-            "ay": [0.0, 0.0, 0.0],
-            "yaw": [0.0, 0.0, 0.0],
-            "agent_category": [1, 1, 1],
-        })
+        frame = pl.DataFrame(
+            {
+                "frame": [0, 1, 2],
+                "id": [1, 1, 1],
+                "x": [0.0, 1.0, 2.0],
+                "y": [0.0, 0.0, 0.0],
+                "vx": [1.0, 1.0, 1.0],
+                "vy": [0.0, 0.0, 0.0],
+                "ax": [0.0, 0.0, 0.0],
+                "ay": [0.0, 0.0, 0.0],
+                "yaw": [0.0, 0.0, 0.0],
+                "agent_category": [1, 1, 1],
+            },
+            schema_overrides={"frame": pl.Int32(), "id": pl.Int32(), "agent_category": pl.Int32()},
+        )
         yield LoadedSourceData(frame.lazy())
 
     @override
@@ -177,7 +194,10 @@ def assert_scene_record_equal(actual: SceneRecord, expected: SceneRecord) -> Non
 
 class DataFramePresets(TypedDict):
     single_agent: Callable[[], pl.DataFrame]
+    single_agent_windowed: Callable[[], pl.DataFrame]
+    single_agent_time_split: Callable[[], pl.DataFrame]
     two_agents: Callable[[], pl.DataFrame]
+    lane_change_sequences: Callable[[], pl.DataFrame]
 
 
 def scene_df_presets() -> DataFramePresets:
@@ -185,10 +205,59 @@ def scene_df_presets() -> DataFramePresets:
         "single_agent": lambda: make_scene_df(
             AgentData(id=1, x=[0.0, 1.0, 2.0], y=[0.0, 0.0, 0.0], category="car", frame=[0, 1, 2])
         ),
+        "single_agent_windowed": lambda: make_scene_df(
+            AgentData(
+                id=1,
+                x=[0.0, 1.0, 2.0, 3.0],
+                y=[0.0, 0.0, 0.0, 0.0],
+                category="car",
+                frame=[0, 1, 2, 3],
+            )
+        ),
+        "single_agent_time_split": lambda: make_scene_df(
+            AgentData(
+                id=1,
+                x=[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+                y=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                category="car",
+                frame=[0, 1, 2, 3, 4, 5, 6, 7],
+            )
+        ),
         "two_agents": lambda: make_scene_df(
             AgentData(id=1, x=[0.0, 1.0, 2.0], y=[0.0, 0.0, 0.0], category="car", frame=[0, 1, 2]),
             AgentData(
                 id=2, x=[5.0, 5.5, 6.0], y=[5.0, 5.5, 6.0], category="pedestrian", frame=[0, 1, 2]
             ),
         ),
+        "lane_change_sequences": lambda: pl.DataFrame({
+            "sequence": [
+                "changing",
+                "changing",
+                "changing",
+                "changing",
+                "changing",
+                "steady",
+                "steady",
+                "steady",
+                "steady",
+                "steady",
+            ],
+            "frame": [0, 1, 2, 3, 4, 0, 1, 2, 3, 4],
+            "id": [1, 1, 1, 1, 1, 2, 2, 2, 2, 2],
+            "x": [0.0, 1.0, 2.0, 3.0, 4.0, 0.0, 1.0, 2.0, 3.0, 4.0],
+            "y": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            "agent_category": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            "lane_id": [1, 1, 2, 2, 2, 1, 1, 1, 1, 1],
+        }),
     }
+
+
+def combine_df(*frames: pl.DataFrame, identify_column: str | None = None) -> pl.DataFrame:
+    # Combine with extra column that specify which preset each row came from
+    if identify_column is None:
+        return pl.concat(frames, how="vertical")
+
+    labeled_frames: list[pl.DataFrame] = []
+    for i, frame in enumerate(frames):
+        labeled_frames.append(frame.with_columns(pl.lit(i).alias(identify_column)))
+    return pl.concat(labeled_frames, how="vertical")

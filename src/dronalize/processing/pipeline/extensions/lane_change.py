@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 from dronalize.processing.pipeline import transforms as tr
-from dronalize.processing.pipeline._internal import SCENE_ID_COLUMN
 from dronalize.processing.pipeline.contributions import PipelineStage, StageContributions
 from dronalize.processing.pipeline.pipeline import Pipeline
 
@@ -44,8 +43,6 @@ class LaneChangeSamplingExtension:
         if not ctx.has_window:
             return StageContributions()
 
-        scene_id_column = ctx.scene_id_column or SCENE_ID_COLUMN
-
         pre = Pipeline().then(
             tr.valid_lane_change(
                 persist=self.persist,
@@ -58,6 +55,11 @@ class LaneChangeSamplingExtension:
                 valid_column=_LANE_CHANGE_EVENT_COLUMN,
             )
         )
+
+        scene_id_column = ctx.scene_id_column
+        if scene_id_column is None:
+            msg = "LaneChangeSamplingExtension requires a scene ID column in the build context."
+            raise ValueError(msg)
 
         def _label_scenes(df: pl.LazyFrame) -> pl.LazyFrame:
             return df.with_columns(
@@ -89,6 +91,6 @@ class LaneChangeSamplingExtension:
         )
 
         return StageContributions(
-            transforms={PipelineStage.PRE_WINDOW: (pre,), PipelineStage.POST_SCREENING: (post,)},
+            transforms={PipelineStage.PRE_WINDOW: pre, PipelineStage.POST_SCREENING: post},
             require_scene_id=True,
         )

@@ -1,20 +1,23 @@
-"""Small root package for shared enums used across the public API.
+"""Small root package for shared enums and sibling core subpackages.
 
 ## Import guide
 
 ```python
 from dronalize.core import AgentCategory, DatasetSplit
+from dronalize.core import functional
 from dronalize.core.scene import Scene, TrajectorySchema
 from dronalize.core.maps import MapGraph, EdgeType
 ```
 
 The richer domain-model surfaces live in sibling packages:
 
+- [`dronalize.core.functional`][] for dataframe-to-dataframe utilities and transforms
 - [`dronalize.core.scene`][] for scenes, trajectory schemas, and schema lookup
 - [`dronalize.core.maps`][] for map graphs and map-edge types
 
 This root package intentionally only exposes the cross-cutting enum types that
-appear throughout the rest of the library.
+appear throughout the rest of the library; the richer helpers remain grouped in
+their dedicated subpackages.
 
 """
 

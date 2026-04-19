@@ -8,8 +8,8 @@ import polars as pl
 
 import dronalize.processing.pipeline.transforms as tr
 from dronalize.config.models import ShuffledTimeSplitConfig, TimeSplitConfig
-from dronalize.core.polars_ops import normalize_group_by
-from dronalize.processing.pipeline.functional.resample import ResampleMethod, ResampleSpec
+from dronalize.core.functional import ResampleMethod, ResampleSpec
+from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.pipeline.pipeline import Pipeline
 from dronalize.processing.screening.screen import Screen
 
