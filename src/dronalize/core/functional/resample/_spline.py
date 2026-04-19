@@ -10,7 +10,7 @@ import numpy.typing as npt
 import polars as pl
 from scipy.interpolate import CubicSpline, PchipInterpolator, PPoly
 
-from dronalize.processing.pipeline.functional.resample._common import (
+from dronalize.core.functional.resample._common import (
     SEGMENT_COLUMN,
     ResamplePlan,
     ResampleSpec,

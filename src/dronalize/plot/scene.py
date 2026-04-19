@@ -47,7 +47,7 @@ class PlotSceneData:
 
     scene_number: int
     trajectories: pl.DataFrame
-    map_edges: pl.DataFrame
+    map_edges: pl.DataFrame | None
 
 
 def plot_scene(
@@ -106,7 +106,6 @@ def plot_scene(
     normalized = _normalize_plot_input(
         data, max_agents=max_agents, agent_sample_seed=agent_sample_seed
     )
-
     chart = _build_scene_chart(
         normalized,
         alt=alt,
@@ -116,10 +115,8 @@ def plot_scene(
         height=height,
         include_map_nodes=include_map_nodes,
     )
-
     if save_path is not None:
         chart.save(save_path)  # pyright: ignore[reportUnknownMemberType]
-
     return chart
 
 
@@ -146,7 +143,7 @@ def _build_scene_chart(
     layers: list[alt.Chart] = []
     params: list[Any] = []
 
-    if show_map and not data.map_edges.is_empty():
+    if show_map and data.map_edges is not None and not data.map_edges.is_empty():
         map_layers, edge_selection = _build_map_layers(
             data.map_edges, alt=alt, include_nodes=include_map_nodes
         )
@@ -302,10 +299,10 @@ def _add_segments(trajectories: pl.DataFrame) -> pl.DataFrame:
     return trajectories.with_columns(segment.cast(pl.Int64()).alias("segment"))
 
 
-def _map_graph_to_edge_frame(graph: MapGraph | None) -> pl.DataFrame:
+def _map_graph_to_edge_frame(graph: MapGraph | None) -> pl.DataFrame | None:
     """Convert a map graph to the minimal edge dataframe needed by Altair."""
     if graph is None or graph.num_edges == 0:
-        return _empty_map_edge_frame()
+        return None
 
     start_indices = graph.edge_indices[0]
     end_indices = graph.edge_indices[1]
@@ -334,24 +331,10 @@ def _map_graph_to_edge_frame(graph: MapGraph | None) -> pl.DataFrame:
     )
 
 
-def _empty_map_edge_frame() -> pl.DataFrame:
-    """Return the canonical empty edge dataframe."""
-    return pl.DataFrame(
-        schema={
-            "x1": pl.Float64(),
-            "y1": pl.Float64(),
-            "x2": pl.Float64(),
-            "y2": pl.Float64(),
-            "edge_type": pl.String(),
-            "length": pl.Float64(),
-        }
-    )
-
-
 def _resolve_plot_dimensions(
     *,
     trajectories: pl.DataFrame,
-    map_edges: pl.DataFrame,
+    map_edges: pl.DataFrame | None,
     show_map: bool,
     aspect: AspectMode,
     width: int | None,
@@ -380,7 +363,7 @@ def _resolve_plot_dimensions(
 
 
 def _collect_plot_bounds(
-    *, trajectories: pl.DataFrame, map_edges: pl.DataFrame, show_map: bool
+    *, trajectories: pl.DataFrame, map_edges: pl.DataFrame | None, show_map: bool
 ) -> tuple[float, float, float, float]:
     """Return combined x/y bounds across plotted layers."""
     x_values: list[float] = []
@@ -397,7 +380,7 @@ def _collect_plot_bounds(
         x_values.extend((float(x_min), float(x_max)))
         y_values.extend((float(y_min), float(y_max)))
 
-    if show_map and not map_edges.is_empty():
+    if show_map and map_edges is not None and not map_edges.is_empty():
         summary = map_edges.select(
             pl.min_horizontal(pl.col("x1"), pl.col("x2")).min().alias("x_min"),
             pl.max_horizontal(pl.col("x1"), pl.col("x2")).max().alias("x_max"),

@@ -10,7 +10,7 @@ from typing import Final
 import polars as pl
 
 from dronalize.core.errors import TrajectorySchemaError
-from dronalize.core.polars_ops import derivative, yaw_from_pos, yaw_from_vel
+from dronalize.core.functional import derivative, yaw_from_pos, yaw_from_vel
 from dronalize.core.scene.schema import TrajectoryField
 
 _POSITION_FIELDS: Final[TrajectoryField] = TrajectoryField.X | TrajectoryField.Y

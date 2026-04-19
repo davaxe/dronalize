@@ -7,20 +7,68 @@ from typing import TYPE_CHECKING, Protocol
 
 from typing_extensions import Self
 
-from dronalize.core.polars_ops import normalize_group_by
+from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.pipeline._internal import (
-    SCENE_ID_COLUMN,
-    SPLIT_PARTITION_COLUMN,
-    WINDOW_INDEX_COLUMN,
+from dronalize.processing.pipeline import stages
+from dronalize.processing.pipeline.contributions import (
+    PipelineStage,
+    StageContributions,
+    get_stage_pipelines,
 )
+from dronalize.processing.pipeline.extensions.lane_change import LaneChangeSamplingExtension
+from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from dronalize.config.models import ScenesConfig
     from dronalize.processing.models import PipelinePlan, SplitRequest
-    from dronalize.processing.pipeline.contributions import StageContributions
+
+
+SPLIT_PARTITION_COLUMN = "_split_partition"
+SCENE_ID_COLUMN = "_scene_id"
+WINDOW_INDEX_COLUMN = "window_index"
+
+
+class TrajectoryPipelineExtension(Protocol):
+    """Protocol for extensions that contribute stage-local pipeline transforms."""
+
+    def compile(self, ctx: BuildContext) -> StageContributions:
+        """Compile this extension against an immutable build context."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class TrajectorySpec:
+    """Declarative specification for building a trajectory-processing pipeline."""
+
+    plan: PipelinePlan
+    columns: TrajectoryColumns = field(default_factory=TrajectoryColumns)
+    window_by: str | Sequence[str] | None = None
+    extension: TrajectoryPipelineExtension | None = None
+
+    def with_window_by(self, window_by: str | Sequence[str] | None) -> Self:
+        """Return a copy with the given pre-window grouping configured."""
+        return replace(self, window_by=window_by)
+
+    def with_extension(self, extension: TrajectoryPipelineExtension | None) -> Self:
+        """Return a copy with the given pipeline extension configured."""
+        return replace(self, extension=extension)
+
+    @property
+    def frame_column(self) -> str:
+        """Return the name of the frame column."""
+        return self.columns.frame
+
+    @property
+    def agent_id_column(self) -> str:
+        """Return the name of the agent ID column."""
+        return self.columns.agent_id
+
+    @property
+    def category_column(self) -> str:
+        """Return the name of the agent category column."""
+        return self.columns.category
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,42 +151,71 @@ def compile_build_context(spec: TrajectorySpec, *, require_scene_id: bool = Fals
     )
 
 
-class TrajectoryPipelineExtension(Protocol):
-    """Protocol for extensions that contribute stage-local pipeline transforms."""
+def trajectory_pipeline(spec: TrajectorySpec) -> Pipeline:
+    """Build a trajectory-processing pipeline from a declarative spec."""
+    initial_ctx = compile_build_context(spec, require_scene_id=False)
+    contributions = (
+        spec.extension.compile(initial_ctx) if spec.extension is not None else StageContributions()
+    )
+    ctx = compile_build_context(spec, require_scene_id=contributions.require_scene_id)
+    return (
+        Pipeline()
+        >> stages.build_split_stage(ctx)
+        >> get_stage_pipelines(contributions, PipelineStage.PRE_WINDOW)
+        >> stages.build_window_stage(ctx)
+        >> get_stage_pipelines(contributions, PipelineStage.POST_WINDOW)
+        >> stages.build_scene_id_stage(ctx)
+        >> stages.build_screening_stage(ctx)
+        >> get_stage_pipelines(contributions, PipelineStage.POST_SCREENING)
+        >> stages.build_output_stage(ctx)
+    )
 
-    def compile(self, ctx: BuildContext) -> StageContributions:
-        """Compile this extension against an immutable build context."""
-        ...
+
+def standard(
+    plan: PipelinePlan,
+    *,
+    columns: TrajectoryColumns | None = None,
+    window_by: str | Sequence[str] | None = None,
+) -> TrajectorySpec:
+    """Build the default trajectory pipeline specification."""
+    return _base_spec(plan, columns=columns, window_by=window_by)
 
 
-@dataclass(frozen=True, slots=True)
-class TrajectorySpec:
-    """Declarative specification for building a trajectory-processing pipeline."""
+def lane_change_sampling(
+    plan: PipelinePlan,
+    *,
+    columns: TrajectoryColumns | None = None,
+    lane_id: str = "lane_id",
+    window_by: str | Sequence[str] | None = None,
+) -> TrajectorySpec:
+    """Build a spec for lane-change-aware window sampling."""
+    sampling_config = plan.scenes.lane_change
+    base_spec = _base_spec(plan, columns=columns, window_by=window_by)
+    if sampling_config is None or sampling_config.negative_keep_every == 1:
+        # If every negative sample is kept, there is no difference in output
+        # selection between lane-change-aware sampling and standard sampling, so
+        # skip the extension (which is more efficient).
+        return base_spec
 
-    plan: PipelinePlan
-    columns: TrajectoryColumns = field(default_factory=TrajectoryColumns)
-    window_by: str | Sequence[str] | None = None
-    extension: TrajectoryPipelineExtension | None = None
+    return base_spec.with_extension(
+        LaneChangeSamplingExtension(
+            lane_id_column=lane_id,
+            negative_keep_every=sampling_config.negative_keep_every,
+            min_lane_change_events=sampling_config.required_lane_changes,
+            persist=sampling_config.persist,
+            margin_before=sampling_config.margin_before,
+            margin_after=sampling_config.margin_after,
+        )
+    )
 
-    def with_window_by(self, window_by: str | Sequence[str] | None) -> Self:
-        """Return a copy with the given pre-window grouping configured."""
-        return replace(self, window_by=window_by)
 
-    def with_extension(self, extension: TrajectoryPipelineExtension | None) -> Self:
-        """Return a copy with the given pipeline extension configured."""
-        return replace(self, extension=extension)
-
-    @property
-    def frame_column(self) -> str:
-        """Return the name of the frame column."""
-        return self.columns.frame
-
-    @property
-    def agent_id_column(self) -> str:
-        """Return the name of the agent ID column."""
-        return self.columns.agent_id
-
-    @property
-    def category_column(self) -> str:
-        """Return the name of the agent category column."""
-        return self.columns.category
+def _base_spec(
+    plan: PipelinePlan,
+    *,
+    columns: TrajectoryColumns | None = None,
+    window_by: str | Sequence[str] | None,
+) -> TrajectorySpec:
+    """Build the shared, extension-free portion of a trajectory spec."""
+    return TrajectorySpec(
+        plan=plan, columns=TrajectoryColumns() if columns is None else columns, window_by=window_by
+    )

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dronalize.processing.pipeline.functional.resample._common import (
+from dronalize.core.functional.resample._common import (
     ResampleMethod,
     ResampleSpec,
     resolve_request,
 )
-from dronalize.processing.pipeline.functional.resample._linear import linear_resample
-from dronalize.processing.pipeline.functional.resample._spline import (
+from dronalize.core.functional.resample._linear import linear_resample
+from dronalize.core.functional.resample._spline import (
     cubic_spline_interpolator_factory,
     pchip_interpolator_factory,
     spline_resample,

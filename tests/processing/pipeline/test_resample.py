@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 from typing_extensions import TypedDict, Unpack
 
-from dronalize.processing.pipeline.functional.resample import ResampleMethod, ResampleSpec
+from dronalize.core.functional import ResampleMethod, ResampleSpec
 from dronalize.processing.pipeline.transforms import resample
 
 if TYPE_CHECKING:

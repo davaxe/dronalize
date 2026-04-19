@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
+from dronalize.core import functional as f
+from dronalize.core.functional import ResampleSpec
 from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.pipeline import functional as f
-from dronalize.processing.pipeline.functional.resample import ResampleSpec
+from dronalize.processing.screening.apply import screen_scene as _screen_scene
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -42,7 +43,7 @@ def screen_scene(
     """
 
     def _screen(df: pl.LazyFrame) -> pl.LazyFrame:
-        return f.screen_scene(
+        return _screen_scene(
             df,
             scene_screening=scene_screening,
             columns=columns or TrajectoryColumns(),

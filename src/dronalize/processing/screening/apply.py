@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.core.polars_ops import normalize_group_by
+from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.screening.agent import invalid_agent_tolerance_expr
 from dronalize.processing.screening.base import AgentCheckRuleBase, rule_name
 from dronalize.processing.screening.context import ScreeningContext
