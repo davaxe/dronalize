@@ -55,9 +55,9 @@ within a circle, within a bounding box, or retained in full.
 class MapConfig(FullConfig):
     """Configuration for map data processing."""
 
-    min_distance: float | None = Field(gt=0, default=1.5)
+    min_distance: float | None = Field(gt=0, default=2)
     """Minimum spacing allowed between neighboring map samples after simplification."""
-    interp_distance: float | None = Field(gt=0, default=4.0)
+    interp_distance: float | None = Field(gt=0, default=5.0)
     """Target spacing used when interpolating map geometry."""
     extraction: MapExtraction = Field(default_factory=FullMapExtraction)
     """Map extraction strategy used to crop or retain source map geometry."""

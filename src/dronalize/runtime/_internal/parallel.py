@@ -110,6 +110,8 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         if _ctx.loader is None or _ctx.builder is None:
             msg = "Loader runtime was not initialized for this worker process."
             raise ValueError(msg)
+        if _ctx.shared.progress.scene_limit_reached(_ctx.shared.scene_limit):
+            return 0
         _ = _ctx.shared.progress.increment_source()
         processed_scenes = 0
         for scene in ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source):
@@ -123,6 +125,8 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         if _ctx.loader is None or _ctx.builder is None:
             msg = "Loader runtime was not initialized for this worker process."
             raise ValueError(msg)
+        if _ctx.shared.progress.scene_limit_reached(_ctx.shared.scene_limit):
+            return []
         _ = _ctx.shared.progress.increment_source()
         scenes = list(ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source))
         for scene in scenes:
@@ -133,6 +137,8 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
     def _generate_scenes(
         loader: BaseSceneLoader[Any, Any], builder: SceneBuilder, source: Source[Any]
     ) -> Iterator[Scene]:
+        if _ctx.shared.progress.scene_limit_reached(_ctx.shared.scene_limit):
+            return
         for processed in builder.prepare_source(loader, source):
             scene_number = _ctx.shared.progress.claim_scene(_ctx.shared.scene_limit)
             if scene_number is None:

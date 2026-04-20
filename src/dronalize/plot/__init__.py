@@ -29,15 +29,20 @@ from dronalize._lazy import lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
     from dronalize.plot.scene import plot_scene
+    from dronalize.plot.theme import DARK_THEME, LIGHT_THEME, PlotTheme, ThemeName
 
 AspectMode = Literal["auto", "equal"]
 """Aspect-ratio modes accepted by [`plot_scene`][dronalize.plot.plot_scene]."""
 
-__all__ = ["AspectMode", "plot_scene"]
+__all__ = ["AspectMode", "DARK_THEME", "LIGHT_THEME", "PlotTheme", "ThemeName", "plot_scene"]
 
 _EXPORTS: dict[str, tuple[str, str]] = {
     "plot_scene": ("dronalize.plot.scene", "plot_scene"),
     "AspectMode": ("dronalize.plot.scene", "AspectMode"),
+    "PlotTheme": ("dronalize.plot.theme", "PlotTheme"),
+    "ThemeName": ("dronalize.plot.theme", "ThemeName"),
+    "LIGHT_THEME": ("dronalize.plot.theme", "LIGHT_THEME"),
+    "DARK_THEME": ("dronalize.plot.theme", "DARK_THEME"),
 }
 
 

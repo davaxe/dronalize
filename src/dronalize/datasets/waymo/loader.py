@@ -11,6 +11,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
+from dronalize.datasets.shared import utils
 from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
 from dronalize.processing.loading.base import BaseSceneLoader
@@ -76,17 +77,18 @@ class WaymoLoader(BaseSceneLoader):
 
     @override
     def resolve_map(self, scene: Scene, map_binding: MapBinding | None = None) -> MapGraph | None:
-        if not self._include_map or map_binding is None:
+        if not self._include_map or map_binding is None or self.map_config is None:
             return None
         raw_map = map_binding.metadata.get("raw_map")
         if not isinstance(raw_map, bytes):
             return None
         map_data = lean_map_pb2.LeanMapContainer.FromString(raw_map)
         map_config = self.map_config
-        return WaymoMapBuilder.from_proto(map_data.map_features).build(
-            min_distance=map_config.min_distance if map_config is not None else None,
-            interp_distance=map_config.interp_distance if map_config is not None else None,
+        map_graph = WaymoMapBuilder.from_proto(map_data.map_features).build(
+            min_distance=map_config.min_distance,
+            interp_distance=map_config.interp_distance,
         )
+        return utils.extract_based_on_scene(map_graph, scene, map_config.extraction)
 
     @staticmethod
     def _count_sources(data_dir: Path) -> int:
