@@ -3,7 +3,7 @@
 This package exposes the smallest configuration surface most callers need:
 
 - [`ProcessingConfig`][dronalize.config.ProcessingConfig] for resolved project
-  configuration loaded from `pyproject.toml`
+  configuration loaded from a TOML file such as `config.toml`
 - [`RuntimeOverride`][dronalize.config.RuntimeOverride] for CLI- or
   programmatic overrides layered on top of a dataset config
 - [`load_project_config`][dronalize.config.load_project_config] for discovering

@@ -11,7 +11,7 @@ to the next pages you are likely to need.
 | --- | --- |
 | [Installation](installation.md) | Install the package and add only the extras you actually need. |
 | [First run (CLI)](first-run-cli.md) | Inspect a dataset, preview the resolved plan, and run the CLI once. |
-| [Python entry](python-entry.md) | Resolve jobs and run preprocessing from Python. |
+| [Python entry](python-entry.md) | Resolve requests and run preprocessing from Python. |
 | [Adding datasets](adding-datasets.md) | Add a custom dataset by implementing a loader and registering a [`DatasetSpec`][dronalize.datasets.DatasetSpec]. |
 | [Changelog](changelog.md) | Review user-facing package and documentation changes. |
 | [Citation](citation.md) | Cite `dronalize` in academic or research work. |

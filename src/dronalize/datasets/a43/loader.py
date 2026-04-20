@@ -46,8 +46,7 @@ class A43Loader(BaseSceneLoader):
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
-        dt = 0.1
-        eps = 1e-9
+        dt, eps = 0.1, 1e-9
         yield LoadedSourceData(
             pl
             .scan_csv(source.data)

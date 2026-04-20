@@ -10,6 +10,8 @@ from pydantic import Field
 from typing_extensions import NotRequired, TypedDict, override
 
 from dronalize.config.models import DatasetConfig, ScenesConfig, WindowConfig
+from dronalize.config.models.scenes import LaneChangeConfig, ResampleConfig
+from dronalize.config.models.screening import MinSamplesSpec, ScreeningConfig
 from dronalize.core.categories import AgentCategory, AgentCategoryLike
 from dronalize.core.maps import MapGraph
 from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
@@ -89,7 +91,6 @@ class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
                 "yaw": [0.0, 0.0, 0.0],
                 "agent_category": [1, 1, 1],
             },
-            schema_overrides={"frame": pl.Int32(), "id": pl.Int32(), "agent_category": pl.Int32()},
         )
         yield LoadedSourceData(frame.lazy())
 
@@ -114,6 +115,20 @@ def demo_descriptor() -> DatasetSpec:
     )
 
 
+def inherited_optional_blocks_descriptor() -> DatasetConfig:
+    return DatasetConfig(
+        scenes=ScenesConfig(
+            history_frames=2,
+            future_frames=1,
+            sample_time=1.0,
+            window=WindowConfig(step=2),
+            resample=ResampleConfig(up=2, down=1, method="cubic"),
+            lane_change=LaneChangeConfig(persist=3),
+        ),
+        screening=ScreeningConfig(agent={"min_obs": MinSamplesSpec(minimum=2)}),
+    )
+
+
 def make_scene(*, passed_agent_ids: frozenset[int] | None = None) -> Scene:
     graph = MapGraph(
         node_positions=np.array([[0.0, 0.0], [1.0, 0.0]], dtype=np.float64),
@@ -135,7 +150,7 @@ def make_scene(*, passed_agent_ids: frozenset[int] | None = None) -> Scene:
         "agent_category": [1, 1, 1, 2, 2, 2],
     })
 
-    return Scene(
+    return Scene.create(
         frame=frame,
         scene_number=7,
         history_frames=2,

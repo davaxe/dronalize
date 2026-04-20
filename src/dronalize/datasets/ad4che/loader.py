@@ -122,7 +122,7 @@ class AD4CHELoader(LevelXDataLoader):
             yield int(number_str), subdir
 
 
-_META_SCHEMA: pl.Schema = pl.Schema({"id": pl.Int32, "numLaneChanges": pl.Int8})
+_META_SCHEMA: pl.Schema = pl.Schema({"id": pl.Int32, "numLaneChanges": pl.Int32})
 
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "frame": pl.Int32,

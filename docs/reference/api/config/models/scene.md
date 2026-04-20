@@ -14,6 +14,4 @@
 
 ## ::: dronalize.config.models.scenes.PartialLaneChangeConfig
 
-## ::: dronalize.config.models.scenes.Derivatives
-
 ## ::: dronalize.config.models.scenes.effective_scene_window

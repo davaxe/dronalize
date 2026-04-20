@@ -80,7 +80,47 @@ class Scene:
         passed_agent_ids: frozenset[int] | None = None,
         cast_schema: bool = True,
     ) -> Scene:
-        """Create a scene with optional schema casting."""
+        """Create a scene with optional schema casting.
+
+        Parameters reflect the fields of `Scene` but with an additional
+        `cast_schema` flag that controls whether the input frame should be cast
+        to match the expected physical schema of the provided trajectory schema.
+        This allows loaders to provide frames that may have compatible but not
+        exactly matching schemas, while ensuring that the resulting `Scene`
+        instance adheres to the expected schema for downstream processing.
+
+        Parameters
+        ----------
+        frame : pl.DataFrame
+            DataFrame containing the scene data. Columns should correspond to the
+            fields defined in the provided `schema`.
+        scene_number : int
+            Unique scene number assigned during processing.
+        history_frames : int
+            Number of history frames included in the scene.
+        future_frames : int
+            Number of future frames included in the scene.
+        schema : TrajectorySchema
+            Schema describing which fields the scene currently provides. The
+            input frame is expected to have columns matching the physical fields
+            defined by this schema.
+        sample_time : float or None, optional
+            Time interval between frames in seconds.
+        map_key : MapKey, optional
+            Stable map identifier for the scene, if one exists.
+        map_resolver : MapResolver or None, optional
+            Resolver attached by the loader to materialize the scene map on
+            demand.
+        split_assignment : DatasetSplit or None, optional
+            Split assignment for this scene (train/val/test).
+        passed_agent_ids : frozenset of int or None, optional
+            Optional set of agents that passed screening and should be explictly
+            added to the scene metadata.
+        cast_schema : bool, optional
+            Whether to cast the input frame to match the expected physical
+            schema or to assume it already matches. Default is `True`.
+
+        """
         if cast_schema:
             frame = _cast_to_schema(frame, schema.physical)
 
@@ -99,10 +139,6 @@ class Scene:
 
     def __post_init__(self) -> None:
         """Cast and validate the trajectory schema."""
-        frame = _cast_to_schema(self.frame, self.schema.physical)
-        object.__setattr__(self, "frame", frame)
-
-        # Verify schema compatibility with the frame DataFrame
         if not _matches_physical_schema(self.frame.schema, self.schema.physical):
             msg = _get_schema_mismatch_message(
                 actual=self.frame.schema,

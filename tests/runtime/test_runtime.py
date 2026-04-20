@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import multiprocessing as mp
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -30,16 +31,18 @@ def _request(tmp_path: Path, **kwargs: object) -> ExecutionRequest:
     return ExecutionRequest.model_validate(base)
 
 
-def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
-    descriptor = demo_descriptor()
-
+def _patch_descriptor(monkeypatch: pytest.MonkeyPatch, descriptor: DatasetSpec) -> None:
     def provider(_name: str) -> DatasetSpec:
         return descriptor
 
     monkeypatch.setattr("dronalize.runtime.api.get", provider)
 
 
-def test_resolve_job_compiles_runtime_and_loader_requests(
+def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_descriptor(monkeypatch, demo_descriptor())
+
+
+def test_resolve_request_compiles_runtime_and_loader_requests(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
@@ -55,7 +58,7 @@ def test_resolve_job_compiles_runtime_and_loader_requests(
     assert plan.effective_future_frames == 1
 
 
-def test_resolve_job_rejects_unknown_storage_backend(
+def test_resolve_request_rejects_unknown_storage_backend(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
@@ -64,16 +67,25 @@ def test_resolve_job_rejects_unknown_storage_backend(
         _ = resolve_request(_request(tmp_path, storage_backend="bad-backend"))
 
 
-def test_process_dataset_surfaces_unknown_dataset_errors(tmp_path: Path) -> None:
+def test_resolve_request_rejects_file_input_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_get_demo_descriptor(monkeypatch)
+    input_file = tmp_path / "input.txt"
+    _ = input_file.write_text("demo", encoding="utf-8")
+
+    with pytest.raises(NotADirectoryError, match="is not a directory"):
+        _ = resolve_request(_request(tmp_path, input_dir=input_file))
+
+
+def test_execute_request_surfaces_unknown_dataset_errors(tmp_path: Path) -> None:
     request = _request(tmp_path, dataset="this-dataset-does-not-exist")
 
     with pytest.raises(DatasetNotFoundError):
         _ = execute_request(request)
 
 
-def test_run_job_executes_and_writes_manifest(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_get_demo_descriptor(monkeypatch)
 
     request = _request(tmp_path)
@@ -91,6 +103,8 @@ def test_run_job_executes_and_writes_manifest(
 def test_parallel_execution_smoke_processes_demo_dataset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+
+    mp.set_start_method("spawn", force=True)
     _patch_get_demo_descriptor(monkeypatch)
 
     input_dir = tmp_path / "input"

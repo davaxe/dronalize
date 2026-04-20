@@ -58,7 +58,7 @@ The built-in backends are:
 Two defaults are easy to miss:
 
 - the CLI `process` command defaults to `pickle`
-- the Python `ProcessRequest` model defaults to `mds`
+- the Python `ExecutionRequest` model also defaults to `pickle`
 
 If you want consistent behavior across both entry points, choose the backend explicitly.
 

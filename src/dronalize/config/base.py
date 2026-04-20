@@ -18,9 +18,7 @@ JobsValue: TypeAlias = int | Literal["auto"]
 Precision: TypeAlias = Literal["float32", "float64"]
 
 MapExtraction: TypeAlias = Literal["full", "scene_extent", "circle", "bounding_box"]
-SplitStrategy: TypeAlias = Literal[
-    "none", "native", "scene", "source", "time", "shuffled-time", "auto"
-]
+SplitStrategy: TypeAlias = Literal["none", "native", "scene", "source", "time", "shuffled-time"]
 
 SelectorMode: TypeAlias = Literal["include", "exclude"]
 FilterMergeMode: TypeAlias = Literal["replace", "extend"]
@@ -77,7 +75,6 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
             Result of applying the partial config to the target full config.
 
         """
-        """Complete the partial config by merging it with the defaults."""
         if target is None:
             base = {
                 name: field.get_default()

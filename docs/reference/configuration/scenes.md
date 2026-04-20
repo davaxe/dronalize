@@ -9,11 +9,11 @@ The scenes config describes how raw trajectory data becomes model-ready scenes. 
 | `history_frames` | `int` | Number of history (observed) frames per scene window before resampling. | `dataset default` |
 | `future_frames` | `int` | Number of future frames (frames to predict) per scene window before resampling. | `dataset default` |
 | `sample_time` | `float` | Time between frames before resampling. | `dataset default` |
-| `window` | `table` | Sliding-window extraction settings. | `inherited` |
-| `resample` | `table` | Temporal resampling and interpolation settings. | `inherited` |
-| `lane_change` | `table` | Lane-change sampling controls for highway-style datasets. | `inherited` |
+| `window` | `table` or `false` | Sliding-window extraction settings. Use `false` to disable an inherited window block. | `inherited` |
+| `resample` | `table` or `false` | Temporal resampling and interpolation settings. Use `false` to disable an inherited resample block. | `inherited` |
+| `lane_change` | `table` or `false` | Lane-change sampling controls for highway-style datasets. Use `false` to disable an inherited lane-change block. | `inherited` |
 
-The `loader` block merges into the dataset's built-in loader config, so several effective defaults are dataset-specific rather than global.
+The `scenes` block merges into the dataset's built-in scene config, so several effective defaults are dataset-specific rather than global.
 
 For dataset-specific defaults and dataset-owned loader behavior, see the [dataset reference](../datasets/index.md).
 
@@ -69,8 +69,8 @@ Use resampling when data should be interpolated to a different temporal resoluti
 | `method` | `"linear"`, `"cubic"`, or `"pchip"` | Interpolation method to use when interpolating. | `"linear"` |
 | `coordinates` | `array[str]` | Position columns used as the resampling base. | `["x", "y"]` |
 | `max_gap` | `int` | Maximum frame gap before a new resampling segment is started. | `1` |
-| `emit_velocities` | `bool` | Whether to generate velocity columns as first-order output derivatives. Can only be used for spline-based resampling. | `false` |
-| `emit_accelerations` | `bool` | Whether to generate acceleration columns as second-order output derivatives. Can only be used for spline-based resampling. | `false` |
+| `emit_velocity` | `bool` | Whether to generate velocity columns as first-order output derivatives. Can only be used for spline-based resampling. | `false` |
+| `emit_acceleration` | `bool` | Whether to generate acceleration columns as second-order output derivatives. Can only be used for spline-based resampling. | `false` |
 
 !!! "Specifying coordinates"
   The coordinate keys must match the position column names in the source dataset. For example, if the dataset uses `x1` and `x2` for positions instead of `x` and `y`, those keys should be specified here.
@@ -79,7 +79,7 @@ Use resampling when data should be interpolated to a different temporal resoluti
 Example:
 
 ```toml
-[datasets.a43.loader.resample]
+[datasets.a43.scenes.resample]
 up = 2
 down = 1
 method = "cubic"
@@ -87,17 +87,17 @@ max_gap = 4
 coordinates = ["x1", "x2"]
 ```
 
-!!! note  "When to use `emit_velocities` and `emit_accelerations`"
-    These options are only relevant for spline-based resampling methods such as `"cubic"`, `"pchip"`, and will add associated velocity and acceleration columns to the output that are ananlytic based
-    on the interpolation fit. Generally, this should be set to true when spline resampling is used
-    to get consistent trajectories with well defined derivatives.
+!!! note  "When to use `emit_velocity` and `emit_acceleration`"
+    These options are only relevant for spline-based resampling methods such as `"cubic"` and
+    `"pchip"`. They add velocity and acceleration columns derived analytically from the interpolation
+    fit. They are invalid for `"linear"` resampling.
     
     [`scipy.interpolate`](https://docs.scipy.org/doc/scipy/reference/interpolate.html) is used for spline
     resampling.
     
-## `[loader.lane_change]` section
+## `[scenes.lane_change]` section
 
-Use `lane_change_sampling` only for lane-change-oriented highway datasets that expose this behavior.
+Use lane-change sampling only for lane-change-oriented highway datasets that expose this behavior.
 
 If a dataset does not support lane-change sampling, adding this block is a configuration error.
 
@@ -118,11 +118,19 @@ future_frames = 60
 sample_time = 0.1
 
 [datasets.a43.scenes.window]
-size = 80
 step = 2
 
-[datasets.a43.scenes.resampling]
+[datasets.a43.scenes.resample]
 up = 2
 down = 1
 method = "cubic"
+```
+
+To disable an inherited optional block instead of overriding it, set the key to `false` on the
+parent `[...scenes]` table:
+
+```toml
+[datasets.highd.scenes]
+resample = false
+lane_change = false
 ```

@@ -28,7 +28,7 @@ Most useful config lives in nested blocks under one of those roots:
 jobs = 4
 
 [datasets.a43]
-extends = ["fast"]
+uses = ["fast"]
 
 [datasets.a43.scenes]
 history_frames = 20
@@ -42,8 +42,8 @@ precision = "float64"
 
 In other words:
 
-- `[profiles.fast.execution]` defines reusable execution settings.
-- `[datasets.a43]` can opt into one or more profiles with `extends = [...]`.
+- `[profiles.fast.runtime]` defines reusable execution settings.
+- `[datasets.a43]` can opt into one or more profiles with `uses = [...]`.
 - `[datasets.a43.scenes]` affects only the `a43` dataset.
 
 ## Available section roots
@@ -55,7 +55,7 @@ Inside either `profiles.<profile-name>` or `datasets.<dataset-name>`, the curren
 | [`runtime`](./runtime.md) | Worker count and executor chunking. |
 | [`scenes`](./scenes.md) | Scene window length, sampling time, and related settings. |
 | [`screening`](./screening.md) | Scene + agent screening and cleanup. |
-| [`map`](./map.md) | Map enablement and extraction settings. |
+| [`map`](./map.md) | Map extraction and interpolation settings. |
 | [`output`](./output.md) | Persisted trajectory schema, precision, offsets, storage backend tuning. |
 | [`split`](./split.md) | Split strategy, ratios, native split selection, and temporal split parameters. |
 | [`dataset`](./dataset.md) | Dataset-specific options that don't fit into the other categories. |
@@ -75,6 +75,19 @@ The reference pages describe the file format only, but the values are resolved i
 4. runtime overrides (very limited set of fields that can be overridden at runtime)
 
 That matters because many fields do not start from a single hard-coded default. Instead, they begin from the dataset's built-in runtime config and are then overridden or merged by the configuration file.
+
+For optional inherited blocks such as `screening`, `scenes.window`, `scenes.resample`, and
+`scenes.lane_change`, you can explicitly disable the inherited block with `false` on the parent
+table instead of inheriting it:
+
+```toml
+[datasets.highd]
+screening = false
+
+[datasets.highd.scenes]
+resample = false
+lane_change = false
+```
 
 When you need to know what a specific dataset starts with, or whether it exposes dataset-specific behavior beyond the generic config tables here, check the [dataset reference](../datasets/index.md).
 
@@ -112,7 +125,7 @@ The page titles use TOML path notation:
 ## Example
 
 ```toml
-[profile.global.runtime]
+[profiles.global.runtime]
 jobs = "auto"
 
 [datasets.a43]
@@ -123,9 +136,8 @@ history_frames = 20
 future_frames = 60
 sample_time = 0.1
 
-[datasets.a43.map]
-enabled = true
-extraction = "circle"
+[datasets.a43.map.extraction]
+mode = "circle"
 radius = 60.0
 
 [datasets.a43.split]

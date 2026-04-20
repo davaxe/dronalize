@@ -17,7 +17,6 @@ from dronalize.processing.loading.resources import DatasetResources
 from dronalize.processing.maps.resolver import MapResolver, no_map
 from dronalize.processing.models import PipelinePlan, SplitRequest
 from dronalize.processing.pipeline import spec
-from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -28,6 +27,7 @@ if TYPE_CHECKING:
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
     from dronalize.processing.models import LoaderRequest
+    from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 class DatasetOptionsModel(BaseModel):
@@ -152,11 +152,7 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
             scenes=self.scenes_config, screening=self.screening_config, split=self.split_config
         )
         columns = TrajectoryColumns.from_schema(self.native_trajectory_schema())
-        return Pipeline().then(
-            lambda df: df.match_to_schema(
-                self.native_trajectory_schema().physical, extra_columns="ignore"
-            )
-        ) >> spec.trajectory_pipeline(
+        return spec.trajectory_pipeline(
             spec.lane_change_sampling(plan, columns=columns)
             if self.scenes_config.lane_change is not None
             else spec.standard(plan, columns=columns)

@@ -28,7 +28,12 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionResult:
-    """Final result of a processing run."""
+    """Final result of a processing run.
+
+    `processed_sources` counts how many source units the executor started
+    processing, even when a scene limit stops the run before a source is fully
+    exhausted.
+    """
 
     dataset: str
     output_dir: Path
@@ -173,7 +178,7 @@ def compile_loader_request(
 
 
 class ExecutionRequest(BaseModel):
-    """Normalized user request for one dataset processing job."""
+    """Normalized user request for one dataset processing run."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 

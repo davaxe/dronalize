@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 def resolve_request(request: ExecutionRequest) -> ExecutionPlan:
-    """Resolve one processing request into an execution-ready job.
+    """Resolve one processing request into an execution-ready plan.
 
     Parameters
     ----------
@@ -58,7 +58,7 @@ def execute_request(request: ExecutionRequest) -> ExecutionResult:
 
 
 def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
-    """Execute one resolved job and collect final counters and output paths.
+    """Execute one resolved plan and collect final counters and output paths.
 
     This will start the execution where the main objective is to process all
     scenes and write them to disk
@@ -88,7 +88,7 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
 
 
 def stream_plan(plan: ExecutionPlan) -> Iterator[Scene]:
-    """Execute one resolved job and yield generated scenes.
+    """Execute one resolved plan and yield generated scenes.
 
     Alternative to [`execute_plan`][dronalize.runtime.execute_plan] for use
     cases where the actual scene objects are the main output of interest.

@@ -10,8 +10,8 @@ Map settings control whether map data is included and, if it is, how much of the
 | `interp_distance` | `float` | Interpolation spacing used when densifying geometry. Must be greater than or equal to `min_distance`. | `inherited` |
 
 !!! note "Disable map data"
-    Currently teh map data cannot be disabled trough the config. To exclude map data use `--no-map` when
-    using the CLI.
+    Map data cannot currently be disabled through TOML. To exclude maps at runtime, use `--no-map`
+    on the CLI or pass `include_map=False` in the Python runtime request.
 
 ## [`map.extraction`] section
 
@@ -35,7 +35,7 @@ When `mode` is set to `"scene_extent"`, the map is cropped around the bounding b
 
 | Key | Type | Description | Default |
 |---|---|---|---|
-| `padding` | `float` | Factor to inflate the scene trajectory bounding box when cropping the map. Must be greater than `1.0`. | `1.15` |
+| `padding` | `float` | Factor to inflate the scene trajectory bounding box when cropping the map. Must be greater than `1.0`. | `1.05` |
 
 ### `mode` = `"circle"`
 

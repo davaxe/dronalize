@@ -110,12 +110,12 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         if _ctx.loader is None or _ctx.builder is None:
             msg = "Loader runtime was not initialized for this worker process."
             raise ValueError(msg)
+        _ = _ctx.shared.progress.increment_source()
         processed_scenes = 0
         for scene in ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source):
             _ctx.shared.progress.record_split(scene.split_assignment)
             _ctx.writer.write(scene)
             processed_scenes += 1
-        _ = _ctx.shared.progress.increment_source()
         return processed_scenes
 
     @staticmethod
@@ -123,10 +123,10 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         if _ctx.loader is None or _ctx.builder is None:
             msg = "Loader runtime was not initialized for this worker process."
             raise ValueError(msg)
+        _ = _ctx.shared.progress.increment_source()
         scenes = list(ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source))
         for scene in scenes:
             _ctx.shared.progress.record_split(scene.split_assignment)
-        _ = _ctx.shared.progress.increment_source()
         return scenes
 
     @staticmethod
