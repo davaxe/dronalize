@@ -64,19 +64,21 @@ class LevelXDataLoader(BaseSceneLoader):
             pl.col("trackId").alias("id"),
             pl
             .col("class")
-            .replace_strict({
-                "car": AgentCategory.CAR.value,
-                "truck": AgentCategory.TRUCK.value,
-                "bus": AgentCategory.BUS.value,
-                "trailer": AgentCategory.TRAILER.value,
-                "motorcycle": AgentCategory.MOTORCYCLE.value,
-                "bicycle": AgentCategory.BICYCLE.value,
-                "pedestrian": AgentCategory.PEDESTRIAN.value,
-                "van": AgentCategory.VAN.value,
-                "truck_bus": AgentCategory.TRUCK.value,
-                "animal": AgentCategory.ANIMAL.value,
-            })
-            .cast(pl.Int32())
+            .replace_strict(
+                {
+                    "car": AgentCategory.CAR.value,
+                    "truck": AgentCategory.TRUCK.value,
+                    "bus": AgentCategory.BUS.value,
+                    "trailer": AgentCategory.TRAILER.value,
+                    "motorcycle": AgentCategory.MOTORCYCLE.value,
+                    "bicycle": AgentCategory.BICYCLE.value,
+                    "pedestrian": AgentCategory.PEDESTRIAN.value,
+                    "van": AgentCategory.VAN.value,
+                    "truck_bus": AgentCategory.TRUCK.value,
+                    "animal": AgentCategory.ANIMAL.value,
+                },
+                return_dtype=pl.Int32,
+            )
             .alias("agent_category"),
         ]
 

@@ -12,6 +12,4 @@ Built-in dataframe transforms and resampling helpers now live under
 
 ## ::: dronalize.processing.pipeline.FlatMapTransform
 
-## ::: dronalize.processing.pipeline.extensions.LaneChangeSamplingExtension
-
-## ::: dronalize.processing.pipeline.extensions.TrajectoryPipelineExtension
+## ::: dronalize.processing.pipeline.spec.TrajectoryPipelineExtension

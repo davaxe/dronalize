@@ -23,7 +23,7 @@ class SplitWeights(FullConfig):
 
     @model_validator(mode="after")
     def _validate_sum(self) -> SplitWeights:
-        """Validate that the weights sum to 1."""
+        """Validate that at least one split weight is positive."""
         total = self.train + self.val + self.test
         if total == 0:
             v = f"train={self.train}, val={self.val}, test={self.test}"

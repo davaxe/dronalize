@@ -10,10 +10,10 @@ Split settings control how processed data is routed into train, val, and test ou
 | `ratio` | `table` | Train/val/test weights. Required for custom split strategies and invalid for `"native"` and `"none"`. | `required for custom split strategies` |
 | `gap` | `int` | Gap between neighboring temporal segments when `strategy = "time"` or `strategy = "shuffled-time"`. | `0` |
 | `segments` | `int` | Number of temporal segments to create before shuffling when `strategy = "shuffled-time"`. | `required for "shuffled-time"` |
-| `read` | `array[str]` | Dataset-native split names to read when `strategy = "native"`, for example `["train"]`. If omitted, all dataset-native splits are used. | `none` |
+| `splits` | `array[str]` | Dataset-native split names to read when `strategy = "native"`, for example `["train"]`. If omitted, all dataset-native splits are used. | `["train", "val", "test"]` |
 
 
-The most central part of the split configuration is the `strategy`. In total there are seven options:
+The most central part of the split configuration is the `strategy`. In total there are six options:
 
 - `"none"`: the default option, which processes all data without splitting.
 - `"native"`: use the predefined splits provided by the dataset, if available.
@@ -21,13 +21,12 @@ The most central part of the split configuration is the `strategy`. In total the
 - `"source"`: split randomly at source level, often individual files or recordings. This works best when sources are numerous and relatively independent.
 - `"time"`: split the data into continuous temporal segments for train, val, and test.
 - `"shuffled-time"`: similar to `"time"` but first partitions the recording into `N` segments, then shuffles those segments into splits based on the provided ratios.
-- `"auto"`: use the recommended split strategy for a dataset.
 
 !!! note "Strategy availability"
     Not all datasets support all split strategies. For example, `"native"` is only available for datasets that provide predefined splits, and `"scene"` is only available for datasets that export at scene level. The CLI will raise an error if you try to use an unsupported strategy.
 
 !!! note "Validation"
-    `gap` is only valid for `"time"` and `"shuffled-time"`. `segments` is only valid for `"shuffled-time"`. `read` is only valid for `"native"`.
+    `ratio` is required for `"scene"`, `"source"`, `"time"`, and `"shuffled-time"`. `gap` is only valid for `"time"` and `"shuffled-time"`. `segments` is only valid for `"shuffled-time"`. `splits` is only valid for `"native"`.
 
 ## Minimal example
 
@@ -45,5 +44,5 @@ To select only specific dataset-native splits:
 ```toml
 [datasets.waymo.split]
 strategy = "native"
-read = ["train", "val"]
+splits = ["train", "val"]
 ```

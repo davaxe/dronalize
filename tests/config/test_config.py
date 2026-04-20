@@ -7,6 +7,7 @@ import pytest
 from dronalize.config import ProcessingConfig, RuntimeOverride, load_project_config
 from dronalize.config.models import DatasetConfig
 from dronalize.core.errors import ConfigurationError
+from tests.support import inherited_optional_blocks_descriptor
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -99,3 +100,27 @@ def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
     assert empty.runtime is None
     assert empty.output is None
     assert empty.split is None
+
+
+def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:
+    cfg = load_project_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo]
+            screening = false
+
+            [datasets.demo.scenes]
+            window = false
+            resample = false
+            lane_change = false
+            """,
+        )
+    )
+
+    resolved = cfg.resolve("demo", inherited_optional_blocks_descriptor())
+
+    assert resolved.screening is None
+    assert resolved.scenes.window is None
+    assert resolved.scenes.resample is None
+    assert resolved.scenes.lane_change is None

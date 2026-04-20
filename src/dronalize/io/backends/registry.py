@@ -35,10 +35,10 @@ def register_writer_backend(backend: StorageBackend, builder: WriterFactoryBuild
     _WRITER_BACKENDS[backend] = builder
 
 
-def build_writer_factory(job: ExecutionPlan) -> WriterFactory:
-    """Build the writer factory for one resolved processing job."""
-    builder = _WRITER_BACKENDS[job.storage_backend]
-    return builder(job)
+def build_writer_factory(plan: ExecutionPlan) -> WriterFactory:
+    """Build the writer factory for one resolved processing plan."""
+    builder = _WRITER_BACKENDS[plan.storage_backend]
+    return builder(plan)
 
 
 def _build_mds_writer_factory(plan: ExecutionPlan) -> WriterFactory:

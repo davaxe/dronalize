@@ -41,29 +41,29 @@ Use `resolve()` when you want the final dataset config with built-in defaults ap
 level `extract()` helper only returns the authored dataset entry from the file, not the fully merged
 result.
 
-## Plan or run a job
+## Plan or run a request
 
 ```python
 from pathlib import Path
 
-from dronalize.runtime import ProcessRequest, process_dataset, resolve_job
+from dronalize.runtime import ExecutionRequest, execute_request, resolve_request
 
-request = ProcessRequest(
+request = ExecutionRequest(
     dataset="a43",
     input_dir=Path("data/a43/raw"),
     output_dir=Path("data/a43/processed"),
     storage_backend="pickle",
 )
 
-job = resolve_job(request)
-print(job.effective_sample_time)
+plan = resolve_request(request)
+print(plan.effective_sample_time)
 
-result = process_dataset(request)
+result = execute_request(request)
 print(result.processed_scenes)
 ```
 
-Use `resolve_job()` when you want a dry planning step. Use `process_dataset()` when you want to
-execute the job.
+Use `resolve_request()` when you want a dry planning step. Use `execute_request()` when you want to
+execute the request directly.
 
 ## Schema and record helpers
 

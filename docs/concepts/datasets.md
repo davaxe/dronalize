@@ -57,4 +57,4 @@ When starting with a dataset:
 1. Run `dronalize inspect <dataset>` to see its defaults and capabilities.
 2. Run `dronalize split-support <dataset>` before choosing a split strategy.
 3. Keep your TOML focused on project-specific changes instead of repeating built-in defaults.
-4. Use `show-config` or `resolve_job()` to verify the fully merged result before execution.
+4. Use `show-config` or `resolve_request()` to verify the fully merged result before execution.

@@ -52,7 +52,7 @@ class SceneRecord:
     """Global 2D translation offset applied to scene coordinates.
 
     Shape:
-        `(2, 1)`
+        `(2,)`
 
     The offset is applied uniformly to all spatial quantities in the scene to
     place them in the canonical coordinate frame used by the reader pipeline.

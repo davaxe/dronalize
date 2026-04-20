@@ -32,6 +32,25 @@ categories = ["ANIMAL"]
 rule = "exclude"
 categories = ["UNIMPORTANT"]
 
+[profiles.strict_screening]
+
+[profiles.strict_screening.screening.agent]
+no_gap = {rule = "max_gap", maximum = 0}
+stationary = { rule = "min_distance", minimum = 4, tolerance = { absolute = 100} }
+
+# --------------------------------------------------------------------------------------
+# Dataset: waymo
+# --------------------------------------------------------------------------------------
+
+[datasets.waymo]
+uses = ["strict_screening"]
+
+[datasets.waymo.screening]
+mode = "extend"
+
+[datasets.waymo.output.mds]
+# compression = "zstd:3"
+
 # --------------------------------------------------------------------------------------
 # Dataset: a43
 # --------------------------------------------------------------------------------------

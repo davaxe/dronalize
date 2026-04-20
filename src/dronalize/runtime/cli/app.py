@@ -153,7 +153,7 @@ def process(
     from dronalize.runtime.api import execute_plan
 
     plan = _run_cli_action(
-        lambda: _resolve_cli_job(
+        lambda: _resolve_cli_plan(
             dataset=dataset,
             input_dir=input_dir,
             output_dir=output_dir,
@@ -240,8 +240,8 @@ def show_config(
     include_map: IncludeMap = None,
 ) -> None:
     """[bold]Show the resolved configuration for a specified dataset[/bold]."""
-    job = _run_cli_action(
-        lambda: _resolve_cli_job(
+    plan = _run_cli_action(
+        lambda: _resolve_cli_plan(
             dataset=dataset,
             input_dir=Path(),
             output_dir=Path(),
@@ -259,7 +259,7 @@ def show_config(
         )
     )
     rprint("\n[bold]Resolved Config:[/bold]")
-    rprint(job.resolved_config)
+    rprint(plan.resolved_config)
 
 
 @app.command()
@@ -312,7 +312,7 @@ def _format_validation_error(exc: ValidationError) -> str:
     return "\n".join(lines)
 
 
-def _resolve_cli_job(
+def _resolve_cli_plan(
     *,
     dataset: str,
     input_dir: Path,

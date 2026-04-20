@@ -44,8 +44,10 @@ class HighDLoader(LevelXDataLoader):
             pl.col("numLaneChanges").alias("lane_changes"),
             pl
             .col("class")
-            .replace_strict({"Car": AgentCategory.CAR.value, "Truck": AgentCategory.TRUCK.value})
-            .cast(pl.Int32())
+            .replace_strict(
+                {"Car": AgentCategory.CAR.value, "Truck": AgentCategory.TRUCK.value},
+                return_dtype=pl.Int32,
+            )
             .alias("agent_category"),
         ]
 

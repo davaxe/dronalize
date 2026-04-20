@@ -367,6 +367,15 @@ All agent rules may optionally define:
 | `selector` | `table` | Optional category selector. | `none` |
 | `tolerance` | `table` | Optional scene-level tolerance for invalid agents. | `none` |
 
+### `rule = "min_distance"`
+
+| Key | Type | Description | Default |
+|---|---|---|---|
+| `rule` | `"min_distance"` | Require a minimum distance traveled across the scene. | `required` |
+| `minimum` | `float` | Minimum distance in meters. |
+| `selector` | `table` | Optional category selector. | `none` |
+| `tolerance` | `table` | Optional scene-level tolerance for invalid agents. |
+
 ## Practical example
 
 ```toml

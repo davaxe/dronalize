@@ -44,7 +44,6 @@ Torch and PyG adapters.
 | `pyg` | Enables PyTorch Geometric adapters such as [`HeteroSceneDataset`][dronalize.io.adapters.HeteroSceneDataset]. |
 | `plot` | Installs Altair-based plotting helpers. |
 | `lyft`, `waymo`, `ad4che` | Add dataset-specific optional dependencies. |
-| `all_datasets` | Convenience extra for all dataset-specific extras. |
 
 ## Readers and adapters
 
@@ -72,12 +71,15 @@ Use a dataset extra only when a dataset needs one:
 ## Working with `uv`
 
 ```bash
-uv sync --group dev --group tools
+uv sync --group dev --extra cli
 uv run dronalize available
 ```
 
-The repository tracks a `uv.lock`, so `uv` is the most direct way to reproduce the local
-development and documentation environment.
+Add `--group docs` when you also want the local documentation toolchain:
+
+```bash
+uv sync --group dev --group docs --extra cli
+```
 
 ## Verify the install
 

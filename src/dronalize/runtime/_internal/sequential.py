@@ -88,6 +88,8 @@ class SequentialExecutor(ObservableExecutor):
         self._running = True
         self._update_event.set()
         for source in self._sources:
+            self._source_counter += 1
+            self._update_event.set()
             for processed in self._builder.prepare_source(self._loader, source):
                 if remaining is not None:
                     if remaining == 0:
@@ -103,10 +105,7 @@ class SequentialExecutor(ObservableExecutor):
                 )
                 self._split_counts[split_key] += 1
                 yield scene
-            else:
-                self._source_counter += 1
-                self._update_event.set()
-                continue
-            break
+            if remaining == 0:
+                break
         self._running = False
         self._update_event.set()

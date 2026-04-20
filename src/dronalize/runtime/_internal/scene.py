@@ -108,7 +108,7 @@ class SceneBuilder:
         scene_number: int,
     ) -> Scene:
         map_key, map_resolver = self._resolve_scene_map(loader, source, data)
-        scene = Scene(
+        scene = Scene.create(
             frame=data.frame,
             scene_number=scene_number,
             history_frames=self.history_frames,

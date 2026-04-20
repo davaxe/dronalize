@@ -34,7 +34,7 @@ PLAN_NOTICE = (
 
 
 def build_processing_summary_table(plan: ExecutionPlan) -> Table:
-    """Build a rich table summarizing one resolved processing job."""
+    """Build a rich table summarizing one resolved processing plan."""
     table = Table(
         title=f"Processing plan: {plan.dataset}",
         show_header=False,
@@ -43,13 +43,13 @@ def build_processing_summary_table(plan: ExecutionPlan) -> Table:
     )
     table.add_column(style="bright_cyan", justify="left", no_wrap=True)
     table.add_column(style="bright_magenta")
-    for label, value in summarize_job(plan):
+    for label, value in summarize_plan(plan):
         table.add_row(label, value)
     return table
 
 
-def summarize_job(plan: ExecutionPlan) -> tuple[tuple[str, str], ...]:
-    """Return label/value rows for a resolved job summary."""
+def summarize_plan(plan: ExecutionPlan) -> tuple[tuple[str, str], ...]:
+    """Return label/value rows for a resolved plan summary."""
     output_config = plan.output.inner
     return (
         ("Dataset", plan.dataset),

@@ -58,9 +58,9 @@ class WaymoMapBuilder(BaseMapBuilder):
 
         self._add_road_edge_edges(min_distance, interp_distance)
         self._add_road_line_edges(min_distance, interp_distance)
-        self._add_crosswalk_edges(min_distance, interp_distance)
+        self._add_crosswalk_edges(interp_distance)
         self._add_driveway_edges(min_distance, interp_distance)
-        self._add_speed_bump_edges(min_distance, interp_distance)
+        self._add_speed_bump_edges(interp_distance)
         self._add_lane_edges(min_distance, interp_distance)
         self._add_stop_sign_nodes()
 
@@ -91,9 +91,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             elif kind == "driveway":
                 dw[feature.id] = feature.driveway
 
-    def _add_speed_bump_edges(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
+    def _add_speed_bump_edges(self, interp_distance: float | None = None) -> None:
         """Add edges for speed bumps to the map graph."""
         for feature_id, speed_bump in self.speed_bumps.items():
             if feature_id in self._processed_features:
@@ -103,7 +101,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             self.add_node_edges_loop_min_dist(
                 points,
                 is_polygon=True,
-                min_distance=min_distance,
+                min_distance=0.5,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.REGULATORY,
             )
@@ -132,9 +130,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             )
             self._processed_features.add(feature_id)
 
-    def _add_crosswalk_edges(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
+    def _add_crosswalk_edges(self, interp_distance: float | None = None) -> None:
         """Process a crosswalk feature and update nodes and id_adj_list."""
         for feature_id, crosswalk in self.crosswalks.items():
             if feature_id in self._processed_features:
@@ -144,7 +140,7 @@ class WaymoMapBuilder(BaseMapBuilder):
             self.add_node_edges_loop_min_dist(
                 points,
                 is_polygon=True,
-                min_distance=min_distance,
+                min_distance=0.5,
                 interp_distance=interp_distance,
                 edge_type=EdgeType.PEDESTRIAN_MARKING,
             )

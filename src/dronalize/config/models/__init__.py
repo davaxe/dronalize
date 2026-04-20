@@ -40,7 +40,6 @@ from dronalize.config.models.output import (
 )
 from dronalize.config.models.runtime import PartialRuntimeConfig, RuntimeConfig
 from dronalize.config.models.scenes import (
-    Derivatives,
     LaneChangeConfig,
     PartialLaneChangeConfig,
     PartialResampleConfig,
@@ -99,7 +98,6 @@ __all__ = [
     "CircularExtraction",
     "CleanupSpec",
     "DatasetConfig",
-    "Derivatives",
     "EndsAfterFrameSpec",
     "ExcludeCategoriesSpec",
     "FullMapExtraction",

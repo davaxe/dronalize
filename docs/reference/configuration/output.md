@@ -10,7 +10,7 @@ Output settings control what is persisted after preprocessing. In practice, this
 | `precision` | `"float32"` or `"float64"` | Floating-point precision of persisted data. | `"float32"` |
 | `recenter_positions` | `bool` | Offset all agent positions by the scene mean before writing. The offset is stored in the output. | `true` |
 
-## `[export.backends.mds]` section
+## `[output.mds]` section
 
 This nested block only matters when writing MDS output and is used to tune shard writing behavior.
 
@@ -29,12 +29,12 @@ This nested block only matters when writing MDS output and is used to tune shard
 ## Minimal example
 
 ```toml
-[datasets.a43.export]
+[datasets.a43.output]
 schema = "positions_velocity_yaw"
 precision = "float64"
 recenter_positions = true
 
-[datasets.a43.export.backends.mds]
+[datasets.a43.output.mds]
 compression = "zstd:7"
 hashes = ["sha1", "xxh64"]
 size_limit = 33554432
@@ -46,7 +46,7 @@ a custom schema using a table. Custom schemas must include the base fields
 `frame`, `id`, `agent_category`, `x`, and `y`:
 
 ```toml
-[datasets.a43.export]
+[datasets.a43.output]
 schema = { name = "custom", fields = ["frame", "id", "agent_category", "x", "y", "vx", "vy"] }
 precision = "float64"
 recenter_positions = true

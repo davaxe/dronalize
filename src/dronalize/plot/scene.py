@@ -1,18 +1,25 @@
+# pyright: standard
 """Altair helpers for visualizing scenes and scene records."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Final, Literal
+from typing import TYPE_CHECKING, Final, Literal, TypeAlias
 
-import numpy as np
 import polars as pl
 
-from dronalize.core.categories import AgentCategory, EdgeType
-from dronalize.core.maps import MapGraph
 from dronalize.core.optional import raise_missing_optional_dependency
-from dronalize.core.scene import Scene
+from dronalize.plot.scene_normalization import (
+    EDGE_TYPE_LABELS,
+    PHASE_FUTURE,
+    PHASE_HISTORY,
+    SCREENING_FAILED,
+    SCREENING_PASSED,
+    PlotSceneData,
+    normalize_plot_scene_data,
+)
+from dronalize.plot.theme import EdgeStyle, PlotTheme, ThemeName, get_plot_theme
 
 try:
     import altair as alt
@@ -21,8 +28,9 @@ except ModuleNotFoundError as error:
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from types import ModuleType
 
+    from dronalize.core.categories import AgentCategory, EdgeType
+    from dronalize.core.scene import Scene
     from dronalize.io import SceneRecord
 
 AspectMode = Literal["auto", "equal"]
@@ -33,21 +41,86 @@ supplied, while `"equal"` computes plot bounds so one data unit in x matches
 one data unit in y.
 """
 
+ChartT: TypeAlias = alt.Chart | alt.LayerChart
+FilterExpression: TypeAlias = str
+
 _DEFAULT_WIDTH: Final[int] = 800
 _DEFAULT_HEIGHT: Final[int] = 450
 _MIN_DIMENSION: Final[int] = 240
 _MAX_DIMENSION: Final[int] = 1200
 _MAX_EQUAL_RATIO: Final[float] = 6.0
 _MAX_TOOLTIP_AGENTS: Final[int] = 150
+_FUTURE_PHASE_DASH: Final[tuple[int, int]] = (6, 12)
+
+_FILTER_ALL: Final[str] = "All"
+
+_SELECTED_FRAME_PARAM: Final[str] = "selected_frame"
+_AGENT_TYPE_FILTER_PARAM: Final[str] = "agent_type_filter"
+_SCREENING_FILTER_PARAM: Final[str] = "screening_filter"
 
 
 @dataclass(slots=True, frozen=True)
-class PlotSceneData:
-    """Normalized plotting payload shared across scene-like inputs."""
+class FrameControl:
+    """Altair frame slider parameter and its derived filter expressions."""
 
-    scene_number: int
-    trajectories: pl.DataFrame
-    map_edges: pl.DataFrame | None
+    parameter: alt.Parameter
+    visible_expr: FilterExpression
+    current_expr: FilterExpression
+
+
+@dataclass(slots=True, frozen=True)
+class DropdownControl:
+    """Altair dropdown parameter and its derived filter expression."""
+
+    parameter: alt.Parameter
+    expression: FilterExpression
+
+
+@dataclass(slots=True, frozen=True)
+class TrajectoryControls:
+    """All interactive controls used by the trajectory layers."""
+
+    selection: alt.Parameter
+    focus: alt.Parameter
+    frame: FrameControl
+    category: DropdownControl
+    screening: DropdownControl
+
+    @property
+    def visible_filters(self) -> tuple[FilterExpression, ...]:
+        """Return filters shared by layers that respect the frame slider."""
+        return (
+            self.category.expression,
+            self.screening.expression,
+            self.frame.visible_expr,
+        )
+
+    @property
+    def static_filters(self) -> tuple[FilterExpression, ...]:
+        """Return filters shared by layers that ignore the frame slider."""
+        return (
+            self.category.expression,
+            self.screening.expression,
+        )
+
+    @property
+    def parameters(self) -> tuple[alt.Parameter, ...]:
+        """Return Altair parameters that must be attached to the chart."""
+        return (
+            self.frame.parameter,
+            self.category.parameter,
+            self.screening.parameter,
+        )
+
+
+@dataclass(slots=True, frozen=True)
+class MapStyleScale:
+    """Resolved per-edge-type styling arrays used by Altair scales."""
+
+    domain: list[str]
+    colors: list[str]
+    widths: list[float]
+    dashes: list[tuple[int, ...]]
 
 
 def plot_scene(
@@ -61,7 +134,10 @@ def plot_scene(
     agent_sample_seed: int | None = None,
     include_map_nodes: bool = False,
     save_path: Path | str | None = None,
-) -> alt.Chart | alt.LayerChart:
+    ignore_map_types: set[EdgeType] | None = None,
+    ignore_agent_categories: set[AgentCategory] | None = None,
+    theme: ThemeName | PlotTheme = "light",
+) -> ChartT:
     """Plot one scene or scene record using Altair.
 
     Parameters
@@ -69,11 +145,11 @@ def plot_scene(
     data : Scene or SceneRecord
         The scene or scene record to plot.
     show_map : bool, optional
-        Whether to include the map graph in the plot regardess of map data
+        Whether to include the map graph in the plot regardless of map data
         presence. Defaults to `True`.
     aspect : AspectMode, optional
         Aspect ratio mode for the plot. `"auto"` (default) automatically adjusts
-        the aspect ratio based on data bounds, while `"equal" forces a 1:1
+        the aspect ratio based on data bounds, while `"equal"` forces a 1:1
         aspect ratio regardless of data. Ignored if both width and height are
         specified.
     width : int, optional
@@ -94,6 +170,15 @@ def plot_scene(
     save_path : Path or str, optional
         Path to save the plot (json, html, png, etc.). If `None` (default), the
         plot is not saved to disk.
+    ignore_map_types : set[EdgeType], optional
+        Map edge types to exclude from plotting. If `None` (default), all map
+        edge types are considered.
+    ignore_agent_categories : set[AgentCategory], optional
+        Agent categories to exclude from plotting. If `None` (default), all
+        agent categories are considered.
+    theme : {"light", "dark"} or PlotTheme, optional
+        Plot theme to apply. Built-in themes are `"light"` (default) and
+        `"dark"`, but a custom `PlotTheme` instance can also be supplied.
 
     Returns
     -------
@@ -103,17 +188,22 @@ def plot_scene(
     """
     _ = alt.data_transformers.enable("vegafusion")  # pyright: ignore[reportUnknownVariableType]
 
-    normalized = _normalize_plot_input(
-        data, max_agents=max_agents, agent_sample_seed=agent_sample_seed
+    normalized = normalize_plot_scene_data(
+        data,
+        max_agents=max_agents,
+        agent_sample_seed=agent_sample_seed,
+        ignore_map_types=ignore_map_types,
+        ignore_agent_categories=ignore_agent_categories,
     )
+    resolved_theme = get_plot_theme(theme)
     chart = _build_scene_chart(
         normalized,
-        alt=alt,
         show_map=show_map,
         aspect=aspect,
         width=width,
         height=height,
         include_map_nodes=include_map_nodes,
+        theme=resolved_theme,
     )
     if save_path is not None:
         chart.save(save_path)  # pyright: ignore[reportUnknownMemberType]
@@ -123,13 +213,13 @@ def plot_scene(
 def _build_scene_chart(
     data: PlotSceneData,
     *,
-    alt: ModuleType,
     show_map: bool,
     aspect: AspectMode,
     width: int | None,
     height: int | None,
     include_map_nodes: bool,
-) -> alt.Chart | alt.LayerChart:
+    theme: PlotTheme,
+) -> ChartT:
     """Construct the layered Altair chart from normalized scene data."""
     plot_width, plot_height = _resolve_plot_dimensions(
         trajectories=data.trajectories,
@@ -141,194 +231,43 @@ def _build_scene_chart(
     )
 
     layers: list[alt.Chart] = []
-    params: list[Any] = []
+    params: list[alt.Parameter] = []
 
     if show_map and data.map_edges is not None and not data.map_edges.is_empty():
-        map_layers, edge_selection = _build_map_layers(
-            data.map_edges, alt=alt, include_nodes=include_map_nodes
+        layers.extend(
+            _build_map_layers(
+                data.map_edges,
+                include_nodes=include_map_nodes,
+                theme=theme,
+            )
         )
-        layers.extend(map_layers)
-        params.append(edge_selection)
 
     if not data.trajectories.is_empty():
-        trajectory_layers, trajectory_params = _build_trajectory_layers(data.trajectories, alt=alt)
+        trajectory_layers, trajectory_params = _build_trajectory_layers(
+            data.trajectories,
+            theme=theme,
+        )
         layers.extend(trajectory_layers)
         params.extend(trajectory_params)
 
     if not layers:
-        return _empty_chart(alt, "Empty Scene Plot")
+        return _empty_chart("Empty Scene Plot", theme=theme)
 
-    chart = alt.layer(*layers)
+    chart: ChartT = alt.layer(*layers)
     if params:
         chart = chart.add_params(*params)
 
-    return (
-        chart
-        .resolve_scale(color="independent", size="independent", strokeDash="independent")
-        .properties(width=plot_width, height=plot_height)
-        .configure_view(stroke=None)
-        .configure_axis(grid=True, gridColor="grey", gridOpacity=0.2, gridDash=[2, 2])
-        .interactive()
-    )
-
-
-def _normalize_plot_input(
-    data: Scene | SceneRecord, *, max_agents: int | None, agent_sample_seed: int | None
-) -> PlotSceneData:
-    """Normalize a scene-like input to the plotting payload."""
-    if isinstance(data, Scene):
-        return _normalize_scene(data, max_agents=max_agents, agent_sample_seed=agent_sample_seed)
-    return _normalize_scene_record(data, max_agents=max_agents, agent_sample_seed=agent_sample_seed)
-
-
-def _normalize_scene(
-    scene: Scene, *, max_agents: int | None, agent_sample_seed: int | None
-) -> PlotSceneData:
-    """Convert a `Scene` into the normalized plotting payload."""
-    trajectories = scene.frame.select(
-        pl.col("frame").cast(pl.Int64()),
-        pl.col("id").cast(pl.Int64()).alias("agent"),
-        pl.col("x").cast(pl.Float64()),
-        pl.col("y").cast(pl.Float64()),
-        pl.col("agent_category").cast(pl.Int64()),
-    )
-    trajectories = trajectories.with_columns(
-        pl
-        .col("agent_category")
-        .replace_strict(_ALL_AGENT_CATEGORIES, default="Unknown")
-        .alias("agent_type")
-    ).drop("agent_category")
-    trajectories = _sample_agents(
-        trajectories, max_agents=max_agents, agent_sample_seed=agent_sample_seed
-    )
-    trajectories = _add_segments(trajectories)
-
-    graph = scene.resolve_map()
-    map_edges = _map_graph_to_edge_frame(graph)
-
-    return PlotSceneData(
-        scene_number=scene.scene_number, trajectories=trajectories, map_edges=map_edges
-    )
-
-
-def _normalize_scene_record(
-    record: SceneRecord, *, max_agents: int | None, agent_sample_seed: int | None
-) -> PlotSceneData:
-    """Convert a `SceneRecord` into the normalized plotting payload."""
-    features = np.concatenate((record.input_features, record.output_features), axis=1)
-    mask = np.concatenate((record.input_mask, record.output_mask), axis=1)
-
-    if features.shape[-1] < 2:
-        msg = "SceneRecord plotting requires x/y feature columns in positions 0 and 1."
-        raise ValueError(msg)
-
-    offset = np.asarray(record.position_offset, dtype=np.float64).reshape(-1)
-    if offset.shape != (2,):
-        msg = f"SceneRecord position_offset must resolve to shape (2,), got {offset.shape!r}."
-        raise ValueError(msg)
-
-    rows: list[dict[str, float | int | str]] = []
-    num_agents, _num_frames = mask.shape
-    for agent_idx in range(num_agents):
-        valid_frames = np.flatnonzero(mask[agent_idx])
-        agent_type = _agent_category_name(int(record.agent_types[agent_idx]))
-        rows.extend(
-            {
-                "frame": frame_idx,
-                "agent": agent_idx,
-                "x": float(features[agent_idx, frame_idx, 0]) + float(offset[0]),
-                "y": float(features[agent_idx, frame_idx, 1]) + float(offset[1]),
-                "agent_type": agent_type,
-            }
-            for frame_idx in valid_frames.tolist()
-        )
-
-    trajectories = pl.DataFrame(
-        rows,
-        schema={
-            "frame": pl.Int64(),
-            "agent": pl.Int64(),
-            "x": pl.Float64(),
-            "y": pl.Float64(),
-            "agent_type": pl.String(),
-        },
-        orient="row",
-    )
-    trajectories = _sample_agents(
-        trajectories, max_agents=max_agents, agent_sample_seed=agent_sample_seed
-    )
-    trajectories = _add_segments(trajectories)
-
-    graph = MapGraph(
-        node_positions=np.asarray(record.map_node_positions, dtype=np.float64) + offset,
-        edge_indices=np.asarray(record.map_edge_indices, dtype=np.int32),
-        node_types=np.asarray(record.map_node_types, dtype=np.int32),
-        edge_types=np.asarray(record.map_edge_types, dtype=np.int32),
-    )
-
-    return PlotSceneData(
-        scene_number=record.scene_number,
-        trajectories=trajectories,
-        map_edges=_map_graph_to_edge_frame(graph),
-    )
-
-
-def _sample_agents(
-    trajectories: pl.DataFrame, *, max_agents: int | None, agent_sample_seed: int | None
-) -> pl.DataFrame:
-    """Optionally subsample plotted agents."""
-    if max_agents is None or trajectories.is_empty():
-        return trajectories
-
-    unique_agents = trajectories.select("agent").unique()
-    if unique_agents.height <= max_agents:
-        return trajectories
-
-    selected_agents = unique_agents.sample(max_agents, seed=agent_sample_seed)
-    return trajectories.join(selected_agents, on="agent", how="semi")
-
-
-def _add_segments(trajectories: pl.DataFrame) -> pl.DataFrame:
-    """Add per-agent segment ids so gaps are rendered as broken lines."""
-    if trajectories.is_empty():
-        return trajectories.with_columns(pl.lit(0).cast(pl.Int64()).alias("segment"))
-
-    trajectories = trajectories.sort(["agent", "frame"])
-    gap = (pl.col("frame") - pl.col("frame").shift(1).over("agent")).fill_null(1) > 1
-    segment = gap.cast(pl.Int64()).cum_sum().over("agent")
-    return trajectories.with_columns(segment.cast(pl.Int64()).alias("segment"))
-
-
-def _map_graph_to_edge_frame(graph: MapGraph | None) -> pl.DataFrame | None:
-    """Convert a map graph to the minimal edge dataframe needed by Altair."""
-    if graph is None or graph.num_edges == 0:
-        return None
-
-    start_indices = graph.edge_indices[0]
-    end_indices = graph.edge_indices[1]
-    start_pos = graph.node_positions[start_indices]
-    end_pos = graph.node_positions[end_indices]
-
-    return (
-        pl
-        .DataFrame({
-            "x1": start_pos[:, 0],
-            "y1": start_pos[:, 1],
-            "x2": end_pos[:, 0],
-            "y2": end_pos[:, 1],
-            "edge_type_int": graph.edge_types,
-        })
-        .with_columns(
-            pl
-            .col("edge_type_int")
-            .replace_strict(_ALL_EDGE_TYPES, default=EdgeType.VIRTUAL.name.title())
-            .alias("edge_type"),
-            ((pl.col("x1") - pl.col("x2")) ** 2 + (pl.col("y1") - pl.col("y2")) ** 2)
-            .sqrt()
-            .alias("length"),
-        )
-        .drop("edge_type_int")
-    )
+    return _style_scene_chart(
+        chart.resolve_scale(
+            color="independent",
+            size="independent",
+            strokeDash="independent",
+        ),
+        data=data,
+        plot_width=plot_width,
+        plot_height=plot_height,
+        theme=theme,
+    ).interactive()
 
 
 def _resolve_plot_dimensions(
@@ -351,7 +290,9 @@ def _resolve_plot_dimensions(
         return _DEFAULT_WIDTH, _DEFAULT_HEIGHT
 
     x_min, x_max, y_min, y_max = _collect_plot_bounds(
-        trajectories=trajectories, map_edges=map_edges, show_map=show_map
+        trajectories=trajectories,
+        map_edges=map_edges,
+        show_map=show_map,
     )
     x_span = max(x_max - x_min, 1.0)
     y_span = max(y_max - y_min, 1.0)
@@ -363,7 +304,10 @@ def _resolve_plot_dimensions(
 
 
 def _collect_plot_bounds(
-    *, trajectories: pl.DataFrame, map_edges: pl.DataFrame | None, show_map: bool
+    *,
+    trajectories: pl.DataFrame,
+    map_edges: pl.DataFrame | None,
+    show_map: bool,
 ) -> tuple[float, float, float, float]:
     """Return combined x/y bounds across plotted layers."""
     x_values: list[float] = []
@@ -398,111 +342,247 @@ def _collect_plot_bounds(
 
 
 def _build_trajectory_layers(
-    trajectories: pl.DataFrame, *, alt: ModuleType
-) -> tuple[list[alt.Chart], list[Any]]:
+    trajectories: pl.DataFrame, *, theme: PlotTheme
+) -> tuple[list[alt.Chart], tuple[alt.Parameter, ...]]:
     """Build Altair layers for scene trajectories."""
     unique_agents = trajectories["agent"].n_unique()
-    agent_selection = alt.selection_point(fields=["agent"], on="click", empty=False)
-    line_tooltips: list[alt.Tooltip] = [
+    controls = _trajectory_controls(trajectories)
+    trajectory_paths = _trajectory_path_data(trajectories)
+    agent_color = _agent_color_encoding(trajectories, theme=theme)
+    line_tooltips = _trajectory_tooltips(include_point_details=unique_agents <= _MAX_TOOLTIP_AGENTS)
+    marker_tooltips = _trajectory_tooltips(include_point_details=True)
+    base = _trajectory_base_chart(
+        trajectory_paths,
+        controls=controls,
+        agent_color=agent_color,
+        tooltips=line_tooltips,
+    )
+
+    layers = [
+        _trajectory_selection_targets(base, controls=controls),
+        *_trajectory_line_layers(base, controls=controls),
+        *_trajectory_marker_layers(
+            trajectories, controls=controls, agent_color=agent_color, tooltips=marker_tooltips
+        ),
+    ]
+    return layers, controls.parameters
+
+
+def _trajectory_controls(trajectories: pl.DataFrame) -> TrajectoryControls:
+    """Create the interactive controls shared by trajectory layers."""
+    return TrajectoryControls(
+        selection=alt.selection_point(fields=["agent"], on="click", clear="dblclick"),
+        focus=alt.selection_point(fields=["agent"], on="click", clear="dblclick", empty=False),
+        frame=_frame_control(trajectories),
+        category=_dropdown_control(
+            name=_AGENT_TYPE_FILTER_PARAM,
+            label="Agent Type",
+            field="agent_type",
+            options=trajectories["agent_type"].unique().sort().to_list(),
+        ),
+        screening=_dropdown_control(
+            name=_SCREENING_FILTER_PARAM,
+            label="Screening",
+            field="screening_status",
+            options=_screening_statuses(trajectories),
+        ),
+    )
+
+
+def _trajectory_base_chart(
+    trajectory_paths: pl.DataFrame,
+    *,
+    controls: TrajectoryControls,
+    agent_color: alt.Color,
+    tooltips: list[alt.Tooltip],
+) -> alt.Chart:
+    """Create the shared base chart used by all trajectory layers."""
+    return _filtered_chart(trajectory_paths, *controls.visible_filters).encode(
+        x=alt.X("x:Q", title="X", scale=alt.Scale(zero=False)),
+        y=alt.Y("y:Q", title="Y", scale=alt.Scale(zero=False)),
+        color=agent_color,
+        order=alt.Order("frame:Q"),
+        detail="phase_segment:N",
+        tooltip=tooltips,
+    )
+
+
+def _trajectory_selection_targets(
+    base: alt.Chart,
+    *,
+    controls: TrajectoryControls,
+) -> alt.Chart:
+    """Add an invisible interaction layer used for agent selection."""
+    return base.mark_line(color="#000000", strokeWidth=14, opacity=0.001).add_params(
+        controls.selection, controls.focus
+    )
+
+
+def _trajectory_line_layers(base: alt.Chart, *, controls: TrajectoryControls) -> list[alt.Chart]:
+    """Create the trajectory line layers in back-to-front order."""
+    trajectories = base.mark_line(strokeWidth=2.15).encode(
+        strokeDash=_trajectory_phase_dash(show_legend=True),
+        opacity=alt.when(controls.selection).then(alt.value(0.86)).otherwise(alt.value(0.06)),
+    )
+
+    focused_trajectory = (
+        base
+        .transform_filter(controls.focus)
+        .mark_line(strokeWidth=2.9)
+        .encode(
+            strokeDash=_trajectory_phase_dash(show_legend=False),
+            opacity=alt.value(1.0),
+        )
+    )
+
+    return [trajectories, focused_trajectory]
+
+
+def _trajectory_marker_layers(
+    trajectories: pl.DataFrame,
+    *,
+    controls: TrajectoryControls,
+    agent_color: alt.Color,
+    tooltips: list[alt.Tooltip],
+) -> list[alt.Chart]:
+    """Create the marker layers that sit on top of the trajectory lines."""
+    start_frames = trajectories.group_by("agent", maintain_order=True).head(1)
+
+    start_markers = (
+        _filtered_chart(start_frames, *controls.visible_filters)
+        .mark_point(shape="circle", size=90, filled=True, fill="#2ecc71", fillOpacity=0.95)
+        .encode(
+            x="x:Q",
+            y="y:Q",
+            tooltip=tooltips,
+            opacity=alt.when(controls.selection).then(alt.value(0.95)).otherwise(alt.value(0.15)),
+        )
+    )
+
+    current_points = (
+        _filtered_chart(trajectories, *controls.static_filters)
+        .transform_filter(controls.frame.current_expr)
+        .mark_point(shape="diamond", size=90, filled=True, fillOpacity=0.98)
+        .encode(
+            x="x:Q",
+            y="y:Q",
+            color=agent_color,
+            tooltip=tooltips,
+            opacity=alt.when(controls.selection).then(alt.value(0.95)).otherwise(alt.value(0.15)),
+        )
+    )
+
+    return [start_markers, current_points]
+
+
+def _trajectory_path_data(trajectories: pl.DataFrame) -> pl.DataFrame:
+    """Prepare line-path rows so phase becomes a visible line style."""
+    path_rows = trajectories.with_columns(pl.col("phase").alias("path_phase")).with_columns(
+        _phase_segment_expr(phase_field="path_phase").alias("phase_segment")
+    )
+    if trajectories.is_empty():
+        return path_rows
+
+    transition_rows = (
+        trajectories
+        .sort(["agent", "segment", "frame"])
+        .with_columns(
+            pl.col("phase").shift(-1).over(["agent", "segment"]).alias("next_phase"),
+            pl.col("frame").shift(-1).over(["agent", "segment"]).alias("next_frame"),
+        )
+        .filter(
+            (pl.col("phase") == PHASE_HISTORY)
+            & (pl.col("next_phase") == PHASE_FUTURE)
+            & (pl.col("next_frame") == pl.col("frame") + 1)
+        )
+        .with_columns(pl.lit(PHASE_FUTURE).alias("path_phase"))
+        .with_columns(_phase_segment_expr(phase_field="path_phase").alias("phase_segment"))
+        .drop("next_phase", "next_frame")
+    )
+
+    return pl.concat([path_rows, transition_rows], how="vertical").sort([
+        "agent",
+        "segment",
+        "frame",
+        "path_phase",
+    ])
+
+
+def _phase_segment_expr(*, phase_field: str) -> pl.Expr:
+    """Return a stable phase-aware segment identifier for Altair line grouping."""
+    return pl.concat_str(
+        pl.col("segment").cast(pl.String()),
+        pl.lit("::"),
+        pl.col(phase_field),
+    )
+
+
+def _trajectory_phase_dash(*, show_legend: bool) -> alt.StrokeDash:
+    """Return the stroke-dash encoding used to distinguish history and future."""
+    legend = alt.Legend(title="Trajectory Phase", orient="right") if show_legend else None
+    return alt.StrokeDash(
+        "path_phase:N",
+        sort=[PHASE_HISTORY, PHASE_FUTURE],
+        scale=alt.Scale(
+            domain=[PHASE_HISTORY, PHASE_FUTURE],
+            range=[(1, 0), _FUTURE_PHASE_DASH],
+        ),
+        legend=legend,
+    )
+
+
+def _trajectory_tooltips(
+    *,
+    include_point_details: bool,
+) -> list[alt.Tooltip]:
+    """Build a consistent tooltip payload for trajectory layers."""
+    tooltips: list[alt.Tooltip] = [
         alt.Tooltip("agent:Q", title="Agent"),
         alt.Tooltip("agent_type:N", title="Type"),
+        alt.Tooltip("screening_status:N", title="Screening"),
+        alt.Tooltip("total_frames:Q", title="Total Frames"),
+        alt.Tooltip("missing_frames:Q", title="Missing Frames"),
     ]
-    marker_tooltips: list[alt.Tooltip] = [
-        alt.Tooltip("agent:Q", title="Agent"),
-        alt.Tooltip("agent_type:N", title="Type"),
-        alt.Tooltip("frame:Q", title="Frame"),
-        alt.Tooltip("x:Q", format=".2f"),
-        alt.Tooltip("y:Q", format=".2f"),
-    ]
-    if unique_agents <= _MAX_TOOLTIP_AGENTS:
-        line_tooltips.extend([
+    if include_point_details:
+        tooltips.extend([
             alt.Tooltip("frame:Q", title="Frame"),
             alt.Tooltip("x:Q", format=".2f"),
             alt.Tooltip("y:Q", format=".2f"),
         ])
-
-    base = alt.Chart(trajectories).encode(
-        x=alt.X("x:Q", title="X", scale=alt.Scale(zero=False)),
-        y=alt.Y("y:Q", title="Y", scale=alt.Scale(zero=False)),
-        color=alt.Color("agent:N", legend=None, scale=alt.Scale(scheme="category20")),
-        order=alt.Order("frame:Q"),
-        tooltip=line_tooltips,
-    )
-
-    trajectories_layer = base.encode(
-        detail="segment:N",
-        opacity=alt.when(agent_selection).then(alt.value(1.0)).otherwise(alt.value(0.8)),
-    ).mark_line(strokeWidth=2)
-
-    start_df = trajectories.group_by("agent", maintain_order=True).head(1)
-    end_df = trajectories.group_by("agent", maintain_order=True).tail(1)
-
-    start_markers = (
-        alt
-        .Chart(start_df)
-        .mark_point(shape="circle", size=75, filled=True, fill="#2ecc71", stroke="black")
-        .encode(x="x:Q", y="y:Q", tooltip=marker_tooltips)
-    )
-    end_markers = (
-        alt
-        .Chart(end_df)
-        .mark_point(shape="cross", size=75, color="#e74c3c", stroke="black")
-        .encode(x="x:Q", y="y:Q", tooltip=marker_tooltips)
-    )
-
-    selected_points = (
-        alt
-        .Chart(trajectories)
-        .mark_point(size=45, filled=True, stroke="black", strokeWidth=0.5)
-        .encode(
-            x="x:Q",
-            y="y:Q",
-            color=alt.Color("agent:N", legend=None, scale=alt.Scale(scheme="category20")),
-            tooltip=marker_tooltips,
-        )
-        .transform_filter(agent_selection)
-    )
-
-    return [trajectories_layer, start_markers, end_markers, selected_points], [agent_selection]
+    return tooltips
 
 
 def _build_map_layers(
-    map_edges: pl.DataFrame, *, alt: ModuleType, include_nodes: bool
-) -> tuple[list[alt.Chart], Any]:
+    map_edges: pl.DataFrame, *, include_nodes: bool, theme: PlotTheme
+) -> list[alt.Chart]:
     """Build Altair layers for a normalized edge dataframe."""
-    color_dict, width_dict, dash_dict = _get_altair_style_dicts()
-    present_types = map_edges["edge_type"].unique().to_list()
-    present_types.sort()
-
-    axis_scale = alt.Scale(zero=False)
-    edge_selection = alt.selection_point(fields=["edge_type"], bind="legend")
-    plot_color = [color_dict.get(edge_type, "gray") for edge_type in present_types]
-    plot_width = [width_dict.get(edge_type, 1.0) for edge_type in present_types]
-    plot_dash = [dash_dict.get(edge_type, [1, 0]) for edge_type in present_types]
+    style_scale = _map_style_scale(map_edges, theme=theme)
 
     lines = (
         alt
         .Chart(map_edges)
-        .mark_rule()
+        .mark_rule(strokeCap="round")
         .encode(
-            x=alt.X("x1:Q", scale=axis_scale, title="X", axis=alt.Axis(grid=False)),
-            y=alt.Y("y1:Q", scale=axis_scale, title="Y", axis=alt.Axis(grid=False)),
+            x=alt.X("x1:Q", scale=alt.Scale(zero=False), title="X", axis=alt.Axis(grid=False)),
+            y=alt.Y("y1:Q", scale=alt.Scale(zero=False), title="Y", axis=alt.Axis(grid=False)),
             x2="x2:Q",
             y2="y2:Q",
             color=alt.Color(
                 "edge_type:N",
-                scale=alt.Scale(domain=present_types, range=plot_color),
-                legend=alt.Legend(
-                    title="Edge Type", symbolType="stroke", symbolStrokeWidth=3, orient="right"
-                ),
+                scale=alt.Scale(domain=style_scale.domain, range=style_scale.colors),
+                legend=alt.Legend(title="Edge Type", symbolType="stroke", orient="right"),
             ),
             size=alt.Size(
-                "edge_type:N", scale=alt.Scale(domain=present_types, range=plot_width), legend=None
+                "edge_type:N",
+                scale=alt.Scale(domain=style_scale.domain, range=style_scale.widths),
+                legend=None,
             ),
             strokeDash=alt.StrokeDash(
-                "edge_type:N", scale=alt.Scale(domain=present_types, range=plot_dash), legend=None
+                "edge_type:N",
+                scale=alt.Scale(domain=style_scale.domain, range=style_scale.dashes),
+                legend=None,
             ),
-            opacity=alt.when(edge_selection).then(alt.value(0.7)).otherwise(alt.value(0.05)),
+            opacity=alt.value(0.45),
             tooltip=[
                 alt.Tooltip("edge_type:N", title="Type"),
                 alt.Tooltip("x1:Q", title="Start X", format=".2f"),
@@ -516,76 +596,236 @@ def _build_map_layers(
 
     layers = [lines]
     if include_nodes:
-        start_nodes = (
-            alt
-            .Chart(map_edges)
-            .mark_circle(color="black", size=15)
-            .encode(
-                x=alt.X("x1:Q", scale=axis_scale),
-                y=alt.Y("y1:Q", scale=axis_scale),
-                opacity=alt.when(edge_selection).then(alt.value(1.0)).otherwise(alt.value(0.05)),
-            )
+        layers.extend([
+            _map_node_layer(map_edges, x_field="x1", y_field="y1", theme=theme),
+            _map_node_layer(map_edges, x_field="x2", y_field="y2", theme=theme),
+        ])
+
+    return layers
+
+
+def _map_style_scale(map_edges: pl.DataFrame, *, theme: PlotTheme) -> MapStyleScale:
+    """Resolve the map-edge styling arrays required by Altair scales."""
+    domain = map_edges["edge_type"].unique().to_list()
+    domain.sort()
+
+    edge_styles = _edge_styles_by_name(theme.name)
+    return MapStyleScale(
+        domain=domain,
+        colors=[edge_styles.get(edge_type, _DEFAULT_EDGE_STYLE).color for edge_type in domain],
+        widths=[edge_styles.get(edge_type, _DEFAULT_EDGE_STYLE).width for edge_type in domain],
+        dashes=[edge_styles.get(edge_type, _DEFAULT_EDGE_STYLE).dash for edge_type in domain],
+    )
+
+
+def _map_node_layer(
+    map_edges: pl.DataFrame,
+    *,
+    x_field: str,
+    y_field: str,
+    theme: PlotTheme,
+) -> alt.Chart:
+    """Return one semi-transparent map-node layer."""
+    return (
+        alt
+        .Chart(map_edges)
+        .mark_circle(color=theme.map_node_color, size=18, opacity=0.35)
+        .encode(
+            x=alt.X(f"{x_field}:Q", scale=alt.Scale(zero=False)),
+            y=alt.Y(f"{y_field}:Q", scale=alt.Scale(zero=False)),
+            opacity=alt.value(0.28),
         )
-        end_nodes = (
-            alt
-            .Chart(map_edges)
-            .mark_circle(color="black", size=15)
-            .encode(
-                x=alt.X("x2:Q", scale=axis_scale),
-                y=alt.Y("y2:Q", scale=axis_scale),
-                opacity=alt.when(edge_selection).then(alt.value(1.0)).otherwise(alt.value(0.05)),
-            )
-        )
-        layers.extend((start_nodes, end_nodes))
-
-    return layers, edge_selection
+    )
 
 
-def _empty_chart(alt: ModuleType, message: str) -> alt.Chart:
+def _empty_chart(message: str, *, theme: PlotTheme) -> alt.Chart:
     """Create a simple text chart used for empty plotting inputs."""
-    return alt.Chart(pl.DataFrame()).mark_text(size=16).encode(text=alt.value(message))
+    return (
+        alt
+        .Chart(pl.DataFrame())
+        .mark_text(size=16, color=theme.title_color, fontWeight="bold")
+        .encode(text=alt.value(message))
+    )
 
 
-_STYLE_MAP: Final[dict[int, tuple[str, float, list[int]]]] = {
-    EdgeType.NONE.value: ("gray", 0.5, [1, 0]),
-    EdgeType.ROAD_BORDER.value: ("black", 2.0, [1, 0]),
-    EdgeType.CURB.value: ("black", 2.5, [1, 0]),
-    EdgeType.REGULATORY.value: ("red", 1.0, [1, 0]),
-    EdgeType.VIRTUAL.value: ("blue", 0.5, [2, 2]),
-    EdgeType.LINE_THIN.value: ("gray", 1.0, [1, 0]),
-    EdgeType.LINE_THIN_DASHED.value: ("gray", 1.0, [5, 5]),
-    EdgeType.LINE_THICK.value: ("gray", 2.0, [1, 0]),
-    EdgeType.LINE_THICK_DASHED.value: ("gray", 2.0, [5, 5]),
-    EdgeType.PEDESTRIAN_MARKING.value: ("orange", 1.5, [5, 5]),
-    EdgeType.BIKE_MARKING.value: ("green", 1.5, [5, 5]),
-    EdgeType.GUARD_RAIL.value: ("purple", 2.0, [1, 0]),
-    EdgeType.STOP.value: ("red", 3.0, [1, 0]),
-    EdgeType.LINE_THIN_DOUBLE.value: ("#D4AF37", 2.0, [1, 0]),
-    EdgeType.LINE_THIN_DOUBLE_DASHED.value: ("#D4AF37", 2.0, [5, 5]),
-}
-
-_ALL_EDGE_TYPES: Final[dict[int, str]] = {
-    item.value: item.name.replace("_", " ").title() for item in EdgeType
-}
-_ALL_AGENT_CATEGORIES: Final[dict[int, str]] = {
-    item.value: item.name.replace("_", " ").title() for item in AgentCategory
-}
+def _filtered_chart(data: pl.DataFrame, *filters: FilterExpression) -> alt.Chart:
+    """Return an Altair chart with all provided filters applied in order."""
+    chart = alt.Chart(data)
+    for filter_expr in filters:
+        chart = chart.transform_filter(filter_expr)
+    return chart
 
 
-@lru_cache(maxsize=1)
-def _get_altair_style_dicts() -> tuple[dict[str, str], dict[str, float], dict[str, list[int]]]:
-    """Cache Altair styling mappings keyed by edge type name."""
-    colors: dict[str, str] = {}
-    widths: dict[str, float] = {}
-    dashes: dict[str, list[int]] = {}
-    for value, name in _ALL_EDGE_TYPES.items():
-        color, width, dash = _STYLE_MAP.get(value, ("gray", 1.0, [1, 0]))
-        colors[name] = color
-        widths[name] = width
-        dashes[name] = dash
-    return colors, widths, dashes
+_DEFAULT_EDGE_STYLE: Final[EdgeStyle] = EdgeStyle(color="gray", width=1.0, dash=(1, 0))
 
 
-def _agent_category_name(value: int) -> str:
-    """Return the display name for one encoded agent category."""
-    return _ALL_AGENT_CATEGORIES.get(value, "Unknown")
+@lru_cache(maxsize=2)
+def _edge_styles_by_name(theme_name: ThemeName) -> dict[str, EdgeStyle]:
+    """Return one theme's edge styles keyed by display name."""
+    theme = get_plot_theme(theme_name)
+    return {EDGE_TYPE_LABELS[value]: style for value, style in theme.edge_styles.items()}
+
+
+def _agent_color_encoding(
+    trajectories: pl.DataFrame,
+    *,
+    theme: PlotTheme,
+) -> alt.Color:
+    """Return a stable per-agent color encoding that does not change under filtering."""
+    agent_ids = trajectories["agent"].unique().sort().to_list()
+    scheme = theme.agent_color_scheme
+
+    if isinstance(scheme, str):
+        scale = alt.Scale(domain=agent_ids, scheme=scheme)  # pyright: ignore[reportArgumentType]
+    else:
+        palette = list(scheme)
+        if not palette:
+            msg = "agent_color_scheme cannot be empty."
+            raise ValueError(msg)
+        scale = alt.Scale(domain=agent_ids, range=palette)
+
+    return alt.Color(
+        "agent:N",
+        legend=None,
+        scale=scale,
+    )
+
+
+def _style_scene_chart(
+    chart: ChartT, *, data: PlotSceneData, plot_width: int, plot_height: int, theme: PlotTheme
+) -> ChartT:
+    """Apply the shared theme used by scene plots."""
+    chart = chart.properties(
+        width=plot_width,
+        height=plot_height,
+        title=_scene_title(data),
+    )
+    return _apply_scene_theme(chart, theme=theme)
+
+
+def _apply_scene_theme(chart: ChartT, *, theme: PlotTheme) -> ChartT:
+    """Apply the shared chart-level Altair theme configuration."""
+    return (
+        chart
+        .configure(background=theme.chart_background)
+        .configure_view(
+            fill=theme.plot_background,
+            stroke=theme.grid_color,
+            strokeOpacity=0.65,
+        )
+        .configure_title(
+            color=theme.title_color,
+            fontSize=18,
+            subtitleFontSize=13,
+            fontWeight="bold",
+            offset=12,
+            subtitleColor=theme.title_color,
+        )
+        .configure_axis(
+            grid=False,
+            domainColor=theme.grid_color,
+            tickColor=theme.grid_color,
+            labelColor=theme.axis_color,
+            titleColor=theme.title_color,
+            labelFontSize=12,
+            titleFontSize=13,
+        )
+        .configure_legend(
+            titleColor=theme.title_color,
+            labelColor=theme.axis_color,
+            fillColor=theme.plot_background,
+            strokeColor=theme.grid_color,
+            padding=10,
+            orient="bottom",
+            titleFontSize=14,
+            labelFontSize=14,
+            symbolSize=500,
+            symbolStrokeWidth=5,
+            symbolOpacity=1.0,
+        )
+    )
+
+
+def _screening_statuses(trajectories: pl.DataFrame) -> list[str]:
+    """Return screening statuses present in plotting order."""
+    present = set(trajectories["screening_status"].unique().to_list())
+    return [status for status in (SCREENING_PASSED, SCREENING_FAILED) if status in present]
+
+
+def _frame_control(trajectories: pl.DataFrame) -> FrameControl:
+    """Return the current-frame slider control."""
+    frame_min, frame_max = trajectories["frame"].min(), trajectories["frame"].max()
+    frame_min = int(frame_min) if isinstance(frame_min, (int, float)) else 0
+    frame_max = int(frame_max) if isinstance(frame_max, (int, float)) else 0
+    parameter = alt.param(
+        name=_SELECTED_FRAME_PARAM,
+        value=frame_max,
+        bind=alt.binding_range(
+            min=frame_min,
+            max=frame_max,
+            step=1,
+            name="Frame ",
+        ),
+    )
+    return FrameControl(
+        parameter=parameter,
+        visible_expr=f"datum.frame <= {_SELECTED_FRAME_PARAM}",
+        current_expr=f"datum.frame == {_SELECTED_FRAME_PARAM}",
+    )
+
+
+def _dropdown_control(
+    *,
+    name: str,
+    label: str,
+    field: str,
+    options: list[str],
+) -> DropdownControl:
+    """Create a dropdown filter control and its Vega expression."""
+    parameter = alt.param(
+        name=name,
+        value=_FILTER_ALL,
+        bind=alt.binding_select(
+            options=[_FILTER_ALL, *options],
+            name=f"{label} ",
+        ),
+    )
+    return DropdownControl(
+        parameter=parameter,
+        expression=f"{name} == '{_FILTER_ALL}' || datum.{field} == {name}",
+    )
+
+
+def _scene_title(data: PlotSceneData) -> alt.TitleParams:
+    """Return the chart title and summary subtitle for one plotted scene."""
+    agent_count = 0
+    category_count = 0
+    passed_count = 0
+    failed_count = 0
+    frame_range = "frames: n/a"
+
+    if not data.trajectories.is_empty():
+        agent_summary = data.trajectories.select(
+            "agent",
+            "agent_type",
+            "screening_status",
+        ).unique(subset="agent")
+        agent_count = agent_summary.height
+        category_count = agent_summary["agent_type"].n_unique()
+        passed_count = int((agent_summary["screening_status"] == SCREENING_PASSED).sum())
+        failed_count = int((agent_summary["screening_status"] == SCREENING_FAILED).sum())
+        frame_min = data.trajectories["frame"].min()
+        frame_max = data.trajectories["frame"].max()
+        frame_range = f"frames: {frame_min}-{frame_max}"
+
+    edge_count = 0 if data.map_edges is None else data.map_edges.height
+    subtitle = (
+        f"{agent_count} agents | {category_count} categories | "
+        f"{passed_count} passed / {failed_count} failed | "
+        f"{edge_count} map edges | {frame_range}"
+    )
+    return alt.TitleParams(
+        text=f"Scene {data.scene_number}",
+        subtitle=[subtitle],
+        anchor="start",
+    )

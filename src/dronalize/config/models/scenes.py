@@ -2,20 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 from pydantic import Field, model_validator
+from typing_extensions import override
 
-from dronalize.config.base import FullConfig, PartialConfig, ResampleMethod
+from dronalize.config.base import ConfigBase, FullConfig, PartialConfig, ResampleMethod
 from dronalize.core.errors import ConfigurationError
 
-Derivatives = Literal["velocity", "acceleration"]
-"""Named derivative families that scene processing can materialize.
-
-These labels are used by configuration helpers and schema-planning code to
-describe which derived motion quantities should be emitted on top of sampled
-positions.
-"""
+if TYPE_CHECKING:
+    from dronalize.core.typing import T
 
 
 class ResampleConfig(FullConfig):
@@ -138,13 +134,66 @@ class PartialScenesConfig(PartialConfig[ScenesConfig]):
     """Replacement number of prediction frames per scene."""
     sample_time: float | None = None
     """Replacement frame interval in seconds."""
-    window: PartialWindowConfig | None = None
+    window: PartialWindowConfig | Literal[False] | None = None
     """Partial override for sliding-window sampling settings."""
-    resample: PartialResampleConfig | None = None
+    resample: PartialResampleConfig | Literal[False] | None = None
     """Partial override for temporal resampling settings."""
-    lane_change: PartialLaneChangeConfig | None = None
+    lane_change: PartialLaneChangeConfig | Literal[False] | None = None
     """Partial override for lane-change-aware sampling settings."""
     full_config_type: type[ScenesConfig] = Field(default=ScenesConfig, init=False, repr=False)
+
+    @override
+    def apply_to(self, target: ScenesConfig | None, *, exclude_none: bool = True) -> ScenesConfig:
+        """Apply this partial scenes config to an existing full scenes config."""
+        return ScenesConfig(
+            history_frames=_resolve_required(
+                "history_frames",
+                self.history_frames,
+                target.history_frames if target is not None else None,
+            ),
+            future_frames=_resolve_required(
+                "future_frames",
+                self.future_frames,
+                target.future_frames if target is not None else None,
+            ),
+            sample_time=_resolve_required(
+                "sample_time",
+                self.sample_time,
+                target.sample_time if target is not None else None,
+            ),
+            window=_apply_optional_block(
+                self.window, target.window if target is not None else None
+            ),
+            resample=_apply_optional_block(
+                self.resample, target.resample if target is not None else None
+            ),
+            lane_change=_apply_optional_block(
+                self.lane_change, target.lane_change if target is not None else None
+            ),
+        )
+
+
+def _resolve_required(name: str, value: T | None, fallback: T | None) -> T:
+    result = value if value is not None else fallback
+    if result is None:
+        msg = f"Missing required field: {name}"
+        raise ValueError(msg)
+    return result
+
+
+ConfigT = TypeVar("ConfigT", bound=ConfigBase)
+
+
+def _apply_optional_block(
+    patch: PartialConfig[ConfigT] | Literal[False] | None,
+    target: ConfigT | None,
+) -> ConfigT | None:
+    """Apply a patch to an optional nested config block."""
+    if patch is None:
+        return target
+    if patch is False:
+        return None
+    return patch.apply_to(target)
 
 
 def effective_scene_window(config: ScenesConfig) -> tuple[int, int, float]:

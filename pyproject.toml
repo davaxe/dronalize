@@ -23,7 +23,7 @@ dependencies = [
     "tomli>=2.0.1; python_version < '3.11'",
 ]
 
-kewords = ["autonomous driving", "trajectory data", "data processing", "datasets", "machine learning"]
+keywords = ["autonomous driving", "trajectory data", "data processing", "datasets", "machine learning"]
 
 classifiers = [
     "Programming Language :: Python :: 3",

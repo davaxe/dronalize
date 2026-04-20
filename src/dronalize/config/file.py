@@ -30,7 +30,7 @@ class PartialDatasetEntryConfig(PartialDatasetConfigBase):
 
 
 class ProcessingConfig(ConfigBase):
-    """Root config model for processing jobs.
+    """Root config model for processing requests.
 
     This model is designed to be loaded from a TOML file with potentially
     incomplete dataset entries, which can be resolved to complete

@@ -269,3 +269,22 @@
     height: 0.9rem;
     box-shadow: var(--md-shadow-z1);
 }
+
+.themed-iframe-figure .only-light,
+.themed-iframe-figure .only-dark {
+    display: block;
+    width: 100%;
+    height: 500px;
+    border: solid 1px var(--md-typeset-table-color);
+    border-radius: 0.4rem;
+    background: var(--md-default-bg-color)
+}
+
+
+[data-md-color-scheme="default"] .themed-iframe-figure .only-dark {
+    display: none;
+}
+
+[data-md-color-scheme="slate"] .themed-iframe-figure .only-light {
+    display: none;
+}

@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 
 def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> ExecutionPlan:
-    """Build a full runtime plan from a public process request."""
+    """Build a full runtime plan from a public execution request."""
     _validate_input_path(request)
     include_map = request.include_map
     storage_backend = _resolve_storage_backend(request.storage_backend)
@@ -91,6 +91,9 @@ def _validate_input_path(request: ExecutionRequest) -> None:
     if not request.input_dir.exists() and request.input_dir_exists:
         msg = f"Input directory {request.input_dir} does not exist."
         raise FileNotFoundError(msg)
+    if request.input_dir_exists and not request.input_dir.is_dir():
+        msg = f"Input directory {request.input_dir} is not a directory."
+        raise NotADirectoryError(msg)
 
 
 def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBackend:

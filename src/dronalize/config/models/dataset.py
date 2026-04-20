@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 from typing_extensions import override
@@ -48,7 +48,7 @@ class PartialDatasetConfigBase(ConfigBase):
     """Partial scene construction overrides to merge into the target config."""
     runtime: PartialRuntimeConfig | None = Field(default=None)
     """Partial runtime execution overrides to merge into the target config."""
-    screening: PartialScreeningConfig | None = Field(default=None)
+    screening: PartialScreeningConfig | Literal[False] | None = Field(default=None)
     """Partial screening rule overrides to merge into the target config."""
     output: PartialOutputConfig | None = Field(default=None)
     """Partial output writer overrides to merge into the target config."""
@@ -78,11 +78,21 @@ class PartialDatasetConfig(PartialDatasetConfigBase, PartialConfig[DatasetConfig
         return DatasetConfig(
             scenes=self.scenes.apply_to(target.scenes) if self.scenes else target.scenes,
             runtime=self.runtime.apply_to(target.runtime) if self.runtime else target.runtime,
-            screening=(
-                self.screening.apply_to(target.screening) if self.screening else target.screening
-            ),
+            screening=_apply_optional_screening(self.screening, target.screening),
             dataset=self.dataset if self.dataset is not None else target.dataset,
             output=self.output.apply_to(target.output) if self.output else target.output,
             map=self.map.apply_to(target.map) if self.map else target.map,
             split=self.split if self.split is not None else target.split,
         )
+
+
+def _apply_optional_screening(
+    patch: PartialScreeningConfig | Literal[False] | None,
+    target: ScreeningConfig | None,
+) -> ScreeningConfig | None:
+    """Apply a patch to an optional screening block."""
+    if patch is None:
+        return target
+    if patch is False:
+        return None
+    return patch.apply_to(target)

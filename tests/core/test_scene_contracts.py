@@ -44,7 +44,7 @@ def test_schema_rejects_missing_required_base_fields() -> None:
 
 
 def test_scene_as_schema_derives_kinematics_from_positions() -> None:
-    scene = Scene(
+    scene = Scene.create(
         frame=pl.DataFrame({
             "frame": [0, 1, 2],
             "id": [1, 1, 1],
@@ -58,16 +58,14 @@ def test_scene_as_schema_derives_kinematics_from_positions() -> None:
         schema=POSITIONS_ONLY,
         sample_time=1.0,
     )
-
     converted = scene.as_schema(CANONICAL)
-
     assert converted.schema == CANONICAL
     np.testing.assert_allclose(converted.frame["vx"].to_numpy(), np.array([1.0, 1.0, 1.0]))
     np.testing.assert_allclose(converted.frame["ax"].to_numpy(), np.array([0.0, 0.0, 0.0]))
 
 
 def test_scene_as_schema_without_sample_time_fails_for_kinematics() -> None:
-    scene = Scene(
+    scene = Scene.create(
         frame=pl.DataFrame({
             "frame": [0, 1, 2],
             "id": [1, 1, 1],
@@ -100,7 +98,7 @@ def test_scene_map_resolver_is_deferred_and_usable_in_encoding() -> None:
         calls["count"] += 1
         return graph
 
-    scene = Scene(
+    scene = Scene.create(
         frame=pl.DataFrame({
             "frame": [0, 1, 2],
             "id": [1, 1, 1],

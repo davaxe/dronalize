@@ -9,7 +9,7 @@ class DatasetCase:
     path_rel_root: str
     max_scenes: int = 10
     scene_start: int = 0
-    scene_step: int = 100
+    scene_step: int = 10
 
 
 ALL_CASES_DEFAULT: dict[str, DatasetCase] = {

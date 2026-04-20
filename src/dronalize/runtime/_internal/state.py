@@ -102,6 +102,12 @@ class ProgressState:
         self.update_event.set()
         return scene_number
 
+    def scene_limit_reached(self, limit: int | None = None) -> bool:
+        if limit is None:
+            return False
+        with self.scene_counter.get_lock():
+            return self.scene_counter.value >= limit
+
     def increment_source(self) -> int:
         with self.source_counter.get_lock():
             self.source_counter.value += 1

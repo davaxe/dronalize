@@ -12,7 +12,7 @@ from dronalize.config.base import FullConfig, PartialConfig
 
 
 class RuntimeConfig(FullConfig):
-    """Execution controls for processing jobs.
+    """Execution controls for processing requests.
 
     Attributes
     ----------
