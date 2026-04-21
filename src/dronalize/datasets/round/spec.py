@@ -40,7 +40,7 @@ def open_round_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="round",
-    loader_factory=RounDLoader.unified_factory,
+    loader_factory=RounDLoader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=50,

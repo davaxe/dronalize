@@ -15,10 +15,15 @@ if TYPE_CHECKING:
 
 
 class Argoverse1Map:
-    """Represents the Argoverse map, containing lane segments and nodes."""
+    """Represents the Argoverse map, containing lane segments and nodes.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the Argoverse XML map file.
+    """
 
     def __init__(self, path: Path) -> None:
-        """Initialize the ArgoverseMap with the path to the XML file."""
         self.path: Path = path
         self.lane_segments: dict[int, LaneSegment] = {}
         self.nodes: dict[int, Point] = {}

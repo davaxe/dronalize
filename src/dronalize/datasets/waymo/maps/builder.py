@@ -19,14 +19,12 @@ class WaymoMapBuilder(BaseMapBuilder):
 
     As opposed to other maps (e.g, argoverse1, argoverse2 and NuScenes) this map
     parses the map features and builds a graph representation of the map.
+
+    The constructor `WaymoMapBuilder.from_proto` should be used to create an
+    instance from a list of `lean_map_pb2.MapFeature` protos.
     """
 
     def __init__(self) -> None:
-        """Initialize the Waymo map builder with empty features and nodes.
-
-        The constructor `WaymoMapBuilder.from_proto` should be used to
-        create an instance from a list of `lean_map_pb2.MapFeature` protos.
-        """
         super().__init__()
         self.road_lines: dict[int, lean_map_pb2.RoadLine] = {}
         self.road_edges: dict[int, lean_map_pb2.RoadEdge] = {}

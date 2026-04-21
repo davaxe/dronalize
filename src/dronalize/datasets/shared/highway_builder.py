@@ -33,6 +33,27 @@ class HighwayLaneMapBuilder(BaseMapBuilder):
         2. Drivers drive in the center of their lanes, so lane centers can be
         estimated by aggregating vehicle positions within each longitudinal bin.
 
+    Parameters
+    ----------
+    data : pl.LazyFrame
+        A Polars LazyFrame containing vehicle trajectory data.
+    id_col : str, optional
+        Name of the column containing unique identifiers for each vehicle.
+    x_col : str, optional
+        Name of the column containing X coordinates.
+    y_col : str, optional
+        Name of the column containing Y coordinates.
+    lane_id_col : str, optional
+        Name of the column containing lane identifiers.
+    orientation : {"vertical", "horizontal"}, optional
+        The dominant axis of the highway ("vertical" for Y-axis, "horizontal" for X-axis).
+    bin_size : float, optional
+        The size of the longitudinal bins used to group vehicle positions.
+    include_outer_borders : bool, optional
+        Whether to include outer lane borders in the graph.
+    smoothing : float, optional
+        Smoothing factor for lane center estimation (spline parameter).
+
     """
 
     def __init__(
@@ -48,30 +69,6 @@ class HighwayLaneMapBuilder(BaseMapBuilder):
         include_outer_borders: bool = True,
         smoothing: float | None = None,
     ) -> None:
-        """Initialize the map builder.
-
-        Parameters
-        ----------
-        data : pl.LazyFrame
-            A Polars LazyFrame containing vehicle trajectory data.
-        id_col : str, optional
-            Name of the column containing unique identifiers for each vehicle.
-        x_col : str, optional
-            Name of the column containing X coordinates.
-        y_col : str, optional
-            Name of the column containing Y coordinates.
-        lane_id_col : str, optional
-            Name of the column containing lane identifiers.
-        orientation : {"vertical", "horizontal"}, optional
-            The dominant axis of the highway ("vertical" for Y-axis, "horizontal" for X-axis).
-        bin_size : float, optional
-            The size of the longitudinal bins used to group vehicle positions.
-        include_outer_borders : bool, optional
-            Whether to include outer lane borders in the graph.
-        smoothing : float, optional
-            Smoothing factor for lane center estimation (spline parameter).
-
-        """
         super().__init__()
         self._data: pl.LazyFrame = data
         self._id_col: str = id_col

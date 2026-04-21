@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
     from dronalize.config.models import DatasetConfig, MDSOutputConfig, OutputConfig, RuntimeConfig
     from dronalize.datasets.registry import DatasetSpec
+    from dronalize.processing.loading.options import DatasetOptionsModel
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +167,7 @@ def compile_loader_request(
     include_map: bool | None,
 ) -> LoaderRequest:
     """Compile the loader-facing request for one resolved dataset config."""
-    dataset_options = descriptor.parse_dataset_config(resolved_config.dataset)
+    dataset_options: DatasetOptionsModel = descriptor.parse_dataset_config(resolved_config.dataset)
     map_config = None if (include_map is False or not descriptor.has_map) else resolved_config.map
     return LoaderRequest(
         scenes=resolved_config.scenes,

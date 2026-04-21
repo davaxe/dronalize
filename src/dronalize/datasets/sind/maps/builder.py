@@ -21,6 +21,14 @@ class SindMapBuilder(OSMMapBuilder):
     with the SIND dataset. It dynamically finds the local origin in the OSM file
     and uses UTM projection offsets to build a local metric coordinate system.
 
+    Parameters
+    ----------
+    osm_file : Path
+        Path to the OSM lanelet map file for the SIND dataset.
+    position_offset : tuple[float, float], optional
+        `(x, y)` offset to apply to all node positions after converting to local coordinates.
+    include_edge_type_none : bool, optional
+        Whether to include edges with type 'none' in the graph.
     """
 
     def __init__(
@@ -30,19 +38,6 @@ class SindMapBuilder(OSMMapBuilder):
         *,
         include_edge_type_none: bool = False,
     ) -> None:
-        """Initialize the map builder.
-
-        Parameters
-        ----------
-        osm_file : Path
-            Path to the OSM lanelet map file for the SIND dataset.
-        position_offset : tuple[float, float], optional
-            (x, y) offset to apply to all node positions after converting to
-            local coordinates.
-        include_edge_type_none : bool, optional
-            Whether to include edges with type 'none' in the graph.
-
-        """
         self._origin_lat: float = 0.0
         self._origin_lon: float = 0.0
         self._origin_lat, self._origin_lon = self._extract_origin(osm_file)

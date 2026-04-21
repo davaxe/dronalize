@@ -7,29 +7,30 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from dronalize.runtime._internal.executor import ObservableExecutor, WriterFactory
+from dronalize.runtime._internal.executor import Executor, WriterFactory
 from dronalize.runtime._internal.state import Progress
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+    from collections.abc import Iterable, Iterator
 
     from dronalize.core.scene import Scene
-    from dronalize.io.base import DatasetWriter
-    from dronalize.processing.loading.base import BaseSceneLoader
+    from dronalize.processing.loading.base import RuntimeSceneLoader
     from dronalize.processing.loading.loader import Source
     from dronalize.runtime._internal.scene import SceneBuilder
 
 
-class SequentialExecutor(ObservableExecutor):
+class SequentialExecutor(Executor):
+    """Single-process executor for internal runtime execution."""
+
     def __init__(
         self,
-        loader: BaseSceneLoader[Any, Any],
+        loader: RuntimeSceneLoader,
         builder: SceneBuilder,
         sources: Iterable[Source[Any]],
         *,
         limit: int | None = None,
     ) -> None:
-        self._loader: BaseSceneLoader[Any, Any] = loader
+        self._loader: RuntimeSceneLoader = loader
         self._builder: SceneBuilder = builder
         self._sources: Iterable[Source[Any]] = sources
         self._limit: int | None = limit
@@ -45,19 +46,14 @@ class SequentialExecutor(ObservableExecutor):
         self._running: bool = False
 
     @override
-    def execute(
-        self, writer_factory: WriterFactory, finalize: Callable[[DatasetWriter], None] | None = None
-    ) -> None:
+    def execute(self, writer_factory: WriterFactory) -> None:
         writer = writer_factory(0)
         try:
             for scene in self._generate_and_track():
                 writer.write(scene)
         finally:
-            if finalize is not None:
-                finalize(writer)
-            else:
-                writer.finish_local()
-                writer.finish_final()
+            writer.finish_local()
+            writer.finish_final()
 
     @override
     def execute_yield(self) -> Iterator[Scene]:

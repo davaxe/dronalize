@@ -10,8 +10,9 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
+from dronalize.processing.loading.options import DatasetOptionsModel
 from dronalize.processing.maps.resolver import no_map, shared_map
 
 if TYPE_CHECKING:
@@ -30,7 +31,17 @@ class NuScenesLoaderOptions(DatasetOptionsModel):
 
 
 class NuScenesLoader(BaseSceneLoader[tuple[int, str], NuScenesLoaderOptions]):
-    """Loader for nuScenes trajectories."""
+    """Loader for nuScenes trajectories.
+
+    Parameters
+    ----------
+    data_root : Path or str
+        Root directory containing the nuScenes tables.
+    request : LoaderRequest
+        Resolved loader request for the current run.
+    resources : DatasetResources, optional
+        Shared runtime resources for this dataset execution.
+    """
 
     def __init__(
         self,
@@ -38,7 +49,6 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str], NuScenesLoaderOptions]):
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the nuScenes loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
         self._data_dirs: list[Path] = self._find_data_dir()
         self._dfs: list[dict[str, pl.LazyFrame]] = []
@@ -107,11 +117,6 @@ class NuScenesLoader(BaseSceneLoader[tuple[int, str], NuScenesLoaderOptions]):
         if not shared_maps or self.map_config is None:
             return no_map()
         return shared_map(shared_maps)
-
-    @classmethod
-    @override
-    def loader_options_model(cls) -> type[NuScenesLoaderOptions]:
-        return NuScenesLoaderOptions
 
     def _load_tables(self) -> None:
         for data_dir in self._data_dirs:

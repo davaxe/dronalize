@@ -35,7 +35,6 @@ class InteractionLoader(BaseSceneLoader[Path]):
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the INTERACTION loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
 
     @classmethod

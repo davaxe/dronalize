@@ -29,10 +29,15 @@ if TYPE_CHECKING:
 
 
 class Argoverse2MapBuilder(BaseMapBuilder):
-    """A builder for creating a graph representation of an Argoverse2 map."""
+    """A builder for creating a graph representation of an Argoverse2 map.
+
+    Parameters
+    ----------
+    map_data : parser.Argoverse2Map
+        Parsed Argoverse 2 map data used to build the graph.
+    """
 
     def __init__(self, map_data: parser.Argoverse2Map) -> None:
-        """Initialize the map builder with an `Argoverse2Map`."""
         super().__init__()
         self.map: parser.Argoverse2Map = map_data
 

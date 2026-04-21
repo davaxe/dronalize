@@ -14,8 +14,9 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
+from dronalize.processing.loading.options import DatasetOptionsModel
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -41,18 +42,11 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the Argoverse 2 loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
-
-    @classmethod
-    @override
-    def loader_options_model(cls) -> type[Argoverse2LoaderOptions]:
-        return Argoverse2LoaderOptions
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         if not data_dir.is_dir():

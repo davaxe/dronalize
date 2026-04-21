@@ -27,8 +27,7 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
 class ApolloScapeLoader(BaseSceneLoader):
     """Loader for ApolloScape prediction trajectories."""
 
-    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
-        """Initialize the ApolloScape loader."""
+    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
         super().__init__(data_root=data_root, request=request)
 
     @staticmethod

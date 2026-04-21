@@ -31,8 +31,7 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 class WaymoLoader(BaseSceneLoader):
     """Loader for Waymo scenarios stored in TFRecord format."""
 
-    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
-        """Initialize the Waymo loader."""
+    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
         super().__init__(data_root=data_root, request=request)
         self.root: Path = Path(data_root)
         self._include_map: bool = self.map_config is not None

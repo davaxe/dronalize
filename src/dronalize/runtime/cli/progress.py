@@ -18,7 +18,7 @@ from typing_extensions import override
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.runtime._internal.executor import ObservableExecutor
+    from dronalize.runtime._internal.executor import Executor
     from dronalize.runtime._internal.state import Progress
 
 T = TypeVar("T")
@@ -115,8 +115,8 @@ class _ExecutorDisplay(RichCast):
 
 
 class _ProgressMonitor:
-    def __init__(self, executor: ObservableExecutor, display: _ExecutorDisplay) -> None:
-        self._executor: ObservableExecutor = executor
+    def __init__(self, executor: Executor, display: _ExecutorDisplay) -> None:
+        self._executor: Executor = executor
         self._display: _ExecutorDisplay = display
         self._stop_event: threading.Event = threading.Event()
         self._error: BaseException | None = None
@@ -159,9 +159,7 @@ class _ProgressMonitor:
                 return
 
 
-def run_with_rich_progress(
-    executor: ObservableExecutor, run: Callable[[], T], *, enable: bool = True
-) -> T:
+def run_with_rich_progress(executor: Executor, run: Callable[[], T], *, enable: bool = True) -> T:
     """Run an executor callback while rendering a Rich progress bar."""
     if not enable:
         return run()

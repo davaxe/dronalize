@@ -37,7 +37,7 @@ def open_sind_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="sind",
-    loader_factory=SindLoader.unified_factory,
+    loader_factory=SindLoader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=25),
         screening=minimum_samples_screening(2),

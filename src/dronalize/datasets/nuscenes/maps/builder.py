@@ -18,12 +18,19 @@ if TYPE_CHECKING:
 
 
 class NuScenesMapBuilder(BaseMapBuilder):
-    """A builder for creating a MapGraph from a NuscenesMap."""
+    """A builder for creating a MapGraph from a NuscenesMap.
+
+    Parameters
+    ----------
+    nuscenes_map : parser.NuScenesMap
+        Parsed NuScenes map data used to build the graph.
+    ignore_edge_types : set[str], optional
+        Edge group names to skip during graph construction.
+    """
 
     def __init__(
         self, nuscenes_map: parser.NuScenesMap, ignore_edge_types: set[str] | None = None
     ) -> None:
-        """Initialize the map builder with a `NuScenesMap`."""
         super().__init__()
         self.map: parser.NuScenesMap = nuscenes_map
         self.map_nodes: dict[str, parser.Node] = self.map.nodes

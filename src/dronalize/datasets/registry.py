@@ -9,7 +9,7 @@ from collections.abc import Callable, Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import ValidationError
 
@@ -20,14 +20,14 @@ from dronalize.core.errors import (
     LoaderConfigError,
     MissingOptionalDependencyError,
 )
-from dronalize.processing.loading.base import DatasetOptionsModel, NoDatasetOptions
+from dronalize.processing.loading.base import RuntimeSceneLoader
+from dronalize.processing.loading.options import DatasetOptionsModel, NoDatasetOptions
 from dronalize.processing.loading.resources import DatasetResources
 from dronalize.processing.models import LoaderRequest, SplitRequest
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.base import BaseSceneLoader
 
 
 _REGISTRY: dict[str, DatasetSpec] = {}
@@ -59,7 +59,7 @@ class LoaderFactory(Protocol):
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
-    ) -> BaseSceneLoader[Any, Any]:
+    ) -> RuntimeSceneLoader:
         """Create a scene loader for the dataset with the given configuration."""
         ...
 
@@ -85,7 +85,7 @@ class DatasetSpec:
     def parse_dataset_config(self, payload: Mapping[str, object] | None) -> DatasetOptionsModel:
         """Parse and validate dataset-owned config from plain data."""
         try:
-            return self.dataset_options_model.model_validate(payload or {})
+            return self.dataset_options_model.parse(dict(payload or {}))
         except ValidationError as exc:
             msg = f"Invalid dataset config for dataset '{self.name}': {exc}"
             raise LoaderConfigError(msg) from exc
@@ -114,9 +114,10 @@ class DatasetSpec:
 
     def build_loader(
         self, *, root: Path, request: LoaderRequest, resources: DatasetResources | None = None
-    ) -> BaseSceneLoader[Any, Any]:
+    ) -> RuntimeSceneLoader:
         """Construct one loader instance for this dataset specification."""
-        return self.loader_factory(data_root=root, request=request, resources=resources)
+        loader = self.loader_factory(data_root=root, request=request, resources=resources)
+        return RuntimeSceneLoader.wrap(loader)
 
 
 @dataclass(frozen=True, slots=True)

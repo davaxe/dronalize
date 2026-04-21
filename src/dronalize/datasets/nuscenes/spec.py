@@ -39,7 +39,7 @@ def open_nuscenes_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="nuscenes",
-    loader_factory=NuScenesLoader.unified_factory,
+    loader_factory=NuScenesLoader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=4,

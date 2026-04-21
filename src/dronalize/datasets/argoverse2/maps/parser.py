@@ -28,10 +28,15 @@ if TYPE_CHECKING:
 
 
 class Argoverse2Map:
-    """Represents a map in the Argoverse2 dataset."""
+    """Represents a map in the Argoverse2 dataset.
+
+    Parameters
+    ----------
+    json_file : Path
+        Path to the Argoverse 2 JSON map file.
+    """
 
     def __init__(self, json_file: Path) -> None:
-        """Initialize the Argoverse2Map with a JSON file."""
         self.json_file: Path = json_file
         with Path.open(json_file, "r") as file:
             self.json_data: dict[str, Any] = json.load(file)

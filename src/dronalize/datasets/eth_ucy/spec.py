@@ -29,7 +29,7 @@ _DEFAULT_CONFIG = DatasetConfig(
 DATASET_SPECS = {
     "eth": DatasetSpec(
         name="eth",
-        loader_factory=EthLoader.unified_factory,
+        loader_factory=EthLoader.unified_runtime_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=EthLoader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
@@ -37,7 +37,7 @@ DATASET_SPECS = {
     ),
     "hotel": DatasetSpec(
         name="hotel",
-        loader_factory=HotelLoader.unified_factory,
+        loader_factory=HotelLoader.unified_runtime_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=HotelLoader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
@@ -45,7 +45,7 @@ DATASET_SPECS = {
     ),
     "univ": DatasetSpec(
         name="univ",
-        loader_factory=UnivLoader.unified_factory,
+        loader_factory=UnivLoader.unified_runtime_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=UnivLoader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
@@ -53,7 +53,7 @@ DATASET_SPECS = {
     ),
     "zara1": DatasetSpec(
         name="zara1",
-        loader_factory=Zara1Loader.unified_factory,
+        loader_factory=Zara1Loader.unified_runtime_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=Zara1Loader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,
@@ -61,7 +61,7 @@ DATASET_SPECS = {
     ),
     "zara2": DatasetSpec(
         name="zara2",
-        loader_factory=Zara2Loader.unified_factory,
+        loader_factory=Zara2Loader.unified_runtime_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=Zara2Loader.native_trajectory_schema(),
         native_splits=_NATIVE_SPLITS,

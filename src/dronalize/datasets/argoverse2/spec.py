@@ -8,7 +8,7 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 DATASET_SPEC = DatasetSpec(
     name="argoverse2",
-    loader_factory=Argoverse2Loader.unified_factory,
+    loader_factory=Argoverse2Loader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=50, future_frames=60, sample_time=0.1),
         screening=minimum_samples_screening(2),

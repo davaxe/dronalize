@@ -26,7 +26,6 @@ class VodLoader(NuScenesLoader):
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the VOD loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
 
     @classmethod
@@ -38,9 +37,3 @@ class VodLoader(NuScenesLoader):
         resources: DatasetResources | None = None,
     ) -> VodLoader:
         return cls(data_root=data_root, request=request, resources=resources)
-
-    @classmethod
-    @override
-    def default_loader_options(cls) -> VodLoaderOptions:
-        # VOD data contains two identical instances of the ego vehicle
-        return VodLoaderOptions(drop_full_category_regex=["vehicle.ego"])

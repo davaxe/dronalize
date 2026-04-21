@@ -41,8 +41,7 @@ def _table_query(table_name: str) -> str:
 class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     """Loader for OpenDD data split across multiple SQLite databases."""
 
-    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
-        """Initialize the multi-database OpenDD loader."""
+    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
         super().__init__(data_root=data_root, request=request)
 
     def _db_paths(self) -> Iterable[Path]:

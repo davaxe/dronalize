@@ -12,8 +12,9 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
+from dronalize.processing.loading.options import DatasetOptionsModel
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
@@ -42,7 +43,6 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the Argoverse 1 loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
         self._train_dir: Path = self.root / "forecasting_train_v1.1" / "train" / "data"
         self._val_dir: Path = self.root / "forecasting_val_v1.1" / "val" / "data"
@@ -57,11 +57,6 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         resources: DatasetResources | None = None,
     ) -> Argoverse1Loader:
         return cls(data_root, request, resources)
-
-    @classmethod
-    @override
-    def loader_options_model(cls) -> type[Argoverse1LoaderOptions]:
-        return Argoverse1LoaderOptions
 
     @override
     def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:

@@ -24,7 +24,6 @@ class ExiDLoader(LevelXDataLoader):
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the ExiD loader."""
         super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
 
     @staticmethod

@@ -38,7 +38,7 @@ def open_interaction_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="interaction",
-    loader_factory=InteractionLoader.unified_factory,
+    loader_factory=InteractionLoader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=10, future_frames=30, sample_time=0.1),
         screening=minimum_samples_screening(2),

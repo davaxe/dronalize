@@ -18,7 +18,23 @@ if TYPE_CHECKING:
 
 
 class Argoverse1MapBuilder(BaseMapBuilder):
-    """A builder for creating a graph representation of an Argoverse1 map."""
+    """A builder for creating a graph representation of an Argoverse1 map.
+
+    Parameters
+    ----------
+    argoverse_map : parser.Argoverse1Map
+        Parsed Argoverse 1 map data used to build the graph.
+    """
+
+    def __init__(self, argoverse_map: parser.Argoverse1Map) -> None:
+        if not argoverse_map.is_parsed():
+            argoverse_map.parse()
+
+        super().__init__()
+        self.lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
+        self.map_nodes: dict[int, Point] = argoverse_map.nodes
+
+        self.max_distance_between_connections: float = 1.0
 
     class SegmentEndpoint(TypedDict):
         """Endpoints of a lane segment used for graph building."""
@@ -31,17 +47,6 @@ class Argoverse1MapBuilder(BaseMapBuilder):
 
         right: Argoverse1MapBuilder.SegmentEndpoint
         left: Argoverse1MapBuilder.SegmentEndpoint
-
-    def __init__(self, argoverse_map: parser.Argoverse1Map) -> None:
-        """Initialize the map builder with an `Argoverse1Map`."""
-        if not argoverse_map.is_parsed():
-            argoverse_map.parse()
-
-        super().__init__()
-        self.lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
-        self.map_nodes: dict[int, Point] = argoverse_map.nodes
-
-        self.max_distance_between_connections: float = 1.0
 
     @classmethod
     def from_xml_file(cls, path: Path) -> Argoverse1MapBuilder:

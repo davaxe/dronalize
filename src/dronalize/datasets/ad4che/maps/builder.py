@@ -28,24 +28,20 @@ class AD4CHEMapBuilder(BaseMapBuilder):
     and related processing. While it is not perfect, it produces a reasonable
     generated map.
 
+    Parameters
+    ----------
+    map_image_path : Path
+        Path to the segmented map image (e.g., "01_laneWidthColorAndID.png").
+    pixel_to_meter : float, optional
+        Conversion factor from pixels to meters, by default PIXEL_TO_METER.
+    spatial_ds : float, optional
+        Minimum distance between consecutive nodes in the generated graph,
+        by default 3.0.
     """
 
     def __init__(
         self, map_image_path: Path, pixel_to_meter: float = PIXEL_TO_METER, spatial_ds: float = 3.0
     ) -> None:
-        """Initialize the map builder.
-
-        Parameters
-        ----------
-        map_image_path : Path
-            Path to the segmented map image (e.g., "01_laneWidthColorAndID.png").
-        pixel_to_meter : float, optional
-            Conversion factor from pixels to meters, by default PIXEL_TO_METER.
-        spatial_ds : float, optional
-            Minimum distance between consecutive nodes in the generated graph,
-            by default 3.0.
-
-        """
         if not map_image_path.is_file():
             msg = f"Map image file does not exist: {map_image_path}"
             raise ValueError(msg)

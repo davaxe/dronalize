@@ -20,17 +20,13 @@ class US101MapBuilder(HighwayLaneMapBuilder):
     uses a simple heuristic to infer the lane structure, see
     `HighwayLaneMapBuilder` for details.
 
+    Parameters
+    ----------
+    data_dir : Path
+        The root directory of the US101 dataset.
     """
 
     def __init__(self, data_dir: Path) -> None:
-        """Initialize the map builder.
-
-        Parameters
-        ----------
-        data_dir : Path
-            The root directory of the US101 dataset.
-
-        """
         files = list(data_dir.rglob("trajectories*.csv"))
         data = pl.scan_csv(files).select(
             pl.col("Vehicle_ID").alias("id"),

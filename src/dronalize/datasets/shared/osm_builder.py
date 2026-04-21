@@ -22,7 +22,22 @@ class OSMWay:
 
 
 class OSMMapBuilder(BaseMapBuilder):
-    """Map builder that constructs a `MapGraph` from OpenStreetMap (OSM) XML data."""
+    """Map builder that constructs a `MapGraph` from OpenStreetMap (OSM) XML data.
+
+    Parameters
+    ----------
+    osm_file : Path
+        File path to the OSM XML data file (.osm format).
+    utm_position_offset : tuple[float, float], optional
+        (x, y) offset to apply to all node positions after converting
+        from lat/lon to UTM coordinates. Defaults to (0.0, 0.0).
+    edge_type_mapping : Callable[[OSMWay], EdgeType], optional
+        How to map the OSM way tags to EdgeType categories.
+    include_edge_type_none : bool, optional
+        Whether to include edges categorized as EdgeType.NONE based on
+        the edge_type_mapping. Defaults to False.
+
+    """
 
     def __init__(
         self,
@@ -32,22 +47,6 @@ class OSMMapBuilder(BaseMapBuilder):
         *,
         include_edge_type_none: bool = False,
     ) -> None:
-        """Initialize the OSM map builder.
-
-        Parameters
-        ----------
-        osm_file : Path
-            File path to the OSM XML data file (.osm format).
-        utm_position_offset : tuple[float, float], optional
-            (x, y) offset to apply to all node positions after converting
-            from lat/lon to UTM coordinates. Defaults to (0.0, 0.0).
-        edge_type_mapping : Callable[[OSMWay], EdgeType], optional
-            How to map the OSM way tags to EdgeType categories.
-        include_edge_type_none : bool, optional
-            Whether to include edges categorized as EdgeType.NONE based on
-            the edge_type_mapping. Defaults to False.
-
-        """
         if not osm_file.exists():
             msg = (
                 f"OSM file not found at {osm_file}. "

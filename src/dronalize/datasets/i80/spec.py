@@ -36,7 +36,7 @@ def open_i80_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="i80",
-    loader_factory=I80Loader.unified_factory,
+    loader_factory=I80Loader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=20,

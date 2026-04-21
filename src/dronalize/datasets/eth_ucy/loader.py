@@ -26,8 +26,7 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 class _EthUcyLoader(BaseSceneLoader):
     """Loader for ETH/UCY pedestrian trajectory datasets."""
 
-    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
-        """Initialize one ETH/UCY dataset loader."""
+    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
         super().__init__(data_root=data_root, request=request)
 
     def _sources_from_split(self, split_name: str) -> Iterable[Source[Path]]:

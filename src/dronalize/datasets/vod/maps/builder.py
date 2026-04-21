@@ -20,19 +20,17 @@ if TYPE_CHECKING:
 
 
 class VODMapBuilder(NuScenesMapBuilder):
-    """A builder for creating a MapGraph from a VOD map."""
+    """A builder for creating a MapGraph from a VOD map.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the VOD map JSON file.
+    ignore_edge_types : set[str], optional
+        A set of edge type names to ignore during graph construction.
+    """
 
     def __init__(self, path: Path, *, ignore_edge_types: set[str] | None = None) -> None:
-        """Initialize the VOD map builder.
-
-        Parameters
-        ----------
-        path : Path
-            Path to the VOD map JSON file.
-        ignore_edge_types : set[str], optional
-            A set of edge type names to ignore during graph construction.
-
-        """
         nuscenes_map = NuScenesMap(path)
         self.ignore_edge_types: set[str] = (
             ignore_edge_types if ignore_edge_types is not None else set()

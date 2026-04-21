@@ -30,12 +30,10 @@ class AD4CHELoader(LevelXDataLoader):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the AD4CHE loader."""
         super().__init__(
             data_root=Path(data_root) / "AD4CHE_Data_V1.0", request=request, resources=resources
         )

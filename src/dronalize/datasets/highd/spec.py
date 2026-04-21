@@ -10,7 +10,7 @@ from dronalize.datasets.shared.specs import (
 
 DATASET_SPEC = DatasetSpec(
     name="highd",
-    loader_factory=HighDLoader.unified_factory,
+    loader_factory=HighDLoader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=50,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from dronalize.config.models import (
     NativeSplitConfig,
@@ -16,8 +16,6 @@ from dronalize.config.models import (
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from dronalize.config.models import (
         MapConfig,
         ScenesConfig,
@@ -25,6 +23,7 @@ if TYPE_CHECKING:
         SplitConfig,
         SplitConfigUnion,
     )
+    from dronalize.processing.loading.options import DatasetOptionsModel
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,9 +109,9 @@ class LoaderRequest:
     """Narrow loader-facing request derived from a resolved dataset config."""
 
     scenes: ScenesConfig
+    dataset: DatasetOptionsModel
     screening: ScreeningConfig | None = None
     split: SplitRequest | None = None
-    dataset: Mapping[str, Any] | Any | None = None
     map: MapConfig | None = None
     native_splits: tuple[DatasetSplit, ...] | None = None
 

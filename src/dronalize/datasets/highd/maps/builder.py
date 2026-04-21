@@ -22,21 +22,17 @@ class HighDMapBuilder(BaseMapBuilder):
     represented as edges between the nodes. The outermost lanes are classified as
     road borders.
 
+    Parameters
+    ----------
+    meta_file : Path
+        Path to the meta file containing the lane markings.
+    start_x : float
+        The x coordinate of the start of the road section.
+    end_x : float
+        The x coordinate of the end of the road section.
     """
 
     def __init__(self, meta_file: Path, start_x: float, end_x: float) -> None:
-        """Initialize the map builder.
-
-        Parameters
-        ----------
-        meta_file : Path
-            Path to the meta file containing the lane markings.
-        start_x : float
-            The x coordinate of the start of the road section.
-        end_x : float
-            The x coordinate of the end of the road section.
-
-        """
         self._start_x: float = start_x
         self._end_x: float = end_x
         self._meta_file: Path = meta_file

@@ -17,8 +17,9 @@ from dronalize.core.maps import MapGraph
 from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
 from dronalize.datasets import DatasetSpec
 from dronalize.io.records import SceneRecord
-from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
+from dronalize.processing.loading.options import DatasetOptionsModel
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -63,11 +64,6 @@ class DemoOptions(DatasetOptionsModel):
 class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
     @classmethod
     @override
-    def loader_options_model(cls) -> type[DemoOptions]:
-        return DemoOptions
-
-    @classmethod
-    @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
@@ -103,7 +99,7 @@ class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
 def demo_descriptor() -> DatasetSpec:
     return DatasetSpec(
         name="demo",
-        loader_factory=DemoLoader.unified_factory,
+        loader_factory=DemoLoader.unified_runtime_factory,
         default_config=DatasetConfig(
             scenes=ScenesConfig(
                 history_frames=2, future_frames=1, sample_time=1.0, window=WindowConfig(step=1)

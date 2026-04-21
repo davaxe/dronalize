@@ -39,7 +39,7 @@ def open_ind_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="ind",
-    loader_factory=InDLoader.unified_factory,
+    loader_factory=InDLoader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=50,

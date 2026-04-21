@@ -13,7 +13,7 @@ from typing_extensions import override
 from dronalize.core.scene import Scene
 from dronalize.core.typing import SourceT
 from dronalize.runtime._internal import state
-from dronalize.runtime._internal.executor import ObservableExecutor, WriterFactory
+from dronalize.runtime._internal.executor import Executor, WriterFactory
 from dronalize.runtime._internal.state import Progress
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.typing import P
     from dronalize.io.base import DatasetWriter
-    from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
+    from dronalize.processing.loading.base import RuntimeSceneLoader
     from dronalize.processing.loading.loader import Source
     from dronalize.runtime._internal.scene import SceneBuilder
 
@@ -31,10 +31,10 @@ ReturnT = TypeVar("ReturnT", int, list[Scene])
 _ctx: state.WorkerRuntime
 
 
-class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
+class ParallelExecutor(Executor, Generic[SourceT]):
     def __init__(
         self,
-        loader: BaseSceneLoader[SourceT, Any],
+        loader: RuntimeSceneLoader,
         builder: SceneBuilder,
         sources: Iterable[Source[SourceT]],
         *,
@@ -45,7 +45,7 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         if workers is not None and workers <= 1:
             msg = "number of processes must be greater than 1 for parallel execution."
             raise ValueError(msg)
-        self._loader: BaseSceneLoader[SourceT, Any] = loader
+        self._loader: RuntimeSceneLoader = loader
         self._builder: SceneBuilder = builder
         self._sources: Iterable[Source[SourceT]] = sources
         self._shared: state.SharedResources = state.SharedResources.create(scene_limit=limit)
@@ -59,15 +59,13 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         self._running: bool = False
 
     @override
-    def execute(
-        self, writer_factory: WriterFactory, finalize: Callable[[DatasetWriter], None] | None = None
-    ) -> None:
+    def execute(self, writer_factory: WriterFactory) -> None:
         _ = deque(
             self._execute_parallel(
                 self._process_fn_write,
                 self._sources,
                 _init_write_worker,
-                *(self._shared, self._loader, self._builder, writer_factory, finalize),
+                *(self._shared, self._loader, self._builder, writer_factory),
             ),
             maxlen=0,
         )
@@ -140,7 +138,7 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
 
     @staticmethod
     def _generate_scenes(
-        loader: BaseSceneLoader[Any, Any], builder: SceneBuilder, source: Source[Any]
+        loader: RuntimeSceneLoader, builder: SceneBuilder, source: Source[Any]
     ) -> Iterator[Scene]:
         if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
             return
@@ -199,10 +197,9 @@ def _init_worker(shared: state.SharedResources, *, with_finalize: bool = True) -
 
 def _init_write_worker(
     shared: state.SharedResources,
-    loader: BaseSceneLoader[Any, DatasetOptionsModel],
+    loader: RuntimeSceneLoader,
     builder: SceneBuilder,
     writer_factory: Callable[[int], DatasetWriter],
-    finalize: Callable[[DatasetWriter], None] | None,
 ) -> None:
     global _ctx  # noqa: PLW0602
     _init_worker(shared, with_finalize=False)
@@ -223,10 +220,7 @@ def _init_write_worker(
         try:
             with _ctx.progress_snapshot_lock():
                 active_before = _ctx.active_workers()
-                if finalize is not None:
-                    finalize(current_writer)
-                else:
-                    current_writer.finish_local()
+                current_writer.finish_local()
                 if active_before == 1:
                     current_writer.finish_final()
         finally:

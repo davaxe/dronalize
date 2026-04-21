@@ -33,7 +33,7 @@ def open_lyft_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="lyft",
-    loader_factory=LyftLoader.unified_factory,
+    loader_factory=LyftLoader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=20),
         screening=minimum_samples_screening(2),

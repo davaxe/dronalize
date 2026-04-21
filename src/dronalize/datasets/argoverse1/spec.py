@@ -39,7 +39,7 @@ def open_argoverse1_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="argoverse1",
-    loader_factory=Argoverse1Loader.unified_factory,
+    loader_factory=Argoverse1Loader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=30, sample_time=0.1),
         screening=minimum_samples_screening(2),

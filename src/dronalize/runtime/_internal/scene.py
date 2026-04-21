@@ -15,13 +15,14 @@ from dronalize.processing.screening.apply import AGENT_PASS_COLUMN, SCENE_PASS_C
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    import polars as pl
+
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
     from dronalize.datasets.registry import DatasetSpec
-    from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
+    from dronalize.processing.loading.base import RuntimeSceneLoader
     from dronalize.processing.maps.resolver import MapKey, MapResolver
     from dronalize.processing.models import SplitRequest
-    from dronalize.processing.pipeline.pipeline import Pipeline
     from dronalize.runtime.types import ExecutionPlan
 
 
@@ -36,9 +37,7 @@ class SceneBuilder:
     history_frames: int
     future_frames: int
     sample_time: float
-    _pipeline: Pipeline | None = None
-    _scene_assigner: StatelessWeightedAssigner[DatasetSplit] | None = None
-    _source_assigner: StatelessWeightedAssigner[DatasetSplit] | None = None
+    _assigner: StatelessWeightedAssigner[DatasetSplit] | None = None
 
     @classmethod
     def from_plan(cls, plan: ExecutionPlan) -> SceneBuilder:
@@ -57,63 +56,51 @@ class SceneBuilder:
         split = self.split_request
         if split is None or not split.uses_weighted_assignment():
             return
-        if split.strategy == "scene":
-            self._scene_assigner = StatelessWeightedAssigner(
+        if split.strategy in {"scene", "source"}:
+            self._assigner = StatelessWeightedAssigner(
                 split.active_splits(), split.active_weights(), seed=split.seed
             )
             return
-        if split.strategy == "source":
-            self._source_assigner = StatelessWeightedAssigner(
-                split.active_splits(), split.active_weights(), seed=split.seed
-            )
 
     def prepare_source(
         self,
-        loader: BaseSceneLoader[Any, DatasetOptionsModel],
+        loader: RuntimeSceneLoader,
         source: Source[Any],
         *,
         record_candidate_scene: Callable[[], object] | None = None,
         claim_selected_scene: Callable[[], int | None] | None = None,
     ) -> Iterable[PreparedSceneData]:
-        if self._pipeline is None:
-            self._pipeline = loader.pipeline()
+        pipeline = loader.pipeline()
 
-        source_local_scene_index = 0
-        fallback_scene_number = 0
+        # Normalize optional callbacks to avoid inline None checks
+        record_candidate = record_candidate_scene or (lambda: None)
+
+        def _fallback_claim() -> int:
+            nonlocal fallback_scene_number
+            val = fallback_scene_number
+            fallback_scene_number += 1
+            return val
+
+        fallback_scene_number: int = 0
+        claim_scene = claim_selected_scene or _fallback_claim
+        source_local_scene_index: int = 0
+
         for data in loader.load_source(source):
             effective_split = data.predefined_split or source.predefined_split
-            for processed_frame in self._pipeline.execute(
-                data.frame, collect=True, filter_empty=True
-            ):
-                if record_candidate_scene is not None:
-                    _ = record_candidate_scene()
 
-                scene_passes = True
-                frame = processed_frame
-                if SCENE_PASS_COLUMN in frame.columns:
-                    scene_passes = bool(frame.get_column(SCENE_PASS_COLUMN).first())
-                    frame = frame.drop(SCENE_PASS_COLUMN)
-                if not scene_passes:
+            for frame_ in pipeline.execute(data.frame, collect=True, filter_empty=True):
+                _ = record_candidate()
+                passes, frame = self._scene_pass(frame_)
+                if not passes:
                     source_local_scene_index += 1
                     continue
 
-                scene_number = (
-                    claim_selected_scene()
-                    if claim_selected_scene is not None
-                    else fallback_scene_number
-                )
+                # Request a scene number; if None is returned, the allocation limit is reached
+                scene_number = claim_scene()
                 if scene_number is None:
                     return
-                if claim_selected_scene is None:
-                    fallback_scene_number += 1
 
-                passed_agent_ids: frozenset[int] | None = None
-                if AGENT_PASS_COLUMN in frame.columns:
-                    passed_ids = (
-                        frame.filter(frame[AGENT_PASS_COLUMN]).get_column("id").unique().to_list()
-                    )
-                    passed_agent_ids = frozenset(int(agent_id) for agent_id in passed_ids)
-                    frame = frame.drop(AGENT_PASS_COLUMN)
+                passed_agent_ids, frame = self._agent_pass(frame)
 
                 yield PreparedSceneData(
                     scene_number=scene_number,
@@ -128,11 +115,22 @@ class SceneBuilder:
                 )
                 source_local_scene_index += 1
 
+    @staticmethod
+    def _scene_pass(data: pl.DataFrame) -> tuple[bool, pl.DataFrame]:
+        if SCENE_PASS_COLUMN not in data.columns:
+            return True, data
+        return bool(data.get_column(SCENE_PASS_COLUMN).first()), data.drop(SCENE_PASS_COLUMN)
+
+    @staticmethod
+    def _agent_pass(data: pl.DataFrame) -> tuple[bool, frozenset[int] | None, pl.DataFrame]:
+        if AGENT_PASS_COLUMN not in data.columns:
+            return None, data
+        passed_ids = data.filter(data[AGENT_PASS_COLUMN]).get_column("id").unique().to_list()
+        passed_agent_ids = frozenset(int(agent_id) for agent_id in passed_ids)
+        return passed_agent_ids, data.drop(AGENT_PASS_COLUMN)
+
     def create_scene(
-        self,
-        loader: BaseSceneLoader[Any, Any],
-        data: PreparedSceneData,
-        source: Source[Any],
+        self, loader: RuntimeSceneLoader, data: PreparedSceneData, source: Source[Any]
     ) -> Scene:
         map_key, map_resolver = self._resolve_scene_map(loader, source, data)
         scene = Scene.create(
@@ -175,7 +173,6 @@ class SceneBuilder:
         if "split" not in data.frame:
             msg = "Did not get split column in dataframe."
             raise SplitAssignmentError(msg)
-
         split_str = str(data.frame["split"].first()).lower()
         try:
             return DatasetSplit(split_str)
@@ -184,24 +181,22 @@ class SceneBuilder:
             raise SplitAssignmentError(msg) from exc
 
     def _resolve_scene_split(self, data: PreparedSceneData) -> DatasetSplit | None:
-        if self._scene_assigner is None:
+        if self._assigner is None:
             return None
 
         identifier = data.stable_identifier
-        return self._scene_assigner.assign(
+        return self._assigner.assign(
             identifier.source_local_scene_index, str(identifier.source_identifier)
         )
 
     def _resolve_source_split(self, source: Source[Any]) -> DatasetSplit | None:
-        if self._source_assigner is None:
+        if self._assigner is None:
             return None
-        return self._source_assigner.assign(str(source.identifier))
+        return self._assigner.assign(str(source.identifier))
 
     @staticmethod
     def _resolve_scene_map(
-        loader: BaseSceneLoader[Any, DatasetOptionsModel],
-        source: Source[Any],
-        data: PreparedSceneData,
+        loader: RuntimeSceneLoader, source: Source[Any], data: PreparedSceneData
     ) -> tuple[MapKey, MapResolver | None]:
         if loader.map_config is None:
             return None, None

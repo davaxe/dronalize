@@ -41,7 +41,7 @@ def open_exid_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="exid",
-    loader_factory=ExiDLoader.unified_factory,
+    loader_factory=ExiDLoader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=50,

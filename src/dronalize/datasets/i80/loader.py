@@ -28,12 +28,10 @@ class I80Loader(BaseSceneLoader):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the I-80 dataset loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
 
     @classmethod

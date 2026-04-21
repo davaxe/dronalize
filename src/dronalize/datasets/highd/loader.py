@@ -27,12 +27,10 @@ class HighDLoader(LevelXDataLoader):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the highD loader."""
         super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
 
     @staticmethod

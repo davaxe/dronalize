@@ -5,7 +5,7 @@ from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_co
 
 DATASET_SPEC = DatasetSpec(
     name="a43",
-    loader_factory=A43Loader.unified_factory,
+    loader_factory=A43Loader.unified_runtime_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=25),
         screening=minimum_samples_screening(2),

@@ -25,10 +25,13 @@ class OpenDDMapBuilder(BaseMapBuilder):
     More information about OpenDD can be found at:
     https://l3pilot.eu/data/opendd.html
 
+    Parameters
+    ----------
+    sqlite_map_path : Path
+        Path to the SQLite map database file.
     """
 
     def __init__(self, sqlite_map_path: Path) -> None:
-        """Initialize the map builder with a SQLite file."""
         super().__init__()
 
         # Connect to the SQLite database

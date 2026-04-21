@@ -6,7 +6,7 @@ import contextlib
 import multiprocessing as mp
 from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Generic
 
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.typing import SourceT
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from multiprocessing.synchronize import Event, Lock
 
     from dronalize.io.base import DatasetWriter
-    from dronalize.processing.loading.base import BaseSceneLoader
+    from dronalize.processing.loading.base import RuntimeSceneLoader
     from dronalize.runtime._internal.scene import SceneBuilder
 
 
@@ -187,7 +187,7 @@ class SharedResources:
 class WorkerRuntime(Generic[SourceT]):
     shared: SharedResources
     worker_id: int
-    loader: BaseSceneLoader[Any, Any] | None = None
+    loader: RuntimeSceneLoader | None = None
     builder: SceneBuilder | None = None
     writer: DatasetWriter | None = None
 

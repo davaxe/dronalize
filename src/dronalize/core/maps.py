@@ -24,10 +24,15 @@ __all__ = ["EdgeType", "MapGraph", "SharedMapGraph"]
 
 
 class SharedMapGraph:
-    """Context manager for accessing a `MapGraph` stored in shared memory."""
+    """Context manager for accessing a `MapGraph` stored in shared memory.
+
+    Parameters
+    ----------
+    shared_name : str
+        Name of the shared memory block containing the serialized map graph.
+    """
 
     def __init__(self, shared_name: str) -> None:
-        """Initialize the shared memory context manager."""
         self._shared_name: str = shared_name
         self._shared: shm.SharedMemory | None = None
         self._map_graph: MapGraph | None = None
@@ -128,19 +133,22 @@ class SharedMapGraph:
 
 @dataclass(init=False, repr=False, slots=True)
 class MapGraph:
-    """Represents a graph structure for a map, including nodes and edges."""
+    """Represents a graph structure for a map, including nodes and edges.
 
-    node_positions: npt.NDArray[np.float64]
-    """Node positions, shape `(N, 2)`."""
-
-    edge_indices: npt.NDArray[np.int32]
-    """Edge COO indices, shape `(2, M)`."""
-
-    node_types: npt.NDArray[np.int32]
-    """Per-node type labels, shape `(N,)`."""
-
-    edge_types: npt.NDArray[np.int32]
-    """Per-edge type labels, shape `(M,)`."""
+    Parameters
+    ----------
+    node_positions : ndarray of float64, shape (N, 2)
+        Array of node positions.
+    edge_indices : ndarray of int64, shape (2, M)
+        Array of edge endpoint indices.
+    node_types : ndarray of int64, shape (N,), optional
+        Per-node type labels. If None, all nodes are assigned type 1.
+    edge_types : ndarray of int64, shape (M,), optional
+        Per-edge type labels. If None, all edges are assigned type 1.
+    return_if_empty : bool, optional
+        If True, allows empty graphs and returns empty arrays. If False,
+        raises `ValueError` when both `node_positions` and `edge_indices` are empty.
+    """
 
     def __init__(
         self,
@@ -151,24 +159,6 @@ class MapGraph:
         *,
         return_if_empty: bool = True,
     ) -> None:
-        """Initialize a `MapGraph` instance.
-
-        Parameters
-        ----------
-        node_positions : ndarray of float64, shape (N, 2)
-            Array of node positions.
-        edge_indices : ndarray of int64, shape (2, M)
-            Array of edge endpoint indices.
-        node_types : ndarray of int64, shape (N,), optional
-            Per-node type labels. If None, all nodes are assigned type 1.
-        edge_types : ndarray of int64, shape (M,), optional
-            Per-edge type labels. If None, all edges are assigned type 1.
-        return_if_empty : bool, optional
-            If True, allows empty graphs and returns empty arrays. If False,
-            raises `ValueError` when both `node_positions` and
-            `edge_indices` are empty.
-
-        """
         if node_positions.size == 0 and edge_indices.size == 0:
             if return_if_empty:
                 node_positions = np.zeros((0, 2), dtype=np.float64)
@@ -196,6 +186,18 @@ class MapGraph:
             if edge_types is not None
             else np.ones(self.num_edges, dtype=np.int32)
         )
+
+    node_positions: npt.NDArray[np.float64]
+    """Node positions, shape `(N, 2)`."""
+
+    edge_indices: npt.NDArray[np.int32]
+    """Edge COO indices, shape `(2, M)`."""
+
+    node_types: npt.NDArray[np.int32]
+    """Per-node type labels, shape `(N,)`."""
+
+    edge_types: npt.NDArray[np.int32]
+    """Per-edge type labels, shape `(M,)`."""
 
     @property
     def num_nodes(self) -> int:

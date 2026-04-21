@@ -29,6 +29,11 @@ class LevelXDataLoader(BaseSceneLoader):
     recording identifier.
 
     With no changes this supports: rounD, inD, exiD, uniD, and sinD.
+
+    Parameters
+    ----------
+    data_root : Path or str
+        Root directory containing the extracted recording CSV files.
     """
 
     def __init__(
@@ -37,14 +42,6 @@ class LevelXDataLoader(BaseSceneLoader):
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the loader for an X-level dataset (e.g., rounD, inD).
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Root directory containing the extracted recording CSV files.
-
-        """
         super().__init__(data_root=data_root, request=request, resources=resources)
 
     @classmethod

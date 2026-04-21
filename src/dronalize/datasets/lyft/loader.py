@@ -16,8 +16,9 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader, DatasetOptionsModel
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
+from dronalize.processing.loading.options import DatasetOptionsModel
 from dronalize.processing.maps.resolver import no_map, shared_map
 
 if TYPE_CHECKING:
@@ -67,7 +68,6 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the Lyft loader."""
         super().__init__(data_root=data_root, request=request, resources=resources)
         self._data: dict[DatasetSplit, _ArrayData] = {}
 
@@ -80,11 +80,6 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
         resources: DatasetResources | None = None,
     ) -> LyftLoader:
         return cls(data_root, request, resources)
-
-    @classmethod
-    @override
-    def loader_options_model(cls) -> type[LyftLoaderOptions]:
-        return LyftLoaderOptions
 
     def _get_arrays(self, split: DatasetSplit) -> _ArrayData:
         if split not in self._data:

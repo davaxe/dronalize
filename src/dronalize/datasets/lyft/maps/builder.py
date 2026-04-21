@@ -12,10 +12,15 @@ from dronalize.processing.maps.builder import BaseMapBuilder
 
 
 class LyftMapBuilder(BaseMapBuilder):
-    """Builder for a map graph from a Lyft LVL5 map."""
+    """Builder for a map graph from a Lyft LVL5 map.
+
+    Parameters
+    ----------
+    lyft_map : parser.LyftLVL5Map
+        Parsed Lyft Level 5 map data used to build the graph.
+    """
 
     def __init__(self, lyft_map: parser.LyftLVL5Map) -> None:
-        """Initialize the map builder with a Lyft LVL5 map."""
         super().__init__()
         self.map: parser.LyftLVL5Map = lyft_map
         self.edge_map: dict[EdgeType, EdgeType] = {EdgeType.NONE: EdgeType.VIRTUAL}

@@ -30,10 +30,16 @@ class LyftLVL5Map:
     The access to these elements is provided through cached properties,
     which means that the elements are loaded only once and then cached
     for subsequent access.
+
+    Parameters
+    ----------
+    protobuf_map_path : Path
+        Path to the serialized protobuf map fragment.
+    meta_json : Path
+        Path to the metadata JSON containing the world transform.
     """
 
     def __init__(self, protobuf_map_path: Path, meta_json: Path) -> None:
-        """Initialize the LyftLVL5Map with the given protobuf map and meta JSON."""
         with Path.open(protobuf_map_path, "rb") as file:
             map_fragment = proto.MapFragment()
             _ = map_fragment.ParseFromString(file.read())

@@ -28,15 +28,7 @@ if TYPE_CHECKING:
 class A43Loader(BaseSceneLoader):
     """Scene loader for the A43 dataset."""
 
-    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
-        """Initialize the A43 dataset loader.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Root directory containing the extracted A43 CSV files.
-
-        """
+    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
         super().__init__(data_root=data_root, request=request)
 
     @override
