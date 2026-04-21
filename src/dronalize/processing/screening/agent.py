@@ -15,14 +15,9 @@ from dronalize.processing.screening.context import (
     FrameSet,
     coerce_frame_set,
 )
-from dronalize.processing.screening.tolerance import (
-    AbsoluteTolerance,
-    RelativeTolerance,
-    Tolerance,
-    tol,
-)
 
 if TYPE_CHECKING:
+    from dronalize.config.models.screening import Tolerance
     from dronalize.processing.screening.context import ScreeningContext
 
 
@@ -59,7 +54,7 @@ class RequireFrames(AgentCheckRuleBase):
         return cls(
             frames=coerce_frame_set(frames),
             selector=selector,
-            tolerance=(tolerance if tolerance is not None else tol(absolute=0)),
+            tolerance=tolerance,
             rule_id=rule_id,
         )
 
@@ -204,12 +199,14 @@ class MinSpan(AgentCheckRuleBase):
 
 
 def invalid_agent_tolerance_expr(
-    tolerance: Tolerance, *, invalid_agents: pl.Expr, invalid_fraction: pl.Expr
+    tolerance: Tolerance | None, *, invalid_agents: pl.Expr, invalid_fraction: pl.Expr
 ) -> pl.Expr:
     """Return the scene-pass expression for a configured invalid-agent tolerance."""
-    if isinstance(tolerance, RelativeTolerance):
+    if tolerance is None:
+        return invalid_agents == 0
+    if tolerance.relative is not None and tolerance.absolute is None:
         return invalid_fraction <= tolerance.relative
-    if isinstance(tolerance, AbsoluteTolerance):
+    if tolerance.absolute is not None and tolerance.relative is None:
         return invalid_agents <= tolerance.absolute
     return pl.all_horizontal(
         invalid_agents <= tolerance.absolute, invalid_fraction <= tolerance.relative

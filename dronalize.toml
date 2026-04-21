@@ -32,11 +32,15 @@ categories = ["ANIMAL"]
 rule = "exclude"
 categories = ["UNIMPORTANT"]
 
-[profiles.strict_screening]
+[profiles.strict_screening.screening]
 
 [profiles.strict_screening.screening.agent]
 no_gap = {rule = "max_gap", maximum = 0}
 stationary = { rule = "min_distance", minimum = 4, tolerance = { absolute = 100} }
+
+[profiles.strict_screening.screening.scene]
+min_agents = { rule = "agent_range", minimum = 12 }
+
 
 # --------------------------------------------------------------------------------------
 # Dataset: waymo

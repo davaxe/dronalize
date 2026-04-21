@@ -297,7 +297,7 @@ class PartialScreeningConfig(PartialConfig[ScreeningConfig]):
     def apply_to(
         self, target: ScreeningConfig | None, *, exclude_none: bool = True
     ) -> ScreeningConfig:
-        mode = self.mode or "replace"
+        mode = self.mode or "extend"  # defaults to extend
         cleanup = target.cleanup if target is not None else {}
         scene = target.scene if target is not None else {}
         agent = target.agent if target is not None else {}

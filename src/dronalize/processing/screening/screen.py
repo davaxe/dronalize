@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, Generic, TypeVar
 
+import rich
 from pydantic import BaseModel, BeforeValidator, TypeAdapter
 from typing_extensions import override
 

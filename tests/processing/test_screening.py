@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import polars as pl
 
+from dronalize.config.models import Tolerance
 from dronalize.core import AgentCategory
 from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.screening import Screen, agent, cleanup, scene, screen_scene, tol
+from dronalize.processing.screening import Screen, agent, cleanup, scene, screen_scene
 from dronalize.processing.screening.apply import AGENT_PASS_COLUMN
 
 
@@ -38,7 +39,9 @@ def test_agent_rule_tolerance_keeps_scene_but_marks_failed_agents() -> None:
     )
     tolerant = Screen.define(
         scene_rules=[scene.AgentRange(minimum=1)],
-        agent_rules=[agent.MaxMissingFrames(maximum=0, tolerance=tol(absolute=1, relative=0.5))],
+        agent_rules=[
+            agent.MaxMissingFrames(maximum=0, tolerance=Tolerance(absolute=1, relative=0.5))
+        ],
     )
 
     strict_result = screen_scene(df, strict, scene_group_by="scene", columns=TrajectoryColumns())
@@ -78,6 +81,8 @@ def test_agent_min_distance() -> None:
     screened = screen_scene(df, rules, columns=TrajectoryColumns(x="x", y="y"))
     assert screened["id"].unique().to_list() == [3]
 
-    rules = Screen.define(agent_rules=[agent.MinDistance(minimum=14, tolerance=tol(absolute=2))])
+    rules = Screen.define(
+        agent_rules=[agent.MinDistance(minimum=14, tolerance=Tolerance(absolute=2))]
+    )
     screened = screen_scene(df, rules, columns=TrajectoryColumns(x="x", y="y"))
     assert screened["id"].unique().to_list() == [1, 2, 3]

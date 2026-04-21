@@ -26,31 +26,18 @@ type into one package namespace.
 
 - [`dronalize.processing`][] for higher-level processing config
 - [`dronalize.processing.screening.agent`][] for agent-rule definitions
-- [`dronalize.processing.screening.tolerance`][] for tolerance models
 """
 
 from dronalize.processing.screening import agent, cleanup, scene
 from dronalize.processing.screening.apply import screen_scene
 from dronalize.processing.screening.context import AgentSelector
 from dronalize.processing.screening.screen import Screen
-from dronalize.processing.screening.tolerance import (
-    AbsoluteTolerance,
-    CombinedTolerance,
-    RelativeTolerance,
-    Tolerance,
-    tol,
-)
 
 __all__ = [
-    "AbsoluteTolerance",
     "AgentSelector",
-    "CombinedTolerance",
-    "RelativeTolerance",
     "Screen",
-    "Tolerance",
     "agent",
     "cleanup",
     "scene",
     "screen_scene",
-    "tol",
 ]
