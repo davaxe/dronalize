@@ -13,6 +13,4 @@
 
 ## ::: dronalize.processing.loading.LoadedSourceData
 
-## ::: dronalize.processing.loading.PreparedSceneData
-
 ## ::: dronalize.processing.loading.MapBinding

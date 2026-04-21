@@ -16,8 +16,7 @@
 # --------------------------------------------------------------------------------------
 
 [profiles.fast.runtime]
-jobs = "auto"
-chunksize = 64
+jobs = 4
 
 [profiles.high_precision.output]
 schema = "positions_velocity_yaw"
@@ -82,13 +81,12 @@ future_frames = 60
 sample_time = 0.1
 
 [datasets.a43.scenes.window]
-step = 2
+step = 15
 
 [datasets.a43.scenes.resample]
 up = 2
 down = 1
 method = "cubic"
-max_gap = 4
 coordinates = ["x", "y"]
 emit_velocity = true
 emit_acceleration = true

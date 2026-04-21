@@ -24,13 +24,13 @@ nav = [
 
   { Concepts = [
     "concepts/index.md",
-    { Architecture = "concepts/architecture.md" },
     { "Configuration model" = "concepts/configuration-model.md" },
     { "Split strategies" = "concepts/split-strategies.md" },
     { "Screening scenes" = "concepts/screening.md" },
     { "Map processing" = "concepts/map-processing.md" },
     { Datasets = "concepts/datasets.md" },
     { "Lane-change sampling" = "concepts/lane-change-sampling.md" },
+    { "Architecture overview" = "concepts/architecture.md" },
   ] },
 
   { "Data formats" = [

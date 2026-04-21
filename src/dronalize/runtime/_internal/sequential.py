@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
@@ -14,34 +14,21 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
     from dronalize.core.scene import Scene
-    from dronalize.processing.loading.base import RuntimeSceneLoader
-    from dronalize.processing.loading.loader import Source
-    from dronalize.runtime._internal.scene import SceneBuilder
+    from dronalize.runtime._internal.processor import RuntimeProcessor
 
 
 class SequentialExecutor(Executor):
     """Single-process executor for internal runtime execution."""
 
-    def __init__(
-        self,
-        loader: RuntimeSceneLoader,
-        builder: SceneBuilder,
-        sources: Iterable[Source[Any]],
-        *,
-        limit: int | None = None,
-    ) -> None:
-        self._loader: RuntimeSceneLoader = loader
-        self._builder: SceneBuilder = builder
-        self._sources: Iterable[Source[Any]] = sources
+    def __init__(self, processor: RuntimeProcessor, *, limit: int | None = None) -> None:
+        self._processor: RuntimeProcessor = processor
         self._limit: int | None = limit
         self._candidate_scene_counter: int = 0
         self._selected_scene_counter: int = 0
         self._source_counter: int = 0
         self._split_counts: dict[str, int] = {"unsplit": 0, "train": 0, "val": 0, "test": 0}
-        self._screening_enabled: bool = loader.screening_config is not None and bool(
-            loader.screening_config.agent or loader.screening_config.scene
-        )
-        self._total_sources: int | None = loader.num_sources()
+        self._screening_enabled: bool = processor.screening_enabled()
+        self._total_sources: int | None = processor.total_sources()
         self._update_event: threading.Event = threading.Event()
         self._running: bool = False
 
@@ -88,18 +75,21 @@ class SequentialExecutor(Executor):
     def _generate_and_track(self) -> Iterable[Scene]:
         self._running = True
         self._update_event.set()
-        for source in self._sources:
+        for source in self._processor.iter_sources():
             if self._selected_scene_limit_reached():
                 break
             self._source_counter += 1
             self._update_event.set()
-            for processed in self._builder.prepare_source(
-                self._loader,
-                source,
-                record_candidate_scene=self._record_candidate_scene,
-                claim_selected_scene=self._claim_selected_scene,
-            ):
-                scene = self._builder.create_scene(self._loader, processed, source)
+            for candidate in self._processor.iter_candidates(source):
+                self._record_candidate_scene()
+                if not candidate.passes_screening:
+                    continue
+                scene_number = self._claim_selected_scene()
+                if scene_number is None:
+                    self._running = False
+                    self._update_event.set()
+                    return
+                scene = self._processor.materialize(candidate, scene_number)
                 split_key = (
                     "unsplit" if scene.split_assignment is None else scene.split_assignment.value
                 )

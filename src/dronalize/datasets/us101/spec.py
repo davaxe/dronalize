@@ -36,7 +36,7 @@ def open_us101_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="us101",
-    loader_factory=US101Loader.unified_runtime_factory,
+    loader_factory=US101Loader.unified_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=20,

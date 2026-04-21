@@ -9,7 +9,7 @@ from dronalize.datasets.shared.specs import (
 
 DATASET_SPEC = DatasetSpec(
     name="opendd",
-    loader_factory=OpenDDLoader.unified_runtime_factory,
+    loader_factory=OpenDDLoader.unified_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=60,

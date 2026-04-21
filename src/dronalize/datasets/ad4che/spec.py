@@ -10,7 +10,7 @@ from dronalize.datasets.shared.specs import (
 
 DATASET_SPEC = DatasetSpec(
     name="ad4che",
-    loader_factory=AD4CHELoader.unified_runtime_factory,
+    loader_factory=AD4CHELoader.unified_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=61,

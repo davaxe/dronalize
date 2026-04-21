@@ -99,7 +99,7 @@ class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
 def demo_descriptor() -> DatasetSpec:
     return DatasetSpec(
         name="demo",
-        loader_factory=DemoLoader.unified_runtime_factory,
+        loader_factory=DemoLoader.unified_factory,
         default_config=DatasetConfig(
             scenes=ScenesConfig(
                 history_frames=2, future_frames=1, sample_time=1.0, window=WindowConfig(step=1)

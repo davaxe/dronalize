@@ -20,7 +20,6 @@ from dronalize.core.errors import (
     LoaderConfigError,
     MissingOptionalDependencyError,
 )
-from dronalize.processing.loading.base import RuntimeSceneLoader
 from dronalize.processing.loading.options import DatasetOptionsModel, NoDatasetOptions
 from dronalize.processing.loading.resources import DatasetResources
 from dronalize.processing.models import LoaderRequest, SplitRequest
@@ -59,7 +58,7 @@ class LoaderFactory(Protocol):
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
-    ) -> RuntimeSceneLoader:
+    ) -> object:
         """Create a scene loader for the dataset with the given configuration."""
         ...
 
@@ -114,10 +113,9 @@ class DatasetSpec:
 
     def build_loader(
         self, *, root: Path, request: LoaderRequest, resources: DatasetResources | None = None
-    ) -> RuntimeSceneLoader:
+    ) -> object:
         """Construct one loader instance for this dataset specification."""
-        loader = self.loader_factory(data_root=root, request=request, resources=resources)
-        return RuntimeSceneLoader.wrap(loader)
+        return self.loader_factory(data_root=root, request=request, resources=resources)
 
 
 @dataclass(frozen=True, slots=True)

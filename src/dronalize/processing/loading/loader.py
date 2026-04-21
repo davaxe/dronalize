@@ -1,4 +1,4 @@
-"""Loader-side data structures and protocols for source-to-scene processing."""
+"""Loader-side data structures for source-to-scene processing."""
 
 from __future__ import annotations
 
@@ -12,22 +12,6 @@ if TYPE_CHECKING:
 
     from dronalize.core.categories import DatasetSplit
     from dronalize.processing.maps.resolver import MapKey
-
-
-@dataclass(slots=True)
-class SceneIdentifier:
-    """Stable identifier for a scene.
-
-    The identifier should remain consistent across runs as long as the raw
-    sources and their organization remain unchanged. That makes scene-level and
-    source-level split assignment reproducible even if the internal loader
-    implementation changes.
-    """
-
-    source_identifier: SourceId
-    """Stable identifier for the source, e.g., file name, URL, database key."""
-    source_local_scene_index: int
-    """Zero-based scene index within its source, stable across runs."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -56,18 +40,6 @@ class LoadedSourceData:
 
 
 @dataclass(slots=True, frozen=True)
-class PreparedSceneData:
-    """Final scene payload produced immediately before `Scene` construction."""
-
-    scene_number: int
-    frame: pl.DataFrame
-    stable_identifier: SceneIdentifier
-    map_binding: MapBinding = field(default_factory=MapBinding)
-    predefined_split: DatasetSplit | None = None
-    passed_agent_ids: frozenset[int] | None = None
-
-
-@dataclass(slots=True, frozen=True)
 class Source(Generic[SourceT]):
     """Lightweight unit of raw input that yields one or more scenes."""
 
@@ -79,8 +51,6 @@ class Source(Generic[SourceT]):
     """Predefined split, if any."""
     map_key: MapKey = None
     """Optional map key associated with this source."""
-    metadata: dict[str, Any] = field(default_factory=dict)
-    """Additional metadata associated with the source."""
 
     def with_predefined_split(self, split_assignment: DatasetSplit | None) -> Source[SourceT]:
         """Return a copy with a concrete split assignment."""

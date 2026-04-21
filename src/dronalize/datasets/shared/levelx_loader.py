@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -21,7 +22,14 @@ if TYPE_CHECKING:
     from dronalize.processing.models import LoaderRequest
 
 
-class LevelXDataLoader(BaseSceneLoader):
+@dataclass(slots=True, frozen=True)
+class SourceData:
+    path: Path
+    x0: float | None = None
+    y0: float | None = None
+
+
+class LevelXDataLoader(BaseSceneLoader[SourceData]):
     """Common trajectory data loader for X-level datasets.
 
     Each discovered source corresponds to one full recording. The source payload
@@ -111,7 +119,7 @@ class LevelXDataLoader(BaseSceneLoader):
         return _TRACK_SCHEMA
 
     @override
-    def discover_sources(self) -> Iterable[Source[Path]]:
+    def discover_sources(self) -> Iterable[Source[SourceData]]:
         for recording_id in self._recording_ids():
             recording_meta = self.root / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
@@ -124,19 +132,16 @@ class LevelXDataLoader(BaseSceneLoader):
                 utm_x0 = recording_meta_data.select(pl.col("xUtmOrigin")).item()
                 utm_y0 = recording_meta_data.select(pl.col("yUtmOrigin")).item()
 
-            metadata: dict[str, float] = {}
-            if utm_x0 is not None and utm_y0 is not None:
-                metadata["utm_x0"] = utm_x0
-                metadata["utm_y0"] = utm_y0
-
             yield Source(
-                identifier=recording_id, data=self.root, map_key=str(location_id), metadata=metadata
+                identifier=recording_id,
+                data=SourceData(self.root, x0=utm_x0, y0=utm_y0),
+                map_key=str(location_id),
             )
 
     @override
-    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
-        tracks = source.data / f"{source.identifier:0>2}_tracks.csv"
-        meta = source.data / f"{source.identifier:0>2}_tracksMeta.csv"
+    def load_source(self, source: Source[SourceData]) -> Iterable[LoadedSourceData]:
+        tracks = source.data.path / f"{source.identifier:0>2}_tracks.csv"
+        meta = source.data.path / f"{source.identifier:0>2}_tracksMeta.csv"
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
             *self.meta_data_select()
         )
@@ -144,11 +149,10 @@ class LevelXDataLoader(BaseSceneLoader):
             *self.track_data_select()
         )
         combined = tracks_df.join(meta_df, left_on="id", right_on="id")
-        if "utm_x0" in source.metadata and "utm_y0" in source.metadata:
-            combined = combined.with_columns(
-                (pl.col("x") + source.metadata["utm_x0"]).alias("x"),
-                (pl.col("y") + source.metadata["utm_y0"]).alias("y"),
-            )
+        combined = combined.with_columns(
+            (pl.col("x") + (source.data.x0 or 0.0)).alias("x"),
+            (pl.col("y") + (source.data.y0)).alias("y"),
+        )
         yield LoadedSourceData(combined)
 
     @override

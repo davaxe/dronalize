@@ -39,7 +39,7 @@ def open_unid_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="unid",
-    loader_factory=UniDLoader.unified_runtime_factory,
+    loader_factory=UniDLoader.unified_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=50,

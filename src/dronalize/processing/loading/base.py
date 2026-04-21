@@ -4,19 +4,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Generic, cast
+from typing import TYPE_CHECKING, Generic, cast
 
 from typing_extensions import Self, TypeVar
 
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.typing import SourceT
-from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.options import DatasetOptionsModel, NoDatasetOptions
 from dronalize.processing.loading.resources import DatasetResources
 from dronalize.processing.maps.resolver import MapResolver, no_map
-from dronalize.processing.models import PipelinePlan, SplitRequest
-from dronalize.processing.pipeline import spec
-from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -26,8 +22,7 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
-    from dronalize.processing.models import LoaderRequest
-    from dronalize.processing.pipeline.pipeline import Pipeline
+    from dronalize.processing.models import LoaderRequest, SplitRequest
 
 
 _LoaderOptionsT = TypeVar("_LoaderOptionsT", bound=DatasetOptionsModel, default=NoDatasetOptions)
@@ -76,7 +71,6 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         options = cast("_LoaderOptionsT", request.dataset)
         self.dataset_config: _LoaderOptionsT = options
         self.loader_options: _LoaderOptionsT = options
-        self._pipeline_cache: Pipeline | None = None
 
     def __init_subclass__(cls) -> None:
         """Validate that subclasses implement at least one source method."""
@@ -130,40 +124,6 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         return cls(data_root=data_root, request=request)
 
     @classmethod
-    def unified_runtime_factory(
-        cls,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> RuntimeSceneLoader:
-        """Construct a runtime-erased wrapper around this loader.
-
-        Parameters
-        ----------
-        data_root : Path or str
-            Root directory or base path for the dataset.
-        request : LoaderRequest
-            Full loader request containing all generic and dataset-specific
-            options.
-        resources : DatasetResources, optional
-            Optional shared resource container passed through to loader
-            construction.
-
-        Returns
-        -------
-        RuntimeSceneLoader
-            A runtime wrapper around the concrete loader instance.
-
-        Notes
-        -----
-        This factory is intended for orchestration layers that should not need
-        to know the loader's concrete generic type parameters. The returned
-        wrapper preserves the operational interface while erasing the specific
-        source type.
-        """
-        return RuntimeSceneLoader.wrap(cls.unified_factory(data_root, request, resources))
-
-    @classmethod
     @abstractmethod
     def native_trajectory_schema(cls) -> TrajectorySchema:
         """Return the native trajectory schema emitted by this loader.
@@ -210,45 +170,6 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         since it allows streaming scene materialization rather than requiring the
         entire source to be loaded into memory at once.
         """
-
-    def pipeline(self) -> Pipeline:
-        """Build the processing pipeline used for this loader instance.
-
-        Returns
-        -------
-        Pipeline
-            A fully configured pipeline derived from the current request,
-            including scene sampling, optional screening, and split handling.
-
-        Notes
-        -----
-        The pipeline is constructed from the loader's scene and screening
-        configuration together with the native trajectory schema reported by the
-        loader.
-
-        The pipeline is cached after the first construction to avoid redundant
-        work across multiple sources. If the loader's configuration is immutable
-        after construction, this cache will ensure the pipeline is only built
-        once.
-
-        """
-        if self._pipeline_cache is not None:
-            return self._pipeline_cache
-        plan = PipelinePlan(
-            scenes=self.scenes_config, screening=self.screening_config, split=self.split_config
-        )
-        columns = TrajectoryColumns.from_schema(self.native_trajectory_schema())
-        pipeline = spec.trajectory_pipeline(
-            spec.lane_change_sampling(plan, columns=columns)
-            if self.scenes_config.lane_change is not None
-            else spec.standard(plan, columns=columns)
-        )
-        self._pipeline_cache = pipeline
-        return pipeline
-
-    def clear_pipeline_cache(self) -> None:
-        """Clear the cached pipeline to force reconstruction on the next access."""
-        self._pipeline_cache = None
 
     def discover_sources(self) -> Iterable[Source[SourceT]]:
         """Discover all available sources for datasets without native split support.
@@ -303,37 +224,6 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         split.
         """  # noqa: DOC202
         raise SplitNotSupportedError(type(self).__name__, split)
-
-    def all_sources(self) -> Iterable[Source[SourceT]]:
-        """Yield all available sources across discovery or native splits.
-
-        Yields
-        ------
-        Source[SourceT]
-            Each source visible to this loader. If native splits are configured,
-            yielded sources are annotated with their predefined split.
-
-        Notes
-        -----
-        The behavior depends on whether the loader advertises native splits:
-
-        - If no native splits are configured, this delegates to
-          `discover_sources()`.
-        - If native splits are available, this iterates each split via
-          `sources_for_split()` and annotates the yielded sources with their
-          predefined split.
-
-        This method provides a normalized entry point for orchestration code
-        that simply needs all sources, regardless of how the dataset organizes
-        them internally.
-        """
-        supported_splits = self.native_splits or ()
-        if len(supported_splits) == 0:
-            yield from self.discover_sources()
-            return
-        for split in supported_splits:
-            for source in self.sources_for_split(split):
-                yield source.with_predefined_split(split)
 
     def map_resolver(self) -> MapResolver:
         """Return the loader-level map resolver used for scene-to-map lookup.
@@ -406,155 +296,3 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         """
         _ = self
         return None
-
-
-class RuntimeSceneLoader:
-    """Erased runtime wrapper around a concrete typed scene loader.
-
-    Parameters
-    ----------
-    loader : object
-        The concrete loader instance to wrap.
-
-    Notes
-    -----
-    This wrapper erases the loader's concrete source type so orchestration
-    code can interact with heterogeneous loaders through a common runtime
-    interface.
-    """
-
-    def __init__(self, loader: object) -> None:
-        self._loader: object = loader
-
-    @classmethod
-    def wrap(cls, loader: object) -> RuntimeSceneLoader:
-        """Create a runtime wrapper for a concrete loader instance.
-
-        Parameters
-        ----------
-        loader : object
-            The concrete typed loader to erase.
-
-        Returns
-        -------
-        RuntimeSceneLoader
-            A wrapper exposing the common runtime loading interface.
-        """
-        return cls(loader)
-
-    @property
-    def screening_config(self) -> ScreeningConfig | None:
-        """Return the screening configuration associated with the wrapped loader.
-
-        Returns
-        -------
-        ScreeningConfig or None
-            The active screening configuration, if any.
-        """
-        return self._typed_loader().screening_config
-
-    @property
-    def map_config(self) -> MapConfig | None:
-        """Return the map configuration associated with the wrapped loader.
-
-        Returns
-        -------
-        MapConfig or None
-            The active map configuration, if any.
-        """
-        return self._typed_loader().map_config
-
-    def pipeline(self) -> Pipeline:
-        """Return the processing pipeline of the wrapped loader.
-
-        Returns
-        -------
-        Pipeline
-            The pipeline configured by the underlying loader.
-        """
-        return self._typed_loader().pipeline()
-
-    def clear_pipeline_cache(self) -> None:
-        """Clear the wrapped loader's cached pipeline to force reconstruction."""
-        self._typed_loader().clear_pipeline_cache()
-
-    def discover_sources(self) -> Iterable[Source[Any]]:
-        """Discover all sources from the wrapped loader.
-
-        Returns
-        -------
-        Iterable[Source[Any]]
-            An iterable of runtime-erased source descriptors.
-
-        Notes
-        -----
-        This simply forwards to the underlying loader while erasing the concrete
-        source payload type.
-        """
-        return self._typed_loader().discover_sources()
-
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Any]]:
-        """Return all sources for a given split from the wrapped loader.
-
-        Parameters
-        ----------
-        split : DatasetSplit
-            Native dataset split to enumerate.
-
-        Returns
-        -------
-        Iterable[Source[Any]]
-            An iterable of runtime-erased source descriptors for the requested
-            split.
-        """
-        return self._typed_loader().sources_for_split(split)
-
-    def load_source(self, source: Source[Any]) -> Iterable[LoadedSourceData]:
-        """Load one source through the wrapped loader.
-
-        Parameters
-        ----------
-        source : Source[Any]
-            Runtime-erased source descriptor compatible with the wrapped loader.
-
-        Returns
-        -------
-        Iterable[LoadedSourceData]
-            Loaded scene data yielded by the underlying loader.
-
-        Notes
-        -----
-        Type erasure means correctness here depends on the caller providing a
-        source that actually matches the wrapped loader's expected source type.
-        """
-        return self._typed_loader().load_source(source)
-
-    def resolve_map(self, scene: Scene, map_binding: MapBinding | None = None) -> MapGraph | None:
-        """Resolve a map for a scene through the wrapped loader.
-
-        Parameters
-        ----------
-        scene : Scene
-            Scene for which map data should be resolved.
-        map_binding : MapBinding, optional
-            Optional explicit binding information for map resolution.
-
-        Returns
-        -------
-        MapGraph or None
-            The resolved map graph, or `None` when unavailable.
-        """
-        return self._typed_loader().resolve_map(scene, map_binding)
-
-    def num_sources(self) -> int | None:
-        """Return the number of sources reported by the wrapped loader.
-
-        Returns
-        -------
-        int or None
-            Total source count if known, otherwise `None`.
-        """
-        return self._typed_loader().num_sources()
-
-    def _typed_loader(self) -> BaseSceneLoader[Any, DatasetOptionsModel]:
-        return cast("BaseSceneLoader[Any, DatasetOptionsModel]", self._loader)

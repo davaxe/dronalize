@@ -254,7 +254,7 @@ def _derive_missing_fields(
         raise TrajectorySchemaError(msg)
 
     output, output_fields = apply_derivation_plan(data, plan, context, source.fields)
-    if output_fields != target.fields:
+    if (target.fields & output_fields) != target.fields:
         missing = ", ".join(field.to_str() for field in (target.fields & ~output_fields).fields())
         msg = f"Cannot materialize trajectory schema {target.name}; missing {missing}."
         raise TrajectorySchemaError(msg)

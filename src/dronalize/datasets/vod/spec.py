@@ -32,7 +32,7 @@ def open_vod_resources(
 
 DATASET_SPEC = DatasetSpec(
     name="vod",
-    loader_factory=VodLoader.unified_runtime_factory,
+    loader_factory=VodLoader.unified_factory,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=5, future_frames=30, sample_time=0.1, window_step=5),
         screening=minimum_samples_screening(2),

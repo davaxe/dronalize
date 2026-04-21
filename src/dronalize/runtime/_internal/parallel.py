@@ -6,12 +6,11 @@ import functools
 import multiprocessing as mp
 from collections import deque
 from multiprocessing.util import Finalize
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from typing_extensions import override
 
 from dronalize.core.scene import Scene
-from dronalize.core.typing import SourceT
 from dronalize.runtime._internal import state
 from dronalize.runtime._internal.executor import Executor, WriterFactory
 from dronalize.runtime._internal.state import Progress
@@ -22,21 +21,18 @@ if TYPE_CHECKING:
 
     from dronalize.core.typing import P
     from dronalize.io.base import DatasetWriter
-    from dronalize.processing.loading.base import RuntimeSceneLoader
     from dronalize.processing.loading.loader import Source
-    from dronalize.runtime._internal.scene import SceneBuilder
+    from dronalize.runtime._internal.processor import RuntimeProcessor
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene])
 _ctx: state.WorkerRuntime
 
 
-class ParallelExecutor(Executor, Generic[SourceT]):
+class ParallelExecutor(Executor):
     def __init__(
         self,
-        loader: RuntimeSceneLoader,
-        builder: SceneBuilder,
-        sources: Iterable[Source[SourceT]],
+        processor: RuntimeProcessor,
         *,
         chunksize: int | None = None,
         workers: int | None = None,
@@ -45,17 +41,14 @@ class ParallelExecutor(Executor, Generic[SourceT]):
         if workers is not None and workers <= 1:
             msg = "number of processes must be greater than 1 for parallel execution."
             raise ValueError(msg)
-        self._loader: RuntimeSceneLoader = loader
-        self._builder: SceneBuilder = builder
-        self._sources: Iterable[Source[SourceT]] = sources
+        self._processor: RuntimeProcessor = processor
         self._shared: state.SharedResources = state.SharedResources.create(scene_limit=limit)
-        self._chunksize: int = chunksize or self._optimal_chunksize(loader.num_sources(), workers)
+        total_sources = processor.total_sources()
+        self._chunksize: int = chunksize or self._optimal_chunksize(total_sources, workers)
         self._limit: int | None = limit
         self._processes: int | None = workers
-        self._num_sources: int | None = loader.num_sources()
-        self._screening_enabled: bool = loader.screening_config is not None and bool(
-            loader.screening_config.agent or loader.screening_config.scene
-        )
+        self._num_sources: int | None = total_sources
+        self._screening_enabled: bool = processor.screening_enabled()
         self._running: bool = False
 
     @override
@@ -63,9 +56,9 @@ class ParallelExecutor(Executor, Generic[SourceT]):
         _ = deque(
             self._execute_parallel(
                 self._process_fn_write,
-                self._sources,
+                self._processor.iter_sources(),
                 _init_write_worker,
-                *(self._shared, self._loader, self._builder, writer_factory),
+                *(self._shared, self._processor, writer_factory),
             ),
             maxlen=0,
         )
@@ -73,7 +66,7 @@ class ParallelExecutor(Executor, Generic[SourceT]):
     @override
     def execute_yield(self) -> Iterator[Scene]:
         for scenes in self._execute_parallel(
-            self._process_fn_yield, self._sources, _init_worker, self._shared
+            self._process_fn_yield, self._processor.iter_sources(), _init_worker, self._shared
         ):
             yield from scenes
 
@@ -110,14 +103,14 @@ class ParallelExecutor(Executor, Generic[SourceT]):
         if _ctx.writer is None:
             msg = "DatasetWriter was not initialized for this worker process."
             raise ValueError(msg)
-        if _ctx.loader is None or _ctx.builder is None:
-            msg = "Loader runtime was not initialized for this worker process."
+        if _ctx.processor is None:
+            msg = "Runtime processor was not initialized for this worker process."
             raise ValueError(msg)
         if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
             return 0
         _ = _ctx.shared.progress.increment_source()
         selected_scenes = 0
-        for scene in ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source):
+        for scene in ParallelExecutor._generate_scenes(_ctx.processor, source):
             _ctx.shared.progress.record_split(scene.split_assignment)
             _ctx.writer.write(scene)
             selected_scenes += 1
@@ -125,38 +118,37 @@ class ParallelExecutor(Executor, Generic[SourceT]):
 
     @staticmethod
     def _process_fn_yield(source: Source[Any]) -> list[Scene]:
-        if _ctx.loader is None or _ctx.builder is None:
-            msg = "Loader runtime was not initialized for this worker process."
+        if _ctx.processor is None:
+            msg = "Runtime processor was not initialized for this worker process."
             raise ValueError(msg)
         if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
             return []
         _ = _ctx.shared.progress.increment_source()
-        scenes = list(ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source))
+        scenes = list(ParallelExecutor._generate_scenes(_ctx.processor, source))
         for scene in scenes:
             _ctx.shared.progress.record_split(scene.split_assignment)
         return scenes
 
     @staticmethod
-    def _generate_scenes(
-        loader: RuntimeSceneLoader, builder: SceneBuilder, source: Source[Any]
-    ) -> Iterator[Scene]:
+    def _generate_scenes(processor: RuntimeProcessor, source: Source[Any]) -> Iterator[Scene]:
         if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
             return
         claim_selected_scene = functools.partial(
             _ctx.shared.progress.claim_selected_scene, _ctx.shared.scene_limit
         )
-        for processed in builder.prepare_source(
-            loader,
-            source,
-            record_candidate_scene=_ctx.shared.progress.record_candidate_scene,
-            claim_selected_scene=claim_selected_scene,
-        ):
-            yield builder.create_scene(loader, processed, source)
+        for candidate in processor.iter_candidates(source):
+            _ = _ctx.shared.progress.record_candidate_scene()
+            if not candidate.passes_screening:
+                continue
+            scene_number = claim_selected_scene()
+            if scene_number is None:
+                return
+            yield processor.materialize(candidate, scene_number)
 
     def _execute_parallel(
         self,
-        process_fn: Callable[[Source[SourceT]], ReturnT],
-        payloads: Iterable[Source[SourceT]],
+        process_fn: Callable[[Source[Any]], ReturnT],
+        payloads: Iterable[Source[Any]],
         initializer: Callable[P, object],
         *args: P.args,
         **kwargs: P.kwargs,
@@ -197,14 +189,12 @@ def _init_worker(shared: state.SharedResources, *, with_finalize: bool = True) -
 
 def _init_write_worker(
     shared: state.SharedResources,
-    loader: RuntimeSceneLoader,
-    builder: SceneBuilder,
+    processor: RuntimeProcessor,
     writer_factory: Callable[[int], DatasetWriter],
 ) -> None:
     global _ctx  # noqa: PLW0602
     _init_worker(shared, with_finalize=False)
-    _ctx.loader = loader
-    _ctx.builder = builder
+    _ctx.processor = processor
     writer: DatasetWriter | None = None
     try:
         writer = writer_factory(_ctx.worker_id)
