@@ -4,11 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dronalize.core.functional.resample._common import (
-    ResampleMethod,
-    ResampleSpec,
-    resolve_request,
-)
+from dronalize.core.functional.resample._common import ResampleMethod, ResampleSpec, resolve_request
 from dronalize.core.functional.resample._linear import linear_resample
 from dronalize.core.functional.resample._spline import (
     cubic_spline_interpolator_factory,

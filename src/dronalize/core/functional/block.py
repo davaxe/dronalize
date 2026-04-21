@@ -221,7 +221,7 @@ def _assign_weighted_groups(
     seed: int | None = None,
 ) -> DataFrameT:
     groups_by = list(group_by) if group_by is not None else []
-    hash_seed = seed if seed is not None else random.randint(0, 2**64 - 1)
+    hash_seed = seed if seed is not None else random.randint(0, 2**64 - 1)  # noqa: S311
     key_columns = [*groups_by, group_column]
     assignment_column = out_col if out_col != group_column else "_assigned_group"
     unique_groups = data.select(*key_columns).unique()

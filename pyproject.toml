@@ -125,11 +125,26 @@ preview = true
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "D203", "D213", "COM812", "PLR2004", "DOC201", "DOC501",
-    "T201", "S101", "TRY003", "D100", "B008", "PLR0904",
-    "TD002", "TD003", "PLR0913", "PLR0917", "PLR0914",
-    "DOC402", "CPY001", "D104", "TD005", "S405", "S314",
-    "RUF067", "PLC2801", "S608", "S311", "T203", "S603", "S404", "D101",
+    "D203",
+    "D213",
+    "COM812",
+    "PLR2004",
+    "DOC201",
+    "DOC501",
+    "TRY003",
+    "D100",
+    "PLR0904",
+    "TD002",
+    "TD003",
+    "PLR0913",
+    "PLR0917",
+    "PLR0914",
+    "DOC402",
+    "CPY001",
+    "D104",
+    "TD005",
+    "PLC2801",
+    "D101",
 ]
 pydocstyle = { convention = "numpy" }
 
@@ -137,10 +152,14 @@ pydocstyle = { convention = "numpy" }
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["D", "INP001"]
+"tests/**/*.py" = ["D", "INP001", "S101"]
 
 [tool.ruff.format]
 quote-style = "double"
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
 
 [tool.basedpyright]
 pythonVersion = "3.10"

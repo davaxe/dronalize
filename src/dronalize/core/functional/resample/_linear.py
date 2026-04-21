@@ -7,11 +7,7 @@ from typing import TYPE_CHECKING, cast
 import polars as pl
 import polars.selectors as cs
 
-from dronalize.core.functional.resample._common import (
-    SEGMENT_COLUMN,
-    ResamplePlan,
-    segment_data,
-)
+from dronalize.core.functional.resample._common import SEGMENT_COLUMN, ResamplePlan, segment_data
 
 if TYPE_CHECKING:
     from dronalize.core.functional.resample._common import ResampleSpec

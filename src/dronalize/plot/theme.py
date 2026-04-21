@@ -158,10 +158,7 @@ DARK_THEME: Final[PlotTheme] = PlotTheme(
 )
 
 
-_THEMES: Final[dict[ThemeName, PlotTheme]] = {
-    "light": LIGHT_THEME,
-    "dark": DARK_THEME,
-}
+_THEMES: Final[dict[ThemeName, PlotTheme]] = {"light": LIGHT_THEME, "dark": DARK_THEME}
 
 
 def get_plot_theme(theme: ThemeName | PlotTheme) -> PlotTheme:

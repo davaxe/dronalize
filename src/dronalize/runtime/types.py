@@ -39,7 +39,8 @@ class ExecutionResult:
     output_dir: Path
     storage_backend: StorageBackend
     processed_sources: int
-    processed_scenes: int
+    candidate_scenes: int
+    selected_scenes: int
     split_counts: dict[str, int]
 
 

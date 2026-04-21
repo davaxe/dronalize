@@ -101,4 +101,4 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
 
 def test_adapter_module_raises_for_unknown_export() -> None:
     with pytest.raises(AttributeError, match="has no attribute"):
-        _ = adapters.__getattr__("DefinitelyMissing")
+        _ = adapters.NotARealAdapter

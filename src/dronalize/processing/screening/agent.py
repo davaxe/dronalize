@@ -52,10 +52,7 @@ class RequireFrames(AgentCheckRuleBase):
     ) -> RequireFrames:
         """Return a defined rule."""
         return cls(
-            frames=coerce_frame_set(frames),
-            selector=selector,
-            tolerance=tolerance,
-            rule_id=rule_id,
+            frames=coerce_frame_set(frames), selector=selector, tolerance=tolerance, rule_id=rule_id
         )
 
     @override

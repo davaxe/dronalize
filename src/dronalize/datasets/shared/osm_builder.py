@@ -1,4 +1,4 @@
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: S405
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,7 +112,7 @@ class OSMMapBuilder(BaseMapBuilder):
         self, min_distance: float | None = None, interp_distance: float | None = None
     ) -> None:
         # Use iterparse for memory-efficient incremental XML parsing
-        context = ET.iterparse(self._osm_file, events=("start", "end"))
+        context = ET.iterparse(self._osm_file, events=("start", "end"))  # noqa: S314
         context = iter(context)
         _, root = next(context)
 

@@ -12,10 +12,7 @@ from dronalize.config.models.map import MapConfig, PartialMapConfig
 from dronalize.config.models.output import OutputConfig, PartialOutputConfig
 from dronalize.config.models.runtime import PartialRuntimeConfig, RuntimeConfig
 from dronalize.config.models.scenes import PartialScenesConfig, ScenesConfig  # noqa: TC001
-from dronalize.config.models.screening import (  # noqa: TC001
-    PartialScreeningConfig,
-    ScreeningConfig,
-)
+from dronalize.config.models.screening import PartialScreeningConfig, ScreeningConfig  # noqa: TC001
 from dronalize.config.models.split import NoSplitConfig, SplitConfig
 
 
@@ -87,8 +84,7 @@ class PartialDatasetConfig(PartialDatasetConfigBase, PartialConfig[DatasetConfig
 
 
 def _apply_optional_screening(
-    patch: PartialScreeningConfig | Literal[False] | None,
-    target: ScreeningConfig | None,
+    patch: PartialScreeningConfig | Literal[False] | None, target: ScreeningConfig | None
 ) -> ScreeningConfig | None:
     """Apply a patch to an optional screening block."""
     if patch is None:

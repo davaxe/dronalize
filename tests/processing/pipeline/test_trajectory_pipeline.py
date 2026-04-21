@@ -130,19 +130,12 @@ def test_lane_change_sampling_keeps_lane_change_windows_and_thins_steady_windows
     frame = scene_df_presets["lane_change_sequences"]()
     plan = PipelinePlan(
         scenes=_scenes(
-            lane_change=LaneChangeConfig(
-                persist=1,
-                negative_keep_every=2,
-                required_lane_changes=1,
-            )
+            lane_change=LaneChangeConfig(persist=1, negative_keep_every=2, required_lane_changes=1)
         )
     )
 
     scenes = _run_pipeline(
-        frame,
-        plan=plan,
-        spec_builder=lane_change_sampling,
-        window_by="sequence",
+        frame, plan=plan, spec_builder=lane_change_sampling, window_by="sequence"
     )
 
     steady_scenes = [scene for scene in scenes if scene["sequence"][0] == "steady"]

@@ -6,9 +6,10 @@ import contextlib
 import multiprocessing as mp
 from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic
 
 from dronalize.core.categories import DatasetSplit
+from dronalize.core.typing import SourceT
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -24,11 +25,13 @@ if TYPE_CHECKING:
 class Progress:
     running: bool
     processed_sources: int
-    processed_scenes: int
+    candidate_scenes: int
+    selected_scenes: int
     total_sources: int | None
-    total_scenes: int | None
+    scene_limit: int | None
     active_workers: int
     split_counts: dict[str, int]
+    screening_enabled: bool
 
 
 @dataclass(slots=True)
@@ -53,7 +56,8 @@ class WorkerRegistry:
 @dataclass(slots=True)
 class ProgressState:
     active_workers: Synchronized[int]
-    scene_counter: Synchronized[int]
+    candidate_scene_counter: Synchronized[int]
+    selected_scene_counter: Synchronized[int]
     source_counter: Synchronized[int]
     unsplit_counter: Synchronized[int]
     train_counter: Synchronized[int]
@@ -66,7 +70,8 @@ class ProgressState:
     def create(cls) -> ProgressState:
         return cls(
             active_workers=mp.Value("i", 0),
-            scene_counter=mp.Value("i", 0),
+            candidate_scene_counter=mp.Value("i", 0),
+            selected_scene_counter=mp.Value("i", 0),
             source_counter=mp.Value("i", 0),
             unsplit_counter=mp.Value("i", 0),
             train_counter=mp.Value("i", 0),
@@ -79,7 +84,8 @@ class ProgressState:
     def reset(self) -> None:
         counters = (
             self.active_workers,
-            self.scene_counter,
+            self.candidate_scene_counter,
+            self.selected_scene_counter,
             self.source_counter,
             self.unsplit_counter,
             self.train_counter,
@@ -93,20 +99,27 @@ class ProgressState:
                 counter.value = 0
             _ = self.update_event.clear()
 
-    def claim_scene(self, limit: int | None = None) -> int | None:
-        with self.scene_counter.get_lock():
-            if limit is not None and self.scene_counter.value >= limit:
+    def record_candidate_scene(self) -> int:
+        with self.candidate_scene_counter.get_lock():
+            self.candidate_scene_counter.value += 1
+            value = self.candidate_scene_counter.value
+        self.update_event.set()
+        return value
+
+    def claim_selected_scene(self, limit: int | None = None) -> int | None:
+        with self.selected_scene_counter.get_lock():
+            if limit is not None and self.selected_scene_counter.value >= limit:
                 return None
-            scene_number = self.scene_counter.value
-            self.scene_counter.value += 1
+            scene_number = self.selected_scene_counter.value
+            self.selected_scene_counter.value += 1
         self.update_event.set()
         return scene_number
 
-    def scene_limit_reached(self, limit: int | None = None) -> bool:
+    def selected_scene_limit_reached(self, limit: int | None = None) -> bool:
         if limit is None:
             return False
-        with self.scene_counter.get_lock():
-            return self.scene_counter.value >= limit
+        with self.selected_scene_counter.get_lock():
+            return self.selected_scene_counter.value >= limit
 
     def increment_source(self) -> int:
         with self.source_counter.get_lock():
@@ -171,7 +184,7 @@ class SharedResources:
 
 
 @dataclass(slots=True)
-class WorkerRuntime:
+class WorkerRuntime(Generic[SourceT]):
     shared: SharedResources
     worker_id: int
     loader: BaseSceneLoader[Any, Any] | None = None

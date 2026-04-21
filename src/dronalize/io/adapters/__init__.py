@@ -47,7 +47,7 @@ __all__ = [
     "collate_hetero_with_time_padding",
 ]
 
-_EXPORTS: dict[str, tuple[str, str]] = {
+__lazy_exports__: dict[str, tuple[str, str]] = {
     "IterableTorchSceneDataset": ("dronalize.io.adapters.torch", "IterableTorchSceneDataset"),
     "TorchSceneDataset": ("dronalize.io.adapters.torch", "TorchSceneDataset"),
     "TorchSceneRecord": ("dronalize.io.adapters.torch", "TorchSceneRecord"),
@@ -62,9 +62,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 
 def __getattr__(name: str) -> object:
     """Resolve optional adapter exports lazily."""
-    return resolve_lazy_export(globals(), _EXPORTS, module_name=__name__, name=name)
+    return resolve_lazy_export(globals(), __lazy_exports__, module_name=__name__, name=name)
 
 
 def __dir__() -> list[str]:
     """Expose lazy adapter exports during interactive discovery."""
-    return lazy_dir(globals(), exported_names=list(_EXPORTS))
+    return lazy_dir(globals(), exported_names=list(__lazy_exports__))

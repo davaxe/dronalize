@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 __all__ = ["DatasetReader", "MDSReader", "MDSReaderInitArgs", "PickleReader"]
 
-_EXPORTS: dict[str, tuple[str, str]] = {
+__lazy_exports__: dict[str, tuple[str, str]] = {
     "DatasetReader": ("dronalize.io.base", "DatasetReader"),
     "MDSReader": ("dronalize.io.readers.mds", "MDSReader"),
     "MDSReaderInitArgs": ("dronalize.io.readers.mds", "MDSReaderInitArgs"),
@@ -40,9 +40,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 
 def __getattr__(name: str) -> object:
     """Resolve optional reader exports lazily."""
-    return resolve_lazy_export(globals(), _EXPORTS, module_name=__name__, name=name)
+    return resolve_lazy_export(globals(), __lazy_exports__, module_name=__name__, name=name)
 
 
 def __dir__() -> list[str]:
     """Expose lazy reader exports during interactive discovery."""
-    return lazy_dir(globals(), exported_names=list(_EXPORTS))
+    return lazy_dir(globals(), exported_names=list(__lazy_exports__))

@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.models import LoaderRequest
 
+VodLoaderOptions = NuScenesLoaderOptions
+
 
 class VodLoader(NuScenesLoader):
     """Loader for the View-of-Delft dataset."""
@@ -39,6 +41,6 @@ class VodLoader(NuScenesLoader):
 
     @classmethod
     @override
-    def default_loader_options(cls) -> NuScenesLoaderOptions:
+    def default_loader_options(cls) -> VodLoaderOptions:
         # VOD data contains two identical instances of the ego vehicle
-        return NuScenesLoaderOptions(drop_full_category_regex=["vehicle.ego"])
+        return VodLoaderOptions(drop_full_category_regex=["vehicle.ego"])

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from dronalize.processing.screening.screen import Screen
 
 
-_SCREENING_SCENE_PASSES = "_scene_passes"
+SCENE_PASS_COLUMN = "_scene_passes"  # noqa: S105
 AGENT_PASS_COLUMN = "_agent_passes"  # noqa: S105
 
 
@@ -48,6 +48,7 @@ def screen_scene(
     scene_group_by: str | Sequence[str] | None = None,
     *,
     mark_passed_agents: bool = False,
+    retain_scene_passes: bool = False,
 ) -> DataFrameT:
     """Apply cleanup and screening rules to trajectory scenes."""
     if scene_screening is None:
@@ -61,13 +62,14 @@ def screen_scene(
     )
     df = df.with_columns(
         _and_all([pl.col(name) for name in [*scene_columns, *agent_columns]]).alias(
-            _SCREENING_SCENE_PASSES
+            SCENE_PASS_COLUMN
         )
     )
     return _finalize_screened(
         df,
-        diagnostic_columns=[*scene_columns, *agent_columns, _SCREENING_SCENE_PASSES],
+        diagnostic_columns=[*scene_columns, *agent_columns, SCENE_PASS_COLUMN],
         include_passed_agent_ids=mark_passed_agents,
+        retain_scene_passes=retain_scene_passes,
     )
 
 
@@ -152,13 +154,20 @@ def _apply_agent_rule(
 
 
 def _finalize_screened(
-    data: DataFrameT, diagnostic_columns: list[str], *, include_passed_agent_ids: bool
+    data: DataFrameT,
+    diagnostic_columns: list[str],
+    *,
+    include_passed_agent_ids: bool,
+    retain_scene_passes: bool,
 ) -> DataFrameT:
     excluded = list(diagnostic_columns)
     if not include_passed_agent_ids:
         excluded.append(AGENT_PASS_COLUMN)
+    if retain_scene_passes:
+        excluded.remove(SCENE_PASS_COLUMN)
+        return data if not excluded else data.select(pl.all().exclude(excluded))
 
-    screened = data.filter(pl.col(_SCREENING_SCENE_PASSES))
+    screened = data.filter(pl.col(SCENE_PASS_COLUMN))
     return screened if not excluded else screened.select(pl.all().exclude(excluded))
 
 

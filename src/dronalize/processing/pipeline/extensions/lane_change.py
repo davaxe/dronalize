@@ -12,7 +12,7 @@ from dronalize.processing.pipeline.contributions import PipelineStage, StageCont
 from dronalize.processing.pipeline.pipeline import Pipeline
 
 if TYPE_CHECKING:
-    from dronalize.processing.pipeline.spec import BuildContext
+    from dronalize.processing.pipeline.context import BuildContext
 
 _LANE_CHANGE_EVENT_COLUMN = "valid_lane_change"
 _SCENE_LANE_CHANGE_COUNT_COLUMN = "_scene_lane_change_count"

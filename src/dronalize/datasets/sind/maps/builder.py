@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: S405
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -59,7 +59,7 @@ class SindMapBuilder(OSMMapBuilder):
     @staticmethod
     def _extract_origin(osm_file: Path) -> tuple[float, float]:
         """Parse the XML sequentially to find the node tagged as 'origin'."""
-        context = ET.iterparse(osm_file, events=("start", "end"))
+        context = ET.iterparse(osm_file, events=("start", "end"))  # noqa: S314
         current_node_element: ET.Element | None = None
 
         for event, elem in context:

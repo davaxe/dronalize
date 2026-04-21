@@ -10,6 +10,7 @@ from typing_extensions import Self
 from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.pipeline import stages
+from dronalize.processing.pipeline.context import BuildContext
 from dronalize.processing.pipeline.contributions import (
     PipelineStage,
     StageContributions,
@@ -21,8 +22,7 @@ from dronalize.processing.pipeline.pipeline import Pipeline
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.config.models import ScenesConfig
-    from dronalize.processing.models import PipelinePlan, SplitRequest
+    from dronalize.processing.models import PipelinePlan
 
 
 SPLIT_PARTITION_COLUMN = "_split_partition"
@@ -71,53 +71,6 @@ class TrajectorySpec:
         return self.columns.category
 
 
-@dataclass(frozen=True, slots=True)
-class BuildContext:
-    """Execution-ready context with all derived pipeline state precompiled."""
-
-    spec: TrajectorySpec
-    split_columns: tuple[str, ...]
-    window_group_columns: tuple[str, ...]
-    scene_key_columns: tuple[str, ...]
-    scene_id_column: str | None
-    drop_columns: tuple[str, ...]
-
-    @property
-    def frame_column(self) -> str:
-        """Return the frame column configured by the trajectory spec."""
-        return self.spec.frame_column
-
-    @property
-    def agent_id_column(self) -> str:
-        """Return the agent-ID column configured by the trajectory spec."""
-        return self.spec.agent_id_column
-
-    @property
-    def category_column(self) -> str:
-        """Return the category column configured by the trajectory spec."""
-        return self.spec.category_column
-
-    @property
-    def has_window(self) -> bool:
-        """Return whether the pipeline will build sliding-window scenes."""
-        return self.scenes.window is not None
-
-    @property
-    def split_request(self) -> SplitRequest | None:
-        """Return the active split request, if the plan uses one."""
-        return self.plan.split
-
-    @property
-    def scenes(self) -> ScenesConfig:
-        """Return the scene-construction config from the pipeline plan."""
-        return self.plan.scenes
-
-    @property
-    def plan(self) -> PipelinePlan:
-        """Return the pipeline plan owned by this build context."""
-        return self.spec.plan
-
-
 def compile_build_context(spec: TrajectorySpec, *, require_scene_id: bool = False) -> BuildContext:
     """Compile immutable derived pipeline state from a declarative spec."""
     plan = spec.plan
@@ -142,7 +95,9 @@ def compile_build_context(spec: TrajectorySpec, *, require_scene_id: bool = Fals
     )
 
     return BuildContext(
-        spec=spec,
+        plan=plan,
+        columns=spec.columns,
+        window_by=tuple(normalize_group_by(spec.window_by)),
         split_columns=split_columns,
         window_group_columns=window_group_columns,
         scene_key_columns=scene_key_columns,

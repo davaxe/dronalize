@@ -85,8 +85,7 @@ class WaymoLoader(BaseSceneLoader):
         map_data = lean_map_pb2.LeanMapContainer.FromString(raw_map)
         map_config = self.map_config
         map_graph = WaymoMapBuilder.from_proto(map_data.map_features).build(
-            min_distance=map_config.min_distance,
-            interp_distance=map_config.interp_distance,
+            min_distance=map_config.min_distance, interp_distance=map_config.interp_distance
         )
         return utils.extract_based_on_scene(map_graph, scene, map_config.extraction)
 

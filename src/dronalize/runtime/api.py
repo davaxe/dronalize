@@ -82,7 +82,8 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
             output_dir=plan.output_dir,
             storage_backend=plan.storage_backend,
             processed_sources=progress.processed_sources,
-            processed_scenes=progress.processed_scenes,
+            candidate_scenes=progress.candidate_scenes,
+            selected_scenes=progress.selected_scenes,
             split_counts=progress.split_counts,
         )
 

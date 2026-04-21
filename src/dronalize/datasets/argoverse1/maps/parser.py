@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: S405
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from typing import TYPE_CHECKING
@@ -37,8 +37,7 @@ class Argoverse1Map:
         """Parse the XML file and extract nodes and lane segments."""
         if self._parsed:
             return
-
-        tree = ET.parse(self.path)
+        tree = ET.parse(self.path)  # noqa: S314
         root = tree.getroot()
 
         all_graph_nodes: dict[int, Point] = {}

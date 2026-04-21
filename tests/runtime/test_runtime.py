@@ -123,7 +123,8 @@ def test_parallel_execution_smoke_processes_demo_dataset(
 
     assert result.dataset == "demo"
     assert result.processed_sources == 1
-    assert result.processed_scenes == 1
+    assert result.candidate_scenes == 1
+    assert result.selected_scenes == 1
     assert result.split_counts["unsplit"] == 1
 
     manifest = read_manifest(output_dir)

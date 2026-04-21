@@ -14,17 +14,17 @@ dataset integrations that need shared per-run state such as cached metadata or
 map stores.
 """
 
-from collections.abc import Callable
-from contextlib import AbstractContextManager
-from pathlib import Path
-
 from dronalize.config.models import MapConfig, ScenesConfig
-from dronalize.datasets.registry import DatasetSpec, available, get, register
+from dronalize.datasets.registry import DatasetSpec, ResourcesFactory, available, get, register
 from dronalize.processing.loading import DatasetResources
 
-ResourcesFactory = Callable[
-    [Path, ScenesConfig, MapConfig | None], AbstractContextManager[DatasetResources]
+__all__ = [
+    "DatasetResources",
+    "DatasetSpec",
+    "MapConfig",
+    "ResourcesFactory",
+    "ScenesConfig",
+    "available",
+    "get",
+    "register",
 ]
-"""Factory signature for dataset-scoped shared resources opened per execution run."""
-
-__all__ = ["DatasetSpec", "ResourcesFactory", "available", "get", "register"]

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import TYPE_CHECKING, Final, Literal, TypeAlias
 
 import polars as pl
@@ -23,12 +24,11 @@ from dronalize.plot.theme import EdgeStyle, PlotTheme, ThemeName, get_plot_theme
 
 try:
     import altair as alt
+    from altair.utils.html import spec_to_html
 except ModuleNotFoundError as error:
     raise_missing_optional_dependency(error, feature="Scene plotting", extra="plot")
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from dronalize.core.categories import AgentCategory, EdgeType
     from dronalize.core.scene import Scene
     from dronalize.io import SceneRecord
@@ -89,28 +89,17 @@ class TrajectoryControls:
     @property
     def visible_filters(self) -> tuple[FilterExpression, ...]:
         """Return filters shared by layers that respect the frame slider."""
-        return (
-            self.category.expression,
-            self.screening.expression,
-            self.frame.visible_expr,
-        )
+        return (self.category.expression, self.screening.expression, self.frame.visible_expr)
 
     @property
     def static_filters(self) -> tuple[FilterExpression, ...]:
         """Return filters shared by layers that ignore the frame slider."""
-        return (
-            self.category.expression,
-            self.screening.expression,
-        )
+        return (self.category.expression, self.screening.expression)
 
     @property
     def parameters(self) -> tuple[alt.Parameter, ...]:
         """Return Altair parameters that must be attached to the chart."""
-        return (
-            self.frame.parameter,
-            self.category.parameter,
-            self.screening.parameter,
-        )
+        return (self.frame.parameter, self.category.parameter, self.screening.parameter)
 
 
 @dataclass(slots=True, frozen=True)
@@ -206,6 +195,14 @@ def plot_scene(
         theme=resolved_theme,
     )
     if save_path is not None:
+        if Path(save_path).suffix.lower() == ".html":
+            _save_html(
+                chart,
+                Path(save_path),
+                bg=resolved_theme.chart_background,
+                fg=resolved_theme.title_color,
+            )
+            return chart
         chart.save(save_path)  # pyright: ignore[reportUnknownMemberType]
     return chart
 
@@ -235,17 +232,12 @@ def _build_scene_chart(
 
     if show_map and data.map_edges is not None and not data.map_edges.is_empty():
         layers.extend(
-            _build_map_layers(
-                data.map_edges,
-                include_nodes=include_map_nodes,
-                theme=theme,
-            )
+            _build_map_layers(data.map_edges, include_nodes=include_map_nodes, theme=theme)
         )
 
     if not data.trajectories.is_empty():
         trajectory_layers, trajectory_params = _build_trajectory_layers(
-            data.trajectories,
-            theme=theme,
+            data.trajectories, theme=theme
         )
         layers.extend(trajectory_layers)
         params.extend(trajectory_params)
@@ -258,11 +250,7 @@ def _build_scene_chart(
         chart = chart.add_params(*params)
 
     return _style_scene_chart(
-        chart.resolve_scale(
-            color="independent",
-            size="independent",
-            strokeDash="independent",
-        ),
+        chart.resolve_scale(color="independent", size="independent", strokeDash="independent"),
         data=data,
         plot_width=plot_width,
         plot_height=plot_height,
@@ -290,9 +278,7 @@ def _resolve_plot_dimensions(
         return _DEFAULT_WIDTH, _DEFAULT_HEIGHT
 
     x_min, x_max, y_min, y_max = _collect_plot_bounds(
-        trajectories=trajectories,
-        map_edges=map_edges,
-        show_map=show_map,
+        trajectories=trajectories, map_edges=map_edges, show_map=show_map
     )
     x_span = max(x_max - x_min, 1.0)
     y_span = max(y_max - y_min, 1.0)
@@ -304,10 +290,7 @@ def _resolve_plot_dimensions(
 
 
 def _collect_plot_bounds(
-    *,
-    trajectories: pl.DataFrame,
-    map_edges: pl.DataFrame | None,
-    show_map: bool,
+    *, trajectories: pl.DataFrame, map_edges: pl.DataFrame | None, show_map: bool
 ) -> tuple[float, float, float, float]:
     """Return combined x/y bounds across plotted layers."""
     x_values: list[float] = []
@@ -352,10 +335,7 @@ def _build_trajectory_layers(
     line_tooltips = _trajectory_tooltips(include_point_details=unique_agents <= _MAX_TOOLTIP_AGENTS)
     marker_tooltips = _trajectory_tooltips(include_point_details=True)
     base = _trajectory_base_chart(
-        trajectory_paths,
-        controls=controls,
-        agent_color=agent_color,
-        tooltips=line_tooltips,
+        trajectory_paths, controls=controls, agent_color=agent_color, tooltips=line_tooltips
     )
 
     layers = [
@@ -407,11 +387,7 @@ def _trajectory_base_chart(
     )
 
 
-def _trajectory_selection_targets(
-    base: alt.Chart,
-    *,
-    controls: TrajectoryControls,
-) -> alt.Chart:
+def _trajectory_selection_targets(base: alt.Chart, *, controls: TrajectoryControls) -> alt.Chart:
     """Add an invisible interaction layer used for agent selection."""
     return base.mark_line(color="#000000", strokeWidth=14, opacity=0.001).add_params(
         controls.selection, controls.focus
@@ -421,7 +397,7 @@ def _trajectory_selection_targets(
 def _trajectory_line_layers(base: alt.Chart, *, controls: TrajectoryControls) -> list[alt.Chart]:
     """Create the trajectory line layers in back-to-front order."""
     trajectories = base.mark_line(strokeWidth=2.15).encode(
-        strokeDash=_trajectory_phase_dash(show_legend=True),
+        strokeDash=_trajectory_phase_dash(),
         opacity=alt.when(controls.selection).then(alt.value(0.86)).otherwise(alt.value(0.06)),
     )
 
@@ -429,12 +405,8 @@ def _trajectory_line_layers(base: alt.Chart, *, controls: TrajectoryControls) ->
         base
         .transform_filter(controls.focus)
         .mark_line(strokeWidth=2.9)
-        .encode(
-            strokeDash=_trajectory_phase_dash(show_legend=False),
-            opacity=alt.value(1.0),
-        )
+        .encode(strokeDash=_trajectory_phase_dash(), opacity=alt.value(1.0))
     )
-
     return [trajectories, focused_trajectory]
 
 
@@ -447,7 +419,6 @@ def _trajectory_marker_layers(
 ) -> list[alt.Chart]:
     """Create the marker layers that sit on top of the trajectory lines."""
     start_frames = trajectories.group_by("agent", maintain_order=True).head(1)
-
     start_markers = (
         _filtered_chart(start_frames, *controls.visible_filters)
         .mark_point(shape="circle", size=90, filled=True, fill="#2ecc71", fillOpacity=0.95)
@@ -471,7 +442,6 @@ def _trajectory_marker_layers(
             opacity=alt.when(controls.selection).then(alt.value(0.95)).otherwise(alt.value(0.15)),
         )
     )
-
     return [start_markers, current_points]
 
 
@@ -510,31 +480,20 @@ def _trajectory_path_data(trajectories: pl.DataFrame) -> pl.DataFrame:
 
 def _phase_segment_expr(*, phase_field: str) -> pl.Expr:
     """Return a stable phase-aware segment identifier for Altair line grouping."""
-    return pl.concat_str(
-        pl.col("segment").cast(pl.String()),
-        pl.lit("::"),
-        pl.col(phase_field),
-    )
+    return pl.concat_str(pl.col("segment").cast(pl.String()), pl.lit("::"), pl.col(phase_field))
 
 
-def _trajectory_phase_dash(*, show_legend: bool) -> alt.StrokeDash:
+def _trajectory_phase_dash() -> alt.StrokeDash:
     """Return the stroke-dash encoding used to distinguish history and future."""
-    legend = alt.Legend(title="Trajectory Phase", orient="right") if show_legend else None
     return alt.StrokeDash(
         "path_phase:N",
         sort=[PHASE_HISTORY, PHASE_FUTURE],
-        scale=alt.Scale(
-            domain=[PHASE_HISTORY, PHASE_FUTURE],
-            range=[(1, 0), _FUTURE_PHASE_DASH],
-        ),
-        legend=legend,
+        scale=alt.Scale(domain=[PHASE_HISTORY, PHASE_FUTURE], range=[(1, 0), _FUTURE_PHASE_DASH]),
+        legend=None,
     )
 
 
-def _trajectory_tooltips(
-    *,
-    include_point_details: bool,
-) -> list[alt.Tooltip]:
+def _trajectory_tooltips(*, include_point_details: bool) -> list[alt.Tooltip]:
     """Build a consistent tooltip payload for trajectory layers."""
     tooltips: list[alt.Tooltip] = [
         alt.Tooltip("agent:Q", title="Agent"),
@@ -570,7 +529,7 @@ def _build_map_layers(
             color=alt.Color(
                 "edge_type:N",
                 scale=alt.Scale(domain=style_scale.domain, range=style_scale.colors),
-                legend=alt.Legend(title="Edge Type", symbolType="stroke", orient="right"),
+                legend=None,
             ),
             size=alt.Size(
                 "edge_type:N",
@@ -619,11 +578,7 @@ def _map_style_scale(map_edges: pl.DataFrame, *, theme: PlotTheme) -> MapStyleSc
 
 
 def _map_node_layer(
-    map_edges: pl.DataFrame,
-    *,
-    x_field: str,
-    y_field: str,
-    theme: PlotTheme,
+    map_edges: pl.DataFrame, *, x_field: str, y_field: str, theme: PlotTheme
 ) -> alt.Chart:
     """Return one semi-transparent map-node layer."""
     return (
@@ -666,11 +621,7 @@ def _edge_styles_by_name(theme_name: ThemeName) -> dict[str, EdgeStyle]:
     return {EDGE_TYPE_LABELS[value]: style for value, style in theme.edge_styles.items()}
 
 
-def _agent_color_encoding(
-    trajectories: pl.DataFrame,
-    *,
-    theme: PlotTheme,
-) -> alt.Color:
+def _agent_color_encoding(trajectories: pl.DataFrame, *, theme: PlotTheme) -> alt.Color:
     """Return a stable per-agent color encoding that does not change under filtering."""
     agent_ids = trajectories["agent"].unique().sort().to_list()
     scheme = theme.agent_color_scheme
@@ -684,22 +635,14 @@ def _agent_color_encoding(
             raise ValueError(msg)
         scale = alt.Scale(domain=agent_ids, range=palette)
 
-    return alt.Color(
-        "agent:N",
-        legend=None,
-        scale=scale,
-    )
+    return alt.Color("agent:N", legend=None, scale=scale)
 
 
 def _style_scene_chart(
     chart: ChartT, *, data: PlotSceneData, plot_width: int, plot_height: int, theme: PlotTheme
 ) -> ChartT:
     """Apply the shared theme used by scene plots."""
-    chart = chart.properties(
-        width=plot_width,
-        height=plot_height,
-        title=_scene_title(data),
-    )
+    chart = chart.properties(width=plot_width, height=plot_height, title=_scene_title(data))
     return _apply_scene_theme(chart, theme=theme)
 
 
@@ -708,11 +651,7 @@ def _apply_scene_theme(chart: ChartT, *, theme: PlotTheme) -> ChartT:
     return (
         chart
         .configure(background=theme.chart_background)
-        .configure_view(
-            fill=theme.plot_background,
-            stroke=theme.grid_color,
-            strokeOpacity=0.65,
-        )
+        .configure_view(fill=theme.plot_background, stroke=theme.grid_color, strokeOpacity=0.65)
         .configure_title(
             color=theme.title_color,
             fontSize=18,
@@ -729,19 +668,6 @@ def _apply_scene_theme(chart: ChartT, *, theme: PlotTheme) -> ChartT:
             titleColor=theme.title_color,
             labelFontSize=12,
             titleFontSize=13,
-        )
-        .configure_legend(
-            titleColor=theme.title_color,
-            labelColor=theme.axis_color,
-            fillColor=theme.plot_background,
-            strokeColor=theme.grid_color,
-            padding=10,
-            orient="bottom",
-            titleFontSize=14,
-            labelFontSize=14,
-            symbolSize=500,
-            symbolStrokeWidth=5,
-            symbolOpacity=1.0,
         )
     )
 
@@ -760,12 +686,7 @@ def _frame_control(trajectories: pl.DataFrame) -> FrameControl:
     parameter = alt.param(
         name=_SELECTED_FRAME_PARAM,
         value=frame_max,
-        bind=alt.binding_range(
-            min=frame_min,
-            max=frame_max,
-            step=1,
-            name="Frame ",
-        ),
+        bind=alt.binding_range(min=frame_min, max=frame_max, step=1, name="Frame "),
     )
     return FrameControl(
         parameter=parameter,
@@ -774,42 +695,26 @@ def _frame_control(trajectories: pl.DataFrame) -> FrameControl:
     )
 
 
-def _dropdown_control(
-    *,
-    name: str,
-    label: str,
-    field: str,
-    options: list[str],
-) -> DropdownControl:
+def _dropdown_control(*, name: str, label: str, field: str, options: list[str]) -> DropdownControl:
     """Create a dropdown filter control and its Vega expression."""
     parameter = alt.param(
         name=name,
         value=_FILTER_ALL,
-        bind=alt.binding_select(
-            options=[_FILTER_ALL, *options],
-            name=f"{label} ",
-        ),
+        bind=alt.binding_select(options=[_FILTER_ALL, *options], name=f"{label} "),
     )
     return DropdownControl(
-        parameter=parameter,
-        expression=f"{name} == '{_FILTER_ALL}' || datum.{field} == {name}",
+        parameter=parameter, expression=f"{name} == '{_FILTER_ALL}' || datum.{field} == {name}"
     )
 
 
 def _scene_title(data: PlotSceneData) -> alt.TitleParams:
     """Return the chart title and summary subtitle for one plotted scene."""
-    agent_count = 0
-    category_count = 0
-    passed_count = 0
-    failed_count = 0
+    agent_count, category_count, passed_count, failed_count = 0, 0, 0, 0
     frame_range = "frames: n/a"
-
     if not data.trajectories.is_empty():
-        agent_summary = data.trajectories.select(
-            "agent",
-            "agent_type",
-            "screening_status",
-        ).unique(subset="agent")
+        agent_summary = data.trajectories.select("agent", "agent_type", "screening_status").unique(
+            subset="agent"
+        )
         agent_count = agent_summary.height
         category_count = agent_summary["agent_type"].n_unique()
         passed_count = int((agent_summary["screening_status"] == SCREENING_PASSED).sum())
@@ -824,8 +729,36 @@ def _scene_title(data: PlotSceneData) -> alt.TitleParams:
         f"{passed_count} passed / {failed_count} failed | "
         f"{edge_count} map edges | {frame_range}"
     )
-    return alt.TitleParams(
-        text=f"Scene {data.scene_number}",
-        subtitle=[subtitle],
-        anchor="start",
+    return alt.TitleParams(text=f"Scene {data.scene_number}", subtitle=[subtitle], anchor="start")
+
+
+def _save_html(chart: ChartT, path: Path, fg: str, bg: str) -> None:
+    """Overwrite the default VegaFusion HTML template to apply the plot theme's fg/bg colors."""
+    spec = chart.to_dict(format="vega")
+    html = spec_to_html(
+        spec,
+        mode="vega",
+        vega_version=alt.VEGA_VERSION,
+        vegaembed_version=alt.VEGAEMBED_VERSION,
+        fullhtml=True,
     )
+
+    css = f"""
+    <style>
+    html, body {{
+        margin: 0;
+        padding: 0;
+        background: {bg};
+        color: {fg};
+    }}
+    #vis, .vega-bindings, .vega-bind {{
+        background: {bg};
+        color: {fg};
+    }}
+    .vega-bind label, .vega-bind-name, .vega-bind span {{
+        color: {fg};
+    }}
+    </style>
+    """
+    html = html.replace("<head>", "<head>" + css)
+    Path(path).write_text(html, encoding="utf-8")

@@ -157,9 +157,7 @@ class PartialScenesConfig(PartialConfig[ScenesConfig]):
                 target.future_frames if target is not None else None,
             ),
             sample_time=_resolve_required(
-                "sample_time",
-                self.sample_time,
-                target.sample_time if target is not None else None,
+                "sample_time", self.sample_time, target.sample_time if target is not None else None
             ),
             window=_apply_optional_block(
                 self.window, target.window if target is not None else None
@@ -185,8 +183,7 @@ ConfigT = TypeVar("ConfigT", bound=ConfigBase)
 
 
 def _apply_optional_block(
-    patch: PartialConfig[ConfigT] | Literal[False] | None,
-    target: ConfigT | None,
+    patch: PartialConfig[ConfigT] | Literal[False] | None, target: ConfigT | None
 ) -> ConfigT | None:
     """Apply a patch to an optional nested config block."""
     if patch is None:

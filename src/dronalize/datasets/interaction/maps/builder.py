@@ -1,6 +1,6 @@
 """Map-graph builder for the INTERACTION dataset."""
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # noqa: S405
 
 from typing_extensions import override
 
@@ -18,7 +18,5 @@ class InteractionMapBuilder(OSMMapBuilder):
         x = float(elem.attrib["x"])
         y = float(elem.attrib["y"])
         self._nodes[node_id] = (x + x_offset, y + y_offset)
-
-        # Clear element from memory once processed
         elem.clear()
         root.clear()

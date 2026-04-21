@@ -61,10 +61,7 @@ def _documented_config_params() -> list[str]:
 
 
 @pytest.mark.parametrize("snippet", _documented_config_params())
-def test_documented_configuration_examples_validate(
-    tmp_path: Path,
-    snippet: str,
-) -> None:
+def test_documented_configuration_examples_validate(tmp_path: Path, snippet: str) -> None:
     config_path = tmp_path / "example.toml"
     _ = config_path.write_text(snippet + "\n", encoding="utf-8")
     _ = load_project_config(config_path)

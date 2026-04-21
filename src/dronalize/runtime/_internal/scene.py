@@ -10,10 +10,10 @@ from dronalize.core.errors import SplitAssignmentError
 from dronalize.core.scene import Scene
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 from dronalize.processing.loading.loader import PreparedSceneData, SceneIdentifier, Source
-from dronalize.processing.screening.apply import AGENT_PASS_COLUMN
+from dronalize.processing.screening.apply import AGENT_PASS_COLUMN, SCENE_PASS_COLUMN
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
@@ -68,19 +68,46 @@ class SceneBuilder:
             )
 
     def prepare_source(
-        self, loader: BaseSceneLoader[Any, DatasetOptionsModel], source: Source[Any]
+        self,
+        loader: BaseSceneLoader[Any, DatasetOptionsModel],
+        source: Source[Any],
+        *,
+        record_candidate_scene: Callable[[], object] | None = None,
+        claim_selected_scene: Callable[[], int | None] | None = None,
     ) -> Iterable[PreparedSceneData]:
         if self._pipeline is None:
             self._pipeline = loader.pipeline()
 
         source_local_scene_index = 0
+        fallback_scene_number = 0
         for data in loader.load_source(source):
             effective_split = data.predefined_split or source.predefined_split
             for processed_frame in self._pipeline.execute(
                 data.frame, collect=True, filter_empty=True
             ):
-                passed_agent_ids: frozenset[int] | None = None
+                if record_candidate_scene is not None:
+                    _ = record_candidate_scene()
+
+                scene_passes = True
                 frame = processed_frame
+                if SCENE_PASS_COLUMN in frame.columns:
+                    scene_passes = bool(frame.get_column(SCENE_PASS_COLUMN).first())
+                    frame = frame.drop(SCENE_PASS_COLUMN)
+                if not scene_passes:
+                    source_local_scene_index += 1
+                    continue
+
+                scene_number = (
+                    claim_selected_scene()
+                    if claim_selected_scene is not None
+                    else fallback_scene_number
+                )
+                if scene_number is None:
+                    return
+                if claim_selected_scene is None:
+                    fallback_scene_number += 1
+
+                passed_agent_ids: frozenset[int] | None = None
                 if AGENT_PASS_COLUMN in frame.columns:
                     passed_ids = (
                         frame.filter(frame[AGENT_PASS_COLUMN]).get_column("id").unique().to_list()
@@ -89,6 +116,7 @@ class SceneBuilder:
                     frame = frame.drop(AGENT_PASS_COLUMN)
 
                 yield PreparedSceneData(
+                    scene_number=scene_number,
                     frame=frame,
                     map_binding=data.map_binding,
                     predefined_split=effective_split,
@@ -105,12 +133,11 @@ class SceneBuilder:
         loader: BaseSceneLoader[Any, Any],
         data: PreparedSceneData,
         source: Source[Any],
-        scene_number: int,
     ) -> Scene:
         map_key, map_resolver = self._resolve_scene_map(loader, source, data)
         scene = Scene.create(
             frame=data.frame,
-            scene_number=scene_number,
+            scene_number=data.scene_number,
             history_frames=self.history_frames,
             future_frames=self.future_frames,
             schema=self.source_schema,

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from dronalize.processing.models import SplitRequest
-    from dronalize.processing.pipeline.spec import BuildContext
+    from dronalize.processing.pipeline.context import BuildContext
 
 
 def build_split_stage(ctx: BuildContext) -> Pipeline:
@@ -27,7 +27,7 @@ def build_split_stage(ctx: BuildContext) -> Pipeline:
     return _split_partition_pipeline(
         ctx.split_request,
         time_column=ctx.frame_column,
-        group_by=ctx.spec.window_by,
+        group_by=ctx.window_by or None,
         split_column="split",
         partition_column=ctx.split_columns[0],
     )
@@ -94,9 +94,10 @@ def build_screening_stage(ctx: BuildContext) -> Pipeline:
     return Pipeline().then(
         tr.screen_scene(
             screening_spec,
-            columns=ctx.spec.columns,
+            columns=ctx.columns,
             group_by=ctx.scene_id_column,
             mark_passed_agents=True,
+            retain_scene_passes=True,
         )
     )
 

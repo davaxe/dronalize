@@ -25,10 +25,7 @@ if TYPE_CHECKING:
 class NullWriter(DatasetWriter):
     """No-op writer used by tests and dry-run execution paths."""
 
-    def __init__(
-        self,
-        identifier: str | int | None = None,
-    ) -> None:
+    def __init__(self, identifier: str | int | None = None) -> None:
         self._identifier: str = "UNNAMED" if identifier is None else str(identifier)
 
     @classmethod

@@ -59,6 +59,7 @@ class LoadedSourceData:
 class PreparedSceneData:
     """Final scene payload produced immediately before `Scene` construction."""
 
+    scene_number: int
     frame: pl.DataFrame
     stable_identifier: SceneIdentifier
     map_binding: MapBinding = field(default_factory=MapBinding)

@@ -35,7 +35,7 @@ def _table_query(table_name: str) -> str:
         UTM_Y as y,
         CLASS
     FROM {table_name}
-    """
+    """  # noqa: S608
 
 
 class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):

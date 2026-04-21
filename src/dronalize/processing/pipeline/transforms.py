@@ -24,6 +24,7 @@ def screen_scene(
     *,
     group_by: str | Sequence[str] | None = None,
     mark_passed_agents: bool = False,
+    retain_scene_passes: bool = False,
 ) -> Transform:
     """Create a screening transform.
 
@@ -49,6 +50,7 @@ def screen_scene(
             columns=columns or TrajectoryColumns(),
             scene_group_by=group_by,
             mark_passed_agents=mark_passed_agents,
+            retain_scene_passes=retain_scene_passes,
         )
 
     _screen.__name__ = "screen"
