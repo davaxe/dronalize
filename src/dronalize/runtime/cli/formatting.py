@@ -9,14 +9,17 @@ from rich import box
 from rich.table import Table
 
 from dronalize.config.models import (
-    NativeSplitConfig,
-    NoSplitConfig,
-    SceneSplitConfig,
-    ShuffledTimeSplitConfig,
-    SourceSplitConfig,
-    SplitConfig,
-    SplitConfigUnion,
-    TimeSplitConfig,
+    AssignConfig,
+    AssignUnion,
+    NoAssign,
+    PreserveNativeAssign,
+    ReadConfig,
+    ReadNative,
+    ReadUnion,
+    SceneAssign,
+    ShuffledTimeBlockAssign,
+    SourceAssign,
+    TimeBlockAssign,
     effective_scene_window,
 )
 from dronalize.core.scene import get_trajectory_schema
@@ -60,8 +63,10 @@ def summarize_plan(plan: ExecutionPlan) -> tuple[tuple[str, str], ...]:
         ("Limit", "none" if plan.limit is None else str(plan.limit)),
         ("Schema", get_trajectory_schema(output_config.trajectory_schema).name),
         ("Map", "yes" if plan.map is not None else "no"),
-        ("Split strategy", _run_plan_split_strategy(plan)),
-        ("Split details", _split_detail(plan)),
+        ("Read strategy", plan.loader.read.strategy),
+        ("Read details", _read_detail(plan)),
+        ("Assign strategy", plan.assignment.strategy),
+        ("Assign details", _assignment_detail(plan)),
         ("Options", _format_options(plan.loader.dataset)),
     )
 
@@ -80,7 +85,7 @@ def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, detail
         table.add_column("Window @ Hz", justify="right", style="bright_magenta", no_wrap=True)
         table.add_column("Map", justify="center")
         table.add_column("Native splits", style="bright_blue")
-        table.add_column("Time split", justify="center")
+        table.add_column("Time assign", justify="center")
 
     for descriptor in descriptors:
         if not details:
@@ -91,7 +96,8 @@ def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, detail
         window = _format_base_window(cfg.history_frames, cfg.future_frames, cfg.sample_time)
         has_map = "[green]yes[/green]" if descriptor.has_map else "[dim]no[/dim]"
         native_splits = (
-            ", ".join(split.value for split in descriptor.native_splits or ()) or "[dim]none[/dim]"
+            ", ".join(split.value for split in descriptor.supported_native_splits or ())
+            or "[dim]none[/dim]"
         )
         table.add_row(
             descriptor.name,
@@ -109,7 +115,8 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     screening_config = descriptor.default_config.screening
     map_config = descriptor.default_config.map if descriptor.has_map else None
     output_config = descriptor.default_config.output
-    split_config = descriptor.default_config.split
+    read_config = descriptor.default_config.read
+    assign_config = descriptor.default_config.assign
 
     overview = _detail_table(title=f"Dataset inspect: {descriptor.name}")
     overview.add_row("Dataset", descriptor.name)
@@ -120,9 +127,11 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     overview.add_row("Schema fields", ", ".join(descriptor.native_schema.semantic_fields()))
     overview.add_row(
         "Native splits",
-        ", ".join(split.value for split in descriptor.native_splits or ()) or "[dim]none[/dim]",
+        ", ".join(split.value for split in descriptor.supported_native_splits or ())
+        or "[dim]none[/dim]",
     )
-    overview.add_row("Supported split modes", _format_split_modes(descriptor))
+    overview.add_row("Read modes", _format_read_modes(descriptor))
+    overview.add_row("Assignment modes", _format_assignment_modes(descriptor))
     overview.add_row("Map", _format_flag(enabled=descriptor.has_map))
 
     scene_defaults = _detail_table(title="Default scene settings")
@@ -143,11 +152,21 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
         "Recenter positions", _format_flag(enabled=output_config.recenter_positions)
     )
 
-    split_defaults = _detail_table(title="Default split settings")
-    for label, value in _split_config_rows(split_config):
-        split_defaults.add_row(label, value)
+    read_defaults = _detail_table(title="Default read settings")
+    for label, value in _read_config_rows(read_config):
+        read_defaults.add_row(label, value)
 
-    tables: list[Table] = [overview, scene_defaults, output_defaults, split_defaults]
+    assign_defaults = _detail_table(title="Default assignment settings")
+    for label, value in _assign_config_rows(assign_config):
+        assign_defaults.add_row(label, value)
+
+    tables: list[Table] = [
+        overview,
+        scene_defaults,
+        output_defaults,
+        read_defaults,
+        assign_defaults,
+    ]
     if descriptor.dataset_options_model.model_fields:
         option_table = _detail_table(title="Dataset Config")
         for name, default in _loader_option_rows(descriptor):
@@ -165,34 +184,46 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
 
 
 def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
-    """Build rich tables describing split support for one dataset."""
+    """Build rich tables describing read and assignment support for one dataset."""
     summary = _detail_table(title=f"Split support: {descriptor.name}")
     summary.add_row("Dataset", descriptor.name)
     summary.add_row(
         "Native splits",
-        ", ".join(split.value for split in descriptor.native_splits or ()) or "[dim]none[/dim]",
+        ", ".join(split.value for split in descriptor.supported_native_splits or ())
+        or "[dim]none[/dim]",
     )
-    summary.add_row("Supported split modes", _format_split_modes(descriptor))
+    summary.add_row("Read modes", _format_read_modes(descriptor))
+    summary.add_row("Assignment modes", _format_assignment_modes(descriptor))
     return (summary,)
 
 
-def _split_detail(plan: ExecutionPlan) -> str:
-    split = plan.loader.split
-    if split is None or split.strategy == "none":
-        return "all data"
-    if split.strategy == "native":
-        selected = split.read or plan.descriptor.native_splits
-        return ", ".join(s.value for s in selected) if selected else "all native splits"
-    if split.strategy in {"scene", "source"}:
-        return ", ".join(f"{s.value}={w:.2f}" for s, w in split.active())
-    if split.strategy == "time":
-        return f"{', '.join(f'{s.value}={w:.2f}' for s, w in split.active())}; gap={split.gap}"
-    if split.strategy == "shuffled-time":
+def _read_detail(plan: ExecutionPlan) -> str:
+    native_splits = plan.loader.read.native_splits
+    if native_splits is None:
+        return "all sources"
+    return ", ".join(split.value for split in native_splits)
+
+
+def _assignment_detail(plan: ExecutionPlan) -> str:
+    assignment = plan.assignment
+    if assignment.strategy == "none":
+        return "unsplit output"
+    if assignment.strategy == "preserve-native":
+        selected = plan.loader.read.native_splits
+        return ", ".join(s.value for s in selected) if selected else "native labels"
+    if assignment.strategy in {"scene", "source"}:
+        return ", ".join(f"{s.value}={w:.2f}" for s, w in assignment.active())
+    if assignment.strategy == "time":
         return (
-            f"{', '.join(f'{s.value}={w:.2f}' for s, w in split.active())}; "
-            f"gap={split.gap}; segments={split.segments}"
+            f"{', '.join(f'{s.value}={w:.2f}' for s, w in assignment.active())}; "
+            f"gap={assignment.gap}"
         )
-    return str(split.strategy)
+    if assignment.strategy == "shuffled-time":
+        return (
+            f"{', '.join(f'{s.value}={w:.2f}' for s, w in assignment.active())}; "
+            f"gap={assignment.gap}; segments={assignment.segments}"
+        )
+    return assignment.strategy
 
 
 def _detail_table(title: str, *, caption: str | None = None) -> Table:
@@ -214,10 +245,17 @@ def _format_flag(*, enabled: bool) -> str:
     return "[green]yes[/green]" if enabled else "[dim]no[/dim]"
 
 
-def _format_split_modes(descriptor: DatasetSpec) -> str:
-    modes: list[str] = []
-    if descriptor.native_splits:
+def _format_read_modes(descriptor: DatasetSpec) -> str:
+    modes = ["all"]
+    if descriptor.supported_native_splits:
         modes.append("native")
+    return ", ".join(modes)
+
+
+def _format_assignment_modes(descriptor: DatasetSpec) -> str:
+    modes = ["none"]
+    if descriptor.supported_native_splits:
+        modes.append("preserve-native")
     if descriptor.split_support.scene:
         modes.append("scene")
     if descriptor.split_support.source:
@@ -307,31 +345,42 @@ def _loader_option_rows(descriptor: DatasetSpec) -> list[tuple[str, str]]:
     return rows
 
 
-def _run_plan_split_strategy(plan: ExecutionPlan) -> str:
-    split = plan.loader.split
-    return "none" if split is None else str(split.strategy)
-
-
-def _split_config_rows(split_config: SplitConfig) -> tuple[tuple[str, str], ...]:
-    split_root = split_config.root
-    rows: list[tuple[str, str]] = [("Strategy", split_root.strategy)]
-    rows.extend(_split_config_detail_rows(split_root))
+def _read_config_rows(read_config: ReadConfig) -> tuple[tuple[str, str], ...]:
+    read_root = read_config.root
+    rows: list[tuple[str, str]] = [("Strategy", read_root.strategy)]
+    rows.extend(_read_config_detail_rows(read_root))
     return tuple(rows)
 
 
-def _split_config_detail_rows(split_config: SplitConfigUnion) -> list[tuple[str, str]]:
-    match split_config:
-        case NoSplitConfig():
-            return [("Selection", "all data")]
-        case NativeSplitConfig(splits=splits):
-            ordered = sorted(splits, key=_split_sort_key)
-            selected = ", ".join(split.value for split in ordered)
+def _read_config_detail_rows(read_config: ReadUnion) -> list[tuple[str, str]]:
+    match read_config:
+        case ReadNative(splits=splits):
+            if splits is None:
+                return [("Native splits", "all native splits")]
+            selected = ", ".join(split.value for split in splits)
             return [("Native splits", selected)]
-        case SceneSplitConfig(ratio=ratio) | SourceSplitConfig(ratio=ratio):
+        case _:
+            return [("Selection", "all available inputs")]
+
+
+def _assign_config_rows(assign_config: AssignConfig) -> tuple[tuple[str, str], ...]:
+    assign_root = assign_config.root
+    rows: list[tuple[str, str]] = [("Strategy", assign_root.strategy)]
+    rows.extend(_assign_config_detail_rows(assign_root))
+    return tuple(rows)
+
+
+def _assign_config_detail_rows(assign_config: AssignUnion) -> list[tuple[str, str]]:
+    match assign_config:
+        case NoAssign():
+            return [("Selection", "unsplit output")]
+        case PreserveNativeAssign():
+            return [("Selection", "preserve native labels")]
+        case SceneAssign(ratio=ratio) | SourceAssign(ratio=ratio):
             return [("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test))]
-        case TimeSplitConfig(ratio=ratio, gap=gap):
+        case TimeBlockAssign(ratio=ratio, gap=gap):
             return [("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test)), ("Gap", str(gap))]
-        case ShuffledTimeSplitConfig(ratio=ratio, gap=gap, segments=segments):
+        case ShuffledTimeBlockAssign(ratio=ratio, gap=gap, segments=segments):
             return [
                 ("Ratio", _format_ratio(ratio.train, ratio.val, ratio.test)),
                 ("Gap", str(gap)),
@@ -341,7 +390,3 @@ def _split_config_detail_rows(split_config: SplitConfigUnion) -> list[tuple[str,
 
 def _format_ratio(train: float, val: float, test: float) -> str:
     return f"train={train:g}, val={val:g}, test={test:g}"
-
-
-def _split_sort_key(split: object) -> str:
-    return getattr(split, "value", str(split))

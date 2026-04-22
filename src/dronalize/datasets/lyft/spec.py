@@ -41,7 +41,7 @@ DATASET_SPEC = DatasetSpec(
         dataset=LyftLoaderOptions().model_dump(),
     ),
     native_schema=LyftLoader.native_trajectory_schema(),
-    native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
+    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     dataset_options_model=LyftLoaderOptions,
     resources_factory=open_lyft_resources,
     has_map=True,

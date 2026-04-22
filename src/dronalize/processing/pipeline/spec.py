@@ -75,11 +75,12 @@ def compile_build_context(spec: TrajectorySpec, *, require_scene_id: bool = Fals
     """Compile immutable derived pipeline state from a declarative spec."""
     plan = spec.plan
     scenes = plan.scenes
-    split_request = plan.split
+    assignment_request = plan.assignment
     has_window = scenes.window is not None
     split_columns = (
         (SPLIT_PARTITION_COLUMN,)
-        if split_request is not None and split_request.strategy in {"time", "shuffled-time"}
+        if assignment_request is not None
+        and assignment_request.strategy in {"time", "shuffled-time"}
         else ()
     )
     window_group_columns = (*normalize_group_by(spec.window_by), *split_columns)

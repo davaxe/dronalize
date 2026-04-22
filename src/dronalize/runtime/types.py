@@ -17,7 +17,7 @@ from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
 from dronalize.io.formats import StorageBackend
 from dronalize.io.manifest import DatasetManifest, write_manifest
-from dronalize.processing.models import LoaderRequest, SplitRequest
+from dronalize.processing.models import AssignmentRequest, LoaderRequest, ReadRequest
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -94,6 +94,7 @@ class ExecutionPlan:
     runtime: RuntimeConfig
     output: OutputPlan
     loader: LoaderRequest
+    assignment: AssignmentRequest
     map: MapConfig | None
     effective_history_frames: int
     effective_future_frames: int
@@ -160,11 +161,7 @@ class ExecutionPlan:
 
 
 def compile_loader_request(
-    *,
-    descriptor: DatasetSpec,
-    resolved_config: DatasetConfig,
-    seed: int | None,
-    include_map: bool | None,
+    *, descriptor: DatasetSpec, resolved_config: DatasetConfig, include_map: bool | None
 ) -> LoaderRequest:
     """Compile the loader-facing request for one resolved dataset config."""
     dataset_options: DatasetOptionsModel = descriptor.parse_dataset_config(resolved_config.dataset)
@@ -172,10 +169,11 @@ def compile_loader_request(
     return LoaderRequest(
         scenes=resolved_config.scenes,
         screening=resolved_config.screening,
-        split=SplitRequest.from_config(resolved_config.split, seed=seed),
+        read=ReadRequest.from_config(
+            resolved_config.read, supported_native_splits=descriptor.supported_native_splits
+        ),
         dataset=dataset_options,
         map=map_config,
-        native_splits=descriptor.native_splits or None,
     )
 
 

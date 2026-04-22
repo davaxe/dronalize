@@ -10,7 +10,7 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_YAW
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -38,12 +38,19 @@ class ApolloScapeLoader(BaseSceneLoader):
             yield Source(identifier=data_file.stem, data=data_file)
 
     @override
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Path]]:
+    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
+        split = selection.native_split
+        if selection.all_sources():
+            for native_split in _NATIVE_SPLITS:
+                yield from self.iter_sources_for(SourceSelection(native_split=native_split))
+            return
         if split is DatasetSplit.TRAIN:
-            return self._sources_from_dir(self.root / "prediction_train")
+            yield from self._sources_from_dir(self.root / "prediction_train")
+            return
         if split is DatasetSplit.VAL:
-            return self._sources_from_dir(self.root / "val_split")
-        raise SplitNotSupportedError(type(self).__name__, split)
+            yield from self._sources_from_dir(self.root / "val_split")
+            return
+        raise SplitNotSupportedError(type(self).__name__, str(split))
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
@@ -61,10 +68,13 @@ class ApolloScapeLoader(BaseSceneLoader):
         )
 
     @override
-    def num_sources(self) -> int | None:
-        return sum(
-            self._count_sources_for_split(split) for split in self.native_splits or _NATIVE_SPLITS
-        )
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+        split = selection.native_split
+        if split is None:
+            return sum(
+                self._count_sources_for_split(native_split) for native_split in _NATIVE_SPLITS
+            )
+        return self._count_sources_for_split(split)
 
     @classmethod
     @override

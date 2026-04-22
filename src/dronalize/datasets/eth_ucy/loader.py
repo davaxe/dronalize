@@ -9,7 +9,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -35,8 +35,13 @@ class _EthUcyLoader(BaseSceneLoader):
             yield Source(identifier=data_file.name, data=data_file)
 
     @override
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Path]]:
-        return self._sources_from_split(split.value)
+    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
+        split = selection.native_split
+        if split is None:
+            for native_split in _NATIVE_SPLITS:
+                yield from self.iter_sources_for(SourceSelection(native_split=native_split))
+            return
+        yield from self._sources_from_split(split.value)
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
@@ -65,10 +70,13 @@ class _EthUcyLoader(BaseSceneLoader):
         return POSITIONS_ONLY
 
     @override
-    def num_sources(self) -> int | None:
-        return sum(
-            self._count_sources_for_split(split) for split in self.native_splits or _NATIVE_SPLITS
-        )
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+        split = selection.native_split
+        if split is None:
+            return sum(
+                self._count_sources_for_split(native_split) for native_split in _NATIVE_SPLITS
+            )
+        return self._count_sources_for_split(split)
 
     def _count_sources_for_split(self, split: DatasetSplit) -> int:
         data_dir = self.root / split.value

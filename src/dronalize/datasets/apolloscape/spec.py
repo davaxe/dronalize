@@ -22,6 +22,6 @@ DATASET_SPEC = DatasetSpec(
         screening=minimum_samples_screening(2),
     ),
     native_schema=ApolloScapeLoader.native_trajectory_schema(),
-    native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
+    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     split_support=DatasetSplitSupport(scene=True, source=True),
 )

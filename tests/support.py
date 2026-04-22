@@ -13,11 +13,12 @@ from dronalize.config.models import DatasetConfig, ScenesConfig, WindowConfig
 from dronalize.config.models.scenes import LaneChangeConfig, ResampleConfig
 from dronalize.config.models.screening import MinSamplesSpec, ScreeningConfig
 from dronalize.core.categories import AgentCategory, AgentCategoryLike
+from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.maps import MapGraph
 from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
 from dronalize.datasets import DatasetSpec
 from dronalize.io.records import SceneRecord
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.loading.options import DatasetOptionsModel
 
@@ -68,7 +69,9 @@ class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
         return CANONICAL
 
     @override
-    def discover_sources(self) -> Iterable[Source[Path]]:
+    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
+        if selection.native_split is not None:
+            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
         yield Source(identifier="source-1", data=self.root / "source.parquet")
 
     @override
@@ -92,7 +95,9 @@ class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
         yield LoadedSourceData(frame.lazy())
 
     @override
-    def num_sources(self) -> int | None:
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+        if selection.native_split is not None:
+            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
         return 1
 
 

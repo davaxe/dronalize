@@ -13,7 +13,7 @@ DATASET_SPEC = DatasetSpec(
         map=MapConfig(extraction=SceneExtentExtraction()),
     ),
     native_schema=WaymoLoader.native_trajectory_schema(),
-    native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
+    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
     has_map=True,
     split_support=DatasetSplitSupport(scene=True),
 )

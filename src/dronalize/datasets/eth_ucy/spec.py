@@ -32,7 +32,7 @@ DATASET_SPECS = {
         loader_factory=EthLoader.unified_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=EthLoader.native_trajectory_schema(),
-        native_splits=_NATIVE_SPLITS,
+        supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "hotel": DatasetSpec(
@@ -40,7 +40,7 @@ DATASET_SPECS = {
         loader_factory=HotelLoader.unified_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=HotelLoader.native_trajectory_schema(),
-        native_splits=_NATIVE_SPLITS,
+        supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "univ": DatasetSpec(
@@ -48,7 +48,7 @@ DATASET_SPECS = {
         loader_factory=UnivLoader.unified_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=UnivLoader.native_trajectory_schema(),
-        native_splits=_NATIVE_SPLITS,
+        supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "zara1": DatasetSpec(
@@ -56,7 +56,7 @@ DATASET_SPECS = {
         loader_factory=Zara1Loader.unified_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=Zara1Loader.native_trajectory_schema(),
-        native_splits=_NATIVE_SPLITS,
+        supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "zara2": DatasetSpec(
@@ -64,7 +64,7 @@ DATASET_SPECS = {
         loader_factory=Zara2Loader.unified_factory,
         default_config=_DEFAULT_CONFIG,
         native_schema=Zara2Loader.native_trajectory_schema(),
-        native_splits=_NATIVE_SPLITS,
+        supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),
     ),
 }

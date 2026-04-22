@@ -13,7 +13,7 @@ from dronalize.config.models.output import OutputConfig, PartialOutputConfig
 from dronalize.config.models.runtime import PartialRuntimeConfig, RuntimeConfig
 from dronalize.config.models.scenes import PartialScenesConfig, ScenesConfig  # noqa: TC001
 from dronalize.config.models.screening import PartialScreeningConfig, ScreeningConfig  # noqa: TC001
-from dronalize.config.models.split import NoSplitConfig, SplitConfig
+from dronalize.config.models.split import AssignConfig, NoAssign, ReadAll, ReadConfig
 
 
 class DatasetConfig(FullConfig):
@@ -29,8 +29,10 @@ class DatasetConfig(FullConfig):
     """Output encoding, schema, and backend-specific writer settings."""
     map: MapConfig = Field(default_factory=MapConfig)
     """Map extraction and interpolation settings for generated scenes."""
-    split: SplitConfig = Field(default_factory=lambda: SplitConfig(NoSplitConfig()))
-    """Dataset split strategy applied when routing scenes into partitions."""
+    read: ReadConfig = Field(default_factory=lambda: ReadConfig(ReadAll()))
+    """Input selection configuration used to choose raw dataset sources."""
+    assign: AssignConfig = Field(default_factory=lambda: AssignConfig(NoAssign()))
+    """Output assignment configuration used to label generated scenes."""
     dataset: dict[str, Any] | None = Field(default=None)
     """Dataset-specific loader options forwarded to the selected dataset plugin."""
 
@@ -51,8 +53,10 @@ class PartialDatasetConfigBase(ConfigBase):
     """Partial output writer overrides to merge into the target config."""
     map: PartialMapConfig | None = Field(default=None)
     """Partial map extraction overrides to merge into the target config."""
-    split: SplitConfig | None = Field(default=None)
-    """Replacement split strategy for the target dataset config."""
+    read: ReadConfig | None = Field(default=None)
+    """Replacement input selection strategy for the target dataset config."""
+    assign: AssignConfig | None = Field(default=None)
+    """Replacement output assignment strategy for the target dataset config."""
     dataset: dict[str, Any] | None = Field(default=None)
     """Dataset-specific loader option overrides for the target config."""
 
@@ -79,7 +83,8 @@ class PartialDatasetConfig(PartialDatasetConfigBase, PartialConfig[DatasetConfig
             dataset=self.dataset if self.dataset is not None else target.dataset,
             output=self.output.apply_to(target.output) if self.output else target.output,
             map=self.map.apply_to(target.map) if self.map else target.map,
-            split=self.split if self.split is not None else target.split,
+            read=self.read if self.read is not None else target.read,
+            assign=self.assign if self.assign is not None else target.assign,
         )
 
 

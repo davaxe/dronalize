@@ -44,7 +44,7 @@ DATASET_SPEC = DatasetSpec(
         screening=minimum_samples_screening(2),
     ),
     native_schema=InteractionLoader.native_trajectory_schema(),
-    native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
+    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
     resources_factory=open_interaction_resources,
     has_map=True,
     split_support=DatasetSplitSupport(scene=True),

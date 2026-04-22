@@ -73,7 +73,7 @@ def test_load_project_config_surfaces_invalid_toml(tmp_path: Path) -> None:
 
 def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
     override = RuntimeOverride.from_inputs(
-        split_strategy="scene",
+        assign_strategy="scene",
         read_split=None,
         jobs=3,
         trajectory_schema="canonical",
@@ -86,11 +86,12 @@ def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
     assert override.runtime.jobs == 3
     assert override.output is not None
     assert override.output.trajectory_schema == "canonical"
-    assert override.split is not None
+    assert override.assign is not None
 
     empty = RuntimeOverride.from_inputs(
-        split_strategy=None,
+        read_strategy=None,
         read_split=None,
+        assign_strategy=None,
         jobs=None,
         trajectory_schema=None,
         ratio=None,
@@ -99,7 +100,8 @@ def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
     )
     assert empty.runtime is None
     assert empty.output is None
-    assert empty.split is None
+    assert empty.read is None
+    assert empty.assign is None
 
 
 def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:

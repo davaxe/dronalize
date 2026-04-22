@@ -52,7 +52,7 @@ uses = ["strict_screening"]
 mode = "extend"
 
 [datasets.waymo.output.mds]
-# compression = "zstd:3"
+compression = "zstd:3"
 
 # --------------------------------------------------------------------------------------
 # Dataset: a43
@@ -123,19 +123,9 @@ rule = "min_samples"
 minimum = 8
 
 
-# Dataset ------------------------------------------------------------------------------
-#
-# Dataset-owned extras live here. This section is for loader-specific parameters that do
-# not belong in the shared public config surface.
-#
-# [datasets.a43.dataset]
-# some_dataset_flag = true
-# custom_threshold = 12
-
-
 # Split --------------------------------------------------------------------------------
 
-[datasets.a43.split]
+[datasets.a43.assign]
 strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8

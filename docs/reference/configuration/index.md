@@ -55,9 +55,10 @@ Inside either `profiles.<profile-name>` or `datasets.<dataset-name>`, the curren
 | [`runtime`](./runtime.md) | Worker count and executor chunking. |
 | [`scenes`](./scenes.md) | Scene window length, sampling time, and related settings. |
 | [`screening`](./screening.md) | Scene + agent screening and cleanup. |
+| [`read`](./read.md) | Raw input selection, including dataset-native partition reads. |
+| [`assign`](./assign.md) | Output split assignment, ratios, and temporal assignment parameters. |
 | [`map`](./map.md) | Map extraction and interpolation settings. |
 | [`output`](./output.md) | Persisted trajectory schema, precision, offsets, storage backend tuning. |
-| [`split`](./split.md) | Split strategy, ratios, native split selection, and temporal split parameters. |
 | [`dataset`](./dataset.md) | Dataset-specific options that don't fit into the other categories. |
 
 !!! note "Section roots"
@@ -140,7 +141,7 @@ sample_time = 0.1
 mode = "circle"
 radius = 60.0
 
-[datasets.a43.split]
+[datasets.a43.assign]
 strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8

@@ -51,9 +51,10 @@ nav = [
     { "[runtime] section" = "reference/configuration/runtime.md" },
     { "[scenes] section" = "reference/configuration/scenes.md" },
     { "[screening] section" = "reference/configuration/screening.md" },
+    { "[read] section" = "reference/configuration/read.md" },
+    { "[assign] section" = "reference/configuration/assign.md" },
     { "[map] section" = "reference/configuration/map.md" },
     { "[output] section" = "reference/configuration/output.md" },
-    { "[split] section" = "reference/configuration/split.md" },
     { "[dataset] section" = "reference/configuration/dataset.md" },
   ] },
 

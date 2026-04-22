@@ -8,9 +8,10 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
+from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.functional import yaw_from_pos_expr
 from dronalize.core.scene import CANONICAL
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
@@ -45,7 +46,9 @@ class SindLoader(BaseSceneLoader):
         return cls(data_root, request, resources)
 
     @override
-    def discover_sources(self) -> Iterable[Source[Path]]:
+    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
+        if selection.native_split is not None:
+            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
         for region in sorted(p for p in self.root.iterdir() if p.is_dir()):
             for data_dir in sorted(p for p in region.iterdir() if p.is_dir()):
                 yield Source(identifier=data_dir.name, data=data_dir, map_key=str(region.name))
@@ -97,7 +100,9 @@ class SindLoader(BaseSceneLoader):
         yield LoadedSourceData(pl.concat([vehicle_df, pedestrian_df]))
 
     @override
-    def num_sources(self) -> int | None:
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+        if selection.native_split is not None:
+            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
         if not self.root.is_dir():
             return 0
         return sum(1 for path in self.root.iterdir() if path.is_dir())

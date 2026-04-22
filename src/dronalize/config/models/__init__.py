@@ -13,7 +13,8 @@ roughly the same way as the project configuration structure:
   [`OutputConfig`][dronalize.config.models.OutputConfig]
 - runtime execution controls via
   [`RuntimeConfig`][dronalize.config.models.RuntimeConfig]
-- split strategies via [`SplitConfig`][dronalize.config.models.SplitConfig]
+- read selection via [`ReadConfig`][dronalize.config.models.ReadConfig]
+- assignment strategies via [`AssignConfig`][dronalize.config.models.AssignConfig]
 """
 
 from dronalize.config.models.dataset import (
@@ -78,21 +79,27 @@ from dronalize.config.models.screening import (
     Tolerance,
 )
 from dronalize.config.models.split import (
-    NativeSplitConfig,
-    NoSplitConfig,
-    SceneSplitConfig,
-    ShuffledTimeSplitConfig,
-    SourceSplitConfig,
-    SplitConfig,
-    SplitConfigUnion,
+    AssignConfig,
+    AssignUnion,
+    NoAssign,
+    PreserveNativeAssign,
+    ReadAll,
+    ReadConfig,
+    ReadNative,
+    ReadUnion,
+    SceneAssign,
+    ShuffledTimeBlockAssign,
+    SourceAssign,
     SplitWeights,
-    TimeSplitConfig,
+    TimeBlockAssign,
 )
 
 __all__ = [
     "AgentCheckSpec",
     "AgentRangeSpec",
     "AgentSelector",
+    "AssignConfig",
+    "AssignUnion",
     "BoundingBoxExtraction",
     "CategoryRangeSpec",
     "CircularExtraction",
@@ -112,8 +119,7 @@ __all__ = [
     "MinConsecutiveFramesSpec",
     "MinSamplesSpec",
     "MinSpanSpec",
-    "NativeSplitConfig",
-    "NoSplitConfig",
+    "NoAssign",
     "OutputConfig",
     "OutputPrecision",
     "PartialDatasetConfig",
@@ -127,26 +133,29 @@ __all__ = [
     "PartialScenesConfig",
     "PartialScreeningConfig",
     "PartialWindowConfig",
+    "PreserveNativeAssign",
     "PruneByRuleSpec",
     "Range",
+    "ReadAll",
+    "ReadConfig",
+    "ReadNative",
+    "ReadUnion",
     "RequireFramesSpec",
     "RequireSceneFramesSpec",
     "RequireSceneWindowSpec",
     "RequireWindowSpec",
     "ResampleConfig",
     "RuntimeConfig",
+    "SceneAssign",
     "SceneCheckSpec",
     "SceneExtentExtraction",
-    "SceneSplitConfig",
     "ScenesConfig",
     "ScreeningConfig",
-    "ShuffledTimeSplitConfig",
-    "SourceSplitConfig",
-    "SplitConfig",
-    "SplitConfigUnion",
+    "ShuffledTimeBlockAssign",
+    "SourceAssign",
     "SplitWeights",
     "StartsByFrameSpec",
-    "TimeSplitConfig",
+    "TimeBlockAssign",
     "Tolerance",
     "TrajectorySchemaLike",
     "WindowConfig",

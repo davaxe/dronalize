@@ -22,7 +22,7 @@ from dronalize.core.errors import (
 )
 from dronalize.processing.loading.options import DatasetOptionsModel, NoDatasetOptions
 from dronalize.processing.loading.resources import DatasetResources
-from dronalize.processing.models import LoaderRequest, SplitRequest
+from dronalize.processing.models import LoaderRequest, ReadRequest
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
@@ -71,7 +71,7 @@ class DatasetSpec:
     loader_factory: LoaderFactory
     default_config: DatasetConfig
     native_schema: TrajectorySchema
-    native_splits: tuple[DatasetSplit, ...] | None = None
+    supported_native_splits: tuple[DatasetSplit, ...] | None = None
     dataset_options_model: type[DatasetOptionsModel] = NoDatasetOptions
     resources_factory: ResourcesFactory | None = None
     has_map: bool = False
@@ -105,10 +105,11 @@ class DatasetSpec:
         return LoaderRequest(
             scenes=self.default_config.scenes,
             screening=self.default_config.screening,
-            split=SplitRequest.from_config(self.default_config.split),
+            read=ReadRequest.from_config(
+                self.default_config.read, supported_native_splits=self.supported_native_splits
+            ),
             dataset=self.default_dataset_options(),
             map=self.default_config.map,
-            native_splits=self.native_splits or None,
         )
 
     def build_loader(

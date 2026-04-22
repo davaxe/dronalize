@@ -11,7 +11,7 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.functional import yaw_from_vel_expr
 from dronalize.core.scene.schema import POSITIONS_VELOCITY_YAW
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
@@ -68,7 +68,12 @@ class InteractionLoader(BaseSceneLoader[Path]):
         raise ValueError(msg)
 
     @override
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Path]]:
+    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
+        split = selection.native_split
+        if split is None:
+            for native_split in _NATIVE_SPLITS:
+                yield from self.iter_sources_for(SourceSelection(native_split=native_split))
+            return
         if split is DatasetSplit.TRAIN:
             yield from self._sources_from_dir(self.root / "train")
             return
@@ -102,10 +107,13 @@ class InteractionLoader(BaseSceneLoader[Path]):
             yield LoadedSourceData(frame=group.lazy().drop("case_id"))
 
     @override
-    def num_sources(self) -> int | None:
-        return sum(
-            self._count_sources_for_split(split) for split in self.native_splits or _NATIVE_SPLITS
-        )
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+        split = selection.native_split
+        if split is None:
+            return sum(
+                self._count_sources_for_split(native_split) for native_split in _NATIVE_SPLITS
+            )
+        return self._count_sources_for_split(split)
 
     @classmethod
     @override

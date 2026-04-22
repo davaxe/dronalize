@@ -9,10 +9,11 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
+from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION, Scene
 from dronalize.datasets.a43.maps.builder import A43MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.loading.options import DatasetOptionsModel
 from dronalize.processing.maps.resolver import MapResolver
@@ -40,7 +41,11 @@ class A43Loader(BaseSceneLoader[tuple[Path, int], A43LoaderOptions]):
         super().__init__(data_root=data_root, request=request)
 
     @override
-    def discover_sources(self) -> Iterable[Source[tuple[Path, int]]]:
+    def iter_sources_for(
+        self, selection: SourceSelection = ALL_SOURCES
+    ) -> Iterable[Source[tuple[Path, int]]]:
+        if not selection.all_sources():
+            raise SplitNotSupportedError(type(self).__name__, str(selection.native_split))
         for i, csv_file in enumerate(self.root.glob("*.csv")):
             rows: int = pl.scan_csv(csv_file, infer_schema=False).select(pl.len()).collect().item()
             for j in range(0, rows, self.loader_options.rows_per_source):
@@ -79,7 +84,9 @@ class A43Loader(BaseSceneLoader[tuple[Path, int], A43LoaderOptions]):
         )
 
     @override
-    def num_sources(self) -> int | None:
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+        if selection.native_split is not None:
+            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
         total, rows_per_source = 0, self.loader_options.rows_per_source
         for csv_file in self.root.glob("*.csv"):
             rows: int = pl.scan_csv(csv_file, infer_schema=False).select(pl.len()).collect().item()

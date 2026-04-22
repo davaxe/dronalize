@@ -6,10 +6,10 @@ from dronalize.config.models import (
     LaneChangeConfig,
     ScenesConfig,
     SplitWeights,
-    TimeSplitConfig,
+    TimeBlockAssign,
     WindowConfig,
 )
-from dronalize.processing.models import PipelinePlan, SplitRequest
+from dronalize.processing.models import AssignmentRequest, PipelinePlan
 from dronalize.processing.pipeline.spec import lane_change_sampling, standard, trajectory_pipeline
 
 if TYPE_CHECKING:
@@ -84,7 +84,9 @@ def test_standard_trajectory_pipeline_outputs_split_labeled_scenes(
         frame,
         plan=PipelinePlan(
             scenes=_scenes(),
-            split=SplitRequest(config=TimeSplitConfig(ratio=SplitWeights(train=0.5, val=0.5))),
+            assignment=AssignmentRequest(
+                config=TimeBlockAssign(ratio=SplitWeights(train=0.5, val=0.5))
+            ),
         ),
     )
 

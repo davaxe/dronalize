@@ -56,6 +56,6 @@ DATASET_SPEC = DatasetSpec(
     native_schema=NuScenesLoader.native_trajectory_schema(),
     resources_factory=open_nuscenes_resources,
     has_map=True,
-    native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
+    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     split_support=DatasetSplitSupport(scene=True, source=True),
 )

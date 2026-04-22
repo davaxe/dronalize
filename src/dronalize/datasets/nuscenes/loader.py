@@ -11,7 +11,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.nuscenes.splits import get_split
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.loading.options import DatasetOptionsModel
 from dronalize.processing.maps.resolver import no_map, shared_map
@@ -29,7 +29,7 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
 
 
 class NuScenesLoaderOptions(DatasetOptionsModel):
-    drop_status: list[str] = Field(default_factory=lambda: ["parked", "undefined"])
+    drop_status: list[str] = Field(default_factory=list)
     drop_full_category_regex: list[str] = Field(default_factory=lambda: ["object"])
 
 
@@ -88,24 +88,28 @@ class NuScenesLoader(BaseSceneLoader[str, NuScenesLoaderOptions]):
         return sources
 
     @override
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[str]]:
+    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[str]]:
+        split = selection.native_split
         if self._sources is None:
             self._sources = self._build_sources_manifest()
+        if split is None:
+            for native_split in _NATIVE_SPLITS:
+                yield from self._sources.get(native_split, [])
+            return
         yield from self._sources.get(split, [])
 
     @override
-    def num_sources(self) -> int | None:
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
         if self._sources is None:
             self._sources = self._build_sources_manifest()
-        return sum(
-            len(self._sources[split])
-            for split in self.split_config.active_splits() or _NATIVE_SPLITS
-        )
+        split = selection.native_split
+        if split is None:
+            return sum(len(self._sources.get(native_split, [])) for native_split in _NATIVE_SPLITS)
+        return len(self._sources.get(split, []))
 
     @override
     def load_source(self, source: Source[str]) -> Iterable[LoadedSourceData]:
         self._ensure_dataset_loaded()
-
         scenes = self._scene_cache[source.data].drop(["scene_token", "scene_name", "map"]).lazy()
         filters = [~pl.col("status").is_in(self.loader_options.drop_status)]
         filters.extend(

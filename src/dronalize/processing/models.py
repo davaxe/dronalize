@@ -6,93 +6,123 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from dronalize.config.models import (
-    NativeSplitConfig,
-    NoSplitConfig,
-    SceneSplitConfig,
-    ShuffledTimeSplitConfig,
-    SourceSplitConfig,
-    TimeSplitConfig,
+    NoAssign,
+    ReadAll,
+    SceneAssign,
+    ShuffledTimeBlockAssign,
+    SourceAssign,
+    TimeBlockAssign,
 )
+from dronalize.config.models.split import ReadNative
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
     from dronalize.config.models import (
+        AssignConfig,
+        AssignUnion,
         MapConfig,
+        ReadConfig,
+        ReadUnion,
         ScenesConfig,
         ScreeningConfig,
-        SplitConfig,
-        SplitConfigUnion,
     )
     from dronalize.processing.loading.options import DatasetOptionsModel
 
 
-@dataclass(frozen=True, slots=True)
-class SplitRequest:
-    """Request for dataset splitting, derived from a resolved dataset config."""
+def _ordered_splits(
+    splits: tuple[DatasetSplit, ...] | frozenset[DatasetSplit],
+) -> tuple[DatasetSplit, ...]:
+    order = {DatasetSplit.TRAIN: 0, DatasetSplit.VAL: 1, DatasetSplit.TEST: 2}
+    return tuple(sorted(splits, key=order.__getitem__))
 
-    config: SplitConfigUnion
-    read: tuple[DatasetSplit, ...] | None = None
-    seed: int | None = None
+
+@dataclass(frozen=True, slots=True)
+class ReadRequest:
+    """Read scope for dataset source enumeration."""
+
+    config: ReadUnion
+    native_splits: tuple[DatasetSplit, ...] | None = None
 
     @classmethod
     def from_config(
-        cls,
-        split: SplitConfig,
-        *,
-        read: tuple[DatasetSplit, ...] | None = None,
-        seed: int | None = None,
-    ) -> SplitRequest:
-        """Build a runtime split request from the public config wrapper."""
-        split_root = split.root
-        native_read = (
-            tuple(split_root.splits) if isinstance(split_root, NativeSplitConfig) else None
-        )
-        return cls(config=split_root, read=read or native_read, seed=seed)
+        cls, read: ReadConfig, *, supported_native_splits: tuple[DatasetSplit, ...] | None = None
+    ) -> ReadRequest:
+        """Build a read scope from the public read configuration."""
+        read_root = read.root
+        if isinstance(read_root, ReadAll):
+            return cls(config=read_root, native_splits=supported_native_splits)
+        match read_root:
+            case ReadNative(splits=None):
+                return cls(config=read_root, native_splits=supported_native_splits)
+        return cls(config=read_root, native_splits=_ordered_splits(read_root.splits))
+
+    @property
+    def strategy(self) -> str:
+        """Return the read strategy name."""
+        return self.config.strategy
+
+
+@dataclass(frozen=True, slots=True)
+class AssignmentRequest:
+    """Output split assignment plan derived from the resolved config."""
+
+    config: AssignUnion
+    seed: int | None = None
+
+    @classmethod
+    def from_config(cls, assign: AssignConfig, *, seed: int | None = None) -> AssignmentRequest:
+        """Build an output-assignment plan from the public config wrapper."""
+        return cls(config=assign.root, seed=seed)
 
     def active(self) -> tuple[tuple[DatasetSplit, float], ...]:
-        """Return the active splits based on the configuration."""
-        if isinstance(self.config, NoSplitConfig):
+        """Return active output splits and their weights."""
+        if isinstance(self.config, NoAssign):
             return ()
-        if isinstance(self.config, NativeSplitConfig):
-            return ((split, 1.0) for split in self.read) if self.read is not None else ()
+        if self.strategy == "preserve-native":
+            return ()
         active: list[tuple[DatasetSplit, float]] = []
-        if self.config.ratio.train > 0:
-            active.append((DatasetSplit.TRAIN, self.config.ratio.train))
-        if self.config.ratio.val > 0:
-            active.append((DatasetSplit.VAL, self.config.ratio.val))
-        if self.config.ratio.test > 0:
-            active.append((DatasetSplit.TEST, self.config.ratio.test))
+        ratio = self.config.ratio
+        if ratio.train > 0:
+            active.append((DatasetSplit.TRAIN, ratio.train))
+        if ratio.val > 0:
+            active.append((DatasetSplit.VAL, ratio.val))
+        if ratio.test > 0:
+            active.append((DatasetSplit.TEST, ratio.test))
         return tuple(active)
 
     def active_splits(self) -> tuple[DatasetSplit, ...]:
-        """Return the active splits based on the configuration."""
+        """Return active output split labels."""
         return tuple(split for split, _ in self.active())
 
     def active_weights(self) -> tuple[float, ...]:
-        """Return the active split weights based on the configuration."""
+        """Return active output split weights."""
         return tuple(weight for _, weight in self.active())
 
     def uses_time_partition(self) -> bool:
-        """Return whether the split strategy uses time-based partitioning."""
-        return isinstance(self.config, (TimeSplitConfig, ShuffledTimeSplitConfig))
+        """Return whether the assignment uses time-based partitioning."""
+        return isinstance(self.config, (TimeBlockAssign, ShuffledTimeBlockAssign))
 
     def uses_weighted_assignment(self) -> bool:
-        """Return whether the split strategy uses weighted random assignment."""
-        return isinstance(self.config, (SceneSplitConfig, SourceSplitConfig))
+        """Return whether the assignment uses weighted routing."""
+        return isinstance(self.config, (SceneAssign, SourceAssign))
+
+    def preserves_native_assignment(self) -> bool:
+        """Return whether output assignment should preserve native labels."""
+        return self.strategy == "preserve-native"
 
     def output_splits(
-        self, *, available_native_splits: tuple[DatasetSplit, ...] | None = None
+        self, *, input_native_splits: tuple[DatasetSplit, ...] | None = None
     ) -> tuple[DatasetSplit, ...] | None:
-        """Return the split directories expected for this request."""
-        if isinstance(self.config, NoSplitConfig):
+        """Return the split directories expected for this assignment plan."""
+        if isinstance(self.config, NoAssign):
             return None
-        if isinstance(self.config, NativeSplitConfig):
-            return self.read or available_native_splits
+        if self.preserves_native_assignment():
+            return input_native_splits
         return self.active_splits()
 
     @property
     def gap(self) -> int | None:
-        """Return the configured temporal split gap, if any."""
+        """Return the configured temporal assignment gap, if any."""
         return getattr(self.config, "gap", None)
 
     @property
@@ -102,7 +132,7 @@ class SplitRequest:
 
     @property
     def strategy(self) -> str:
-        """Return the split strategy name."""
+        """Return the assignment strategy name."""
         return self.config.strategy
 
 
@@ -112,10 +142,9 @@ class LoaderRequest:
 
     scenes: ScenesConfig
     dataset: DatasetOptionsModel
+    read: ReadRequest
     screening: ScreeningConfig | None = None
-    split: SplitRequest = SplitRequest(config=NoSplitConfig())
     map: MapConfig | None = None
-    native_splits: tuple[DatasetSplit, ...] | None = None
 
     @property
     def history_frames(self) -> int:
@@ -134,4 +163,4 @@ class PipelinePlan:
 
     scenes: ScenesConfig
     screening: ScreeningConfig | None = None
-    split: SplitRequest | None = None
+    assignment: AssignmentRequest | None = None

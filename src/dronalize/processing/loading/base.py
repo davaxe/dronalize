@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, cast
 
 from typing_extensions import Self, TypeVar
 
-from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.typing import SourceT
 from dronalize.processing.loading.options import DatasetOptionsModel, NoDatasetOptions
 from dronalize.processing.loading.resources import DatasetResources
@@ -22,10 +22,29 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
-    from dronalize.processing.models import LoaderRequest, SplitRequest
+    from dronalize.processing.models import LoaderRequest, ReadRequest
 
 
 _LoaderOptionsT = TypeVar("_LoaderOptionsT", bound=DatasetOptionsModel, default=NoDatasetOptions)
+
+
+@dataclass(frozen=True, slots=True)
+class SourceSelection:
+    """Source-enumeration selector used by loader source APIs."""
+
+    native_split: DatasetSplit | None = None
+
+    @classmethod
+    def all(cls) -> Self:
+        """Return a selector representing all sources."""
+        return cls(native_split=None)
+
+    def all_sources(self) -> bool:
+        """Return whether this selector represents all sources."""
+        return self.native_split is None
+
+
+ALL_SOURCES = SourceSelection()
 
 
 class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
@@ -64,27 +83,10 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         self.request: LoaderRequest = request
         self.scenes_config: ScenesConfig = request.scenes
         self.screening_config: ScreeningConfig | None = request.screening
-        self.split_config: SplitRequest = request.split
+        self.read_config: ReadRequest = request.read
         self.map_config: MapConfig | None = request.map
-        self.native_splits: tuple[DatasetSplit, ...] | None = request.native_splits
         self.resources: DatasetResources = DatasetResources() if resources is None else resources
-        options = cast("_LoaderOptionsT", request.dataset)
-        self.dataset_config: _LoaderOptionsT = options
-        self.loader_options: _LoaderOptionsT = options
-
-    def __init_subclass__(cls) -> None:
-        """Validate that subclasses implement at least one source method."""
-        if cls is BaseSceneLoader:
-            return
-
-        has_discover_override = cls.discover_sources is not BaseSceneLoader.discover_sources
-        has_split_override = cls.sources_for_split is not BaseSceneLoader.sources_for_split
-        if not (has_discover_override or has_split_override):
-            msg = (
-                f"{cls.__name__} must override discover_sources() or sources_for_split() "
-                "to provide source enumeration logic."
-            )
-            raise TypeError(msg)
+        self.loader_options: _LoaderOptionsT = cast("_LoaderOptionsT", request.dataset)
 
     @classmethod
     def unified_factory(
@@ -171,59 +173,38 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         entire source to be loaded into memory at once.
         """
 
-    def discover_sources(self) -> Iterable[Source[SourceT]]:
-        """Discover all available sources for datasets without native split support.
+    @abstractmethod
+    def iter_sources_for(
+        self, selection: SourceSelection = ALL_SOURCES
+    ) -> Iterable[Source[SourceT]]:
+        """Yield sources matching a specific selection request.
 
         Returns
         -------
         Iterable[Source[SourceT]]
-            An iterable of source descriptors representing every available raw
-            source in the dataset.
+            An iterable of source descriptors matching the selection.
 
         Raises
         ------
         NotImplementedError
-            If the concrete loader does not implement source discovery.
+            If the concrete loader does not implement source enumeration.
 
         Notes
         -----
-        Loaders should implement this method when the dataset is not organized
-        around predefined native splits, or when the loader prefers direct
-        discovery over split-specific enumeration.
+        `selection.native_split=None` represents all sources exposed by the
+        loader. Native-split datasets may also support selection of one
+        concrete native partition via `selection.native_split`.
+        """
 
-        The default implementation is intentionally strict so that subclasses
-        must make an explicit choice between implementing this method,
-        implementing `sources_for_split()`, or both.
-        """  # noqa: DOC202
-        msg = f"{type(self).__name__} must implement discover_sources() or sources_for_split()."
-        raise NotImplementedError(msg)
-
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[SourceT]]:
-        """Yield source descriptors for a specific native dataset split.
-
-        Parameters
-        ----------
-        split : DatasetSplit
-            The dataset-native split to enumerate, such as training,
-            validation, or test.
-
-        Returns
-        -------
-        Iterable[Source[SourceT]]
-            An iterable of source descriptors belonging to the requested split.
-
-        Raises
-        ------
-        SplitNotSupportedError
-            If the loader does not support the requested native split.
-
-        Notes
-        -----
-        Loaders should implement this method when the underlying dataset defines
-        explicit native splits and source enumeration depends on the requested
-        split.
-        """  # noqa: DOC202
-        raise SplitNotSupportedError(type(self).__name__, split)
+    def iter_sources(self) -> Iterable[Source[SourceT]]:
+        """Yield all sources for the effective read scope."""
+        native_splits = self.read_config.native_splits
+        if native_splits is not None:
+            for split in native_splits:
+                for source in self.iter_sources_for(SourceSelection(native_split=split)):
+                    yield source.with_predefined_split(split)
+            return
+        yield from self.iter_sources_for()
 
     def map_resolver(self) -> MapResolver:
         """Return the loader-level map resolver used for scene-to-map lookup.
@@ -278,8 +259,13 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
             return None
         return self.map_resolver()(scene)
 
-    def num_sources(self) -> int | None:
-        """Return the total number of sources when that value is cheaply knowable.
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+        """Return the source count for a selection when cheaply knowable."""
+        _ = selection, self
+        return None
+
+    def count_sources(self) -> int | None:
+        """Return the total number of sources for the effective read scope.
 
         Returns
         -------
@@ -294,5 +280,13 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         does not require materializing or exhaustively traversing the full
         source iterator unless that cost is acceptable.
         """
-        _ = self
-        return None
+        native_splits = self.read_config.native_splits
+        if native_splits is None:
+            return self.count_sources_for()
+        total = 0
+        for split in native_splits:
+            count = self.count_sources_for(SourceSelection(native_split=split))
+            if count is None:
+                return None
+            total += count
+        return total

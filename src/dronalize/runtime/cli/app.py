@@ -38,7 +38,8 @@ if TYPE_CHECKING:
 app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
 _T = TypeVar("_T")
 
-SplitStrategy = Literal["none", "native", "scene", "source", "time", "shuffled-time"]
+ReadStrategy = Literal["all", "native"]
+AssignStrategy = Literal["none", "preserve-native", "scene", "source", "time", "shuffled-time"]
 
 InputDir = Annotated[
     Path, typer.Option("--input", "-i", help="Directory containing the raw dataset.")
@@ -46,20 +47,26 @@ InputDir = Annotated[
 OutputDir = Annotated[
     Path, typer.Option("--output", "-o", help="Directory to save the processed dataset.")
 ]
-Split = Annotated[
-    SplitStrategy | None,
-    typer.Option(
-        "--split", "-s", help="Split mode to use.", show_default=False, rich_help_panel="Split"
-    ),
+Read = Annotated[
+    ReadStrategy | None,
+    typer.Option("--read", help="Read mode to use.", show_default=False, rich_help_panel="Read"),
 ]
 ReadSplit = Annotated[
     list[DatasetSplit] | None,
     typer.Option(
         "--read-split",
-        "-rs",
-        help="Dataset-defined partition(s) to read when --split native is selected.",
+        help="Dataset-defined partition(s) to read when --read native is selected.",
         show_default=False,
-        rich_help_panel="Split",
+        rich_help_panel="Read",
+    ),
+]
+Assign = Annotated[
+    AssignStrategy | None,
+    typer.Option(
+        "--assign",
+        help="Output assignment mode to use.",
+        show_default=False,
+        rich_help_panel="Assign",
     ),
 ]
 Config = Annotated[
@@ -96,20 +103,20 @@ SplitRatio = Annotated[
     tuple[float, float, float] | None,
     typer.Option(
         "--ratio",
-        help="Train/val/test ratio used by source, scene, time, and shuffled-time split modes.",
-        rich_help_panel="Split",
+        help="Train/val/test ratio used by scene, source, time, and shuffled-time assignment.",
+        rich_help_panel="Assign",
     ),
 ]
 SplitGap = Annotated[
     int | None,
-    typer.Option("--gap", help="Gap inserted between time partitions.", rich_help_panel="Split"),
+    typer.Option("--gap", help="Gap inserted between time partitions.", rich_help_panel="Assign"),
 ]
 SplitSegments = Annotated[
     int | None,
     typer.Option(
         "--segments",
-        help="Number of contiguous temporal segments used by shuffled-time split mode.",
-        rich_help_panel="Split",
+        help="Number of contiguous temporal segments used by shuffled-time assignment.",
+        rich_help_panel="Assign",
     ),
 ]
 Force = Annotated[
@@ -132,8 +139,9 @@ def process(
     dataset: DatasetName,
     input_dir: InputDir,
     output_dir: OutputDir,
-    split: Split = None,
+    read: Read = None,
     read_split: ReadSplit = None,
+    assign: Assign = None,
     config: Config = None,
     jobs: Jobs = None,
     progress: Progress = True,
@@ -159,8 +167,9 @@ def process(
             output_dir=output_dir,
             storage_backend=storage_backend,
             config=config,
-            split=split,
+            read=read,
             read_split=read_split,
+            assign=assign,
             jobs=jobs,
             trajectory_schema=trajectory_schema,
             ratio=ratio,
@@ -228,8 +237,9 @@ def inspect(dataset: DatasetName) -> None:
 @app.command()
 def show_config(
     dataset: DatasetName,
-    split: Split = None,
+    read: Read = None,
     read_split: ReadSplit = None,
+    assign: Assign = None,
     config: Config = None,
     jobs: Jobs = None,
     storage_backend: StorageBackendOption = StorageBackend.MDS,
@@ -247,8 +257,9 @@ def show_config(
             output_dir=Path(),
             storage_backend=storage_backend,
             config=config,
-            split=split,
+            read=read,
             read_split=read_split,
+            assign=assign,
             jobs=jobs,
             trajectory_schema=trajectory_schema,
             ratio=ratio,
@@ -319,8 +330,9 @@ def _resolve_cli_plan(
     output_dir: Path,
     storage_backend: StorageBackend,
     config: Path | None,
-    split: SplitStrategy | None,
+    read: ReadStrategy | None,
     read_split: list[DatasetSplit] | None,
+    assign: AssignStrategy | None,
     jobs: int | None,
     trajectory_schema: str | None,
     ratio: tuple[float, float, float] | None,
@@ -343,8 +355,9 @@ def _resolve_cli_plan(
             storage_backend=storage_backend,
             config_path=config,
             overrides=RuntimeOverride.from_inputs(
-                split_strategy=split,
+                read_strategy=read,
                 read_split=read_split,
+                assign_strategy=assign,
                 jobs=jobs,
                 trajectory_schema=trajectory_schema,
                 ratio=ratio,

@@ -16,7 +16,7 @@ integration contract:
 
 - `default_config` for the dataset's starting point
 - `native_schema` for the loader's physical trajectory fields
-- `native_splits` when the dataset ships with fixed partitions
+- `supported_native_splits` when the dataset ships with fixed partitions
 - `has_map` for map availability
 - `dataset_options_model` for typed `[datasets.<name>.dataset]` config
 - `resources_factory` for run-scoped shared resources such as maps

@@ -106,6 +106,5 @@ nuscenes/
 │       ├── boston-seaport.json
 │       ├── singapore-onenorth.json
 │       └── ...
-├── v1.0-trainval_meta/
-└── v1.0-test_meta/
+└── v1.0-trainval_meta/
 ```

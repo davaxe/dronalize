@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from dronalize.config.models import ScenesConfig
     from dronalize.processing.columns import TrajectoryColumns
-    from dronalize.processing.models import PipelinePlan, SplitRequest
+    from dronalize.processing.models import AssignmentRequest, PipelinePlan
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,9 +45,9 @@ class BuildContext:
         return self.scenes.window is not None
 
     @property
-    def split_request(self) -> SplitRequest | None:
-        """Return the active split request, if the plan uses one."""
-        return self.plan.split
+    def assignment_request(self) -> AssignmentRequest | None:
+        """Return the active assignment request, if the plan uses one."""
+        return self.plan.assignment
 
     @property
     def scenes(self) -> ScenesConfig:

@@ -11,7 +11,7 @@ from dronalize.core.scene import Scene
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
-from dronalize.processing.models import PipelinePlan, SplitRequest
+from dronalize.processing.models import AssignmentRequest, PipelinePlan
 from dronalize.processing.pipeline import spec as pipeline_spec
 from dronalize.processing.screening.apply import AGENT_PASS_COLUMN, SCENE_PASS_COLUMN
 
@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.datasets.registry import DatasetSpec
     from dronalize.processing.loading.base import BaseSceneLoader
     from dronalize.processing.loading.options import DatasetOptionsModel
     from dronalize.processing.maps.resolver import MapKey, MapResolver
@@ -67,35 +66,19 @@ class SourcePlanner:
     """Resolve the effective source stream for one runtime plan."""
 
     loader: BaseSceneLoader[Any, DatasetOptionsModel]
-    descriptor: DatasetSpec
-    split_request: SplitRequest | None
 
     def iter_sources(self) -> Iterable[Source[Any]]:
-        split = self.split_request
-        if split is not None and split.strategy == "native":
-            read = split.read or self.descriptor.native_splits
-            for native_split in read or ():
-                for source in self.loader.sources_for_split(native_split):
-                    yield source.with_predefined_split(native_split)
-            return
-
-        if self.descriptor.native_splits:
-            for native_split in self.descriptor.native_splits:
-                for source in self.loader.sources_for_split(native_split):
-                    yield source.with_predefined_split(native_split)
-            return
-
-        yield from self.loader.discover_sources()
+        yield from self.loader.iter_sources()
 
     def total_sources(self) -> int | None:
-        return self.loader.num_sources()
+        return self.loader.count_sources()
 
 
 @dataclass(slots=True)
 class SplitAssigner:
     """Assign output splits to selected scene candidates."""
 
-    request: SplitRequest | None
+    request: AssignmentRequest | None
     _weighted_assigner: StatelessWeightedAssigner[DatasetSplit] | None = None
 
     def __post_init__(self) -> None:
@@ -120,7 +103,7 @@ class SplitAssigner:
             return self._resolve_scene_split(source, stable_identifier)
         if strategy == "source":
             return self._resolve_source_split(source)
-        if strategy == "native":
+        if strategy == "preserve-native":
             return source.predefined_split
         return None
 
@@ -202,7 +185,7 @@ class SceneExtractor:
         plan = PipelinePlan(
             scenes=self.loader.scenes_config,
             screening=self.loader.screening_config,
-            split=self.loader.split_config,
+            assignment=self.split_assigner.request,
         )
         columns = TrajectoryColumns.from_schema(self.loader.native_trajectory_schema())
         self._pipeline = pipeline_spec.trajectory_pipeline(
@@ -282,11 +265,9 @@ class RuntimeProcessor:
     @classmethod
     def from_plan(cls, plan: ExecutionPlan, loader: object) -> RuntimeProcessor:
         typed_loader = cast("BaseSceneLoader[Any, DatasetOptionsModel]", loader)
-        split_assigner = SplitAssigner(plan.loader.split)
+        split_assigner = SplitAssigner(plan.assignment)
         return cls(
-            planner=SourcePlanner(
-                loader=typed_loader, descriptor=plan.descriptor, split_request=plan.loader.split
-            ),
+            planner=SourcePlanner(loader=typed_loader),
             extractor=SceneExtractor(loader=typed_loader, split_assigner=split_assigner),
             materializer=SceneMaterializer(
                 loader=typed_loader,

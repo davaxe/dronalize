@@ -25,7 +25,8 @@ class PartialDatasetEntryConfig(PartialDatasetConfigBase):
             dataset=self.dataset,
             output=self.output,
             map=self.map,
-            split=self.split,
+            read=self.read,
+            assign=self.assign,
         )
 
 

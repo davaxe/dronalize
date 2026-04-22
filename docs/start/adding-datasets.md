@@ -35,11 +35,12 @@ In practice, a loader needs to:
 
 - implement `native_trajectory_schema()`
 - implement `load_source()`
-- implement either `discover_sources()` or `sources_for_split()`
+- implement `iter_sources_for()`
+- optionally implement `count_sources_for()` when the loader can report counts cheaply
 
 Most loaders can inherit the default pipeline behavior from
 [`BaseSceneLoader`][dronalize.processing.loading.BaseSceneLoader]. That gives
-you the standard `scenes`, `screening`, `split`, `map`, and lane-change
+you the standard `scenes`, `screening`, `read`, `assign`, `map`, and lane-change
 handling automatically.
 
 If your dataset needs dataset-owned config, define a typed options model and let the loader read it
@@ -69,11 +70,11 @@ register(
 Add the other [`DatasetSpec`][dronalize.datasets.DatasetSpec] fields only when
 the dataset actually supports them:
 
-- `native_splits` when the raw dataset ships with fixed partitions
+- `supported_native_splits` when the raw dataset ships with fixed partitions
 - `has_map` when map data is available
 - `dataset_options_model` when `[datasets.<name>.dataset]` should be typed and validated
 - `resources_factory` when a run should build or cache shared resources such as maps once
-- `time_split_support` when time-based split strategies are valid for the dataset
+- `split_support` when scene-, source-, or time-block assignment strategies are valid
 
 ## Keep responsibilities clean
 
@@ -84,12 +85,13 @@ Put dataset-specific logic in the loader:
 - coordinate conventions
 - dataset-specific metadata
 - map lookup details
+- optional source counting
 
 Leave shared runtime behavior to the library:
 
 - config layering and override handling
 - screening and resampling
-- split assignment
+- read-scope planning and assignment
 - schema conversion
 - backend writing and manifest creation
 

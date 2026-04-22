@@ -47,7 +47,7 @@ DATASET_SPEC = DatasetSpec(
         dataset=Argoverse1LoaderOptions().model_dump(),
     ),
     native_schema=Argoverse1Loader.native_trajectory_schema(),
-    native_splits=_NATIVE_SPLITS,
+    supported_native_splits=_NATIVE_SPLITS,
     dataset_options_model=Argoverse1LoaderOptions,
     resources_factory=open_argoverse1_resources,
     split_support=DatasetSplitSupport(scene=True),

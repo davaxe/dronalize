@@ -14,7 +14,7 @@ spec = get("a43")
 print(spec.name)
 print(spec.has_map)
 print(spec.native_schema.name)
-print(spec.native_splits)
+print(spec.supported_native_splits)
 ```
 
 `get()` returns a `DatasetSpec`, which is the same descriptor the CLI uses for `inspect` and
@@ -34,7 +34,8 @@ resolved = project.resolve("a43", spec.default_config)
 
 print(resolved.scenes.history_frames, resolved.scenes.future_frames)
 print(resolved.output.precision)
-print(resolved.split.root.strategy)
+print(resolved.read.root.strategy)
+print(resolved.assign.root.strategy)
 ```
 
 Use `resolve()` when you want the final dataset config with built-in defaults applied. The lower
@@ -59,7 +60,7 @@ plan = resolve_request(request)
 print(plan.effective_sample_time)
 
 result = execute_request(request)
-print(result.processed_scenes)
+print(result.selected_scenes)
 ```
 
 Use `resolve_request()` when you want a dry planning step. Use `execute_request()` when you want to

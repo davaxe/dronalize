@@ -11,10 +11,11 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
+from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -51,7 +52,11 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
                 yield db_file
 
     @override
-    def discover_sources(self) -> Iterable[Source[tuple[Path, str]]]:
+    def iter_sources_for(
+        self, selection: SourceSelection = ALL_SOURCES
+    ) -> Iterable[Source[tuple[Path, str]]]:
+        if selection.native_split is not None:
+            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
         for db_path in self._db_paths():
             for table_name in _list_table_names(db_path):
                 identifier = f"{db_path.stem}:{table_name}"
@@ -60,7 +65,9 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
                 )
 
     @override
-    def num_sources(self) -> int | None:
+    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+        if selection.native_split is not None:
+            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
         return sum(_count_tables(db_path) for db_path in self._db_paths())
 
     @override

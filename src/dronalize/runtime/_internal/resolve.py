@@ -7,15 +7,19 @@ from typing import TYPE_CHECKING
 import dronalize.core.errors as dronalize_exceptions
 from dronalize.config.file import ProcessingConfig
 from dronalize.config.models.split import (
-    NativeSplitConfig,
-    SceneSplitConfig,
-    ShuffledTimeSplitConfig,
-    SourceSplitConfig,
-    SplitConfig,
-    TimeSplitConfig,
+    AssignConfig,
+    NoAssign,
+    PreserveNativeAssign,
+    ReadConfig,
+    ReadNative,
+    SceneAssign,
+    ShuffledTimeBlockAssign,
+    SourceAssign,
+    TimeBlockAssign,
 )
 from dronalize.config.reader import load_project_config
 from dronalize.io.formats import StorageBackend
+from dronalize.processing.models import AssignmentRequest
 from dronalize.runtime.types import (
     ExecutionPlan,
     OutputPlan,
@@ -41,16 +45,17 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
         descriptor=descriptor, config_path=request.config_path, cli_override=request.overrides
     )
     loader_request = compile_loader_request(
-        descriptor=descriptor,
-        resolved_config=resolved_config,
-        seed=request.seed,
-        include_map=include_map,
+        descriptor=descriptor, resolved_config=resolved_config, include_map=include_map
     )
+    assignment_request = AssignmentRequest.from_config(resolved_config.assign, seed=request.seed)
     effective_history_frames, effective_future_frames, effective_sample_time = (
         compile_effective_scene_metrics(resolved_config)
     )
-    if not _validate_split_support(descriptor, resolved_config.split):
-        msg = f"Dataset {descriptor.name} does not support the requested split configuration."
+    if not _validate_read_support(descriptor, resolved_config.read):
+        msg = f"Dataset {descriptor.name} does not support the requested read configuration."
+        raise dronalize_exceptions.ConfigurationError(msg)
+    if not _validate_assignment_support(descriptor, resolved_config.assign):
+        msg = f"Dataset {descriptor.name} does not support the requested assignment configuration."
         raise dronalize_exceptions.ConfigurationError(msg)
     return ExecutionPlan(
         descriptor=descriptor,
@@ -60,6 +65,7 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
         runtime=resolved_config.runtime,
         output=OutputPlan(inner=resolved_config.output),
         loader=loader_request,
+        assignment=assignment_request,
         map=loader_request.map,
         effective_history_frames=effective_history_frames,
         effective_future_frames=effective_future_frames,
@@ -70,21 +76,36 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
     )
 
 
-def _validate_split_support(spec: DatasetSpec, config: SplitConfig | None) -> bool:
+def _validate_read_support(spec: DatasetSpec, config: ReadConfig | None) -> bool:
+    if config is None:
+        return True
+    match config.root:
+        case ReadNative(splits=splits) if splits is not None:
+            supported = spec.supported_native_splits
+            if not supported:
+                return False
+            return set(splits).issubset(supported)
+        case ReadNative(splits=None):
+            return bool(spec.supported_native_splits)
+        case _:
+            return True
+
+
+def _validate_assignment_support(spec: DatasetSpec, config: AssignConfig | None) -> bool:
     if config is None:
         return True
     support = spec.split_support
     match config.root:
-        case NativeSplitConfig():
-            return bool(spec.native_splits)
-        case TimeSplitConfig() | ShuffledTimeSplitConfig():
-            return support.time_block
-        case SceneSplitConfig():
-            return support.scene
-        case SourceSplitConfig():
-            return support.source
-        case _:
+        case NoAssign():
             return True
+        case PreserveNativeAssign():
+            return bool(spec.supported_native_splits)
+        case TimeBlockAssign() | ShuffledTimeBlockAssign():
+            return support.time_block
+        case SceneAssign():
+            return support.scene
+        case SourceAssign():
+            return support.source
 
 
 def _validate_input_path(request: ExecutionRequest) -> None:

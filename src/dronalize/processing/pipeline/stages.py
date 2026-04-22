@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 import dronalize.processing.pipeline.transforms as tr
-from dronalize.config.models import ShuffledTimeSplitConfig, TimeSplitConfig
+from dronalize.config.models import ShuffledTimeBlockAssign, TimeBlockAssign
 from dronalize.core.functional import ResampleMethod, ResampleSpec
 from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.pipeline.pipeline import Pipeline
@@ -16,16 +16,16 @@ from dronalize.processing.screening.screen import Screen
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.processing.models import SplitRequest
+    from dronalize.processing.models import AssignmentRequest
     from dronalize.processing.pipeline.context import BuildContext
 
 
 def build_split_stage(ctx: BuildContext) -> Pipeline:
     """Build the optional split-partition stage."""
-    if not ctx.split_columns or ctx.split_request is None:
+    if not ctx.split_columns or ctx.assignment_request is None:
         return Pipeline()
     return _split_partition_pipeline(
-        ctx.split_request,
+        ctx.assignment_request,
         time_column=ctx.frame_column,
         group_by=ctx.window_by or None,
         split_column="split",
@@ -181,7 +181,7 @@ def _finalize_split_pipeline(
 
 
 def _split_partition_pipeline(
-    request: SplitRequest,
+    request: AssignmentRequest,
     *,
     time_column: str = "frame",
     group_by: str | Sequence[str] | None = None,
@@ -194,7 +194,7 @@ def _split_partition_pipeline(
     config = request.config
     weights = request.active_weights()
 
-    if isinstance(config, TimeSplitConfig):
+    if isinstance(config, TimeBlockAssign):
         split_source_column = _RAW_SPLIT_PARTITION_COLUMN if partition_column else split_column
         pipeline = Pipeline().then(
             tr.block_partition_cumulative(
@@ -206,7 +206,7 @@ def _split_partition_pipeline(
             )
         )
         partition_source_column = split_source_column if partition_column else None
-    elif isinstance(config, ShuffledTimeSplitConfig):
+    elif isinstance(config, ShuffledTimeBlockAssign):
         split_source_column = _RAW_SPLIT_ASSIGNMENT_COLUMN
         pipeline = Pipeline().then(
             tr.block_partition_shuffle(
