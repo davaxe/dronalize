@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dronalize
 from dronalize import datasets, io, processing, runtime
-from dronalize.config import ProcessingConfig, RuntimeOverride, load_project_config
+from dronalize.config import ProcessingConfig, RuntimeOverride, parse_config
 from dronalize.core import AgentCategory, DatasetSplit, EdgeType
 from dronalize.core.maps import MapGraph, SharedMapGraph
 from dronalize.io import DatasetManifest, manifest_path, read_manifest, write_manifest
@@ -54,7 +54,7 @@ def test_io_and_config_exports_are_present() -> None:
     assert write_manifest is not None
     assert ProcessingConfig is not None
     assert RuntimeOverride is not None
-    assert load_project_config is not None
+    assert parse_config is not None
 
 
 def test_reader_and_adapter_root_exports_are_declared() -> None:

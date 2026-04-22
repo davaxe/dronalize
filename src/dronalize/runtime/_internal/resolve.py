@@ -17,7 +17,7 @@ from dronalize.config.models.split import (
     SourceAssign,
     TimeBlockAssign,
 )
-from dronalize.config.reader import load_project_config
+from dronalize.config.reader import parse_config
 from dronalize.io.formats import StorageBackend
 from dronalize.processing.models import AssignmentRequest
 from dronalize.runtime.types import (
@@ -130,13 +130,13 @@ def _resolve_dataset_config(
     *, descriptor: DatasetSpec, config_path: Path | None, cli_override: RuntimeOverride
 ) -> DatasetConfig:
 
-    project = _load_project_config(config_path)
+    project = _parse_config(config_path)
     defaults = descriptor.default_config
     config = project.resolve(descriptor.name, defaults)
     return cli_override.apply_to(None).apply_to(config)
 
 
-def _load_project_config(config_path: Path | None) -> ProcessingConfig:
+def _parse_config(config_path: Path | None) -> ProcessingConfig:
     if config_path is None:
         return ProcessingConfig()
-    return load_project_config(config_path)
+    return parse_config(config_path)

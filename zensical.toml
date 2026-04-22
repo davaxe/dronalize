@@ -17,7 +17,6 @@ nav = [
     { Installation = "start/installation.md" },
     { "First run (CLI)" = "start/first-run-cli.md" },
     { "Python entry" = "start/python-entry.md" },
-    { "Adding datasets" = "start/adding-datasets.md" },
     { Changelog = "start/changelog.md" },
     { Citation = "start/citation.md" },
   ] },

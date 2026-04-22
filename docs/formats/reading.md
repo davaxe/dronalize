@@ -31,6 +31,11 @@ Reading the manifest up front with
 [`read_manifest()`][dronalize.io.read_manifest] is the easiest way to verify
 schema, horizon, and precision.
 
+!!! tip "Readable manifest"
+    The manifest is stored in a human-readable JSON format, so you can also
+    open and inspect it manually if needed.
+
+
 ## Read from Pickle output
 
 ```python

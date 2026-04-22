@@ -25,11 +25,11 @@ print(spec.supported_native_splits)
 ```python
 from pathlib import Path
 
-from dronalize.config import load_project_config
+from dronalize.config import parse_config
 from dronalize.datasets import get
 
 spec = get("a43")
-project = load_project_config(Path("config.toml"))
+project = parse_config(Path("config.toml"))
 resolved = project.resolve("a43", spec.default_config)
 
 print(resolved.scenes.history_frames, resolved.scenes.future_frames)

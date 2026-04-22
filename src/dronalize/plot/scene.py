@@ -41,7 +41,7 @@ supplied, while `"equal"` computes plot bounds so one data unit in x matches
 one data unit in y.
 """
 
-ChartT: TypeAlias = alt.Chart | alt.LayerChart
+ChartT: TypeAlias = alt.Chart | alt.LayerChart | alt.FacetChart
 FilterExpression: TypeAlias = str
 
 _DEFAULT_WIDTH: Final[int] = 800

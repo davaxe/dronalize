@@ -13,7 +13,7 @@ from dronalize.config.models import (
     SourceAssign,
     TimeBlockAssign,
 )
-from dronalize.config.models.split import ReadNative
+from dronalize.config.models.split import PreserveNativeAssign, ReadNative
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
@@ -49,12 +49,13 @@ class ReadRequest:
     ) -> ReadRequest:
         """Build a read scope from the public read configuration."""
         read_root = read.root
-        if isinstance(read_root, ReadAll):
-            return cls(config=read_root, native_splits=supported_native_splits)
         match read_root:
-            case ReadNative(splits=None):
+            case ReadAll():
                 return cls(config=read_root, native_splits=supported_native_splits)
-        return cls(config=read_root, native_splits=_ordered_splits(read_root.splits))
+            case ReadNative(splits=splits) if splits is not None:
+                return cls(config=read_root, native_splits=_ordered_splits(splits))
+            case ReadNative():
+                return cls(config=read_root, native_splits=supported_native_splits)
 
     @property
     def strategy(self) -> str:
@@ -76,9 +77,7 @@ class AssignmentRequest:
 
     def active(self) -> tuple[tuple[DatasetSplit, float], ...]:
         """Return active output splits and their weights."""
-        if isinstance(self.config, NoAssign):
-            return ()
-        if self.strategy == "preserve-native":
+        if isinstance(self.config, NoAssign | PreserveNativeAssign):
             return ()
         active: list[tuple[DatasetSplit, float]] = []
         ratio = self.config.ratio

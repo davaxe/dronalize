@@ -10,13 +10,15 @@ The current CLI exposes five commands: `available`, `inspect`, `show-config`, `s
 
 ```bash
 dronalize available
+dronalize available --no-details
 dronalize inspect a43
 dronalize split-support a43
 ```
 
 `available` lists the datasets that are usable in the current environment. `inspect` shows a
-dataset's defaults, native schema, split support, map support, and dataset-owned options.
-`split-support` shows which split strategies are available for that dataset.
+dataset's defaults, native schema, read and assignment support, map support, and dataset-owned
+options. `split-support` shows which read and assignment strategies are available for that dataset.
+Use `available --no-details` for a compact registry listing.
 
 !!! note "`available` and `inspect` reflect the current environment"
 
@@ -34,7 +36,11 @@ dronalize show-config a43 --config config.toml
 
 `show-config` resolves the same dataset defaults, profile fragments, dataset entry, and CLI
 overrides that `process` uses, but it stops before execution. Use it when you want to confirm the
-effective `scenes`, `screening`, `split`, `map`, `output`, and dataset-specific settings.
+effective `scenes`, `screening`, `read`, `assign`, `map`, `output`, and dataset-specific settings.
+
+`show-config` currently defaults to the `mds` backend, while `process` defaults to `pickle`. If you
+want `show-config` to reflect the exact same backend choice as a default `process` run, pass
+`--storage-backend pickle`.
 
 ## Plan a processing run
 
@@ -45,6 +51,8 @@ effective `scenes`, `screening`, `split`, `map`, `output`, and dataset-specific 
         --input data/a43/raw \
         --output data/a43/processed \
         --config config.toml \
+        --read all \
+        --assign preserve-native \
         --plan
     ```
 
@@ -55,12 +63,14 @@ effective `scenes`, `screening`, `split`, `map`, `output`, and dataset-specific 
         --input data/a43/raw `
         --output data/a43/processed `
         --config config.toml `
+        --read all `
+        --assign preserve-native `
         --plan
     ```
 
 `--plan` resolves the full run and prints a summary without executing it. The summary includes the
-dataset, paths, backend, worker count, schema, map usage, split strategy, and any dataset-owned
-options that affect the run.
+dataset, paths, backend, worker count, schema, map usage, read strategy, assignment strategy, and
+any dataset-owned options that affect the run.
 
 The `process` command currently defaults to the `pickle` backend. Choose a different backend
 explicitly when needed:
@@ -76,10 +86,13 @@ explicitly when needed:
 | `--storage-backend` | Choose `pickle`, `mds`, or `null`. |
 | `--scene-schema` | Override the output trajectory schema for this run. |
 | `--jobs` | Override worker count. Values above `1` enable parallel execution. |
+| `--progress/--no-progress` | Enable or disable the live progress display during processing. |
 | `--limit` | Stop after producing the requested number of scenes. |
-| `--split` | Override the split strategy for the run. |
-| `--read-split` | Select native dataset partitions when `--split native` is used. |
-| `--ratio`, `--gap`, `--segments` | Tune split behavior for compatible split strategies. |
+| `--seed` | Set the random seed for assignment and other randomized operations. |
+| `--read` | Choose the input read mode, currently `all` or `native`. |
+| `--read-split` | Select native dataset partitions when `--read native` is used. |
+| `--assign` | Choose the output assignment mode such as `preserve-native`, `scene`, `source`, `time`, or `shuffled-time`. |
+| `--ratio`, `--gap`, `--segments` | Tune assignment behavior for compatible assignment modes. |
 | `--include-map/--no-map` | Force map inclusion on or off for datasets that support maps. |
 
 ## Execute the run
@@ -90,5 +103,5 @@ CLI prints the summary again and asks for confirmation before processing starts.
 After a successful run, check the output directory:
 
 - `manifest.json` at the dataset root describes the produced dataset
-- split subdirectories such as `train`, `val`, `test`, or `unsplit` contain the backend-specific
+- assignment subdirectories such as `train`, `val`, `test`, or `unsplit` contain the backend-specific
   data files

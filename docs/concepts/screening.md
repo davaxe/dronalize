@@ -82,12 +82,27 @@ categories = ["CAR"]
 Tolerance makes agent checks less brittle:
 
 ```toml
-[datasets.a43.screening.agent.anchor_present.tolerance]
-absolute = 1
-relative = 0.05
+[datasets.a43.screening.agent.anchor_present]
+rule = "frames"
+frames = [19]
+tolerance = { absolute = 2, relative = 0.2 }
 ```
 
-This means a scene can survive even if a small number of selected agents fail the rule.
+This means a scene can survive even if a small number of selected agents fail the rule; in this case 2 absolute failures or 20% relative failures would be allowed. Both absolute and relative tolerances are applied, so if either threshold is breached the agent-based screening rule fails for the scene.
+
+!!! tip "Non-passing agents will be marked"
+    If tolerances is used it means that agents that fail the rule still exist
+    in the scenes. Importantly, they will be marked both in the output records
+    so downstream code can handle them differently, if needed.
+
+    In practice this means the scene can still be emitted, but the runtime keeps
+    track of which agent ids passed screening and which did not. When the scene
+    is encoded, that information is exported as a per-agent `passed_agent_mask`.
+
+    This is useful when you want to keep borderline or context agents in the
+    scene graph while still training, evaluating, or plotting with a stricter
+    subset. For example, a downstream model can use all agents as context but
+    only compute loss on agents whose screening mask is `true`.
 
 ## Extending inherited rules
 
@@ -99,11 +114,121 @@ mode = "extend"
 remove = ["old_rule"]
 ```
 
-- `replace` discards inherited rules and uses only the current block
-- `extend` merges by rule name
-- `remove` drops named rules across the cleanup, scene, and agent namespaces
+The merge order is:
+
+1. start from inherited screening rules, or empty rule maps if nothing is inherited
+2. apply `mode`
+3. apply `remove`
+
+The behavior is:
+
+- `extend` is the default and merges the current block into inherited rules by name
+- in `extend`, a rule only overrides an inherited rule with the same name in the same namespace
+- `replace` discards inherited rules first and keeps only rules authored in the current block
+- `remove` runs last and drops matching names across the cleanup, scene, and agent namespaces
+- because `remove` runs last, it can remove both inherited rules and rules declared in the current block
 
 This is why stable rule names matter.
+
+## Worked multi-profile example
+
+When multiple profiles are used, screening is resolved in order: start from the dataset defaults, apply profiles in `uses` order, then apply the dataset’s own block last.
+
+Start with these three profiles:
+
+```toml
+[profiles.base.screening.agent.min_obs]
+rule = "min_samples"
+minimum = 4
+
+[profiles.base.screening.scene.min_context]
+rule = "agent_range"
+minimum = 2
+
+[profiles.strict.screening]
+mode = "extend"
+
+[profiles.strict.screening.agent.min_obs]
+rule = "min_samples"
+minimum = 8
+
+[profiles.strict.screening.agent.anchor_present]
+rule = "frames"
+frames = [19]
+
+[profiles.curated.screening]
+mode = "replace"
+
+[profiles.curated.screening.cleanup.trim_static]
+rule = "exclude"
+categories = ["STATIC_OBJECT", "UNIMPORTANT"]
+
+[profiles.curated.screening.scene.category_mix]
+rule = "category_range"
+ranges = { CAR = { minimum = 1 }, PEDESTRIAN = { minimum = 1 } }
+```
+
+Assuming all these profiles are inherited in the order `base`, then `strict`, then `curated`. The `base` profile adds two rules: `agent.min_obs` and `scene.min_context`.
+
+The `strict` profile uses `mode = "extend"`, so it keeps what it inherits, overrides `agent.min_obs` from `4` to `8`, and adds `agent.anchor_present`.
+
+```toml
+[profiles.strict.screening]
+mode = "extend"
+```
+
+So after `base` and `strict`, the active rules are:
+
+- `agent.min_obs`
+- `scene.min_context`
+- `agent.anchor_present`
+
+Then `curated` changes the picture completely:
+
+```toml
+[profiles.curated.screening]
+mode = "replace"
+```
+
+Because it uses `replace`, it discards everything inherited from earlier profiles and starts over. After `curated`, only these rules remain:
+
+- `cleanup.trim_static`
+- `scene.category_mix`
+
+Now introduce the dataset itself:
+
+```toml
+[datasets.a43]
+uses = ["base", "strict", "curated"]
+
+[datasets.a43.screening]
+mode = "extend"
+remove = ["category_mix"]
+
+[datasets.a43.screening.scene.final_context]
+rule = "agent_range"
+minimum = 3
+```
+
+The profile chain is applied in the order shown in `uses`, so the dataset first sees the result of `base`, then `strict`, then `curated`. Since `curated` replaced the inherited screening state, the dataset starts from:
+
+- `cleanup.trim_static`
+- `scene.category_mix`
+
+Its own screening block then extends that state, adds `scene.final_context`, and removes `scene.category_mix`.
+
+```toml
+[datasets.a43.screening]
+mode = "extend"
+remove = ["category_mix"]
+```
+
+So the final effective screening is:
+
+- `cleanup.trim_static`
+- `scene.final_context`
+
+The important takeaway is that `extend` keeps building on the current state, while `replace` resets it at that point in the chain. After that, `remove` is applied to the result of the current block. Because the dataset block always runs last, it always has the final say.
 
 ## Common patterns
 

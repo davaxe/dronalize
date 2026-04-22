@@ -58,7 +58,6 @@ class TorchSceneDataset(Dataset[TorchSceneRecord], Generic[ReaderT]):
 
         If PyG-based batching is desired, consider using
         `HeteroSceneDataset` instead.
-
     """
 
     def __init__(self, reader: ReaderT, *, copy: bool = True) -> None:
@@ -108,5 +107,4 @@ class IterableTorchSceneDataset(TorchSceneDataset[ReaderT], IterableDataset[Torc
         `torch.utils.data.IterableDataset` to support iterable-style usage with
         `torch.utils.data.DataLoader` (e.g. for streaming readers that are design
         around sequential access).
-
     """

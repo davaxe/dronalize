@@ -39,8 +39,7 @@ class ProcessingConfig(ConfigBase):
     `resolve` method.
 
     To load a `ProcessingConfig` from a TOML file, use the
-    [`load_project_config`][dronalize.config.reader.load_project_config]
-    function.
+    [`parse_config`][dronalize.config.reader.parse_config] function.
 
     """
 

@@ -305,10 +305,10 @@ class PartialScreeningConfig(PartialConfig[ScreeningConfig]):
             cleanup = self.cleanup if self.cleanup is not None else {}
             scene = self.scene if self.scene is not None else {}
             agent = self.agent if self.agent is not None else {}
-        elif mode == "extend" and target is not None:
-            cleanup = {**target.cleanup, **(self.cleanup or {})}
-            scene = {**target.scene, **(self.scene or {})}
-            agent = {**target.agent, **(self.agent or {})}
+        elif mode == "extend":
+            cleanup = {**cleanup, **(self.cleanup or {})}
+            scene = {**scene, **(self.scene or {})}
+            agent = {**agent, **(self.agent or {})}
         if self.remove:
             cleanup = {k: v for k, v in cleanup.items() if k not in self.remove}
             scene = {k: v for k, v in scene.items() if k not in self.remove}

@@ -15,6 +15,7 @@ Authoring config has two top-level entry points:
 
 Minimal shape:
 
+<!-- no-validate -->
 ```toml
 [profiles.<profile-name>]
 

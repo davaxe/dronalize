@@ -41,7 +41,7 @@ DATASET_SPEC = DatasetSpec(
     ),
     dataset_options_model=VodLoaderOptions,
     native_schema=VodLoader.native_trajectory_schema(),
-    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
+    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
     resources_factory=open_vod_resources,
     has_map=True,
     split_support=DatasetSplitSupport(scene=True, source=True),

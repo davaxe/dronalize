@@ -78,22 +78,34 @@ The parent `screening` table controls merge behavior for the named rules below i
 
 | Key | Type | Description | Default |
 |---|---|---|---|
-| `mode` | `"replace"` or `"extend"` | Whether this screening block replaces inherited rules or merges by rule name. | `"replace"` |
+| `mode` | `"replace"` or `"extend"` | Whether this screening block replaces inherited rules or merges by rule name. | `"extend"` |
 | `remove` | `array[str]` | Named rules to remove after merging. Names may target cleanup, scene, or agent rules. | `none` |
 
 `mode` and `remove` belong on the parent `[...screening]` table, not inside individual rules.
 
 ## Merge behavior
 
-- `replace` discards inherited screening rules and uses only the rules defined in the current block.
-- `extend` merges the current rules into the inherited screening rules by rule name.
-- `remove` is applied after merging.
+Screening inheritance is applied in this order:
 
-Merging happens independently across the three namespaces:
+1. Start from the inherited `cleanup`, `scene`, and `agent` rule maps, or from empty maps if nothing is inherited.
+2. Apply `mode`.
+3. Apply `remove`.
+
+`mode = "extend"` is the default. It merges the current rules into the inherited rules independently for each namespace:
 
 - `cleanup`
 - `scene`
 - `agent`
+
+Within a namespace, a current rule with the same name replaces the inherited rule with that name. If no inherited screening exists, `extend` behaves like extending from empty and keeps the authored rules.
+
+`mode = "replace"` discards all inherited screening rules first, then uses only the rules authored in the current block.
+
+`remove` is applied after `extend` or `replace`. A removed name is deleted from all three namespaces, so it can remove:
+
+- inherited rules
+- rules introduced in the current block
+- the same rule name in multiple namespaces at once
 
 This means the same rule name can exist once in each namespace, but rule names should still be chosen carefully because they are also used for diagnostics and compiled internal identifiers.
 
@@ -105,6 +117,7 @@ Selectors are supported on all agent rules and on scene rules that explicitly li
 
 Example:
 
+<!-- no-validate -->
 ```toml
 [datasets.a43.screening.agent.rule_name.selector]
 mode = "include"
@@ -113,6 +126,7 @@ categories = ["CAR"]
 
 or inline:
 
+<!-- no-validate -->
 ```toml
 [datasets.a43.screening.agent.rule_name]
 ... # rule fields
@@ -131,6 +145,10 @@ Agent rules may define a tolerance table. The current config model uses numeric 
 Example:
 
 ```toml
+[datasets.a43.screening.agent.anchor_present]
+rule = "frames"
+frames = [19]
+
 [datasets.a43.screening.agent.anchor_present.tolerance]
 absolute = 1
 relative = 0.05

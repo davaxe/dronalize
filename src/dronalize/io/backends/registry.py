@@ -65,10 +65,7 @@ def _build_pickle_writer_factory(plan: ExecutionPlan) -> WriterFactory:
 
 
 def _output_splits(plan: ExecutionPlan) -> tuple[DatasetSplit, ...] | None:
-    assignment = plan.assignment
-    if assignment is None:
-        return None
-    return assignment.output_splits(input_native_splits=plan.loader.read.native_splits)
+    return plan.assignment.output_splits(input_native_splits=plan.loader.read.native_splits)
 
 
 register_writer_backend(StorageBackend.MDS, _build_mds_writer_factory)

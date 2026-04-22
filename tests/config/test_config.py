@@ -1,11 +1,19 @@
+# pyright: standard
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 import pytest
 
-from dronalize.config import ProcessingConfig, RuntimeOverride, load_project_config
-from dronalize.config.models import DatasetConfig
+from dronalize.config import ProcessingConfig, RuntimeOverride, parse_config
+from dronalize.config.models import (
+    AgentRangeSpec,
+    DatasetConfig,
+    ExcludeCategoriesSpec,
+    MinSamplesSpec,
+    RequireSceneFramesSpec,
+    RequireSceneWindowSpec,
+)
 from dronalize.core.errors import ConfigurationError
 from tests.support import inherited_optional_blocks_descriptor
 
@@ -19,8 +27,17 @@ def _write(path: Path, body: str) -> Path:
     return config_path
 
 
-def test_load_project_config_parses_profiles_and_dataset_entries(tmp_path: Path) -> None:
-    cfg = load_project_config(
+def _dataset_config(*, screening: dict[str, object] | None = None) -> DatasetConfig:
+    payload: dict[str, object] = {
+        "scenes": {"history_frames": 1, "future_frames": 1, "sample_time": 0.1}
+    }
+    if screening is not None:
+        payload["screening"] = screening
+    return DatasetConfig.model_validate(payload)
+
+
+def test_parse_config_parses_profiles_and_dataset_entries(tmp_path: Path) -> None:
+    cfg = parse_config(
         _write(
             tmp_path,
             """
@@ -39,7 +56,7 @@ def test_load_project_config_parses_profiles_and_dataset_entries(tmp_path: Path)
 
 
 def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
-    cfg = load_project_config(
+    cfg = parse_config(
         _write(
             tmp_path,
             """
@@ -58,7 +75,7 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
         )
 
 
-def test_load_project_config_surfaces_invalid_toml(tmp_path: Path) -> None:
+def test_parse_config_surfaces_invalid_toml(tmp_path: Path) -> None:
     path = _write(
         tmp_path,
         """
@@ -68,7 +85,7 @@ def test_load_project_config_surfaces_invalid_toml(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ConfigurationError, match="Invalid TOML in config file"):
-        _ = load_project_config(path)
+        _ = parse_config(path)
 
 
 def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
@@ -105,7 +122,7 @@ def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
 
 
 def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:
-    cfg = load_project_config(
+    cfg = parse_config(
         _write(
             tmp_path,
             """
@@ -126,3 +143,235 @@ def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:
     assert resolved.scenes.window is None
     assert resolved.scenes.resample is None
     assert resolved.scenes.lane_change is None
+
+
+def test_screening_extend_is_default_and_keeps_rules_without_inheritance(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.screening.agent.sample_floor]
+            rule = "min_samples"
+            minimum = 8
+            """,
+        )
+    )
+
+    resolved = cfg.resolve("demo", _dataset_config())
+
+    assert resolved.screening is not None
+    assert resolved.screening.cleanup == {}
+    assert resolved.screening.scene == {}
+    assert set(resolved.screening.agent) == {"sample_floor"}
+    assert isinstance(resolved.screening.agent["sample_floor"], MinSamplesSpec)
+    assert resolved.screening.agent["sample_floor"].minimum == 8
+
+
+def test_screening_extend_merges_namespaces_and_overrides_same_rule_name(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.screening]
+            mode = "extend"
+
+            [datasets.demo.screening.scene.context_window]
+            rule = "scene_window"
+            start_frame = 0
+            end_frame = 3
+
+            [datasets.demo.screening.agent.sample_floor]
+            rule = "min_samples"
+            minimum = 8
+            """,
+        )
+    )
+
+    resolved = cfg.resolve(
+        "demo",
+        _dataset_config(
+            screening={
+                "cleanup": {"trim_static": {"rule": "exclude", "categories": ["STATIC_OBJECT"]}},
+                "scene": {"min_context": {"rule": "agent_range", "minimum": 2}},
+                "agent": {"sample_floor": {"rule": "min_samples", "minimum": 4}},
+            }
+        ),
+    )
+
+    assert resolved.screening is not None
+    assert set(resolved.screening.cleanup) == {"trim_static"}
+    assert set(resolved.screening.scene) == {"min_context", "context_window"}
+    assert set(resolved.screening.agent) == {"sample_floor"}
+    assert isinstance(resolved.screening.cleanup["trim_static"], ExcludeCategoriesSpec)
+    assert isinstance(resolved.screening.scene["min_context"], AgentRangeSpec)
+    assert isinstance(resolved.screening.scene["context_window"], RequireSceneWindowSpec)
+    assert isinstance(resolved.screening.agent["sample_floor"], MinSamplesSpec)
+    assert resolved.screening.agent["sample_floor"].minimum == 8
+
+
+def test_screening_replace_discards_inherited_rules_not_redeclared(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.screening]
+            mode = "replace"
+
+            [datasets.demo.screening.scene.context_window]
+            rule = "scene_window"
+            start_frame = 0
+            end_frame = 3
+            """,
+        )
+    )
+
+    resolved = cfg.resolve(
+        "demo",
+        _dataset_config(
+            screening={
+                "cleanup": {"trim_static": {"rule": "exclude", "categories": ["STATIC_OBJECT"]}},
+                "scene": {"min_context": {"rule": "agent_range", "minimum": 2}},
+                "agent": {"sample_floor": {"rule": "min_samples", "minimum": 4}},
+            }
+        ),
+    )
+
+    assert resolved.screening is not None
+    assert resolved.screening.cleanup == {}
+    assert set(resolved.screening.scene) == {"context_window"}
+    assert resolved.screening.agent == {}
+    assert isinstance(resolved.screening.scene["context_window"], RequireSceneWindowSpec)
+
+
+def test_screening_remove_drops_matching_names_across_all_namespaces(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.screening]
+            mode = "extend"
+            remove = ["shared"]
+            """,
+        )
+    )
+
+    resolved = cfg.resolve(
+        "demo",
+        _dataset_config(
+            screening={
+                "cleanup": {
+                    "shared": {"rule": "exclude", "categories": ["STATIC_OBJECT"]},
+                    "keep_cleanup": {"rule": "exclude", "categories": ["ANIMAL"]},
+                },
+                "scene": {
+                    "shared": {"rule": "agent_range", "minimum": 2},
+                    "keep_scene": {"rule": "scene_frames", "frames": [0]},
+                },
+                "agent": {
+                    "shared": {"rule": "min_samples", "minimum": 4},
+                    "keep_agent": {"rule": "min_samples", "minimum": 2},
+                },
+            }
+        ),
+    )
+
+    assert resolved.screening is not None
+    assert set(resolved.screening.cleanup) == {"keep_cleanup"}
+    assert set(resolved.screening.scene) == {"keep_scene"}
+    assert set(resolved.screening.agent) == {"keep_agent"}
+    assert isinstance(resolved.screening.cleanup["keep_cleanup"], ExcludeCategoriesSpec)
+    assert isinstance(resolved.screening.scene["keep_scene"], RequireSceneFramesSpec)
+    assert isinstance(resolved.screening.agent["keep_agent"], MinSamplesSpec)
+
+
+def test_screening_remove_is_applied_after_replace_and_can_drop_current_rules(
+    tmp_path: Path,
+) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.screening]
+            mode = "replace"
+            remove = ["drop_me"]
+
+            [datasets.demo.screening.agent.drop_me]
+            rule = "min_samples"
+            minimum = 8
+
+            [datasets.demo.screening.agent.keep_me]
+            rule = "min_samples"
+            minimum = 3
+            """,
+        )
+    )
+
+    resolved = cfg.resolve("demo", _dataset_config())
+
+    assert resolved.screening is not None
+    assert resolved.screening.cleanup == {}
+    assert resolved.screening.scene == {}
+    assert set(resolved.screening.agent) == {"keep_me"}
+    assert isinstance(resolved.screening.agent["keep_me"], MinSamplesSpec)
+
+
+def test_screening_multiple_profiles_resolve_in_uses_order_then_dataset_block(
+    tmp_path: Path,
+) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [profiles.base.screening.agent.min_obs]
+            rule = "min_samples"
+            minimum = 4
+
+            [profiles.base.screening.scene.min_context]
+            rule = "agent_range"
+            minimum = 2
+
+            [profiles.strict.screening]
+            mode = "extend"
+
+            [profiles.strict.screening.agent.min_obs]
+            rule = "min_samples"
+            minimum = 8
+
+            [profiles.strict.screening.agent.anchor_present]
+            rule = "frames"
+            frames = [19]
+
+            [profiles.curated.screening]
+            mode = "replace"
+
+            [profiles.curated.screening.cleanup.trim_static]
+            rule = "exclude"
+            categories = ["STATIC_OBJECT", "UNIMPORTANT"]
+
+            [profiles.curated.screening.scene.category_mix]
+            rule = "category_range"
+            ranges = { CAR = { minimum = 1 }, PEDESTRIAN = { minimum = 1 } }
+
+            [datasets.demo]
+            uses = ["base", "strict", "curated"]
+
+            [datasets.demo.screening]
+            mode = "extend"
+            remove = ["category_mix"]
+
+            [datasets.demo.screening.scene.final_context]
+            rule = "agent_range"
+            minimum = 3
+            """,
+        )
+    )
+
+    resolved = cfg.resolve("demo", _dataset_config())
+
+    assert resolved.screening is not None
+    assert set(resolved.screening.cleanup) == {"trim_static"}
+    assert set(resolved.screening.scene) == {"final_context"}
+    assert isinstance(resolved.screening.cleanup["trim_static"], ExcludeCategoriesSpec)
+    assert isinstance(resolved.screening.scene["final_context"], AgentRangeSpec)
+    assert resolved.screening.scene["final_context"].minimum == 3
+    assert resolved.screening.agent == {}

@@ -9,8 +9,8 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 
-def load_project_config(path: Path) -> ProcessingConfig:
-    """Load and parse a project configuration from a TOML file.
+def parse_config(path: Path) -> ProcessingConfig:
+    """Parse configuration from a TOML file.
 
     !!! note "Completeness of the returned config"
         By design, this loader returns a validated but potentially incomplete configuration for
@@ -30,7 +30,7 @@ def load_project_config(path: Path) -> ProcessingConfig:
     Returns
     -------
     ProcessingConfig
-        The parsed project configuration, fully validated and ready for use.
+        The parsed configuration, fully validated and ready for use.
     """
     with path.open("rb") as handle:
         try:

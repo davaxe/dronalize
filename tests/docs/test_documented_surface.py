@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from dronalize import runtime
-from dronalize.config import load_project_config
+from dronalize.config import parse_config
 from dronalize.io import StorageBackend
 from dronalize.runtime import (
     ExecutionRequest,
@@ -17,15 +17,8 @@ from dronalize.runtime import (
 )
 
 DOCS_ROOT = Path(__file__).resolve().parents[2] / "docs"
-TOML_BLOCK = re.compile(r"```toml\n(.*?)\n```", re.DOTALL)
-CONFIG_DOCS = (
-    "reference/configuration/index.md",
-    "reference/configuration/output.md",
-    "reference/configuration/scenes.md",
-    "reference/configuration/split.md",
-    "reference/configuration/map.md",
-    "formats/backends/mds.md",
-)
+FENCED_BLOCK = re.compile(r"```(?P<info>[^\n`]*)\n(?P<body>.*?)\n```", re.DOTALL)
+SKIP_VALIDATE_MARKER = "<!-- no-validate -->"
 
 
 def test_documented_runtime_imports_match_public_api() -> None:
@@ -40,28 +33,35 @@ def test_documented_runtime_imports_match_public_api() -> None:
     assert ExecutionRequest.model_fields["storage_backend"].default == StorageBackend.PICKLE
 
 
-def _concrete_toml_blocks(doc_path: Path) -> list[str]:
-    blocks: list[str] = []
-    for match in TOML_BLOCK.findall(doc_path.read_text(encoding="utf-8")):
-        snippet = match.strip()
-        if "<" in snippet or "..." in snippet:
-            continue
-        blocks.append(snippet)
-    return blocks
-
-
-def _documented_config_params() -> list[str]:
-    params: list[str] = []
-    for relative_path in CONFIG_DOCS:
-        doc_path = DOCS_ROOT / relative_path
-        blocks = _concrete_toml_blocks(doc_path)
-        assert blocks, f"No concrete TOML blocks found in {relative_path}"
-        params.extend(blocks)
+def _documented_config_params() -> list[tuple[str, str]]:
+    params: list[tuple[str, str]] = []
+    for doc_path in sorted(DOCS_ROOT.rglob("*.md")):
+        relative_path = doc_path.relative_to(DOCS_ROOT).as_posix()
+        text = doc_path.read_text(encoding="utf-8")
+        for match in FENCED_BLOCK.finditer(text):
+            info = match.group("info").strip().split()
+            prefix = text[: match.start()].rstrip()
+            marker_line = prefix.rsplit("\n", maxsplit=1)[-1] if prefix else ""
+            if "toml" not in info or marker_line == SKIP_VALIDATE_MARKER:
+                continue
+            params.append((relative_path, match.group("body").strip()))
+    assert params, "No TOML documentation examples found"
     return params
 
 
-@pytest.mark.parametrize("snippet", _documented_config_params())
-def test_documented_configuration_examples_validate(tmp_path: Path, snippet: str) -> None:
+@pytest.mark.parametrize(
+    ("relative_path", "snippet"), _documented_config_params(), ids=lambda value: value
+)
+def test_documented_configuration_examples_validate(
+    tmp_path: Path, relative_path: str, snippet: str
+) -> None:
+    """Test that TOML code blocks in the docs can be parsed as valid config."""
+    _ = relative_path
     config_path = tmp_path / "example.toml"
     _ = config_path.write_text(snippet + "\n", encoding="utf-8")
-    _ = load_project_config(config_path)
+    _ = parse_config(config_path)
+
+
+def test_config_file_parses() -> None:
+    path = Path("dronalize.toml")
+    _ = parse_config(path)

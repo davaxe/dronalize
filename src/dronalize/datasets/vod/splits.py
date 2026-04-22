@@ -1,6 +1,8 @@
+from typing import Final
+
 from dronalize.core.categories import DatasetSplit
 
-train = [
+_TRAIN: Final[list[str]] = [
     "q4hez5edjjtfph90o7y22t1tdgnnqfkp",
     "8k2fk99l0phbz83lxtc25q87e06jarnk",
     "owogq5dslsmf48dagon6fxeb108ts8eh",
@@ -15,14 +17,14 @@ train = [
     "87cgygi3l41q3ft0ct9dizxclqg4b434",
 ]
 
-train_val = [
+_VAL: Final[list[str]] = [
     "smsz20lamf98gmpt1ppia0oefubih4kw",
     "63p8qt0d4biowur5es45sojf7fj3h5iu",
     "9q5jy0dlaz7blaw6fd1fizdnnw2dl4to",
     "0j93nt1dpgzxvhppg9smwlul7ka75rb4",
 ]
 
-test = [
+_TEST: Final[list[str]] = [
     "r4bf59dp37h696i9gg03siw2gq8p4msn",
     "k3rblq6f3tulyggqfyjz8st4ewokv8fa",
     "79fxw6jjbwgw8lax0ukcwtrujv4ktj5v",
@@ -35,11 +37,11 @@ test = [
 
 def get_split(token: str) -> DatasetSplit:
     """Determine the split based on token."""
-    if token in train:
+    if token in _TRAIN:
         return DatasetSplit.TRAIN
-    if token in train_val:
+    if token in _VAL:
         return DatasetSplit.VAL
-    if token in test:
+    if token in _TEST:
         return DatasetSplit.TEST
     msg = f"Token {token} does not belong to any known split."
     raise ValueError(msg)

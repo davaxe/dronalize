@@ -94,7 +94,7 @@ sample_time = 0.1
 [datasets.a43.scenes.window]
 step = 2
 
-[datasets.a43.split]
+[datasets.a43.assign]
 strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8

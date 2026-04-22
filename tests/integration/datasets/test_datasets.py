@@ -33,9 +33,6 @@ def test_datasets(
 ) -> None:
     if not (raw_data_root / case.path_rel_root).exists():
         pytest.skip(f"Dataset root not found: {raw_data_root / case.path_rel_root}")
-    if jobs == 4 or case.dataset != "vod":
-        return
-
     if jobs > 1:
         case.max_scenes = 2
         case.scene_step = 10
