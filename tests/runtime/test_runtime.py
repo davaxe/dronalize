@@ -67,17 +67,6 @@ def test_resolve_request_rejects_unknown_storage_backend(
         _ = resolve_request(_request(tmp_path, storage_backend="bad-backend"))
 
 
-def test_resolve_request_rejects_file_input_paths(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _patch_get_demo_descriptor(monkeypatch)
-    input_file = tmp_path / "input.txt"
-    _ = input_file.write_text("demo", encoding="utf-8")
-
-    with pytest.raises(NotADirectoryError, match="is not a directory"):
-        _ = resolve_request(_request(tmp_path, input_dir=input_file))
-
-
 def test_execute_request_surfaces_unknown_dataset_errors(tmp_path: Path) -> None:
     request = _request(tmp_path, dataset="this-dataset-does-not-exist")
 

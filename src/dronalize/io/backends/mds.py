@@ -2,12 +2,12 @@
 
 This backend writes processed scenes as MosaicML Streaming shards. It is the
 shard-based option intended for training pipelines that benefit from streaming,
-compression, and the upstream ``StreamingDataset`` reader surface.
+compression, and the upstream `StreamingDataset` reader surface.
 
 Notes
 -----
 - requires the optional `dronalize[mds]` extra
-- writes data into split subdirectories such as ``train`` or ``unsplit``
+- writes data into split subdirectories such as `train` or `unsplit`
 - when running in parallel, each worker writes to its own temporary subfolder
   and the backend merges the shard indexes at the end of the run
 """

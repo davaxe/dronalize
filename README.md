@@ -58,7 +58,7 @@ plan = resolve_request(request)
 print(plan.effective_sample_time)
 
 result = execute_request(request)
-print(result.processed_scenes)
+print(result.selected_scenes)
 ```
 
 The public Python surface is intentionally explicit:

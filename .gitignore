@@ -19,9 +19,6 @@ slurm*.out
 *.csv
 *.zip
 
-### UV ###
-uv.lock
-
 ### JupyterNotebooks ###
 Untitled*
 

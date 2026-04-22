@@ -14,6 +14,7 @@ from dronalize.config.models import (
     RequireSceneFramesSpec,
     RequireSceneWindowSpec,
 )
+from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import ConfigurationError
 from tests.support import inherited_optional_blocks_descriptor
 
@@ -119,6 +120,33 @@ def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
     assert empty.output is None
     assert empty.read is None
     assert empty.assign is None
+
+
+def test_runtime_override_from_inputs_rejects_read_split_without_native_read() -> None:
+    with pytest.raises(ConfigurationError, match="read_split"):
+        _ = RuntimeOverride.from_inputs(read_split=[DatasetSplit.TRAIN])
+
+
+def test_runtime_override_from_inputs_rejects_assignment_options_without_strategy() -> None:
+    with pytest.raises(ConfigurationError, match="Assignment options require"):
+        _ = RuntimeOverride.from_inputs(ratio=(0.7, 0.2, 0.1))
+
+
+def test_runtime_override_from_inputs_rejects_ratio_for_invalid_assign_strategy() -> None:
+    with pytest.raises(
+        ConfigurationError, match="only valid for scene, source, time, and shuffled-time"
+    ):
+        _ = RuntimeOverride.from_inputs(assign_strategy="none", ratio=(0.7, 0.2, 0.1))
+
+
+def test_runtime_override_from_inputs_rejects_gap_for_invalid_assign_strategy() -> None:
+    with pytest.raises(ConfigurationError, match="gap"):
+        _ = RuntimeOverride.from_inputs(assign_strategy="scene", gap=2, ratio=(0.7, 0.2, 0.1))
+
+
+def test_runtime_override_from_inputs_requires_segments_for_shuffled_time() -> None:
+    with pytest.raises(ConfigurationError, match="segments"):
+        _ = RuntimeOverride.from_inputs(assign_strategy="shuffled-time", ratio=(0.7, 0.2, 0.1))
 
 
 def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:

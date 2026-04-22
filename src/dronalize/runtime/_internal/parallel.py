@@ -176,10 +176,12 @@ class ParallelExecutor(Executor):
         pool_initializer = functools.partial(initializer, *args, **kwargs)
         self._running = True
         self.progress_event().set()
-        with mp.Pool(self._processes, initializer=pool_initializer) as pool:
-            yield from pool.imap_unordered(process_fn, payloads, self._chunksize)
-        self._running = False
-        self.progress_event().set()
+        try:
+            with mp.Pool(self._processes, initializer=pool_initializer) as pool:
+                yield from pool.imap_unordered(process_fn, payloads, self._chunksize)
+        finally:
+            self._running = False
+            self.progress_event().set()
 
     @staticmethod
     def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:

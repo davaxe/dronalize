@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dronalize._lazy import lazy_dir, resolve_lazy_export
+from dronalize.core._lazy import lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
     from dronalize.plot.scene import AspectMode, plot_scene

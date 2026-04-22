@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene
     from dronalize.io import SceneRecord
-    from tests.integration.datasets.catalog import DatasetCase
+    from tests.integration.catalog import DatasetCase
 
 
 def _assert_shape(array: npt.NDArray[Any], expected: tuple[int, ...], name: str) -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import threading
 from typing import TYPE_CHECKING
 
@@ -80,6 +81,14 @@ class SequentialExecutor(Executor):
     def _generate_and_track(self) -> Iterable[Scene]:
         self._running = True
         self._update_event.set()
+
+        try:
+            yield from self._inner_iter_sources()
+        finally:
+            self._running = False
+            self._update_event.set()
+
+    def _inner_iter_sources(self) -> Iterable[Scene]:
         for source in self._processor.iter_sources():
             if self._selected_scene_limit_reached():
                 break
@@ -91,8 +100,6 @@ class SequentialExecutor(Executor):
                     continue
                 scene_number = self._claim_selected_scene()
                 if scene_number is None:
-                    self._running = False
-                    self._update_event.set()
                     return
                 scene = self._processor.materialize(candidate, scene_number)
                 split_key = (
@@ -101,8 +108,6 @@ class SequentialExecutor(Executor):
                 self._split_counts[split_key] += 1
                 self._update_event.set()
                 yield scene
-        self._running = False
-        self._update_event.set()
 
     def _record_candidate_scene(self) -> None:
         self._candidate_scene_counter += 1

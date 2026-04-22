@@ -17,10 +17,10 @@ def parse_config(path: Path) -> ProcessingConfig:
         specific datasets.
 
         See the
-        [`ProcessingConfig.resolve`][dronalize.config.project.ProcessingConfig.resolve]
+        [`ProcessingConfig.resolve`][dronalize.config.ProcessingConfig.resolve]
         method for applying dataset-specific overrides returned by this loader
         on top of a fully resolved `DatasetConfig` to get a complete
-        configuration for a specific dataset. Returns
+        configuration for a specific dataset.
 
     Parameters
     ----------
@@ -30,7 +30,7 @@ def parse_config(path: Path) -> ProcessingConfig:
     Returns
     -------
     ProcessingConfig
-        The parsed configuration, fully validated and ready for use.
+        The parsed configuration, validated and ready for dataset-specific resolution.
     """
     with path.open("rb") as handle:
         try:

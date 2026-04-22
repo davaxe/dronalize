@@ -1,4 +1,4 @@
-"""Public configuration entry points used by he CLI and Python API.
+"""Public configuration entry points used by the CLI and Python API.
 
 This package exposes the smallest configuration surface most callers need:
 

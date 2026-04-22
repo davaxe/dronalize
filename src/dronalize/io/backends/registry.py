@@ -1,22 +1,24 @@
 """Registry-driven writer backend resolution.
 
 The runtime keeps backend selection separate from scene encoding. A resolved
-``RunPlan`` chooses a :class:`dronalize.io.formats.StorageBackend`, and this
+`RunPlan` chooses a :class:`dronalize.io.formats.StorageBackend`, and this
 registry maps that backend to a builder that can create worker-local
-``DatasetWriter`` instances.
+`DatasetWriter` instances.
 
 The built-in registry entries are:
 
-- ``mds`` for shard-based Mosaic Streaming output
-- ``pickle`` for one pickled scene record per file
-- ``null`` for dry-run style execution without persisted scene data
+- `mds` for shard-based Mosaic Streaming output
+- `pickle` for one pickled scene record per file
+- `null` for dry-run style execution without persisted scene data
 """
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from dronalize.core.errors import UnsupportedStorageBackendError
 from dronalize.io.base import DatasetWriter
 from dronalize.io.formats import StorageBackend
 
@@ -28,16 +30,26 @@ WriterFactory = Callable[[int | None], DatasetWriter]
 WriterFactoryBuilder = Callable[["ExecutionPlan"], WriterFactory]
 
 _WRITER_BACKENDS: dict[StorageBackend, WriterFactoryBuilder] = {}
+logger = logging.getLogger(__name__)
 
 
 def register_writer_backend(backend: StorageBackend, builder: WriterFactoryBuilder) -> None:
     """Register a writer backend factory builder."""
     _WRITER_BACKENDS[backend] = builder
+    logger.debug("Registered writer backend", extra={"storage_backend": backend.value})
 
 
 def build_writer_factory(plan: ExecutionPlan) -> WriterFactory:
     """Build the writer factory for one resolved processing plan."""
-    builder = _WRITER_BACKENDS[plan.storage_backend]
+    builder = _WRITER_BACKENDS.get(plan.storage_backend)
+    if builder is None:
+        raise UnsupportedStorageBackendError(
+            plan.storage_backend.value, tuple(backend.value for backend in _WRITER_BACKENDS)
+        )
+    logger.debug(
+        "Building writer factory",
+        extra={"dataset": plan.dataset, "storage_backend": plan.storage_backend.value},
+    )
     return builder(plan)
 
 

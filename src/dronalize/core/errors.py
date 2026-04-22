@@ -103,6 +103,19 @@ class SplitAssignmentError(SplitError):
     """Raised when runtime split-assignment data is missing or invalid."""
 
 
+class ManifestCompatibilityError(ValueError, DronalizeError):
+    """Raised when a persisted dataset manifest is incompatible with this version."""
+
+    def __init__(self, format_version: int, supported_version: int) -> None:
+        msg = (
+            f"Unsupported manifest format version '{format_version}'. "
+            f"Supported version: {supported_version}."
+        )
+        super().__init__(msg)
+        self.format_version: int = format_version
+        self.supported_version: int = supported_version
+
+
 class UnsupportedStorageBackendError(ValueError, DronalizeError):
     """Raised when an unknown storage backend is requested."""
 

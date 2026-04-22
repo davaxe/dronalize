@@ -1,7 +1,7 @@
 # Proposed next-generation config layout
 #
-# This file is intentionally a design proposal for a cleaner public config model.
-# It is not required to match the current parser.
+# This file doubles as a parser-validated example config for docs and tests.
+# Keep it aligned with the current public configuration model.
 #
 # Design goals:
 # - keep reusable profiles and per-dataset entries

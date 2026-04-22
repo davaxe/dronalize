@@ -1,7 +1,7 @@
 """Pickle writer backend.
 
-This backend writes one pickled ``SceneRecord`` per scene inside split
-subdirectories such as ``train`` or ``unsplit``. It is the simplest persisted
+This backend writes one pickled `SceneRecord` per scene inside split
+subdirectories such as `train` or `unsplit`. It is the simplest persisted
 backend, requires no optional storage dependency, and is a practical default
 when inspectability matters more than shard-based streaming.
 """

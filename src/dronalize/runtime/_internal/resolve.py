@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import dronalize.core.errors as dronalize_exceptions
@@ -36,9 +37,13 @@ if TYPE_CHECKING:
     from dronalize.runtime.types import ExecutionRequest
 
 
+logger = logging.getLogger(__name__)
+
+
 def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> ExecutionPlan:
     """Build a full runtime plan from a public execution request."""
     _validate_input_path(request)
+    _validate_output_path(request)
     include_map = request.include_map
     storage_backend = _resolve_storage_backend(request.storage_backend)
     resolved_config = _resolve_dataset_config(
@@ -57,6 +62,15 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
     if not _validate_assignment_support(descriptor, resolved_config.assign):
         msg = f"Dataset {descriptor.name} does not support the requested assignment configuration."
         raise dronalize_exceptions.ConfigurationError(msg)
+    logger.debug(
+        "Built execution plan",
+        extra={
+            "dataset": descriptor.name,
+            "storage_backend": storage_backend.value,
+            "parallel": resolved_config.runtime.jobs > 1,
+            "include_map": loader_request.map is not None,
+        },
+    )
     return ExecutionPlan(
         descriptor=descriptor,
         data_root=request.input_dir,
@@ -117,6 +131,12 @@ def _validate_input_path(request: ExecutionRequest) -> None:
         raise NotADirectoryError(msg)
 
 
+def _validate_output_path(request: ExecutionRequest) -> None:
+    if request.output_dir.exists() and not request.output_dir.is_dir():
+        msg = f"Output directory {request.output_dir} is not a directory."
+        raise NotADirectoryError(msg)
+
+
 def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBackend:
     try:
         return StorageBackend(storage_backend)
@@ -129,10 +149,10 @@ def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBa
 def _resolve_dataset_config(
     *, descriptor: DatasetSpec, config_path: Path | None, cli_override: RuntimeOverride
 ) -> DatasetConfig:
-
     project = _parse_config(config_path)
     defaults = descriptor.default_config
     config = project.resolve(descriptor.name, defaults)
+    logger.debug("Resolved dataset config", extra={"dataset": descriptor.name})
     return cli_override.apply_to(None).apply_to(config)
 
 

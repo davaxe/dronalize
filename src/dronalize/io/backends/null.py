@@ -1,6 +1,6 @@
 """No-op writer backend.
 
-The ``null`` backend executes the full runtime, counts accepted scenes, and
+The `null` backend executes the full runtime, counts accepted scenes, and
 intentionally skips all persisted scene output. It is useful for tests, dry
 runs, configuration validation, and measuring pipeline cost without storage
 I/O.
