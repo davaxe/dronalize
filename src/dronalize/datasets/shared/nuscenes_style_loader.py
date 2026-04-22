@@ -11,7 +11,7 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.loading.options import DatasetOptionsModel
 from dronalize.processing.maps.resolver import no_map, shared_map
@@ -88,25 +88,15 @@ class NuScenesStyleLoader(BaseSceneLoader[str, NuScenesStyleLoaderOptions]):
         return sources
 
     @override
-    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[str]]:
-        split = selection.native_split
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[str]]:
         if self._sources is None:
             self._sources = self._build_sources_manifest()
-        if split is None:
-            for native_split in self.native_splits:
-                yield from self._sources.get(native_split, [])
-            return
         yield from self._sources.get(split, [])
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
         if self._sources is None:
             self._sources = self._build_sources_manifest()
-        split = selection.native_split
-        if split is None:
-            return sum(
-                len(self._sources.get(native_split, [])) for native_split in self.native_splits
-            )
         return len(self._sources.get(split, []))
 
     @override

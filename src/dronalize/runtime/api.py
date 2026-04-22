@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from dronalize.datasets.registry import get
@@ -15,6 +16,9 @@ if TYPE_CHECKING:
 
     from dronalize.core.scene import Scene
     from dronalize.runtime.types import ExecutionPlan, ExecutionRequest
+
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_request(request: ExecutionRequest) -> ExecutionPlan:
@@ -37,6 +41,7 @@ def resolve_request(request: ExecutionRequest) -> ExecutionPlan:
 
     """
     descriptor = get(request.dataset)
+    logger.debug("Resolving execution request", extra={"dataset": request.dataset})
     return build_plan(descriptor=descriptor, request=request)
 
 
@@ -54,6 +59,7 @@ def execute_request(request: ExecutionRequest) -> ExecutionResult:
         user-provided parameters, paths, and overrides.
 
     """
+    logger.info("Executing request", extra={"dataset": request.dataset})
     return execute_plan(resolve_request(request))
 
 
@@ -73,10 +79,22 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
     ExecutionResult
         Summary of the execution.
     """
+    logger.info(
+        "Executing plan",
+        extra={"dataset": plan.dataset, "storage_backend": plan.storage_backend.value},
+    )
     with open_execution_session(plan) as run:
         run.executor.execute(writer_factory=build_writer_factory(plan))
         plan.write_manifests()
         progress = run.executor.progress()
+        logger.info(
+            "Finished plan",
+            extra={
+                "dataset": plan.dataset,
+                "processed_sources": progress.processed_sources,
+                "selected_scenes": progress.selected_scenes,
+            },
+        )
         return ExecutionResult(
             dataset=plan.dataset,
             output_dir=plan.output_dir,
@@ -106,5 +124,6 @@ def stream_plan(plan: ExecutionPlan) -> Iterator[Scene]:
         a streaming fashion, without waiting for the entire execution to complete.
 
     """
+    logger.info("Streaming plan", extra={"dataset": plan.dataset})
     with open_execution_session(plan) as run:
         yield from run.executor.execute_yield()

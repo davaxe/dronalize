@@ -150,27 +150,30 @@ class MapGraph:
         raises `ValueError` when both `node_positions` and `edge_indices` are empty.
     """
 
+    node_positions: npt.NDArray[np.float64]
+    """Node positions, shape `(N, 2)`."""
+
+    edge_indices: npt.NDArray[np.int32]
+    """Edge COO indices, shape `(2, M)`."""
+
+    node_types: npt.NDArray[np.int32]
+    """Per-node type labels, shape `(N,)`."""
+
+    edge_types: npt.NDArray[np.int32]
+    """Per-edge type labels, shape `(M,)`."""
+
     def __init__(
         self,
         node_positions: npt.NDArray[np.float64],
         edge_indices: npt.NDArray[np.int32],
         node_types: npt.NDArray[np.int32] | None = None,
         edge_types: npt.NDArray[np.int32] | None = None,
-        *,
-        return_if_empty: bool = True,
     ) -> None:
         if node_positions.size == 0 and edge_indices.size == 0:
-            if return_if_empty:
-                node_positions = np.zeros((0, 2), dtype=np.float64)
-                edge_indices = np.zeros((2, 0), dtype=np.int32)
-                node_types = np.zeros((0,), dtype=np.int32)
-                edge_types = np.zeros((0,), dtype=np.int32)
-            else:
-                msg = (
-                    "Node positions and edge indices cannot be empty."
-                    " Set `return_if_empty=True` to allow empty graphs."
-                )
-                raise ValueError(msg)
+            node_positions = np.zeros((0, 2), dtype=np.float64)
+            edge_indices = np.zeros((2, 0), dtype=np.int32)
+            node_types = np.zeros((0,), dtype=np.int32)
+            edge_types = np.zeros((0,), dtype=np.int32)
 
         self.node_positions = np.ascontiguousarray(node_positions, dtype=np.float64)
         self.edge_indices = np.ascontiguousarray(edge_indices, dtype=np.int32)
@@ -186,18 +189,6 @@ class MapGraph:
             if edge_types is not None
             else np.ones(self.num_edges, dtype=np.int32)
         )
-
-    node_positions: npt.NDArray[np.float64]
-    """Node positions, shape `(N, 2)`."""
-
-    edge_indices: npt.NDArray[np.int32]
-    """Edge COO indices, shape `(2, M)`."""
-
-    node_types: npt.NDArray[np.int32]
-    """Per-node type labels, shape `(N,)`."""
-
-    edge_types: npt.NDArray[np.int32]
-    """Per-edge type labels, shape `(M,)`."""
 
     @property
     def num_nodes(self) -> int:

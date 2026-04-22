@@ -12,6 +12,7 @@ from dronalize.config.models import (
     PartialRuntimeConfig,
     ReadConfig,
 )
+from dronalize.core.errors import ConfigurationError
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
@@ -47,6 +48,47 @@ class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
     full_config_type: type[PartialDatasetConfig] = Field(
         default=PartialDatasetConfig, init=False, repr=False
     )
+
+    @staticmethod
+    def _validate_read_inputs(
+        *, read_strategy: ReadStrategy | None, read_split: list[DatasetSplit] | None
+    ) -> None:
+        if read_split is None:
+            return
+        if read_strategy != "native":
+            msg = "`read_split` requires `read_strategy='native'`."
+            raise ConfigurationError(msg)
+
+    @staticmethod
+    def _validate_assign_inputs(
+        *,
+        assign_strategy: AssignStrategy | None,
+        ratio: tuple[float, float, float] | None,
+        gap: int | None,
+        segments: int | None,
+    ) -> None:
+        if assign_strategy is None and any(value is not None for value in (ratio, gap, segments)):
+            msg = "Assignment options require `assign_strategy` to be set."
+            raise ConfigurationError(msg)
+
+        weighted = {"scene", "source", "time", "shuffled-time"}
+        time_based = {"time", "shuffled-time"}
+
+        if ratio is not None and assign_strategy not in weighted:
+            msg = "`ratio` is only valid for scene, source, time, and shuffled-time assignment."
+            raise ConfigurationError(msg)
+        if gap is not None and assign_strategy not in time_based:
+            msg = "`gap` is only valid for time and shuffled-time assignment."
+            raise ConfigurationError(msg)
+        if segments is not None and assign_strategy != "shuffled-time":
+            msg = "`segments` is only valid for shuffled-time assignment."
+            raise ConfigurationError(msg)
+        if assign_strategy in weighted and ratio is None:
+            msg = f"`ratio` is required when `assign_strategy='{assign_strategy}'`."
+            raise ConfigurationError(msg)
+        if assign_strategy == "shuffled-time" and segments is None:
+            msg = "`segments` is required when `assign_strategy='shuffled-time'`."
+            raise ConfigurationError(msg)
 
     @classmethod
     def from_inputs(
@@ -106,6 +148,11 @@ class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
             A runtime override object containing the specified overrides.
 
         """
+        cls._validate_read_inputs(read_strategy=read_strategy, read_split=read_split)
+        cls._validate_assign_inputs(
+            assign_strategy=assign_strategy, ratio=ratio, gap=gap, segments=segments
+        )
+
         read_data = {"strategy": read_strategy, "splits": read_split}
         read_data = {k: v for k, v in read_data.items() if v is not None}
         read_config = ReadConfig.model_validate(read_data) if "strategy" in read_data else None

@@ -9,12 +9,10 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
-from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION
 from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.datasets.shared.levelx_loader import LevelXDataLoader, SourceData
-from dronalize.processing.loading.base import ALL_SOURCES, SourceSelection
 from dronalize.processing.loading.loader import Source
 
 if TYPE_CHECKING:
@@ -41,11 +39,7 @@ class AD4CHELoader(LevelXDataLoader):
         )
 
     @override
-    def iter_sources_for(
-        self, selection: SourceSelection = ALL_SOURCES
-    ) -> Iterable[Source[SourceData]]:
-        if selection.native_split is not None:
-            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
+    def iter_sources(self) -> Iterable[Source[SourceData]]:
         for recording_id, subdir in self._recordings():
             yield Source(
                 identifier=recording_id,
@@ -54,9 +48,7 @@ class AD4CHELoader(LevelXDataLoader):
             )
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        if selection.native_split is not None:
-            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
+    def count_sources(self) -> int | None:
         return sum(1 for _ in self._recordings())
 
     @staticmethod

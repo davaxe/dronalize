@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import importlib
 import importlib.util
+import logging
 from collections.abc import Callable, Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
@@ -30,6 +31,7 @@ if TYPE_CHECKING:
 
 
 _REGISTRY: dict[str, DatasetSpec] = {}
+logger = logging.getLogger(__name__)
 
 ResourcesFactory = Callable[
     [Path, ScenesConfig, MapConfig | None], AbstractContextManager[DatasetResources]
@@ -191,11 +193,13 @@ def register(descriptor: DatasetSpec) -> None:
         msg = f"Dataset '{descriptor.name}' is already registered."
         raise DatasetRegistryError(msg)
     _REGISTRY[descriptor.name] = descriptor
+    logger.debug("Registered dataset descriptor", extra={"dataset": descriptor.name})
 
 
 def get(name: str) -> DatasetSpec:
     """Return one registered or built-in dataset descriptor."""
     if name in _REGISTRY:
+        logger.debug("Resolved dataset descriptor from in-memory registry", extra={"dataset": name})
         return _REGISTRY[name]
 
     builtin_specs = _builtin_datasets()
@@ -207,6 +211,7 @@ def get(name: str) -> DatasetSpec:
     if missing:
         raise _missing_dependency_error(subject=f"Dataset '{name}'", spec=spec, missing=missing)
 
+    logger.debug("Resolved dataset descriptor from built-in registry", extra={"dataset": name})
     return _load_builtin_descriptor(name)
 
 

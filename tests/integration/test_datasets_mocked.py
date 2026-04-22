@@ -13,7 +13,7 @@ from dronalize.io import StorageBackend
 from dronalize.io.encoding.common import encode_scene_record
 from dronalize.runtime import ExecutionRequest, resolve_request
 from dronalize.runtime.api import stream_plan
-from tests.integration.datasets.assertions import (
+from tests.integration.assertions import (
     assert_basic_map_sanity,
     assert_basic_scene_sanity,
     assert_record_sanity,

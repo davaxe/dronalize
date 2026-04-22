@@ -31,7 +31,7 @@ jobs:
           enable-cache: true
 
       - name: Sync test environment
-        run: uv sync --group test
+        run: uv sync --frozen --group test
 
       - name: Run tests
         run: uv run pytest -q tests -m "not slow and not dataset"
@@ -67,12 +67,35 @@ jobs:
           enable-cache: true
 
       - name: Sync typecheck environment
-        run: uv sync --group typecheck
+        run: uv sync --frozen --group typecheck
 
       - name: Run basedpyright
-        run: uv run basedpyright src/dronalize/core src/dronalize/processing
-          src/dronalize/config src/dronalize/runtime src/dronalize/io
-          src/dronalize/datasets
+        run: uv run basedpyright src tests
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv and set Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync coverage environment
+        run: uv sync --frozen --group test
+
+      - name: Run coverage
+        run: uv run coverage run -m pytest -q tests -m "not slow and not dataset"
+
+      - name: Report coverage
+        run: |
+          uv run coverage report -m
+          uv run coverage xml
 
   build:
     name: Build package
@@ -89,7 +112,7 @@ jobs:
           enable-cache: true
 
       - name: Sync build environment
-        run: uv sync --group build
+        run: uv sync --frozen --group build
 
       - name: Build sdist and wheel
         run: uv build
@@ -115,7 +138,7 @@ jobs:
           enable-cache: true
 
       - name: Sync docs environment
-        run: uv sync --group docs
+        run: uv sync --frozen --group docs
 
       - name: Build docs
         run: uv run zensical build --clean

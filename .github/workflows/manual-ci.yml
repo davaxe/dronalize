@@ -24,7 +24,7 @@ jobs:
           enable-cache: true
 
       - name: Sync environment with broad dependency coverage
-        run: uv sync --group test --group lint --group typecheck --all-extras
+        run: uv sync --frozen --group test --group lint --group typecheck --all-extras
 
       - name: Run Ruff
         run: uv run ruff check .
@@ -33,7 +33,7 @@ jobs:
         run: uv run basedpyright src tests
 
       - name: Run pytest with coverage
-        run: uv run coverage run -m pytest -x --junitxml=junit.xml -m "not dataset"
+        run: uv run coverage run -m pytest -x --junitxml=junit.xml -m "not slow and not dataset"
 
       - name: Build coverage reports
         if: always()

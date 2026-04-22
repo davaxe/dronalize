@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Generic, cast
 
@@ -26,25 +25,6 @@ if TYPE_CHECKING:
 
 
 _LoaderOptionsT = TypeVar("_LoaderOptionsT", bound=DatasetOptionsModel, default=NoDatasetOptions)
-
-
-@dataclass(frozen=True, slots=True)
-class SourceSelection:
-    """Source-enumeration selector used by loader source APIs."""
-
-    native_split: DatasetSplit | None = None
-
-    @classmethod
-    def all(cls) -> Self:
-        """Return a selector representing all sources."""
-        return cls(native_split=None)
-
-    def all_sources(self) -> bool:
-        """Return whether this selector represents all sources."""
-        return self.native_split is None
-
-
-ALL_SOURCES = SourceSelection()
 
 
 class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
@@ -87,6 +67,18 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         self.map_config: MapConfig | None = request.map
         self.resources: DatasetResources = DatasetResources() if resources is None else resources
         self.loader_options: _LoaderOptionsT = cast("_LoaderOptionsT", request.dataset)
+
+    def __init_subclass__(cls) -> None:
+        """Ensure subclasses implement required source enumeration methods."""
+        if cls is BaseSceneLoader:
+            return
+
+        if (
+            cls.iter_sources_for is BaseSceneLoader.iter_sources_for
+            and cls.iter_sources is BaseSceneLoader.iter_sources
+        ):
+            msg = f"{cls.__name__} must implement either iter_sources_for() or iter_sources()"
+            raise TypeError(msg)
 
     @classmethod
     def unified_factory(
@@ -173,11 +165,20 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         entire source to be loaded into memory at once.
         """
 
-    @abstractmethod
-    def iter_sources_for(
-        self, selection: SourceSelection = ALL_SOURCES
-    ) -> Iterable[Source[SourceT]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[SourceT]]:
         """Yield sources matching a specific selection request.
+
+        !!! warning "Implement at least one source enumeration method"
+            Subclasses should implement either `iter_sources_for()` with native
+            split support or `iter_sources()` for full enumeration. The default
+            implementation of `iter_sources_for()` raises `NotImplementedError`
+            to enforce this contract and provide a clear error message if
+            neither method is implemented.
+
+        Parameters
+        ----------
+        split : DatasetSplit
+            The dataset split to select sources for.
 
         Returns
         -------
@@ -194,17 +195,45 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         `selection.native_split=None` represents all sources exposed by the
         loader. Native-split datasets may also support selection of one
         concrete native partition via `selection.native_split`.
-        """
+        """  # noqa: DOC202
+        _ = split
+        msg = (
+            f"{self.__class__.__name__} does not implement source enumeration"
+            " by split. Either implement iter_sources_for() with native split"
+            " support or iter_sources() for full enumeration."
+        )
+        raise NotImplementedError(msg)
 
     def iter_sources(self) -> Iterable[Source[SourceT]]:
-        """Yield all sources for the effective read scope."""
+        """Yield all sources for the effective read scope.
+
+        !!! warning "Implement at least one source enumeration method"
+            Subclasses should implement either `iter_sources_for()` with native
+            split support or `iter_sources()` for full enumeration. The default
+            implementation of `iter_sources_for()` raises `NotImplementedError`
+            to enforce this contract and provide a clear error message if
+            neither method is implemented.
+
+        !!! note "Default implementation"
+            The default implementation of `iter_sources()` checks for native split
+            support and delegates to `iter_sources_for()` if native splits are
+            defined. This allows loaders with native split support to only
+            implement `iter_sources_for()` while still providing a working
+            `iter_sources()` method for full enumeration. Loaders without native
+            split support must implement `iter_sources()` directly.
+
+        """
         native_splits = self.read_config.native_splits
         if native_splits is not None:
             for split in native_splits:
-                for source in self.iter_sources_for(SourceSelection(native_split=split)):
+                for source in self.iter_sources_for(split):
                     yield source.with_predefined_split(split)
             return
-        yield from self.iter_sources_for()
+        msg = (
+            f"{self.__class__.__name__} does not implement iter_sources()"
+            f"or `iter_sources_for()` with native split support"
+        )
+        raise NotImplementedError(msg)
 
     def map_resolver(self) -> MapResolver:
         """Return the loader-level map resolver used for scene-to-map lookup.
@@ -259,9 +288,25 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
             return None
         return self.map_resolver()(scene)
 
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        """Return the source count for a selection when cheaply knowable."""
-        _ = selection, self
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
+        """Return the source count for a selection when cheaply knowable.
+
+        !!! info "Override when source counts are cheaply knowable"
+            The default implementation returns `None` to indicate that the count
+            is unknown or expensive to compute. Loaders with native split
+            support and cheaply knowable source counts should override this
+            method to enable accurate progress reporting and diagnostics.
+
+            If the native splits is not defined, overrides should implement
+            `count_sources()` to provide a total count.
+
+        Returns
+        -------
+        int or None
+            The number of sources matching the selection, or `None` if the value
+            is unknown, expensive to compute, or inherently dynamic.
+        """
+        _ = split, self
         return None
 
     def count_sources(self) -> int | None:
@@ -282,10 +327,10 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         """
         native_splits = self.read_config.native_splits
         if native_splits is None:
-            return self.count_sources_for()
+            return None
         total = 0
         for split in native_splits:
-            count = self.count_sources_for(SourceSelection(native_split=split))
+            count = self.count_sources_for(split)
             if count is None:
                 return None
             total += count

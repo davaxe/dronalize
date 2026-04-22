@@ -16,7 +16,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.loading.options import DatasetOptionsModel
 from dronalize.processing.maps.resolver import no_map, shared_map
@@ -107,36 +107,20 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
             current += self.loader_options.scene_batch_size
 
     @override
-    def iter_sources_for(
-        self, selection: SourceSelection = ALL_SOURCES
-    ) -> Iterable[Source[_Source]]:
-        split = selection.native_split
-        if split is None:
-            for native_split in _NATIVE_SPLITS:
-                yield from self.iter_sources_for(SourceSelection(native_split=native_split))
-            return
-        if split in {DatasetSplit.TRAIN, DatasetSplit.VAL}:
-            yield from self._generate_sources(split)
-            return
-        raise SplitNotSupportedError(type(self).__name__, split)
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[_Source]]:
+        if split == DatasetSplit.TEST:
+            raise SplitNotSupportedError(type(self).__name__, split)
+        yield from self._generate_sources(split)
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        split = selection.native_split
-        if split is None:
-            return sum(
-                self._count_sources_for_split(native_split) for native_split in _NATIVE_SPLITS
-            )
-        return self._count_sources_for_split(split)
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
+        return self._source_count(
+            self._get_arrays(split).total_scenes, self.loader_options.scene_batch_size
+        )
 
     @staticmethod
     def _source_count(total_scenes: int, batch_size: int) -> int:
         return (total_scenes + batch_size - 1) // batch_size
-
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
-        return self._source_count(
-            self._get_arrays(split).total_scenes, self.loader_options.scene_batch_size
-        )
 
     @override
     def load_source(self, source: Source[_Source]) -> Iterable[LoadedSourceData]:

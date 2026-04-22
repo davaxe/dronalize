@@ -84,7 +84,7 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         else:
             base = target.model_dump()
         patch = self.model_dump(exclude_unset=True, exclude_none=exclude_none)
-        merged = _deep_merge(base, patch)
+        merged = deep_merge(base, patch)
         return self.full_config_type.model_validate(merged)
 
     @classmethod
@@ -94,13 +94,13 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         return cls.model_validate(data)
 
 
-def _deep_merge(base: MutableMapping[str, V], patch: Mapping[str, V]) -> MutableMapping[str, V]:
+def deep_merge(base: MutableMapping[str, V], patch: Mapping[str, V]) -> MutableMapping[str, V]:
     """Recursively merge two mappings."""
     for key, patch_value in patch.items():
         base_value = base.get(key)
 
         if isinstance(base_value, MutableMapping) and isinstance(patch_value, Mapping):
-            _ = _deep_merge(base_value, patch_value)  # pyright: ignore[reportUnknownArgumentType]
+            _ = deep_merge(base_value, patch_value)  # pyright: ignore[reportUnknownArgumentType]
         else:
             base[key] = copy.deepcopy(patch_value)
 

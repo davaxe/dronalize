@@ -84,7 +84,6 @@ class BaseMapBuilder(MapBuilder, ABC):
     _seen_edges: set[tuple[int, int, int]] = field(default_factory=set, init=False)
 
     _pending_paths: list[_PendingPathDict] = field(default_factory=list, repr=False, init=False)
-    """Paths queued via `add_path_lazy` for deferred processing."""
 
     def _next_node_id(self) -> int:
         """Return the next unique integer node ID and advance the counter.

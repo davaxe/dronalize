@@ -9,7 +9,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -29,19 +29,11 @@ class _EthUcyLoader(BaseSceneLoader):
     def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
         super().__init__(data_root=data_root, request=request)
 
-    def _sources_from_split(self, split_name: str) -> Iterable[Source[Path]]:
-        data_dir = self.root / split_name
+    @override
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
+        data_dir = self.root / split.value
         for data_file in sorted(data_dir.iterdir()):
             yield Source(identifier=data_file.name, data=data_file)
-
-    @override
-    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
-        split = selection.native_split
-        if split is None:
-            for native_split in _NATIVE_SPLITS:
-                yield from self.iter_sources_for(SourceSelection(native_split=native_split))
-            return
-        yield from self._sources_from_split(split.value)
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
@@ -70,15 +62,7 @@ class _EthUcyLoader(BaseSceneLoader):
         return POSITIONS_ONLY
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        split = selection.native_split
-        if split is None:
-            return sum(
-                self._count_sources_for_split(native_split) for native_split in _NATIVE_SPLITS
-            )
-        return self._count_sources_for_split(split)
-
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
         data_dir = self.root / split.value
         return sum(1 for _ in data_dir.iterdir()) if data_dir.is_dir() else 0
 

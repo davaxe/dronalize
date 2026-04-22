@@ -62,8 +62,6 @@ class LyftMapBuilder(BaseMapBuilder):
         self._add_road_segment_edges()
         self._add_junction_edges()
 
-    # --- Private methods ---
-
     def _add_junction_edges(self) -> None:
         """Add edges for junctions in the map."""
         for junction in self.map.junctions.values():

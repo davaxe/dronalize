@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
+
+from dronalize.core.errors import ManifestCompatibilityError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -12,6 +15,7 @@ if TYPE_CHECKING:
 
 FORMAT_VERSION: int = 1
 MANIFEST_FILENAME: str = "manifest.json"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -38,8 +42,11 @@ class DatasetManifest:
     @classmethod
     def from_json_dict(cls, payload: dict[str, Any]) -> DatasetManifest:
         """Create a manifest from previously serialized JSON data."""
+        format_version = int(payload.get("format_version", 0))
+        if format_version != FORMAT_VERSION:
+            raise ManifestCompatibilityError(format_version, FORMAT_VERSION)
         return cls(
-            format_version=int(payload["format_version"]),
+            format_version=format_version,
             source_trajectory_schema=str(
                 payload.get("source_trajectory_schema", payload["trajectory_schema"])
             ),
@@ -75,6 +82,7 @@ def manifest_path(root: Path) -> Path:
 def write_manifest(root: Path, manifest: DatasetManifest) -> None:
     """Write the storage manifest for one output root."""
     root.mkdir(parents=True, exist_ok=True)
+    logger.debug("Writing manifest", extra={"root": str(root), "format_version": FORMAT_VERSION})
     _ = manifest_path(root).write_text(
         json.dumps(manifest.to_json_dict(), indent=2), encoding="utf-8"
     )
@@ -93,5 +101,6 @@ def read_manifest(root: Path) -> DatasetManifest:
     DatasetManifest
         The parsed dataset manifest.
     """
+    logger.debug("Reading manifest", extra={"root": str(root)})
     payload = json.loads(manifest_path(root).read_text(encoding="utf-8"))
     return DatasetManifest.from_json_dict(payload)

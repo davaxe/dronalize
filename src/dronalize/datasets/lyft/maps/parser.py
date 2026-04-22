@@ -316,33 +316,14 @@ class RoadNetworkSegment:
     """
 
     start_node: str
-    """Id of the start node of the segment."""
-
     end_node: str
-    """Id of the end node of the segment."""
-
     forward_lane_set: LaneSet
-    """Lane set in the forward direction."""
-
     backward_lane_set: LaneSet
-    """Lane set in the backward direction."""
-
     num_bidirectional_lanes: int
-    """Total number of bidirectional lanes in the segment."""
-
     lanes: list[str]
-    """Ids of the lanes in the segment, ordered from left to right, often
-    starting from backward lanes to forward lanes."""
-
     road_type: RoadType = RoadType.UNKNOWN
-    """Type of the road segment, e.g., MOTORWAY, PRIMARY, etc."""
-
     travel_direction: TravelDirection = TravelDirection.UNKNOWN
-    """Indicates the travel direction in the road segment, e.g., TWO_WAY."""
-
     walkable: SideOfSegment = SideOfSegment.UNKNOWN
-    """Indicates if the segment is walkable on the some side(s) of the road
-    segment."""
 
     @classmethod
     def from_proto_road_network_segment(

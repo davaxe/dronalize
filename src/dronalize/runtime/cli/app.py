@@ -1,4 +1,4 @@
-"""Typer application for the otional dronalze CLI."""
+"""Typer application for the optional Dronalize CLI."""
 
 # ruff: noqa: PLC0415
 from __future__ import annotations
@@ -35,7 +35,9 @@ if TYPE_CHECKING:
     from dronalize.runtime.types import ExecutionPlan
 
 
-app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
+app: typer.Typer = typer.Typer(
+    help="Trajectory data processing toolkit.", no_args_is_help=True
+)
 _T = TypeVar("_T")
 
 ReadStrategy = Literal["all", "native"]
@@ -242,7 +244,7 @@ def show_config(
     assign: Assign = None,
     config: Config = None,
     jobs: Jobs = None,
-    storage_backend: StorageBackendOption = StorageBackend.MDS,
+    storage_backend: StorageBackendOption = StorageBackend.PICKLE,
     trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,

@@ -14,7 +14,7 @@ from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.shared import utils
 from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
-from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
 
 if TYPE_CHECKING:
@@ -44,27 +44,16 @@ class WaymoLoader(BaseSceneLoader):
             yield Source(identifier=tfrecord_path.stem, data=tfrecord_path)
 
     @override
-    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
-        split = selection.native_split
-        if split is None:
-            for native_split in _NATIVE_SPLITS:
-                yield from self.iter_sources_for(SourceSelection(native_split=native_split))
-            return
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
         if split is DatasetSplit.TRAIN:
             yield from self._sources_from_dir(self.root / "training")
-            return
-        if split is DatasetSplit.VAL:
+        elif split is DatasetSplit.VAL:
             yield from self._sources_from_dir(self.root / "validation")
-            return
-        yield from self._sources_from_dir(self.root / "testing")
+        else:
+            yield from self._sources_from_dir(self.root / "testing")
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        split = selection.native_split
-        if split is None:
-            return sum(
-                self._count_sources_for_split(native_split) for native_split in _NATIVE_SPLITS
-            )
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
         return self._count_sources_for_split(split)
 
     @override

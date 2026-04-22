@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
-
 from pydantic import Field
 
 from dronalize.config.base import ConfigBase
@@ -68,31 +66,3 @@ class ProcessingConfig(ConfigBase):
             dataset_config = profile.apply_to(dataset_config)
 
         return partial.partial_config().apply_to(dataset_config)
-
-    def extract(self, dataset: str) -> DatasetConfig | None:
-        """Extract the dataset config for a specific dataset without resolution.
-
-        There are two failure modes for this method that both result in `None`
-        being returned:
-
-        1. the dataset is not found in the file, and
-        2. the dataset is found but resolution fails due to incomplete config
-           values.
-
-        Parameters
-        ----------
-        dataset : str
-            The name of the dataset to extract, e.g. `"argoverse1"` or `"vod"`.
-
-        Returns
-        -------
-        DatasetConfig | None
-            The dataset config for the specified dataset, or `None` if not found
-            or if resolution fails.
-        """
-        partial = self.datasets.get(dataset) if self.datasets else None
-        if partial is None:
-            return None
-        with contextlib.suppress(ValueError):
-            return partial.partial_config().apply_to(None)
-        return None

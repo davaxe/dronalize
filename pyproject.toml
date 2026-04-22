@@ -26,15 +26,24 @@ dependencies = [
 keywords = ["autonomous driving", "trajectory data", "data processing", "datasets", "machine learning"]
 
 classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
 ]
 
 [project.urls]
-Repository = "https://github.com/westny/dronalize"
+Homepage = "https://github.com/davaxe/dronalize"
+Repository = "https://github.com/davaxe/dronalize"
+Documentation = "https://westny.github.io/dronalize/"
+Issues = "https://github.com/davaxe/dronalize/issues"
+Changelog = "https://github.com/davaxe/dronalize/blob/main/CHANGELOG.md"
 
 [project.scripts]
 dronalize = "dronalize.__main__:main"
@@ -112,6 +121,7 @@ omit = [
 [tool.coverage.report]
 show_missing = true
 skip_covered = false
+fail_under = 50
 
 [tool.coverage.html]
 directory = "htmlcov"
