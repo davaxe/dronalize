@@ -2,8 +2,8 @@ from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.opendd.loader import OpenDDLoader
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import (
+    linear_resample,
     minimum_samples_screening,
-    resample_config,
     scenes_config,
 )
 
@@ -16,7 +16,7 @@ DATASET_SPEC = DatasetSpec(
             future_frames=150,
             sample_time=1 / 30,
             window_step=75,
-            resample=resample_config(method="linear", up=1, down=3),
+            resample=linear_resample(up=1, down=3),
         ),
         screening=minimum_samples_screening(6),
         map=MapConfig(extraction=FullMapExtraction()),

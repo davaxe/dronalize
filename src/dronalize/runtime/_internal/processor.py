@@ -51,6 +51,17 @@ class SceneCandidate:
     split_assignment: DatasetSplit | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class DeferredMapResolver:
+    """Picklable scene map resolver for deferred map materialization."""
+
+    loader: BaseSceneLoader[Any, DatasetOptionsModel]
+    map_binding: MapBinding | None = None
+
+    def __call__(self, scene: Scene) -> MapGraph | None:
+        return self.loader.resolve_map(scene, self.map_binding)
+
+
 @dataclass(slots=True)
 class SourcePlanner:
     """Resolve the effective source stream for one runtime plan."""
@@ -257,11 +268,7 @@ class SceneMaterializer:
             return None, None
 
         map_key = candidate.map_binding.map_key or candidate.source.map_key
-
-        def _resolver(scene: Scene) -> MapGraph | None:
-            return self.loader.resolve_map(scene, candidate.map_binding)
-
-        return map_key, _resolver
+        return map_key, DeferredMapResolver(self.loader, candidate.map_binding)
 
 
 @dataclass(slots=True)

@@ -66,7 +66,11 @@ class ParallelExecutor(Executor):
     @override
     def execute_yield(self) -> Iterator[Scene]:
         for scenes in self._execute_parallel(
-            self._process_fn_yield, self._processor.iter_sources(), _init_worker, self._shared
+            self._process_fn_yield,
+            self._processor.iter_sources(),
+            _init_worker,
+            self._shared,
+            self._processor,
         ):
             yield from scenes
 
@@ -174,11 +178,16 @@ class ParallelExecutor(Executor):
         return max(chunksize, 1)
 
 
-def _init_worker(shared: state.SharedResources, *, with_finalize: bool = True) -> None:
+def _init_worker(
+    shared: state.SharedResources,
+    processor: RuntimeProcessor | None = None,
+    *,
+    with_finalize: bool = True,
+) -> None:
     global _ctx  # noqa: PLW0603
     worker_id = shared.registry.next_worker()
     shared.progress.worker_started()
-    _ctx = state.WorkerRuntime(shared=shared, worker_id=worker_id)
+    _ctx = state.WorkerRuntime(shared=shared, worker_id=worker_id, processor=processor)
     if with_finalize:
 
         def cleanup() -> None:
@@ -193,8 +202,7 @@ def _init_write_worker(
     writer_factory: Callable[[int], DatasetWriter],
 ) -> None:
     global _ctx  # noqa: PLW0602
-    _init_worker(shared, with_finalize=False)
-    _ctx.processor = processor
+    _init_worker(shared, processor, with_finalize=False)
     writer: DatasetWriter | None = None
     try:
         writer = writer_factory(_ctx.worker_id)

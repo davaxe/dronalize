@@ -7,8 +7,6 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from dronalize.plot import plot_scene
-
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -200,6 +198,8 @@ def save_scene_artifacts(
     scene: Scene, graph: MapGraph | None, out_dir: Path, case: DatasetCase
 ) -> None:
     """Save scene artifacts like trajectories and maps for debugging."""
+    from dronalize.plot import plot_scene
+
     out_dir.mkdir(parents=True, exist_ok=True)
 
     frame = scene.frame.select("frame", "id", "x", "y")

@@ -1,4 +1,4 @@
-"""Public entry point for temporal resampling of trajectory tables."""
+"""Public entry point for tempral resampling of trajectory tables."""
 
 from __future__ import annotations
 

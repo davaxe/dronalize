@@ -3,9 +3,9 @@ from dronalize.datasets.highd.loader import HighDLoader
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import (
     lane_change_sampling,
+    linear_resample,
     minimum_samples_screening,
     scenes_config,
-    spline_resample,
 )
 
 DATASET_SPEC = DatasetSpec(
@@ -17,7 +17,7 @@ DATASET_SPEC = DatasetSpec(
             future_frames=125,
             sample_time=1 / 25,
             window_step=25,
-            resample=spline_resample(up=2),
+            resample=linear_resample(up=2, down=5),
             lane_change=lane_change_sampling(required_lane_changes=3, negative_keep_every=3),
         ),
         screening=minimum_samples_screening(2),

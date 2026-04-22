@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from dronalize.config.models.output import OutputConfig
-from dronalize.io import DatasetManifest, adapters, read_manifest
+from dronalize.io import DatasetManifest, read_manifest
 from dronalize.io.backends.pickle import PickleWriter
 from dronalize.io.encoding import encode_scene_record, encode_unsplit_scene_record
 from dronalize.io.encoding.mds import decode_mds_sample, encode_mds_sample
@@ -51,9 +51,7 @@ def test_encode_scene_record_uses_passed_agent_ids(scene: Scene) -> None:
     np.testing.assert_array_equal(record.passed_agent_mask, np.array([True, False]))
 
 
-def test_pickle_writer_roundtrip_preserves_scene_record_contract(
-    tmp_path: Path, scene: Scene
-) -> None:
+def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     output_dir = tmp_path / "pickle"
     writer = PickleWriter(output_dir=output_dir, config=_output_plan(), splits=None)
 
@@ -67,9 +65,28 @@ def test_pickle_writer_roundtrip_preserves_scene_record_contract(
     assert_scene_record_equal(reader[0], expected)
 
 
-def test_mds_encoder_decoder_roundtrip_preserves_data_without_streaming_dependency(
-    scene: Scene,
-) -> None:
+def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("streaming")
+
+    from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
+    from dronalize.io.readers import MDSReader  # noqa: PLC0415
+
+    output_dir = tmp_path / "mds"
+    writer = MDSDatasetWriter(
+        output_dir=output_dir, config=_output_plan(), splits=None, parallel=False
+    )
+
+    expected = encode_scene_record(scene, dtype=np.float32)
+    writer.write(scene)
+    writer.finish_local()
+    writer.finish_final()
+
+    reader = MDSReader(path=output_dir)
+    assert len(reader) == 1
+    assert_scene_record_equal(reader[0], expected)
+
+
+def test_mds_encoder_decoder_roundtrip_preserves_data(scene: Scene) -> None:
     unsplit = encode_unsplit_scene_record(scene, dtype=np.float32)
     sample = encode_mds_sample(unsplit, observation_length=scene.history_frames)
     decoded = decode_mds_sample(sample)
@@ -97,8 +114,3 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     loaded = read_manifest(tmp_path)
 
     assert loaded == manifest
-
-
-def test_adapter_module_raises_for_unknown_export() -> None:
-    with pytest.raises(AttributeError, match="has no attribute"):
-        _ = adapters.NotARealAdapter

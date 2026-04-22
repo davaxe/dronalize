@@ -40,7 +40,7 @@ class AD4CHEMapBuilder(BaseMapBuilder):
     """
 
     def __init__(
-        self, map_image_path: Path, pixel_to_meter: float = PIXEL_TO_METER, spatial_ds: float = 3.0
+        self, map_image_path: Path, pixel_to_meter: float = PIXEL_TO_METER, spatial_ds: float = 4.0
     ) -> None:
         if not map_image_path.is_file():
             msg = f"Map image file does not exist: {map_image_path}"
@@ -74,10 +74,8 @@ class AD4CHEMapBuilder(BaseMapBuilder):
                 coords = cnt[:, 0, :] * self.pixel_to_meter
                 # Downsample
                 coords = _spatial_downsample_polyline(coords, d_min=self.spatial_ds)
-
                 if len(coords) < 2:
                     continue
-
                 points = [(float(pt[0]), h_meters - float(pt[1])) for pt in coords]
 
                 self.add_path_lazy(
@@ -93,7 +91,7 @@ def _get_black_border_pixels(gray_image: MatLike) -> npt.NDArray[np.uint8]:
 
 
 def _spatial_downsample_polyline(
-    polyline: npt.NDArray[np.float64], d_min: float = 0.5
+    polyline: npt.NDArray[np.float64], d_min: float = 1
 ) -> npt.NDArray[np.float64]:
     if len(polyline) < 2:
         return polyline

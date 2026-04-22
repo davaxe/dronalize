@@ -151,7 +151,7 @@ class LevelXDataLoader(BaseSceneLoader[SourceData]):
         combined = tracks_df.join(meta_df, left_on="id", right_on="id")
         combined = combined.with_columns(
             (pl.col("x") + (source.data.x0 or 0.0)).alias("x"),
-            (pl.col("y") + (source.data.y0)).alias("y"),
+            (pl.col("y") + (source.data.y0 or 0.0)).alias("y"),
         )
         yield LoadedSourceData(combined)
 

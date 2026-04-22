@@ -6,9 +6,9 @@ from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig,
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import open_named_shared_map_resources
 from dronalize.datasets.shared.specs import (
+    linear_resample,
     minimum_samples_screening,
     scenes_config,
-    spline_resample,
 )
 from dronalize.datasets.unid.loader import UniDLoader
 from dronalize.datasets.unid.maps.builder import UniDMapBuilder
@@ -46,7 +46,7 @@ DATASET_SPEC = DatasetSpec(
             future_frames=125,
             sample_time=1 / 25,
             window_step=25,
-            resample=spline_resample(up=2),
+            resample=linear_resample(up=2, down=5),
         ),
         screening=minimum_samples_screening(2),
         map=MapConfig(extraction=FullMapExtraction()),

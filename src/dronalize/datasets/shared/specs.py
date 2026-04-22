@@ -61,6 +61,11 @@ def resample_config(
     )
 
 
+def linear_resample(up: int, down: int = 1) -> ResampleConfig:
+    """Return a linear resampling config."""
+    return resample_config(method="linear", up=up, down=down)
+
+
 def spline_resample(
     up: int, down: int = 1, *, emit_velocity: bool = True, emit_acceleration: bool = True
 ) -> ResampleConfig:

@@ -9,8 +9,8 @@ from dronalize.datasets.eth_ucy.loader import (
 )
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import (
+    linear_resample,
     minimum_samples_screening,
-    resample_config,
     scenes_config,
 )
 
@@ -21,7 +21,7 @@ _DEFAULT_CONFIG = DatasetConfig(
         future_frames=12,
         sample_time=0.4,
         window_step=1,
-        resample=resample_config(method="linear", up=4),
+        resample=linear_resample(up=4),
     ),
     screening=minimum_samples_screening(2),
 )
