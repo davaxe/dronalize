@@ -51,8 +51,10 @@ class SplitRequest:
 
     def active(self) -> tuple[tuple[DatasetSplit, float], ...]:
         """Return the active splits based on the configuration."""
-        if isinstance(self.config, (NativeSplitConfig, NoSplitConfig)):
+        if isinstance(self.config, NoSplitConfig):
             return ()
+        if isinstance(self.config, NativeSplitConfig):
+            return ((split, 1.0) for split in self.read) if self.read is not None else ()
         active: list[tuple[DatasetSplit, float]] = []
         if self.config.ratio.train > 0:
             active.append((DatasetSplit.TRAIN, self.config.ratio.train))
@@ -111,7 +113,7 @@ class LoaderRequest:
     scenes: ScenesConfig
     dataset: DatasetOptionsModel
     screening: ScreeningConfig | None = None
-    split: SplitRequest | None = None
+    split: SplitRequest = SplitRequest(config=NoSplitConfig())
     map: MapConfig | None = None
     native_splits: tuple[DatasetSplit, ...] | None = None
 

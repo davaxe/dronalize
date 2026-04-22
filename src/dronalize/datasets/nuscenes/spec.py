@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction, ScenesConfig
+from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.nuscenes.loader import NuScenesLoader, NuScenesLoaderOptions
 from dronalize.datasets.nuscenes.maps.builder import NuScenesMapBuilder
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
@@ -55,5 +56,6 @@ DATASET_SPEC = DatasetSpec(
     native_schema=NuScenesLoader.native_trajectory_schema(),
     resources_factory=open_nuscenes_resources,
     has_map=True,
+    native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     split_support=DatasetSplitSupport(scene=True, source=True),
 )

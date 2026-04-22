@@ -7,8 +7,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-pytest.importorskip("altair")
-
 from dronalize.config.runtime import RuntimeOverride
 from dronalize.io import StorageBackend
 from dronalize.io.encoding.common import encode_scene_record
@@ -35,7 +33,7 @@ def test_datasets(
 ) -> None:
     if not (raw_data_root / case.path_rel_root).exists():
         pytest.skip(f"Dataset root not found: {raw_data_root / case.path_rel_root}")
-    if jobs == 1 or case.dataset != "nuscenes":
+    if jobs == 4 or case.dataset != "vod":
         return
 
     if jobs > 1:

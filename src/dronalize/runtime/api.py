@@ -84,7 +84,7 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
             processed_sources=progress.processed_sources,
             candidate_scenes=progress.candidate_scenes,
             selected_scenes=progress.selected_scenes,
-            split_counts=progress.split_counts,
+            split_counts={k: v for k, v in progress.split_counts.items() if isinstance(v, int)},
         )
 
 

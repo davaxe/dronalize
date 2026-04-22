@@ -64,7 +64,7 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         self.request: LoaderRequest = request
         self.scenes_config: ScenesConfig = request.scenes
         self.screening_config: ScreeningConfig | None = request.screening
-        self.split_config: SplitRequest | None = request.split
+        self.split_config: SplitRequest = request.split
         self.map_config: MapConfig | None = request.map
         self.native_splits: tuple[DatasetSplit, ...] | None = request.native_splits
         self.resources: DatasetResources = DatasetResources() if resources is None else resources

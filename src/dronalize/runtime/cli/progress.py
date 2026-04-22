@@ -15,6 +15,8 @@ from rich.panel import Panel
 from rich.text import Text
 from typing_extensions import override
 
+from dronalize.runtime._internal.state import SplitCounts
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -47,7 +49,7 @@ class _ExecutorDisplay(RichCast):
         self.workers: int = 0
         self.candidate_scenes: int = 0
         self.selected_scenes: int = 0
-        self.split_counts: dict[str, int] = {}
+        self.split_counts: SplitCounts = SplitCounts(unsplit=0, train=0, val=0, test=0)
         self.screening_enabled: bool = False
 
     def update(self, progress_state: Progress) -> None:
@@ -98,7 +100,9 @@ class _ExecutorDisplay(RichCast):
             screening_text.justify = "center"
             layout_elements.append(screening_text)
 
-        nonzero_splits = {k: v for k, v in self.split_counts.items() if v > 0}
+        nonzero_splits = {
+            k: v for k, v in self.split_counts.items() if isinstance(v, int) and v > 0
+        }
         if nonzero_splits:
             total = sum(nonzero_splits.values())
             splits_str = " • ".join(

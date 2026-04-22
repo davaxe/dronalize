@@ -198,7 +198,10 @@ def save_scene_artifacts(
     scene: Scene, graph: MapGraph | None, out_dir: Path, case: DatasetCase
 ) -> None:
     """Save scene artifacts like trajectories and maps for debugging."""
-    from dronalize.plot import plot_scene
+    try:
+        from dronalize.plot import plot_scene  # noqa: PLC0415
+    except ImportError:
+        return
 
     out_dir.mkdir(parents=True, exist_ok=True)
 

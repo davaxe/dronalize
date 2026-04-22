@@ -8,6 +8,8 @@ from contextlib import ExitStack
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from typing_extensions import TypedDict
+
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
@@ -19,17 +21,37 @@ if TYPE_CHECKING:
     from dronalize.runtime._internal.processor import RuntimeProcessor
 
 
+class SplitCounts(TypedDict, total=True):
+    unsplit: int
+    train: int
+    val: int
+    test: int
+
+
 @dataclass(frozen=True, slots=True)
 class Progress:
     running: bool
+    """Whether the execution is currently running."""
     processed_sources: int
+    """The number of sources that have been processed."""
     candidate_scenes: int
+    """The number of candidate scenes that have been generated and screened.
+
+    This is incremented for every scene that is generated and screened,
+    regardless of whether it is selected or not.
+    """
     selected_scenes: int
+    """Actual number of scenes that have been selected for the dataset."""
     total_sources: int | None
+    """Total sources to process if known, otherwise None."""
     scene_limit: int | None
+    """The total scene limit if one is set, otherwise None."""
     active_workers: int
-    split_counts: dict[str, int]
+    """Current number of active worker processes."""
+    split_counts: SplitCounts
+    """Split partition counts, with keys "unsplit", "train", "val", and "test"."""
     screening_enabled: bool
+    """Whether the processor has screening enabled."""
 
 
 @dataclass(slots=True)
@@ -137,7 +159,7 @@ class ProgressState:
             counter.value += 1
         self.update_event.set()
 
-    def split_counts(self) -> dict[str, int]:
+    def split_counts(self) -> SplitCounts:
         return {
             "unsplit": self.unsplit_counter.value,
             DatasetSplit.TRAIN.value: self.train_counter.value,

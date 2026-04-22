@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from dronalize.runtime._internal.executor import Executor, WriterFactory
-from dronalize.runtime._internal.state import Progress
+from dronalize.runtime._internal.state import Progress, SplitCounts
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
@@ -18,7 +18,16 @@ if TYPE_CHECKING:
 
 
 class SequentialExecutor(Executor):
-    """Single-process executor for internal runtime execution."""
+    """Single-process executor for internal runtime execution.
+
+    Parameters
+    ----------
+    processor: RuntimeProcessor
+        The runtime processor to execute, containing logic and cofigurations.
+    limit: int | None, optional
+        An optional limit on the total number of scenes to select. If None, no
+        limit will be applied. Default is None.
+    """
 
     def __init__(self, processor: RuntimeProcessor, *, limit: int | None = None) -> None:
         self._processor: RuntimeProcessor = processor
@@ -26,7 +35,7 @@ class SequentialExecutor(Executor):
         self._candidate_scene_counter: int = 0
         self._selected_scene_counter: int = 0
         self._source_counter: int = 0
-        self._split_counts: dict[str, int] = {"unsplit": 0, "train": 0, "val": 0, "test": 0}
+        self._split_counts: SplitCounts = {"unsplit": 0, "train": 0, "val": 0, "test": 0}
         self._screening_enabled: bool = processor.screening_enabled()
         self._total_sources: int | None = processor.total_sources()
         self._update_event: threading.Event = threading.Event()
@@ -56,7 +65,7 @@ class SequentialExecutor(Executor):
             total_sources=self._total_sources,
             scene_limit=self._limit,
             active_workers=1 if self._running else 0,
-            split_counts=self.split_counts,
+            split_counts=self._split_counts,
             screening_enabled=self._screening_enabled,
         )
 
@@ -67,10 +76,6 @@ class SequentialExecutor(Executor):
     @override
     def is_running(self) -> bool:
         return self._running
-
-    @property
-    def split_counts(self) -> dict[str, int]:
-        return dict(self._split_counts)
 
     def _generate_and_track(self) -> Iterable[Scene]:
         self._running = True

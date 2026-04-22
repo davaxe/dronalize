@@ -30,6 +30,26 @@ _ctx: state.WorkerRuntime
 
 
 class ParallelExecutor(Executor):
+    """Parallel executor for internal runtime execution.
+
+    Parameters
+    ----------
+    processor: RuntimeProcessor
+        The runtime processor to execute, containing logic and cofigurations.
+    chunksize: int | None, optional
+        The number of sources to process in each worker batch. If None, an
+        optimal chunksize will be estimated based on a simple heuristic. Default
+        is None.
+    workers: int | None, optional
+        The number of worker processes to use for parallel execution. If None,
+        the number of CPU cores will be used. Default is None.
+    limit: int | None, optional
+        An optional limit on the total number of scenes to select across all
+        workers. If None, no limit will be applied. Default is None.
+
+
+    """
+
     def __init__(
         self,
         processor: RuntimeProcessor,
@@ -97,11 +117,6 @@ class ParallelExecutor(Executor):
     def is_running(self) -> bool:
         return self._running
 
-    @property
-    def split_counts(self) -> dict[str, int]:
-        with self._shared.progress.snapshot_lock:
-            return self._shared.progress.split_counts()
-
     @staticmethod
     def _process_fn_write(source: Source[Any]) -> int:
         if _ctx.writer is None:
@@ -112,12 +127,12 @@ class ParallelExecutor(Executor):
             raise ValueError(msg)
         if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
             return 0
-        _ = _ctx.shared.progress.increment_source()
         selected_scenes = 0
         for scene in ParallelExecutor._generate_scenes(_ctx.processor, source):
             _ctx.shared.progress.record_split(scene.split_assignment)
             _ctx.writer.write(scene)
             selected_scenes += 1
+        _ = _ctx.shared.progress.increment_source()
         return selected_scenes
 
     @staticmethod
@@ -163,8 +178,6 @@ class ParallelExecutor(Executor):
         self.progress_event().set()
         with mp.Pool(self._processes, initializer=pool_initializer) as pool:
             yield from pool.imap_unordered(process_fn, payloads, self._chunksize)
-            pool.close()
-            pool.join()
         self._running = False
         self.progress_event().set()
 
