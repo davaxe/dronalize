@@ -6,23 +6,12 @@ ExiD is a drone-based highway dataset centered on highly interactive entry and e
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Highway</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2022</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Vehicles</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                            | Notes                                                           |
-| ------------------- | -------------------------------- | --------------------------------------------------------------- |
-| Release year        | 2022                             | Based on the cited dataset paper and release.                   |
-| Domain              | Highway entry and exit traffic   | Designed around interactive merge and diverge situations.       |
-| Capture platform    | Drone                            | Recorded from an overhead aerial perspective.                   |
-| Primary agent types | Cars, trucks, buses, motorcycles | Focused on motorized highway traffic.                           |
-| Map context         | Road geometry and lane layout    | Includes map assets for the recording areas.                    |
-| Geographic coverage | Germany                          | Spans several highway locations with interaction-heavy traffic. |
-| Data format         | CSV trajectories with maps       | Distributed as track files and companion map data.              |
 
 ## Default processing profile
 
@@ -38,45 +27,50 @@ These are the default Dronalize settings used when processing this dataset.
 | Lane-change sampling | Require 3 lane changes; keep 1 in 3 negatives |
 | Maps | Full map |
 
-## Version
+## Dataset compatibility
 
-Dronalize currently targets exiD `v2.1`, matching the inspected `exiD-dataset-v2.1.zip` distribution name.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | exiD v2.1 |
+| Loader expectation | The loader assumes the exiD v2.1 distribution layout. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `car` | `CAR` | Shared LevelX category mapping from `class`. |
-| `truck` | `TRUCK` | Shared LevelX category mapping from `class`. |
-| `bus` | `BUS` | Shared LevelX category mapping from `class`. |
-| `trailer` | `TRAILER` | Shared LevelX category mapping from `class`. |
-| `motorcycle` | `MOTORCYCLE` | Shared LevelX category mapping from `class`. |
-| `bicycle` | `BICYCLE` | Shared LevelX category mapping from `class`. |
-| `pedestrian` | `PEDESTRIAN` | Shared LevelX category mapping from `class`. |
-| `van` | `VAN` | Shared LevelX category mapping from `class`. |
-| `truck_bus` | `TRUCK` | Shared LevelX category mapping that collapses the combined label into `TRUCK`. |
-| `animal` | `ANIMAL` | Shared LevelX category mapping from `class`. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `car` | `CAR` |
+| `truck` | `TRUCK` |
+| `bus` | `BUS` |
+| `trailer` | `TRAILER` |
+| `motorcycle` | `MOTORCYCLE` |
+| `bicycle` | `BICYCLE` |
+| `pedestrian` | `PEDESTRIAN` |
+| `van` | `VAN` |
+| `truck_bus` | `TRUCK` |
+| `animal` | `ANIMAL` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `road_border` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `fence` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `wall` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `curbstone` | `CURB` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `stop_line` | `STOP` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `regulatory_element` | `REGULATORY` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `virtual` | `VIRTUAL` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `pedestrian_marking` | `PEDESTRIAN_MARKING` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `bike_marking` | `BIKE_MARKING` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `guard_rail` | `GUARD_RAIL` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `line_thin` without `subtype=dashed` | `LINE_THIN` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
-| `line_thick` without `subtype=dashed` | `LINE_THICK` | Shared Lanelet2/OSM mapping used by the ExiD map builder. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `road_border` | `ROAD_BORDER` |
+| `fence` | `ROAD_BORDER` |
+| `wall` | `ROAD_BORDER` |
+| `curbstone` | `CURB` |
+| `stop_line` | `STOP` |
+| `regulatory_element` | `REGULATORY` |
+| `virtual` | `VIRTUAL` |
+| `pedestrian_marking` | `PEDESTRIAN_MARKING` |
+| `bike_marking` | `BIKE_MARKING` |
+| `guard_rail` | `GUARD_RAIL` |
+| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` |
+| `line_thin` without `subtype=dashed` | `LINE_THIN` |
+| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` |
+| `line_thick` without `subtype=dashed` | `LINE_THICK` |
 
 ## Split support
 

@@ -17,17 +17,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.models import LoaderRequest
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
-class _EthUcyLoader(BaseSceneLoader):
+class EthUcyLoader(BaseSceneLoader):
     """Loader for ETH/UCY pedestrian trajectory datasets."""
-
-    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
-        super().__init__(data_root=data_root, request=request)
 
     @override
     def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
@@ -65,23 +61,3 @@ class _EthUcyLoader(BaseSceneLoader):
     def count_sources_for(self, split: DatasetSplit) -> int | None:
         data_dir = self.root / split.value
         return sum(1 for _ in data_dir.iterdir()) if data_dir.is_dir() else 0
-
-
-class HotelLoader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY hotel dataset."""
-
-
-class EthLoader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY eth dataset."""
-
-
-class UnivLoader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY univ dataset."""
-
-
-class Zara1Loader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY zara1 dataset."""
-
-
-class Zara2Loader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY zara2 dataset."""

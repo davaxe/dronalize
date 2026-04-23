@@ -19,30 +19,10 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
-    from dronalize.processing.models import LoaderRequest
 
 
 class SindLoader(BaseSceneLoader):
     """Loader for the SinD dataset."""
-
-    def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> None:
-        super().__init__(data_root=data_root, request=request, resources=resources)
-
-    @classmethod
-    @override
-    def unified_factory(
-        cls,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> SindLoader:
-        return cls(data_root, request, resources)
 
     @override
     def iter_sources(self) -> Iterable[Source[Path]]:

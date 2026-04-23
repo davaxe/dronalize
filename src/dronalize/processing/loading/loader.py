@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Generic
 
 from dronalize.core.typing import SourceId, SourceT
 
@@ -19,15 +19,15 @@ class MapBinding:
     """Loader-side map attachment carried alongside ingested or processed data.
 
     The binding intentionally stays lightweight. Datasets can attach a stable
-    map key and any extra metadata required by their loader-specific
-    `resolve_map()` implementation, while the runtime owns final scene
-    construction and map attachment.
+    map key and, when map data is already read together with trajectories, a
+    serialized map payload for their loader-specific `resolve_map()`
+    implementation.
     """
 
     map_key: MapKey = None
     """Stable map identifier for the scene, if one is known at ingest time."""
-    metadata: dict[str, Any] = field(default_factory=dict)
-    """Loader-local metadata needed to resolve the scene map."""
+    map_payload: bytes | None = None
+    """Serialized map payload already available from trajectory ingestion."""
 
 
 @dataclass(slots=True, frozen=True)

@@ -23,9 +23,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.maps.resolver import MapResolver
-    from dronalize.processing.models import LoaderRequest
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -39,14 +37,6 @@ class Argoverse2LoaderOptions(DatasetOptionsModel):
 
 class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
     """Loader for Argoverse 2 trajectory data stored in Parquet files."""
-
-    def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> None:
-        super().__init__(data_root=data_root, request=request, resources=resources)
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         if not data_dir.is_dir():
@@ -134,9 +124,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
             "background": AgentCategory.UNIMPORTANT,
             "unknown": AgentCategory.UNKNOWN,
         }
-        return pl.col(col).replace_strict(
-            mapping, default=AgentCategory.UNKNOWN, return_dtype=pl.Int32
-        )
+        return pl.col(col).replace_strict(mapping, return_dtype=pl.Int32)
 
     def _count_sources(self, data_dir: Path) -> int:
         if not data_dir.is_dir():

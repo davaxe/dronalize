@@ -131,11 +131,11 @@ class LaneBoundaryType(IntEnum):
 
     def to_edge_type(self) -> EdgeType:
         """Convert the lane boundary type to an edge type."""
-        return _LANE_BOUNDARY_TYPE_TO_EDGE_TYPE.get(self, EdgeType.NONE)
+        return _LANE_BOUNDARY_TYPE_TO_EDGE_TYPE[self]
 
 
 _LANE_BOUNDARY_TYPE_TO_EDGE_TYPE = {
-    LaneBoundaryType.UNKNOWN: EdgeType.NONE,
+    LaneBoundaryType.UNKNOWN: EdgeType.VIRTUAL,
     LaneBoundaryType.NONE: EdgeType.VIRTUAL,
     LaneBoundaryType.SINGLE_YELLOW_SOLID: EdgeType.LINE_THIN,
     LaneBoundaryType.SINGLE_WHITE_SOLID: EdgeType.LINE_THIN,
@@ -410,7 +410,7 @@ class LaneBoundary:
             src_idx = len(self.points) + src_idx
 
         if not self.lane_types:
-            return EdgeType.NONE
+            return EdgeType.VIRTUAL
 
         if not self.type_change_distances:
             return self.lane_types[0].to_edge_type()

@@ -114,8 +114,7 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         behavior, precomputation, validation, or dependency injection beyond the
         default initializer.
         """
-        _ = resources
-        return cls(data_root=data_root, request=request)
+        return cls(data_root=data_root, request=request, resources=resources)
 
     @classmethod
     @abstractmethod

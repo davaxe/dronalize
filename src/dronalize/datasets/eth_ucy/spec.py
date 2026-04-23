@@ -1,12 +1,6 @@
 from dronalize.config.models import DatasetConfig
 from dronalize.core.categories import DatasetSplit
-from dronalize.datasets.eth_ucy.loader import (
-    EthLoader,
-    HotelLoader,
-    UnivLoader,
-    Zara1Loader,
-    Zara2Loader,
-)
+from dronalize.datasets.eth_ucy.loader import EthUcyLoader
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import (
     linear_resample,
@@ -27,44 +21,13 @@ _DEFAULT_CONFIG = DatasetConfig(
 )
 
 DATASET_SPECS = {
-    "eth": DatasetSpec(
-        name="eth",
-        loader_factory=EthLoader.unified_factory,
+    name: DatasetSpec(
+        name=name,
+        loader_factory=EthUcyLoader.unified_factory,
         default_config=_DEFAULT_CONFIG,
-        native_schema=EthLoader.native_trajectory_schema(),
+        native_schema=EthUcyLoader.native_trajectory_schema(),
         supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),
-    ),
-    "hotel": DatasetSpec(
-        name="hotel",
-        loader_factory=HotelLoader.unified_factory,
-        default_config=_DEFAULT_CONFIG,
-        native_schema=HotelLoader.native_trajectory_schema(),
-        supported_native_splits=_NATIVE_SPLITS,
-        split_support=DatasetSplitSupport(scene=True, source=True),
-    ),
-    "univ": DatasetSpec(
-        name="univ",
-        loader_factory=UnivLoader.unified_factory,
-        default_config=_DEFAULT_CONFIG,
-        native_schema=UnivLoader.native_trajectory_schema(),
-        supported_native_splits=_NATIVE_SPLITS,
-        split_support=DatasetSplitSupport(scene=True, source=True),
-    ),
-    "zara1": DatasetSpec(
-        name="zara1",
-        loader_factory=Zara1Loader.unified_factory,
-        default_config=_DEFAULT_CONFIG,
-        native_schema=Zara1Loader.native_trajectory_schema(),
-        supported_native_splits=_NATIVE_SPLITS,
-        split_support=DatasetSplitSupport(scene=True, source=True),
-    ),
-    "zara2": DatasetSpec(
-        name="zara2",
-        loader_factory=Zara2Loader.unified_factory,
-        default_config=_DEFAULT_CONFIG,
-        native_schema=Zara2Loader.native_trajectory_schema(),
-        supported_native_splits=_NATIVE_SPLITS,
-        split_support=DatasetSplitSupport(scene=True, source=True),
-    ),
+    )
+    for name in ("eth", "hotel", "univ", "zara1", "zara2")
 }

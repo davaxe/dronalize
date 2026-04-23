@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.models import LoaderRequest
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
@@ -26,9 +25,6 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
 
 class ApolloScapeLoader(BaseSceneLoader):
     """Loader for ApolloScape prediction trajectories."""
-
-    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
-        super().__init__(data_root=data_root, request=request)
 
     @staticmethod
     def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:

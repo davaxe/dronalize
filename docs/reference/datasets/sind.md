@@ -6,23 +6,12 @@ SIND is a drone dataset for signalized intersections in China. It combines multi
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Urban</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2022</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone + camera</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                                                              | Notes                                                              |
-| ------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| Release year        | 2022                                                               | Based on the cited dataset paper and release.                      |
-| Domain              | Signalized urban intersections                                     | Designed for controlled intersection behavior and interaction.     |
-| Capture platform    | Drone                                                              | Recorded from an overhead aerial perspective.                      |
-| Primary agent types | Cars, trucks, buses, motorcycles, tricycles, bicycles, pedestrians | One of the broader road-user mixes among drone datasets.           |
-| Map context         | HD-style road layout plus signal context                           | The signalized setting is central to the benchmark.                |
-| Geographic coverage | China                                                              | Recorded at four urban intersections.                              |
-| Data format         | Per-site trajectory folders with map files                         | Data and map assets are distributed separately within the release. |
 
 ## Default processing profile
 
@@ -37,43 +26,48 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Prune agents with fewer than 2 samples |
 | Maps | Full map |
 
-## Version
+## Dataset compatibility
 
-Dronalize does not currently rely on a stable release version marker for SinD. The inspected raw layout does not expose a dataset version beyond the city and recording directories.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | SinD city and recording directory layout |
+| Loader expectation | The loader uses the city and recording directories directly and does not parse a separate release marker. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `motorcycle` | `MOTORCYCLE` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
-| `car` | `CAR` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
-| `truck` | `TRUCK` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
-| `tricycle` | `TRICYCLE` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
-| `bus` | `BUS` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
-| `bicycle` | `BICYCLE` | Vehicle-track category mapping from `Veh_smoothed_tracks.csv`. |
-| `pedestrian` | `PEDESTRIAN` | Pedestrian-track category mapping from `Ped_smoothed_tracks.csv`. |
-| `animal` | `ANIMAL` | Pedestrian-track category mapping from `Ped_smoothed_tracks.csv`. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `motorcycle` | `MOTORCYCLE` |
+| `car` | `CAR` |
+| `truck` | `TRUCK` |
+| `tricycle` | `TRICYCLE` |
+| `bus` | `BUS` |
+| `bicycle` | `BICYCLE` |
+| `pedestrian` | `PEDESTRIAN` |
+| `animal` | `ANIMAL` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `road_border` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `fence` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `wall` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `curbstone` | `CURB` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `stop_line` | `STOP` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `regulatory_element` | `REGULATORY` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `virtual` | `VIRTUAL` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `pedestrian_marking` | `PEDESTRIAN_MARKING` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `bike_marking` | `BIKE_MARKING` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `guard_rail` | `GUARD_RAIL` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `line_thin` without `subtype=dashed` | `LINE_THIN` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
-| `line_thick` without `subtype=dashed` | `LINE_THICK` | Shared Lanelet2/OSM mapping after SinD-specific coordinate recentering. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `road_border` | `ROAD_BORDER` |
+| `fence` | `ROAD_BORDER` |
+| `wall` | `ROAD_BORDER` |
+| `curbstone` | `CURB` |
+| `stop_line` | `STOP` |
+| `regulatory_element` | `REGULATORY` |
+| `virtual` | `VIRTUAL` |
+| `pedestrian_marking` | `PEDESTRIAN_MARKING` |
+| `bike_marking` | `BIKE_MARKING` |
+| `guard_rail` | `GUARD_RAIL` |
+| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` |
+| `line_thin` without `subtype=dashed` | `LINE_THIN` |
+| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` |
+| `line_thick` without `subtype=dashed` | `LINE_THICK` |
 
 ## Split support
 

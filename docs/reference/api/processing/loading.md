@@ -5,8 +5,6 @@
 
 ## ::: dronalize.processing.loading.BaseSceneLoader
 
-## ::: dronalize.processing.loading.SourceSelection
-
 ## ::: dronalize.processing.loading.DatasetOptionsModel
 
 ## ::: dronalize.processing.loading.NoDatasetOptions

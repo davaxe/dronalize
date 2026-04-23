@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
     from dronalize.core.categories import EdgeType
 
 Point: TypeAlias = tuple[float, float]
 """A 2-D point as `(x, y)`."""
-
-EndpointName: TypeAlias = Literal["start", "end"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,26 +31,7 @@ class PathFeature:
     interp_distance: float | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class EndpointLinkFeature:
-    """A semantic link between endpoints of keyed path features."""
-
-    src_key: str
-    dst_key: str
-    edge_type: EdgeType
-    src_endpoint: EndpointName = "end"
-    dst_endpoint: EndpointName = "start"
-    max_distance: float | None = None
+MapFeature: TypeAlias = PointFeature | PathFeature
 
 
-MapFeature: TypeAlias = PointFeature | PathFeature | EndpointLinkFeature
-
-
-__all__ = [
-    "EndpointLinkFeature",
-    "EndpointName",
-    "MapFeature",
-    "PathFeature",
-    "Point",
-    "PointFeature",
-]
+__all__ = ["MapFeature", "PathFeature", "Point", "PointFeature"]

@@ -6,23 +6,12 @@ Argoverse 2 expands the original Argoverse benchmark into a broader forecasting 
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Mixed urban</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2023</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                                                           | Notes                                                                  |
-| ------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Release year        | 2023                                                            | Based on the cited dataset paper and release.                          |
-| Domain              | Autonomous-driving forecasting                                  | Designed for large-scale motion prediction and related tasks.          |
-| Capture platform    | Self-driving vehicle fleet                                      | Collected from real urban driving.                                     |
-| Primary agent types | Vehicles, pedestrians, cyclists, other traffic participants     | Broader participant coverage than many earlier forecasting benchmarks. |
-| Map context         | HD maps                                                         | Rich local road geometry is part of the dataset identity.              |
-| Geographic coverage | Austin, Detroit, Miami, Pittsburgh, Palo Alto, Washington, D.C. | Built to span multiple North American cities.                          |
-| Data format         | Scenario directories                                            | Organized by train, validation, and test scenario folders.             |
 
 ## Default processing profile
 
@@ -37,47 +26,52 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Prune agents with fewer than 2 samples |
 | Maps | Full map |
 
-## Version
+## Dataset compatibility
 
-Dronalize does not currently infer a stable upstream release version for Argoverse 2 from the motion-forecasting directory layout. The loader relies on the standard train/val/test structure rather than on a versioned dataset root.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | Argoverse 2 motion-forecasting train/val/test layout |
+| Loader expectation | The loader uses the standard split directories and does not depend on a versioned dataset root. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `static` | `STATIC_OBJECT` | Direct category mapping from `object_type`. |
-| `riderless_bicycle` | `STATIC_OBJECT` | The current loader groups riderless bicycles with static objects. |
-| `construction` | `STATIC_OBJECT` | The current loader groups construction objects with static objects. |
-| `vehicle` | `CAR` | Direct category mapping from `object_type`. |
-| `motorcyclist` | `MOTORCYCLE` | Direct category mapping from `object_type`. |
-| `cyclist` | `BICYCLE` | Direct category mapping from `object_type`. |
-| `bus` | `BUS` | Direct category mapping from `object_type`. |
-| `pedestrian` | `PEDESTRIAN` | Direct category mapping from `object_type`. |
-| `background` | `UNIMPORTANT` | The loader keeps the source distinction but maps it into the shared unimportant category. |
-| `unknown` | `UNKNOWN` | Direct category mapping from `object_type`. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `static` | `STATIC_OBJECT` |
+| `riderless_bicycle` | `STATIC_OBJECT` |
+| `construction` | `STATIC_OBJECT` |
+| `vehicle` | `CAR` |
+| `motorcyclist` | `MOTORCYCLE` |
+| `cyclist` | `BICYCLE` |
+| `bus` | `BUS` |
+| `pedestrian` | `PEDESTRIAN` |
+| `background` | `UNIMPORTANT` |
+| `unknown` | `UNKNOWN` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `SOLID_WHITE` | `LINE_THIN` | Argoverse 2 lane-boundary mapping in the parser. |
-| `SOLID_YELLOW` | `LINE_THIN` | Argoverse 2 lane-boundary mapping in the parser. |
-| `DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` | Argoverse 2 lane-boundary mapping in the parser. |
-| `DOUBLE_SOLID_YELLOW` | `LINE_THIN_DOUBLE` | Argoverse 2 lane-boundary mapping in the parser. |
-| `DASHED_WHITE` | `LINE_THIN_DASHED` | Argoverse 2 lane-boundary mapping in the parser. |
-| `DASHED_YELLOW` | `LINE_THIN_DASHED` | Argoverse 2 lane-boundary mapping in the parser. |
-| `DOUBLE_DASH_WHITE` | `LINE_THIN_DOUBLE_DASHED` | Argoverse 2 lane-boundary mapping in the parser. |
-| `DOUBLE_DASH_YELLOW` | `LINE_THIN_DOUBLE_DASHED` | Argoverse 2 lane-boundary mapping in the parser. |
-| `DASH_SOLID_WHITE` | `LINE_THIN_DASHED` | Mixed dash-solid boundaries are currently normalized to dashed thin lines. |
-| `DASH_SOLID_YELLOW` | `LINE_THIN_DASHED` | Mixed dash-solid boundaries are currently normalized to dashed thin lines. |
-| `SOLID_DASH_WHITE` | `LINE_THIN_DASHED` | Mixed solid-dash boundaries are currently normalized to dashed thin lines. |
-| `SOLID_DASH_YELLOW` | `LINE_THIN_DASHED` | Mixed solid-dash boundaries are currently normalized to dashed thin lines. |
-| `SOLID_BLUE` | `LINE_THICK` | Argoverse 2 lane-boundary mapping in the parser. |
-| `NONE` | `VIRTUAL` | Parsed as no-marking and then treated as virtual in the builder. |
-| `UNKNOWN` | `VIRTUAL` | Parsed as no-marking and then treated as virtual in the builder. |
-| Pedestrian crossing edge | `PEDESTRIAN_MARKING` | The builder emits pedestrian crossing edges as pedestrian markings. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `SOLID_WHITE` | `LINE_THIN` |
+| `SOLID_YELLOW` | `LINE_THIN` |
+| `DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` |
+| `DOUBLE_SOLID_YELLOW` | `LINE_THIN_DOUBLE` |
+| `DASHED_WHITE` | `LINE_THIN_DASHED` |
+| `DASHED_YELLOW` | `LINE_THIN_DASHED` |
+| `DOUBLE_DASH_WHITE` | `LINE_THIN_DOUBLE_DASHED` |
+| `DOUBLE_DASH_YELLOW` | `LINE_THIN_DOUBLE_DASHED` |
+| `DASH_SOLID_WHITE` | `LINE_THIN_DASHED` |
+| `DASH_SOLID_YELLOW` | `LINE_THIN_DASHED` |
+| `SOLID_DASH_WHITE` | `LINE_THIN_DASHED` |
+| `SOLID_DASH_YELLOW` | `LINE_THIN_DASHED` |
+| `SOLID_BLUE` | `LINE_THICK` |
+| `NONE` | `VIRTUAL` |
+| `UNKNOWN` | `VIRTUAL` |
+| Pedestrian crossing edge | `PEDESTRIAN_MARKING` |
 
 ## Split support
 

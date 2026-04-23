@@ -53,16 +53,6 @@ class NuScenesStyleLoader(BaseSceneLoader[str, NuScenesStyleLoaderOptions]):
         self._sources: dict[DatasetSplit, list[Source[str]]] | None = None
         self._scene_cache: dict[str, pl.DataFrame] = {}
 
-    @classmethod
-    @override
-    def unified_factory(
-        cls,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> NuScenesStyleLoader:
-        return cls(data_root, request, resources)
-
     def _build_sources_manifest(self) -> dict[DatasetSplit, list[Source[str]]]:
         sources: dict[DatasetSplit, list[Source[str]]] = {split: [] for split in self.native_splits}
 

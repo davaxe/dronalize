@@ -6,23 +6,12 @@ Univ is a pedestrian-only scene from the ETH/UCY benchmark family. It is commonl
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Pedestrian</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2007</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Pedestrians</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Camera</strong></div>
   <div class="summary-item"><span>Map context</span><strong>None</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                               | Notes                                                                |
-| ------------------- | ----------------------------------- | -------------------------------------------------------------------- |
-| Release year        | 2007                                | Part of the UCY scene family used with ETH/UCY benchmarks.           |
-| Domain              | Pedestrian                          | Used for social-interaction modeling in human trajectory prediction. |
-| Capture platform    | Overhead pedestrian scene recording | Focused on walker motion in a shared public space.                   |
-| Primary agent types | Pedestrians                         | Human motion is the only target class.                               |
-| Map context         | Limited                             | Typically treated as a scene benchmark rather than a map benchmark.  |
-| Benchmark family    | ETH/UCY                             | Shares setup conventions with `eth`, `hotel`, `zara1`, and `zara2`.  |
-| Data format         | Text trajectory files               | Commonly arranged into train, validation, and test folders.          |
 
 ## Default processing profile
 
@@ -37,23 +26,28 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Keep agents with at least 2 samples |
 | Maps | Disabled |
 
-## Version
+## Dataset compatibility
 
-Dronalize does not currently rely on a dataset-specific version marker for UNIV. The raw layout used by the loader does not expose a stable release version.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | UCY UNIV scene layout |
+| Loader expectation | The loader uses the ETH/UCY raw text layout and does not parse a dataset-specific version marker. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| Any tracked actor | `PEDESTRIAN` | The ETH/UCY loaders normalize every trajectory to the pedestrian category. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| Any tracked actor | `PEDESTRIAN` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| Not applicable | Not applicable | Dronalize does not resolve maps for this dataset. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| Not applicable | Not applicable |
 
 ## Split support
 

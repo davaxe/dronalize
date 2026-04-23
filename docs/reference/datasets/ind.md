@@ -6,23 +6,12 @@ inD is a naturalistic urban-intersection dataset captured from drones above Germ
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Urban</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2020</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                                        | Notes                                                    |
-| ------------------- | -------------------------------------------- | -------------------------------------------------------- |
-| Release year        | 2020                                         | Based on the cited dataset paper and release.            |
-| Domain              | Urban intersections                          | Designed for interaction-heavy city traffic.             |
-| Capture platform    | Drone                                        | Recorded from an overhead aerial viewpoint.              |
-| Primary agent types | Cars, trucks or buses, bicycles, pedestrians | Stronger multimodal focus than highway-only benchmarks.  |
-| Map context         | Intersection road layout                     | Includes map assets for the recorded sites.              |
-| Geographic coverage | Germany                                      | Spans four urban intersections.                          |
-| Data format         | CSV trajectories with maps                   | Organized as recording metadata, tracks, and map assets. |
 
 ## Default processing profile
 
@@ -37,45 +26,50 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Prune agents with fewer than 2 samples |
 | Maps | Full map |
 
-## Version
+## Dataset compatibility
 
-Dronalize currently targets inD `v1.1`, matching the inspected `inD-dataset-v1.1.zip` distribution name.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | inD v1.1 |
+| Loader expectation | The loader assumes the inD v1.1 distribution layout. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `car` | `CAR` | Shared LevelX category mapping from `class`. |
-| `truck` | `TRUCK` | Shared LevelX category mapping from `class`. |
-| `bus` | `BUS` | Shared LevelX category mapping from `class`. |
-| `trailer` | `TRAILER` | Shared LevelX category mapping from `class`. |
-| `motorcycle` | `MOTORCYCLE` | Shared LevelX category mapping from `class`. |
-| `bicycle` | `BICYCLE` | Shared LevelX category mapping from `class`. |
-| `pedestrian` | `PEDESTRIAN` | Shared LevelX category mapping from `class`. |
-| `van` | `VAN` | Shared LevelX category mapping from `class`. |
-| `truck_bus` | `TRUCK` | Shared LevelX category mapping that collapses the combined label into `TRUCK`. |
-| `animal` | `ANIMAL` | Shared LevelX category mapping from `class`. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `car` | `CAR` |
+| `truck` | `TRUCK` |
+| `bus` | `BUS` |
+| `trailer` | `TRAILER` |
+| `motorcycle` | `MOTORCYCLE` |
+| `bicycle` | `BICYCLE` |
+| `pedestrian` | `PEDESTRIAN` |
+| `van` | `VAN` |
+| `truck_bus` | `TRUCK` |
+| `animal` | `ANIMAL` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `road_border` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `fence` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `wall` | `ROAD_BORDER` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `curbstone` | `CURB` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `stop_line` | `STOP` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `regulatory_element` | `REGULATORY` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `virtual` | `VIRTUAL` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `pedestrian_marking` | `PEDESTRIAN_MARKING` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `bike_marking` | `BIKE_MARKING` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `guard_rail` | `GUARD_RAIL` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `line_thin` without `subtype=dashed` | `LINE_THIN` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` | Shared Lanelet2/OSM mapping used by the InD map builder. |
-| `line_thick` without `subtype=dashed` | `LINE_THICK` | Shared Lanelet2/OSM mapping used by the InD map builder. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `road_border` | `ROAD_BORDER` |
+| `fence` | `ROAD_BORDER` |
+| `wall` | `ROAD_BORDER` |
+| `curbstone` | `CURB` |
+| `stop_line` | `STOP` |
+| `regulatory_element` | `REGULATORY` |
+| `virtual` | `VIRTUAL` |
+| `pedestrian_marking` | `PEDESTRIAN_MARKING` |
+| `bike_marking` | `BIKE_MARKING` |
+| `guard_rail` | `GUARD_RAIL` |
+| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` |
+| `line_thin` without `subtype=dashed` | `LINE_THIN` |
+| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` |
+| `line_thick` without `subtype=dashed` | `LINE_THICK` |
 
 ## Split support
 

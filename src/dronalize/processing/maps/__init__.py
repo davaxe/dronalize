@@ -7,12 +7,11 @@ from dronalize.processing.maps.builder import (
     Point,
     build_map,
 )
-from dronalize.processing.maps.features import EndpointLinkFeature, PathFeature, PointFeature
+from dronalize.processing.maps.features import PathFeature, PointFeature
 from dronalize.processing.maps.options import MapBuildOptions
 from dronalize.processing.maps.resolver import no_map, shared_map
 
 __all__ = [
-    "EndpointLinkFeature",
     "FeatureMapBuilder",
     "MapBuildOptions",
     "MapBuilder",

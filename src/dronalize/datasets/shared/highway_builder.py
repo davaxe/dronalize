@@ -13,6 +13,7 @@ from dronalize.processing.maps.features import PathFeature, Point
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
 LaneId = int | str
 
@@ -58,6 +59,26 @@ class HighwayLaneMapBuilder(FeatureMapBuilder):
         else:
             self._long_col = self._x_col
             self._lat_col = self._y_col
+
+    @classmethod
+    def from_csv(
+        cls,
+        *file: Path,
+        select_expr: Iterable[pl.Expr],
+        bin_size: float = 8.0,
+        include_outer_borders: bool = True,
+        smoothing: float | None = None,
+        lane_description: LaneDescription | None = None,
+    ) -> HighwayLaneMapBuilder:
+        """Create a map builder from CSV files containing trajectory data."""
+        data = pl.scan_csv(source=list(file)).select(select_expr)
+        return cls(
+            data,
+            bin_size=bin_size,
+            include_outer_borders=include_outer_borders,
+            smoothing=smoothing,
+            lane_description=lane_description,
+        )
 
     @override
     def iter_features(self) -> Iterable[PathFeature]:

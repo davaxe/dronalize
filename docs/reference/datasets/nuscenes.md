@@ -6,23 +6,12 @@ nuScenes is a multimodal autonomous-driving benchmark that combines tracked acto
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Mixed urban</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2020</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                              | Notes                                                     |
-| ------------------- | ---------------------------------- | --------------------------------------------------------- |
-| Release year        | 2020                               | Based on the cited dataset paper and benchmark release.   |
-| Domain              | Mixed urban autonomous driving     | Used across perception, tracking, and forecasting tasks.  |
-| Capture platform    | Self-driving vehicle fleet         | Includes camera, radar, lidar, and map assets.            |
-| Primary agent types | Vehicles and vulnerable road users | Supports a broad set of traffic participants.             |
-| Map context         | Map expansion files                | Rich road-layout context is part of the standard release. |
-| Geographic coverage | Boston and Singapore               | Chosen to provide strong geographic diversity.            |
-| Data format         | Metadata tables plus map assets    | Organized into train/validation and test releases.        |
 
 ## Default processing profile
 
@@ -37,53 +26,58 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Drop parked and undefined actors, ignore categories matching `object`, and prune agents with fewer than 2 samples |
 | Maps | Relevant area (padding 1.15) |
 
-## Version
+## Dataset compatibility
 
-Dronalize currently targets nuScenes `v1.0` metadata together with the `v1.3` map expansion, matching the inspected `v1.0-trainval_meta`, `v1.0-test_meta`, and `nuScenes-map-expansion-v1.3` layout.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | nuScenes v1.0 metadata with map expansion v1.3 |
+| Loader expectation | The loader expects `v1.0-trainval_meta`, `v1.0-test_meta`, and `nuScenes-map-expansion-v1.3`. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `vehicle.car` | `CAR` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.ego.car` | `CAR` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.van` | `VAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.construction` | `VAN` | Construction vehicles are merged into the shared van category. |
-| `vehicle.bus.bendy` | `BUS` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.bus.rigid` | `BUS` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.truck` | `TRUCK` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.trailer` | `TRAILER` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.motorcycle` | `MOTORCYCLE` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.bicycle` | `BICYCLE` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `vehicle.emergency.ambulance` | `CAR` | Emergency road vehicles are currently merged into the shared car category. |
-| `vehicle.emergency.police` | `CAR` | Emergency road vehicles are currently merged into the shared car category. |
-| `human.pedestrian.adult` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `human.pedestrian.child` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `human.pedestrian.construction_worker` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `human.pedestrian.police_officer` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `human.pedestrian.stroller` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `human.pedestrian.wheelchair` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `human.pedestrian` | `PEDESTRIAN` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `static_object.bicycle_rack` | `STATIC_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `movable_object.barrier` | `MOVEABLE_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `movable_object.debris` | `MOVEABLE_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `movable_object.pushable_pullable` | `MOVEABLE_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `movable_object.trafficcone` | `MOVEABLE_OBJECT` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
-| `animal` | `ANIMAL` | nuScenes category mapping in `_FULL_CATEGORY_MAPPING`. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `vehicle.car` | `CAR` |
+| `vehicle.ego.car` | `CAR` |
+| `vehicle.van` | `VAN` |
+| `vehicle.construction` | `VAN` |
+| `vehicle.bus.bendy` | `BUS` |
+| `vehicle.bus.rigid` | `BUS` |
+| `vehicle.truck` | `TRUCK` |
+| `vehicle.trailer` | `TRAILER` |
+| `vehicle.motorcycle` | `MOTORCYCLE` |
+| `vehicle.bicycle` | `BICYCLE` |
+| `vehicle.emergency.ambulance` | `CAR` |
+| `vehicle.emergency.police` | `CAR` |
+| `human.pedestrian.adult` | `PEDESTRIAN` |
+| `human.pedestrian.child` | `PEDESTRIAN` |
+| `human.pedestrian.construction_worker` | `PEDESTRIAN` |
+| `human.pedestrian.police_officer` | `PEDESTRIAN` |
+| `human.pedestrian.stroller` | `PEDESTRIAN` |
+| `human.pedestrian.wheelchair` | `PEDESTRIAN` |
+| `human.pedestrian` | `PEDESTRIAN` |
+| `static_object.bicycle_rack` | `STATIC_OBJECT` |
+| `movable_object.barrier` | `MOVEABLE_OBJECT` |
+| `movable_object.debris` | `MOVEABLE_OBJECT` |
+| `movable_object.pushable_pullable` | `MOVEABLE_OBJECT` |
+| `movable_object.trafficcone` | `MOVEABLE_OBJECT` |
+| `animal` | `ANIMAL` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `SegmentDividerType.NIL` | `VIRTUAL` | nuScenes divider mapping in the parser. |
-| `SegmentDividerType.SINGLE_SOLID_WHITE` | `LINE_THIN` | nuScenes divider mapping in the parser. |
-| `SegmentDividerType.SINGLE_SOLID_YELLOW` | `LINE_THIN` | nuScenes divider mapping in the parser. |
-| `SegmentDividerType.SINGLE_ZIGZAG_WHITE` | `REGULATORY` | nuScenes divider mapping in the parser. |
-| `SegmentDividerType.DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` | nuScenes divider mapping in the parser. |
-| `SegmentDividerType.DOUBLE_DASHED_WHITE` | `LINE_THIN_DOUBLE_DASHED` | nuScenes divider mapping in the parser. |
-| Lane polygon outline | Not emitted | The current nuScenes builder keeps `lane_polygon_edge=None`. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `SegmentDividerType.NIL` | `VIRTUAL` |
+| `SegmentDividerType.SINGLE_SOLID_WHITE` | `LINE_THIN` |
+| `SegmentDividerType.SINGLE_SOLID_YELLOW` | `LINE_THIN` |
+| `SegmentDividerType.SINGLE_ZIGZAG_WHITE` | `REGULATORY` |
+| `SegmentDividerType.DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` |
+| `SegmentDividerType.DOUBLE_DASHED_WHITE` | `LINE_THIN_DOUBLE_DASHED` |
+| Lane polygon outline | Not emitted |
 
 ## Split support
 

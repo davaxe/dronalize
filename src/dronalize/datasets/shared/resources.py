@@ -2,21 +2,26 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from contextlib import contextmanager
+from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.config.models import MapConfig
+from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.core.maps import MapGraph
 from dronalize.processing.loading.resources import DatasetResources
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable
+    from collections.abc import Generator
     from multiprocessing.shared_memory import SharedMemory
 
 
 MapBuilder = Callable[[Path, MapConfig], MapGraph]
+NamedPathsFactory = Callable[[Path], Iterable[tuple[str | None, Path]]]
+SinglePathFactory = Callable[[Path], Path]
+ResourcesFactory = Callable[
+    [Path, ScenesConfig, MapConfig | None], AbstractContextManager[DatasetResources]
+]
 
 
 @contextmanager
@@ -61,3 +66,39 @@ def open_single_shared_map_resource(
     finally:
         handle.close()
         handle.unlink()
+
+
+def named_shared_map_resources_factory(
+    *, named_paths: NamedPathsFactory, build_map: MapBuilder
+) -> ResourcesFactory:
+    """Return a registry resource factory for named shared maps."""
+
+    @contextmanager
+    def _factory(
+        root: Path, scenes: ScenesConfig, map_config: MapConfig | None
+    ) -> Generator[DatasetResources, None, None]:
+        _ = scenes
+        with open_named_shared_map_resources(
+            map_config=map_config, named_paths=named_paths(root), build_map=build_map
+        ) as resources:
+            yield resources
+
+    return _factory
+
+
+def single_shared_map_resource_factory(
+    *, map_path: SinglePathFactory, build_map: MapBuilder
+) -> ResourcesFactory:
+    """Return a registry resource factory for one shared map."""
+
+    @contextmanager
+    def _factory(
+        root: Path, scenes: ScenesConfig, map_config: MapConfig | None
+    ) -> Generator[DatasetResources, None, None]:
+        _ = scenes
+        with open_single_shared_map_resource(
+            map_config=map_config, map_path=map_path(root), build_map=build_map
+        ) as resources:
+            yield resources
+
+    return _factory

@@ -6,23 +6,12 @@ INTERACTION is a benchmark for difficult multi-agent driving scenarios with stro
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Interactive</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2019</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>Provided</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                                | Notes                                                                    |
-| ------------------- | ------------------------------------ | ------------------------------------------------------------------------ |
-| Release year        | 2019                                 | Based on the cited dataset paper and release.                            |
-| Domain              | Interactive driving scenarios        | Covers merges, ramps, roundabouts, and intersections.                    |
-| Capture platform    | Processed benchmark release          | Released as trajectory files with semantic maps.                         |
-| Primary agent types | Cars, cyclists, pedestrians          | Designed around multi-agent interaction rather than one actor class.     |
-| Map context         | Semantic OSM maps                    | The raw dataset ships maps, but the current Dronalize loader does not resolve them. |
-| Geographic coverage | 18 locations across three continents | Intentionally spans different traffic environments and driving cultures. |
-| Data format         | CSV trajectories plus OSM maps       | Structured into training, validation, and test scenario folders.         |
 
 ## Default processing profile
 
@@ -37,26 +26,31 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Prune agents with fewer than 2 samples |
 | Maps | Disabled |
 
-## Version
+## Dataset compatibility
 
-Dronalize currently targets the INTERACTION multi-agent release identified as `v1.2`, matching the inspected `INTERACTION-Dataset-DR-multi-v1_2.zip` archive name.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | INTERACTION DR-multi v1.2 |
+| Loader expectation | The loader expects the multi-agent v1.2 archive layout and split naming. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `car` | `CAR` | Direct category mapping from `agent_type`. |
-| `pedestrian/bicycle` with speed `< 2 m/s` | `PEDESTRIAN` | The loader uses the velocity magnitude to split the shared source label. |
-| `pedestrian/bicycle` with speed `>= 2 m/s` | `BICYCLE` | The loader uses the velocity magnitude to split the shared source label. |
-| Any other `agent_type` | Unchanged source value | No additional explicit category mapping is defined in the current loader. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `car` | `CAR` |
+| `pedestrian/bicycle` with speed `< 2 m/s` | `PEDESTRIAN` |
+| `pedestrian/bicycle` with speed `>= 2 m/s` | `BICYCLE` |
+| Any other `agent_type` | Unchanged source value |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| Not applicable | Not applicable | The raw dataset ships OSM maps, but the current Dronalize loader does not resolve them. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| Not applicable | Not applicable |
 
 ## Split support
 

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 
 class HighDMapBuilder(FeatureMapBuilder):
-    """Map builder for the HighD dataset."""
+    """Map builder for the highD dataset."""
 
     def __init__(self, meta_file: Path, start_x: float, end_x: float) -> None:
         self._start_x: float = start_x

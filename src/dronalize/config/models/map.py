@@ -13,7 +13,7 @@ class SceneExtentExtraction(FullConfig):
     """Configuration for extraction around the scene trajectory extent."""
 
     mode: Literal["scene_extent"] = Field("scene_extent", repr=False, init=False)
-    padding: float = Field(gt=1.0, default=1.05)
+    padding: float = Field(ge=1.0, default=1.0)
     """Scale factor applied around the scene extent before cropping the map."""
 
 

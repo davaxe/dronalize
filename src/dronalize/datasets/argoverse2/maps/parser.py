@@ -99,9 +99,8 @@ class LaneBoundary:
 
 
 _BOUNDARY_TO_EDGE_TYPE = {
-    # Seemingly NONE is often used and closest match is LINE_THIN.
-    LaneBoundaryType.NONE: EdgeType.NONE,
-    LaneBoundaryType.UNKNOWN: EdgeType.NONE,
+    LaneBoundaryType.NONE: EdgeType.VIRTUAL,
+    LaneBoundaryType.UNKNOWN: EdgeType.VIRTUAL,
     LaneBoundaryType.SOLID_WHITE: EdgeType.LINE_THIN,
     LaneBoundaryType.SOLID_YELLOW: EdgeType.LINE_THIN,
     LaneBoundaryType.DOUBLE_SOLID_WHITE: EdgeType.LINE_THIN_DOUBLE,

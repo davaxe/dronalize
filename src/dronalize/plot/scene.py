@@ -126,6 +126,7 @@ def plot_scene(
     ignore_map_types: set[EdgeType] | None = None,
     ignore_agent_categories: set[AgentCategory] | None = None,
     theme: ThemeName | PlotTheme = "light",
+    inline_html: bool = False,
 ) -> ChartT:
     """Plot one scene or scene record using Altair.
 
@@ -168,6 +169,8 @@ def plot_scene(
     theme : {"light", "dark"} or PlotTheme, optional
         Plot theme to apply. Built-in themes are `"light"` (default) and
         `"dark"`, but a custom `PlotTheme` instance can also be supplied.
+    inline_html : bool, optional
+        If `True` the HTML will include everything needed to view it offline.
 
     Returns
     -------
@@ -201,6 +204,7 @@ def plot_scene(
                 Path(save_path),
                 bg=resolved_theme.chart_background,
                 fg=resolved_theme.title_color,
+                inline_html=inline_html,
             )
             return chart
         chart.save(save_path)  # pyright: ignore[reportUnknownMemberType]
@@ -732,7 +736,7 @@ def _scene_title(data: PlotSceneData) -> alt.TitleParams:
     return alt.TitleParams(text=f"Scene {data.scene_number}", subtitle=[subtitle], anchor="start")
 
 
-def _save_html(chart: ChartT, path: Path, fg: str, bg: str) -> None:
+def _save_html(chart: ChartT, path: Path, fg: str, bg: str, *, inline_html: bool) -> None:
     """Overwrite the default VegaFusion HTML template to apply the plot theme's fg/bg colors."""
     spec = chart.to_dict(format="vega")
     html = spec_to_html(
@@ -741,6 +745,7 @@ def _save_html(chart: ChartT, path: Path, fg: str, bg: str) -> None:
         vega_version=alt.VEGA_VERSION,
         vegaembed_version=alt.VEGAEMBED_VERSION,
         fullhtml=True,
+        template="inline" if inline_html else "standard",
     )
 
     css = f"""

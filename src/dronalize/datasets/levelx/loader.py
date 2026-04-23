@@ -1,13 +1,17 @@
+"""Loader implementations for LevelX-style datasets."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
-from dronalize.core.scene import CANONICAL
+from dronalize.core.scene import CANONICAL, POSITIONS_VELOCITY_ACCELERATION
+from dronalize.datasets.levelx.maps.builder import HighDMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
@@ -15,9 +19,9 @@ from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from pathlib import Path
 
-    from dronalize.core.scene import TrajectorySchema
+    from dronalize.core.maps import MapGraph
+    from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.models import LoaderRequest
 
@@ -30,37 +34,7 @@ class SourceData:
 
 
 class LevelXDataLoader(BaseSceneLoader[SourceData]):
-    """Common trajectory data loader for X-level datasets.
-
-    Each discovered source corresponds to one full recording. The source payload
-    stays lightweight: it is just the shared dataset root plus a stable
-    recording identifier.
-
-    With no changes this supports: rounD, inD, exiD, uniD, and sinD.
-
-    Parameters
-    ----------
-    data_root : Path or str
-        Root directory containing the extracted recording CSV files.
-    """
-
-    def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> None:
-        super().__init__(data_root=data_root, request=request, resources=resources)
-
-    @classmethod
-    @override
-    def unified_factory(
-        cls,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> Self:
-        return cls(data_root=data_root, request=request, resources=resources)
+    """Common recording CSV loader for LevelX-style datasets."""
 
     @staticmethod
     def meta_data_select() -> list[pl.Expr]:
@@ -104,8 +78,8 @@ class LevelXDataLoader(BaseSceneLoader[SourceData]):
 
     @staticmethod
     def location_id_select(meta_df: pl.DataFrame, path: Path) -> str:
-        """Select the relevant columns from the recording metadata CSV."""
-        _ = path  # Added path since highD wants to use  the path as key
+        """Select the map key from the recording metadata CSV."""
+        _ = path
         return meta_df.select(pl.col("locationId")).item()
 
     @staticmethod
@@ -180,6 +154,118 @@ class LevelXDataLoader(BaseSceneLoader[SourceData]):
         return recording_ids
 
 
+class StandardLevelXLoader(LevelXDataLoader):
+    """Loader for LevelX datasets that store recordings under a ``data`` directory."""
+
+    def __init__(
+        self,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> None:
+        super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
+
+
+class ExiDLoader(StandardLevelXLoader):
+    """Loader for the ExiD dataset."""
+
+    @staticmethod
+    @override
+    def track_data_select() -> list[pl.Expr]:
+        """Select the relevant columns from the track CSV."""
+        select = LevelXDataLoader.track_data_select()
+        select.append(pl.col("laneletId").alias("lane_id"))
+        return select
+
+    @staticmethod
+    @override
+    def track_schema() -> pl.Schema:
+        """Define the schema for the track CSV."""
+        return _EXID_TRACK_SCHEMA
+
+
+class HighDLoader(LevelXDataLoader):
+    """Loader for the highD dataset."""
+
+    def __init__(
+        self,
+        data_root: Path | str,
+        request: LoaderRequest,
+        resources: DatasetResources | None = None,
+    ) -> None:
+        super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
+
+    @staticmethod
+    @override
+    def meta_data_select() -> list[pl.Expr]:
+        """Select the relevant columns from the metadata CSV."""
+        return [
+            pl.col("id"),
+            pl.col("numLaneChanges").alias("lane_changes"),
+            pl
+            .col("class")
+            .replace_strict(
+                {"Car": AgentCategory.CAR.value, "Truck": AgentCategory.TRUCK.value},
+                return_dtype=pl.Int32,
+            )
+            .alias("agent_category"),
+        ]
+
+    @staticmethod
+    @override
+    def track_data_select() -> list[pl.Expr]:
+        """Select the relevant columns from the track CSV."""
+        return [
+            pl.col("frame"),
+            pl.col("id"),
+            pl.col("x").add(pl.col("width") / 2),
+            pl.col("y").add(pl.col("height") / 2),
+            pl.col("xVelocity").alias("vx"),
+            pl.col("yVelocity").alias("vy"),
+            pl.col("xAcceleration").alias("ax"),
+            pl.col("yAcceleration").alias("ay"),
+            pl.col("laneId").alias("lane_id"),
+        ]
+
+    @staticmethod
+    @override
+    def meta_schema() -> pl.Schema:
+        """Define the schema for the metadata CSV."""
+        return _HIGHD_META_SCHEMA
+
+    @staticmethod
+    @override
+    def track_schema() -> pl.Schema:
+        """Define the schema for the track CSV."""
+        return _HIGHD_TRACK_SCHEMA
+
+    @staticmethod
+    @override
+    def location_id_select(meta_df: pl.DataFrame, path: Path) -> str:
+        _ = meta_df
+        return str(path)
+
+    @classmethod
+    @override
+    def native_trajectory_schema(cls) -> TrajectorySchema:
+        return POSITIONS_VELOCITY_ACCELERATION
+
+    @override
+    def map_resolver(self) -> MapResolver:
+        def _resolver(scene: Scene) -> MapGraph | None:
+            if scene.map_key is None or self.map_config is None:
+                return None
+
+            min_x = scene.frame.select(pl.col("x")).min().item()
+            max_x = scene.frame.select(pl.col("x")).max().item()
+            dist = max_x - min_x
+            builder = HighDMapBuilder(Path(scene.map_key), min_x - dist * 0.1, max_x + dist * 0.1)
+            map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
+            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
+
+        return _resolver
+
+
 _META_SCHEMA: pl.Schema = pl.Schema({"trackId": pl.Int32, "class": pl.Utf8})
 
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
@@ -187,6 +273,33 @@ _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "trackId": pl.Int32,
     "xCenter": pl.Float64,
     "yCenter": pl.Float64,
+    "xVelocity": pl.Float64,
+    "yVelocity": pl.Float64,
+    "xAcceleration": pl.Float64,
+    "yAcceleration": pl.Float64,
+})
+
+_EXID_TRACK_SCHEMA: pl.Schema = pl.Schema({
+    "frame": pl.Int32,
+    "trackId": pl.Int32,
+    "xCenter": pl.Float64,
+    "yCenter": pl.Float64,
+    "xVelocity": pl.Float64,
+    "yVelocity": pl.Float64,
+    "xAcceleration": pl.Float64,
+    "yAcceleration": pl.Float64,
+    "laneletId": pl.Int32,
+})
+
+_HIGHD_META_SCHEMA: pl.Schema = pl.Schema({"id": pl.Int32, "numLaneChanges": pl.Int8})
+
+_HIGHD_TRACK_SCHEMA: pl.Schema = pl.Schema({
+    "frame": pl.Int32,
+    "id": pl.Int32,
+    "width": pl.Float64,
+    "height": pl.Float64,
+    "x": pl.Float64,
+    "y": pl.Float64,
     "xVelocity": pl.Float64,
     "yVelocity": pl.Float64,
     "xAcceleration": pl.Float64,

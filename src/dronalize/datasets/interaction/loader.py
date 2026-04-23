@@ -19,8 +19,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
-    from dronalize.processing.models import LoaderRequest
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -28,24 +26,6 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 class InteractionLoader(BaseSceneLoader[Path]):
     """Loader for the INTERACTION dataset."""
-
-    def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> None:
-        super().__init__(data_root=data_root, request=request, resources=resources)
-
-    @classmethod
-    @override
-    def unified_factory(
-        cls,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> InteractionLoader:
-        return cls(data_root, request, resources)
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[Path]]:
         if not data_dir.is_dir():

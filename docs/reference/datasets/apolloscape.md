@@ -6,23 +6,12 @@ ApolloScape is an urban trajectory benchmark built around heterogeneous traffic 
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Urban</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2019</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>None</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                                          | Notes                                                                  |
-| ------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
-| Release year        | 2019                                           | Based on the cited benchmark paper.                                    |
-| Domain              | Urban traffic                                  | Built for city-scene trajectory prediction.                            |
-| Capture platform    | Processed benchmark release                    | Distributed as trajectory files rather than raw sensor recordings.      |
-| Primary agent types | Vehicles, pedestrians, bicycles or motorcycles | Emphasizes heterogeneous traffic.                                      |
-| Map context         | None handled by current loader                | The current Dronalize ApolloScape loader does not resolve maps.       |
-| Geographic coverage | Urban Chinese road scenes                      | Focused on dense mixed-traffic environments.                           |
-| Data format         | Text trajectory files                          | Split into benchmark train and evaluation directories.                 |
 
 ## Default processing profile
 
@@ -37,27 +26,32 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Prune agents with fewer than 2 samples |
 | Maps | Disabled |
 
-## Version
+## Dataset compatibility
 
-Dronalize does not currently rely on a stable release version marker for ApolloScape. The current loader paths and inspected raw layout do not expose a dataset version beyond the benchmark split directories.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | ApolloScape trajectory benchmark split layout |
+| Loader expectation | The loader follows the benchmark split directories and does not parse a separate upstream version marker. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `1` | `CAR` | Numeric category mapping from the ApolloScape trajectory files. |
-| `2` | `TRUCK` | Numeric category mapping from the ApolloScape trajectory files. |
-| `3` | `PEDESTRIAN` | Numeric category mapping from the ApolloScape trajectory files. |
-| `4` | `BICYCLE` | Numeric category mapping from the ApolloScape trajectory files. |
-| `5` | `UNKNOWN` | Numeric category mapping from the ApolloScape trajectory files. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `1` | `CAR` |
+| `2` | `TRUCK` |
+| `3` | `PEDESTRIAN` |
+| `4` | `BICYCLE` |
+| `5` | `UNKNOWN` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| Not applicable | Not applicable | The current Dronalize ApolloScape loader does not resolve maps. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| Not applicable | Not applicable |
 
 ## Split support
 

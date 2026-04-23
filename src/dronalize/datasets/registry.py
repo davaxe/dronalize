@@ -164,10 +164,10 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     "zara2": _builtin(
         "dronalize.datasets.eth_ucy", export_name="DATASET_SPECS", export_key="zara2"
     ),
-    "exid": _builtin("dronalize.datasets.exid"),
-    "highd": _builtin("dronalize.datasets.highd"),
-    "i80": _builtin("dronalize.datasets.i80"),
-    "ind": _builtin("dronalize.datasets.ind"),
+    "exid": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="exid"),
+    "highd": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="highd"),
+    "i80": _builtin("dronalize.datasets.ngsim", export_name="DATASET_SPECS", export_key="i80"),
+    "ind": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="ind"),
     "interaction": _builtin("dronalize.datasets.interaction"),
     "lyft": _builtin(
         "dronalize.datasets.lyft",
@@ -176,10 +176,10 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     ),
     "nuscenes": _builtin("dronalize.datasets.nuscenes"),
     "opendd": _builtin("dronalize.datasets.opendd"),
-    "round": _builtin("dronalize.datasets.round"),
+    "round": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="round"),
     "sind": _builtin("dronalize.datasets.sind"),
-    "unid": _builtin("dronalize.datasets.unid"),
-    "us101": _builtin("dronalize.datasets.us101"),
+    "unid": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="unid"),
+    "us101": _builtin("dronalize.datasets.ngsim", export_name="DATASET_SPECS", export_key="us101"),
     "vod": _builtin("dronalize.datasets.vod"),
     "waymo": _builtin(
         "dronalize.datasets.waymo", optional_dependencies=("google.protobuf",), extra="waymo"

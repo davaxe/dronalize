@@ -71,16 +71,6 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
         super().__init__(data_root=data_root, request=request, resources=resources)
         self._data: dict[DatasetSplit, _ArrayData] = {}
 
-    @classmethod
-    @override
-    def unified_factory(
-        cls,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> LyftLoader:
-        return cls(data_root, request, resources)
-
     def _get_arrays(self, split: DatasetSplit) -> _ArrayData:
         if split not in self._data:
             split_paths = {

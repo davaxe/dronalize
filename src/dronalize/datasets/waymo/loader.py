@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import struct
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import polars as pl
@@ -19,10 +18,10 @@ from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, So
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from pathlib import Path
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.models import LoaderRequest
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -30,11 +29,6 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 class WaymoLoader(BaseSceneLoader):
     """Loader for Waymo scenarios stored in TFRecord format."""
-
-    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
-        super().__init__(data_root=data_root, request=request)
-        self.root: Path = Path(data_root)
-        self._include_map: bool = self.map_config is not None
 
     @staticmethod
     def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
@@ -54,7 +48,11 @@ class WaymoLoader(BaseSceneLoader):
 
     @override
     def count_sources_for(self, split: DatasetSplit) -> int | None:
-        return self._count_sources_for_split(split)
+        if split is DatasetSplit.TRAIN:
+            return self._count_sources(self.root / "training")
+        if split is DatasetSplit.VAL:
+            return self._count_sources(self.root / "validation")
+        return self._count_sources(self.root / "testing")
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
@@ -64,7 +62,7 @@ class WaymoLoader(BaseSceneLoader):
                 frame=_scenario_to_polars(scenario).lazy().with_columns(pl.col("id").add(1)),
                 map_binding=MapBinding(
                     map_key=f"{source.identifier}:{scenario_index}",
-                    metadata={"raw_map": raw_data} if self._include_map else {},
+                    map_payload=raw_data if self.map_config is not None else None,
                 ),
             )
 
@@ -75,12 +73,11 @@ class WaymoLoader(BaseSceneLoader):
 
     @override
     def resolve_map(self, scene: Scene, map_binding: MapBinding | None = None) -> MapGraph | None:
-        if not self._include_map or map_binding is None or self.map_config is None:
+        if map_binding is None or self.map_config is None:
             return None
-        raw_map = map_binding.metadata.get("raw_map")
-        if not isinstance(raw_map, bytes):
+        if map_binding.map_payload is None:
             return None
-        map_data = lean_map_pb2.LeanMapContainer.FromString(raw_map)
+        map_data = lean_map_pb2.LeanMapContainer.FromString(map_binding.map_payload)
         map_config = self.map_config
         map_graph = WaymoMapBuilder.from_proto(map_data.map_features).build(
             min_distance=map_config.min_distance, interp_distance=map_config.interp_distance
@@ -90,13 +87,6 @@ class WaymoLoader(BaseSceneLoader):
     @staticmethod
     def _count_sources(data_dir: Path) -> int:
         return sum(1 for _ in data_dir.glob("*.tfrecord*")) if data_dir.is_dir() else 0
-
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
-        if split is DatasetSplit.TRAIN:
-            return self._count_sources(self.root / "training")
-        if split is DatasetSplit.VAL:
-            return self._count_sources(self.root / "validation")
-        return self._count_sources(self.root / "testing")
 
 
 def _scenario_to_polars(scenario: lean_scenario_pb2.LeanScenario) -> pl.DataFrame:

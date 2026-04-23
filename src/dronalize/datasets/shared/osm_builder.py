@@ -41,10 +41,10 @@ class OSMMapBuilder(FeatureMapBuilder):
         self._edge_type_mapping: Callable[[OSMWay], EdgeType] = (
             edge_type_mapping or self._default_edge_type_mapping
         )
-        self._utm_position_offset = utm_position_offset
-        self._osm_file = osm_file
+        self._utm_position_offset: tuple[float, float] = utm_position_offset
+        self._osm_file: Path = osm_file
         self._nodes: dict[int, Point] = {}
-        self._include_edge_type_none = include_edge_type_none
+        self._include_edge_type_none: bool = include_edge_type_none
 
         self._force_zone_number: int | None = None
         self._force_zone_letter: str | None = None
@@ -133,13 +133,3 @@ class OSMMapBuilder(FeatureMapBuilder):
                 feature = self._process_way(elem, root)
                 if feature is not None:
                     yield feature
-
-
-if __name__ == "__main__":
-    builder = OSMMapBuilder(
-        Path("data/sind/Chongqing/NR_ll2.osm"),
-        force_zone_from_origin=(0.0, 0.0),
-        local_origin_latlon=(0.0, 0.0),
-    )
-    map = builder.build(min_distance=0.5, interp_distance=3)
-    print(map)

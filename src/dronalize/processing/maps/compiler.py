@@ -12,7 +12,7 @@ import numpy as np
 
 from dronalize.core.categories import EdgeType
 from dronalize.core.maps import MapGraph
-from dronalize.processing.maps.features import EndpointLinkFeature, MapFeature, PathFeature, Point
+from dronalize.processing.maps.features import MapFeature, PathFeature, Point
 from dronalize.processing.maps.features import PointFeature as MapPointFeature
 
 if TYPE_CHECKING:
@@ -74,18 +74,11 @@ class MapGraphCompiler:
 
     def compile(self, features: Iterable[MapFeature]) -> MapGraph:
         """Compile semantic features into a `MapGraph`."""
-        links: list[EndpointLinkFeature] = []
         for feature in features:
-            if isinstance(feature, EndpointLinkFeature):
-                links.append(feature)
-            elif isinstance(feature, MapPointFeature):
+            if isinstance(feature, MapPointFeature):
                 _ = self._add_node(*feature.point)
             else:
                 self._compile_path(feature)
-                continue
-
-        for link in links:
-            self._compile_endpoint_link(link)
 
         node_positions = np.column_stack([
             np.array(self._x, dtype=np.float64),
@@ -149,22 +142,6 @@ class MapGraphCompiler:
                 start_node=first_node, end_node=end_node
             )
 
-    def _compile_endpoint_link(self, feature: EndpointLinkFeature) -> None:
-        src_path = self._paths_by_key.get(feature.src_key)
-        dst_path = self._paths_by_key.get(feature.dst_key)
-        if src_path is None or dst_path is None:
-            return
-
-        src_node = src_path.start_node if feature.src_endpoint == "start" else src_path.end_node
-        dst_node = dst_path.start_node if feature.dst_endpoint == "start" else dst_path.end_node
-        if (
-            feature.max_distance is not None
-            and self._node_distance(src_node, dst_node) > feature.max_distance
-        ):
-            return
-
-        self._add_edge(src_node, dst_node, feature.edge_type)
-
     def _add_interpolated_edge(
         self,
         *,
@@ -199,11 +176,6 @@ class MapGraphCompiler:
         self._edge_src.append(src)
         self._edge_dst.append(dst)
         self._edge_types.append(int(edge_type_val))
-
-    def _node_distance(self, src: int, dst: int) -> float:
-        dx = self._x[src] - self._x[dst]
-        dy = self._y[src] - self._y[dst]
-        return math.sqrt(dx * dx + dy * dy)
 
 
 def _normalize_edge_types(

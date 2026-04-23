@@ -48,16 +48,6 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         self._val_dir: Path = self.root / "forecasting_val_v1.1" / "val" / "data"
         self._test_dir: Path = self.root / "forecasting_test_v1.1" / "test_obs" / "data"
 
-    @classmethod
-    @override
-    def unified_factory(
-        cls,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> Argoverse1Loader:
-        return cls(data_root, request, resources)
-
     @override
     def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
         if split is DatasetSplit.TRAIN:

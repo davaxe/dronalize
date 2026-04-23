@@ -6,23 +6,12 @@ Argoverse 1 is an early large-scale autonomous-driving forecasting benchmark wit
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Mixed urban</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2019</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>Limited HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                               | Notes                                                             |
-| ------------------- | ----------------------------------- | ----------------------------------------------------------------- |
-| Release year        | 2019                                | Based on the cited dataset paper and release.                     |
-| Domain              | Autonomous-driving forecasting      | Structured around city driving with map-aware prediction tasks.   |
-| Capture platform    | Self-driving vehicle fleet          | Collected from on-road autonomous-driving data.                   |
-| Primary agent types | Cars, pedestrians, cyclists         | Forecasting is centered on urban traffic participants.            |
-| Map context         | Limited HD vector maps              | One of the benchmark's defining features.                         |
-| Geographic coverage | Pittsburgh and Miami, United States | Covers two cities with distinct road layouts.                     |
-| Data format         | CSV scenes plus map files           | Distributed as split-specific forecasting folders and map assets. |
 
 ## Default processing profile
 
@@ -37,27 +26,32 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Prune agents with fewer than 2 samples |
 | Maps | Relevant area (padding 1.15) |
 
-## Version
+## Dataset compatibility
 
-Dronalize currently targets Argoverse 1 `v1.1`, matching the `forecasting_train_v1.1`, `forecasting_val_v1.1`, and `forecasting_test_v1.1` directories expected by the loader.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | Argoverse Forecasting v1.1 |
+| Loader expectation | The loader expects `forecasting_train_v1.1`, `forecasting_val_v1.1`, and `forecasting_test_v1.1`. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `OBJECT_TYPE = AV` | `CAR` | The ego autonomous vehicle is normalized to the shared car category. |
-| `OBJECT_TYPE = OTHERS` | `UNKNOWN` | The loader does not derive a more specific shared category from this label. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `OBJECT_TYPE = AV` | `CAR` |
+| `OBJECT_TYPE = OTHERS` | `UNKNOWN` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| Non-intersection lane segment with left and right neighbors | `LINE_THIN` | The parser treats a bordered lane between neighbors as a lane separator. |
-| Non-intersection lane segment without left or right neighbors | `LINE_THIN` | The parser still treats an isolated non-intersection center boundary as a thin line. |
-| Non-intersection outer border without an adjacent neighbor | `CURB` | The parser treats the outside border of a non-intersection lane as a curb. |
-| Intersection border | `VIRTUAL` | Intersection borders are treated as virtual / no-marking boundaries. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| Non-intersection lane segment with left and right neighbors | `LINE_THIN` |
+| Non-intersection lane segment without left or right neighbors | `LINE_THIN` |
+| Non-intersection outer border without an adjacent neighbor | `CURB` |
+| Intersection border | `VIRTUAL` |
 
 ## Split support
 

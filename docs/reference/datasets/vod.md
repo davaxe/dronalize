@@ -6,23 +6,12 @@ The View-of-Delft prediction dataset is an urban mixed-traffic benchmark with a 
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Urban</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2024</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                           | Notes                                                                                            |
-| ------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Release year        | 2024                            | Based on the cited dataset paper and release.                                                   |
-| Domain              | Urban mixed traffic             | Focused on dense city traffic with more vulnerable road users than many self-driving benchmarks. |
-| Capture platform    | Processed benchmark release     | Released as scene metadata and map assets.                                                       |
-| Primary agent types | Vehicles, pedestrians, cyclists | Explicitly framed as a multi-class prediction dataset.                                           |
-| Map context         | HD semantic maps                | Includes semantic map material for the Delft environment.                                        |
-| Geographic coverage | Delft, Netherlands              | Concentrated in one urban area.                                                                  |
-| Data format         | Scene metadata plus map assets  | Structured into train/validation and test releases.                                              |
 
 ## Default processing profile
 
@@ -37,53 +26,58 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Drop parked and undefined actors, remove duplicate `vehicle.ego` instances, and prune agents with fewer than 2 samples |
 | Maps | Relevant area (padding 1.15) |
 
-## Version
+## Dataset compatibility
 
-Dronalize currently targets VoD `v1.0`, matching the inspected `v1.0-trainval` and `v1.0-test` layout.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | View of Delft v1.0 trainval and test layout |
+| Loader expectation | The loader expects the `v1.0-trainval` and `v1.0-test` directory names. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `vehicle.car` | `CAR` | VoD reuses the nuScenes category mapping. |
-| `vehicle.ego.car` | `CAR` | VoD reuses the nuScenes category mapping; duplicate `vehicle.ego` rows are filtered by default loader options. |
-| `vehicle.van` | `VAN` | VoD reuses the nuScenes category mapping. |
-| `vehicle.construction` | `VAN` | VoD reuses the nuScenes category mapping. |
-| `vehicle.bus.bendy` | `BUS` | VoD reuses the nuScenes category mapping. |
-| `vehicle.bus.rigid` | `BUS` | VoD reuses the nuScenes category mapping. |
-| `vehicle.truck` | `TRUCK` | VoD reuses the nuScenes category mapping. |
-| `vehicle.trailer` | `TRAILER` | VoD reuses the nuScenes category mapping. |
-| `vehicle.motorcycle` | `MOTORCYCLE` | VoD reuses the nuScenes category mapping. |
-| `vehicle.bicycle` | `BICYCLE` | VoD reuses the nuScenes category mapping. |
-| `vehicle.emergency.ambulance` | `CAR` | VoD reuses the nuScenes category mapping. |
-| `vehicle.emergency.police` | `CAR` | VoD reuses the nuScenes category mapping. |
-| `human.pedestrian.adult` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
-| `human.pedestrian.child` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
-| `human.pedestrian.construction_worker` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
-| `human.pedestrian.police_officer` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
-| `human.pedestrian.stroller` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
-| `human.pedestrian.wheelchair` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
-| `human.pedestrian` | `PEDESTRIAN` | VoD reuses the nuScenes category mapping. |
-| `static_object.bicycle_rack` | `STATIC_OBJECT` | VoD reuses the nuScenes category mapping. |
-| `movable_object.barrier` | `MOVEABLE_OBJECT` | VoD reuses the nuScenes category mapping. |
-| `movable_object.debris` | `MOVEABLE_OBJECT` | VoD reuses the nuScenes category mapping. |
-| `movable_object.pushable_pullable` | `MOVEABLE_OBJECT` | VoD reuses the nuScenes category mapping. |
-| `movable_object.trafficcone` | `MOVEABLE_OBJECT` | VoD reuses the nuScenes category mapping. |
-| `animal` | `ANIMAL` | VoD reuses the nuScenes category mapping. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `vehicle.car` | `CAR` |
+| `vehicle.ego.car` | `CAR` |
+| `vehicle.van` | `VAN` |
+| `vehicle.construction` | `VAN` |
+| `vehicle.bus.bendy` | `BUS` |
+| `vehicle.bus.rigid` | `BUS` |
+| `vehicle.truck` | `TRUCK` |
+| `vehicle.trailer` | `TRAILER` |
+| `vehicle.motorcycle` | `MOTORCYCLE` |
+| `vehicle.bicycle` | `BICYCLE` |
+| `vehicle.emergency.ambulance` | `CAR` |
+| `vehicle.emergency.police` | `CAR` |
+| `human.pedestrian.adult` | `PEDESTRIAN` |
+| `human.pedestrian.child` | `PEDESTRIAN` |
+| `human.pedestrian.construction_worker` | `PEDESTRIAN` |
+| `human.pedestrian.police_officer` | `PEDESTRIAN` |
+| `human.pedestrian.stroller` | `PEDESTRIAN` |
+| `human.pedestrian.wheelchair` | `PEDESTRIAN` |
+| `human.pedestrian` | `PEDESTRIAN` |
+| `static_object.bicycle_rack` | `STATIC_OBJECT` |
+| `movable_object.barrier` | `MOVEABLE_OBJECT` |
+| `movable_object.debris` | `MOVEABLE_OBJECT` |
+| `movable_object.pushable_pullable` | `MOVEABLE_OBJECT` |
+| `movable_object.trafficcone` | `MOVEABLE_OBJECT` |
+| `animal` | `ANIMAL` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `SegmentDividerType.NIL` | `VIRTUAL` | VoD reuses the nuScenes divider mapping. |
-| `SegmentDividerType.SINGLE_SOLID_WHITE` | `LINE_THIN` | VoD reuses the nuScenes divider mapping. |
-| `SegmentDividerType.SINGLE_SOLID_YELLOW` | `LINE_THIN` | VoD reuses the nuScenes divider mapping. |
-| `SegmentDividerType.SINGLE_ZIGZAG_WHITE` | `REGULATORY` | VoD reuses the nuScenes divider mapping. |
-| `SegmentDividerType.DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` | VoD reuses the nuScenes divider mapping. |
-| `SegmentDividerType.DOUBLE_DASHED_WHITE` | `LINE_THIN_DOUBLE_DASHED` | VoD reuses the nuScenes divider mapping. |
-| Lane polygon outline | `LINE_THIN` | Unlike nuScenes, the VoD builder sets `lane_polygon_edge=LINE_THIN`. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `SegmentDividerType.NIL` | `VIRTUAL` |
+| `SegmentDividerType.SINGLE_SOLID_WHITE` | `LINE_THIN` |
+| `SegmentDividerType.SINGLE_SOLID_YELLOW` | `LINE_THIN` |
+| `SegmentDividerType.SINGLE_ZIGZAG_WHITE` | `REGULATORY` |
+| `SegmentDividerType.DOUBLE_SOLID_WHITE` | `LINE_THIN_DOUBLE` |
+| `SegmentDividerType.DOUBLE_DASHED_WHITE` | `LINE_THIN_DOUBLE_DASHED` |
+| Lane polygon outline | `LINE_THIN` |
 
 ## Split support
 

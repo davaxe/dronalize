@@ -6,6 +6,7 @@ The Waymo Open Motion Dataset is a large-scale benchmark for interactive motion 
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Forecasting</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2021</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
@@ -18,18 +19,6 @@ The Waymo Open Motion Dataset is a large-scale benchmark for interactive motion 
     ```bash
     pip install dronalize[waymo]
     ``` 
-
-## Dataset facts
-
-| Field               | Value                           | Notes                                                         |
-| ------------------- | ------------------------------- | ------------------------------------------------------------- |
-| Release year        | 2021                            | Based on the cited dataset paper and release.                 |
-| Domain              | Mixed urban autonomous driving  | Designed for planning-relevant multi-agent behavior.          |
-| Capture platform    | Self-driving vehicle fleet      | Collected from real autonomous-driving operation.             |
-| Primary agent types | Vehicles, pedestrians, cyclists | Covers major urban traffic participants.                      |
-| Map context         | Local map geometry              | Each scene includes map information for the surrounding area. |
-| Geographic coverage | Waymo Open Dataset cities       | Used as a large-scale self-driving forecasting benchmark.     |
-| Data format         | TFRecord scenario files         | Organized into training, validation, and testing releases.    |
 
 ## Default processing profile
 
@@ -44,42 +33,47 @@ These are the default Dronalize settings used when processing this dataset.
 | Filtering | Prune agents with fewer than 2 samples |
 | Maps | Relevant area (padding 1.15) |
 
-## Version
+## Dataset compatibility
 
-Dronalize does not currently infer a stable Motion Dataset release number from the Waymo raw layout. The TFRecord directory structure identifies the split layout, but not the exact upstream release revision.
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | Waymo Motion TFRecord scenario layout |
+| Loader expectation | The loader uses the split directory layout and does not infer the exact upstream release revision. |
 
 ## Normalization
 
 ### Agent categories
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `0` | `UNKNOWN` | Waymo object type mapping from the lean scenario proto. |
-| `1` | `CAR` | Waymo object type mapping from the lean scenario proto. |
-| `2` | `PEDESTRIAN` | Waymo object type mapping from the lean scenario proto. |
-| `3` | `BICYCLE` | Waymo object type mapping from the lean scenario proto. |
-| `4` | `UNKNOWN` | The current loader does not assign a more specific shared category for this object type. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `0` | `UNKNOWN` |
+| `1` | `CAR` |
+| `2` | `PEDESTRIAN` |
+| `3` | `BICYCLE` |
+| `4` | `UNKNOWN` |
 
 ### Map types
 
-| Dataset type | Dronalize type | Notes |
-| ------------ | -------------- | ----- |
-| `RoadLine.TYPE_UNKNOWN` | `VIRTUAL` | Waymo road-line mapping in the map builder. |
-| `RoadLine.TYPE_BROKEN_SINGLE_WHITE` | `LINE_THIN_DASHED` | Waymo road-line mapping in the map builder. |
-| `RoadLine.TYPE_BROKEN_SINGLE_YELLOW` | `LINE_THIN_DASHED` | Waymo road-line mapping in the map builder. |
-| `RoadLine.TYPE_SOLID_SINGLE_WHITE` | `LINE_THIN` | Waymo road-line mapping in the map builder. |
-| `RoadLine.TYPE_SOLID_SINGLE_YELLOW` | `LINE_THIN` | Waymo road-line mapping in the map builder. |
-| `RoadLine.TYPE_SOLID_DOUBLE_WHITE` | `LINE_THIN_DOUBLE` | Waymo road-line mapping in the map builder. |
-| `RoadLine.TYPE_SOLID_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE` | Waymo road-line mapping in the map builder. |
-| `RoadLine.TYPE_PASSING_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE` | Waymo road-line mapping in the map builder. |
-| `RoadLine.TYPE_BROKEN_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE_DASHED` | Waymo road-line mapping in the map builder. |
-| `RoadEdge.TYPE_UNKNOWN` | `VIRTUAL` | Waymo road-edge mapping in the map builder. |
-| `RoadEdge.TYPE_ROAD_EDGE_BOUNDARY` | `ROAD_BORDER` | Waymo road-edge mapping in the map builder. |
-| `RoadEdge.TYPE_ROAD_EDGE_MEDIAN` | `GUARD_RAIL` | Waymo road-edge mapping in the map builder. |
-| Crosswalk polygon | `PEDESTRIAN_MARKING` | The builder emits crosswalk polygons as pedestrian markings. |
-| Speed-bump polygon | `REGULATORY` | The builder emits speed bumps as regulatory map elements. |
-| Lane-center polyline | `VIRTUAL` | Lane centerlines are represented as virtual edges. |
-| Driveway polygon | `VIRTUAL` | Driveways are represented as virtual edges. |
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `RoadLine.TYPE_UNKNOWN` | `VIRTUAL` |
+| `RoadLine.TYPE_BROKEN_SINGLE_WHITE` | `LINE_THIN_DASHED` |
+| `RoadLine.TYPE_BROKEN_SINGLE_YELLOW` | `LINE_THIN_DASHED` |
+| `RoadLine.TYPE_SOLID_SINGLE_WHITE` | `LINE_THIN` |
+| `RoadLine.TYPE_SOLID_SINGLE_YELLOW` | `LINE_THIN` |
+| `RoadLine.TYPE_SOLID_DOUBLE_WHITE` | `LINE_THIN_DOUBLE` |
+| `RoadLine.TYPE_SOLID_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE` |
+| `RoadLine.TYPE_PASSING_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE` |
+| `RoadLine.TYPE_BROKEN_DOUBLE_YELLOW` | `LINE_THIN_DOUBLE_DASHED` |
+| `RoadEdge.TYPE_UNKNOWN` | `VIRTUAL` |
+| `RoadEdge.TYPE_ROAD_EDGE_BOUNDARY` | `ROAD_BORDER` |
+| `RoadEdge.TYPE_ROAD_EDGE_MEDIAN` | `GUARD_RAIL` |
+| Crosswalk polygon | `PEDESTRIAN_MARKING` |
+| Speed-bump polygon | `REGULATORY` |
+| Lane-center polyline | `VIRTUAL` |
+| Driveway polygon | `VIRTUAL` |
 
 ## Split support
 

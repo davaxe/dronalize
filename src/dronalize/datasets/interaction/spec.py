@@ -1,39 +1,25 @@
-from collections.abc import Generator
-from contextlib import contextmanager
 from pathlib import Path
 
 from dronalize.config.models import DatasetConfig
-from dronalize.config.models.map import MapConfig
-from dronalize.config.models.scenes import ScenesConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.interaction.loader import InteractionLoader
 from dronalize.datasets.interaction.maps.builder import InteractionMapBuilder
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
-from dronalize.datasets.shared.resources import open_named_shared_map_resources
+from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
-from dronalize.processing.loading.resources import DatasetResources
 
 
-@contextmanager
-def open_interaction_resources(
-    root: Path, scenes: ScenesConfig, map_config: MapConfig | None
-) -> Generator[DatasetResources, None, None]:
-    """Build shared SinD maps once per run."""
-    _ = scenes
-    if map_config is None:
-        yield DatasetResources()
-        return
-
+def _interaction_map_paths(root: Path) -> list[tuple[str, Path]]:
     paths: list[Path] = list((root / "maps").glob("*.osm_xy"))
-    named_paths = [(path.stem, path) for path in paths if path.is_file()]
-    with open_named_shared_map_resources(
-        map_config=map_config,
-        named_paths=named_paths,
-        build_map=lambda path, config: InteractionMapBuilder(path).build(
-            config.min_distance, config.interp_distance
-        ),
-    ) as resources:
-        yield resources
+    return [(path.stem, path) for path in paths if path.is_file()]
+
+
+_open_interaction_resources = named_shared_map_resources_factory(
+    named_paths=_interaction_map_paths,
+    build_map=lambda path, config: InteractionMapBuilder(path).build(
+        config.min_distance, config.interp_distance
+    ),
+)
 
 
 DATASET_SPEC = DatasetSpec(
@@ -45,7 +31,7 @@ DATASET_SPEC = DatasetSpec(
     ),
     native_schema=InteractionLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
-    resources_factory=open_interaction_resources,
+    resources_factory=_open_interaction_resources,
     has_map=True,
     split_support=DatasetSplitSupport(scene=True),
 )

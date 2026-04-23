@@ -145,9 +145,6 @@ class MapGraph:
         Per-node type labels. If None, all nodes are assigned type 1.
     edge_types : ndarray of int64, shape (M,), optional
         Per-edge type labels. If None, all edges are assigned type 1.
-    return_if_empty : bool, optional
-        If True, allows empty graphs and returns empty arrays. If False,
-        raises `ValueError` when both `node_positions` and `edge_indices` are empty.
     """
 
     node_positions: npt.NDArray[np.float64]

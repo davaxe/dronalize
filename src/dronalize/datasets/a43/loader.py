@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.maps.resolver import MapResolver
-    from dronalize.processing.models import LoaderRequest
 
 
 class A43LoaderOptions(DatasetOptionsModel):
@@ -35,9 +34,6 @@ class A43Loader(BaseSceneLoader[tuple[Path, int], A43LoaderOptions]):
 
     _dt: ClassVar[float] = 0.1
     _eps: ClassVar[float] = 1e-9
-
-    def __init__(self, data_root: Path | str, request: LoaderRequest) -> None:
-        super().__init__(data_root=data_root, request=request)
 
     @override
     def iter_sources(self) -> Iterable[Source[tuple[Path, int]]]:

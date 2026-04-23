@@ -12,7 +12,7 @@ from dronalize.processing.maps.builder import FeatureMapBuilder, Point
 from dronalize.processing.maps.features import PathFeature
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Mapping
+    from collections.abc import Iterable
     from pathlib import Path
 
 
@@ -27,10 +27,6 @@ class Argoverse2MapBuilder(FeatureMapBuilder):
         """Create a map builder from an Argoverse 2 JSON file."""
         map_data = parser.Argoverse2Map(json_file)
         return cls(map_data)
-
-    @override
-    def edge_remap(self) -> Mapping[EdgeType, EdgeType]:
-        return {EdgeType.NONE: EdgeType.VIRTUAL}
 
     @override
     def iter_features(self) -> Iterable[PathFeature]:
