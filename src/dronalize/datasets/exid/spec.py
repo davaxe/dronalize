@@ -4,8 +4,8 @@ from pathlib import Path
 
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig, ScenesConfig
 from dronalize.datasets.exid.loader import ExiDLoader
-from dronalize.datasets.exid.maps.builder import ExiDMapBuilder
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 from dronalize.datasets.shared.resources import open_named_shared_map_resources
 from dronalize.datasets.shared.specs import (
     lane_change_sampling,
@@ -32,7 +32,7 @@ def open_exid_resources(
             (map_path.stem[len("location") :], map_path)
             for map_path in (root / "maps" / "lanelets").rglob("*.osm")
         ),
-        build_map=lambda path, config: ExiDMapBuilder(path).build(
+        build_map=lambda path, config: OSMMapBuilder(path).build(
             config.min_distance, config.interp_distance
         ),
     ) as resources:

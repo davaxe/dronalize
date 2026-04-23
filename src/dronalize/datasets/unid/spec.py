@@ -4,6 +4,7 @@ from pathlib import Path
 
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig, ScenesConfig
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 from dronalize.datasets.shared.resources import open_named_shared_map_resources
 from dronalize.datasets.shared.specs import (
     linear_resample,
@@ -11,7 +12,6 @@ from dronalize.datasets.shared.specs import (
     scenes_config,
 )
 from dronalize.datasets.unid.loader import UniDLoader
-from dronalize.datasets.unid.maps.builder import UniDMapBuilder
 from dronalize.processing.loading.resources import DatasetResources
 
 
@@ -30,7 +30,7 @@ def open_unid_resources(
             (map_path.stem[len("location") :], map_path)
             for map_path in (root / "maps" / "lanelets").rglob("*.osm")
         ),
-        build_map=lambda path, config: UniDMapBuilder(path).build(
+        build_map=lambda path, config: OSMMapBuilder(path).build(
             config.min_distance, config.interp_distance
         ),
     ) as resources:

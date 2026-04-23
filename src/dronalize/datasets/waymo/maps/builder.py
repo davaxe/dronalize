@@ -8,24 +8,17 @@ from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
 from dronalize.datasets.waymo.protos import lean_map_pb2
-from dronalize.processing.maps.builder import BaseMapBuilder
+from dronalize.processing.maps.builder import FeatureMapBuilder
+from dronalize.processing.maps.features import PathFeature, PointFeature
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterable, Sequence
 
 
-class WaymoMapBuilder(BaseMapBuilder):
-    """A Waymo map representation.
-
-    As opposed to other maps (e.g, argoverse1, argoverse2 and NuScenes) this map
-    parses the map features and builds a graph representation of the map.
-
-    The constructor `WaymoMapBuilder.from_proto` should be used to create an
-    instance from a list of `lean_map_pb2.MapFeature` protos.
-    """
+class WaymoMapBuilder(FeatureMapBuilder):
+    """A Waymo map representation."""
 
     def __init__(self) -> None:
-        super().__init__()
         self.road_lines: dict[int, lean_map_pb2.RoadLine] = {}
         self.road_edges: dict[int, lean_map_pb2.RoadEdge] = {}
         self.driveways: dict[int, lean_map_pb2.Driveway] = {}
@@ -33,7 +26,6 @@ class WaymoMapBuilder(BaseMapBuilder):
         self.lanes: dict[int, lean_map_pb2.LaneCenter] = {}
         self.speed_bumps: dict[int, lean_map_pb2.SpeedBump] = {}
         self.stop_signs: dict[int, lean_map_pb2.StopSign] = {}
-
         self._no_map_features: bool = True
 
     @classmethod
@@ -49,150 +41,68 @@ class WaymoMapBuilder(BaseMapBuilder):
         return self._no_map_features
 
     @override
-    def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
-        self._processed_features: set[int] = set()
+    def iter_features(self) -> Iterable[PathFeature | PointFeature]:
+        for road_edge in self.road_edges.values():
+            yield PathFeature(
+                points=tuple((point.x, point.y) for point in road_edge.polyline),
+                edge_types=_ROAD_EDGE_TYPE_TO_EDGE_TYPE[road_edge.type],
+            )
 
-        self._add_road_edge_edges(min_distance, interp_distance)
-        self._add_road_line_edges(min_distance, interp_distance)
-        self._add_crosswalk_edges(interp_distance)
-        self._add_driveway_edges(min_distance, interp_distance)
-        self._add_speed_bump_edges(interp_distance)
-        self._add_lane_edges(min_distance, interp_distance)
-        self._add_stop_sign_nodes()
+        for road_line in self.road_lines.values():
+            yield PathFeature(
+                points=tuple((point.x, point.y) for point in road_line.polyline),
+                edge_types=_ROAD_LINE_TYPE_TO_EDGE_TYPE[road_line.type],
+            )
+
+        for crosswalk in self.crosswalks.values():
+            yield PathFeature(
+                points=tuple((point.x, point.y) for point in crosswalk.polygon),
+                edge_types=EdgeType.PEDESTRIAN_MARKING,
+                closed=True,
+                min_distance=0.5,
+            )
+
+        for driveway in self.driveways.values():
+            yield PathFeature(
+                points=tuple((point.x, point.y) for point in driveway.polygon),
+                edge_types=EdgeType.VIRTUAL,
+                closed=True,
+            )
+
+        for speed_bump in self.speed_bumps.values():
+            yield PathFeature(
+                points=tuple((point.x, point.y) for point in speed_bump.polygon),
+                edge_types=EdgeType.REGULATORY,
+                closed=True,
+                min_distance=0.5,
+            )
+
+        for lane in self.lanes.values():
+            yield PathFeature(
+                points=tuple((point.x, point.y) for point in lane.polyline),
+                edge_types=EdgeType.VIRTUAL,
+            )
+
+        for stop_sign in self.stop_signs.values():
+            yield PointFeature(point=(stop_sign.position.x, stop_sign.position.y))
 
     def _process_map_features(self, map_features: Sequence[lean_map_pb2.MapFeature]) -> None:
-        """Process the map features and populate nodes and id_adj_list."""
-        r_lines = self.road_lines
-        r_edges = self.road_edges
-        dw = self.driveways
-        cw = self.crosswalks
-        ln = self.lanes
-        sb = self.speed_bumps
-        ss = self.stop_signs
-
         for feature in map_features:
             kind = feature.WhichOneof("feature_data")
             if kind == "road_line":
-                r_lines[feature.id] = feature.road_line
+                self.road_lines[feature.id] = feature.road_line
             elif kind == "road_edge":
-                r_edges[feature.id] = feature.road_edge
+                self.road_edges[feature.id] = feature.road_edge
             elif kind == "lane":
-                ln[feature.id] = feature.lane
+                self.lanes[feature.id] = feature.lane
             elif kind == "stop_sign":
-                ss[feature.id] = feature.stop_sign
+                self.stop_signs[feature.id] = feature.stop_sign
             elif kind == "crosswalk":
-                cw[feature.id] = feature.crosswalk
+                self.crosswalks[feature.id] = feature.crosswalk
             elif kind == "speed_bump":
-                sb[feature.id] = feature.speed_bump
+                self.speed_bumps[feature.id] = feature.speed_bump
             elif kind == "driveway":
-                dw[feature.id] = feature.driveway
-
-    def _add_speed_bump_edges(self, interp_distance: float | None = None) -> None:
-        """Add edges for speed bumps to the map graph."""
-        for feature_id, speed_bump in self.speed_bumps.items():
-            if feature_id in self._processed_features:
-                continue
-
-            points = [(point.x, point.y) for point in speed_bump.polygon]
-            self.add_node_edges_loop_min_dist(
-                points,
-                is_polygon=True,
-                min_distance=0.5,
-                interp_distance=interp_distance,
-                edge_type=EdgeType.REGULATORY,
-            )
-            self._processed_features.add(feature_id)
-
-    def _add_stop_sign_nodes(self) -> None:
-        """Add stop sign nodes to the map graph."""
-        for stop_sign in self.stop_signs.values():
-            _ = self.add_node(stop_sign.position.x, stop_sign.position.y)
-
-    def _add_lane_edges(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
-        """Process a lane center feature and update nodes and id_adj_list."""
-        for feature_id, lane in self.lanes.items():
-            if feature_id in self._processed_features:
-                continue
-
-            points = [(point.x, point.y) for point in lane.polyline]
-            self.add_node_edges_loop_min_dist(
-                points,
-                is_polygon=False,
-                min_distance=min_distance,
-                interp_distance=interp_distance,
-                edge_type=EdgeType.VIRTUAL,
-            )
-            self._processed_features.add(feature_id)
-
-    def _add_crosswalk_edges(self, interp_distance: float | None = None) -> None:
-        """Process a crosswalk feature and update nodes and id_adj_list."""
-        for feature_id, crosswalk in self.crosswalks.items():
-            if feature_id in self._processed_features:
-                continue
-            points = [(point.x, point.y) for point in crosswalk.polygon]
-
-            self.add_node_edges_loop_min_dist(
-                points,
-                is_polygon=True,
-                min_distance=0.5,
-                interp_distance=interp_distance,
-                edge_type=EdgeType.PEDESTRIAN_MARKING,
-            )
-            self._processed_features.add(feature_id)
-
-    def _add_driveway_edges(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
-        """Process a driveway feature and update nodes and id_adj_list."""
-        for feature_id, driveway in self.driveways.items():
-            if feature_id in self._processed_features:
-                continue
-            points = [(point.x, point.y) for point in driveway.polygon]
-
-            self.add_node_edges_loop_min_dist(
-                points,
-                is_polygon=True,
-                min_distance=min_distance,
-                interp_distance=interp_distance,
-                edge_type=EdgeType.VIRTUAL,
-            )
-            self._processed_features.add(feature_id)
-
-    def _add_road_edge_edges(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
-        """Process a road edge feature and update nodes and id_adj_list."""
-        for feature_id, road_edge in self.road_edges.items():
-            points = [(point.x, point.y) for point in road_edge.polyline]
-
-            self.add_node_edges_loop_min_dist(
-                points,
-                is_polygon=False,
-                min_distance=min_distance,
-                interp_distance=interp_distance,
-                edge_type=_ROAD_EDGE_TYPE_TO_EDGE_TYPE[road_edge.type],
-            )
-            self._processed_features.add(feature_id)
-
-    def _add_road_line_edges(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
-        """Process a road line feature and update nodes and id_adj_list."""
-        for feature_id, road_line in self.road_lines.items():
-            points = [(point.x, point.y) for point in road_line.polyline]
-
-            self.add_node_edges_loop_min_dist(
-                points,
-                min_distance=min_distance,
-                is_polygon=False,
-                interp_distance=interp_distance,
-                edge_type=_ROAD_LINE_TYPE_TO_EDGE_TYPE[road_line.type],
-            )
-            self._processed_features.add(feature_id)
+                self.driveways[feature.id] = feature.driveway
 
 
 _ROAD_LINE_TYPE_TO_EDGE_TYPE: dict[int, EdgeType] = {
