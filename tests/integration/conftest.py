@@ -8,7 +8,7 @@ import pytest
 def raw_data_root() -> Path:
     """Path to the root directory containing raw dataset files."""
     root = os.environ.get("TRAJ_DATA")
-    return Path(root) if root is not None else Path()
+    return Path(root) if root is not None else Path("data")
 
 
 @pytest.fixture

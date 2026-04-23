@@ -11,7 +11,7 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.functional import yaw_from_vel_expr
 from dronalize.core.scene.schema import POSITIONS_VELOCITY_YAW
-from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
@@ -68,19 +68,12 @@ class InteractionLoader(BaseSceneLoader[Path]):
         raise ValueError(msg)
 
     @override
-    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
-        split = selection.native_split
-        if split is None:
-            for native_split in _NATIVE_SPLITS:
-                yield from self.iter_sources_for(SourceSelection(native_split=native_split))
-            return
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
         if split is DatasetSplit.TRAIN:
             yield from self._sources_from_dir(self.root / "train")
-            return
-        if split is DatasetSplit.VAL:
+        elif split is DatasetSplit.VAL:
             yield from self._sources_from_dir(self.root / "val")
-            return
-        if split is DatasetSplit.TEST:
+        elif split is DatasetSplit.TEST:
             yield from self._sources_from_dir(self.root / "test_multi-agent")
             yield from self._sources_from_dir(self.root / "test_conditional-multi-agent")
 
@@ -107,13 +100,14 @@ class InteractionLoader(BaseSceneLoader[Path]):
             yield LoadedSourceData(frame=group.lazy().drop("case_id"))
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        split = selection.native_split
-        if split is None:
-            return sum(
-                self._count_sources_for_split(native_split) for native_split in _NATIVE_SPLITS
-            )
-        return self._count_sources_for_split(split)
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
+        if split is DatasetSplit.TRAIN:
+            return self._count_sources(self.root / "train")
+        if split is DatasetSplit.VAL:
+            return self._count_sources(self.root / "val")
+        return self._count_sources(self.root / "test_multi-agent") + self._count_sources(
+            self.root / "test_conditional-multi-agent"
+        )
 
     @classmethod
     @override
@@ -141,15 +135,6 @@ class InteractionLoader(BaseSceneLoader[Path]):
         if not data_dir.is_dir():
             return 0
         return sum(1 for _ in data_dir.rglob("*.csv"))
-
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
-        if split is DatasetSplit.TRAIN:
-            return self._count_sources(self.root / "train")
-        if split is DatasetSplit.VAL:
-            return self._count_sources(self.root / "val")
-        return self._count_sources(self.root / "test_multi-agent") + self._count_sources(
-            self.root / "test_conditional-multi-agent"
-        )
 
     @override
     def map_resolver(self) -> MapResolver:

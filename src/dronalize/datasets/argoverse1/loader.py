@@ -12,7 +12,7 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
 from dronalize.processing.loading.options import DatasetOptionsModel
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
@@ -59,21 +59,13 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         return cls(data_root, request, resources)
 
     @override
-    def iter_sources_for(
-        self, selection: SourceSelection = ALL_SOURCES
-    ) -> Iterable[Source[list[Path]]]:
-        split = selection.native_split
-        if selection.all_sources():
-            for native_split in _NATIVE_SPLITS:
-                yield from self.iter_sources_for(SourceSelection(native_split=native_split))
-            return
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
         if split is DatasetSplit.TRAIN:
             yield from self._sources_from_dir(self._train_dir)
-            return
-        if split is DatasetSplit.VAL:
+        elif split is DatasetSplit.VAL:
             yield from self._sources_from_dir(self._val_dir)
-            return
-        yield from self._sources_from_dir(self._test_dir)
+        else:
+            yield from self._sources_from_dir(self._test_dir)
 
     @override
     def load_source(self, source: Source[list[Path]]) -> Iterable[LoadedSourceData]:
@@ -113,13 +105,12 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
             )
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        split = selection.native_split
-        if split is None:
-            return sum(
-                self._count_sources_for_split(native_split) for native_split in _NATIVE_SPLITS
-            )
-        return self._count_sources_for_split(split)
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
+        if split is DatasetSplit.TRAIN:
+            return self._count_sources(self._train_dir)
+        if split is DatasetSplit.VAL:
+            return self._count_sources(self._val_dir)
+        return self._count_sources(self._test_dir)
 
     @classmethod
     @override
@@ -148,13 +139,6 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         num_files = sum(1 for _ in data_dir.glob("*.csv"))
         batches, extra = divmod(num_files, self.loader_options.file_batch_size)
         return batches + int(extra > 0)
-
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
-        if split is DatasetSplit.TRAIN:
-            return self._count_sources(self._train_dir)
-        if split is DatasetSplit.VAL:
-            return self._count_sources(self._val_dir)
-        return self._count_sources(self._test_dir)
 
 
 _SCHEMA: pl.Schema = pl.Schema({

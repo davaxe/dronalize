@@ -13,28 +13,20 @@ if TYPE_CHECKING:
 
 
 class I80MapBuilder(HighwayLaneMapBuilder):
-    """Map builder for the I-80 dataset.
-
-    This dataset does not have actual map data, but the map can be reconstructed
-    (inferred/estimated) from vehicle trajectories. The map builder
-    uses a simple heuristic to infer the lane structure, see
-    `HighwayLaneMapBuilder` for details.
-
-    Parameters
-    ----------
-    data_dir : Path
-        The root directory of the I-80 dataset.
-    """
+    """Map builder for the I-80 dataset."""
 
     def __init__(self, data_dir: Path) -> None:
         files = list(data_dir.rglob("trajectories*.csv"))
         data = pl.scan_csv(files).select(
             pl.col("Vehicle_ID").alias("id"),
-            pl.col("Local_X").alias("x").mul(0.3048),  # Convert feet to meters
+            pl.col("Local_X").alias("x").mul(0.3048),
             pl.col("Local_Y").alias("y").mul(0.3048),
             pl.col("Lane_ID").alias("lane_id"),
         )
-        super().__init__(data, bin_size=10.0, include_outer_borders=True, smoothing=3.0)
-        self._lane_description: LaneDescription | None = LaneDescription(
-            ids=list(range(1, 8)), direction=[True] * 7
+        super().__init__(
+            data,
+            bin_size=10.0,
+            include_outer_borders=True,
+            smoothing=3.0,
+            lane_description=LaneDescription(ids=list(range(1, 8)), direction=[True] * 7),
         )

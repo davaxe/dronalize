@@ -4,10 +4,10 @@ from pathlib import Path
 
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig, ScenesConfig
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 from dronalize.datasets.shared.resources import open_named_shared_map_resources
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 from dronalize.datasets.sind.loader import SindLoader
-from dronalize.datasets.sind.maps.builder import SindMapBuilder
 from dronalize.processing.loading.resources import DatasetResources
 
 
@@ -28,9 +28,9 @@ def open_sind_resources(
             ("Chongqing", root / "Chongqing" / "NR_ll2.osm"),
             ("Tianjin", root / "Tianjin" / "map_relink_law_save.osm"),
         ),
-        build_map=lambda path, config: SindMapBuilder(path).build(
-            config.min_distance, config.interp_distance
-        ),
+        build_map=lambda path, config: OSMMapBuilder(
+            path, force_zone_from_origin=(0, 0), local_origin_latlon=(0, 0)
+        ).build(config.min_distance, config.interp_distance),
     ) as resources:
         yield resources
 

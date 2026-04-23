@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import polars as pl
 
@@ -21,8 +21,8 @@ if TYPE_CHECKING:
     from dronalize.processing.screening.screen import Screen
 
 
-SCENE_PASS_COLUMN = "_scene_passes"  # noqa: S105
-AGENT_PASS_COLUMN = "_agent_passes"  # noqa: S105
+SCENE_PASS_COLUMN: Final[str] = "_scene_passes"  # noqa: S105
+AGENT_PASS_COLUMN: Final[str] = "_agent_passes"  # noqa: S105
 
 
 @dataclass(slots=True, frozen=True)

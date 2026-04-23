@@ -35,9 +35,7 @@ if TYPE_CHECKING:
     from dronalize.runtime.types import ExecutionPlan
 
 
-app: typer.Typer = typer.Typer(
-    help="Trajectory data processing toolkit.", no_args_is_help=True
-)
+app: typer.Typer = typer.Typer(help="Trajectory data processing toolkit.", no_args_is_help=True)
 _T = TypeVar("_T")
 
 ReadStrategy = Literal["all", "native"]

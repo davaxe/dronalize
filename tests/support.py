@@ -13,34 +13,16 @@ from dronalize.config.models import DatasetConfig, ScenesConfig, WindowConfig
 from dronalize.config.models.scenes import LaneChangeConfig, ResampleConfig
 from dronalize.config.models.screening import MinSamplesSpec, ScreeningConfig
 from dronalize.core.categories import AgentCategory, AgentCategoryLike
-from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.maps import MapGraph
 from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
 from dronalize.datasets import DatasetSpec
 from dronalize.io.records import SceneRecord
-from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.loading.options import DatasetOptionsModel
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
-
-
-class DataFrameBuilder:
-    def __init__(self) -> None:
-        self.data_frames: list[pl.DataFrame] = []
-
-    def add_agent_data(self, agent_data: AgentData) -> None:
-        if len(self.data_frames) == 0:
-            self.next_frame()
-        df = make_scene_df(agent_data)
-        self.data_frames[-1] = pl.concat([self.data_frames[-1], df], how="vertical")
-
-    def next_frame(self) -> None:
-        self.data_frames.append(pl.DataFrame())
-
-    def build(self) -> pl.DataFrame:
-        return combine_df(*self.data_frames)
 
 
 class AgentData(TypedDict):
@@ -69,9 +51,7 @@ class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
         return CANONICAL
 
     @override
-    def iter_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> Iterable[Source[Path]]:
-        if selection.native_split is not None:
-            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
+    def iter_sources(self) -> Iterable[Source[Path]]:
         yield Source(identifier="source-1", data=self.root / "source.parquet")
 
     @override
@@ -95,9 +75,7 @@ class DemoLoader(BaseSceneLoader[Path, DemoOptions]):
         yield LoadedSourceData(frame.lazy())
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        if selection.native_split is not None:
-            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
+    def count_sources(self) -> int | None:
         return 1
 
 
@@ -267,14 +245,3 @@ def scene_df_presets() -> DataFramePresets:
             "lane_id": [1, 1, 2, 2, 2, 1, 1, 1, 1, 1],
         }),
     }
-
-
-def combine_df(*frames: pl.DataFrame, identify_column: str | None = None) -> pl.DataFrame:
-    # Combine with extra column that specify which preset each row came from
-    if identify_column is None:
-        return pl.concat(frames, how="vertical")
-
-    labeled_frames: list[pl.DataFrame] = []
-    for i, frame in enumerate(frames):
-        labeled_frames.append(frame.with_columns(pl.lit(i).alias(identify_column)))
-    return pl.concat(labeled_frames, how="vertical")

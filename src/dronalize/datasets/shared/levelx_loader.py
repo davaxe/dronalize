@@ -7,10 +7,9 @@ import polars as pl
 from typing_extensions import Self, override
 
 from dronalize.core.categories import AgentCategory
-from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import CANONICAL
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import ALL_SOURCES, BaseSceneLoader, SourceSelection
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
@@ -120,11 +119,7 @@ class LevelXDataLoader(BaseSceneLoader[SourceData]):
         return _TRACK_SCHEMA
 
     @override
-    def iter_sources_for(
-        self, selection: SourceSelection = ALL_SOURCES
-    ) -> Iterable[Source[SourceData]]:
-        if selection.native_split is not None:
-            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
+    def iter_sources(self) -> Iterable[Source[SourceData]]:
         for recording_id in self._recording_ids():
             recording_meta = self.root / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
@@ -161,9 +156,7 @@ class LevelXDataLoader(BaseSceneLoader[SourceData]):
         yield LoadedSourceData(combined)
 
     @override
-    def count_sources_for(self, selection: SourceSelection = ALL_SOURCES) -> int | None:
-        if selection.native_split is not None:
-            raise SplitNotSupportedError(type(self).__name__, selection.native_split)
+    def count_sources(self) -> int | None:
         return len(self._recording_ids())
 
     @classmethod
