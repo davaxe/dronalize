@@ -1,4 +1,4 @@
-from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction
+from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import single_shared_map_resource_factory
@@ -20,7 +20,7 @@ DATASET_SPEC = DatasetSpec(
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=5, future_frames=30, sample_time=0.1, window_step=5),
         screening=minimum_samples_screening(2),
-        map=MapConfig(extraction=SceneExtentExtraction()),
+        map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
     dataset_options_model=VodLoaderOptions,
     native_schema=VodLoader.native_trajectory_schema(),

@@ -206,10 +206,10 @@ def save_scene_artifacts(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     frame = scene.frame.select("frame", "id", "x", "y")
-    _ = plot_scene(scene, show_map=False, save_path=out_dir / "trajectories.html", aspect="equal")
+    _ = plot_scene(scene, show_map=False, save_path=out_dir / "trajectories.html")
 
     if graph is not None and (graph.num_nodes > 0 or graph.num_edges > 0):
-        _ = plot_scene(scene, save_path=out_dir / "overlay.html", aspect="equal")
+        _ = plot_scene(scene, save_path=out_dir / "overlay.html")
 
     summary_frame = frame.select(
         pl.col("x").min().alias("x_min"),

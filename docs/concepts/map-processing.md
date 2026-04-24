@@ -25,13 +25,15 @@ Extraction is configured under `[datasets.<name>.map.extraction]`.
 | Mode | When to use it |
 | --- | --- |
 | `full` | Keep the whole map when size is manageable or you want maximum context. |
-| `scene_extent` | Crop adaptively around the scene trajectory extent. |
+| `scene_extent` | Crop adaptively around the scene trajectory extent, with either a circle or bounding box. |
 | `circle` | Keep a fixed-radius area around the scene. |
+| `trajectory_buffer` | Keep only the road geometry that stays close to the actual scene trajectories. |
 | `bounding_box` | Keep a fixed-width, fixed-height area around the scene. |
 
 As a rule of thumb:
 
 - use `scene_extent` for adaptive local context
+- use `trajectory_buffer` when you want a smaller cut that follows the driven paths more closely
 - use `circle` or `bounding_box` when downstream code expects a consistent spatial extent
 - use `full` when cropping is unnecessary or the map is already small
 
@@ -45,6 +47,14 @@ As a rule of thumb:
 These settings matter most for storage size, rendering cost, and graph density. If you do not have
 a reason to tune them, dataset defaults are usually a good starting point.
 
+## Semantic filtering
+
+The optional `[datasets.<name>.map.edge_types]` block lets you reshape the semantic map payload without touching dataset code.
+
+- use `exclude` to drop noisy edge classes such as `VIRTUAL`
+- use `include` when you want a strict semantic subset
+- use `remap` to collapse fine-grained types into a smaller vocabulary
+
 ## Typical setup
 
 ```toml
@@ -53,9 +63,13 @@ min_distance = 1.0
 interp_distance = 2.5
 
 [datasets.a43.map.extraction]
-mode = "circle"
-radius = 60.0
+mode = "scene_extent"
+padding = 1.2
+shape = "bounding_box"
+
+[datasets.a43.map.edge_types]
+exclude = ["VIRTUAL"]
 ```
 
-This keeps map context within a fixed radius around each scene while simplifying the geometry to the
-requested point density.
+This keeps a scene-aligned bounding box around each scene, simplifies the geometry to the requested
+point density, and removes virtual edges from the emitted graph.

@@ -36,9 +36,8 @@ if TYPE_CHECKING:
 AspectMode = Literal["auto", "equal"]
 """Aspect-ratio modes supported by [`plot_scene`][dronalize.plot.plot_scene].
 
-`"auto"` uses the default plotting dimensions unless explicit dimensions are
-supplied, while `"equal"` computes plot bounds so one data unit in x matches
-one data unit in y.
+These values are retained for backwards compatibility, but scene plots now use
+fixed canvas dimensions unless explicit `width` / `height` are supplied.
 """
 
 ChartT: TypeAlias = alt.Chart | alt.LayerChart | alt.FacetChart
@@ -46,9 +45,6 @@ FilterExpression: TypeAlias = str
 
 _DEFAULT_WIDTH: Final[int] = 800
 _DEFAULT_HEIGHT: Final[int] = 450
-_MIN_DIMENSION: Final[int] = 240
-_MAX_DIMENSION: Final[int] = 1200
-_MAX_EQUAL_RATIO: Final[float] = 6.0
 _MAX_TOOLTIP_AGENTS: Final[int] = 150
 _FUTURE_PHASE_DASH: Final[tuple[int, int]] = (6, 12)
 
@@ -138,16 +134,13 @@ def plot_scene(
         Whether to include the map graph in the plot regardless of map data
         presence. Defaults to `True`.
     aspect : AspectMode, optional
-        Aspect ratio mode for the plot. `"auto"` (default) automatically adjusts
-        the aspect ratio based on data bounds, while `"equal"` forces a 1:1
-        aspect ratio regardless of data. Ignored if both width and height are
-        specified.
+        Legacy sizing flag retained for backwards compatibility. Scene plots now
+        use fixed canvas dimensions by default, so this argument does not
+        affect sizing.
     width : int, optional
-        Width of the plot in pixels. If `None`, width is determined by aspect
-        mode.
+        Width of the plot in pixels. Defaults to `800`.
     height : int, optional
-        Height of the plot in pixels. If `None`, height is determined by aspect
-        mode.
+        Height of the plot in pixels. Defaults to `450`.
     max_agents : int, optional
         Maximum number of unique agents to plot. If the scene contains more than
         this number, a random sample of agents will be plotted. If `None`
@@ -187,11 +180,11 @@ def plot_scene(
         ignore_map_types=ignore_map_types,
         ignore_agent_categories=ignore_agent_categories,
     )
+    _ = aspect
     resolved_theme = get_plot_theme(theme)
     chart = _build_scene_chart(
         normalized,
         show_map=show_map,
-        aspect=aspect,
         width=width,
         height=height,
         include_map_nodes=include_map_nodes,
@@ -215,21 +208,13 @@ def _build_scene_chart(
     data: PlotSceneData,
     *,
     show_map: bool,
-    aspect: AspectMode,
     width: int | None,
     height: int | None,
     include_map_nodes: bool,
     theme: PlotTheme,
 ) -> ChartT:
     """Construct the layered Altair chart from normalized scene data."""
-    plot_width, plot_height = _resolve_plot_dimensions(
-        trajectories=data.trajectories,
-        map_edges=data.map_edges,
-        show_map=show_map,
-        aspect=aspect,
-        width=width,
-        height=height,
-    )
+    plot_width, plot_height = _resolve_plot_dimensions(width=width, height=height)
 
     layers: list[alt.Chart] = []
     params: list[alt.Parameter] = []
@@ -264,68 +249,11 @@ def _build_scene_chart(
 
 def _resolve_plot_dimensions(
     *,
-    trajectories: pl.DataFrame,
-    map_edges: pl.DataFrame | None,
-    show_map: bool,
-    aspect: AspectMode,
     width: int | None,
     height: int | None,
 ) -> tuple[int, int]:
-    """Resolve chart dimensions while keeping aspect behavior explicit."""
-    if width is not None and height is not None:
-        return width, height
-    if width is not None:
-        return width, height or _DEFAULT_HEIGHT
-    if height is not None:
-        return width or _DEFAULT_WIDTH, height
-    if aspect == "auto":
-        return _DEFAULT_WIDTH, _DEFAULT_HEIGHT
-
-    x_min, x_max, y_min, y_max = _collect_plot_bounds(
-        trajectories=trajectories, map_edges=map_edges, show_map=show_map
-    )
-    x_span = max(x_max - x_min, 1.0)
-    y_span = max(y_max - y_min, 1.0)
-    ratio = min(max(x_span / y_span, 1.0 / _MAX_EQUAL_RATIO), _MAX_EQUAL_RATIO)
-
-    if ratio >= 1.0:
-        return _MAX_DIMENSION, max(_MIN_DIMENSION, round(_MAX_DIMENSION / ratio))
-    return max(_MIN_DIMENSION, round(_MAX_DIMENSION * ratio)), _MAX_DIMENSION
-
-
-def _collect_plot_bounds(
-    *, trajectories: pl.DataFrame, map_edges: pl.DataFrame | None, show_map: bool
-) -> tuple[float, float, float, float]:
-    """Return combined x/y bounds across plotted layers."""
-    x_values: list[float] = []
-    y_values: list[float] = []
-
-    if not trajectories.is_empty():
-        summary = trajectories.select(
-            pl.col("x").min().alias("x_min"),
-            pl.col("x").max().alias("x_max"),
-            pl.col("y").min().alias("y_min"),
-            pl.col("y").max().alias("y_max"),
-        )
-        x_min, x_max, y_min, y_max = summary.row(0)
-        x_values.extend((float(x_min), float(x_max)))
-        y_values.extend((float(y_min), float(y_max)))
-
-    if show_map and map_edges is not None and not map_edges.is_empty():
-        summary = map_edges.select(
-            pl.min_horizontal(pl.col("x1"), pl.col("x2")).min().alias("x_min"),
-            pl.max_horizontal(pl.col("x1"), pl.col("x2")).max().alias("x_max"),
-            pl.min_horizontal(pl.col("y1"), pl.col("y2")).min().alias("y_min"),
-            pl.max_horizontal(pl.col("y1"), pl.col("y2")).max().alias("y_max"),
-        )
-        x_min, x_max, y_min, y_max = summary.row(0)
-        x_values.extend((float(x_min), float(x_max)))
-        y_values.extend((float(y_min), float(y_max)))
-
-    if not x_values or not y_values:
-        return 0.0, 1.0, 0.0, 1.0
-
-    return min(x_values), max(x_values), min(y_values), max(y_values)
+    """Resolve fixed chart dimensions with optional caller overrides."""
+    return width or _DEFAULT_WIDTH, height or _DEFAULT_HEIGHT
 
 
 def _build_trajectory_layers(

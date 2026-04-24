@@ -105,3 +105,17 @@ def deep_merge(base: MutableMapping[str, V], patch: Mapping[str, V]) -> MutableM
             base[key] = copy.deepcopy(patch_value)
 
     return base
+
+
+TargetT = TypeVar("TargetT", bound=ConfigBase)
+
+
+def apply_optional(
+    patch: PartialConfig[TargetT] | Literal[False] | None, target: TargetT | None
+) -> TargetT | None:
+    """Apply a patch to an optional config block."""
+    if patch is None:
+        return target
+    if patch is False:
+        return None
+    return patch.apply_to(target)

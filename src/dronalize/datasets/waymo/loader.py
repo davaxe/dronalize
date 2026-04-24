@@ -82,7 +82,7 @@ class WaymoLoader(BaseSceneLoader):
         map_graph = WaymoMapBuilder.from_proto(map_data.map_features).build(
             min_distance=map_config.min_distance, interp_distance=map_config.interp_distance
         )
-        return utils.extract_based_on_scene(map_graph, scene, map_config.extraction)
+        return utils.extract_configured_map(map_graph, scene, map_config)
 
     @staticmethod
     def _count_sources(data_dir: Path) -> int:

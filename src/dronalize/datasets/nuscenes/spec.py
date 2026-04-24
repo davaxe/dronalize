@@ -1,4 +1,4 @@
-from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction
+from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.nuscenes.loader import NuScenesLoader, NuScenesLoaderOptions
 from dronalize.datasets.nuscenes.maps.builder import NuScenesMapBuilder
@@ -33,7 +33,7 @@ DATASET_SPEC = DatasetSpec(
             resample=linear_resample(up=5),
         ),
         screening=minimum_samples_screening(2),
-        map=MapConfig(extraction=SceneExtentExtraction()),
+        map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
     dataset_options_model=NuScenesLoaderOptions,
     native_schema=NuScenesLoader.native_trajectory_schema(),

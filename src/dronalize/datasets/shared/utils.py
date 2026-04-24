@@ -9,15 +9,18 @@ from dronalize.config.models import (
     BoundingBoxExtraction,
     CircularExtraction,
     FullMapExtraction,
+    MapConfig,
+    MapEdgeTypesConfig,
     MapExtraction,
     SceneExtentExtraction,
+    TrajectoryBufferExtraction,
 )
+from dronalize.core.categories import EdgeType, EdgeTypeLike
+from dronalize.core.maps import MapGraph
 from dronalize.core.scene import Scene
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-    from dronalize.core.maps import MapGraph
 
 
 def extract_fn(extraction: MapExtraction) -> Callable[[Scene, MapGraph], MapGraph]:
@@ -65,6 +68,16 @@ def extract_based_on_scene(
     return extract(map_graph, center=center, extraction=extraction, relevant_positions=scene)
 
 
+def apply_map_config(map_graph: MapGraph, config: MapConfig) -> MapGraph:
+    """Apply config-wide map transforms that do not depend on a scene."""
+    return apply_edge_type_config(map_graph, config.edge_types)
+
+
+def extract_configured_map(map_graph: MapGraph, scene: Scene, config: MapConfig) -> MapGraph:
+    """Apply map config and then extract the scene-local subgraph."""
+    return extract_based_on_scene(apply_map_config(map_graph, config), scene, config.extraction)
+
+
 def extract(
     graph: MapGraph,
     center: tuple[float, float] | npt.NDArray[np.floating[Any]] | None,
@@ -100,13 +113,81 @@ def extract(
             return graph.extract_bbox(center, width, height)
         case CircularExtraction(radius=radius):
             return graph.extract_radius(center, radius)
-        case SceneExtentExtraction(padding=padding):
+        case TrajectoryBufferExtraction(radius=radius):
+            if relevant_positions is None:
+                msg = "relevant_positions must be provided for TrajectoryBufferExtraction"
+                raise ValueError(msg)
+            return graph.extract_trajectory_buffer(relevant_positions, radius)
+        case SceneExtentExtraction(padding=padding, shape=shape):
             if relevant_positions is None:
                 msg = "relevant_positions must be provided for SceneExtentExtraction"
                 raise ValueError(msg)
-            return graph.extract_relevant(relevant_positions, padding)
+            return graph.extract_relevant(
+                relevant_positions, padding, use_bbox=shape == "bounding_box"
+            )
         case FullMapExtraction():
             return graph
+
+
+def apply_edge_type_config(map_graph: MapGraph, edge_types: MapEdgeTypesConfig | None) -> MapGraph:
+    """Apply edge-type remapping and filtering to a graph."""
+    if edge_types is None or map_graph.num_edges == 0:
+        return map_graph
+
+    include, exclude, remap = _normalize_edge_type_rules(edge_types)
+    remapped_edge_types = np.array(map_graph.edge_types, copy=True)
+    changed = False
+    for source, target in remap.items():
+        source_value = int(source)
+        target_value = int(target)
+        matches = remapped_edge_types == source_value
+        if matches.any():
+            remapped_edge_types[matches] = target_value
+            changed = True
+
+    edge_mask = np.ones(map_graph.num_edges, dtype=bool)
+    if include is not None:
+        include_values = np.array([int(edge_type) for edge_type in include], dtype=np.int32)
+        edge_mask &= np.isin(remapped_edge_types, include_values)
+    if exclude:
+        exclude_values = np.array([int(edge_type) for edge_type in exclude], dtype=np.int32)
+        edge_mask &= ~np.isin(remapped_edge_types, exclude_values)
+
+    if not edge_mask.all():
+        filtered_graph = map_graph.filter_edges(edge_mask)
+        filtered_edge_types = remapped_edge_types[edge_mask]
+        return MapGraph(
+            node_positions=filtered_graph.node_positions,
+            edge_indices=filtered_graph.edge_indices,
+            node_types=filtered_graph.node_types,
+            edge_types=filtered_edge_types,
+        )
+
+    if not changed:
+        return map_graph
+
+    return MapGraph(
+        node_positions=map_graph.node_positions,
+        edge_indices=map_graph.edge_indices,
+        node_types=map_graph.node_types,
+        edge_types=remapped_edge_types,
+    )
+
+
+def _normalize_edge_type_rules(
+    edge_types: MapEdgeTypesConfig,
+) -> tuple[frozenset[EdgeType] | None, frozenset[EdgeType], dict[EdgeType, EdgeType]]:
+    include = (
+        None
+        if edge_types.include is None
+        else frozenset(EdgeType.from_value(edge_type) for edge_type in edge_types.include)
+    )
+    exclude = frozenset(EdgeType.from_value(edge_type) for edge_type in edge_types.exclude)
+    remap = {
+        EdgeType.from_value(source): EdgeType.from_value(target)
+        for source, target in edge_types.remap.items()
+    }
+    return include, exclude, remap
 
 
 FloatArray = npt.NDArray[np.floating[Any]]

@@ -48,6 +48,33 @@ class EdgeType(IntEnum):
 
         return cls.NONE
 
+    @classmethod
+    def from_string(cls, value: str) -> EdgeType:
+        """Convert a string to an `EdgeType`, case-insensitive."""
+        normalized = value.strip().lower().replace("-", "_")
+        for edge_type in cls:
+            if edge_type.name.lower() == normalized:
+                return edge_type
+
+        if normalized in _STR_TO_EDGE:
+            return _STR_TO_EDGE[normalized]
+        if normalized == "line_thin":
+            return cls.LINE_THIN
+        if normalized == "line_thick":
+            return cls.LINE_THICK
+
+        msg = f"Unknown edge type: {value}"
+        raise ValueError(msg)
+
+    @classmethod
+    def from_value(cls, value: int | str | EdgeType) -> EdgeType:
+        """Convert an integer or string to an `EdgeType`."""
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, int):
+            return cls(value)
+        return cls.from_string(value)
+
 
 class DatasetSplit(str, Enum):
     """Enum representing the available dataset splits."""
@@ -127,16 +154,29 @@ AgentCategoryLike = int | str | AgentCategory
 """Type for specifying a single agent category."""
 AgentCategoryInput = AgentCategoryLike | Iterable[AgentCategoryLike]
 """Input type for specifying one or more agent categories."""
+EdgeTypeLike = int | str | EdgeType
+"""Type for specifying a single edge type."""
+EdgeTypeInput = EdgeTypeLike | Iterable[EdgeTypeLike]
+"""Input type for specifying one or more edge types."""
 
-_T = TypeVar("_T", bound=Collection[AgentCategory])
+_AgentCollectionT = TypeVar("_AgentCollectionT", bound=Collection[AgentCategory])
+_EdgeCollectionT = TypeVar("_EdgeCollectionT", bound=Collection[EdgeType])
 
 
 def coerce_agent_categories(
-    value: AgentCategoryInput, collection: Callable[[Iterable[AgentCategory]], _T]
-) -> _T:
+    value: AgentCategoryInput, collection: Callable[[Iterable[AgentCategory]], _AgentCollectionT]
+) -> _AgentCollectionT:
     """Convert one or many agent-category values into a normalized collection."""
     values = [value] if isinstance(value, (str, int, AgentCategory)) else value
     return collection(AgentCategory.from_value(item) for item in values)
+
+
+def coerce_edge_types(
+    value: EdgeTypeInput, collection: Callable[[Iterable[EdgeType]], _EdgeCollectionT]
+) -> _EdgeCollectionT:
+    """Convert one or many edge-type values into a normalized collection."""
+    values = [value] if isinstance(value, (str, int, EdgeType)) else value
+    return collection(EdgeType.from_value(item) for item in values)
 
 
 _STR_TO_EDGE: Final[dict[str, EdgeType]] = {

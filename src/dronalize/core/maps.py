@@ -413,6 +413,100 @@ class MapGraph:
 
         return self.extract_bbox(center, half_w, half_h)
 
+    def extract_trajectory_buffer(
+        self, relevant_positions: npt.NDArray[np.floating[Any]], radius: float
+    ) -> MapGraph:
+        """Extract nodes within a fixed radius of any relevant position.
+
+        Parameters
+        ----------
+        relevant_positions : npt.NDArray[np.floating[Any]]
+            Positions that define the buffered trajectory support.
+        radius : float
+            Euclidean buffer radius around each relevant position.
+
+        Returns
+        -------
+        MapGraph
+            The extracted subgraph.
+
+        """
+        if relevant_positions.size == 0:
+            return MapGraph(
+                node_positions=np.zeros((0, 2), dtype=np.float64),
+                edge_indices=np.zeros((2, 0), dtype=np.int32),
+                node_types=np.zeros((0,), dtype=np.int32),
+                edge_types=np.zeros((0,), dtype=np.int32),
+            )
+
+        within_mask = np.zeros(self.num_nodes, dtype=bool)
+        radius_sq = radius * radius
+        for point in relevant_positions:
+            diff = self.node_positions - np.asarray(point, dtype=np.float64)
+            within_mask |= np.sum(diff * diff, axis=1) <= radius_sq
+            if within_mask.all():
+                break
+
+        return self._subgraph_from_mask(within_mask)
+
+    def filter_edges(
+        self, edge_mask: npt.NDArray[np.bool_], *, prune_unreferenced_nodes: bool = True
+    ) -> MapGraph:
+        """Return a graph with only the selected edges.
+
+        Parameters
+        ----------
+        edge_mask : ndarray of bool, shape `(E,)`
+            Boolean mask selecting which edges to keep.
+        prune_unreferenced_nodes : bool, optional
+            Whether to drop nodes that are no longer referenced by any kept
+            edge. Defaults to `True`.
+
+        Returns
+        -------
+        MapGraph
+            A new graph containing only the selected edges.
+
+        """
+        mask = np.asarray(edge_mask, dtype=bool)
+        if mask.shape != (self.num_edges,):
+            msg = f"edge_mask must have shape ({self.num_edges},), got {mask.shape!r}"
+            raise ValueError(msg)
+
+        if self.num_edges == 0 or mask.all():
+            return self.copy()
+
+        kept_edge_indices = self.edge_indices[:, mask]
+        kept_edge_types = self.edge_types[mask]
+
+        if not prune_unreferenced_nodes:
+            return MapGraph(
+                node_positions=self.node_positions,
+                edge_indices=kept_edge_indices,
+                node_types=self.node_types,
+                edge_types=kept_edge_types,
+            )
+
+        if kept_edge_indices.size == 0:
+            return MapGraph(
+                node_positions=np.zeros((0, 2), dtype=np.float64),
+                edge_indices=np.zeros((2, 0), dtype=np.int32),
+                node_types=np.zeros((0,), dtype=np.int32),
+                edge_types=np.zeros((0,), dtype=np.int32),
+            )
+
+        node_mask = np.zeros(self.num_nodes, dtype=bool)
+        node_mask[np.unique(kept_edge_indices)] = True
+        remap = np.full(self.num_nodes, -1, dtype=np.int32)
+        remap[node_mask] = np.arange(node_mask.sum(), dtype=np.int32)
+
+        return MapGraph(
+            node_positions=self.node_positions[node_mask],
+            edge_indices=remap[kept_edge_indices],
+            node_types=self.node_types[node_mask],
+            edge_types=kept_edge_types,
+        )
+
     def _subgraph_from_mask(self, node_mask: npt.NDArray[np.bool_]) -> MapGraph:
         """Build a new `MapGraph` from a boolean node mask."""
         new_edge_indices, edge_mask = _extract_subgraph(node_mask, self.edge_indices)

@@ -261,7 +261,7 @@ class HighDLoader(LevelXDataLoader):
             dist = max_x - min_x
             builder = HighDMapBuilder(Path(scene.map_key), min_x - dist * 0.1, max_x + dist * 0.1)
             map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
-            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
+            return utils.extract_configured_map(map_graph, scene, self.map_config)
 
         return _resolver
 

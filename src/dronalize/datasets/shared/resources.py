@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.core.maps import MapGraph
+from dronalize.datasets.shared import utils
 from dronalize.processing.loading.resources import DatasetResources
 
 if TYPE_CHECKING:
@@ -39,7 +40,7 @@ def open_named_shared_map_resources(
     handles: list[SharedMemory] = []
     mappings: dict[str | None, str] = {}
     for key, path in named_paths:
-        handle = build_map(path, map_config).to_shared()
+        handle = utils.apply_map_config(build_map(path, map_config), map_config).to_shared()
         handles.append(handle)
         mappings[key] = handle.name
 
@@ -60,7 +61,7 @@ def open_single_shared_map_resource(
         yield DatasetResources()
         return
 
-    handle = build_map(map_path, map_config).to_shared()
+    handle = utils.apply_map_config(build_map(map_path, map_config), map_config).to_shared()
     try:
         yield DatasetResources(shared_maps=handle.name)
     finally:

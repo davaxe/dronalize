@@ -22,6 +22,7 @@ from dronalize.config.models import (
     TimeBlockAssign,
     effective_scene_window,
 )
+from dronalize.core.categories import EdgeType
 from dronalize.core.scene import get_trajectory_schema
 
 if TYPE_CHECKING:
@@ -179,6 +180,7 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
         map_defaults.add_row("Extraction", _format_map_extraction(map_config))
         map_defaults.add_row("Min distance", _format_optional_float(map_config.min_distance))
         map_defaults.add_row("Interp distance", _format_optional_float(map_config.interp_distance))
+        map_defaults.add_row("Edge types", _format_map_edge_types(map_config))
     tables.append(map_defaults)
     return tuple(tables)
 
@@ -324,11 +326,41 @@ def _format_map_extraction(map_config: MapConfig) -> str:
         case "full":
             return "full map"
         case "scene_extent":
-            return f"scene extent (padding={extraction.padding:g})"
+            return f"scene extent (padding={extraction.padding:g}, shape={extraction.shape})"
         case "circle":
             return f"circle (radius={extraction.radius:g})"
+        case "trajectory_buffer":
+            return f"trajectory buffer (radius={extraction.radius:g})"
         case "bounding_box":
             return f"bounding box ({extraction.width:g} x {extraction.height:g})"
+
+
+def _format_map_edge_types(map_config: MapConfig) -> str:
+    edge_types = map_config.edge_types
+    if edge_types is None:
+        return "all"
+
+    parts: list[str] = []
+    if edge_types.include is not None:
+        parts.append("include=" + ",".join(_format_edge_type_value(edge_type) for edge_type in edge_types.include))
+    if edge_types.exclude:
+        parts.append("exclude=" + ",".join(_format_edge_type_value(edge_type) for edge_type in edge_types.exclude))
+    if edge_types.remap:
+        parts.append(
+            "remap="
+            + ",".join(
+                f"{_format_edge_type_value(source)}->{_format_edge_type_value(target)}"
+                for source, target in edge_types.remap.items()
+            )
+        )
+    return " | ".join(parts) if parts else "all"
+
+
+def _format_edge_type_value(value: object) -> str:
+    try:
+        return EdgeType.from_value(value).name
+    except (TypeError, ValueError):
+        return str(value)
 
 
 def _format_optional_float(value: float | None) -> str:

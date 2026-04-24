@@ -1,4 +1,4 @@
-from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction
+from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.datasets.lyft.loader import LyftLoader, LyftLoaderOptions
 from dronalize.datasets.lyft.maps.builder import LyftMapBuilder
@@ -27,7 +27,7 @@ DATASET_SPEC = DatasetSpec(
         screening=combine_screenings(
             minimum_samples_screening(2), exclude_category_screening(AgentCategory.UNKNOWN)
         ),
-        map=MapConfig(extraction=SceneExtentExtraction()),
+        map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
         dataset=LyftLoaderOptions().model_dump(),
     ),
     native_schema=LyftLoader.native_trajectory_schema(),

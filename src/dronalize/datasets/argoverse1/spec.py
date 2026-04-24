@@ -1,4 +1,4 @@
-from dronalize.config.models import DatasetConfig, MapConfig, SceneExtentExtraction
+from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.argoverse1.loader import Argoverse1Loader, Argoverse1LoaderOptions
 from dronalize.datasets.argoverse1.maps.builder import Argoverse1MapBuilder
@@ -25,7 +25,7 @@ DATASET_SPEC = DatasetSpec(
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=30, sample_time=0.1),
         screening=minimum_samples_screening(2),
-        map=MapConfig(extraction=SceneExtentExtraction()),
+        map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
         dataset=Argoverse1LoaderOptions().model_dump(),
     ),
     native_schema=Argoverse1Loader.native_trajectory_schema(),

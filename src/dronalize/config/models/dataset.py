@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import Field
 from typing_extensions import override
 
-from dronalize.config.base import ConfigBase, FullConfig, PartialConfig
+from dronalize.config.base import ConfigBase, FullConfig, PartialConfig, apply_optional
 from dronalize.config.models.map import MapConfig, PartialMapConfig
 from dronalize.config.models.output import OutputConfig, PartialOutputConfig
 from dronalize.config.models.runtime import PartialRuntimeConfig, RuntimeConfig
@@ -79,21 +79,10 @@ class PartialDatasetConfig(PartialDatasetConfigBase, PartialConfig[DatasetConfig
         return DatasetConfig(
             scenes=self.scenes.apply_to(target.scenes) if self.scenes else target.scenes,
             runtime=self.runtime.apply_to(target.runtime) if self.runtime else target.runtime,
-            screening=_apply_optional_screening(self.screening, target.screening),
+            screening=apply_optional(self.screening, target.screening),
             dataset=self.dataset if self.dataset is not None else target.dataset,
             output=self.output.apply_to(target.output) if self.output else target.output,
             map=self.map.apply_to(target.map) if self.map else target.map,
             read=self.read if self.read is not None else target.read,
             assign=self.assign if self.assign is not None else target.assign,
         )
-
-
-def _apply_optional_screening(
-    patch: PartialScreeningConfig | Literal[False] | None, target: ScreeningConfig | None
-) -> ScreeningConfig | None:
-    """Apply a patch to an optional screening block."""
-    if patch is None:
-        return target
-    if patch is False:
-        return None
-    return patch.apply_to(target)

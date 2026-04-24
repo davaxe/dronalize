@@ -101,12 +101,12 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         def _resolver(scene: Scene) -> MapGraph | None:
             if scene.map_key is None or self.map_config is None:
                 return None
-            return utils.extract_based_on_scene(
+            return utils.extract_configured_map(
                 self._get_map(
                     scene.map_key, self.map_config.min_distance, self.map_config.interp_distance
                 ),
                 scene,
-                self.map_config.extraction,
+                self.map_config,
             )
 
         return _resolver

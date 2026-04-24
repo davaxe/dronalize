@@ -10,11 +10,14 @@ from dronalize.config.models import (
     AgentRangeSpec,
     DatasetConfig,
     ExcludeCategoriesSpec,
+    MapEdgeTypesConfig,
     MinSamplesSpec,
     RequireSceneFramesSpec,
     RequireSceneWindowSpec,
+    SceneExtentExtraction,
+    TrajectoryBufferExtraction,
 )
-from dronalize.core.categories import DatasetSplit
+from dronalize.core.categories import DatasetSplit, EdgeType
 from dronalize.core.errors import ConfigurationError
 from tests.support import inherited_optional_blocks_descriptor
 
@@ -403,3 +406,68 @@ def test_screening_multiple_profiles_resolve_in_uses_order_then_dataset_block(
     assert isinstance(resolved.screening.scene["final_context"], AgentRangeSpec)
     assert resolved.screening.scene["final_context"].minimum == 3
     assert resolved.screening.agent == {}
+
+
+def test_map_config_parses_scene_extent_shape_and_edge_type_rules(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.map.extraction]
+            mode = "scene_extent"
+            padding = 1.25
+            shape = "bounding_box"
+
+            [datasets.demo.map.edge_types]
+            include = ["CURB", "LINE_THIN_DOUBLE"]
+            exclude = ["VIRTUAL"]
+
+            [datasets.demo.map.edge_types.remap]
+            LINE_THIN_DOUBLE = "LINE_THIN"
+            """,
+        )
+    )
+
+    resolved = cfg.resolve("demo", _dataset_config())
+
+    assert isinstance(resolved.map.extraction, SceneExtentExtraction)
+    assert resolved.map.extraction.padding == pytest.approx(1.25)
+    assert resolved.map.extraction.shape == "bounding_box"
+    assert resolved.map.edge_types is not None
+    assert resolved.map.edge_types.include == frozenset({EdgeType.CURB, EdgeType.LINE_THIN_DOUBLE})
+    assert resolved.map.edge_types.exclude == frozenset({EdgeType.VIRTUAL})
+    assert resolved.map.edge_types.remap == {EdgeType.LINE_THIN_DOUBLE: EdgeType.LINE_THIN}
+
+
+def test_map_edge_types_validation_rejects_include_exclude_overlap() -> None:
+    with pytest.raises(ValueError, match="Conflict"):
+        _ = MapEdgeTypesConfig.model_validate({
+            "include": ["CURB", "VIRTUAL"],
+            "exclude": ["VIRTUAL"],
+        })
+
+
+def test_map_edge_types_validation_normalizes_mixed_inputs_for_conflicts() -> None:
+    with pytest.raises(ValueError, match="VIRTUAL"):
+        _ = MapEdgeTypesConfig.model_validate({
+            "include": ["VIRTUAL"],
+            "exclude": [EdgeType.VIRTUAL],
+        })
+
+
+def test_map_config_parses_trajectory_buffer_extraction(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.map.extraction]
+            mode = "trajectory_buffer"
+            radius = 6.5
+            """,
+        )
+    )
+
+    resolved = cfg.resolve("demo", _dataset_config())
+
+    assert isinstance(resolved.map.extraction, TrajectoryBufferExtraction)
+    assert resolved.map.extraction.radius == pytest.approx(6.5)

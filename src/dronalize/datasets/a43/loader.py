@@ -96,7 +96,7 @@ class A43Loader(BaseSceneLoader[tuple[Path, int], A43LoaderOptions]):
             max_x = scene.frame.select(pl.col("x")).max().item()
             builder = A43MapBuilder(scene.map_key, min_x, max_x)
             map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
-            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
+            return utils.extract_configured_map(map_graph, scene, self.map_config)
 
         return _resolver
 

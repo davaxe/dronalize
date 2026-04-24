@@ -109,7 +109,7 @@ class AD4CHELoader(LevelXDataLoader):
             map_graph = AD4CHEMapBuilder(path).build(
                 self.map_config.min_distance, self.map_config.interp_distance
             )
-            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
+            return utils.extract_configured_map(map_graph, scene, self.map_config)
 
         return _resolver
 
