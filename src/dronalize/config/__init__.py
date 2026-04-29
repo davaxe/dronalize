@@ -15,7 +15,7 @@ individual config blocks directly.
 """
 
 from dronalize.config.file import ProcessingConfig
-from dronalize.config.reader import parse_config
+from dronalize.config.parse import parse_config
 from dronalize.config.runtime import RuntimeOverride
 
 __all__ = ["ProcessingConfig", "RuntimeOverride", "parse_config"]

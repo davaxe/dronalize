@@ -11,6 +11,7 @@ import typer
 from pydantic import ValidationError
 from rich import print as rprint
 
+from dronalize import __version__
 from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import (
@@ -131,6 +132,28 @@ Plan = Annotated[
 IncludeMap = Annotated[
     bool | None, typer.Option("--include-map/--no-map", help="Include the map (if available).")
 ]
+
+
+def _version_callback(*, version: bool) -> None:
+    if version:
+        rprint(f"dronalize version: {__version__}")
+        raise typer.Exit
+
+
+@app.callback()
+def version(
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show the version and exit.",
+        ),
+    ] = None,
+) -> None:
+    """Version callback to display the version."""
+    _ = version
 
 
 @app.command()

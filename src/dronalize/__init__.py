@@ -25,6 +25,8 @@ from dronalize.core import AgentCategory, DatasetSplit
 
 """
 
+from importlib.metadata import version
+
 __all__: list[str] = []
 
-__version__ = "1.3.0"
+__version__: str = version("dronalize")

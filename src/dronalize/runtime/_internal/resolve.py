@@ -18,7 +18,7 @@ from dronalize.config.models.split import (
     SourceAssign,
     TimeBlockAssign,
 )
-from dronalize.config.reader import parse_config
+from dronalize.config.parse import parse_config
 from dronalize.io.formats import StorageBackend
 from dronalize.processing.models import AssignmentRequest
 from dronalize.runtime.types import (
