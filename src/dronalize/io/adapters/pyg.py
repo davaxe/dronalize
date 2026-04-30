@@ -25,7 +25,12 @@ if TYPE_CHECKING:
 
 
 class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
-    """Iterable PyG dataset built on top of `TorchSceneDataset`."""
+    """PyG dataset view over Dronalize scene records.
+
+    Each sample is a `HeteroData` object with `agent` and `map` node stores and
+    a `("map", "connects", "map")` edge store. Agent trajectories are exposed
+    as `agent.x` and `agent.y` with matching validity masks.
+    """
 
     def __init__(self, reader: ReaderT, *, copy: bool = True) -> None:
         super().__init__()  # pyright: ignore[reportUnknownMemberType]
@@ -49,11 +54,11 @@ class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
 
 
 class IterableHeteroSceneDataset(HeteroSceneDataset[ReaderT], IterableDataset[HeteroData]):
-    """Iterable PyG dataset built on top of `TorchSceneDataset`."""
+    """Iterable PyG dataset view over Dronalize scene records."""
 
 
 def collate_hetero_with_time_padding(samples: Sequence[HeteroData]) -> Batch:
-    """Batch hetero scenes by padding time axes within the current batch."""
+    """Batch hetero scenes by padding agent time axes within the current batch."""
     if not samples:
         msg = "`samples` must contain at least one HeteroData object."
         raise ValueError(msg)

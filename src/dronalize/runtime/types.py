@@ -37,12 +37,19 @@ class ExecutionResult:
     """
 
     dataset: str
+    """Dataset key used for the run."""
     output_dir: Path
+    """Root directory where processed output was written."""
     storage_backend: StorageBackend
+    """Storage backend used for the exported records."""
     processed_sources: int
+    """Number of raw source units the executor started processing."""
     candidate_scenes: int
+    """Number of scene candidates materialized before screening."""
     selected_scenes: int
+    """Number of scenes accepted for output after screening and limits."""
     split_counts: dict[str, int]
+    """Accepted scene count per output split."""
 
 
 @dataclass(frozen=True)
@@ -50,6 +57,7 @@ class OutputPlan:
     """Plan for output configuration."""
 
     inner: OutputConfig
+    """Resolved output configuration used by the writer and manifest."""
 
     def precision(self) -> type[np.float32 | np.float64]:
         """Return the floating point precision for this output plan."""
@@ -75,7 +83,7 @@ class OutputPlan:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionPlan:
-    """Initial compiled runtime plan.
+    """Fully resolved runtime plan produced from an execution request.
 
     !!! info "Do not construct this directly"
         This is not meant to be directly constructed. Instead, it should be
@@ -87,20 +95,35 @@ class ExecutionPlan:
     """
 
     descriptor: DatasetSpec
+    """Resolved dataset specification."""
     data_root: Path
+    """Input dataset root."""
     output_dir: Path
+    """Output dataset root."""
     storage_backend: StorageBackend
+    """Storage backend selected for writing output records."""
     resolved_config: DatasetConfig
+    """Dataset config after defaults, config files, and overrides are merged."""
     runtime: RuntimeConfig
+    """Resolved runtime execution settings."""
     output: OutputPlan
+    """Resolved output settings and derived output schema."""
     loader: LoaderRequest
+    """Loader-facing subset of the resolved configuration."""
     assignment: AssignmentRequest
+    """Compiled split-assignment request."""
     map: MapConfig | None
+    """Resolved map configuration, or `None` when map output is disabled."""
     effective_history_frames: int
+    """History frame count after resampling/window configuration is applied."""
     effective_future_frames: int
+    """Future frame count after resampling/window configuration is applied."""
     effective_sample_time: float
+    """Sample interval in seconds after resampling is applied."""
     limit: int | None = None
+    """Optional maximum number of selected scenes to write."""
     seed: int | None = None
+    """Optional seed used by deterministic runtime choices."""
 
     def __post_init__(self) -> None:
         """Validate the runtime plan after initialization."""
@@ -178,20 +201,37 @@ def compile_loader_request(
 
 
 class ExecutionRequest(BaseModel):
-    """Normalized user request for one dataset processing run."""
+    """User-facing request for one dataset processing run.
+
+    The request is intentionally small: it names the dataset, input/output
+    paths, optional config file, and runtime overrides. Pass it to
+    [`resolve_request`][dronalize.runtime.api.resolve_request] to obtain an
+    [`ExecutionPlan`][dronalize.runtime.ExecutionPlan], or to
+    [`execute_request`][dronalize.runtime.api.execute_request] to run directly.
+    """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
     dataset: str
+    """Dataset registry key, such as `a43` or `waymo`."""
     input_dir: Path
+    """Root directory containing the raw dataset files."""
     output_dir: Path
+    """Directory where processed output should be written."""
     storage_backend: StorageBackend | str = StorageBackend.PICKLE
+    """Output storage backend. Built-in values are `pickle` and `mds`."""
     config_path: Path | None = None
+    """Optional TOML config file applied on top of the dataset defaults."""
     overrides: RuntimeOverride = Field(default_factory=RuntimeOverride)
+    """Programmatic runtime overrides applied after the config file."""
     include_map: bool | None = None
+    """Override for map output. `None` uses the resolved dataset config."""
     limit: int | None = None
+    """Optional maximum number of selected scenes to write."""
     seed: int | None = None
+    """Optional seed used by deterministic runtime choices."""
     input_dir_exists: bool = True
+    """Whether request resolution should require `input_dir` to exist."""
 
 
 def compile_effective_scene_metrics(config: DatasetConfig) -> tuple[int, int, float]:

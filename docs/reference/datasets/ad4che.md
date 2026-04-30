@@ -30,7 +30,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 20 obs / 50 pred @ 10 Hz |
 | Resampling | Linear 1:3 |
 | Windowing | 210-frame window, step 45 |
-| Filtering | Drop short tracks with fewer than 4 samples |
+| Screening | Drop short tracks with fewer than 4 samples |
 | Lane-change sampling | Require 5 lane changes; keep 1 in 3 negative scenes |
 | Maps | Full map |
 

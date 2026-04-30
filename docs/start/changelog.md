@@ -2,7 +2,14 @@
 
 ## Unreleased
 
-This page is still being prepared for the next release. The historical notes below are kept for context, but the final release notes will be updated before publication.
+No unreleased user-facing changes are documented yet.
+
+## v2.0.0
+
+- Introduced the current runtime request/plan API.
+- Split input selection and output assignment into separate `read` and `assign` config sections.
+- Switched the default persisted backend to `pickle`.
+- Refreshed the documentation structure for the current package surface.
 
 ## v1.3.0 - August 2025
 

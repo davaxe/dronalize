@@ -20,20 +20,37 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True, frozen=True)
 class DatasetManifest:
-    """Format-agnostic metadata stored alongside exported datasets."""
+    """Format-agnostic metadata stored alongside exported datasets.
+
+    The manifest records the shape and schema contract of one processed export.
+    Reader and adapter code use it to understand feature columns, temporal
+    horizons, coordinate handling, map availability, and manifest compatibility.
+    """
 
     source_trajectory_schema: str
+    """Trajectory schema emitted by the dataset loader before conversion."""
     trajectory_schema: str
+    """Trajectory schema stored in the exported records."""
     derived_features: tuple[str, ...]
+    """Output features derived during schema conversion."""
     feature_columns: tuple[str, ...]
+    """Per-timestep feature columns stored in record tensors."""
     history_frames: int
+    """Number of observation frames per record."""
     future_frames: int
+    """Number of prediction frames per record."""
     precision: str
+    """Floating-point precision used for exported feature arrays."""
     recenter_positions: bool
+    """Whether spatial values were recentered around each scene."""
     has_map: bool
+    """Whether records may contain map topology arrays."""
     sample_time: float
+    """Output sample interval in seconds after resampling."""
     original_sample_time: float
+    """Dataset sample interval in seconds before resampling."""
     format_version: int = FORMAT_VERSION
+    """Manifest schema version used for compatibility checks."""
 
     def to_json_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation of the manifest."""

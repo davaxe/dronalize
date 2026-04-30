@@ -11,7 +11,6 @@ from dronalize.core.maps import MapGraph, EdgeType
 
 The richer domain-model surfaces live in sibling packages:
 
-- [`dronalize.core.functional`][] for dataframe-to-dataframe utilities and transforms
 - [`dronalize.core.scene`][] for scenes, trajectory schemas, and schema lookup
 - [`dronalize.core.maps`][] for map graphs and map-edge types
 

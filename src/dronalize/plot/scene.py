@@ -247,11 +247,7 @@ def _build_scene_chart(
     ).interactive()
 
 
-def _resolve_plot_dimensions(
-    *,
-    width: int | None,
-    height: int | None,
-) -> tuple[int, int]:
+def _resolve_plot_dimensions(*, width: int | None, height: int | None) -> tuple[int, int]:
     """Resolve fixed chart dimensions with optional caller overrides."""
     return width or _DEFAULT_WIDTH, height or _DEFAULT_HEIGHT
 

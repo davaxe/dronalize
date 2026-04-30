@@ -23,7 +23,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 16 obs / 60 pred @ 10 Hz |
 | Resampling | Linear 5:1 |
 | Windowing | 16-frame window, step 1 |
-| Filtering | Drop parked and undefined actors, ignore categories matching `object`, and prune agents with fewer than 2 samples |
+| Screening | Drop parked and undefined actors, ignore categories matching `object`, and prune agents with fewer than 2 samples |
 | Maps | Relevant area (padding 1.15) |
 
 ## Dataset compatibility

@@ -22,6 +22,13 @@ from dronalize.config.models import (
     TimeBlockAssign,
     effective_scene_window,
 )
+from dronalize.config.models.map import (
+    BoundingBoxExtraction,
+    CircularExtraction,
+    FullMapExtraction,
+    SceneExtentExtraction,
+    TrajectoryBufferExtraction,
+)
 from dronalize.core.categories import EdgeType
 from dronalize.core.scene import get_trajectory_schema
 
@@ -321,18 +328,17 @@ def _format_options(options: BaseModel | object | None) -> str:
 
 
 def _format_map_extraction(map_config: MapConfig) -> str:
-    extraction = map_config.extraction
-    match extraction.mode:
-        case "full":
+    match map_config.extraction:
+        case FullMapExtraction():
             return "full map"
-        case "scene_extent":
-            return f"scene extent (padding={extraction.padding:g}, shape={extraction.shape})"
-        case "circle":
-            return f"circle (radius={extraction.radius:g})"
-        case "trajectory_buffer":
-            return f"trajectory buffer (radius={extraction.radius:g})"
-        case "bounding_box":
-            return f"bounding box ({extraction.width:g} x {extraction.height:g})"
+        case SceneExtentExtraction(padding=padding, shape=shape):
+            return f"scene extent (padding={padding:g}, shape={shape})"
+        case CircularExtraction(radius=radius):
+            return f"circle (radius={radius:g})"
+        case TrajectoryBufferExtraction(radius=radius):
+            return f"trajectory buffer (radius={radius:g})"
+        case BoundingBoxExtraction(width=width, height=height):
+            return f"bounding box ({width:g} x {height:g})"
 
 
 def _format_map_edge_types(map_config: MapConfig) -> str:
@@ -342,9 +348,15 @@ def _format_map_edge_types(map_config: MapConfig) -> str:
 
     parts: list[str] = []
     if edge_types.include is not None:
-        parts.append("include=" + ",".join(_format_edge_type_value(edge_type) for edge_type in edge_types.include))
+        parts.append(
+            "include="
+            + ",".join(_format_edge_type_value(edge_type) for edge_type in edge_types.include)
+        )
     if edge_types.exclude:
-        parts.append("exclude=" + ",".join(_format_edge_type_value(edge_type) for edge_type in edge_types.exclude))
+        parts.append(
+            "exclude="
+            + ",".join(_format_edge_type_value(edge_type) for edge_type in edge_types.exclude)
+        )
     if edge_types.remap:
         parts.append(
             "remap="
@@ -356,7 +368,7 @@ def _format_map_edge_types(map_config: MapConfig) -> str:
     return " | ".join(parts) if parts else "all"
 
 
-def _format_edge_type_value(value: object) -> str:
+def _format_edge_type_value(value: str | int | EdgeType) -> str:
     try:
         return EdgeType.from_value(value).name
     except (TypeError, ValueError):

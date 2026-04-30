@@ -1,7 +1,7 @@
 # `[scenes]` section
 
 <div class="section-intro" markdown="1">
-The scenes config describes how raw trajectory data becomes model-ready scenes. In practice, it controls four things: scene-window length, optional temporal transforms such as windowing and resampling behavior.
+The scenes config describes how raw trajectory data becomes model-ready scenes. In practice, it controls scene-window length and optional temporal transforms such as windowing and resampling.
 </div>
 
 | Key | Type | Description | Default |

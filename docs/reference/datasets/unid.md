@@ -23,7 +23,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 99 obs / 250 pred @ 50 Hz |
 | Resampling | Cubic 2:1 |
 | Windowing | 175-frame window, step 25 |
-| Filtering | Prune agents with fewer than 2 samples |
+| Screening | Prune agents with fewer than 2 samples |
 | Maps | Full map |
 
 ## Dataset compatibility

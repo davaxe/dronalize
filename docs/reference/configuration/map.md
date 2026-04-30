@@ -1,7 +1,7 @@
 # `[map]` section
 
 <div class="section-intro" markdown="1">
-Map settings control whether map data is included and, if it is, how much of the map is kept around each scene. The most important choice here is usually the extraction mode.
+Map settings control how map data is processed when a run includes maps. The most important choice here is usually the extraction mode.
 </div>
 
 | Key | Type | Description | Default |
@@ -25,7 +25,7 @@ by a `mode` and a set of parameters that depend on the mode.
 
 The available modes are:
 
-- `"full"` keeps the full map without cropping. This have no additional parameters.
+- `"full"` keeps the full map without cropping. This has no additional parameters.
 - `"scene_extent"` crops around the scene trajectory extent and requires `padding`.
 - `"circle"` crops with a circular area and requires `radius`.
 - `"trajectory_buffer"` keeps only map nodes within a fixed radius of the scene trajectories.

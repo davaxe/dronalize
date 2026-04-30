@@ -22,41 +22,31 @@ The supported datasets span several common trajectory-prediction settings:
 
 ## Other information
 
-In addition to this reference, it is possible to use `dronalize inspect <dataset>` and `dronalize split-support <dataset>` to 
-get information about a specific dataset. For example using
+In addition to this reference, use `dronalize inspect <dataset>` and
+`dronalize split-support <dataset>` to get current information from the code.
+For example:
 
 ```bash
 dronalize inspect a43
 ```
-will output the following information about the `a43` dataset:
+prints the current `a43` defaults and capabilities:
 
 ```text
 Dataset inspect: a43
-                ╷
-  Dataset       │ a43
-  Capabilities  │  map   custom split strategies
-  Native schema │ positions_velocity_acceleration (6 features)
-  Schema fields │ frame, id, x, y, vx, vy, ax, ay, agent_category
-  Split support │ time, shuffled-time
-                ╵
-Default loader config
-                   ╷
+  Native schema    │ positions_velocity_acceleration (6 features)
+  Native splits    │ none
+  Read modes       │ all
+  Assignment modes │ none, scene, time, shuffled-time
+  Map              │ yes
+
+Default scene settings
   Source window    │ 20/50 @ 10.0 Hz
   Effective window │ 20/50 @ 10.0 Hz
-  Resampling       │ none
   Windowing        │ 70 frames, step 25
-  Filter rules     │ agent: agent_frames
-  Options          │ none
-                   ╵
-Default map config
-                  ╷
-  Enabled         │ yes
-  Extraction      │ full map
-  Min distance    │ 1.75
-  Interp distance │ 3
+  Screening rules  │ cleanup: min_samples
+  Dataset config   │ rows_per_source=40000
 ```
 
-For simple information prefer the CLI over this reference, as they are based on
-the actual code and is more likely to be up to date. However, some details may
-be omitted in the CLI, which is where this reference can be useful. For example,
-the expected dataset structure on disk is not included in the CLI.
+For simple information, prefer the CLI because it is generated from the actual
+registry and config models. This reference remains useful for details that the
+CLI omits, such as expected dataset structure on disk.

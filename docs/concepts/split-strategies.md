@@ -64,11 +64,10 @@ This is the quickest way to check whether a dataset supports native partitions, 
     ```
     gives output like:
     ```text
-    Dataset       │ a43
-    Native splits │ none
-    Scene split   │ yes
-    Source split  │ yes
-    Time split    │ yes
+    Dataset          │ a43
+    Native splits    │ none
+    Read modes       │ all
+    Assignment modes │ none, scene, time, shuffled-time
     ```
 
 ## Practical workflow

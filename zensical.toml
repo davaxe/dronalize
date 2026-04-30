@@ -6,8 +6,8 @@ site_author = "Theodor Westny, David Axelsson"
 copyright = "&copy; 2026 Dronalize contributors"
 docs_dir = "docs"
 site_dir = "site"
-repo_url = "https://github.com/westny/dronalize"
-repo_name = "westny/dronalize"
+repo_url = "https://github.com/davaxe/dronalize"
+repo_name = "davaxe/dronalize"
 extra_css = ["stylesheets/extra.css"]
 nav = [
   { Home = "index.md" },
@@ -17,6 +17,7 @@ nav = [
     { Installation = "start/installation.md" },
     { "First run (CLI)" = "start/first-run-cli.md" },
     { "Python entry" = "start/python-entry.md" },
+    { "Adding datasets" = "start/adding-datasets.md" },
     { Changelog = "start/changelog.md" },
     { Citation = "start/citation.md" },
   ] },
@@ -108,7 +109,7 @@ nav = [
     { Datasets = [
       "reference/api/datasets/index.md",
       { "Registry operations" = "reference/api/datasets/registry.md" },
-      { "Dataset specs and capabilities" = "reference/api/datasets/descriptors.md" },
+      { "Dataset specification" = "reference/api/datasets/spec.md" },
     ] },
     { Runtime = [
       "reference/api/runtime/index.md",
@@ -189,7 +190,8 @@ separate_signature = true
 show_root_heading = true
 show_symbol_type_heading = true
 show_signature_annotations = true
-show_source = true
+show-bases = true
+show_source = false
 show_symbol_type_toc = true
 signature_crossrefs = true
 show_if_no_docstring = false

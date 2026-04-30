@@ -15,7 +15,7 @@ from dronalize.config.models import (
     SceneExtentExtraction,
     TrajectoryBufferExtraction,
 )
-from dronalize.core.categories import EdgeType, EdgeTypeLike
+from dronalize.core.categories import EdgeType
 from dronalize.core.maps import MapGraph
 from dronalize.core.scene import Scene
 

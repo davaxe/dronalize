@@ -47,9 +47,20 @@ across loader instances.
 
 @dataclass(slots=True, frozen=True, kw_only=True)
 class DatasetSplitSupport:
+    """Assignment strategies supported by a dataset integration.
+
+    These flags describe how the runtime may create train/validation/test
+    partitions when `assign.strategy` is not `none` or `preserve-native`.
+    Datasets should only enable strategies whose required grouping information
+    is stable and available from their sources.
+    """
+
     scene: bool = True
+    """Whether scenes may be assigned independently by scene id."""
     source: bool = False
+    """Whether all scenes from the same source may be assigned together."""
     time_block: bool = False
+    """Whether source timelines may be divided into contiguous split blocks."""
 
 
 class LoaderFactory(Protocol):
@@ -67,7 +78,46 @@ class LoaderFactory(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class DatasetSpec:
-    """Explicit descriptor for one dataset integration."""
+    """Descriptor for one dataset integration.
+
+    A `DatasetSpec` is the registry object that connects a dataset key, such as
+    `"a43"` or `"waymo"`, to the loader and defaults needed by the runtime. The
+    CLI, config resolver, and Python runtime all resolve dataset names to this
+    object before planning a run.
+
+    The spec owns dataset-level metadata rather than per-run state. It defines
+    how to build loaders, which trajectory fields the raw loader produces, what
+    configuration should be used as the starting point, which split strategies
+    are valid, and whether map resources can be requested.
+
+    Parameters
+    ----------
+    name : str
+        Unique registry key used in config files, CLI commands, and
+        `ExecutionRequest.dataset`.
+    loader_factory : LoaderFactory
+        Callable that constructs a dataset loader from a root path, compiled
+        loader request, and optional shared resources.
+    default_config : DatasetConfig
+        Dataset-specific baseline configuration. User profiles, dataset entries,
+        and runtime overrides are applied on top of this value.
+    native_schema : TrajectorySchema
+        Trajectory schema emitted by the loader before output schema conversion.
+    supported_native_splits : tuple[DatasetSplit, ...] or None, optional
+        Dataset-provided partitions available to `read.strategy = "native"` and
+        `assign.strategy = "preserve-native"`. Use `None` for datasets without
+        native partitions.
+    dataset_options_model : type[DatasetOptionsModel], optional
+        Typed model for dataset-owned options under `[datasets.<name>.dataset]`.
+    resources_factory : ResourcesFactory or None, optional
+        Optional context-manager factory for shared per-run resources such as
+        maps or cached metadata.
+    has_map : bool, optional
+        Whether the dataset can provide map data when map inclusion is enabled.
+    split_support : DatasetSplitSupport, optional
+        Custom assignment modes supported by this dataset in addition to native
+        split preservation.
+    """
 
     name: str
     loader_factory: LoaderFactory
@@ -187,17 +237,39 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
 }
 
 
-def register(descriptor: DatasetSpec) -> None:
-    """Register one dataset descriptor in the in-memory registry."""
-    if descriptor.name in _REGISTRY and _REGISTRY[descriptor.name] != descriptor:
-        msg = f"Dataset '{descriptor.name}' is already registered."
+def register(spec: DatasetSpec) -> None:
+    """Register one dataset specification in the in-memory registry.
+
+    This is the main extension point for adding new datasets to dronalize from
+    an external module.
+
+    Parameters
+    ----------
+    spec : DatasetSpec
+        The dataset specification to register.
+    """
+    if spec.name in _REGISTRY and _REGISTRY[spec.name] != spec:
+        msg = f"Dataset '{spec.name}' is already registered."
         raise DatasetRegistryError(msg)
-    _REGISTRY[descriptor.name] = descriptor
-    logger.debug("Registered dataset descriptor", extra={"dataset": descriptor.name})
+    _REGISTRY[spec.name] = spec
+    logger.debug("Registered dataset descriptor", extra={"dataset": spec.name})
 
 
 def get(name: str) -> DatasetSpec:
-    """Return one registered or built-in dataset descriptor."""
+    """Return one registered or built-in dataset descriptor.
+
+    Parameters
+    ----------
+    name : str
+        The name of the dataset to resolve. The name should match the `name`
+        field of the returned descriptor, and is case-sensitive.
+
+    Returns
+    -------
+    DatasetSpec
+        The resolved dataset descriptor.
+
+    """
     if name in _REGISTRY:
         logger.debug("Resolved dataset descriptor from in-memory registry", extra={"dataset": name})
         return _REGISTRY[name]
@@ -216,7 +288,14 @@ def get(name: str) -> DatasetSpec:
 
 
 def available() -> list[str]:
-    """Return the sorted list of available dataset names."""
+    """Return the sorted list of available dataset names.
+
+    Returns
+    -------
+    list[str]
+        The sorted list of available dataset names, including both registered
+        and built-in datasets that have their optional dependencies satisfied.
+    """
     builtin_names = {
         name
         for name, spec in _builtin_datasets().items()

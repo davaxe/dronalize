@@ -29,6 +29,7 @@ from dronalize.runtime.cli.formatting import (
     build_processing_summary_table,
     build_split_support_tables,
 )
+from dronalize.runtime.cli.register import register_custom_datasets
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -132,6 +133,14 @@ Plan = Annotated[
 IncludeMap = Annotated[
     bool | None, typer.Option("--include-map/--no-map", help="Include the map (if available).")
 ]
+DatasetModule = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--dataset-module",
+        help=("Import a module that registers custom datasets. Can be provided more than once."),
+        show_default=False,
+    ),
+]
 
 
 def _version_callback(*, version: bool) -> None:
@@ -141,7 +150,7 @@ def _version_callback(*, version: bool) -> None:
 
 
 @app.callback()
-def version(
+def global_options(
     version: Annotated[
         bool | None,
         typer.Option(
@@ -151,9 +160,11 @@ def version(
             help="Show the version and exit.",
         ),
     ] = None,
+    dataset_module: DatasetModule = None,
 ) -> None:
-    """Version callback to display the version."""
+    """Global CLI options."""
     _ = version
+    register_custom_datasets(dataset_module)
 
 
 @app.command()

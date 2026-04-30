@@ -27,4 +27,4 @@ to the next pages you are likely to need.
 
 - [Concepts](../concepts/index.md)
 - [Configuration reference](../reference/configuration/index.md)
-- [Storage backends](../outputs/index.md)
+- [Storage backends](../formats/backends/index.md)

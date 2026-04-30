@@ -168,22 +168,38 @@ class SceneRecord:
 
 @dataclass(slots=True)
 class UnsplitSceneRecord:
-    """Scene record without an observation/prediction split."""
+    """Canonical scene record before observation/prediction splitting.
+
+    This is the storage-facing intermediary used by formats that store one
+    contiguous trajectory tensor and split it into input/output horizons while
+    reading. It follows the same conventions as `SceneRecord`, except that
+    `features` has shape `(N, T, F)` and `mask` has shape `(N, T)`.
+    """
 
     scene_number: int
+    """Scene identifier within the source dataset."""
     position_offset: npt.NDArray[np.float64]
+    """Global 2D translation offset with shape `(2,)`."""
 
     # Agent data
     agent_types: npt.NDArray[np.int32]
+    """Integer-encoded agent type for each agent, shape `(N,)`."""
     passed_agent_mask: npt.NDArray[np.bool_]
+    """Mask indicating which agents passed screening, shape `(N,)`."""
     features: npt.NDArray[np.float32 | np.float64]
+    """Contiguous per-agent trajectory features, shape `(N, T, F)`."""
     mask: npt.NDArray[np.bool_]
+    """Validity mask for `features`, shape `(N, T)`."""
 
     # Map data
     map_node_positions: npt.NDArray[np.float32 | np.float64]
+    """2D map node coordinates, shape `(M, 2)`."""
     map_edge_indices: npt.NDArray[np.int32]
+    """Directed map connectivity, shape `(2, E)`."""
     map_node_types: npt.NDArray[np.int32]
+    """Integer-encoded map node types, shape `(M,)`."""
     map_edge_types: npt.NDArray[np.int32]
+    """Integer-encoded map edge types, shape `(E,)`."""
 
 
 def make_raw_scene_record(

@@ -38,9 +38,8 @@ dronalize show-config a43 --config config.toml
 overrides that `process` uses, but it stops before execution. Use it when you want to confirm the
 effective `scenes`, `screening`, `read`, `assign`, `map`, `output`, and dataset-specific settings.
 
-`show-config` currently defaults to the `mds` backend, while `process` defaults to `pickle`. If you
-want `show-config` to reflect the exact same backend choice as a default `process` run, pass
-`--storage-backend pickle`.
+`show-config` and `process` both default to the `pickle` backend. Pass
+`--storage-backend` when you want to preview a different backend.
 
 ## Plan a processing run
 
@@ -50,9 +49,6 @@ want `show-config` to reflect the exact same backend choice as a default `proces
     dronalize process a43 \
         --input data/a43/raw \
         --output data/a43/processed \
-        --config config.toml \
-        --read all \
-        --assign preserve-native \
         --plan
     ```
 
@@ -62,15 +58,16 @@ want `show-config` to reflect the exact same backend choice as a default `proces
     dronalize process a43 `
         --input data/a43/raw `
         --output data/a43/processed `
-        --config config.toml `
-        --read all `
-        --assign preserve-native `
         --plan
     ```
 
 `--plan` resolves the full run and prints a summary without executing it. The summary includes the
 dataset, paths, backend, worker count, schema, map usage, read strategy, assignment strategy, and
 any dataset-owned options that affect the run.
+
+Add `--config config.toml` when you have a project config file. Add read or assignment overrides
+only after checking `dronalize split-support <dataset>`; for example, `a43` does not support
+`preserve-native` because it has no native partitions.
 
 The `process` command currently defaults to the `pickle` backend. Choose a different backend
 explicitly when needed:

@@ -18,6 +18,7 @@ from dronalize.runtime import (
 
 DOCS_ROOT = Path(__file__).resolve().parents[2] / "docs"
 FENCED_BLOCK = re.compile(r"```(?P<info>[^\n`]*)\n(?P<body>.*?)\n```", re.DOTALL)
+MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]+\]\((?P<target>[^)]+)\)")
 SKIP_VALIDATE_MARKER = "<!-- no-validate -->"
 
 
@@ -65,3 +66,24 @@ def test_documented_configuration_examples_validate(
 def test_config_file_parses() -> None:
     path = Path("dronalize.toml")
     _ = parse_config(path)
+
+
+def test_local_markdown_links_resolve() -> None:
+    failures: list[str] = []
+    for doc_path in sorted(DOCS_ROOT.rglob("*.md")):
+        text = doc_path.read_text(encoding="utf-8")
+        for match in MARKDOWN_LINK.finditer(text):
+            target = match.group("target").strip()
+            if "://" in target or target.startswith("#"):
+                continue
+            target = target.split("#", maxsplit=1)[0].strip()
+            if not target:
+                continue
+            if not target.endswith(".md"):
+                continue
+            linked_path = (doc_path.parent / target).resolve()
+            if not linked_path.is_file():
+                source = doc_path.relative_to(DOCS_ROOT).as_posix()
+                failures.append(f"{source}: missing link target {target}")
+
+    assert not failures, "\n".join(failures)

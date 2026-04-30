@@ -10,7 +10,7 @@ streaming-oriented sharding, or no-op validation runs.
 The storage backend is a run-level decision set with `--storage-backend` on the
 CLI. It cannot at the moment be specified in the TOML config file.
 
-The current default is `pickle` since it requires extra dependencies. 
+The current default is `pickle` because it requires no extra dependencies.
 
 | Backend | Purpose |
 | --- | --- |
