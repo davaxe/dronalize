@@ -1,99 +1,125 @@
 # Installation
 
-<div class="section-intro" markdown="1">
-The base package is intentionally small. Start there, then add extras for the CLI, MDS storage,
-Torch or PyG adapters, or dataset-specific loaders only when you need them.
-</div>
+The base `dronalize` package is intentionally small. Install it first, then add optional extras for the CLI, MDS storage, Torch/PyG adapters, plotting, or dataset-specific loaders when needed.
 
 ## Requirements
 
 - Python `>=3.10`
 - `pip` or `uv`
 
-## Common installs
+## Install the base package
 
 ```bash
 pip install dronalize
+```
+
+The base package includes:
+
+- the dataset registry and runtime planning API
+- the processing pipeline
+- built-in scene and schema types
+- the `pickle` storage backend
+- the framework-neutral [`PickleReader`](../reference/api/io/readers.md#dronalize.io.readers.PickleReader)
+
+It does **not** include the CLI, MDS backend, Torch adapters, PyTorch Geometric adapters, plotting helpers, or dataset-specific optional dependencies.
+
+## Install optional features
+
+Use extras to enable additional functionality.
+
+```bash
 pip install "dronalize[cli]"
 pip install "dronalize[cli,mds]"
 pip install "dronalize[torch]"
 pip install "dronalize[pyg]"
 ```
 
-Combine extras as needed in one install command.
+You can combine extras in one command:
 
-## What the base package includes
+```bash
+pip install "dronalize[cli,mds,torch,pyg]"
+```
 
-The base install already gives you:
+## Available extras
 
-- the dataset registry and runtime planning API
-- the processing pipeline and built-in scene/schema types
-- the `pickle` storage backend
-- the framework-neutral `PickleReader`
-
-The base install does not include the practical CLI dependencies, the MDS backend, or the optional
-Torch and PyG adapters.
-
-## Optional extras
-
-| Extra | Purpose |
+| Extra | Adds |
 | --- | --- |
-| `cli` | Enables the Typer and Rich command-line interface. |
-| `mds` | Enables the `mds` writer backend and `MDSReader`. |
-| `torch` | Enables Torch-based dataset adapters such as `TorchSceneDataset`. |
-| `pyg` | Enables PyTorch Geometric adapters such as `HeteroSceneDataset`. |
-| `plot` | Installs Altair-based plotting helpers. |
-| `lyft`, `waymo`, `ad4che` | Add dataset-specific optional dependencies. |
-| `all_datasets` | Convenience extra for all dataset-specific extras. |
+| `cli` | Typer/Rich command-line interface |
+| `mds` | MDS writer backend and [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) |
+| `torch` | Torch dataset adapters such as [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) |
+| `pyg` | PyTorch Geometric adapters such as [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) |
+| `viz` | Altair-based plotting helpers |
+| `waymo` | Optional dependencies for the Waymo dataset |
+| `lyft` | Optional dependencies for the Lyft dataset |
+| `ad4che` | Optional dependencies for the AD4CHE dataset |
+
+## Recommended installs
+
+| Use case | Command |
+| --- | --- |
+| Basic processing with pickle output | `pip install dronalize` |
+| CLI workflows | `pip install "dronalize[cli]"` |
+| MDS output and reading | `pip install "dronalize[cli,mds]"` |
+| Torch training pipelines | `pip install "dronalize[torch]"` |
+| PyG graph pipelines | `pip install "dronalize[pyg]"` |
 
 ## Readers and adapters
 
-| Surface | Extra |
+| API | Required extra |
 | --- | --- |
-| `dronalize.io.readers.PickleReader` | none |
-| `dronalize.io.readers.MDSReader` | `mds` |
-| `dronalize.io.adapters.TorchSceneDataset` | `torch` |
-| `dronalize.io.adapters.HeteroSceneDataset` | `pyg` |
+| [`PickleReader`](../reference/api/io/readers.md#dronalize.io.readers.PickleReader) | none |
+| [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) | `mds` |
+| [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) | `torch` |
+| [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) | `pyg` |
 
-## Dataset extras
+## Dataset-specific dependencies
 
-Most built-in datasets work with the base install. The dataset registry only exposes entries whose
-optional dependencies are currently available, so `dronalize available` reflects the environment
-you actually installed.
+Most built-in datasets are available with the base install. Some datasets require additional optional dependencies.
 
-Use a dataset extra only when a dataset needs one:
-
-| Dataset | Extra |
+| Dataset | Required extra |
 | --- | --- |
 | `waymo` | `waymo` |
 | `lyft` | `lyft` |
 | `ad4che` | `ad4che` |
 
-## Working with `uv`
+The dataset registry only exposes datasets whose dependencies are installed. As a result, `dronalize available` reflects the datasets supported by your current environment.
+
+For example:
 
 ```bash
-uv sync --group dev --group tools
-uv run dronalize available
+pip install "dronalize[cli,waymo]"
+dronalize available
 ```
 
-The repository tracks a `uv.lock`, so `uv` is the most direct way to reproduce the local
-development and documentation environment.
+## Verify the installation
 
-## Verify the install
+For the base package:
 
 ```bash
 python -c "import dronalize"
 ```
 
-If you installed the CLI extra, also verify:
+For the CLI:
 
 ```bash
 dronalize available
 dronalize inspect a43
 ```
 
-If you installed the MDS extra, a quick import check is:
+For the MDS reader:
 
 ```bash
 python -c "from dronalize.io.readers import MDSReader"
+```
+
+For Torch adapters:
+
+```bash
+python -c "from dronalize.io.adapters import TorchSceneDataset"
+```
+
+For PyG adapters:
+
+```bash
+python -c "from dronalize.io.adapters import HeteroSceneDataset"
 ```

@@ -6,23 +6,12 @@ OpenDD is a large-scale drone dataset for roundabout traffic. It combines many t
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Roundabout</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2020</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                                      | Notes                                                                   |
-| ------------------- | ------------------------------------------ | ----------------------------------------------------------------------- |
-| Release year        | 2020                                       | Based on the cited dataset paper and release.                           |
-| Domain              | Roundabout traffic                         | Focused on circular-junction interaction.                               |
-| Capture platform    | Drone                                      | Overhead recording supports wide scene coverage with limited occlusion. |
-| Primary agent types | Cars, bicycles, pedestrians, trucks, buses | Covers both motorized and vulnerable road users.                        |
-| Map context         | Roundabout road geometry                   | Includes map material for the recorded sites.                           |
-| Geographic coverage | Germany                                    | Recorded across seven German roundabouts.                               |
-| Data format         | SQLite trajectories plus map files         | Each roundabout release contains trajectory and map assets.             |
 
 ## Default processing profile
 
@@ -34,8 +23,45 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 20 obs / 50 pred @ 10 Hz |
 | Resampling | Linear 1:3 |
 | Windowing | 210-frame window, step 75 |
-| Filtering | Require last observation frame (59) |
+| Screening | Prune agents with fewer than 6 samples |
 | Maps | Full map |
+
+## Dataset compatibility
+
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | OpenDD v3 SQLite layout |
+| Loader expectation | The loader currently scans `trajectories_*_v3.sqlite`, so other OpenDD layouts will not match automatically. |
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `Car` | `CAR` |
+| `Medium Vehicle` | `CAR` |
+| `Heavy Vehicle` | `TRUCK` |
+| `Trailer` | `TRUCK` |
+| `Bus` | `BUS` |
+| `Motorcycle` | `MOTORCYCLE` |
+| `Pedestrian` | `PEDESTRIAN` |
+| `Bicycle` | `BICYCLE` |
+
+### Map types
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `CURB` | `CURB` |
+| `CURB_TRAVERSABLE` | `CURB` |
+| `SHORT_DASHED_LINE` | `LINE_THIN_DASHED` |
+| `LONG_DASHED_LINE` | `LINE_THIN_DASHED` |
+| `SINGLE_SOLID_LINE` | `LINE_THIN` |
+| `NO_MARKING` | `VIRTUAL` |
+| `SHADED_AREA_MARKING` | `VIRTUAL` |
+| `GUARDRAIL` | `GUARD_RAIL` |
 
 ## Split support
 
@@ -52,7 +78,7 @@ dronalize split-support opendd
 ## Expected structure
 
 ```text
-openDD/
+opendd/
 ├── opendd_v3-rdb1/
 │   ├── rdb1/
 │   │   └── map_rdb1/

@@ -1,3 +1,7 @@
-## ::: dronalize.runtime.api.process_dataset
+## ::: dronalize.runtime.resolve_request
 
-## ::: dronalize.runtime.api.resolve_job
+## ::: dronalize.runtime.execute_request
+
+## ::: dronalize.runtime.execute_plan
+
+## ::: dronalize.runtime.stream_plan

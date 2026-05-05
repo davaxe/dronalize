@@ -23,9 +23,20 @@ if TYPE_CHECKING:
 
 
 MapKey = str | None
-"""Stable identifier for the map associated with a scene."""
+"""Stable identifier for the map associated with a scene.
+
+Loaders typically populate this with a dataset-native lane graph or HD map
+identifier. `None` indicates that the scene either has no map or that the map
+should be resolved without a per-scene key.
+"""
+
 MapResolver = Callable[["Scene"], MapGraph | None]
-"""Callable that materializes a map graph for a scene when needed."""
+"""Callable signature used to materialize a scene's map graph lazily.
+
+Resolvers are attached to [`Scene`][dronalize.core.scene.Scene] instances so
+map loading can be deferred until a consumer explicitly requests it through
+[`Scene.resolve_map()`][dronalize.core.scene.Scene.resolve_map].
+"""
 
 
 @dataclass(slots=True, frozen=True)
@@ -69,7 +80,47 @@ class Scene:
         passed_agent_ids: frozenset[int] | None = None,
         cast_schema: bool = True,
     ) -> Scene:
-        """Create a scene with optional schema casting."""
+        """Create a scene with optional schema casting.
+
+        Parameters reflect the fields of `Scene` but with an additional
+        `cast_schema` flag that controls whether the input frame should be cast
+        to match the expected physical schema of the provided trajectory schema.
+        This allows loaders to provide frames that may have compatible but not
+        exactly matching schemas, while ensuring that the resulting `Scene`
+        instance adheres to the expected schema for downstream processing.
+
+        Parameters
+        ----------
+        frame : pl.DataFrame
+            DataFrame containing the scene data. Columns should correspond to the
+            fields defined in the provided `schema`.
+        scene_number : int
+            Unique scene number assigned during processing.
+        history_frames : int
+            Number of history frames included in the scene.
+        future_frames : int
+            Number of future frames included in the scene.
+        schema : TrajectorySchema
+            Schema describing which fields the scene currently provides. The
+            input frame is expected to have columns matching the physical fields
+            defined by this schema.
+        sample_time : float or None, optional
+            Time interval between frames in seconds.
+        map_key : MapKey, optional
+            Stable map identifier for the scene, if one exists.
+        map_resolver : MapResolver or None, optional
+            Resolver attached by the loader to materialize the scene map on
+            demand.
+        split_assignment : DatasetSplit or None, optional
+            Split assignment for this scene (train/val/test).
+        passed_agent_ids : frozenset of int or None, optional
+            Optional set of agents that passed screening and should be explictly
+            added to the scene metadata.
+        cast_schema : bool, optional
+            Whether to cast the input frame to match the expected physical
+            schema or to assume it already matches. Default is `True`.
+
+        """
         if cast_schema:
             frame = _cast_to_schema(frame, schema.physical)
 
@@ -88,10 +139,6 @@ class Scene:
 
     def __post_init__(self) -> None:
         """Cast and validate the trajectory schema."""
-        frame = _cast_to_schema(self.frame, self.schema.physical)
-        object.__setattr__(self, "frame", frame)
-
-        # Verify schema compatibility with the frame DataFrame
         if not _matches_physical_schema(self.frame.schema, self.schema.physical):
             msg = _get_schema_mismatch_message(
                 actual=self.frame.schema,
@@ -207,7 +254,7 @@ def _derive_missing_fields(
         raise TrajectorySchemaError(msg)
 
     output, output_fields = apply_derivation_plan(data, plan, context, source.fields)
-    if output_fields != target.fields:
+    if (target.fields & output_fields) != target.fields:
         missing = ", ".join(field.to_str() for field in (target.fields & ~output_fields).fields())
         msg = f"Cannot materialize trajectory schema {target.name}; missing {missing}."
         raise TrajectorySchemaError(msg)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import functools
 import sqlite3
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -14,7 +14,7 @@ from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
     from dronalize.processing.maps.resolver import MapResolver
-    from dronalize.processing.models import LoaderRequest
 
 
 def _table_query(table_name: str) -> str:
@@ -35,19 +34,11 @@ def _table_query(table_name: str) -> str:
         UTM_Y as y,
         CLASS
     FROM {table_name}
-    """
+    """  # noqa: S608
 
 
 class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
     """Loader for OpenDD data split across multiple SQLite databases."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True
-    )
-
-    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
-        """Initialize the multi-database OpenDD loader."""
-        super().__init__(data_root=data_root, request=request)
 
     def _db_paths(self) -> Iterable[Path]:
         for db_file in self.root.rglob("trajectories_*_v3.sqlite"):
@@ -56,7 +47,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
                 yield db_file
 
     @override
-    def discover_sources(self) -> Iterable[Source[tuple[Path, str]]]:
+    def iter_sources(self) -> Iterable[Source[tuple[Path, str]]]:
         for db_path in self._db_paths():
             for table_name in _list_table_names(db_path):
                 identifier = f"{db_path.stem}:{table_name}"
@@ -65,7 +56,7 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
                 )
 
     @override
-    def num_sources(self) -> int | None:
+    def count_sources(self) -> int | None:
         return sum(_count_tables(db_path) for db_path in self._db_paths())
 
     @override
@@ -110,12 +101,12 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         def _resolver(scene: Scene) -> MapGraph | None:
             if scene.map_key is None or self.map_config is None:
                 return None
-            return utils.extract_based_on_scene(
+            return utils.extract_configured_map(
                 self._get_map(
                     scene.map_key, self.map_config.min_distance, self.map_config.interp_distance
                 ),
                 scene,
-                self.map_config.extraction,
+                self.map_config,
             )
 
         return _resolver

@@ -1,17 +1,3 @@
-# Copyright 2024-2025, Theodor Westny. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from __future__ import annotations
 
 import json
@@ -28,10 +14,15 @@ if TYPE_CHECKING:
 
 
 class Argoverse2Map:
-    """Represents a map in the Argoverse2 dataset."""
+    """Represents a map in the Argoverse2 dataset.
+
+    Parameters
+    ----------
+    json_file : Path
+        Path to the Argoverse 2 JSON map file.
+    """
 
     def __init__(self, json_file: Path) -> None:
-        """Initialize the Argoverse2Map with a JSON file."""
         self.json_file: Path = json_file
         with Path.open(json_file, "r") as file:
             self.json_data: dict[str, Any] = json.load(file)
@@ -108,9 +99,8 @@ class LaneBoundary:
 
 
 _BOUNDARY_TO_EDGE_TYPE = {
-    # Seemingly NONE is often used and closest match is LINE_THIN.
-    LaneBoundaryType.NONE: EdgeType.NONE,
-    LaneBoundaryType.UNKNOWN: EdgeType.NONE,
+    LaneBoundaryType.NONE: EdgeType.VIRTUAL,
+    LaneBoundaryType.UNKNOWN: EdgeType.VIRTUAL,
     LaneBoundaryType.SOLID_WHITE: EdgeType.LINE_THIN,
     LaneBoundaryType.SOLID_YELLOW: EdgeType.LINE_THIN,
     LaneBoundaryType.DOUBLE_SOLID_WHITE: EdgeType.LINE_THIN_DOUBLE,

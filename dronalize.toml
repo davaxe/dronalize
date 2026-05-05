@@ -1,7 +1,7 @@
 # Proposed next-generation config layout
 #
-# This file is intentionally a design proposal for a cleaner public config model.
-# It is not required to match the current parser.
+# This file doubles as a parser-validated example config for docs and tests.
+# Keep it aligned with the current public configuration model.
 #
 # Design goals:
 # - keep reusable profiles and per-dataset entries
@@ -16,8 +16,7 @@
 # --------------------------------------------------------------------------------------
 
 [profiles.fast.runtime]
-jobs = "auto"
-chunksize = 64
+jobs = 4
 
 [profiles.high_precision.output]
 schema = "positions_velocity_yaw"
@@ -31,6 +30,29 @@ categories = ["ANIMAL"]
 [profiles.basic_screening.screening.cleanup.remove_unimportant]
 rule = "exclude"
 categories = ["UNIMPORTANT"]
+
+[profiles.strict_screening.screening]
+
+[profiles.strict_screening.screening.agent]
+no_gap = {rule = "max_gap", maximum = 0}
+stationary = { rule = "min_distance", minimum = 4, tolerance = { absolute = 100} }
+
+[profiles.strict_screening.screening.scene]
+min_agents = { rule = "agent_range", minimum = 12 }
+
+
+# --------------------------------------------------------------------------------------
+# Dataset: waymo
+# --------------------------------------------------------------------------------------
+
+[datasets.waymo]
+uses = ["strict_screening"]
+
+[datasets.waymo.screening]
+mode = "extend"
+
+[datasets.waymo.output.mds]
+compression = "zstd:3"
 
 # --------------------------------------------------------------------------------------
 # Dataset: a43
@@ -59,13 +81,12 @@ future_frames = 60
 sample_time = 0.1
 
 [datasets.a43.scenes.window]
-step = 2
+step = 15
 
 [datasets.a43.scenes.resample]
 up = 2
 down = 1
 method = "cubic"
-max_gap = 4
 coordinates = ["x", "y"]
 emit_velocity = true
 emit_acceleration = true
@@ -102,19 +123,9 @@ rule = "min_samples"
 minimum = 8
 
 
-# Dataset ------------------------------------------------------------------------------
-#
-# Dataset-owned extras live here. This section is for loader-specific parameters that do
-# not belong in the shared public config surface.
-#
-# [datasets.a43.dataset]
-# some_dataset_flag = true
-# custom_threshold = 12
-
-
 # Split --------------------------------------------------------------------------------
 
-[datasets.a43.split]
+[datasets.a43.assign]
 strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8

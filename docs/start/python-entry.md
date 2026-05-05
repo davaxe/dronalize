@@ -14,7 +14,7 @@ spec = get("a43")
 print(spec.name)
 print(spec.has_map)
 print(spec.native_schema.name)
-print(spec.native_splits)
+print(spec.supported_native_splits)
 ```
 
 `get()` returns a `DatasetSpec`, which is the same descriptor the CLI uses for `inspect` and
@@ -25,45 +25,46 @@ print(spec.native_splits)
 ```python
 from pathlib import Path
 
-from dronalize.config import load_project_config
+from dronalize.config import parse_config
 from dronalize.datasets import get
 
 spec = get("a43")
-project = load_project_config(Path("config.toml"))
+project = parse_config(Path("config.toml"))
 resolved = project.resolve("a43", spec.default_config)
 
 print(resolved.scenes.history_frames, resolved.scenes.future_frames)
 print(resolved.output.precision)
-print(resolved.split.root.strategy)
+print(resolved.read.root.strategy)
+print(resolved.assign.root.strategy)
 ```
 
 Use `resolve()` when you want the final dataset config with built-in defaults applied. The lower
 level `extract()` helper only returns the authored dataset entry from the file, not the fully merged
 result.
 
-## Plan or run a job
+## Plan or run a request
 
 ```python
 from pathlib import Path
 
-from dronalize.runtime import ProcessRequest, process_dataset, resolve_job
+from dronalize.runtime import ExecutionRequest, execute_request, resolve_request
 
-request = ProcessRequest(
+request = ExecutionRequest(
     dataset="a43",
     input_dir=Path("data/a43/raw"),
     output_dir=Path("data/a43/processed"),
     storage_backend="pickle",
 )
 
-job = resolve_job(request)
-print(job.effective_sample_time)
+plan = resolve_request(request)
+print(plan.effective_sample_time)
 
-result = process_dataset(request)
-print(result.processed_scenes)
+result = execute_request(request)
+print(result.selected_scenes)
 ```
 
-Use `resolve_job()` when you want a dry planning step. Use `process_dataset()` when you want to
-execute the job.
+Use `resolve_request()` when you want a dry planning step. Use `execute_request()` when you want to
+execute the request directly.
 
 ## Schema and record helpers
 

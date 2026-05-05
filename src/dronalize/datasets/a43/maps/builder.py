@@ -2,24 +2,22 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
-from dronalize.processing.maps.builder import BaseMapBuilder
+from dronalize.processing.maps.builder import FeatureMapBuilder
+from dronalize.processing.maps.features import PathFeature
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
-class A43MapBuilder(BaseMapBuilder):
-    """Graph builder for the A43 dataset.
-
-    This dataset does not have actual map data, but the map can be reconstructed
-    (inferred/estimated) from the trajectories of the vehicles. The graph
-    builder uses a mathematical heuristic to infer the lane structure based on
-    lane width and the number of lanes.
-
-    """
+class A43MapBuilder(FeatureMapBuilder):
+    """Graph builder for the A43 dataset."""
 
     def __init__(self, data_file_name: str, min_x: float, max_x: float) -> None:
-        super().__init__()
         self._markings: dict[str, list[float]] = {
             "DroneDataEastToWestCSV_220725": [-3.75, 0, 3.75, 7.5],
             "DroneDataWestToEastCSV_220725": [-7.5, -3.75, 0, 3.75, 7.5],
@@ -33,14 +31,10 @@ class A43MapBuilder(BaseMapBuilder):
         self._max_x: float = max_x
 
     @override
-    def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
+    def iter_features(self) -> Iterable[PathFeature]:
         markings = self._markings[self._name]
         for i, y in enumerate(markings):
-            if i in {0, len(markings) - 1}:
-                edge_type = EdgeType.ROAD_BORDER
-            else:
-                edge_type = EdgeType.LINE_THIN_DASHED
-
-            self.add_path_lazy(points=[(self._min_x, y), (self._max_x, y)], edge_type=edge_type)
+            edge_type = (
+                EdgeType.ROAD_BORDER if i in {0, len(markings) - 1} else EdgeType.LINE_THIN_DASHED
+            )
+            yield PathFeature(points=((self._min_x, y), (self._max_x, y)), edge_types=edge_type)

@@ -5,11 +5,12 @@ from __future__ import annotations
 import functools
 import importlib
 import importlib.util
-from collections.abc import Callable, Generator
+import logging
+from collections.abc import Callable, Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import ValidationError
 
@@ -20,22 +21,46 @@ from dronalize.core.errors import (
     LoaderConfigError,
     MissingOptionalDependencyError,
 )
-from dronalize.processing.loading.base import DatasetOptionsModel, NoDatasetOptions
+from dronalize.processing.loading.options import DatasetOptionsModel, NoDatasetOptions
 from dronalize.processing.loading.resources import DatasetResources
-from dronalize.processing.models import LoaderRequest, SplitRequest
+from dronalize.processing.models import LoaderRequest, ReadRequest
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.base import BaseSceneLoader
-    from dronalize.processing.loading.loader import BlockSplitSupport
 
 
 _REGISTRY: dict[str, DatasetSpec] = {}
+logger = logging.getLogger(__name__)
 
 ResourcesFactory = Callable[
     [Path, ScenesConfig, MapConfig | None], AbstractContextManager[DatasetResources]
 ]
+"""Factory signature for dataset-scoped shared resources.
+
+A resources factory receives the dataset root plus the resolved scene and map
+configuration for a run, then returns a context manager that owns shared state
+such as cached metadata tables, shared-memory map stores, or handles reused
+across loader instances.
+"""
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class DatasetSplitSupport:
+    """Assignment strategies supported by a dataset integration.
+
+    These flags describe how the runtime may create train/validation/test
+    partitions when `assign.strategy` is not `none` or `preserve-native`.
+    Datasets should only enable strategies whose required grouping information
+    is stable and available from their sources.
+    """
+
+    scene: bool = True
+    """Whether scenes may be assigned independently by scene id."""
+    source: bool = False
+    """Whether all scenes from the same source may be assigned together."""
+    time_block: bool = False
+    """Whether source timelines may be divided into contiguous split blocks."""
 
 
 class LoaderFactory(Protocol):
@@ -46,33 +71,72 @@ class LoaderFactory(Protocol):
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
-    ) -> BaseSceneLoader[Any, Any]:
+    ) -> object:
         """Create a scene loader for the dataset with the given configuration."""
         ...
 
 
 @dataclass(frozen=True, slots=True)
 class DatasetSpec:
-    """Explicit descriptor for one dataset integration."""
+    """Descriptor for one dataset integration.
+
+    A `DatasetSpec` is the registry object that connects a dataset key, such as
+    `"a43"` or `"waymo"`, to the loader and defaults needed by the runtime. The
+    CLI, config resolver, and Python runtime all resolve dataset names to this
+    object before planning a run.
+
+    The spec owns dataset-level metadata rather than per-run state. It defines
+    how to build loaders, which trajectory fields the raw loader produces, what
+    configuration should be used as the starting point, which split strategies
+    are valid, and whether map resources can be requested.
+
+    Parameters
+    ----------
+    name : str
+        Unique registry key used in config files, CLI commands, and
+        `ExecutionRequest.dataset`.
+    loader_factory : LoaderFactory
+        Callable that constructs a dataset loader from a root path, compiled
+        loader request, and optional shared resources.
+    default_config : DatasetConfig
+        Dataset-specific baseline configuration. User profiles, dataset entries,
+        and runtime overrides are applied on top of this value.
+    native_schema : TrajectorySchema
+        Trajectory schema emitted by the loader before output schema conversion.
+    supported_native_splits : tuple[DatasetSplit, ...] or None, optional
+        Dataset-provided partitions available to `read.strategy = "native"` and
+        `assign.strategy = "preserve-native"`. Use `None` for datasets without
+        native partitions.
+    dataset_options_model : type[DatasetOptionsModel], optional
+        Typed model for dataset-owned options under `[datasets.<name>.dataset]`.
+    resources_factory : ResourcesFactory or None, optional
+        Optional context-manager factory for shared per-run resources such as
+        maps or cached metadata.
+    has_map : bool, optional
+        Whether the dataset can provide map data when map inclusion is enabled.
+    split_support : DatasetSplitSupport, optional
+        Custom assignment modes supported by this dataset in addition to native
+        split preservation.
+    """
 
     name: str
     loader_factory: LoaderFactory
     default_config: DatasetConfig
     native_schema: TrajectorySchema
-    native_splits: tuple[DatasetSplit, ...] = ()
+    supported_native_splits: tuple[DatasetSplit, ...] | None = None
     dataset_options_model: type[DatasetOptionsModel] = NoDatasetOptions
     resources_factory: ResourcesFactory | None = None
     has_map: bool = False
-    time_split_support: BlockSplitSupport | None = None
+    split_support: DatasetSplitSupport = DatasetSplitSupport()
 
     def default_dataset_options(self) -> DatasetOptionsModel:
         """Return the default typed dataset-owned config block."""
         return self.dataset_options_model()
 
-    def parse_dataset_config(self, payload: dict[str, object] | None) -> DatasetOptionsModel:
+    def parse_dataset_config(self, payload: Mapping[str, object] | None) -> DatasetOptionsModel:
         """Parse and validate dataset-owned config from plain data."""
         try:
-            return self.dataset_options_model.model_validate(payload or {})
+            return self.dataset_options_model.parse(dict(payload or {}))
         except ValidationError as exc:
             msg = f"Invalid dataset config for dataset '{self.name}': {exc}"
             raise LoaderConfigError(msg) from exc
@@ -93,15 +157,16 @@ class DatasetSpec:
         return LoaderRequest(
             scenes=self.default_config.scenes,
             screening=self.default_config.screening,
-            split=SplitRequest.from_config(self.default_config.split),
+            read=ReadRequest.from_config(
+                self.default_config.read, supported_native_splits=self.supported_native_splits
+            ),
             dataset=self.default_dataset_options(),
             map=self.default_config.map,
-            native_splits=self.native_splits or None,
         )
 
     def build_loader(
         self, *, root: Path, request: LoaderRequest, resources: DatasetResources | None = None
-    ) -> BaseSceneLoader[Any, Any]:
+    ) -> object:
         """Construct one loader instance for this dataset specification."""
         return self.loader_factory(data_root=root, request=request, resources=resources)
 
@@ -149,11 +214,11 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     "zara2": _builtin(
         "dronalize.datasets.eth_ucy", export_name="DATASET_SPECS", export_key="zara2"
     ),
-    "exid": _builtin("dronalize.datasets.exid"),
-    "highd": _builtin("dronalize.datasets.highd"),
-    "i80": _builtin("dronalize.datasets.i80"),
-    "ind": _builtin("dronalize.datasets.ind"),
-    "interact": _builtin("dronalize.datasets.interact"),
+    "exid": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="exid"),
+    "highd": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="highd"),
+    "i80": _builtin("dronalize.datasets.ngsim", export_name="DATASET_SPECS", export_key="i80"),
+    "ind": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="ind"),
+    "interaction": _builtin("dronalize.datasets.interaction"),
     "lyft": _builtin(
         "dronalize.datasets.lyft",
         optional_dependencies=("zarr", "numcodecs", "google.protobuf"),
@@ -161,10 +226,10 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
     ),
     "nuscenes": _builtin("dronalize.datasets.nuscenes"),
     "opendd": _builtin("dronalize.datasets.opendd"),
-    "round": _builtin("dronalize.datasets.round"),
+    "round": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="round"),
     "sind": _builtin("dronalize.datasets.sind"),
-    "unid": _builtin("dronalize.datasets.unid"),
-    "us101": _builtin("dronalize.datasets.us101"),
+    "unid": _builtin("dronalize.datasets.levelx", export_name="DATASET_SPECS", export_key="unid"),
+    "us101": _builtin("dronalize.datasets.ngsim", export_name="DATASET_SPECS", export_key="us101"),
     "vod": _builtin("dronalize.datasets.vod"),
     "waymo": _builtin(
         "dronalize.datasets.waymo", optional_dependencies=("google.protobuf",), extra="waymo"
@@ -172,17 +237,41 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetSpec] = {
 }
 
 
-def register(descriptor: DatasetSpec) -> None:
-    """Register one dataset descriptor in the in-memory registry."""
-    if descriptor.name in _REGISTRY and _REGISTRY[descriptor.name] != descriptor:
-        msg = f"Dataset '{descriptor.name}' is already registered."
+def register(spec: DatasetSpec) -> None:
+    """Register one dataset specification in the in-memory registry.
+
+    This is the main extension point for adding new datasets to dronalize from
+    an external module.
+
+    Parameters
+    ----------
+    spec : DatasetSpec
+        The dataset specification to register.
+    """
+    if spec.name in _REGISTRY and _REGISTRY[spec.name] != spec:
+        msg = f"Dataset '{spec.name}' is already registered."
         raise DatasetRegistryError(msg)
-    _REGISTRY[descriptor.name] = descriptor
+    _REGISTRY[spec.name] = spec
+    logger.debug("Registered dataset descriptor", extra={"dataset": spec.name})
 
 
 def get(name: str) -> DatasetSpec:
-    """Return one registered or built-in dataset descriptor."""
+    """Return one registered or built-in dataset descriptor.
+
+    Parameters
+    ----------
+    name : str
+        The name of the dataset to resolve. The name should match the `name`
+        field of the returned descriptor, and is case-sensitive.
+
+    Returns
+    -------
+    DatasetSpec
+        The resolved dataset descriptor.
+
+    """
     if name in _REGISTRY:
+        logger.debug("Resolved dataset descriptor from in-memory registry", extra={"dataset": name})
         return _REGISTRY[name]
 
     builtin_specs = _builtin_datasets()
@@ -194,11 +283,19 @@ def get(name: str) -> DatasetSpec:
     if missing:
         raise _missing_dependency_error(subject=f"Dataset '{name}'", spec=spec, missing=missing)
 
+    logger.debug("Resolved dataset descriptor from built-in registry", extra={"dataset": name})
     return _load_builtin_descriptor(name)
 
 
 def available() -> list[str]:
-    """Return the sorted list of available dataset names."""
+    """Return the sorted list of available dataset names.
+
+    Returns
+    -------
+    list[str]
+        The sorted list of available dataset names, including both registered
+        and built-in datasets that have their optional dependencies satisfied.
+    """
     builtin_names = {
         name
         for name, spec in _builtin_datasets().items()

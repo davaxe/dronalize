@@ -1,35 +1,33 @@
-"""Loader implementation for the View-of-Delft dataset."""
-
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import ClassVar
 
 from typing_extensions import override
 
-from dronalize.datasets.nuscenes.loader import NuScenesLoader, NuScenesLoaderOptions
+from dronalize.core.categories import DatasetSplit
+from dronalize.datasets.shared.nuscenes_style_loader import (
+    NuScenesStyleLoader,
+    NuScenesStyleLoaderOptions,
+)
+from dronalize.datasets.vod.splits import get_split
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-    from dronalize.processing.loading.resources import DatasetResources
-    from dronalize.processing.models import LoaderRequest
+VodLoaderOptions = NuScenesStyleLoaderOptions
 
 
-class VodLoader(NuScenesLoader):
+class VodLoader(NuScenesStyleLoader):
     """Loader for the View-of-Delft dataset."""
 
-    def __init__(
-        self,
-        *,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> None:
-        """Initialize the VOD loader."""
-        super().__init__(data_root=data_root, request=request, resources=resources)
+    metadata_dir_parts: ClassVar[tuple[tuple[str, ...], ...]] = (("v1.0-trainval",), ("v1.0-test",))
+    native_splits: ClassVar[tuple[DatasetSplit, ...]] = (
+        DatasetSplit.TRAIN,
+        DatasetSplit.VAL,
+        DatasetSplit.TEST,
+    )
+    source_identifier_field: ClassVar[str] = "token"
+    bad_first_step_threshold_meters: ClassVar[float | None] = 15.0
 
+    @staticmethod
     @override
-    @classmethod
-    def default_loader_options(cls) -> NuScenesLoaderOptions:
-        # vod contains dulplicate ego vehicle data
-        return NuScenesLoaderOptions(drop_full_category_regex=["vehicle.ego"])
+    def split_from_scene_row(row: dict[str, object]) -> DatasetSplit:
+        """Resolve the native split for one VoD scene row."""
+        return get_split(str(row["token"]))

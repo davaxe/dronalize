@@ -1,0 +1,67 @@
+name: Manual Coverage
+
+on:
+  workflow_dispatch:
+    inputs:
+      python-version:
+        description: Python version to use
+        required: false
+        default: "3.12"
+
+jobs:
+  coverage:
+    name: Coverage (Python ${{ github.event.inputs.python-version || '3.12' }})
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv and set Python
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ github.event.inputs.python-version || '3.12' }}
+          enable-cache: true
+
+      - name: Sync environment with broad dependency coverage
+        run: uv sync --frozen --group test --group lint --group typecheck --all-extras
+
+      - name: Run Ruff
+        run: uv run ruff check .
+
+      - name: Run Basedpyright
+        run: uv run basedpyright src tests
+
+      - name: Run pytest with coverage
+        run: uv run coverage run -m pytest -x --junitxml=junit.xml -m "not slow and not dataset"
+
+      - name: Build coverage reports
+        if: always()
+        run: |
+          uv run coverage report -m
+          uv run coverage xml
+          uv run coverage html
+
+      - name: Generate coverage badge
+        if: always()
+        run: |
+          uvx --with "genbadge[coverage]" genbadge coverage --local -i coverage.xml -o coverage-badge.svg
+
+      - name: Generate tests badge
+        if: always()
+        run: |
+          uvx --with "genbadge[tests]" genbadge tests --local -i junit.xml -o tests-badge.svg
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          path: |
+            .coverage
+            junit.xml
+            coverage.xml
+            coverage-badge.svg
+            tests-badge.svg
+            htmlcov/

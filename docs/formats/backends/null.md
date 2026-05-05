@@ -7,7 +7,7 @@ It is useful for validation, planning, and runtime benchmarking without storage 
 
 ## What it does
 
-When `storage_backend = "null"`:
+When the `null` backend is selected, the processing pipeline executes as normal with the following differences:
 
 - source loading, preprocessing, screening, splitting, and scene assembly still run
 - progress counters and split counts are still produced

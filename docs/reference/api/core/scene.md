@@ -18,6 +18,8 @@
 
 ## ::: dronalize.core.scene.available_trajectory_schemas
 
+## ::: dronalize.core.scene.TRAJECTORY_SCHEMAS
+
 ## ::: dronalize.core.scene.CANONICAL
 
 ## ::: dronalize.core.scene.POSITIONS_ONLY

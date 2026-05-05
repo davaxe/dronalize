@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from pydantic import Field
@@ -14,27 +14,22 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import (
-    BaseSceneLoader,
-    LoaderOptions,
-    LoaderSplitCapabilities,
-)
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
+from dronalize.processing.loading.options import DatasetOptionsModel
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
     from dronalize.processing.maps.resolver import MapResolver
-    from dronalize.processing.models import LoaderRequest
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
-class Argoverse2LoaderOptions(LoaderOptions):
+class Argoverse2LoaderOptions(DatasetOptionsModel):
     """Dataset-owned config for the Argoverse 2 loader."""
 
     file_batch_size: int = Field(default=100, ge=1)
@@ -42,25 +37,6 @@ class Argoverse2LoaderOptions(LoaderOptions):
 
 class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
     """Loader for Argoverse 2 trajectory data stored in Parquet files."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_scene_split=True
-    )
-
-    def __init__(
-        self,
-        *,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> None:
-        """Initialize the Argoverse 2 loader."""
-        super().__init__(data_root=data_root, request=request, resources=resources)
-
-    @classmethod
-    @override
-    def loader_options_model(cls) -> type[Argoverse2LoaderOptions]:
-        return Argoverse2LoaderOptions
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
         if not data_dir.is_dir():
@@ -72,12 +48,8 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
             )
 
     @override
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
-        if split is DatasetSplit.TRAIN:
-            return self._sources_from_dir(self.root / "train")
-        if split is DatasetSplit.VAL:
-            return self._sources_from_dir(self.root / "val")
-        return self._sources_from_dir(self.root / "test")
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
+        yield from self._sources_from_dir(self.root / split.value)
 
     @override
     def load_source(self, source: Source[list[Path]]) -> Iterable[LoadedSourceData]:
@@ -106,10 +78,12 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
             )
 
     @override
-    def num_sources(self) -> int | None:
-        return sum(
-            self._count_sources_for_split(split) for split in self.native_splits or _NATIVE_SPLITS
-        )
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
+        if split is DatasetSplit.TRAIN:
+            return self._count_sources(self.root / "train")
+        if split is DatasetSplit.VAL:
+            return self._count_sources(self.root / "val")
+        return self._count_sources(self.root / "test")
 
     @classmethod
     @override
@@ -121,12 +95,12 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
         def _resolver(scene: Scene) -> MapGraph | None:
             if scene.map_key is None or self.map_config is None:
                 return None
-            return utils.extract_based_on_scene(
+            return utils.extract_configured_map(
                 self._get_map(
                     scene.map_key, self.map_config.min_distance, self.map_config.interp_distance
                 ),
                 scene,
-                self.map_config.extraction,
+                self.map_config,
             )
 
         return _resolver
@@ -150,9 +124,7 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
             "background": AgentCategory.UNIMPORTANT,
             "unknown": AgentCategory.UNKNOWN,
         }
-        return pl.col(col).replace_strict(
-            mapping, default=AgentCategory.UNKNOWN, return_dtype=pl.Int32
-        )
+        return pl.col(col).replace_strict(mapping, return_dtype=pl.Int32)
 
     def _count_sources(self, data_dir: Path) -> int:
         if not data_dir.is_dir():
@@ -160,10 +132,3 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
         num_files = sum(1 for _ in data_dir.glob("*/*.parquet"))
         batches, extra = divmod(num_files, self.loader_options.file_batch_size)
         return batches + int(extra > 0)
-
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
-        if split is DatasetSplit.TRAIN:
-            return self._count_sources(self.root / "train")
-        if split is DatasetSplit.VAL:
-            return self._count_sources(self.root / "val")
-        return self._count_sources(self.root / "test")

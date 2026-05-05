@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
+from dronalize.core.functional import yaw_from_pos_expr
 from dronalize.core.scene import CANONICAL
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
 
@@ -18,35 +19,16 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
-    from dronalize.processing.models import LoaderRequest
 
 
 class SindLoader(BaseSceneLoader):
     """Loader for the SinD dataset."""
 
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True
-    )
-
-    def __init__(
-        self,
-        *,
-        data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
-    ) -> None:
-        """Initialize the SinD loader."""
-        super().__init__(data_root=data_root, request=request, resources=resources)
-
     @override
-    def discover_sources(self) -> Iterable[Source[Path]]:
-        if not self.root.is_dir():
-            return
-        for subdir in sorted(path for path in self.root.iterdir() if path.is_dir()):
-            yield Source(
-                identifier=subdir.name, data=subdir, map_key=str(self._resolve_map_key(subdir.name))
-            )
+    def iter_sources(self) -> Iterable[Source[Path]]:
+        for region in sorted(p for p in self.root.iterdir() if p.is_dir()):
+            for data_dir in sorted(p for p in region.iterdir() if p.is_dir()):
+                yield Source(identifier=data_dir.name, data=data_dir, map_key=str(region.name))
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
@@ -88,14 +70,14 @@ class SindLoader(BaseSceneLoader):
                 "animal": AgentCategory.ANIMAL.value,
             })
             .alias("agent_category"),
-            pl.lit(None).alias("yaw"),
+            yaw_from_pos_expr().alias("yaw"),
             *("x", "y", "vx", "vy", "ax", "ay"),
         )
 
         yield LoadedSourceData(pl.concat([vehicle_df, pedestrian_df]))
 
     @override
-    def num_sources(self) -> int | None:
+    def count_sources(self) -> int | None:
         if not self.root.is_dir():
             return 0
         return sum(1 for path in self.root.iterdir() if path.is_dir())
@@ -108,19 +90,9 @@ class SindLoader(BaseSceneLoader):
     @override
     def map_resolver(self) -> MapResolver:
         shared_maps = self.resources.shared_maps
-        if not isinstance(shared_maps, dict):
+        if not shared_maps or self.map_config is None:
             return no_map()
         return shared_map(shared_maps)
-
-    @staticmethod
-    def _resolve_map_key(path_name: str) -> str:
-        if path_name.startswith("changchun"):
-            return "changchun"
-        if path_name.startswith("xian"):
-            return "xian"
-        if "NR" in path_name:
-            return "nr_ll2"
-        return "map_relink_law_save"
 
 
 _VEHICLE_SCHEMA = pl.Schema({

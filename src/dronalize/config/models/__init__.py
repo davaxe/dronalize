@@ -1,4 +1,21 @@
-"""Explicit configuration models grouped by concern."""
+"""Typed configuration models grouped by processing concern.
+
+Import from this package when you need to build, validate, or introspect
+individual configuration sections directly in Python. The models are organized
+roughly the same way as the project configuration structure:
+
+- dataset-level composition via [`DatasetConfig`][dronalize.config.models.DatasetConfig]
+- scene sampling and temporal transforms via
+  [`ScenesConfig`][dronalize.config.models.ScenesConfig]
+- screening and cleanup rules via
+  [`ScreeningConfig`][dronalize.config.models.ScreeningConfig]
+- output encoding and storage options via
+  [`OutputConfig`][dronalize.config.models.OutputConfig]
+- runtime execution controls via
+  [`RuntimeConfig`][dronalize.config.models.RuntimeConfig]
+- read selection via [`ReadConfig`][dronalize.config.models.ReadConfig]
+- assignment strategies via [`AssignConfig`][dronalize.config.models.AssignConfig]
+"""
 
 from dronalize.config.models.dataset import (
     DatasetConfig,
@@ -10,9 +27,12 @@ from dronalize.config.models.map import (
     CircularExtraction,
     FullMapExtraction,
     MapConfig,
+    MapEdgeTypesConfig,
     MapExtraction,
     PartialMapConfig,
+    PartialMapEdgeTypesConfig,
     SceneExtentExtraction,
+    TrajectoryBufferExtraction,
 )
 from dronalize.config.models.output import (
     MDSOutputConfig,
@@ -24,7 +44,6 @@ from dronalize.config.models.output import (
 )
 from dronalize.config.models.runtime import PartialRuntimeConfig, RuntimeConfig
 from dronalize.config.models.scenes import (
-    Derivatives,
     LaneChangeConfig,
     PartialLaneChangeConfig,
     PartialResampleConfig,
@@ -63,27 +82,32 @@ from dronalize.config.models.screening import (
     Tolerance,
 )
 from dronalize.config.models.split import (
-    NativeSplitConfig,
-    NoSplitConfig,
-    SceneSplitConfig,
-    ShuffledTimeSplitConfig,
-    SourceSplitConfig,
-    SplitConfig,
-    SplitConfigUnion,
+    AssignConfig,
+    AssignUnion,
+    NoAssign,
+    PreserveNativeAssign,
+    ReadAll,
+    ReadConfig,
+    ReadNative,
+    ReadUnion,
+    SceneAssign,
+    ShuffledTimeBlockAssign,
+    SourceAssign,
     SplitWeights,
-    TimeSplitConfig,
+    TimeBlockAssign,
 )
 
 __all__ = [
     "AgentCheckSpec",
     "AgentRangeSpec",
     "AgentSelector",
+    "AssignConfig",
+    "AssignUnion",
     "BoundingBoxExtraction",
     "CategoryRangeSpec",
     "CircularExtraction",
     "CleanupSpec",
     "DatasetConfig",
-    "Derivatives",
     "EndsAfterFrameSpec",
     "ExcludeCategoriesSpec",
     "FullMapExtraction",
@@ -91,6 +115,7 @@ __all__ = [
     "LaneChangeConfig",
     "MDSOutputConfig",
     "MapConfig",
+    "MapEdgeTypesConfig",
     "MapExtraction",
     "MaxGapSpec",
     "MaxMissingFramesSpec",
@@ -98,8 +123,7 @@ __all__ = [
     "MinConsecutiveFramesSpec",
     "MinSamplesSpec",
     "MinSpanSpec",
-    "NativeSplitConfig",
-    "NoSplitConfig",
+    "NoAssign",
     "OutputConfig",
     "OutputPrecision",
     "PartialDatasetConfig",
@@ -107,33 +131,38 @@ __all__ = [
     "PartialLaneChangeConfig",
     "PartialMDSOutputConfig",
     "PartialMapConfig",
+    "PartialMapEdgeTypesConfig",
     "PartialOutputConfig",
     "PartialResampleConfig",
     "PartialRuntimeConfig",
     "PartialScenesConfig",
     "PartialScreeningConfig",
     "PartialWindowConfig",
+    "PreserveNativeAssign",
     "PruneByRuleSpec",
     "Range",
+    "ReadAll",
+    "ReadConfig",
+    "ReadNative",
+    "ReadUnion",
     "RequireFramesSpec",
     "RequireSceneFramesSpec",
     "RequireSceneWindowSpec",
     "RequireWindowSpec",
     "ResampleConfig",
     "RuntimeConfig",
+    "SceneAssign",
     "SceneCheckSpec",
     "SceneExtentExtraction",
-    "SceneSplitConfig",
     "ScenesConfig",
     "ScreeningConfig",
-    "ShuffledTimeSplitConfig",
-    "SourceSplitConfig",
-    "SplitConfig",
-    "SplitConfigUnion",
+    "ShuffledTimeBlockAssign",
+    "SourceAssign",
     "SplitWeights",
     "StartsByFrameSpec",
-    "TimeSplitConfig",
+    "TimeBlockAssign",
     "Tolerance",
+    "TrajectoryBufferExtraction",
     "TrajectorySchemaLike",
     "WindowConfig",
     "effective_scene_window",

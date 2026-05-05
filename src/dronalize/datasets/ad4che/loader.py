@@ -11,8 +11,8 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION
 from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
+from dronalize.datasets.levelx.loader import LevelXDataLoader, SourceData
 from dronalize.datasets.shared import utils
-from dronalize.datasets.shared.levelx_loader import LevelXDataLoader
 from dronalize.processing.loading.loader import Source
 
 if TYPE_CHECKING:
@@ -30,27 +30,25 @@ class AD4CHELoader(LevelXDataLoader):
 
     def __init__(
         self,
-        *,
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
     ) -> None:
-        """Initialize the AD4CHE loader."""
         super().__init__(
             data_root=Path(data_root) / "AD4CHE_Data_V1.0", request=request, resources=resources
         )
 
     @override
-    def discover_sources(self) -> Iterable[Source[Path]]:
+    def iter_sources(self) -> Iterable[Source[SourceData]]:
         for recording_id, subdir in self._recordings():
             yield Source(
                 identifier=recording_id,
-                data=subdir,
+                data=SourceData(path=subdir),
                 map_key=f"{subdir.name}/{recording_id:02d}_laneWidthColorAndID.png",
             )
 
     @override
-    def num_sources(self) -> int | None:
+    def count_sources(self) -> int | None:
         return sum(1 for _ in self._recordings())
 
     @staticmethod
@@ -111,7 +109,7 @@ class AD4CHELoader(LevelXDataLoader):
             map_graph = AD4CHEMapBuilder(path).build(
                 self.map_config.min_distance, self.map_config.interp_distance
             )
-            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
+            return utils.extract_configured_map(map_graph, scene, self.map_config)
 
         return _resolver
 
@@ -122,7 +120,7 @@ class AD4CHELoader(LevelXDataLoader):
             yield int(number_str), subdir
 
 
-_META_SCHEMA: pl.Schema = pl.Schema({"id": pl.Int32, "numLaneChanges": pl.Int8})
+_META_SCHEMA: pl.Schema = pl.Schema({"id": pl.Int32, "numLaneChanges": pl.Int32})
 
 _TRACK_SCHEMA: pl.Schema = pl.Schema({
     "frame": pl.Int32,

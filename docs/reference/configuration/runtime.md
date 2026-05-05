@@ -19,7 +19,7 @@ Runtime settings control how work is distributed while processing. In most cases
 ```toml
 
 # Define a profile named "basic" with runtime settings.
-[profile.basic.runtime]
+[profiles.basic.runtime]
 jobs = "auto"
 
 # Specify runtime settings for a43 dataset.

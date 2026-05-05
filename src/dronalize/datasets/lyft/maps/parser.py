@@ -30,10 +30,16 @@ class LyftLVL5Map:
     The access to these elements is provided through cached properties,
     which means that the elements are loaded only once and then cached
     for subsequent access.
+
+    Parameters
+    ----------
+    protobuf_map_path : Path
+        Path to the serialized protobuf map fragment.
+    meta_json : Path
+        Path to the metadata JSON containing the world transform.
     """
 
     def __init__(self, protobuf_map_path: Path, meta_json: Path) -> None:
-        """Initialize the LyftLVL5Map with the given protobuf map and meta JSON."""
         with Path.open(protobuf_map_path, "rb") as file:
             map_fragment = proto.MapFragment()
             _ = map_fragment.ParseFromString(file.read())
@@ -125,11 +131,11 @@ class LaneBoundaryType(IntEnum):
 
     def to_edge_type(self) -> EdgeType:
         """Convert the lane boundary type to an edge type."""
-        return _LANE_BOUNDARY_TYPE_TO_EDGE_TYPE.get(self, EdgeType.NONE)
+        return _LANE_BOUNDARY_TYPE_TO_EDGE_TYPE[self]
 
 
 _LANE_BOUNDARY_TYPE_TO_EDGE_TYPE = {
-    LaneBoundaryType.UNKNOWN: EdgeType.NONE,
+    LaneBoundaryType.UNKNOWN: EdgeType.VIRTUAL,
     LaneBoundaryType.NONE: EdgeType.VIRTUAL,
     LaneBoundaryType.SINGLE_YELLOW_SOLID: EdgeType.LINE_THIN,
     LaneBoundaryType.SINGLE_WHITE_SOLID: EdgeType.LINE_THIN,
@@ -310,33 +316,14 @@ class RoadNetworkSegment:
     """
 
     start_node: str
-    """Id of the start node of the segment."""
-
     end_node: str
-    """Id of the end node of the segment."""
-
     forward_lane_set: LaneSet
-    """Lane set in the forward direction."""
-
     backward_lane_set: LaneSet
-    """Lane set in the backward direction."""
-
     num_bidirectional_lanes: int
-    """Total number of bidirectional lanes in the segment."""
-
     lanes: list[str]
-    """Ids of the lanes in the segment, ordered from left to right, often
-    starting from backward lanes to forward lanes."""
-
     road_type: RoadType = RoadType.UNKNOWN
-    """Type of the road segment, e.g., MOTORWAY, PRIMARY, etc."""
-
     travel_direction: TravelDirection = TravelDirection.UNKNOWN
-    """Indicates the travel direction in the road segment, e.g., TWO_WAY."""
-
     walkable: SideOfSegment = SideOfSegment.UNKNOWN
-    """Indicates if the segment is walkable on the some side(s) of the road
-    segment."""
 
     @classmethod
     def from_proto_road_network_segment(
@@ -423,7 +410,7 @@ class LaneBoundary:
             src_idx = len(self.points) + src_idx
 
         if not self.lane_types:
-            return EdgeType.NONE
+            return EdgeType.VIRTUAL
 
         if not self.type_change_distances:
             return self.lane_types[0].to_edge_type()

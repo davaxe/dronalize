@@ -2,33 +2,54 @@
 
 from __future__ import annotations
 
-import contextlib
 import multiprocessing as mp
 from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
+
+from typing_extensions import TypedDict
 
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
     from multiprocessing.sharedctypes import Synchronized
     from multiprocessing.synchronize import Event, Lock
 
     from dronalize.io.base import DatasetWriter
-    from dronalize.processing.loading.base import BaseSceneLoader
-    from dronalize.runtime._internal.scene import SceneBuilder
+    from dronalize.runtime._internal.processor import RuntimeProcessor
+
+
+class SplitCounts(TypedDict, total=True):
+    unsplit: int
+    train: int
+    val: int
+    test: int
 
 
 @dataclass(frozen=True, slots=True)
 class Progress:
     running: bool
+    """Whether the execution is currently running."""
     processed_sources: int
-    processed_scenes: int
+    """The number of sources that have been processed."""
+    candidate_scenes: int
+    """The number of candidate scenes that have been generated and screened.
+
+    This is incremented for every scene that is generated and screened,
+    regardless of whether it is selected or not.
+    """
+    selected_scenes: int
+    """Actual number of scenes that have been selected for the dataset."""
     total_sources: int | None
-    total_scenes: int | None
+    """Total sources to process if known, otherwise None."""
+    scene_limit: int | None
+    """The total scene limit if one is set, otherwise None."""
     active_workers: int
-    split_counts: dict[str, int]
+    """Current number of active worker processes."""
+    split_counts: SplitCounts
+    """Split partition counts, with keys "unsplit", "train", "val", and "test"."""
+    screening_enabled: bool
+    """Whether the processor has screening enabled."""
 
 
 @dataclass(slots=True)
@@ -53,7 +74,8 @@ class WorkerRegistry:
 @dataclass(slots=True)
 class ProgressState:
     active_workers: Synchronized[int]
-    scene_counter: Synchronized[int]
+    candidate_scene_counter: Synchronized[int]
+    selected_scene_counter: Synchronized[int]
     source_counter: Synchronized[int]
     unsplit_counter: Synchronized[int]
     train_counter: Synchronized[int]
@@ -66,7 +88,8 @@ class ProgressState:
     def create(cls) -> ProgressState:
         return cls(
             active_workers=mp.Value("i", 0),
-            scene_counter=mp.Value("i", 0),
+            candidate_scene_counter=mp.Value("i", 0),
+            selected_scene_counter=mp.Value("i", 0),
             source_counter=mp.Value("i", 0),
             unsplit_counter=mp.Value("i", 0),
             train_counter=mp.Value("i", 0),
@@ -79,7 +102,8 @@ class ProgressState:
     def reset(self) -> None:
         counters = (
             self.active_workers,
-            self.scene_counter,
+            self.candidate_scene_counter,
+            self.selected_scene_counter,
             self.source_counter,
             self.unsplit_counter,
             self.train_counter,
@@ -93,14 +117,27 @@ class ProgressState:
                 counter.value = 0
             _ = self.update_event.clear()
 
-    def claim_scene(self, limit: int | None = None) -> int | None:
-        with self.scene_counter.get_lock():
-            if limit is not None and self.scene_counter.value >= limit:
+    def record_candidate_scene(self) -> int:
+        with self.candidate_scene_counter.get_lock():
+            self.candidate_scene_counter.value += 1
+            value = self.candidate_scene_counter.value
+        self.update_event.set()
+        return value
+
+    def claim_selected_scene(self, limit: int | None = None) -> int | None:
+        with self.selected_scene_counter.get_lock():
+            if limit is not None and self.selected_scene_counter.value >= limit:
                 return None
-            scene_number = self.scene_counter.value
-            self.scene_counter.value += 1
+            scene_number = self.selected_scene_counter.value
+            self.selected_scene_counter.value += 1
         self.update_event.set()
         return scene_number
+
+    def selected_scene_limit_reached(self, limit: int | None = None) -> bool:
+        if limit is None:
+            return False
+        with self.selected_scene_counter.get_lock():
+            return self.selected_scene_counter.value >= limit
 
     def increment_source(self) -> int:
         with self.source_counter.get_lock():
@@ -120,7 +157,7 @@ class ProgressState:
             counter.value += 1
         self.update_event.set()
 
-    def split_counts(self) -> dict[str, int]:
+    def split_counts(self) -> SplitCounts:
         return {
             "unsplit": self.unsplit_counter.value,
             DatasetSplit.TRAIN.value: self.train_counter.value,
@@ -139,10 +176,6 @@ class ProgressState:
             value = self.active_workers.value
         self.update_event.set()
         return value
-
-    def active_worker_count(self) -> int:
-        with self.active_workers.get_lock():
-            return self.active_workers.value
 
 
 @dataclass(slots=True)
@@ -168,14 +201,5 @@ class SharedResources:
 class WorkerRuntime:
     shared: SharedResources
     worker_id: int
-    loader: BaseSceneLoader[Any, Any] | None = None
-    builder: SceneBuilder | None = None
+    processor: RuntimeProcessor | None = None
     writer: DatasetWriter | None = None
-
-    def active_workers(self) -> int:
-        return self.shared.progress.active_worker_count()
-
-    @contextlib.contextmanager
-    def progress_snapshot_lock(self) -> Generator[None, None, None]:
-        with self.shared.progress.snapshot_lock:
-            yield

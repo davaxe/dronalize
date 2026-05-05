@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence  # noqa: TC003
+from collections.abc import Sequence  # noqa: TC003
 from dataclasses import dataclass
 from enum import IntFlag, auto
-from typing import Final
+from typing import TYPE_CHECKING, Final, Literal, cast
 
 import polars as pl
 from typing_extensions import TypedDict
 
 from dronalize.core.errors import TrajectorySchemaError
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+FieldStr = Literal["frame", "id", "agent_category", "x", "y", "vx", "vy", "ax", "ay", "yaw"]
 
 
 class TrajectoryField(IntFlag):
@@ -52,12 +57,12 @@ class TrajectoryField(IntFlag):
         """Yield individual TrajectoryField members present in this combination."""
         return (field for field in TrajectoryField if _contains_fields(self, field))
 
-    def to_str(self) -> str:
+    def to_str(self) -> FieldStr:
         """Return the canonical physical column name for this TrajectoryField."""
         if self.name is None:
             msg = f"Field combinations cannot be converted to strings: {self}"
             raise TrajectorySchemaError(msg)
-        return self.name.lower()
+        return cast("FieldStr", self.name.lower())
 
 
 _FIELD_DTYPES: Final[dict[TrajectoryField, pl.DataType]] = {
@@ -196,16 +201,24 @@ _BASE_FIELDS: Final[TrajectoryField] = (
 POSITIONS_ONLY: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_only", fields=_BASE_FIELDS
 )
+"""Built-in schema containing only positions and the required identifier fields."""
+
 POSITIONS_YAW: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_yaw", fields=_BASE_FIELDS | TrajectoryField.YAW
 )
+"""Built-in schema extending positions with yaw orientation."""
+
 POSITIONS_VELOCITY: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_velocity", fields=_BASE_FIELDS | TrajectoryField.VX | TrajectoryField.VY
 )
+"""Built-in schema extending positions with planar velocity components."""
+
 POSITIONS_VELOCITY_YAW: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_velocity_yaw",
     fields=(_BASE_FIELDS | TrajectoryField.VX | TrajectoryField.VY | TrajectoryField.YAW),
 )
+"""Built-in schema combining positions, velocity, and yaw orientation."""
+
 POSITIONS_VELOCITY_ACCELERATION: Final[TrajectorySchema] = TrajectorySchema.define(
     "positions_velocity_acceleration",
     fields=_BASE_FIELDS
@@ -214,6 +227,8 @@ POSITIONS_VELOCITY_ACCELERATION: Final[TrajectorySchema] = TrajectorySchema.defi
     | TrajectoryField.AX
     | TrajectoryField.AY,
 )
+"""Built-in schema combining positions, velocity, and acceleration."""
+
 CANONICAL: Final[TrajectorySchema] = TrajectorySchema.define(
     "canonical",
     fields=_BASE_FIELDS
@@ -223,6 +238,7 @@ CANONICAL: Final[TrajectorySchema] = TrajectorySchema.define(
     | TrajectoryField.AY
     | TrajectoryField.YAW,
 )
+"""Most feature-complete built-in trajectory schema exported by the package."""
 
 TRAJECTORY_SCHEMAS: Final[dict[str, TrajectorySchema]] = {
     schema.name: schema
@@ -235,6 +251,7 @@ TRAJECTORY_SCHEMAS: Final[dict[str, TrajectorySchema]] = {
         CANONICAL,
     )
 }
+"""Registry of built-in trajectory schemas keyed by their stable public names."""
 
 
 def available_trajectory_schemas() -> tuple[TrajectorySchema, ...]:

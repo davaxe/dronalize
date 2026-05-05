@@ -1,4 +1,4 @@
-"""Typer application for the otional dronalze CLI."""
+"""Typer application for the optional Dronalize CLI."""
 
 # ruff: noqa: PLC0415
 from __future__ import annotations
@@ -11,6 +11,7 @@ import typer
 from pydantic import ValidationError
 from rich import print as rprint
 
+from dronalize import __version__
 from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import (
@@ -28,16 +29,19 @@ from dronalize.runtime.cli.formatting import (
     build_processing_summary_table,
     build_split_support_tables,
 )
+from dronalize.runtime.cli.register import register_custom_datasets
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
-    from dronalize.runtime.types import RunPlan
+    from dronalize.runtime.types import ExecutionPlan
 
-app: typer.Typer = typer.Typer(help="Trajectory data processing package.", no_args_is_help=True)
+
+app: typer.Typer = typer.Typer(help="Trajectory data processing toolkit.", no_args_is_help=True)
 _T = TypeVar("_T")
 
-SplitStrategy = Literal["none", "native", "scene", "source", "time", "shuffled-time"]
+ReadStrategy = Literal["all", "native"]
+AssignStrategy = Literal["none", "preserve-native", "scene", "source", "time", "shuffled-time"]
 
 InputDir = Annotated[
     Path, typer.Option("--input", "-i", help="Directory containing the raw dataset.")
@@ -45,20 +49,26 @@ InputDir = Annotated[
 OutputDir = Annotated[
     Path, typer.Option("--output", "-o", help="Directory to save the processed dataset.")
 ]
-Split = Annotated[
-    SplitStrategy | None,
-    typer.Option(
-        "--split", "-s", help="Split mode to use.", show_default=False, rich_help_panel="Split"
-    ),
+Read = Annotated[
+    ReadStrategy | None,
+    typer.Option("--read", help="Read mode to use.", show_default=False, rich_help_panel="Read"),
 ]
 ReadSplit = Annotated[
     list[DatasetSplit] | None,
     typer.Option(
         "--read-split",
-        "-rs",
-        help="Dataset-defined partition(s) to read when --split native is selected.",
+        help="Dataset-defined partition(s) to read when --read native is selected.",
         show_default=False,
-        rich_help_panel="Split",
+        rich_help_panel="Read",
+    ),
+]
+Assign = Annotated[
+    AssignStrategy | None,
+    typer.Option(
+        "--assign",
+        help="Output assignment mode to use.",
+        show_default=False,
+        rich_help_panel="Assign",
     ),
 ]
 Config = Annotated[
@@ -86,11 +96,7 @@ Seed = Annotated[
 ]
 StorageBackendOption = Annotated[
     StorageBackend,
-    typer.Option(
-        "--storage-backend",
-        "--sb",
-        help="Storage backend for processed data.",
-    ),
+    typer.Option("--storage-backend", "--sb", help="Storage backend for processed data."),
 ]
 TrajectorySchema = Annotated[
     str | None, typer.Option("--scene-schema", help="Scene schema to persist in exported output.")
@@ -99,20 +105,20 @@ SplitRatio = Annotated[
     tuple[float, float, float] | None,
     typer.Option(
         "--ratio",
-        help="Train/val/test ratio used by source, scene, time, and shuffled-time split modes.",
-        rich_help_panel="Split",
+        help="Train/val/test ratio used by scene, source, time, and shuffled-time assignment.",
+        rich_help_panel="Assign",
     ),
 ]
 SplitGap = Annotated[
     int | None,
-    typer.Option("--gap", help="Gap inserted between time partitions.", rich_help_panel="Split"),
+    typer.Option("--gap", help="Gap inserted between time partitions.", rich_help_panel="Assign"),
 ]
 SplitSegments = Annotated[
     int | None,
     typer.Option(
         "--segments",
-        help="Number of contiguous temporal segments used by shuffled-time split mode.",
-        rich_help_panel="Split",
+        help="Number of contiguous temporal segments used by shuffled-time assignment.",
+        rich_help_panel="Assign",
     ),
 ]
 Force = Annotated[
@@ -127,6 +133,38 @@ Plan = Annotated[
 IncludeMap = Annotated[
     bool | None, typer.Option("--include-map/--no-map", help="Include the map (if available).")
 ]
+DatasetModule = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--dataset-module",
+        help=("Import a module that registers custom datasets. Can be provided more than once."),
+        show_default=False,
+    ),
+]
+
+
+def _version_callback(*, version: bool) -> None:
+    if version:
+        rprint(f"dronalize version: {__version__}")
+        raise typer.Exit
+
+
+@app.callback()
+def global_options(
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show the version and exit.",
+        ),
+    ] = None,
+    dataset_module: DatasetModule = None,
+) -> None:
+    """Global CLI options."""
+    _ = version
+    register_custom_datasets(dataset_module)
 
 
 @app.command()
@@ -135,8 +173,9 @@ def process(
     dataset: DatasetName,
     input_dir: InputDir,
     output_dir: OutputDir,
-    split: Split = None,
+    read: Read = None,
     read_split: ReadSplit = None,
+    assign: Assign = None,
     config: Config = None,
     jobs: Jobs = None,
     progress: Progress = True,
@@ -148,22 +187,23 @@ def process(
     gap: SplitGap = None,
     segments: SplitSegments = None,
     force: Force = False,
-    plan: Plan = False,
+    plan_mode: Plan = False,
     include_map: IncludeMap = None,
 ) -> None:
     """[bold]Process a specified dataset[/bold]."""
-    from dronalize.runtime._internal.runner import open_job
-    from dronalize.runtime.api import run_job
+    from dronalize.runtime._internal.runner import open_execution_session
+    from dronalize.runtime.api import execute_plan
 
-    job = _run_cli_action(
-        lambda: _resolve_cli_job(
+    plan = _run_cli_action(
+        lambda: _resolve_cli_plan(
             dataset=dataset,
             input_dir=input_dir,
             output_dir=output_dir,
             storage_backend=storage_backend,
             config=config,
-            split=split,
+            read=read,
             read_split=read_split,
+            assign=assign,
             jobs=jobs,
             trajectory_schema=trajectory_schema,
             ratio=ratio,
@@ -172,35 +212,35 @@ def process(
             include_map=include_map,
             limit=limit,
             seed=seed,
-            input_dir_exists=not plan,
+            input_dir_exists=not plan_mode,
         )
     )
 
-    if plan:
+    if plan_mode:
         rprint(PLAN_NOTICE)
-        rprint(build_processing_summary_table(job))
+        rprint(build_processing_summary_table(plan))
         return
 
     if not force:
-        rprint("\n", build_processing_summary_table(job))
+        rprint("\n", build_processing_summary_table(plan))
         _ = typer.confirm("Proceed with this processing plan?", abort=True)
 
     if not progress:
-        _ = _run_cli_action(lambda: run_job(job))
+        _ = _run_cli_action(lambda: execute_plan(plan))
         return
 
     from dronalize.io.backends.registry import build_writer_factory
     from dronalize.runtime.cli.progress import run_with_rich_progress
 
-    with open_job(job) as run:
+    with open_execution_session(plan) as run:
         run_with_rich_progress(
             run.executor,
             lambda: _run_cli_action(
-                lambda: run.executor.execute(writer_factory=build_writer_factory(job))
+                lambda: run.executor.execute(writer_factory=build_writer_factory(plan))
             ),
             enable=True,
         )
-        job.write_manifests()
+        plan.write_manifests()
 
 
 @app.command()
@@ -231,11 +271,12 @@ def inspect(dataset: DatasetName) -> None:
 @app.command()
 def show_config(
     dataset: DatasetName,
-    split: Split = None,
+    read: Read = None,
     read_split: ReadSplit = None,
+    assign: Assign = None,
     config: Config = None,
     jobs: Jobs = None,
-    storage_backend: StorageBackendOption = StorageBackend.MDS,
+    storage_backend: StorageBackendOption = StorageBackend.PICKLE,
     trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,
@@ -243,15 +284,16 @@ def show_config(
     include_map: IncludeMap = None,
 ) -> None:
     """[bold]Show the resolved configuration for a specified dataset[/bold]."""
-    job = _run_cli_action(
-        lambda: _resolve_cli_job(
+    plan = _run_cli_action(
+        lambda: _resolve_cli_plan(
             dataset=dataset,
             input_dir=Path(),
             output_dir=Path(),
             storage_backend=storage_backend,
             config=config,
-            split=split,
+            read=read,
             read_split=read_split,
+            assign=assign,
             jobs=jobs,
             trajectory_schema=trajectory_schema,
             ratio=ratio,
@@ -262,7 +304,7 @@ def show_config(
         )
     )
     rprint("\n[bold]Resolved Config:[/bold]")
-    rprint(job.resolved_config)
+    rprint(plan.resolved_config)
 
 
 @app.command()
@@ -315,15 +357,16 @@ def _format_validation_error(exc: ValidationError) -> str:
     return "\n".join(lines)
 
 
-def _resolve_cli_job(
+def _resolve_cli_plan(
     *,
     dataset: str,
     input_dir: Path,
     output_dir: Path,
     storage_backend: StorageBackend,
     config: Path | None,
-    split: SplitStrategy | None,
+    read: ReadStrategy | None,
     read_split: list[DatasetSplit] | None,
+    assign: AssignStrategy | None,
     jobs: int | None,
     trajectory_schema: str | None,
     ratio: tuple[float, float, float] | None,
@@ -333,11 +376,11 @@ def _resolve_cli_job(
     limit: int | None = None,
     seed: int | None = None,
     input_dir_exists: bool = True,
-) -> RunPlan:
-    from dronalize.runtime import ProcessRequest, resolve_job
+) -> ExecutionPlan:
+    from dronalize.runtime import ExecutionRequest, resolve_request
 
-    return resolve_job(
-        ProcessRequest(
+    return resolve_request(
+        ExecutionRequest(
             dataset=dataset,
             input_dir=input_dir,
             output_dir=output_dir,
@@ -346,8 +389,9 @@ def _resolve_cli_job(
             storage_backend=storage_backend,
             config_path=config,
             overrides=RuntimeOverride.from_inputs(
-                split_strategy=split,
+                read_strategy=read,
                 read_split=read_split,
+                assign_strategy=assign,
                 jobs=jobs,
                 trajectory_schema=trajectory_schema,
                 ratio=ratio,

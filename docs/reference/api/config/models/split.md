@@ -1,15 +1,25 @@
-## ::: dronalize.config.models.split.SplitConfig
-
 ## ::: dronalize.config.models.split.SplitWeights
 
-## ::: dronalize.config.models.split.NoSplitConfig
+## ::: dronalize.config.models.split.ReadAll
 
-## ::: dronalize.config.models.split.NativeSplitConfig
+## ::: dronalize.config.models.split.ReadNative
 
-## ::: dronalize.config.models.split.SceneSplitConfig
+## ::: dronalize.config.models.split.ReadUnion
 
-## ::: dronalize.config.models.split.SourceSplitConfig
+## ::: dronalize.config.models.split.ReadConfig
 
-## ::: dronalize.config.models.split.TimeSplitConfig
+## ::: dronalize.config.models.split.NoAssign
 
-## ::: dronalize.config.models.split.ShuffledTimeSplitConfig
+## ::: dronalize.config.models.split.PreserveNativeAssign
+
+## ::: dronalize.config.models.split.SceneAssign
+
+## ::: dronalize.config.models.split.SourceAssign
+
+## ::: dronalize.config.models.split.TimeBlockAssign
+
+## ::: dronalize.config.models.split.ShuffledTimeBlockAssign
+
+## ::: dronalize.config.models.split.AssignUnion
+
+## ::: dronalize.config.models.split.AssignConfig

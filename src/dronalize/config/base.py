@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping, MutableMapping
-from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeAlias, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
@@ -18,9 +18,7 @@ JobsValue: TypeAlias = int | Literal["auto"]
 Precision: TypeAlias = Literal["float32", "float64"]
 
 MapExtraction: TypeAlias = Literal["full", "scene_extent", "circle", "bounding_box"]
-SplitStrategy: TypeAlias = Literal[
-    "none", "native", "scene", "source", "time", "shuffled-time", "auto"
-]
+SplitStrategy: TypeAlias = Literal["none", "native", "scene", "source", "time", "shuffled-time"]
 
 SelectorMode: TypeAlias = Literal["include", "exclude"]
 FilterMergeMode: TypeAlias = Literal["replace", "extend"]
@@ -44,7 +42,6 @@ class FullConfig(ConfigBase):
 
 
 FullConfigT = TypeVar("FullConfigT", bound=ConfigBase)
-V = TypeVar("V")
 
 
 class PartialConfig(BaseModel, Generic[FullConfigT]):
@@ -77,7 +74,6 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
             Result of applying the partial config to the target full config.
 
         """
-        """Complete the partial config by merging it with the defaults."""
         if target is None:
             base = {
                 name: field.get_default()
@@ -87,7 +83,7 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         else:
             base = target.model_dump()
         patch = self.model_dump(exclude_unset=True, exclude_none=exclude_none)
-        merged = _deep_merge(base, patch)
+        merged = deep_merge(base, patch)
         return self.full_config_type.model_validate(merged)
 
     @classmethod
@@ -97,17 +93,33 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         return cls.model_validate(data)
 
 
-def _deep_merge(
-    base: MutableMapping[str, V],
-    patch: Mapping[str, V],
-) -> MutableMapping[str, V]:
+def deep_merge(
+    base: MutableMapping[str, object], patch: Mapping[str, object]
+) -> MutableMapping[str, object]:
     """Recursively merge two mappings."""
     for key, patch_value in patch.items():
         base_value = base.get(key)
 
         if isinstance(base_value, MutableMapping) and isinstance(patch_value, Mapping):
-            _ = _deep_merge(base_value, patch_value)  # pyright: ignore[reportUnknownArgumentType]
+            _ = deep_merge(
+                cast("MutableMapping[str, object]", base_value),
+                cast("Mapping[str, object]", patch_value),
+            )
         else:
             base[key] = copy.deepcopy(patch_value)
 
     return base
+
+
+TargetT = TypeVar("TargetT", bound=ConfigBase)
+
+
+def apply_optional(
+    patch: PartialConfig[TargetT] | Literal[False] | None, target: TargetT | None
+) -> TargetT | None:
+    """Apply a patch to an optional config block."""
+    if patch is None:
+        return target
+    if patch is False:
+        return None
+    return patch.apply_to(target)

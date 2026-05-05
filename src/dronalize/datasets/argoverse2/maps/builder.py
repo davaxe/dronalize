@@ -1,18 +1,4 @@
-# Copyright 2024-2025, Theodor Westny. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
 """Map-graph builder for the Argoverse 2 dataset."""
-
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 from __future__ import annotations
 
@@ -22,21 +8,19 @@ from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
 from dronalize.datasets.argoverse2.maps import parser
-from dronalize.processing.maps.builder import BaseMapBuilder, Point
+from dronalize.processing.maps.builder import FeatureMapBuilder, Point
+from dronalize.processing.maps.features import PathFeature
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
 
-class Argoverse2MapBuilder(BaseMapBuilder):
+class Argoverse2MapBuilder(FeatureMapBuilder):
     """A builder for creating a graph representation of an Argoverse2 map."""
 
     def __init__(self, map_data: parser.Argoverse2Map) -> None:
-        """Initialize the map builder with an `Argoverse2Map`."""
-        super().__init__()
         self.map: parser.Argoverse2Map = map_data
-
-        self.edge_map: dict[EdgeType, EdgeType] = {EdgeType.NONE: EdgeType.VIRTUAL}
 
     @classmethod
     def from_json_file(cls, json_file: Path) -> Argoverse2MapBuilder:
@@ -45,47 +29,32 @@ class Argoverse2MapBuilder(BaseMapBuilder):
         return cls(map_data)
 
     @override
-    def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
-        # Used implicitly when `self.add_path_lazy` is called
-        _, _ = min_distance, interp_distance
-        self._add_lane_boundary_edges()
-        self._add_pedestrian_crossing_edges()
-
-    # --- Private methods ----
-
-    def _add_pedestrian_crossing_edges(self) -> None:
-        """Add edges for pedestrian crossings in the map."""
+    def iter_features(self) -> Iterable[PathFeature]:
         for crossing in self.map.pedestrian_crossings.values():
-            self.add_path_lazy(points=crossing.first_edge, edge_type=EdgeType.PEDESTRIAN_MARKING)
-            self.add_path_lazy(points=crossing.second_edge, edge_type=EdgeType.PEDESTRIAN_MARKING)
+            yield PathFeature(
+                points=tuple(crossing.first_edge), edge_types=EdgeType.PEDESTRIAN_MARKING
+            )
+            yield PathFeature(
+                points=tuple(crossing.second_edge), edge_types=EdgeType.PEDESTRIAN_MARKING
+            )
 
-    def _add_lane_boundary_edges(self) -> None:
-        """Add edges for lane boundaries in the map."""
-        lane_segments = self.map.segments.copy()
-
-        while lane_segments:
-            _, segment = lane_segments.popitem()
+        for segment in self.map.segments.values():
             left = self._lane_segment_points(segment, side="left")
             if left is not None:
                 points, edge = left
-                self.add_path_lazy(points=points, edge_type=edge)
+                yield PathFeature(points=tuple(points), edge_types=edge)
 
             right = self._lane_segment_points(segment, side="right")
             if right is not None:
                 points, edge = right
-                self.add_path_lazy(points=points, edge_type=edge)
+                yield PathFeature(points=tuple(points), edge_types=edge)
 
     @staticmethod
     def _lane_segment_points(
         segment: parser.LaneSegment, side: Literal["left", "right"]
     ) -> tuple[list[Point], EdgeType] | None:
-        """Get all points for a lane segment's boundaries."""
         boundary = segment.left_boundary if side == "left" else segment.right_boundary
         if boundary is None:
             return None
 
-        points = boundary.points
-        edge_type = boundary.get_edge_type()
-        return points, edge_type
+        return boundary.points, boundary.get_edge_type()

@@ -2,8 +2,6 @@
     options:
         members: false
 
-## ::: dronalize.processing.maps.BaseMapBuilder
-
 ## ::: dronalize.processing.maps.MapBuilder
 
 ## ::: dronalize.processing.maps.no_map

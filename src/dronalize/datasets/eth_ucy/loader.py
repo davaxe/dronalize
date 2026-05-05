@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
 
-import dronalize.processing.pipeline.transforms as tr
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -18,32 +17,19 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.models import LoaderRequest
-    from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
-class _EthUcyLoader(BaseSceneLoader):
+class EthUcyLoader(BaseSceneLoader):
     """Loader for ETH/UCY pedestrian trajectory datasets."""
 
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True
-    )
-
-    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
-        """Initialize one ETH/UCY dataset loader."""
-        super().__init__(data_root=data_root, request=request)
-
-    def _sources_from_split(self, split_name: str) -> Iterable[Source[Path]]:
-        data_dir = self.root / split_name
+    @override
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
+        data_dir = self.root / split.value
         for data_file in sorted(data_dir.iterdir()):
             yield Source(identifier=data_file.name, data=data_file)
-
-    @override
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Path]]:
-        return self._sources_from_split(split.value)
 
     @override
     def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
@@ -62,15 +48,8 @@ class _EthUcyLoader(BaseSceneLoader):
             ).with_columns(
                 ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
                 pl.col("id").cast(pl.Int32),
+                agent_category=pl.lit(AgentCategory.PEDESTRIAN),
             )
-        )
-
-    @override
-    def pipeline(self) -> Pipeline:
-        return (
-            super()
-            .pipeline()
-            .then(tr.with_columns(agent_category=pl.lit(AgentCategory.PEDESTRIAN)))
         )
 
     @classmethod
@@ -79,31 +58,6 @@ class _EthUcyLoader(BaseSceneLoader):
         return POSITIONS_ONLY
 
     @override
-    def num_sources(self) -> int | None:
-        return sum(
-            self._count_sources_for_split(split) for split in self.native_splits or _NATIVE_SPLITS
-        )
-
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
         data_dir = self.root / split.value
         return sum(1 for _ in data_dir.iterdir()) if data_dir.is_dir() else 0
-
-
-class HotelLoader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY hotel dataset."""
-
-
-class EthLoader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY eth dataset."""
-
-
-class UnivLoader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY univ dataset."""
-
-
-class Zara1Loader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY zara1 dataset."""
-
-
-class Zara2Loader(_EthUcyLoader):
-    """Convenience alias for the ETH/UCY zara2 dataset."""

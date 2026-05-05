@@ -6,6 +6,7 @@ AD4CHE is an aerial congestion dataset for highway and expressway traffic in Chi
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Highway traffic</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2023</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Vehicles</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>Limited</strong></div>
@@ -19,18 +20,6 @@ AD4CHE is an aerial congestion dataset for highway and expressway traffic in Chi
     pip install dronalize[ad4che]
     ```
 
-## Dataset facts
-
-| Field               | Value                             | Notes                                                                     |
-| ------------------- | --------------------------------- | ------------------------------------------------------------------------- |
-| Release year        | 2023                              | Based on the cited dataset paper and release.                             |
-| Domain              | Congested highway traffic         | Focused on highways and expressways in urban Chinese settings.            |
-| Capture platform    | Drone                             | Recorded from an overhead aerial perspective.                             |
-| Primary agent types | Cars, trucks, buses, motorcycles  | Covers mixed motorized traffic in congestion.                             |
-| Map context         | Lane imagery                      | Includes lane images that provide road context for each recording.        |
-| Geographic coverage | Four cities in China              | Designed to span multiple congestion scenarios rather than a single site. |
-| Data format         | CSV trajectories with lane images | Trajectories are paired with recording metadata and lane-view assets.     |
-
 ## Default processing profile
 
 These are the default Dronalize settings used when processing this dataset.
@@ -41,9 +30,34 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 20 obs / 50 pred @ 10 Hz |
 | Resampling | Linear 1:3 |
 | Windowing | 210-frame window, step 45 |
-| Filtering | Drop short tracks with fewer than 4 samples |
+| Screening | Drop short tracks with fewer than 4 samples |
 | Lane-change sampling | Require 5 lane changes; keep 1 in 3 negative scenes |
-| Maps | Relevant area (padding 1.15) |
+| Maps | Full map |
+
+## Dataset compatibility
+
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | AD4CHE v1.0 |
+| Loader expectation | The loader expects the `AD4CHE_Data_V1.0` directory and matching archive layout. |
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `car` | `CAR` |
+| `truck` | `TRUCK` |
+| `bus` | `BUS` |
+
+### Map types
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| Extracted lane-image border contour | `LINE_THICK_DASHED` |
 
 ## Split support
 

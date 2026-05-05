@@ -2,4 +2,4 @@
 
 ## ::: dronalize.config.RuntimeOverride
 
-## ::: dronalize.config.load_project_config
+## ::: dronalize.config.parse_config

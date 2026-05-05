@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Annotated, ClassVar, Literal
+from typing import TYPE_CHECKING, Annotated, ClassVar, Literal
 
 import polars as pl
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from dronalize.core.categories import AgentCategory, AgentCategoryInput, coerce_agent_categories
+
+if TYPE_CHECKING:
+    from dronalize.processing.columns import TrajectoryColumns
 
 
 def coerce_frame_set(value: FrameInput) -> frozenset[int]:
@@ -60,15 +63,13 @@ class AgentSelector(BaseModel):
 class ScreeningContext:
     """Shared expressions and column metadata used while evaluating screening logic."""
 
-    agent_id: str
-    frame_column: str
-    category_column: str
-    scene_window: pl.Expr | list[str]
-    agent_window: list[str]
+    columns: TrajectoryColumns
+    scene_window: tuple[str, ...]
+    agent_window: tuple[str, ...]
 
     def over_scene_window(self, expr: pl.Expr) -> pl.Expr:
         """Apply the scene window to an expression."""
-        if isinstance(self.scene_window, list) and not self.scene_window:
+        if not self.scene_window:
             return expr
         return expr.over(self.scene_window)
 
@@ -80,7 +81,7 @@ class ScreeningContext:
 
     def relative_frame(self) -> pl.Expr:
         """Return the scene-relative frame index expression."""
-        return pl.col(self.frame_column) - self.scene_start_frame()
+        return pl.col(self.columns.frame) - self.scene_start_frame()
 
     def scene_length(self) -> pl.Expr:
         """Return the number of frames in the current scene."""
@@ -88,22 +89,22 @@ class ScreeningContext:
 
     def scene_start_frame(self) -> pl.Expr:
         """Return the starting frame of the current scene."""
-        return self.over_scene_window(pl.col(self.frame_column).min())
+        return self.over_scene_window(pl.col(self.columns.frame).min())
 
     def scene_end_frame(self) -> pl.Expr:
         """Return the ending frame of the current scene."""
-        return self.over_scene_window(pl.col(self.frame_column).max())
+        return self.over_scene_window(pl.col(self.columns.frame).max())
 
     def selector_mask(self, selector: AgentSelector | None) -> pl.Expr:
         """Return a row mask for the given selector."""
         if selector is None:
             return pl.lit(value=True)
 
-        in_scope = pl.col(self.category_column).is_in(selector.categories)
+        in_scope = pl.col(self.columns.category).is_in(selector.categories)
         return in_scope if selector.mode == "include" else ~in_scope
 
     def retained_agent_count(self, selector: AgentSelector | None = None) -> pl.Expr:
         """Return the number of retained agents in the current scene."""
         return self.over_scene_window(
-            pl.col(self.agent_id).filter(self.selector_mask(selector)).n_unique()
+            pl.col(self.columns.agent_id).filter(self.selector_mask(selector)).n_unique()
         )

@@ -47,7 +47,7 @@ class ExcludeCategories(CleanupRuleBase):
     @override
     def expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression that excludes selected categories."""
-        return ~pl.col(ctx.category_column).is_in(self.categories)
+        return ~pl.col(ctx.columns.category).is_in(self.categories)
 
 
 class IncludeCategories(CleanupRuleBase):
@@ -66,12 +66,17 @@ class IncludeCategories(CleanupRuleBase):
     @override
     def expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression that keeps selected categories."""
-        return pl.col(ctx.category_column).is_in(self.categories)
+        return pl.col(ctx.columns.category).is_in(self.categories)
 
 
 CleanupRule = Annotated[
     PruneByRule | ExcludeCategories | IncludeCategories, Field(discriminator="rule")
 ]
+"""Discriminated union of executable cleanup-rule types.
+
+Cleanup rules run before screening checks and determine which scene rows are
+retained for subsequent scene- and agent-level evaluation.
+"""
 
 __all__ = [
     "CleanupRule",

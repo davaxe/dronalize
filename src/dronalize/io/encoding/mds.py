@@ -101,11 +101,16 @@ def mds_columns(dtype: str) -> dict[str, str]:
 
 
 def _encode_mds_map_arrays(
-    map_node_positions: npt.NDArray[Any],
-    map_edge_indices: npt.NDArray[Any],
-    map_node_types: npt.NDArray[Any],
-    map_edge_types: npt.NDArray[Any],
-) -> tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any]]:
+    map_node_positions: npt.NDArray[np.float32 | np.float64],
+    map_edge_indices: npt.NDArray[np.int32],
+    map_node_types: npt.NDArray[np.int32],
+    map_edge_types: npt.NDArray[np.int32],
+) -> tuple[
+    npt.NDArray[np.float32 | np.float64],
+    npt.NDArray[np.int32],
+    npt.NDArray[np.int32],
+    npt.NDArray[np.int32],
+]:
     if map_node_positions.size != 0:
         return map_node_positions, map_edge_indices, map_node_types, map_edge_types
 
@@ -122,7 +127,12 @@ def _decode_mds_map_arrays(
     map_edge_indices: npt.NDArray[Any],
     map_node_types: npt.NDArray[Any],
     map_edge_types: npt.NDArray[Any],
-) -> tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any]]:
+) -> tuple[
+    npt.NDArray[np.float32 | np.float64],
+    npt.NDArray[np.int32],
+    npt.NDArray[np.int32],
+    npt.NDArray[np.int32],
+]:
     is_empty_map = (
         map_node_positions.shape == (1, 2)
         and np.isnan(map_node_positions).all()

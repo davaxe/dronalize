@@ -5,9 +5,9 @@
 
 ## ::: dronalize.processing.loading.BaseSceneLoader
 
-## ::: dronalize.processing.loading.LoaderOptions
+## ::: dronalize.processing.loading.DatasetOptionsModel
 
-## ::: dronalize.processing.loading.LoaderSplitCapabilities
+## ::: dronalize.processing.loading.NoDatasetOptions
 
 ## ::: dronalize.processing.loading.DatasetResources
 
@@ -15,8 +15,4 @@
 
 ## ::: dronalize.processing.loading.LoadedSourceData
 
-## ::: dronalize.processing.loading.PreparedSceneData
-
 ## ::: dronalize.processing.loading.MapBinding
-
-## ::: dronalize.processing.loading.BlockSplitSupport

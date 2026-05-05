@@ -12,10 +12,12 @@ For exact field tables and TOML syntax, see the [configuration reference](../ref
 
 Think of one resolved dataset config as four layers:
 
-1. built-in dataset defaults from the `DatasetSpec`
+1. built-in dataset defaults from the
+   [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec)
 2. profile fragments from `[profiles.<name>]`
 3. one dataset entry under `[datasets.<name>]`
-4. runtime overrides from the CLI or `RuntimeOverride`
+4. runtime overrides from the CLI or
+   [`RuntimeOverride`](../reference/api/config/project.md#dronalize.config.RuntimeOverride)
 
 Profiles are opted into with `uses`, in the order they should be applied.
 
@@ -27,7 +29,8 @@ Profiles are opted into with `uses`, in the order they should be applied.
 | `scenes` | Scene window shape, sliding-window extraction, resampling, and lane-change sampling. |
 | `screening` | Cleanup rules, scene checks, and agent checks. |
 | `map` | Map extraction mode and geometry density. |
-| `split` | Train, val, and test routing. |
+| `read` | Raw input selection, including dataset-native partitions. |
+| `assign` | Train, val, and test output routing. |
 | `output` | Output schema, precision, recentering, and MDS-specific tuning. |
 | `dataset` | Dataset-owned options validated by the selected dataset integration. |
 
@@ -92,7 +95,7 @@ sample_time = 0.1
 [datasets.a43.scenes.window]
 step = 2
 
-[datasets.a43.split]
+[datasets.a43.assign]
 strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
@@ -108,7 +111,7 @@ radius = 60.0
 The merge behavior depends on the section:
 
 - nested config sections such as `scenes`, `runtime`, `map`, and `output` merge into inherited values
-- `split` is replaced as one unit
+- `read` and `assign` are replaced as whole strategy configs
 - `screening` can either replace or extend inherited named rules
 - `dataset` is dataset-owned and validated by the selected dataset integration
 
@@ -119,7 +122,7 @@ defaults intact.
 
 The CLI and Python runtime can override a focused subset of values without editing the TOML file:
 
-- split strategy and split-specific parameters
+- read and assignment strategy parameters
 - worker count
 - output schema
 - map inclusion

@@ -22,8 +22,9 @@ surfaces.
 
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING
+
+from dronalize.core._lazy import lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
     from dronalize.io.adapters.pyg import (
@@ -46,10 +47,12 @@ __all__ = [
     "collate_hetero_with_time_padding",
 ]
 
-_EXPORTS: dict[str, tuple[str, str]] = {
+__lazy_exports__: dict[str, tuple[str, str]] = {
+    "IterableTorchSceneDataset": ("dronalize.io.adapters.torch", "IterableTorchSceneDataset"),
     "TorchSceneDataset": ("dronalize.io.adapters.torch", "TorchSceneDataset"),
     "TorchSceneRecord": ("dronalize.io.adapters.torch", "TorchSceneRecord"),
     "HeteroSceneDataset": ("dronalize.io.adapters.pyg", "HeteroSceneDataset"),
+    "IterableHeteroSceneDataset": ("dronalize.io.adapters.pyg", "IterableHeteroSceneDataset"),
     "collate_hetero_with_time_padding": (
         "dronalize.io.adapters.pyg",
         "collate_hetero_with_time_padding",
@@ -59,16 +62,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 
 def __getattr__(name: str) -> object:
     """Resolve optional adapter exports lazily."""
-    if name not in _EXPORTS:
-        msg = f"module '{__name__}' has no attribute '{name}'"
-        raise AttributeError(msg)
-
-    module_name, export_name = _EXPORTS[name]
-    value = getattr(importlib.import_module(module_name), export_name)
-    globals()[name] = value
-    return value
+    return resolve_lazy_export(globals(), __lazy_exports__, module_name=__name__, name=name)
 
 
 def __dir__() -> list[str]:
     """Expose lazy adapter exports during interactive discovery."""
-    return sorted(set(globals()) | set(__all__))
+    return lazy_dir(globals(), exported_names=list(__lazy_exports__))

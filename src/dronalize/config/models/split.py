@@ -1,3 +1,5 @@
+"""Read-selection and assignment configuration models."""
+
 from __future__ import annotations
 
 from typing import Annotated, Literal
@@ -5,20 +7,23 @@ from typing import Annotated, Literal
 from pydantic import Field, RootModel, model_validator
 
 from dronalize.config.base import FullConfig
-from dronalize.core.categories import DatasetSplit
+from dronalize.core.categories import DatasetSplit  # noqa: TC001
 from dronalize.core.errors import ConfigurationError
 
 
 class SplitWeights(FullConfig):
-    """Weights used when routing data into train/val/test splits."""
+    """Weights used when routing data into train/val/test assignments."""
 
     train: float = Field(ge=0, default=0.0)
+    """Weight assigned to the training split."""
     val: float = Field(ge=0, default=0.0)
+    """Weight assigned to the validation split."""
     test: float = Field(ge=0, default=0.0)
+    """Weight assigned to the test split."""
 
     @model_validator(mode="after")
     def _validate_sum(self) -> SplitWeights:
-        """Validate that the weights sum to 1."""
+        """Validate that at least one split weight is positive."""
         total = self.train + self.val + self.test
         if total == 0:
             v = f"train={self.train}, val={self.val}, test={self.test}"
@@ -27,16 +32,65 @@ class SplitWeights(FullConfig):
         return self
 
 
-class TimeSplitConfig(FullConfig):
-    """Time-block split specification."""
+class ReadAll(FullConfig):
+    """Read the full dataset input surface."""
+
+    strategy: Literal["all"] = Field("all", repr=False, init=False)
+
+
+class ReadNative(FullConfig):
+    """Read only selected dataset-native partitions."""
+
+    strategy: Literal["native"] = Field("native", repr=False, init=False)
+    splits: frozenset[DatasetSplit] | None = None
+    """Native dataset partitions to read from the source dataset."""
+
+
+ReadUnion = Annotated[ReadAll | ReadNative, Field(discriminator="strategy")]
+
+
+class ReadConfig(RootModel[ReadUnion]):
+    """Read-selection configuration wrapper model."""
+
+    root: ReadUnion
+
+
+class NoAssign(FullConfig):
+    """No output split assignment."""
+
+    strategy: Literal["none"] = Field("none", repr=False, init=False)
+
+
+class PreserveNativeAssign(FullConfig):
+    """Preserve dataset-native split labels in output."""
+
+    strategy: Literal["preserve-native"] = Field("preserve-native", repr=False, init=False)
+
+
+class SceneAssign(FullConfig):
+    """Scene-based output split assignment."""
+
+    strategy: Literal["scene"] = Field("scene", repr=False, init=False)
+    ratio: SplitWeights = Field(default_factory=SplitWeights)
+
+
+class SourceAssign(FullConfig):
+    """Source-based output split assignment."""
+
+    strategy: Literal["source"] = Field("source", repr=False, init=False)
+    ratio: SplitWeights = Field(default_factory=SplitWeights)
+
+
+class TimeBlockAssign(FullConfig):
+    """Time-block output split assignment."""
 
     gap: int = Field(ge=0, default=0)
     strategy: Literal["time"] = Field("time", repr=False, init=False)
     ratio: SplitWeights = Field(default_factory=SplitWeights)
 
 
-class ShuffledTimeSplitConfig(FullConfig):
-    """Shuffled time-block split specification."""
+class ShuffledTimeBlockAssign(FullConfig):
+    """Shuffled time-block output split assignment."""
 
     segments: int = Field(ge=1)
     gap: int = Field(ge=0, default=0)
@@ -44,47 +98,18 @@ class ShuffledTimeSplitConfig(FullConfig):
     ratio: SplitWeights = Field(default_factory=SplitWeights)
 
 
-class SceneSplitConfig(FullConfig):
-    """Scene-based split specification."""
-
-    strategy: Literal["scene"] = Field("scene", repr=False, init=False)
-    ratio: SplitWeights = Field(default_factory=SplitWeights)
-
-
-class SourceSplitConfig(FullConfig):
-    """Source-based split specification."""
-
-    strategy: Literal["source"] = Field("source", repr=False, init=False)
-    ratio: SplitWeights = Field(default_factory=SplitWeights)
-
-
-class NativeSplitConfig(FullConfig):
-    """Dataset-defined split specification."""
-
-    strategy: Literal["native"] = Field("native", repr=False, init=False)
-    splits: frozenset[DatasetSplit] = Field(
-        default=frozenset((DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)),
-        max_length=3,
-        min_length=1,
-    )
-
-
-class NoSplitConfig(FullConfig):
-    """No-split strategy specification."""
-
-    strategy: Literal["none"] = Field("none", repr=False, init=False)
-
-
-SplitConfigUnion = Annotated[
-    TimeSplitConfig
-    | ShuffledTimeSplitConfig
-    | SceneSplitConfig
-    | SourceSplitConfig
-    | NativeSplitConfig
-    | NoSplitConfig,
+AssignUnion = Annotated[
+    NoAssign
+    | PreserveNativeAssign
+    | SceneAssign
+    | SourceAssign
+    | TimeBlockAssign
+    | ShuffledTimeBlockAssign,
     Field(discriminator="strategy"),
 ]
 
 
-class SplitConfig(RootModel[SplitConfigUnion]):
-    """Split configuration wrapper model for discriminated union behavior."""
+class AssignConfig(RootModel[AssignUnion]):
+    """Assignment configuration wrapper model."""
+
+    root: AssignUnion

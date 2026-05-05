@@ -1,7 +1,7 @@
 """Pickle writer backend.
 
-This backend writes one pickled ``SceneRecord`` per scene inside split
-subdirectories such as ``train`` or ``unsplit``. It is the simplest persisted
+This backend writes one pickled `SceneRecord` per scene inside split
+subdirectories such as `train` or `unsplit`. It is the simplest persisted
 backend, requires no optional storage dependency, and is a practical default
 when inspectability matters more than shard-based streaming.
 """
@@ -33,12 +33,7 @@ def _create_writer(
     config: OutputPlan,
     splits: Iterable[DatasetSplit] | None,
 ) -> PickleWriter:
-    return PickleWriter(
-        output_dir=output_dir,
-        config=config,
-        splits=splits,
-        identifier=identifier,
-    )
+    return PickleWriter(output_dir=output_dir, config=config, splits=splits, identifier=identifier)
 
 
 @final
@@ -66,10 +61,7 @@ class PickleWriter(DatasetWriter):
     @classmethod
     @override
     def as_factory(
-        cls,
-        output_dir: Path,
-        config: OutputPlan,
-        splits: Iterable[DatasetSplit] | None = None,
+        cls, output_dir: Path, config: OutputPlan, splits: Iterable[DatasetSplit] | None = None
     ) -> Callable[[int | None], PickleWriter]:
         """Create a worker-local pickle writer factory."""
         return functools.partial(

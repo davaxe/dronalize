@@ -15,10 +15,12 @@ from rich.panel import Panel
 from rich.text import Text
 from typing_extensions import override
 
+from dronalize.runtime._internal.state import SplitCounts
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.runtime._internal.executor import ObservableExecutor
+    from dronalize.runtime._internal.executor import Executor
     from dronalize.runtime._internal.state import Progress
 
 T = TypeVar("T")
@@ -28,7 +30,7 @@ class _ExecutorDisplay(RichCast):
     """A custom renderable that stacks a progress bar and a stats grid vertically."""
 
     def __init__(self) -> None:
-        num = random.randint(1, 12)
+        num = random.randint(1, 12)  # noqa: S311
         spinner_name = f"dots{num}" if num > 1 else "dots"
 
         self.progress: rp.Progress = rp.Progress(
@@ -45,21 +47,24 @@ class _ExecutorDisplay(RichCast):
         )
         self.task_id: rp.TaskID = self.progress.add_task("run", total=0)
         self.workers: int = 0
-        self.scenes: int = 0
-        self.split_counts: dict[str, int] = {}
-        self.finished: bool = False
+        self.candidate_scenes: int = 0
+        self.selected_scenes: int = 0
+        self.split_counts: SplitCounts = SplitCounts(unsplit=0, train=0, val=0, test=0)
+        self.screening_enabled: bool = False
 
     def update(self, progress_state: Progress) -> None:
-        if progress_state.total_scenes is not None:
-            total = progress_state.total_scenes
-            completed = progress_state.processed_scenes
+        if progress_state.scene_limit is not None:
+            total = progress_state.scene_limit
+            completed = progress_state.selected_scenes
         else:
             total = progress_state.total_sources
             completed = progress_state.processed_sources
 
         self.workers = progress_state.active_workers if progress_state.running else 0
-        self.scenes = progress_state.processed_scenes
+        self.candidate_scenes = progress_state.candidate_scenes
+        self.selected_scenes = progress_state.selected_scenes
         self.split_counts = progress_state.split_counts
+        self.screening_enabled = progress_state.screening_enabled
 
         if not progress_state.running and (total is None or completed < total):
             total = completed
@@ -75,13 +80,29 @@ class _ExecutorDisplay(RichCast):
         layout_elements: list[RenderableType] = [self.progress, ""]
         stats_markup = (
             f"[bold cyan]Workers:[/bold cyan] {self.workers}"
-            f"    [bold magenta]Scenes:[/bold magenta] {self.scenes}"
+            f"    [bold magenta]Scenes:[/bold magenta] {self.selected_scenes}"
         )
         stats_text = Text.from_markup(stats_markup)
         stats_text.justify = "center"
         layout_elements.append(stats_text)
 
-        nonzero_splits = {k: v for k, v in self.split_counts.items() if v > 0}
+        if self.screening_enabled:
+            screening_percent = (
+                (self.selected_scenes / self.candidate_scenes) * 100
+                if self.candidate_scenes > 0
+                else 0
+            )
+            screening_markup = (
+                "[bold yellow]Screening:[/bold yellow] "
+                f"{self.selected_scenes} / {self.candidate_scenes} ({screening_percent:.1f}%)"
+            )
+            screening_text = Text.from_markup(screening_markup)
+            screening_text.justify = "center"
+            layout_elements.append(screening_text)
+
+        nonzero_splits = {
+            k: v for k, v in self.split_counts.items() if isinstance(v, int) and v > 0
+        }
         if nonzero_splits:
             total = sum(nonzero_splits.values())
             splits_str = " • ".join(
@@ -98,8 +119,8 @@ class _ExecutorDisplay(RichCast):
 
 
 class _ProgressMonitor:
-    def __init__(self, executor: ObservableExecutor, display: _ExecutorDisplay) -> None:
-        self._executor: ObservableExecutor = executor
+    def __init__(self, executor: Executor, display: _ExecutorDisplay) -> None:
+        self._executor: Executor = executor
         self._display: _ExecutorDisplay = display
         self._stop_event: threading.Event = threading.Event()
         self._error: BaseException | None = None
@@ -142,9 +163,7 @@ class _ProgressMonitor:
                 return
 
 
-def run_with_rich_progress(
-    executor: ObservableExecutor, run: Callable[[], T], *, enable: bool = True
-) -> T:
+def run_with_rich_progress(executor: Executor, run: Callable[[], T], *, enable: bool = True) -> T:
     """Run an executor callback while rendering a Rich progress bar."""
     if not enable:
         return run()

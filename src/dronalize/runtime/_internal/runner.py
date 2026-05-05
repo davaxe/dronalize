@@ -2,74 +2,49 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from dronalize.runtime._internal.parallel import ParallelExecutor
-from dronalize.runtime._internal.scene import SceneBuilder
+from dronalize.runtime._internal.processor import RuntimeProcessor
 from dronalize.runtime._internal.sequential import SequentialExecutor
 
 if TYPE_CHECKING:
-    from collections.abc import Generator, Iterable
+    from collections.abc import Generator
 
-    from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
-    from dronalize.processing.loading.loader import Source
-    from dronalize.runtime._internal.executor import ObservableExecutor
-    from dronalize.runtime.types import RunPlan
+    from dronalize.runtime._internal.executor import Executor
+    from dronalize.runtime.types import ExecutionPlan
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
-class JobRun:
-    job: RunPlan
-    executor: ObservableExecutor
+class ExecutionSession:
+    plan: ExecutionPlan
+    executor: Executor
 
 
 @contextmanager
-def open_job(job: RunPlan) -> Generator[JobRun, None, None]:
-    """Open one job with initialized resources, loader, builder, and executor."""
-    with job.descriptor.open_resources(job.data_root, job.loader) as resources:
-        loader = job.descriptor.build_loader(
-            root=job.data_root, request=job.loader, resources=resources
+def open_execution_session(plan: ExecutionPlan) -> Generator[ExecutionSession, None, None]:
+    """Open one plan with initialized resources, processor, and executor."""
+    with plan.descriptor.open_resources(plan.data_root, plan.loader) as resources:
+        logger.debug("Opening execution session", extra={"dataset": plan.dataset})
+        loader = plan.descriptor.build_loader(
+            root=plan.data_root, request=plan.loader, resources=resources
         )
-        sources = tuple(iter_sources(loader, job))
-        builder = SceneBuilder.from_job(job)
-        executor = _build_executor(job, loader, builder, sources)
-        yield JobRun(job=job, executor=executor)
+        processor = RuntimeProcessor.from_plan(plan, loader)
+        executor = _build_executor(plan, processor)
+        yield ExecutionSession(plan=plan, executor=executor)
 
 
-def iter_sources(
-    loader: BaseSceneLoader[Any, LoaderOptions], job: RunPlan
-) -> Iterable[Source[Any]]:
-    """Yield runtime source objects for one loader and resolved job."""
-    split = job.loader.split
-    if split is not None and split.strategy == "native":
-        read = split.read or job.descriptor.native_splits
-        for native_split in read or ():
-            for source in loader.sources_for_split(native_split):
-                yield source.with_predefined_split(native_split)
-        return
-    if job.descriptor.native_splits:
-        for native_split in job.descriptor.native_splits:
-            for source in loader.sources_for_split(native_split):
-                yield source.with_predefined_split(native_split)
-        return
-    yield from loader.discover_sources()
-
-
-def _build_executor(
-    job: RunPlan,
-    loader: BaseSceneLoader[Any, LoaderOptions],
-    builder: SceneBuilder,
-    sources: tuple[Source[Any], ...],
-) -> ObservableExecutor:
-    if job.parallel:
+def _build_executor(plan: ExecutionPlan, processor: RuntimeProcessor) -> Executor:
+    if plan.parallel:
+        logger.debug("Using parallel executor", extra={"dataset": plan.dataset})
         return ParallelExecutor(
-            loader,
-            builder,
-            sources,
-            workers=job.workers,
-            chunksize=job.runtime.chunksize,
-            limit=job.limit,
+            processor, workers=plan.workers, chunksize=plan.runtime.chunksize, limit=plan.limit
         )
-    return SequentialExecutor(loader, builder, sources, limit=job.limit)
+    logger.debug("Using sequential executor", extra={"dataset": plan.dataset})
+    return SequentialExecutor(processor, limit=plan.limit)

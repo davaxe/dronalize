@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
 import polars as pl
 from typing_extensions import override
@@ -10,7 +10,7 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_YAW
-from dronalize.processing.loading.base import BaseSceneLoader, LoaderSplitCapabilities
+from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
 
 if TYPE_CHECKING:
@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.models import LoaderRequest
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
@@ -26,14 +25,6 @@ _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
 
 class ApolloScapeLoader(BaseSceneLoader):
     """Loader for ApolloScape prediction trajectories."""
-
-    split_capabilities: ClassVar[LoaderSplitCapabilities] = LoaderSplitCapabilities(
-        supports_source_split=True
-    )
-
-    def __init__(self, *, data_root: Path | str, request: LoaderRequest) -> None:
-        """Initialize the ApolloScape loader."""
-        super().__init__(data_root=data_root, request=request)
 
     @staticmethod
     def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
@@ -43,11 +34,13 @@ class ApolloScapeLoader(BaseSceneLoader):
             yield Source(identifier=data_file.stem, data=data_file)
 
     @override
-    def sources_for_split(self, split: DatasetSplit) -> Iterable[Source[Path]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
         if split is DatasetSplit.TRAIN:
-            return self._sources_from_dir(self.root / "prediction_train")
+            yield from self._sources_from_dir(self.root / "prediction_train")
+            return
         if split is DatasetSplit.VAL:
-            return self._sources_from_dir(self.root / "val_split")
+            yield from self._sources_from_dir(self.root / "val_split")
+            return
         raise SplitNotSupportedError(type(self).__name__, split)
 
     @override
@@ -66,22 +59,17 @@ class ApolloScapeLoader(BaseSceneLoader):
         )
 
     @override
-    def num_sources(self) -> int | None:
-        return sum(
-            self._count_sources_for_split(split) for split in self.native_splits or _NATIVE_SPLITS
-        )
-
-    @classmethod
-    @override
-    def native_trajectory_schema(cls) -> TrajectorySchema:
-        return POSITIONS_YAW
-
-    def _count_sources_for_split(self, split: DatasetSplit) -> int:
+    def count_sources_for(self, split: DatasetSplit) -> int | None:
         if split is DatasetSplit.TRAIN:
             return sum(1 for _ in (self.root / "prediction_train").glob("*.txt"))
         if split is DatasetSplit.VAL:
             return sum(1 for _ in (self.root / "val_split").glob("*.txt"))
         raise SplitNotSupportedError(type(self).__name__, split)
+
+    @classmethod
+    @override
+    def native_trajectory_schema(cls) -> TrajectorySchema:
+        return POSITIONS_YAW
 
 
 _DATA_SCHEMA: pl.Schema = pl.Schema({

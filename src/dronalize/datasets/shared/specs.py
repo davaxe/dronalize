@@ -13,9 +13,32 @@ from dronalize.config.models import (
     ScreeningConfig,
     WindowConfig,
 )
+from dronalize.config.models.screening import ExcludeCategoriesSpec
 
 if TYPE_CHECKING:
     from dronalize.config.base import ResampleMethod
+    from dronalize.config.models.screening import AgentCheckSpec, CleanupSpec, SceneCheckSpec
+    from dronalize.core.categories import AgentCategory
+
+
+def combine_screenings(*screenings: ScreeningConfig) -> ScreeningConfig:
+    """Combine multiple screenings into one by merging their cleanup rules."""
+    combined_cleanup: dict[str, CleanupSpec] = {}
+    combined_agent: dict[str, AgentCheckSpec] = {}
+    combined_scene: dict[str, SceneCheckSpec] = {}
+    for screening in screenings:
+        if screening.cleanup:
+            combined_cleanup.update(screening.cleanup)
+        if screening.agent:
+            combined_agent.update(screening.agent)
+        if screening.scene:
+            combined_scene.update(screening.scene)
+    return ScreeningConfig(cleanup=combined_cleanup, agent=combined_agent, scene=combined_scene)
+
+
+def exclude_category_screening(*category: AgentCategory) -> ScreeningConfig:
+    """Return a cleanup-only screening that excludes the given agent categories."""
+    return ScreeningConfig(cleanup={"category": ExcludeCategoriesSpec(categories=category)})
 
 
 def minimum_samples_screening(minimum: int) -> ScreeningConfig:
@@ -61,12 +84,13 @@ def resample_config(
     )
 
 
+def linear_resample(up: int, down: int = 1) -> ResampleConfig:
+    """Return a linear resampling config."""
+    return resample_config(method="linear", up=up, down=down)
+
+
 def spline_resample(
-    up: int,
-    down: int = 1,
-    *,
-    emit_velocity: bool = True,
-    emit_acceleration: bool = True,
+    up: int, down: int = 1, *, emit_velocity: bool = True, emit_acceleration: bool = True
 ) -> ResampleConfig:
     """Return the default cubic resampling config used by most trajectory datasets."""
     return resample_config(

@@ -116,7 +116,6 @@ def encode_unsplit_scene_record(
     data = scene.frame
     feature_columns = scene.schema.feature_columns()
     time_steps = scene.history_frames + scene.future_frames
-
     start_frame = data["frame"].min()
     unique_ids: list[int] = data["id"].unique().to_list()
     sorted_ids = sorted(unique_ids)
@@ -201,24 +200,18 @@ def empty_map_record(dtype: FloatDType) -> MapRecordF32 | MapRecordF64:
 
 @overload
 def encode_map_from_scene(
-    scene: Scene,
-    dtype: type[np.float32],
-    offset: npt.NDArray[np.float64] | None = None,
+    scene: Scene, dtype: type[np.float32], offset: npt.NDArray[np.float64] | None = None
 ) -> MapRecordF32: ...
 
 
 @overload
 def encode_map_from_scene(
-    scene: Scene,
-    dtype: type[np.float64],
-    offset: npt.NDArray[np.float64] | None = None,
+    scene: Scene, dtype: type[np.float64], offset: npt.NDArray[np.float64] | None = None
 ) -> MapRecordF64: ...
 
 
 def encode_map_from_scene(
-    scene: Scene,
-    dtype: FloatDType,
-    offset: npt.NDArray[np.float64] | None = None,
+    scene: Scene, dtype: FloatDType, offset: npt.NDArray[np.float64] | None = None
 ) -> MapRecordF32 | MapRecordF64:
     """Resolve one scene map and convert it to the canonical raw-record layout."""
     graph = scene.resolve_map()

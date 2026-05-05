@@ -5,8 +5,9 @@ Splitting controls how processed scenes are routed into train, val, and test out
 choice is not just the ratio. It is what unit should stay together when data is assigned to a split.
 </div>
 
-For exact syntax, see the [split reference](../reference/configuration/split.md). For dataset
-support, see the [dataset reference](../reference/datasets/index.md).
+For exact syntax, see the [read reference](../reference/configuration/read.md) and
+[assign reference](../reference/configuration/assign.md). For dataset support,
+see the [dataset reference](../reference/datasets/index.md).
 
 ## Available strategies
 
@@ -63,11 +64,10 @@ This is the quickest way to check whether a dataset supports native partitions, 
     ```
     gives output like:
     ```text
-    Dataset       │ a43
-    Native splits │ none
-    Scene split   │ yes
-    Source split  │ yes
-    Time split    │ yes
+    Dataset          │ a43
+    Native splits    │ none
+    Read modes       │ all
+    Assignment modes │ none, scene, time, shuffled-time
     ```
 
 ## Practical workflow

@@ -1,35 +1,17 @@
-from collections.abc import Generator
-from contextlib import contextmanager
-from pathlib import Path
-
-from dronalize.config.models import (
-    DatasetConfig,
-    MapConfig,
-    SceneExtentExtraction,
-    ScenesConfig,
-)
-from dronalize.datasets.registry import DatasetSpec
-from dronalize.datasets.shared.resources import open_single_shared_map_resource
+from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
+from dronalize.core.categories import DatasetSplit
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.shared.resources import single_shared_map_resource_factory
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
-from dronalize.datasets.vod.loader import VodLoader
+from dronalize.datasets.vod.loader import VodLoader, VodLoaderOptions
 from dronalize.datasets.vod.maps.builder import VODMapBuilder
-from dronalize.processing.loading.resources import DatasetResources
 
-
-@contextmanager
-def open_vod_resources(
-    root: Path, scenes: ScenesConfig, map_config: MapConfig | None
-) -> Generator[DatasetResources, None, None]:
-    """Build the shared VOD map once per run."""
-    _ = scenes
-    with open_single_shared_map_resource(
-        map_config=map_config,
-        map_path=root / "maps" / "expansion" / "delft.json",
-        build_map=lambda path, config: VODMapBuilder.from_json_file(path).build(
-            config.min_distance, config.interp_distance
-        ),
-    ) as resources:
-        yield resources
+_open_vod_resources = single_shared_map_resource_factory(
+    map_path=lambda root: root / "maps" / "expansion" / "delft.json",
+    build_map=lambda path, config: VODMapBuilder.from_json_file(path).build(
+        config.min_distance, config.interp_distance
+    ),
+)
 
 
 DATASET_SPEC = DatasetSpec(
@@ -38,9 +20,12 @@ DATASET_SPEC = DatasetSpec(
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=5, future_frames=30, sample_time=0.1, window_step=5),
         screening=minimum_samples_screening(2),
-        map=MapConfig(extraction=SceneExtentExtraction()),
+        map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
+    dataset_options_model=VodLoaderOptions,
     native_schema=VodLoader.native_trajectory_schema(),
-    resources_factory=open_vod_resources,
+    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
+    resources_factory=_open_vod_resources,
     has_map=True,
+    split_support=DatasetSplitSupport(scene=True, source=True),
 )

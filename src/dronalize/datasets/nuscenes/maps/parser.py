@@ -33,17 +33,15 @@ if TYPE_CHECKING:
 
 
 class NuScenesMap:
-    """A class representing a NuScenes map, containing various map objects."""
+    """A class representing a NuScenes map, containing various map objects.
+
+    Parameters
+    ----------
+    json_file : Path
+        Path to the JSON file containing the map data.
+    """
 
     def __init__(self, json_file: Path) -> None:
-        """Initialize the `NuscenesMap` with data from a JSON file.
-
-        Parameters
-        ----------
-        json_file : Path
-            Path to the JSON file containing the map data.
-
-        """
         self.json_file: Path = json_file
         with Path.open(json_file) as f:
             self.json_data: dict[str, Any] = json.load(f)
@@ -130,8 +128,9 @@ class StopLineType(IntEnum):
 
     TURN_STOP = auto()
     STOP_SIGN = auto()
-    PEDESTRIAN_CROSSING = auto()
+    PED_CROSSING = auto()
     TRAFFIC_LIGHT = auto()
+    YIELD = auto()
 
 
 class SegmentDividerType(IntEnum):
@@ -387,8 +386,7 @@ class StopLine:
             return False
 
         return not (
-            self.stop_line_type == StopLineType.PEDESTRIAN_CROSSING
-            and not allow_pedestrian_crossings
+            self.stop_line_type == StopLineType.PED_CROSSING and not allow_pedestrian_crossings
         )
 
 

@@ -3,28 +3,26 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 import polars as pl
 
-from dronalize.core.polars_ops import normalize_group_by
+from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.screening.agent import invalid_agent_tolerance_expr
-from dronalize.processing.screening.base import (
-    AgentCheckRuleBase,
-    rule_name,
-)
+from dronalize.processing.screening.base import AgentCheckRuleBase, rule_name
 from dronalize.processing.screening.context import ScreeningContext
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from dronalize.core.typing import DataFrameT
+    from dronalize.processing.columns import TrajectoryColumns
     from dronalize.processing.screening.base import CleanupRuleBase, Rule, SceneCheckRuleBase
     from dronalize.processing.screening.screen import Screen
 
 
-_SCREENING_SCENE_PASSES = "_scene_passes"
-AGENT_PASS_COLUMN = "_agent_passes"  # noqa: S105
+SCENE_PASS_COLUMN: Final[str] = "_scene_passes"  # noqa: S105
+AGENT_PASS_COLUMN: Final[str] = "_agent_passes"  # noqa: S105
 
 
 @dataclass(slots=True, frozen=True)
@@ -40,85 +38,59 @@ class _RuleColumns:
         prefix = f"_screening_rule_{rule_name(rule)}"
         if isinstance(rule, AgentCheckRuleBase):
             prefix = "_agent" + prefix
-        return cls(
-            agent_pass=f"{prefix}_agent_passes",
-            scene_pass=f"{prefix}_scene_passes",
-        )
+        return cls(agent_pass=f"{prefix}_agent_passes", scene_pass=f"{prefix}_scene_passes")
 
 
 def screen_scene(
     data: DataFrameT,
     scene_screening: Screen | None,
-    group_by: str | Sequence[str] | None = None,
-    agent_id: str = "id",
-    frame_column: str = "frame",
-    category_column: str = "agent_category",
+    columns: TrajectoryColumns,
+    scene_group_by: str | Sequence[str] | None = None,
     *,
     mark_passed_agents: bool = False,
+    retain_scene_passes: bool = False,
 ) -> DataFrameT:
     """Apply cleanup and screening rules to trajectory scenes."""
     if scene_screening is None:
         return data
 
-    ctx = _build_context(
-        group_by=group_by,
-        agent_id=agent_id,
-        frame_column=frame_column,
-        category_column=category_column,
-    )
-
+    ctx = _build_context(columns=columns, scene_group_by=scene_group_by)
     df = _apply_cleanup(data, scene_screening.cleanup_rules, ctx)
     df, scene_columns = _apply_scene_rules(df, scene_screening.scene_rules, ctx)
     df, agent_columns = _apply_agent_rules(
-        df,
-        scene_screening.agent_rules,
-        ctx,
-        include_passed_agent_ids=mark_passed_agents,
+        df, scene_screening.agent_rules, ctx, include_passed_agent_ids=mark_passed_agents
     )
-
     df = df.with_columns(
         _and_all([pl.col(name) for name in [*scene_columns, *agent_columns]]).alias(
-            _SCREENING_SCENE_PASSES
+            SCENE_PASS_COLUMN
         )
     )
-
     return _finalize_screened(
         df,
-        diagnostic_columns=[*scene_columns, *agent_columns, _SCREENING_SCENE_PASSES],
+        diagnostic_columns=[*scene_columns, *agent_columns, SCENE_PASS_COLUMN],
         include_passed_agent_ids=mark_passed_agents,
+        retain_scene_passes=retain_scene_passes,
     )
 
 
 def _build_context(
-    *,
-    group_by: str | Sequence[str] | None,
-    agent_id: str,
-    frame_column: str,
-    category_column: str,
+    *, columns: TrajectoryColumns, scene_group_by: str | Sequence[str] | None
 ) -> ScreeningContext:
-    scene_window = list(normalize_group_by(group_by))
-    agent_window = [*scene_window, agent_id] if scene_window else [agent_id]
+    scene_window = list(normalize_group_by(scene_group_by))
+    agent_window = [*scene_window, columns.agent_id] if scene_window else [columns.agent_id]
     return ScreeningContext(
-        agent_id=agent_id,
-        frame_column=frame_column,
-        category_column=category_column,
-        scene_window=scene_window,
-        agent_window=agent_window,
+        columns=columns, scene_window=tuple(scene_window), agent_window=tuple(agent_window)
     )
 
 
 def _apply_cleanup(
-    data: DataFrameT,
-    rules: tuple[CleanupRuleBase, ...],
-    ctx: ScreeningContext,
+    data: DataFrameT, rules: tuple[CleanupRuleBase, ...], ctx: ScreeningContext
 ) -> DataFrameT:
     return data.filter(_and_all([rule.expr(ctx) for rule in rules]))
 
 
 def _apply_scene_rules(
-    data: DataFrameT,
-    rules: tuple[SceneCheckRuleBase, ...],
-    ctx: ScreeningContext,
+    data: DataFrameT, rules: tuple[SceneCheckRuleBase, ...], ctx: ScreeningContext
 ) -> tuple[DataFrameT, list[str]]:
     df = data
     scene_passes: list[str] = []
@@ -154,17 +126,15 @@ def _apply_agent_rules(
 
 
 def _apply_agent_rule(
-    data: DataFrameT,
-    rule: AgentCheckRuleBase,
-    ctx: ScreeningContext,
+    data: DataFrameT, rule: AgentCheckRuleBase, ctx: ScreeningContext
 ) -> tuple[DataFrameT, _RuleColumns]:
     cols = _RuleColumns.from_rule(rule)
     scope = ctx.selector_mask(rule.selector)
     scoped_agent_count = ctx.retained_agent_count(rule.selector)
 
     agent_pass = pl.when(scope).then(rule.expr(ctx)).otherwise(pl.lit(value=True))
-    invalid_agents = (
-        pl.col(ctx.agent_id).filter(scope & ~agent_pass).n_unique().over(ctx.scene_window)
+    invalid_agents = ctx.over_scene_window(
+        pl.col(ctx.columns.agent_id).filter(scope & ~agent_pass).n_unique()
     )
     invalid_fraction = (
         pl.when(scoped_agent_count > 0).then(invalid_agents / scoped_agent_count).otherwise(0.0)
@@ -174,17 +144,12 @@ def _apply_agent_rule(
         .when(scoped_agent_count > 0)
         .then(
             invalid_agent_tolerance_expr(
-                rule.tolerance,
-                invalid_agents=invalid_agents,
-                invalid_fraction=invalid_fraction,
+                rule.tolerance, invalid_agents=invalid_agents, invalid_fraction=invalid_fraction
             )
         )
         .otherwise(pl.lit(value=True))
     )
-    df = data.with_columns(
-        agent_pass.alias(cols.agent_pass),
-        scene_pass.alias(cols.scene_pass),
-    )
+    df = data.with_columns(agent_pass.alias(cols.agent_pass), scene_pass.alias(cols.scene_pass))
     return df, cols
 
 
@@ -193,12 +158,16 @@ def _finalize_screened(
     diagnostic_columns: list[str],
     *,
     include_passed_agent_ids: bool,
+    retain_scene_passes: bool,
 ) -> DataFrameT:
     excluded = list(diagnostic_columns)
     if not include_passed_agent_ids:
         excluded.append(AGENT_PASS_COLUMN)
+    if retain_scene_passes:
+        excluded.remove(SCENE_PASS_COLUMN)
+        return data if not excluded else data.select(pl.all().exclude(excluded))
 
-    screened = data.filter(pl.col(_SCREENING_SCENE_PASSES))
+    screened = data.filter(pl.col(SCENE_PASS_COLUMN))
     return screened if not excluded else screened.select(pl.all().exclude(excluded))
 
 

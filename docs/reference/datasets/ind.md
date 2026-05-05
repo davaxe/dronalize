@@ -6,23 +6,12 @@ inD is a naturalistic urban-intersection dataset captured from drones above Germ
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Urban</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2020</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                                        | Notes                                                    |
-| ------------------- | -------------------------------------------- | -------------------------------------------------------- |
-| Release year        | 2020                                         | Based on the cited dataset paper and release.            |
-| Domain              | Urban intersections                          | Designed for interaction-heavy city traffic.             |
-| Capture platform    | Drone                                        | Recorded from an overhead aerial viewpoint.              |
-| Primary agent types | Cars, trucks or buses, bicycles, pedestrians | Stronger multimodal focus than highway-only benchmarks.  |
-| Map context         | Intersection road layout                     | Includes map assets for the recorded sites.              |
-| Geographic coverage | Germany                                      | Spans four urban intersections.                          |
-| Data format         | CSV trajectories with maps                   | Organized as recording metadata, tracks, and map assets. |
 
 ## Default processing profile
 
@@ -34,15 +23,53 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 99 obs / 250 pred @ 50 Hz |
 | Resampling | Cubic 2:1 |
 | Windowing | 175-frame window, step 25 |
-| Filtering | Exclude trailers; prune agents with fewer than 6 samples |
+| Screening | Prune agents with fewer than 2 samples |
 | Maps | Full map |
 
-### Filtering details
+## Dataset compatibility
 
-| Scope | Rule | Effect |
-| ----- | ---- | ------ |
-| Cleanup | Exclude categories | Remove trailer tracks. |
-| Cleanup | Minimum samples | Prune agents with fewer than 6 samples. |
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | inD v1.1 |
+| Loader expectation | The loader assumes the inD v1.1 distribution layout. |
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `car` | `CAR` |
+| `truck` | `TRUCK` |
+| `bus` | `BUS` |
+| `trailer` | `TRAILER` |
+| `motorcycle` | `MOTORCYCLE` |
+| `bicycle` | `BICYCLE` |
+| `pedestrian` | `PEDESTRIAN` |
+| `van` | `VAN` |
+| `truck_bus` | `TRUCK` |
+| `animal` | `ANIMAL` |
+
+### Map types
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `road_border` | `ROAD_BORDER` |
+| `fence` | `ROAD_BORDER` |
+| `wall` | `ROAD_BORDER` |
+| `curbstone` | `CURB` |
+| `stop_line` | `STOP` |
+| `regulatory_element` | `REGULATORY` |
+| `virtual` | `VIRTUAL` |
+| `pedestrian_marking` | `PEDESTRIAN_MARKING` |
+| `bike_marking` | `BIKE_MARKING` |
+| `guard_rail` | `GUARD_RAIL` |
+| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` |
+| `line_thin` without `subtype=dashed` | `LINE_THIN` |
+| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` |
+| `line_thick` without `subtype=dashed` | `LINE_THICK` |
 
 ## Split support
 
@@ -59,7 +86,7 @@ dronalize split-support ind
 ## Expected structure
 
 ```text
-inD/
+ind/
 ├── data/
 │   ├── 01_recordingMeta.csv
 │   ├── 01_tracks.csv

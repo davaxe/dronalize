@@ -29,24 +29,41 @@ ReaderT = TypeVar("ReaderT", bound=DatasetReader[SceneRecord])
 
 @dataclass(slots=True)
 class TorchSceneRecord:
-    """Torch-backed scene record returned by `TorchSceneDataset`."""
+    """Torch-backed equivalent of `SceneRecord`.
+
+    Shapes match the framework-neutral record: agent features use
+    `(N, T_in, F)` and `(N, T_out, F)`, masks use `(N, T_in)` and
+    `(N, T_out)`, map node positions use `(M, 2)`, and map edges use `(2, E)`.
+    """
 
     scene_number: int
+    """Scene identifier within the source dataset."""
     position_offset: torch.Tensor
+    """Global 2D translation offset with shape `(2,)`."""
     agent_types: torch.Tensor
+    """Integer-encoded agent types with shape `(N,)`."""
     passed_agent_mask: torch.Tensor
+    """Mask of agents that passed screening, shape `(N,)`."""
     input_features: torch.Tensor
+    """Observed agent features with shape `(N, T_in, F)`."""
     input_mask: torch.Tensor
+    """Validity mask for `input_features`, shape `(N, T_in)`."""
     output_features: torch.Tensor
+    """Prediction target features with shape `(N, T_out, F)`."""
     output_mask: torch.Tensor
+    """Validity mask for `output_features`, shape `(N, T_out)`."""
     map_node_positions: torch.Tensor
+    """2D map node coordinates with shape `(M, 2)`."""
     map_edge_indices: torch.Tensor
+    """Directed map connectivity with shape `(2, E)`."""
     map_node_types: torch.Tensor
+    """Integer-encoded map node types with shape `(M,)`."""
     map_edge_types: torch.Tensor
+    """Integer-encoded map edge types with shape `(E,)`."""
 
 
 class TorchSceneDataset(Dataset[TorchSceneRecord], Generic[ReaderT]):
-    """Iterable Torch dataset wrapper over any `SceneReader[SceneRecord]`.
+    """Map-style Torch dataset wrapper over any `DatasetReader[SceneRecord]`.
 
     The dataset yields `TorchSceneRecord` instances converted from the wrapped
     reader's canonical `SceneRecord` outputs.
@@ -58,7 +75,6 @@ class TorchSceneDataset(Dataset[TorchSceneRecord], Generic[ReaderT]):
 
         If PyG-based batching is desired, consider using
         `HeteroSceneDataset` instead.
-
     """
 
     def __init__(self, reader: ReaderT, *, copy: bool = True) -> None:
@@ -101,12 +117,11 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
 
 
 class IterableTorchSceneDataset(TorchSceneDataset[ReaderT], IterableDataset[TorchSceneRecord]):
-    """Iterable Torch dataset wrapper over any `SceneReader[SceneRecord]`.
+    """Iterable Torch dataset wrapper over any `DatasetReader[SceneRecord]`.
 
     !!! tip "Iterable vs. Map-style"
         This dataset is identical to `TorchSceneDataset`, but also inherits from
         `torch.utils.data.IterableDataset` to support iterable-style usage with
         `torch.utils.data.DataLoader` (e.g. for streaming readers that are design
         around sequential access).
-
     """

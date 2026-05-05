@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import dronalize
 from dronalize import datasets, io, processing, runtime
-from dronalize.config import ProcessingConfig, RuntimeOverride, load_project_config
+from dronalize.config import ProcessingConfig, RuntimeOverride, parse_config
 from dronalize.core import AgentCategory, DatasetSplit, EdgeType
 from dronalize.core.maps import MapGraph, SharedMapGraph
-from dronalize.io import DatasetManifest, manifest_path, read_manifest
+from dronalize.io import DatasetManifest, manifest_path, read_manifest, write_manifest
+from dronalize.io import adapters as io_adapters
+from dronalize.io import readers as io_readers
 from dronalize.io.base import DatasetWriter
-from dronalize.io.manifest import write_manifest
 from dronalize.runtime import (
-    PlanningRequest,
-    ProcessRequest,
-    ProcessResult,
-    RunPlan,
-    process_dataset,
-    resolve_job,
+    ExecutionPlan,
+    ExecutionRequest,
+    ExecutionResult,
+    execute_plan,
+    execute_request,
+    resolve_request,
+    stream_plan,
 )
 
 
@@ -35,12 +37,13 @@ def test_core_and_runtime_exports_are_present() -> None:
     assert EdgeType is not None
     assert MapGraph is not None
     assert SharedMapGraph is not None
-    assert PlanningRequest is not None
-    assert ProcessRequest is not None
-    assert ProcessResult is not None
-    assert RunPlan is not None
-    assert resolve_job is not None
-    assert process_dataset is not None
+    assert ExecutionPlan is not None
+    assert ExecutionRequest is not None
+    assert ExecutionResult is not None
+    assert execute_plan is not None
+    assert resolve_request is not None
+    assert execute_request is not None
+    assert stream_plan is not None
 
 
 def test_io_and_config_exports_are_present() -> None:
@@ -51,7 +54,16 @@ def test_io_and_config_exports_are_present() -> None:
     assert write_manifest is not None
     assert ProcessingConfig is not None
     assert RuntimeOverride is not None
-    assert load_project_config is not None
+    assert parse_config is not None
+
+
+def test_reader_and_adapter_root_exports_are_declared() -> None:
+    assert DatasetWriter is not None
+    assert io_readers.DatasetReader is not None
+    assert "DatasetReader" in io_readers.__all__
+    assert "MDSReaderInitArgs" in io_readers.__all__
+    assert "IterableTorchSceneDataset" in io_adapters.__all__
+    assert "IterableHeteroSceneDataset" in io_adapters.__all__
 
 
 def test_removed_runtime_executors_remain_internal() -> None:

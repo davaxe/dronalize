@@ -1,7 +1,5 @@
-## ::: dronalize.runtime.types.RunPlan
+## ::: dronalize.runtime.ExecutionRequest
 
-## ::: dronalize.runtime.types.ProcessResult
+## ::: dronalize.runtime.ExecutionPlan
 
-## ::: dronalize.runtime.request.ProcessRequest
-
-## ::: dronalize.runtime.request.PlanningRequest
+## ::: dronalize.runtime.ExecutionResult

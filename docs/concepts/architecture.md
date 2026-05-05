@@ -1,140 +1,66 @@
-# Architecture
+# Architecture overview
 
 <div class="section-intro" markdown="1">
-`dronalize` is built around one idea: datasets stay dataset-specific at the edges, while the middle
-of the runtime stays shared. A run resolves configuration, opens one dataset loader, turns raw
-sources into normalized scenes, and hands those scenes to a storage backend.
+`dronalize` is built around a simple architectural idea: dataset-specific logic stays at the edges, while the runtime in the middle stays shared. A run resolves its configuration, opens a dataset loader, turns raw sources into normalized scenes, and writes those scenes through a storage backend.
+
+This keeps dataset integrations focused on ingestion and metadata, while the rest of the system can stay consistent across all datasets.
 </div>
 
 <figure markdown="block" class="full-figure">
   ![Design architecture](../assets/architecture-dark.svg#only-dark){ width="100%" }
   ![Design architecture](../assets/architecture-light.svg#only-light){ width="100%" }
   <figcaption>
-    High-level architecture diagram. The CLI and Python API both resolve the same runtime plan and
-    execute the same loader, scene-building, and writing flow.
+    High-level architecture diagram. Dataset-specific logic stays near source loading and map access, while planning, scene construction, and output writing remain shared.
   </figcaption>
 </figure>
 
-## Main runtime objects
+## The basic shape of a run
 
-Four public objects define most of the runtime:
+At a high level, every run follows the same path:
 
-- `DatasetSpec` describes one dataset integration
-- `ProcessingConfig` represents the optional TOML file
-- `ProcessRequest` describes one requested run
-- `RunPlan` is the execution-ready result after config resolution and planning
+1. the CLI or Python API receives a request
+2. the runtime resolves that request into an execution plan
+3. a dataset loader exposes raw sources
+4. the shared runtime turns those sources into scenes
+5. a backend writes the final dataset artifacts
 
-The CLI is a thin layer that builds a `ProcessRequest`, resolves a `RunPlan`, and then either
-prints it or executes it.
+That separation is the main design choice in the project. Dataset code is responsible for understanding how raw data is laid out and how it should be read. Once that data has been loaded, the rest of the flow is largely dataset-agnostic.
 
-## Resolution flow
+## Why the system is organized this way
 
-Every run starts by looking up a dataset key in the registry. That returns a `DatasetSpec` with the
-dataset defaults, native schema, native split support, map support, and any dataset-owned config
-model.
+The goal is not just code reuse. It is to keep the responsibilities of the system clear.
 
-The runtime then resolves configuration in this order:
+A dataset integration should be relatively narrow: it should know how to discover sources, load them, and expose any dataset-native metadata such as map references or predefined partitions. The shared runtime should own the common execution flow: planning, scene construction, split assignment, schema conversion, and writing output.
 
-1. the dataset's built-in `default_config`
-2. any profiles named in `[datasets.<name>].uses`
-3. the dataset-local TOML entry in `[datasets.<name>]`
-4. runtime overrides from the CLI or `RuntimeOverride`
+This makes new dataset integrations easier to add without duplicating the rest of the runtime. It also makes the processing model easier to reason about, because the same overall flow applies regardless of which dataset is being converted.
 
-That produces one resolved `DatasetConfig`. The runtime compiles it into narrower subsystem plans:
+## Main runtime concepts
 
-- a loader-facing `LoaderRequest`
-- an `OutputPlan`
-- effective scene metrics after any resampling
+A few public types define that flow. [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) describes one dataset integration. [`ProcessingConfig`](../reference/api/config/project.md#dronalize.config.ProcessingConfig) represents optional user configuration. [`ExecutionRequest`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest) describes the requested run, and [`ExecutionPlan`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionPlan) is the resolved, execution-ready result.
 
-The result is a `RunPlan`, which is what both `resolve_job()` and `process_dataset()` work with.
+Together, these types separate what the user asked for from what the runtime is actually going to execute.
 
-## Dataset boundary
+## Output model
 
-The dataset boundary is the loader API in `dronalize.processing.loading`.
+The final output is always the same in concept:
 
-A loader is responsible for:
+- a collection of normalized scenes
+- encoded in a backend-specific format
+- plus a manifest describing what was produced
 
-- discovering raw sources
-- reading one source into one or more Polars `LazyFrame` objects
-- attaching lightweight map bindings when needed
-- exposing dataset-specific options and map resolution behavior
+Different backends can store those scenes in different formats, but that choice does not change the runtime model itself. Writing is treated as the last stage of a shared pipeline, not as something that reshapes the rest of the system.
 
-The shared runtime is responsible for everything after that:
+## Module guide
 
-- screening
-- split routing
-- resampling
-- scene numbering
-- schema conversion
-- backend writing
-
-## Execution flow
-
-After planning, `open_job()` does three things:
-
-1. opens any run-scoped shared resources declared by the `DatasetSpec`
-2. builds the loader
-3. chooses a sequential or parallel executor
-
-Execution then follows two nested loops.
-
-### Source loop
-
-The loader yields `Source` objects. A source is a stable unit of raw input, usually a file or a
-directory-backed sample group. If the dataset has native splits, the runtime can iterate those
-partitions directly. Otherwise it uses `discover_sources()`.
-
-For each source, the loader returns one or more `LoadedSourceData` objects. Each one contains:
-
-- a Polars `LazyFrame`
-- an optional `MapBinding`
-- an optional predefined split
-
-### Scene loop
-
-The loader's pipeline is built once and reused. The default pipeline can apply:
-
-- time partitioning for `time` and `shuffled-time` splits
-- sliding-window extraction
-- screening
-- resampling
-- final grouping into one scene frame at a time
-
-The `SceneBuilder` then turns each prepared frame into a `Scene` by:
-
-1. assigning a split
-2. attaching a lazy map resolver when maps are enabled
-3. converting the scene to the requested output schema if needed
-
-The split assignment strategy depends on the configured mode:
-
-- `native` uses the dataset's predefined partitions
-- `scene` hashes the stable per-source scene identifier
-- `source` hashes the source identifier
-- `time` and `shuffled-time` read the partition column produced earlier in the pipeline
-
-## Output flow
-
-Each final `Scene` is encoded into the shared record layout and passed to a dataset writer. The
-writer comes from the backend registry in `dronalize.io.backends`.
-
-The built-in backends are:
-
-- `pickle` for one pickled `SceneRecord` per scene
-- `mds` for Mosaic Streaming shards
-- `null` for runs that should execute but not persist scenes
-
-Regardless of backend, the runtime writes one `manifest.json` at the dataset root. That manifest is
-the stable description of the produced dataset: schema, feature columns, sample time, derived
-features, map presence, and precision.
-
-## Module map
-
-| Module | Responsibility |
+| Module | Role |
 | --- | --- |
-| `dronalize.datasets` | Dataset registry, specs, and built-in dataset definitions |
-| `dronalize.config` | TOML loading and runtime override helpers |
-| `dronalize.runtime` | Request models, planning, execution, and the CLI |
-| `dronalize.processing` | Loader API, pipeline assembly, screening, resampling, and map helpers |
-| `dronalize.core` | Scene types, map graph types, schemas, categories, and shared errors |
-| `dronalize.io` | Encoding, manifests, backends, readers, and optional adapters |
+| `dronalize.datasets` | Dataset definitions, registry, and dataset-specific integration points |
+| `dronalize.config` | User-facing configuration and override handling |
+| `dronalize.runtime` | Requests, planning, execution, and CLI entry points |
+| `dronalize.processing` | Source loading, shared processing flow, scene preparation, and map helpers |
+| `dronalize.core` | Shared domain types such as scenes, schemas, maps, and common errors |
+| `dronalize.io` | Encoding, manifests, storage backends, and dataset readers |
+
+## In summary
+
+`dronalize` is a shared runtime for turning raw dataset sources into normalized scenes. Its architecture is meant to keep dataset-specific concerns local, keep the core execution flow shared, and make new dataset integrations fit into the same overall model.

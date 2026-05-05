@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Annotated, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from typing_extensions import override
 
+from dronalize.config.models.screening import Tolerance  # noqa: TC001
 from dronalize.processing.screening.context import AgentSelector
-from dronalize.processing.screening.tolerance import Tolerance, tol
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -46,7 +46,7 @@ class AgentCheckRuleBase(CheckRuleBase, ABC):
     """Base class for per-agent check rules."""
 
     selector: AgentSelector | None = None
-    tolerance: Tolerance = Field(default=tol(absolute=0))
+    tolerance: Tolerance | None = Field(default=None)
 
     @override
     def __repr_args__(self) -> Iterator[tuple[str | None, object]]:

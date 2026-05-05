@@ -6,23 +6,12 @@ Zara1 is a pedestrian-only scene from the ETH/UCY benchmark family. It is common
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Pedestrian</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2007</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Pedestrians</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Camera</strong></div>
   <div class="summary-item"><span>Map context</span><strong>None</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                               | Notes                                                               |
-| ------------------- | ----------------------------------- | ------------------------------------------------------------------- |
-| Release year        | 2007                                | Part of the UCY scene family used with ETH/UCY benchmarks.          |
-| Domain              | Pedestrian                          | Used for interaction-aware human trajectory prediction.             |
-| Capture platform    | Overhead pedestrian scene recording | Focused on walker motion in a shared public space.                  |
-| Primary agent types | Pedestrians                         | Human motion is the only target class.                              |
-| Map context         | Limited                             | Typically treated as a scene benchmark rather than a map benchmark. |
-| Benchmark family    | ETH/UCY                             | Shares setup conventions with `eth`, `hotel`, `univ`, and `zara2`.  |
-| Data format         | Text trajectory files               | Commonly arranged into train, validation, and test folders.         |
 
 ## Default processing profile
 
@@ -34,8 +23,31 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 29 obs / 48 pred @ 10 Hz |
 | Resampling | Linear 4:1 |
 | Windowing | 20-frame window, step 1 |
-| Filtering | Keep agents with at least 2 samples |
+| Screening | Keep agents with at least 2 samples |
 | Maps | Disabled |
+
+## Dataset compatibility
+
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | UCY ZARA1 scene layout |
+| Loader expectation | The loader uses the ETH/UCY raw text layout and does not parse a dataset-specific version marker. |
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| Any tracked actor | `PEDESTRIAN` |
+
+### Map types
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| Not applicable | Not applicable |
 
 ## Split support
 
@@ -52,9 +64,8 @@ dronalize split-support zara1
 ## Expected structure
 
 ```text
-ethucy/
-└── zara1/
-    ├── train/
-    ├── val/
-    └── test/
+zara1/
+├── train/
+├── val/
+└── test/
 ```

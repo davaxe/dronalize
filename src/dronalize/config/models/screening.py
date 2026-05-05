@@ -1,3 +1,5 @@
+"""Models for declaratively specifying screening rules and cleanup actions."""
+
 from __future__ import annotations
 
 from typing import Annotated, Literal
@@ -20,21 +22,27 @@ class AgentSelector(FullConfig):
     """
 
     mode: Literal["include", "exclude"] = Field("include")
+    """Whether listed categories are included in or excluded from the rule evaluation."""
     categories: Categories
+    """Categories included in or excluded from the rule evaluation."""
 
 
 class Tolerance(FullConfig):
     """Optional tolerance thresholds for relaxed rule checks."""
 
     absolute: float | None = Field(default=None, gt=0.0)
+    """Absolute tolerance applied when evaluating numeric thresholds."""
     relative: float | None = Field(default=None, gt=0.0)
+    """Relative tolerance applied when evaluating numeric thresholds."""
 
 
 class Range(FullConfig):
     """Generic integer range with optional minimum and maximum."""
 
     minimum: int | None = None
+    """Inclusive lower bound for the range, if one is required."""
     maximum: int | None = None
+    """Inclusive upper bound for the range, if one is required."""
 
     @model_validator(mode="after")
     def _val_range(self) -> Range:
@@ -48,7 +56,17 @@ class _AgentRuleSpecBase(FullConfig):
     """Shared options for per-agent screening rules."""
 
     selector: AgentSelector | None = Field(default=None)
+    """Optional category selector limiting which agents the rule evaluates."""
     tolerance: Tolerance | None = Field(default=None)
+    """Optional tolerance thresholds used to relax rule comparisons."""
+
+
+class MinDistanceSpec(_AgentRuleSpecBase):
+    """Require a minimum distance between first and last observations."""
+
+    rule: Literal["min_distance"] = Field("min_distance", repr=False, init=False)
+    minimum: float = Field(ge=0.0)
+    """Minimum distance between first and last observations for each selected agent."""
 
 
 class RequireFramesSpec(_AgentRuleSpecBase):
@@ -56,6 +74,7 @@ class RequireFramesSpec(_AgentRuleSpecBase):
 
     rule: Literal["frames"] = Field("frames", repr=False, init=False)
     frames: tuple[int, ...]
+    """Frame indices that must be present for each selected agent."""
 
 
 class RequireWindowSpec(_AgentRuleSpecBase):
@@ -63,8 +82,11 @@ class RequireWindowSpec(_AgentRuleSpecBase):
 
     rule: Literal["window"] = Field("window", repr=False, init=False)
     start_frame: int = Field(ge=0)
+    """Inclusive start frame of the required coverage window."""
     end_frame: int = Field(ge=0)
+    """Inclusive end frame of the required coverage window."""
     min_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
+    """Minimum fraction of frames within the window that must be present."""
 
 
 class MinSamplesSpec(_AgentRuleSpecBase):
@@ -72,6 +94,7 @@ class MinSamplesSpec(_AgentRuleSpecBase):
 
     rule: Literal["min_samples"] = Field("min_samples", repr=False, init=False)
     minimum: int = Field(ge=1)
+    """Minimum number of samples required for each selected agent."""
 
 
 class MaxMissingFramesSpec(_AgentRuleSpecBase):
@@ -79,6 +102,7 @@ class MaxMissingFramesSpec(_AgentRuleSpecBase):
 
     rule: Literal["max_missing_frames"] = Field("max_missing_frames", repr=False, init=False)
     maximum: int = Field(ge=0)
+    """Maximum number of missing frames allowed for each selected agent."""
 
 
 class MaxGapSpec(_AgentRuleSpecBase):
@@ -86,6 +110,7 @@ class MaxGapSpec(_AgentRuleSpecBase):
 
     rule: Literal["max_gap"] = Field("max_gap", repr=False, init=False)
     maximum: int = Field(ge=0)
+    """Maximum consecutive missing-frame gap allowed for each selected agent."""
 
 
 class MinConsecutiveFramesSpec(_AgentRuleSpecBase):
@@ -95,6 +120,7 @@ class MinConsecutiveFramesSpec(_AgentRuleSpecBase):
         "min_consecutive_frames", repr=False, init=False
     )
     minimum: int = Field(ge=1)
+    """Minimum uninterrupted run of observed frames required per selected agent."""
 
 
 class StartsByFrameSpec(_AgentRuleSpecBase):
@@ -102,6 +128,7 @@ class StartsByFrameSpec(_AgentRuleSpecBase):
 
     rule: Literal["starts_by_frame"] = Field("starts_by_frame", repr=False, init=False)
     frame: int = Field(ge=0)
+    """Latest frame index by which each selected agent must have started."""
 
 
 class EndsAfterFrameSpec(_AgentRuleSpecBase):
@@ -109,6 +136,7 @@ class EndsAfterFrameSpec(_AgentRuleSpecBase):
 
     rule: Literal["ends_after_frame"] = Field("ends_after_frame", repr=False, init=False)
     frame: int = Field(ge=0)
+    """Frame index after which each selected agent must still be present."""
 
 
 class MinSpanSpec(_AgentRuleSpecBase):
@@ -116,6 +144,7 @@ class MinSpanSpec(_AgentRuleSpecBase):
 
     rule: Literal["min_span"] = Field("min_span", repr=False, init=False)
     minimum: int = Field(ge=1)
+    """Minimum frame span between first and last observations for each selected agent."""
 
 
 AgentCheckSpec = Annotated[
@@ -127,9 +156,16 @@ AgentCheckSpec = Annotated[
     | MinConsecutiveFramesSpec
     | StartsByFrameSpec
     | EndsAfterFrameSpec
-    | MinSpanSpec,
+    | MinSpanSpec
+    | MinDistanceSpec,
     Field(discriminator="rule"),
 ]
+"""Discriminated union of all declarative per-agent screening rule models.
+
+Each variant describes one rule family that can be placed in the `agent`
+section of a
+[`ScreeningConfig`][dronalize.config.models.screening.ScreeningConfig].
+"""
 
 
 class AgentRangeSpec(FullConfig):
@@ -137,8 +173,11 @@ class AgentRangeSpec(FullConfig):
 
     rule: Literal["agent_range"] = Field("agent_range", repr=False, init=False)
     selector: AgentSelector | None = None
+    """Optional category selector limiting which agents are counted."""
     minimum: int | None = Field(default=None, ge=0)
+    """Inclusive lower bound on the number of matching agents in a scene."""
     maximum: int | None = Field(default=None, ge=0)
+    """Inclusive upper bound on the number of matching agents in a scene."""
 
 
 class CategoryRangeSpec(FullConfig):
@@ -146,6 +185,7 @@ class CategoryRangeSpec(FullConfig):
 
     rule: Literal["category_range"] = Field("category_range", repr=False, init=False)
     ranges: dict[str, Range]
+    """Required count ranges keyed by category name."""
 
 
 class RequireSceneFramesSpec(FullConfig):
@@ -153,6 +193,7 @@ class RequireSceneFramesSpec(FullConfig):
 
     rule: Literal["scene_frames"] = Field("scene_frames", repr=False, init=False)
     frames: tuple[int, ...]
+    """Frame indices that must exist at scene scope."""
 
 
 class RequireSceneWindowSpec(FullConfig):
@@ -160,8 +201,11 @@ class RequireSceneWindowSpec(FullConfig):
 
     rule: Literal["scene_window"] = Field("scene_window", repr=False, init=False)
     start_frame: int = Field(ge=0)
+    """Inclusive start frame of the required scene coverage window."""
     end_frame: int = Field(ge=0)
+    """Inclusive end frame of the required scene coverage window."""
     min_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
+    """Minimum fraction of scene frames within the window that must exist."""
 
 
 class MaxMissingSceneFramesSpec(FullConfig):
@@ -169,7 +213,9 @@ class MaxMissingSceneFramesSpec(FullConfig):
 
     rule: Literal["max_missing_frames"] = Field("max_missing_frames", repr=False, init=False)
     selector: AgentSelector
+    """Category selector defining which agents contribute to the scene-level check."""
     maximum: int = Field(ge=0)
+    """Maximum number of missing scene frames allowed for the selected agents."""
 
 
 SceneCheckSpec = Annotated[
@@ -180,6 +226,11 @@ SceneCheckSpec = Annotated[
     | MaxMissingSceneFramesSpec,
     Field(discriminator="rule"),
 ]
+"""Discriminated union of all declarative scene-level screening rule models.
+
+These models power the `scene` section of
+[`ScreeningConfig`][dronalize.config.models.screening.ScreeningConfig].
+"""
 
 
 class PruneByRuleSpec(FullConfig):
@@ -187,6 +238,7 @@ class PruneByRuleSpec(FullConfig):
 
     rule: Literal["prune_by"] = Field("prune_by", repr=False, init=False)
     agent_rule: AgentCheckSpec
+    """Nested agent rule used to remove matching agents from the scene."""
 
 
 class ExcludeCategoriesSpec(FullConfig):
@@ -194,6 +246,7 @@ class ExcludeCategoriesSpec(FullConfig):
 
     rule: Literal["exclude"] = Field("exclude", repr=False, init=False)
     categories: Categories
+    """Categories removed from the scene during cleanup."""
 
 
 class IncludeCategoriesSpec(FullConfig):
@@ -201,37 +254,50 @@ class IncludeCategoriesSpec(FullConfig):
 
     rule: Literal["include"] = Field("include", repr=False, init=False)
     categories: Categories
+    """Categories retained in the scene during cleanup."""
 
 
 CleanupSpec = Annotated[
-    ExcludeCategoriesSpec | IncludeCategoriesSpec | PruneByRuleSpec,
-    Field(discriminator="rule"),
+    ExcludeCategoriesSpec | IncludeCategoriesSpec | PruneByRuleSpec, Field(discriminator="rule")
 ]
+"""Discriminated union of all declarative cleanup actions applied before screening.
+
+Cleanup specs can drop categories or prune agents based on nested screening
+rules before the main scene and agent checks run.
+"""
 
 
 class ScreeningConfig(FullConfig):
     """Declarative screening configuration composed from named rule maps."""
 
     cleanup: dict[str, CleanupSpec] = Field(default_factory=dict)
+    """Named cleanup actions applied before screening checks are evaluated."""
     scene: dict[str, SceneCheckSpec] = Field(default_factory=dict)
+    """Named scene-level screening rules."""
     agent: dict[str, AgentCheckSpec] = Field(default_factory=dict)
+    """Named agent-level screening rules."""
 
 
 class PartialScreeningConfig(PartialConfig[ScreeningConfig]):
     """Patch model for replacing or extending named screening rule sets."""
 
     mode: Literal["replace", "extend"] | None = None
+    """How this partial screening config should combine with an existing target."""
     remove: tuple[str, ...] | None = None
+    """Named cleanup, scene, or agent rules to remove after merging."""
     cleanup: dict[str, CleanupSpec] | None = None
+    """Cleanup rule overrides keyed by rule name."""
     scene: dict[str, SceneCheckSpec] | None = None
+    """Scene-level rule overrides keyed by rule name."""
     agent: dict[str, AgentCheckSpec] | None = None
-    full_config_type: type[ScreeningConfig] = ScreeningConfig
+    """Agent-level rule overrides keyed by rule name."""
+    full_config_type: type[ScreeningConfig] = Field(ScreeningConfig, repr=False, init=False)
 
     @override
     def apply_to(
         self, target: ScreeningConfig | None, *, exclude_none: bool = True
     ) -> ScreeningConfig:
-        mode = self.mode or "replace"
+        mode = self.mode or "extend"  # defaults to extend
         cleanup = target.cleanup if target is not None else {}
         scene = target.scene if target is not None else {}
         agent = target.agent if target is not None else {}
@@ -239,10 +305,10 @@ class PartialScreeningConfig(PartialConfig[ScreeningConfig]):
             cleanup = self.cleanup if self.cleanup is not None else {}
             scene = self.scene if self.scene is not None else {}
             agent = self.agent if self.agent is not None else {}
-        elif mode == "extend" and target is not None:
-            cleanup = {**target.cleanup, **(self.cleanup or {})}
-            scene = {**target.scene, **(self.scene or {})}
-            agent = {**target.agent, **(self.agent or {})}
+        elif mode == "extend":
+            cleanup = {**cleanup, **(self.cleanup or {})}
+            scene = {**scene, **(self.scene or {})}
+            agent = {**agent, **(self.agent or {})}
         if self.remove:
             cleanup = {k: v for k, v in cleanup.items() if k not in self.remove}
             scene = {k: v for k, v in scene.items() if k not in self.remove}

@@ -11,9 +11,18 @@ if TYPE_CHECKING:
     from dronalize.core.scene.model import Scene
 
 MapKey = str | None
-"""Stable identifier for a map associated with a scene or source."""
+"""Stable identifier for a map associated with a scene or source.
+
+This alias mirrors [`dronalize.core.scene.MapKey`][] so runtime map helpers can
+depend on the processing package without importing higher-level scene APIs.
+"""
+
 MapResolver = Callable[["Scene"], MapGraph | None]
-"""Callable that materializes a `MapGraph` for a scene on demand."""
+"""Callable signature for lazily resolving a map graph for a scene.
+
+Processing loaders attach resolvers to scenes so map materialization can be
+deferred until a downstream consumer actually needs the graph.
+"""
 
 __all__ = ["MapKey", "MapResolver", "no_map", "shared_map"]
 

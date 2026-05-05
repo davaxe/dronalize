@@ -126,9 +126,9 @@ class MaxMissingFrames(SceneCheckRuleBase):
     @override
     def expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the scene-pass expression for the missing-frame budget."""
-        unique_frame_count = ctx.over_scene_window(pl.col(ctx.frame_column).n_unique())
+        unique_frame_count = ctx.over_scene_window(pl.col(ctx.columns.frame).n_unique())
         frame_span = ctx.over_scene_window(
-            pl.col(ctx.frame_column).max() - pl.col(ctx.frame_column).min() + 1
+            pl.col(ctx.columns.frame).max() - pl.col(ctx.columns.frame).min() + 1
         )
         return (frame_span - unique_frame_count) <= self.max_missing_frames
 
@@ -137,6 +137,11 @@ SceneCheckRule = Annotated[
     AgentRange | CategoryRange | RequireFrames | RequireWindow | MaxMissingFrames,
     Field(discriminator="rule"),
 ]
+"""Discriminated union of executable scene-scoped screening rule types.
+
+These rule objects evaluate aggregate properties of a cleaned scene such as
+frame coverage, retained-agent counts, or per-category count ranges.
+"""
 
 __all__ = [
     "AgentRange",

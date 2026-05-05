@@ -1,40 +1,21 @@
-from collections.abc import Generator
-from contextlib import contextmanager
-from pathlib import Path
-
-from dronalize.config.models import (
-    DatasetConfig,
-    FullMapExtraction,
-    MapConfig,
-    ScenesConfig,
-)
-from dronalize.datasets.registry import DatasetSpec
-from dronalize.datasets.shared.resources import open_named_shared_map_resources
+from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
+from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.shared.osm_builder import OSMMapBuilder
+from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 from dronalize.datasets.sind.loader import SindLoader
-from dronalize.datasets.sind.maps.builder import SindMapBuilder
-from dronalize.processing.loading.resources import DatasetResources
 
-
-@contextmanager
-def open_sind_resources(
-    root: Path, scenes: ScenesConfig, map_config: MapConfig | None
-) -> Generator[DatasetResources, None, None]:
-    """Build shared SinD maps once per run."""
-    _ = scenes
-    with open_named_shared_map_resources(
-        map_config=map_config,
-        named_paths=(
-            ("changchun", root / "maps" / "Changchun_Pudong.osm"),
-            ("xian", root / "maps" / "Xi'an_Shanglin.osm"),
-            ("nr_ll2", root / "maps" / "NR_ll2.osm"),
-            ("map_relink_law_save", root / "maps" / "map_relink_law_save.osm"),
-        ),
-        build_map=lambda path, config: SindMapBuilder(path).build(
-            config.min_distance, config.interp_distance
-        ),
-    ) as resources:
-        yield resources
+_open_sind_resources = named_shared_map_resources_factory(
+    named_paths=lambda root: (
+        ("Changchun", root / "Changchun" / "Changchun_Pudong.osm"),
+        ("Xi'an", root / "Xi'an" / "Xi'an_Shanglin.osm"),
+        ("Chongqing", root / "Chongqing" / "NR_ll2.osm"),
+        ("Tianjin", root / "Tianjin" / "map_relink_law_save.osm"),
+    ),
+    build_map=lambda path, config: OSMMapBuilder(
+        path, force_zone_from_origin=(0, 0), local_origin_latlon=(0, 0)
+    ).build(config.min_distance, config.interp_distance),
+)
 
 
 DATASET_SPEC = DatasetSpec(
@@ -46,6 +27,7 @@ DATASET_SPEC = DatasetSpec(
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=SindLoader.native_trajectory_schema(),
-    resources_factory=open_sind_resources,
+    resources_factory=_open_sind_resources,
     has_map=True,
+    split_support=DatasetSplitSupport(scene=True, source=True),
 )

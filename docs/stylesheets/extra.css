@@ -13,6 +13,14 @@
     background: var(--drona-header-bg);
 }
 
+.md-typeset h1#__skip {
+    display: none;
+}
+
+.md-typeset h2 {
+    border-bottom: 1px var(--md-default-fg-color--lightest) solid;
+}
+
 .md-header__title,
 .md-header__button,
 .md-tabs__item,
@@ -31,6 +39,12 @@
 
 .md-search__button::after {
     background: rgba(13, 41, 82, 0.5);
+}
+
+.md-search__button:hover,
+.md-search__button:focus-visible {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
 }
 
 .section-intro {
@@ -62,16 +76,17 @@
 .summary-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    border: 1px solid var(--md-typeset-table-color);
-    border-radius: 0.4rem;
+    grid-auto-rows: 1fr;
+    border: 2px solid var(--md-typeset-table-color);
+    border-radius: 0.45rem;
     overflow: hidden;
     background: var(--md-default-bg-color);
 }
 
 .summary-item {
-    padding: 0.5rem 0.7rem;
-    border-right: 0.5px solid var(--md-typeset-table-color);
-    border-bottom: 0.5px solid var(--md-typeset-table-color);
+    padding: 0.5rem 0.45rem;
+    border-right: 2px solid var(--md-typeset-table-color--light);
+    border-bottom: 2px solid var(--md-typeset-table-color--light);
     background: var(--md-default-bg-color);
 }
 
@@ -99,6 +114,7 @@
     line-height: 1.2;
     font-weight: 550;
     color: var(--md-default-fg-color);
+    overflow-wrap: anywhere;
 }
 
 @media (max-width: 800px) {
@@ -194,13 +210,12 @@
 
 /* Optional: nicer inline code inside tables */
 .md-typeset table:not([class]) td code {
-    background: var(--md-code-bg-color);
-    color: var(--md-code-fg-color);
     border: 0.75px solid var(--md-typeset-table-color);
-    padding: 0.10rem 0.25rem;
+    padding: 0.08rem 0.208em;
 }
 
 .landing {
+    width: 100%;
     max-width: 860px;
     margin: 0 auto;
 }
@@ -215,7 +230,7 @@
 
 .hero {
     text-align: center;
-    padding: 2rem 1rem 1.1rem;
+    padding: 3rem 1rem 0.5rem;
 }
 
 .hero__image {
@@ -225,17 +240,91 @@
 }
 
 .hero__eyebrow {
-    margin: 1rem 0 0;
-    font-size: 0.72rem;
+    margin: 0.7rem 0 0;
+    font-size: 0.86rem;
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--md-default-fg-color--light);
 }
 
-.hero__title {
-    margin: 0.7rem 0 0;
-    font-size: 1.5rem;
-    line-height: 1.1;
-    color: hsla(var(--md-hue), 0%, 100%, 1);
+.hero__badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.3rem;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    padding-bottom: 1rem;
+    list-style: none;
+    border-bottom: 2px solid var(--md-typeset-table-color);
+}
+
+.hero__badge {
+    display: inline-flex;
+    align-items: center;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.hero__badge:hover {
+    transform: translateY(-1px);
+    opacity: 0.92;
+}
+
+.hero__badge img {
+    display: block;
+    height: 0.9rem;
+    box-shadow: var(--md-shadow-z1);
+}
+
+.themed-iframe-figure .only-light,
+.themed-iframe-figure .only-dark {
+    display: block;
+    width: 100%;
+    height: 500px;
+    border: solid 1px var(--md-typeset-table-color);
+    border-radius: 0.4rem;
+    background: var(--md-default-bg-color)
+}
+
+
+[data-md-color-scheme="default"] .themed-iframe-figure .only-dark {
+    display: none;
+}
+
+[data-md-color-scheme="slate"] .themed-iframe-figure .only-light {
+    display: none;
+}
+
+.md-typeset a code,
+.md-typeset .doc a *,
+.md-typeset .doc-heading a *,
+.md-typeset .doc-signature a *,
+.md-typeset .doc-contents a * {
+    color: inherit;
+    text-decoration: none;
+}
+
+.md-typeset a:has(code),
+.md-typeset .doc a,
+.md-typeset .doc-heading a,
+.md-typeset .doc-signature a,
+.md-typeset .doc-contents a {
+    color: var(--md-code-fg-color);
+    text-decoration: underline dotted var(--md-code-fg-color);
+    text-underline-offset: 0.16rem;
+}
+
+.md-typeset a:has(code):hover,
+.md-typeset a:has(code):focus-visible,
+.md-typeset .doc a:hover,
+.md-typeset .doc a:focus-visible,
+.md-typeset .doc-heading a:hover,
+.md-typeset .doc-heading a:focus-visible,
+.md-typeset .doc-signature a:hover,
+.md-typeset .doc-signature a:focus-visible,
+.md-typeset .doc-contents a:hover,
+.md-typeset .doc-contents a:focus-visible {
+    color: var(--md-accent-fg-color);
+    text-decoration-color: var(--md-accent-fg-color);
 }

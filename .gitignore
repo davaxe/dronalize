@@ -2,6 +2,7 @@
 .vscode
 .zed
 old
+test_artifacts
 output/
 data/
 lightning_logs/
@@ -17,9 +18,6 @@ slurm*.out
 ### Files ###
 *.csv
 *.zip
-
-### UV ###
-uv.lock
 
 ### JupyterNotebooks ###
 Untitled*

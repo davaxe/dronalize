@@ -6,23 +6,12 @@ ExiD is a drone-based highway dataset centered on highly interactive entry and e
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Highway</strong></div>
+  <div class="summary-item"><span>Release year</span><strong>2022</strong></div>
   <div class="summary-item"><span>Primary agents</span><strong>Vehicles</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
   <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
 </div>
-
-## Dataset facts
-
-| Field               | Value                            | Notes                                                           |
-| ------------------- | -------------------------------- | --------------------------------------------------------------- |
-| Release year        | 2022                             | Based on the cited dataset paper and release.                   |
-| Domain              | Highway entry and exit traffic   | Designed around interactive merge and diverge situations.       |
-| Capture platform    | Drone                            | Recorded from an overhead aerial perspective.                   |
-| Primary agent types | Cars, trucks, buses, motorcycles | Focused on motorized highway traffic.                           |
-| Map context         | Road geometry and lane layout    | Includes map assets for the recording areas.                    |
-| Geographic coverage | Germany                          | Spans several highway locations with interaction-heavy traffic. |
-| Data format         | CSV trajectories with maps       | Distributed as track files and companion map data.              |
 
 ## Default processing profile
 
@@ -34,16 +23,54 @@ These are the default Dronalize settings used when processing this dataset.
 | Effective sequence | 99 obs / 250 pred @ 50 Hz |
 | Resampling | Cubic 2:1 |
 | Windowing | 175-frame window, step 25 |
-| Filtering | Exclude trailers; prune agents with fewer than 6 samples |
+| Screening | Prune agents with fewer than 2 samples |
 | Lane-change sampling | Require 3 lane changes; keep 1 in 3 negatives |
 | Maps | Full map |
 
-### Filtering details
+## Dataset compatibility
 
-| Scope | Rule | Effect |
-| ----- | ---- | ------ |
-| Cleanup | Exclude categories | Remove trailer tracks. |
-| Cleanup | Minimum samples | Prune agents with fewer than 6 samples. |
+Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+
+| Field | Value |
+| ----- | ----- |
+| Expected release/layout | exiD v2.1 |
+| Loader expectation | The loader assumes the exiD v2.1 distribution layout. |
+
+## Normalization
+
+### Agent categories
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `car` | `CAR` |
+| `truck` | `TRUCK` |
+| `bus` | `BUS` |
+| `trailer` | `TRAILER` |
+| `motorcycle` | `MOTORCYCLE` |
+| `bicycle` | `BICYCLE` |
+| `pedestrian` | `PEDESTRIAN` |
+| `van` | `VAN` |
+| `truck_bus` | `TRUCK` |
+| `animal` | `ANIMAL` |
+
+### Map types
+
+| Dataset type | Dronalize type |
+| ------------ | -------------- |
+| `road_border` | `ROAD_BORDER` |
+| `fence` | `ROAD_BORDER` |
+| `wall` | `ROAD_BORDER` |
+| `curbstone` | `CURB` |
+| `stop_line` | `STOP` |
+| `regulatory_element` | `REGULATORY` |
+| `virtual` | `VIRTUAL` |
+| `pedestrian_marking` | `PEDESTRIAN_MARKING` |
+| `bike_marking` | `BIKE_MARKING` |
+| `guard_rail` | `GUARD_RAIL` |
+| `line_thin` with `subtype=dashed` | `LINE_THIN_DASHED` |
+| `line_thin` without `subtype=dashed` | `LINE_THIN` |
+| `line_thick` with `subtype=dashed` | `LINE_THICK_DASHED` |
+| `line_thick` without `subtype=dashed` | `LINE_THICK` |
 
 ## Split support
 
@@ -60,7 +87,7 @@ dronalize split-support exid
 ## Expected structure
 
 ```text
-exiD/
+exid/
 ├── data/
 │   ├── 01_recordingMeta.csv
 │   ├── 01_tracks.csv

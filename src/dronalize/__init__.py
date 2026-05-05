@@ -12,7 +12,7 @@ Use the package namespaces directly:
 - [`dronalize.processing`][] for processing config and grouped processing modules
 - [`dronalize.io`][] for export config, manifests, readers, and adapters
 - [`dronalize.core.scene`][] and [`dronalize.core.maps`][] for shared domain types
-- [`dronalize.plot`][] for optional visualization helpers
+- [`dronalize.visualization`][] for optional visualization helpers
 
 # Import guide
 
@@ -25,4 +25,8 @@ from dronalize.core import AgentCategory, DatasetSplit
 
 """
 
+from importlib.metadata import version
+
 __all__: list[str] = []
+
+__version__: str = version("dronalize")

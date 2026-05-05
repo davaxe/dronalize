@@ -5,15 +5,15 @@ from __future__ import annotations
 import functools
 import multiprocessing as mp
 from collections import deque
+from multiprocessing.pool import Pool
 from multiprocessing.util import Finalize
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from typing_extensions import override
 
 from dronalize.core.scene import Scene
-from dronalize.core.typing import SourceT
 from dronalize.runtime._internal import state
-from dronalize.runtime._internal.executor import ObservableExecutor, WriterFactory
+from dronalize.runtime._internal.executor import Executor, WriterFactory
 from dronalize.runtime._internal.state import Progress
 
 if TYPE_CHECKING:
@@ -22,21 +22,38 @@ if TYPE_CHECKING:
 
     from dronalize.core.typing import P
     from dronalize.io.base import DatasetWriter
-    from dronalize.processing.loading.base import BaseSceneLoader, LoaderOptions
     from dronalize.processing.loading.loader import Source
-    from dronalize.runtime._internal.scene import SceneBuilder
+    from dronalize.runtime._internal.processor import RuntimeProcessor
 
 
 ReturnT = TypeVar("ReturnT", int, list[Scene])
 _ctx: state.WorkerRuntime
 
 
-class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
+class ParallelExecutor(Executor):
+    """Parallel executor for internal runtime execution.
+
+    Parameters
+    ----------
+    processor: RuntimeProcessor
+        The runtime processor to execute, containing logic and cofigurations.
+    chunksize: int | None, optional
+        The number of sources to process in each worker batch. If None, an
+        optimal chunksize will be estimated based on a simple heuristic. Default
+        is None.
+    workers: int | None, optional
+        The number of worker processes to use for parallel execution. If None,
+        the number of CPU cores will be used. Default is None.
+    limit: int | None, optional
+        An optional limit on the total number of scenes to select across all
+        workers. If None, no limit will be applied. Default is None.
+
+
+    """
+
     def __init__(
         self,
-        loader: BaseSceneLoader[SourceT, Any],
-        builder: SceneBuilder,
-        sources: Iterable[Source[SourceT]],
+        processor: RuntimeProcessor,
         *,
         chunksize: int | None = None,
         workers: int | None = None,
@@ -45,29 +62,41 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         if workers is not None and workers <= 1:
             msg = "number of processes must be greater than 1 for parallel execution."
             raise ValueError(msg)
-        self._loader: BaseSceneLoader[SourceT, LoaderOptions] = loader
-        self._builder: SceneBuilder = builder
-        self._sources: Iterable[Source[SourceT]] = sources
+        self._processor: RuntimeProcessor = processor
         self._shared: state.SharedResources = state.SharedResources.create(scene_limit=limit)
-        self._chunksize: int = chunksize or self._optimal_chunksize(loader.num_sources(), workers)
+        total_sources = processor.total_sources()
+        self._chunksize: int = chunksize or self._optimal_chunksize(total_sources, workers)
         self._limit: int | None = limit
         self._processes: int | None = workers
-        self._num_sources: int | None = loader.num_sources()
+        self._num_sources: int | None = total_sources
+        self._screening_enabled: bool = processor.screening_enabled()
         self._running: bool = False
 
     @override
-    def execute(
-        self, writer_factory: WriterFactory, finalize: Callable[[DatasetWriter], None] | None = None
-    ) -> None:
+    def execute(self, writer_factory: WriterFactory) -> None:
         _ = deque(
             self._execute_parallel(
                 self._process_fn_write,
-                self._sources,
+                self._processor.iter_sources(),
                 _init_write_worker,
-                *(self._shared, self._loader, self._builder, writer_factory, finalize),
+                self._shared,
+                self._processor,
+                writer_factory,
             ),
             maxlen=0,
         )
+        writer_factory(None).finish_final()
+
+    @override
+    def execute_yield(self) -> Iterator[Scene]:
+        for scenes in self._execute_parallel(
+            self._process_fn_yield,
+            self._processor.iter_sources(),
+            _init_worker,
+            self._shared,
+            self._processor,
+        ):
+            yield from scenes
 
     @override
     def progress(self) -> Progress:
@@ -75,11 +104,13 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
             return Progress(
                 running=self._running,
                 processed_sources=self._shared.progress.source_counter.value,
-                processed_scenes=self._shared.progress.scene_counter.value,
+                candidate_scenes=self._shared.progress.candidate_scene_counter.value,
+                selected_scenes=self._shared.progress.selected_scene_counter.value,
                 active_workers=self._shared.progress.active_workers.value,
                 total_sources=self._num_sources,
-                total_scenes=self._limit,
+                scene_limit=self._limit,
                 split_counts=self._shared.progress.split_counts(),
+                screening_enabled=self._screening_enabled,
             )
 
     @override
@@ -90,41 +121,57 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
     def is_running(self) -> bool:
         return self._running
 
-    @property
-    def split_counts(self) -> dict[str, int]:
-        with self._shared.progress.snapshot_lock:
-            return self._shared.progress.split_counts()
-
     @staticmethod
     def _process_fn_write(source: Source[Any]) -> int:
         if _ctx.writer is None:
             msg = "DatasetWriter was not initialized for this worker process."
             raise ValueError(msg)
-        if _ctx.loader is None or _ctx.builder is None:
-            msg = "Loader runtime was not initialized for this worker process."
+        if _ctx.processor is None:
+            msg = "Runtime processor was not initialized for this worker process."
             raise ValueError(msg)
-        processed_scenes = 0
-        for scene in ParallelExecutor._generate_scenes(_ctx.loader, _ctx.builder, source):
+        if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
+            return 0
+        selected_scenes = 0
+        for scene in ParallelExecutor._generate_scenes(_ctx.processor, source):
             _ctx.shared.progress.record_split(scene.split_assignment)
             _ctx.writer.write(scene)
-            processed_scenes += 1
+            selected_scenes += 1
         _ = _ctx.shared.progress.increment_source()
-        return processed_scenes
+        return selected_scenes
 
     @staticmethod
-    def _generate_scenes(
-        loader: BaseSceneLoader[Any, Any], builder: SceneBuilder, source: Source[Any]
-    ) -> Iterator[Scene]:
-        for processed in builder.prepare_source(loader, source):
-            scene_number = _ctx.shared.progress.claim_scene(_ctx.shared.scene_limit)
+    def _process_fn_yield(source: Source[Any]) -> list[Scene]:
+        if _ctx.processor is None:
+            msg = "Runtime processor was not initialized for this worker process."
+            raise ValueError(msg)
+        if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
+            return []
+        _ = _ctx.shared.progress.increment_source()
+        scenes = list(ParallelExecutor._generate_scenes(_ctx.processor, source))
+        for scene in scenes:
+            _ctx.shared.progress.record_split(scene.split_assignment)
+        return scenes
+
+    @staticmethod
+    def _generate_scenes(processor: RuntimeProcessor, source: Source[Any]) -> Iterator[Scene]:
+        if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
+            return
+        claim_selected_scene = functools.partial(
+            _ctx.shared.progress.claim_selected_scene, _ctx.shared.scene_limit
+        )
+        for candidate in processor.iter_candidates(source):
+            _ = _ctx.shared.progress.record_candidate_scene()
+            if not candidate.passes_screening:
+                continue
+            scene_number = claim_selected_scene()
             if scene_number is None:
                 return
-            yield builder.create_scene(loader, processed, source, scene_number)
+            yield processor.materialize(candidate, scene_number)
 
     def _execute_parallel(
         self,
-        process_fn: Callable[[Source[SourceT]], ReturnT],
-        payloads: Iterable[Source[SourceT]],
+        process_fn: Callable[[Source[Any]], ReturnT],
+        payloads: Iterable[Source[Any]],
         initializer: Callable[P, object],
         *args: P.args,
         **kwargs: P.kwargs,
@@ -133,12 +180,21 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         pool_initializer = functools.partial(initializer, *args, **kwargs)
         self._running = True
         self.progress_event().set()
-        with mp.Pool(self._processes, initializer=pool_initializer) as pool:
+        pool: Pool | None = None
+        completed = False
+        try:
+            pool = Pool(self._processes, initializer=pool_initializer)
             yield from pool.imap_unordered(process_fn, payloads, self._chunksize)
-            pool.close()
-            pool.join()
-        self._running = False
-        self.progress_event().set()
+            completed = True
+        finally:
+            if pool is not None:
+                if completed:
+                    pool.close()
+                else:
+                    pool.terminate()
+                pool.join()
+            self._running = False
+            self.progress_event().set()
 
     @staticmethod
     def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:
@@ -150,15 +206,19 @@ class ParallelExecutor(ObservableExecutor, Generic[SourceT]):
         return max(chunksize, 1)
 
 
-def _init_worker(shared: state.SharedResources, *, with_finalize: bool = True) -> None:
+def _init_worker(
+    shared: state.SharedResources,
+    processor: RuntimeProcessor | None = None,
+    *,
+    with_finalize: bool = True,
+) -> None:
     global _ctx  # noqa: PLW0603
     worker_id = shared.registry.next_worker()
     shared.progress.worker_started()
-    _ctx = state.WorkerRuntime(shared=shared, worker_id=worker_id)
+    _ctx = state.WorkerRuntime(shared=shared, worker_id=worker_id, processor=processor)
     if with_finalize:
 
         def cleanup() -> None:
-            assert _ctx is not None
             _ = _ctx.shared.progress.worker_stopped()
 
         _ = Finalize(obj=None, callback=cleanup, exitpriority=10)
@@ -166,16 +226,11 @@ def _init_worker(shared: state.SharedResources, *, with_finalize: bool = True) -
 
 def _init_write_worker(
     shared: state.SharedResources,
-    loader: BaseSceneLoader[Any, LoaderOptions],
-    builder: SceneBuilder,
-    writer_factory: Callable[[int], DatasetWriter],
-    finalize: Callable[[DatasetWriter], None] | None,
+    processor: RuntimeProcessor,
+    writer_factory: Callable[[int | None], DatasetWriter],
 ) -> None:
     global _ctx  # noqa: PLW0602
-    _init_worker(shared, with_finalize=False)
-    assert _ctx is not None
-    _ctx.loader = loader
-    _ctx.builder = builder
+    _init_worker(shared, processor, with_finalize=False)
     writer: DatasetWriter | None = None
     try:
         writer = writer_factory(_ctx.worker_id)
@@ -185,18 +240,11 @@ def _init_write_worker(
         raise
 
     def cleanup() -> None:
-        assert _ctx is not None
         current_writer = _ctx.writer
-        assert current_writer is not None
+        if current_writer is None:
+            return
         try:
-            with _ctx.progress_snapshot_lock():
-                active_before = _ctx.active_workers()
-                if finalize is not None:
-                    finalize(current_writer)
-                else:
-                    current_writer.finish_local()
-                if active_before == 1:
-                    current_writer.finish_final()
+            current_writer.finish_local()
         finally:
             _ = _ctx.shared.progress.worker_stopped()
 

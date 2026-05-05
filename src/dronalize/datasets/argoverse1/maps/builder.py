@@ -2,89 +2,104 @@
 
 from __future__ import annotations
 
-from itertools import chain, repeat
 from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import TypedDict, override
+from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
-from dronalize.datasets.argoverse1.maps import parser, utils
-from dronalize.processing.maps.builder import BaseMapBuilder, Point
+from dronalize.datasets.argoverse1.maps import parser
+from dronalize.processing.maps.builder import FeatureMapBuilder, Point
+from dronalize.processing.maps.features import PathFeature
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
 
 
-class Argoverse1MapBuilder(BaseMapBuilder):
+class Argoverse1MapBuilder(FeatureMapBuilder):
     """A builder for creating a graph representation of an Argoverse1 map."""
 
-    class SegmentEndpoint(TypedDict):
-        """Endpoints of a lane segment used for graph building."""
-
-        start_id: int
-        end_id: int
-
-    class SegmentEndpoints(TypedDict):
-        """Endpoints of a lane segment with a line string."""
-
-        right: Argoverse1MapBuilder.SegmentEndpoint
-        left: Argoverse1MapBuilder.SegmentEndpoint
-
     def __init__(self, argoverse_map: parser.Argoverse1Map) -> None:
-        """Initialize the map builder with an `Argoverse1Map`."""
         if not argoverse_map.is_parsed():
             argoverse_map.parse()
 
-        super().__init__()
-        self.lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
-        self.map_nodes: dict[int, Point] = argoverse_map.nodes
-
-        self.max_distance_between_connections: float = 1.0
+        self._lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
+        self._map_nodes: dict[int, Point] = argoverse_map.nodes
+        self._max_distance_between_connections: float = 1.0
 
     @classmethod
     def from_xml_file(cls, path: Path) -> Argoverse1MapBuilder:
         """Create a map builder from an Argoverse 1 XML file."""
-        argoverse_map = parser.Argoverse1Map.from_xml_file(path)
-        return cls(argoverse_map)
+        return cls(parser.Argoverse1Map.from_xml_file(path))
 
     @override
-    def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
-        # Dict to store endpoints (start and end) of each lane segment to enable
-        # efficient connection of segments after all segments are added
-        self._lane_endpoints: dict[int, Argoverse1MapBuilder.SegmentEndpoints] = {}
-        self._build_segment_edges(interp_distance=interp_distance, min_distance=min_distance)
-        self._connect_lane_segments()
+    def iter_features(self) -> Iterable[PathFeature]:
+        for segment in self._lane_segments.values():
+            yield from self._segment_features(segment)
+        yield from self._connection_features()
 
-    # --- Private methods ---
+    def _segment_features(self, segment: parser.LaneSegment) -> Iterable[PathFeature]:
+        node_ids = list(segment.node_ids)
+        centerline = [self._map_nodes[i] for i in node_ids]
+        left_key = f"lane:{segment.id}:left"
+        right_key = f"lane:{segment.id}:right"
 
-    def _connect_lane_segments(self) -> None:
-        """Connect endpoints of all connected lane segments in the graph.
+        add_as_polygon = (
+            lane_segment_is_regulatory(segment) and segment.turn_direction == parser.TurnType.NONE
+        )
+        add_as_polygon &= not any_lane_segment_is_regulatory(
+            lane_segment_successors(segment, self._lane_segments)
+        )
 
-        The connections are based on the predecessors and successors of each
-        lane segment.
-        """
+        right, left = edge_borders_from_centerline(np.array(centerline))
+        left_points = tuple((float(x), float(y)) for x, y in left)
+        right_points = tuple((float(x), float(y)) for x, y in right)
+
+        yield PathFeature(points=left_points, edge_types=EdgeType.VIRTUAL, key=left_key)
+        yield PathFeature(points=right_points, edge_types=EdgeType.VIRTUAL, key=right_key)
+
+        if add_as_polygon:
+            yield PathFeature(
+                points=(left_points[-1], right_points[-1]),
+                edge_types=EdgeType.REGULATORY,
+                min_distance=0.0,
+            )
+            yield PathFeature(
+                points=(right_points[0], left_points[0]),
+                edge_types=EdgeType.REGULATORY,
+                min_distance=0.0,
+            )
+
+    def _get_segment_borders(self, segment_id: int) -> tuple[tuple[Point, ...], tuple[Point, ...]]:
+        """Get the left and right border points for a segment."""
+        segment = self._lane_segments[segment_id]
+        node_ids = list(segment.node_ids)
+        centerline = [self._map_nodes[i] for i in node_ids]
+
+        right, left = edge_borders_from_centerline(np.array(centerline))
+        left_points = tuple((float(x), float(y)) for x, y in left)
+        right_points = tuple((float(x), float(y)) for x, y in right)
+        return (left_points, right_points)
+
+    def _connection_features(self) -> Iterable[PathFeature]:
         already_connected: dict[int, set[int]] = {}
-        for segment in self.lane_segments.values():
+        for segment in self._lane_segments.values():
             _ = already_connected.setdefault(segment.id, set())
-            for pre_id in segment.predecessors:
-                if pre_id in already_connected[segment.id]:
+            for predecessor_id in segment.predecessors:
+                if predecessor_id in already_connected[segment.id]:
                     continue
+                yield from self._connect_endpoints(predecessor_id, segment.id)
+                already_connected[segment.id].add(predecessor_id)
+                already_connected.setdefault(predecessor_id, set()).add(segment.id)
 
-                self._connect_endpoints(pre_id, segment.id)
-                already_connected[segment.id].add(pre_id)
-                already_connected.setdefault(pre_id, set()).add(segment.id)
-
-            for suc_id in segment.successors:
-                if suc_id in already_connected[segment.id]:
+            for successor_id in segment.successors:
+                if successor_id in already_connected[segment.id]:
                     continue
-
-                self._connect_endpoints(segment.id, suc_id)
-                already_connected[segment.id].add(suc_id)
-                already_connected.setdefault(suc_id, set()).add(segment.id)
+                yield from self._connect_endpoints(segment.id, successor_id)
+                already_connected[segment.id].add(successor_id)
+                already_connected.setdefault(successor_id, set()).add(segment.id)
 
     def _connect_endpoints(
         self,
@@ -92,156 +107,166 @@ class Argoverse1MapBuilder(BaseMapBuilder):
         endpoint_to: int,
         left_edge_type: EdgeType = EdgeType.VIRTUAL,
         right_edge_type: EdgeType = EdgeType.VIRTUAL,
-    ) -> None:
-        """Connect two lane segment endpoints in the graph.
+    ) -> Iterable[PathFeature]:
+        from_left, from_right = self._get_segment_borders(endpoint_from)
+        to_left, to_right = self._get_segment_borders(endpoint_to)
 
-        Parameters
-        ----------
-        endpoint_from : int
-            Lane segment ID from which to connect.
-        endpoint_to : int
-            Lane segment ID to which to connect.
-        left_edge_type : EdgeType, optional
-            Left border edge type.
-        right_edge_type : EdgeType, optional
-            Right border edge type.
+        # Check distance constraints before yielding
+        max_dist = self._max_distance_between_connections
+        right_dist_sq = (from_right[-1][0] - to_right[0][0]) ** 2 + (
+            from_right[-1][1] - to_right[0][1]
+        ) ** 2
+        left_dist_sq = (from_left[-1][0] - to_left[0][0]) ** 2 + (
+            from_left[-1][1] - to_left[0][1]
+        ) ** 2
 
-        """
-        if endpoint_from not in self._lane_endpoints or endpoint_to not in self._lane_endpoints:
-            return
-
-        from_endpoints = self._lane_endpoints[endpoint_from]
-        to_endpoints = self._lane_endpoints[endpoint_to]
-
-        right_from = from_endpoints["right"]["end_id"]
-        left_from = from_endpoints["left"]["end_id"]
-        right_to = to_endpoints["right"]["start_id"]
-        left_to = to_endpoints["left"]["start_id"]
-
-        if (
-            not self.edge_exists(right_from, right_to, right_edge_type)
-            and self.node_distance(right_from, right_to) < self.max_distance_between_connections
-        ):
-            self.add_edge(right_from, right_to, right_edge_type)
-
-        if (
-            not self.edge_exists(left_from, left_to, left_edge_type)
-            and self.node_distance(left_from, left_to) < self.max_distance_between_connections
-        ):
-            self.add_edge(left_from, left_to, left_edge_type)
-
-    def _build_segment_edges(
-        self, *, interp_distance: float | None = None, min_distance: float | None = None
-    ) -> None:
-        """Build edges through a lane segment."""
-        for segment in self.lane_segments.values():
-            self._add_boundary_edges(
-                segment, interp_distance=interp_distance, min_distance=min_distance
+        if right_dist_sq <= max_dist**2:
+            yield PathFeature(
+                points=(from_right[-1], to_right[0]), edge_types=right_edge_type, min_distance=0.0
             )
 
-    def _add_boundary_edges(
-        self,
-        segment: parser.LaneSegment,
-        *,
-        interp_distance: float | None = None,
-        min_distance: float | None = None,
-    ) -> None:
-        """Add edges for the left and right boundaries of a lane segment."""
-        node_ids = list(segment.node_ids)
-        centerline = [self.map_nodes[i] for i in node_ids]
-        l_type, r_type = EdgeType.VIRTUAL, EdgeType.VIRTUAL
-        add_as_polygon = (
-            utils.lane_segment_is_regulatory(segment)
-            and segment.turn_direction == parser.TurnType.NONE
-        )
-        add_as_polygon &= not utils.any_lane_segment_is_regulatory(
-            utils.lane_segment_successors(segment, self.lane_segments)
-        )
-
-        right, left = utils.edge_borders_from_centerline(np.array(centerline))
-        if add_as_polygon:
-            polygon = np.vstack([left, right[::-1], left[0]])
-            edge_types = chain(
-                repeat(l_type, len(right) - 1),  # The left border types
-                [EdgeType.REGULATORY],  # Type between left and right border
-                repeat(r_type, len(left) - 1),  # The right border types
-                [EdgeType.REGULATORY],  # Type between right and left border
-            )
-            added_nodes = self._numpy_add_edge_loop(
-                polygon,
-                edge_type=list(edge_types),
-                interp_distance=interp_distance,
-                min_distance=min_distance,
-            )
-            l_nodes = added_nodes[: len(left) - 1]
-            r_nodes = added_nodes[len(left) : -1]
-        else:
-            # Add left border edges
-            l_nodes = self._numpy_add_edge_loop(
-                left, edge_type=l_type, interp_distance=interp_distance, min_distance=min_distance
-            )
-            # Add right border edges
-            r_nodes = self._numpy_add_edge_loop(
-                right, edge_type=r_type, interp_distance=interp_distance, min_distance=min_distance
+        if left_dist_sq <= max_dist**2:
+            yield PathFeature(
+                points=(from_left[-1], to_left[0]), edge_types=left_edge_type, min_distance=0.0
             )
 
-        # Store endpoints for the lane segment for later use to connect lanes
-        if len(l_nodes) > 1 and len(r_nodes) > 1:
-            self._lane_endpoints[segment.id] = {
-                "right": {"start_id": r_nodes[0], "end_id": r_nodes[-1]},
-                "left": {"start_id": l_nodes[0], "end_id": l_nodes[-1]},
-            }
 
-    def _numpy_add_edge_loop(
-        self,
-        numpy_nodes: npt.NDArray[np.float64],
-        edge_type: EdgeType | list[EdgeType] = EdgeType.VIRTUAL,
-        min_distance: float | None = None,
-        interp_distance: float | None = None,
-    ) -> list[int]:
-        if len(numpy_nodes) == 0:
-            return []
+# `swap_left_and_right` and `edge_borders_from_centerline` are utility functions
+# that are taken (with some modifications) from the original Argoverse 1
+# codebase. Available at: https://github.com/argoverse/argoverse-api
+# Note: `edge_borders_from_centerline` was originally named `centerline_to_polygon`.
 
-        # Handle edge types
-        if isinstance(edge_type, EdgeType):
-            edge_type_list = list(repeat(edge_type, times=len(numpy_nodes) - 1))
-        else:
-            edge_type_list = edge_type
 
-        # 1. Create the starting node
-        prev_pt: Point = (float(numpy_nodes[0][0]), float(numpy_nodes[0][1]))
-        prev_id = self.add_node(*prev_pt)
+def swap_left_and_right(
+    condition: npt.NDArray[np.bool_],
+    left_centerline: npt.NDArray[np.float64],
+    right_centerline: npt.NDArray[np.float64],
+) -> Iterable[npt.NDArray[np.float64]]:
+    """Swap points in left and right centerline according to condition.
 
-        added_ids = [prev_id]
-        min_distance = min_distance if min_distance is not None else 0.0
+    Parameters
+    ----------
+    condition : np.ndarray
+        Boolean array of shape (N,). Where True, swap the values in the left
+        and right centerlines.
+    left_centerline : np.ndarray
+        The left centerline, whose points should be swapped with the right
+        centerline.
+    right_centerline : np.ndarray
+        The right centerline.
 
-        i, j = 0, 1
-        edge_idx = 0
-        while i < len(numpy_nodes) - 1:
-            src_vec, dst_vec = numpy_nodes[i], numpy_nodes[j]
-            distance = np.linalg.norm(dst_vec - src_vec)
-            if distance < min_distance and j < len(numpy_nodes) - 1:
-                j += 1
-                continue
+    Returns
+    -------
+    left_centerline : np.ndarray
+        The (possibly swapped) left centerline.
+    right_centerline : np.ndarray
+        The (possibly swapped) right centerline.
 
-            dst_pt: Point = (float(dst_vec[0]), float(dst_vec[1]))
-            dst_id = self.add_node(*dst_pt)
-            current_edge_type = edge_type_list[min(edge_idx, len(edge_type_list) - 1)]
+    """
+    right_swap_indices = right_centerline[condition]
+    left_swap_indices = left_centerline[condition]
 
-            last_id = prev_id
-            for s_id, d_id, e_type in self.interpolate_edge(
-                prev_id, prev_pt, dst_id, dst_pt, interp_distance, current_edge_type
-            ):
-                self.add_edge(s_id, d_id, e_type)
-                added_ids.append(d_id)
-                last_id = d_id
+    left_centerline[condition] = right_swap_indices
+    right_centerline[condition] = left_swap_indices
+    return left_centerline, right_centerline
 
-            prev_pt = dst_pt
-            prev_id = last_id
 
-            # Advance indices
-            i = j
-            j = i + 1
-            edge_idx += 1
+def edge_borders_from_centerline(
+    centerline: npt.NDArray[np.float64], width_scaling_factor: float = 1.0
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    """Convert a lane centerline polyline into a rough polygon of the lane's area.
 
-        return added_ids
+    On average, a lane is 3.8 meters in width. Thus, we allow 1.9 m on each
+    side. We use this as the length of the hypotenuse of a right triangle, and
+    compute the other two legs to find the scaled x and y displacement.
+
+    Parameters
+    ----------
+    centerline : np.ndarray, shape (N, 2)
+        The lane centerline polyline.
+    width_scaling_factor : float, optional
+        Multiplier that scales 3.8 meters to get the lane width.
+
+    Returns
+    -------
+    right_centerline : np.ndarray
+        Right border of the lane.
+    left_centerline : np.ndarray
+        Left border of the lane.
+
+    """
+    # eliminate duplicates
+    _, inds = np.unique(centerline, axis=0, return_index=True)
+    # does not return indices in sorted order
+    inds = np.sort(inds)
+    centerline = centerline[inds]
+
+    dx = np.gradient(centerline[:, 0])
+    dy = np.gradient(centerline[:, 1])
+
+    # compute the normal at each point
+    slopes = dy / dx
+    inv_slopes = -1.0 / slopes
+
+    thetas = np.arctan(inv_slopes)
+    x_disp = 3.8 * width_scaling_factor / 2.0 * np.cos(thetas)
+    y_disp = 3.8 * width_scaling_factor / 2.0 * np.sin(thetas)
+
+    displacement = np.hstack([x_disp[:, np.newaxis], y_disp[:, np.newaxis]])
+    right_centerline = centerline + displacement
+    left_centerline = centerline - displacement
+
+    # right centerline position depends on sign of dx and dy
+    subtract_cond1 = np.logical_and(dx > 0, dy < 0)
+    subtract_cond2 = np.logical_and(dx > 0, dy > 0)
+    subtract_cond = np.logical_or(subtract_cond1, subtract_cond2)
+    left_centerline, right_centerline = swap_left_and_right(
+        subtract_cond, left_centerline, right_centerline
+    )
+
+    # right centerline also depended on if we added or subtracted y
+    neg_disp_cond = displacement[:, 1] > 0
+    left_centerline, right_centerline = swap_left_and_right(
+        neg_disp_cond, left_centerline, right_centerline
+    )
+
+    left_centerline, right_centerline = right_centerline, left_centerline
+
+    # return the polygon
+    return right_centerline, left_centerline
+
+
+def lane_segment_successors(
+    lane_segment: parser.LaneSegment, lane_segments: dict[int, parser.LaneSegment]
+) -> Iterable[parser.LaneSegment]:
+    """Get successors of a lane segment."""
+    return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.successors)
+
+
+def lane_segment_predecessors(
+    lane_segment: parser.LaneSegment, lane_segments: dict[int, parser.LaneSegment]
+) -> Iterable[parser.LaneSegment]:
+    """Get predecessors of a lane segment."""
+    return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.predecessors)
+
+
+def lane_segment_is_regulatory(lane_segment: parser.LaneSegment) -> bool:
+    """Check if a lane segment is regulatory.
+
+    Parameters
+    ----------
+    lane_segment : LaneSegment
+        The lane segment to check.
+
+    Returns
+    -------
+    bool
+        True if the lane segment is regulatory, False otherwise.
+
+    """
+    return lane_segment.is_intersection and lane_segment.has_traffic_control
+
+
+def any_lane_segment_is_regulatory(lane_segments: Iterable[parser.LaneSegment]) -> bool:
+    """Check if any lane segment in the iterable is regulatory."""
+    return any(lane_segment_is_regulatory(lane_segment) for lane_segment in lane_segments)

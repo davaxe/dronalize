@@ -41,7 +41,13 @@ SplitAssigner = Assigner[DatasetSplit | None]
 
 
 class ConstantAssigner(Assigner[T_co]):
-    """A simple assigner that always assigns the same constant group."""
+    """A simple assigner that always assigns the same constant group.
+
+    Parameters
+    ----------
+    group : T_co
+        The constant group to assign for any input values.
+    """
 
     def __init__(self, group: T_co) -> None:
         self._group: T_co = group
@@ -71,6 +77,17 @@ class StatelessWeightedAssigner(Assigner[T_co]):
     assignments, and could differ significantly from the specified distribution
     for small numbers of assignments.
 
+    Parameters
+    ----------
+    groups : Sequence[T_co]
+        A sequence of unique groups to assign the stream into.
+    weights : Sequence[float], optional
+        A sequence of weights corresponding to each group. If `None` groups are
+        treated as equally weighted. The weights will be normalized to sum to 1
+    seed : int, optional
+        An optional random seed for deterministic group assignment. If `None`, a
+        random seed will be generated internally.
+
     """
 
     def __init__(
@@ -79,20 +96,6 @@ class StatelessWeightedAssigner(Assigner[T_co]):
         weights: Sequence[float] | None = None,
         seed: int | None = None,
     ) -> None:
-        """Initialize and construct the StatelessWeightedAssigner.
-
-        Parameters
-        ----------
-        groups : Sequence[T]
-            A sequence of unique groups to assign the stream into.
-        weights : Sequence[float], optional
-            A sequence of weights corresponding to each group. If None,
-            groups are treated as equally weighted. The weights will be
-            normalized to sum to 1.
-        seed : int, optional
-            An optional random seed for deterministic group assignment. If None,
-            a random seed will be generated internally.
-        """
         self._seed: int = (
             seed if seed is not None else int(np.random.default_rng().integers(0, 2**31 - 1))
         )

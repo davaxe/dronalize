@@ -6,8 +6,10 @@ from typing import TYPE_CHECKING
 
 import polars as pl
 
-from dronalize.processing.pipeline import functional as f
-from dronalize.processing.pipeline.functional.resample import ResampleSpec
+from dronalize.core import functional as f
+from dronalize.core.functional import ResampleSpec
+from dronalize.processing.columns import TrajectoryColumns
+from dronalize.processing.screening.apply import screen_scene as _screen_scene
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -18,12 +20,11 @@ if TYPE_CHECKING:
 
 def screen_scene(
     scene_screening: Screen | None = None,
+    columns: TrajectoryColumns | None = None,
     *,
     group_by: str | Sequence[str] | None = None,
-    agent_id: str = "id",
-    frame_column: str = "frame",
-    category_column: str = "agent_category",
     mark_passed_agents: bool = False,
+    retain_scene_passes: bool = False,
 ) -> Transform:
     """Create a screening transform.
 
@@ -33,52 +34,28 @@ def screen_scene(
     ----------
     scene_screening : Screen, optional
         Screening specification containing cleanup and check rules.
+    columns : TrajectoryColumns, optional
+        Column mapping for the input frame.
     group_by : str or Sequence[str], optional
         Column(s) that define independent scenes inside the frame.
-    agent_id : str, optional
-        Column name for agent IDs.
-    frame_column : str, optional
-        Column name for frame indices.
-    category_column : str, optional
-        Column name for agent categories.
     mark_passed_agents : bool, optional
         Whether to retain an internal per-agent passed marker for runtime transport.
 
     """
 
     def _screen(df: pl.LazyFrame) -> pl.LazyFrame:
-        return f.screen_scene(
+        return _screen_scene(
             df,
             scene_screening=scene_screening,
-            group_by=group_by,
-            agent_id=agent_id,
-            frame_column=frame_column,
-            category_column=category_column,
+            columns=columns or TrajectoryColumns(),
+            scene_group_by=group_by,
             mark_passed_agents=mark_passed_agents,
+            retain_scene_passes=retain_scene_passes,
         )
 
     _screen.__name__ = "screen"
     _screen.__qualname__ = "transforms.screen"
     return _screen
-
-
-def require_min(group_by: str | Sequence[str], minimum: int = 2) -> Transform:
-    """Require a minimum number of rows per group.
-
-    Parameters
-    ----------
-    group_by : str or Sequence[str]
-        Column(s) to group by.
-    minimum : int, optional
-        Minimum number of rows required per group. Default is 1.
-    """
-
-    def _require_min(df: pl.LazyFrame) -> pl.LazyFrame:
-        return df.filter(pl.len().over(group_by) >= minimum)
-
-    _require_min.__name__ = "require_min"
-    _require_min.__qualname__ = "transforms.require_min"
-    return _require_min
 
 
 def resample(

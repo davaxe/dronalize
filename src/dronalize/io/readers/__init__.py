@@ -7,7 +7,7 @@ storage-agnostic in-memory representations of scene records.
 ## Import guide
 
 ```python
-from dronalize.io.readers import MDSReader, MDSReaderInitArgs, PickleReader, SceneReader
+from dronalize.io.readers import DatasetReader, MDSReader, MDSReaderInitArgs, PickleReader
 ```
 
 ## Related modules
@@ -19,8 +19,9 @@ from dronalize.io.readers import MDSReader, MDSReaderInitArgs, PickleReader, Sce
 
 from __future__ import annotations
 
-import importlib
 from typing import TYPE_CHECKING
+
+from dronalize.core._lazy import lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
     from dronalize.io.base import DatasetReader
@@ -29,8 +30,8 @@ if TYPE_CHECKING:
 
 __all__ = ["DatasetReader", "MDSReader", "MDSReaderInitArgs", "PickleReader"]
 
-_EXPORTS: dict[str, tuple[str, str]] = {
-    "SceneReader": ("dronalize.io.readers.base", "SceneReader"),
+__lazy_exports__: dict[str, tuple[str, str]] = {
+    "DatasetReader": ("dronalize.io.base", "DatasetReader"),
     "MDSReader": ("dronalize.io.readers.mds", "MDSReader"),
     "MDSReaderInitArgs": ("dronalize.io.readers.mds", "MDSReaderInitArgs"),
     "PickleReader": ("dronalize.io.readers.pickle", "PickleReader"),
@@ -39,16 +40,9 @@ _EXPORTS: dict[str, tuple[str, str]] = {
 
 def __getattr__(name: str) -> object:
     """Resolve optional reader exports lazily."""
-    if name not in _EXPORTS:
-        msg = f"module '{__name__}' has no attribute '{name}'"
-        raise AttributeError(msg)
-
-    module_name, export_name = _EXPORTS[name]
-    value = getattr(importlib.import_module(module_name), export_name)
-    globals()[name] = value
-    return value
+    return resolve_lazy_export(globals(), __lazy_exports__, module_name=__name__, name=name)
 
 
 def __dir__() -> list[str]:
     """Expose lazy reader exports during interactive discovery."""
-    return sorted(set(globals()) | set(__all__))
+    return lazy_dir(globals(), exported_names=list(__lazy_exports__))

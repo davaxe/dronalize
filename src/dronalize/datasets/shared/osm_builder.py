@@ -1,17 +1,14 @@
-import xml.etree.ElementTree as ET
-from collections.abc import Callable
+import xml.etree.ElementTree as ET  # noqa: S405
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
 from dronalize.datasets.shared import utils
-from dronalize.processing.maps.builder import BaseMapBuilder
-
-if TYPE_CHECKING:
-    from dronalize.processing.maps.builder import Point
+from dronalize.processing.maps.builder import FeatureMapBuilder
+from dronalize.processing.maps.features import PathFeature, Point
 
 
 @dataclass
@@ -21,7 +18,7 @@ class OSMWay:
     tags: dict[str, str]
 
 
-class OSMMapBuilder(BaseMapBuilder):
+class OSMMapBuilder(FeatureMapBuilder):
     """Map builder that constructs a `MapGraph` from OpenStreetMap (OSM) XML data."""
 
     def __init__(
@@ -31,23 +28,9 @@ class OSMMapBuilder(BaseMapBuilder):
         edge_type_mapping: Callable[[OSMWay], EdgeType] | None = None,
         *,
         include_edge_type_none: bool = False,
+        force_zone_from_origin: tuple[float, float] | None = None,
+        local_origin_latlon: tuple[float, float] | None = None,
     ) -> None:
-        """Initialize the OSM map builder.
-
-        Parameters
-        ----------
-        osm_file : Path
-            File path to the OSM XML data file (.osm format).
-        utm_position_offset : tuple[float, float], optional
-            (x, y) offset to apply to all node positions after converting
-            from lat/lon to UTM coordinates. Defaults to (0.0, 0.0).
-        edge_type_mapping : Callable[[OSMWay], EdgeType], optional
-            How to map the OSM way tags to EdgeType categories.
-        include_edge_type_none : bool, optional
-            Whether to include edges categorized as EdgeType.NONE based on
-            the edge_type_mapping. Defaults to False.
-
-        """
         if not osm_file.exists():
             msg = (
                 f"OSM file not found at {osm_file}. "
@@ -55,7 +38,6 @@ class OSMMapBuilder(BaseMapBuilder):
             )
             raise FileNotFoundError(msg)
 
-        super().__init__()
         self._edge_type_mapping: Callable[[OSMWay], EdgeType] = (
             edge_type_mapping or self._default_edge_type_mapping
         )
@@ -63,6 +45,26 @@ class OSMMapBuilder(BaseMapBuilder):
         self._osm_file: Path = osm_file
         self._nodes: dict[int, Point] = {}
         self._include_edge_type_none: bool = include_edge_type_none
+
+        self._force_zone_number: int | None = None
+        self._force_zone_letter: str | None = None
+        self._origin_utm_x: float = 0.0
+        self._origin_utm_y: float = 0.0
+
+        if force_zone_from_origin is not None:
+            zone_lat, zone_lon = force_zone_from_origin
+            _, _, self._force_zone_number, self._force_zone_letter = utils.from_latlon(
+                zone_lat, zone_lon
+            )
+
+        if local_origin_latlon is not None:
+            origin_lat, origin_lon = local_origin_latlon
+            self._origin_utm_x, self._origin_utm_y, _, _ = utils.from_latlon(
+                origin_lat,
+                origin_lon,
+                force_zone_number=self._force_zone_number,
+                force_zone_letter=self._force_zone_letter,
+            )
 
     @staticmethod
     def _default_edge_type_mapping(way: OSMWay) -> EdgeType:
@@ -76,19 +78,26 @@ class OSMMapBuilder(BaseMapBuilder):
         lat = float(elem.attrib["lat"])
         lon = float(elem.attrib["lon"])
 
-        x, y, _, _ = utils.from_latlon(lat, lon)
-        self._nodes[node_id] = (x + x_offset, y + y_offset)
+        x, y, _, _ = utils.from_latlon(
+            lat,
+            lon,
+            force_zone_number=self._force_zone_number,
+            force_zone_letter=self._force_zone_letter,
+        )
 
-        # Clear element from memory once processed
+        self._nodes[node_id] = (
+            x - self._origin_utm_x + x_offset,
+            y - self._origin_utm_y + y_offset,
+        )
+
         elem.clear()
         root.clear()
 
-    def _process_way(self, elem: ET.Element, root: ET.Element) -> None:
+    def _process_way(self, elem: ET.Element, root: ET.Element) -> PathFeature | None:
         """Process an OSM way element."""
         points: list[Point] = []
         tags: dict[str, str] = {}
 
-        # Extract node references and tags
         for child in elem:
             if child.tag == "nd":
                 ref = int(child.attrib["ref"])
@@ -97,31 +106,30 @@ class OSMMapBuilder(BaseMapBuilder):
             elif child.tag == "tag":
                 tags[child.attrib["k"]] = child.attrib["v"]
 
-        way = OSMWay(tags=tags)
-        edge_type = self._edge_type_mapping(way)
-
-        if (edge_type != EdgeType.NONE or self._include_edge_type_none) and points:
-            self.add_path_lazy(points=points, edge_type=edge_type)
-
-        # Clear element from memory once processed
         elem.clear()
         root.clear()
 
+        way = OSMWay(tags=tags)
+        edge_type = self._edge_type_mapping(way)
+        if (edge_type == EdgeType.NONE and not self._include_edge_type_none) or not points:
+            return None
+
+        return PathFeature(points=tuple(points), edge_types=edge_type)
+
     @override
-    def build_impl(
-        self, min_distance: float | None = None, interp_distance: float | None = None
-    ) -> None:
-        # Use iterparse for memory-efficient incremental XML parsing
-        context = ET.iterparse(self._osm_file, events=("start", "end"))
-        context = iter(context)
-        _, root = next(context)
+    def iter_features(self) -> Iterable[PathFeature]:
+        self._nodes = {}
+        context = ET.iterparse(self._osm_file, events=("start", "end"))  # noqa: S314
+        iterator = iter(context)
+        _, root = next(iterator)
 
         x_offset, y_offset = self._utm_position_offset
-
-        for event, elem in context:
+        for event, elem in iterator:
             if event != "end":
                 continue
             if elem.tag == "node":
                 self._process_node(elem, x_offset, y_offset, root)
             elif elem.tag == "way":
-                self._process_way(elem, root)
+                feature = self._process_way(elem, root)
+                if feature is not None:
+                    yield feature

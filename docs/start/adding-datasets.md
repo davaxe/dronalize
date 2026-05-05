@@ -1,102 +1,113 @@
 # Adding datasets
 
 <div class="section-intro" markdown="1">
-The stable extension surface for new datasets is the dataset registry plus the loader API in
-`dronalize.processing.loading`. The goal of a dataset integration is to turn raw sources into the
-shared scene model and let the common runtime handle screening, splitting, schema conversion, and
-writing.
+Custom datasets enter `dronalize` through the same registry surface as built-in datasets: a loader
+turns raw files into normalized source data, and a [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec)
+describes how that loader should be configured and discovered.
 </div>
 
-## Start with the dataset contract
+## Minimal path
 
-Before writing code, pin down:
+1. Implement a [`BaseSceneLoader`](../reference/api/processing/loading.md#dronalize.processing.loading.BaseSceneLoader) subclass that finds
+   raw sources and loads them into the shared trajectory representation.
+2. Define a [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) with a unique `name`, `loader_type`,
+   `default_config`, and `native_schema`.
+3. Register it before resolving or executing a request. For Python code, call
+   [`dronalize.datasets.register()`](../reference/api/datasets/registry.md#dronalize.datasets.register) directly. For CLI usage, expose the
+   dataset through the module hook below.
+4. Verify it with a small [`ExecutionRequest`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest) and
+   [`resolve_request()`](../reference/api/runtime/executor.md#dronalize.runtime.resolve_request), or with `process --plan` through the CLI
+   once the module hook is in place.
 
-- what counts as one raw source: file, directory, archive member, or database row
-- whether the dataset already has native train, val, or test partitions
-- which trajectory fields are present in the native data
-- whether timestamps are regular enough for windowing and resampling
-- whether map data exists, and if it is scene-local or shared across many scenes
-- whether the dataset needs custom options under `[datasets.<name>.dataset]`
+## Registration scope
 
-These answers determine the loader shape, the `DatasetSpec`, and the default config you should
-publish.
+`register()` updates the in-memory registry for the current Python process. A normal shell command
+such as `dronalize inspect <name>` starts a new process, so it will not see registrations performed
+by unrelated external code.
 
-## Implement a loader
-
-Subclass `BaseSceneLoader` and implement the dataset-specific pieces only.
-
-```python
-from dronalize.processing.loading import BaseSceneLoader, LoadedSourceData, Source
-```
-
-In practice, a loader needs to:
-
-- implement `native_trajectory_schema()`
-- implement `load_source()`
-- implement either `discover_sources()` or `sources_for_split()`
-
-Most loaders can inherit the default pipeline behavior from `BaseSceneLoader`. That gives you the
-standard `scenes`, `screening`, `split`, `map`, and lane-change handling automatically.
-
-If your dataset needs dataset-owned config, define a typed options model and let the loader read it
-from `self.dataset_config`. Those values come from `[datasets.<name>.dataset]`.
-
-## Register a `DatasetSpec`
-
-Wrap the loader in a `DatasetSpec` and register it:
+That means this works for Python-driven runs:
 
 ```python
-from dronalize.config.models import DatasetConfig, ScenesConfig
-from dronalize.datasets import DatasetSpec, register
+from pathlib import Path
 
-register(
-    DatasetSpec(
-        name="my_dataset",
-        loader_factory=MyLoader.unified_factory,
-        default_config=DatasetConfig(
-            scenes=ScenesConfig(history_frames=20, future_frames=30, sample_time=0.1),
-        ),
-        native_schema=MyLoader.native_trajectory_schema(),
-    )
+from dronalize.datasets import register
+from dronalize.runtime import ExecutionRequest, resolve_request
+from my_project.datasets import MY_DATASET_SPEC
+
+register(MY_DATASET_SPEC)
+
+request = ExecutionRequest(
+    dataset=MY_DATASET_SPEC.name, input_dir=Path("raw"), output_dir=Path("processed")
 )
+plan = resolve_request(request)
 ```
 
-Add the other `DatasetSpec` fields only when the dataset actually supports them:
+It does not make the dataset visible to a later, separate `dronalize ...` shell command.
 
-- `native_splits` when the raw dataset ships with fixed partitions
-- `has_map` when map data is available
-- `dataset_options_model` when `[datasets.<name>.dataset]` should be typed and validated
-- `resources_factory` when a run should build or cache shared resources such as maps once
-- `time_split_support` when time-based split strategies are valid for the dataset
+## CLI usage
 
-## Keep responsibilities clean
+For CLI workflows, put the dataset registration in an importable Python module and expose a
+`register_dronalize_datasets()` hook. The hook can register specs itself:
 
-Put dataset-specific logic in the loader:
+```python
+from dronalize.datasets import register
+from my_project.datasets import MY_DATASET_SPEC
 
-- source discovery
-- raw parsing and normalization
-- coordinate conventions
-- dataset-specific metadata
-- map lookup details
 
-Leave shared runtime behavior to the library:
+def register_dronalize_datasets():
+    register(MY_DATASET_SPEC)
+```
 
-- config layering and override handling
-- screening and resampling
-- split assignment
-- schema conversion
-- backend writing and manifest creation
+The hook may also return one [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) or an iterable of
+specs instead:
 
-## Practical guidance
+```python
+from my_project.datasets import MY_DATASET_SPEC
 
-- Start with the smallest correct integration.
-- Reuse the common pipeline unless the dataset genuinely needs a custom one.
-- Add map support only when you can resolve maps reliably for each scene.
-- Add native split support only when the dataset really defines stable partitions.
-- Use dataset-owned config only for options that do not belong in the shared public config model.
 
-## See also
+def register_dronalize_datasets():
+    return [MY_DATASET_SPEC]
+```
 
-- [Architecture](../concepts/architecture.md)
-- [Datasets](../concepts/datasets.md)
-- [Configuration model](../concepts/configuration-model.md)
+Pass the module with `--dataset-module` before the command name:
+
+```bash
+dronalize --dataset-module my_project.dronalize_datasets available
+dronalize --dataset-module my_project.dronalize_datasets inspect <name>
+dronalize --dataset-module my_project.dronalize_datasets split-support <name>
+dronalize --dataset-module my_project.dronalize_datasets process <name> --input raw --output processed --plan
+```
+
+The CLI imports the module and calls `register_dronalize_datasets()` before resolving dataset names,
+so the same option works with `available`, `inspect`, `show-config`, `split-support`, and `process`.
+
+Limitations:
+
+- `--dataset-module` must be passed on each CLI invocation that needs the custom dataset.
+- The module must be importable in the CLI environment, for example because the package is installed
+  or its parent directory is on `PYTHONPATH`.
+- The hook runs as Python code, so only use modules you trust.
+- There is no automatic discovery of external dataset packages unless they are imported with
+  `--dataset-module`.
+
+## Keep the first integration small
+
+Start with one source format, one default scene window, and no optional map handling. Add native
+splits, dataset-specific options, maps, or specialized screening only after the basic loader can
+produce valid scenes.
+
+## Simple example
+
+The  `examples/custom_dataset.py` script demonstrates a minimal custom dataset integration. It is self-contained and covers both supported usage patterns:
+
+- Python-driven dataset registration and execution
+- CLI-based loading via `--dataset-module`
+
+For example, run the CLI `inspect` command from the repository root with the custom dataset module:
+
+```sh
+PYTHONPATH=. dronalize --dataset-module examples.custom_dataset inspect mini-csv
+```
+
+!!! note "Python path"
+    `PYTHONPATH=.` makes the local examples package importable when running directly from the repository checkout. In normal projects, the dataset module is usually part of an installed package, so this extra environment variable is not required.
