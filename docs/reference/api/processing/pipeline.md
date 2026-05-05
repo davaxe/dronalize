@@ -4,7 +4,7 @@
         members: false
 
 Built-in dataframe transforms and resampling helpers now live under
-[`dronalize.core.functional`][].
+[`dronalize.core.functional`](../core/index.md).
 
 ## ::: dronalize.processing.pipeline.Pipeline
 

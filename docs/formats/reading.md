@@ -7,7 +7,7 @@ you can switch between `pickle` and `mds` without changing your downstream scene
 
 ## Reader model
 
-Framework-neutral readers return [`SceneRecord`][dronalize.io.SceneRecord]
+Framework-neutral readers return [`SceneRecord`](../reference/api/io/storage-and-manifests.md#dronalize.io.SceneRecord)
 objects with:
 
 - scene id and position offset
@@ -28,7 +28,7 @@ print(manifest.history_frames, manifest.future_frames)
 ```
 
 Reading the manifest up front with
-[`read_manifest()`][dronalize.io.read_manifest] is the easiest way to verify
+[`read_manifest()`](../reference/api/io/storage-and-manifests.md#dronalize.io.read_manifest) is the easiest way to verify
 schema, horizon, and precision.
 
 !!! tip "Readable manifest"
@@ -73,18 +73,18 @@ For unsplit exports, use `split=None` (default), which reads from `unsplit/`.
 
 On top of the readers, `dronalize` provides optional adapters:
 
-- [`TorchSceneDataset`][dronalize.io.adapters.TorchSceneDataset] for Torch
+- [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) for Torch
   tensor records
-- [`HeteroSceneDataset`][dronalize.io.adapters.HeteroSceneDataset] for PyTorch
+- [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) for PyTorch
   Geometric `HeteroData`
 
 Use these when your training stack expects framework-native dataset objects.
 
 ## Choosing a reader setup
 
-- Use [`PickleReader`][dronalize.io.readers.PickleReader] for simple local
+- Use [`PickleReader`](../reference/api/io/readers.md#dronalize.io.readers.PickleReader) for simple local
   workflows and easy inspection.
-- Use [`MDSReader`][dronalize.io.readers.MDSReader] for larger-scale or
+- Use [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) for larger-scale or
   streaming-oriented training pipelines.
 - Keep reader-side code backend-neutral by depending on the shared
-  [`SceneRecord`][dronalize.io.SceneRecord] contract.
+  [`SceneRecord`](../reference/api/io/storage-and-manifests.md#dronalize.io.SceneRecord) contract.

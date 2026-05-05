@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import multiprocessing as mp
 from contextlib import ExitStack
 from dataclasses import dataclass
@@ -13,7 +12,6 @@ from typing_extensions import TypedDict
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
     from multiprocessing.sharedctypes import Synchronized
     from multiprocessing.synchronize import Event, Lock
 
@@ -179,10 +177,6 @@ class ProgressState:
         self.update_event.set()
         return value
 
-    def active_worker_count(self) -> int:
-        with self.active_workers.get_lock():
-            return self.active_workers.value
-
 
 @dataclass(slots=True)
 class SharedResources:
@@ -209,11 +203,3 @@ class WorkerRuntime:
     worker_id: int
     processor: RuntimeProcessor | None = None
     writer: DatasetWriter | None = None
-
-    def active_workers(self) -> int:
-        return self.shared.progress.active_worker_count()
-
-    @contextlib.contextmanager
-    def progress_snapshot_lock(self) -> Generator[None, None, None]:
-        with self.shared.progress.snapshot_lock:
-            yield

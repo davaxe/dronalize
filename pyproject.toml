@@ -49,7 +49,7 @@ Changelog = "https://github.com/davaxe/dronalize/blob/main/CHANGELOG.md"
 dronalize = "dronalize.__main__:main"
 
 [project.optional-dependencies]
-plot = ["altair>=5.0.0", "vegafusion>=2.0.3", "vl-convert-python>=1.9.0.post1"]
+viz = []
 lyft = ["zarr<3", "numcodecs<=0.13.1", "protobuf>=4.25.8"]
 waymo = ["protobuf>=4.25.8"]
 ad4che = ["opencv-python"]
@@ -118,6 +118,9 @@ omit = [
     "src/dronalize/datasets/shared/_debug.py",
 ]
 
+[tool.ty.src]
+exclude =  ["*_pb2.py", "*_pb2_grpc.py", "*_pb2.pyi", "protos/*"]
+
 [tool.coverage.report]
 show_missing = true
 skip_covered = false
@@ -163,6 +166,7 @@ ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D", "INP001", "S101", "PLC2701"]
+"examples/**/*.py" = ["D", "INP001", "S101", "PLC2701", "T201"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -194,3 +198,4 @@ ignore = [
 reportAny = false
 reportExplicitAny = false
 reportMissingTypeStubs = false
+reportPrivateImportUsage = false

@@ -198,19 +198,9 @@ def save_scene_artifacts(
     scene: Scene, graph: MapGraph | None, out_dir: Path, case: DatasetCase
 ) -> None:
     """Save scene artifacts like trajectories and maps for debugging."""
-    try:
-        from dronalize.plot import plot_scene  # noqa: PLC0415
-    except ImportError:
-        return
 
     out_dir.mkdir(parents=True, exist_ok=True)
-
     frame = scene.frame.select("frame", "id", "x", "y")
-    _ = plot_scene(scene, show_map=False, save_path=out_dir / "trajectories.html")
-
-    if graph is not None and (graph.num_nodes > 0 or graph.num_edges > 0):
-        _ = plot_scene(scene, save_path=out_dir / "overlay.html")
-
     summary_frame = frame.select(
         pl.col("x").min().alias("x_min"),
         pl.col("x").max().alias("x_max"),

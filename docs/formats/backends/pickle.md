@@ -48,7 +48,7 @@ output/
 ```
 
 Each `.pkl` file contains one framework-neutral
-[`SceneRecord`][dronalize.io.SceneRecord].
+[`SceneRecord`](../../reference/api/io/storage-and-manifests.md#dronalize.io.SceneRecord).
 
 ## Reading Pickle output
 

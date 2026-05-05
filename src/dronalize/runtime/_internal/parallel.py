@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import multiprocessing as mp
 from collections import deque
+from multiprocessing.pool import Pool
 from multiprocessing.util import Finalize
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -78,10 +79,13 @@ class ParallelExecutor(Executor):
                 self._process_fn_write,
                 self._processor.iter_sources(),
                 _init_write_worker,
-                *(self._shared, self._processor, writer_factory),
+                self._shared,
+                self._processor,
+                writer_factory,
             ),
             maxlen=0,
         )
+        writer_factory(None).finish_final()
 
     @override
     def execute_yield(self) -> Iterator[Scene]:
@@ -176,10 +180,19 @@ class ParallelExecutor(Executor):
         pool_initializer = functools.partial(initializer, *args, **kwargs)
         self._running = True
         self.progress_event().set()
+        pool: Pool | None = None
+        completed = False
         try:
-            with mp.Pool(self._processes, initializer=pool_initializer) as pool:
-                yield from pool.imap_unordered(process_fn, payloads, self._chunksize)
+            pool = Pool(self._processes, initializer=pool_initializer)
+            yield from pool.imap_unordered(process_fn, payloads, self._chunksize)
+            completed = True
         finally:
+            if pool is not None:
+                if completed:
+                    pool.close()
+                else:
+                    pool.terminate()
+                pool.join()
             self._running = False
             self.progress_event().set()
 
@@ -214,7 +227,7 @@ def _init_worker(
 def _init_write_worker(
     shared: state.SharedResources,
     processor: RuntimeProcessor,
-    writer_factory: Callable[[int], DatasetWriter],
+    writer_factory: Callable[[int | None], DatasetWriter],
 ) -> None:
     global _ctx  # noqa: PLW0602
     _init_worker(shared, processor, with_finalize=False)
@@ -231,11 +244,7 @@ def _init_write_worker(
         if current_writer is None:
             return
         try:
-            with _ctx.progress_snapshot_lock():
-                active_before = _ctx.active_workers()
-                current_writer.finish_local()
-                if active_before == 1:
-                    current_writer.finish_final()
+            current_writer.finish_local()
         finally:
             _ = _ctx.shared.progress.worker_stopped()
 

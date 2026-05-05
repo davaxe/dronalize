@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from dronalize.runtime._internal.state import Progress
 
 AnyEvent = Event | threading.Event
-WriterFactory = Callable[[int], DatasetWriter]
+WriterFactory = Callable[[int | None], DatasetWriter]
 
 
 class Executor(Protocol):

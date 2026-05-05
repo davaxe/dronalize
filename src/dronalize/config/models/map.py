@@ -62,7 +62,7 @@ class MapEdgeTypesConfig(FullConfig):
 
     include: EdgeTypes | None = Field(default=None)
     """Optional allow-list of edge types to keep after remapping."""
-    exclude: EdgeTypes = Field(default_factory=frozenset)
+    exclude: EdgeTypes = frozenset()
     """Edge types to drop after remapping."""
     remap: dict[EdgeType, EdgeType] = Field(default_factory=dict)
     """Mapping applied to edge types before include/exclude filters."""

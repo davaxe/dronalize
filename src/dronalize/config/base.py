@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping, MutableMapping
-from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeAlias, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
@@ -42,7 +42,6 @@ class FullConfig(ConfigBase):
 
 
 FullConfigT = TypeVar("FullConfigT", bound=ConfigBase)
-V = TypeVar("V")
 
 
 class PartialConfig(BaseModel, Generic[FullConfigT]):
@@ -94,13 +93,18 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         return cls.model_validate(data)
 
 
-def deep_merge(base: MutableMapping[str, V], patch: Mapping[str, V]) -> MutableMapping[str, V]:
+def deep_merge(
+    base: MutableMapping[str, object], patch: Mapping[str, object]
+) -> MutableMapping[str, object]:
     """Recursively merge two mappings."""
     for key, patch_value in patch.items():
         base_value = base.get(key)
 
         if isinstance(base_value, MutableMapping) and isinstance(patch_value, Mapping):
-            _ = deep_merge(base_value, patch_value)  # pyright: ignore[reportUnknownArgumentType]
+            _ = deep_merge(
+                cast("MutableMapping[str, object]", base_value),
+                cast("Mapping[str, object]", patch_value),
+            )
         else:
             base[key] = copy.deepcopy(patch_value)
 

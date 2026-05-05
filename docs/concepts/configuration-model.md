@@ -13,11 +13,11 @@ For exact field tables and TOML syntax, see the [configuration reference](../ref
 Think of one resolved dataset config as four layers:
 
 1. built-in dataset defaults from the
-   [`DatasetSpec`][dronalize.datasets.DatasetSpec]
+   [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec)
 2. profile fragments from `[profiles.<name>]`
 3. one dataset entry under `[datasets.<name>]`
 4. runtime overrides from the CLI or
-   [`RuntimeOverride`][dronalize.config.RuntimeOverride]
+   [`RuntimeOverride`](../reference/api/config/project.md#dronalize.config.RuntimeOverride)
 
 Profiles are opted into with `uses`, in the order they should be applied.
 

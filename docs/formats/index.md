@@ -19,7 +19,7 @@ storage backend that best fits your workflow.
 Every processing run produces:
 
 - one root `manifest.json` that describes how scenes were produced and can be
-  loaded as a [`DatasetManifest`][dronalize.io.DatasetManifest]
+  loaded as a [`DatasetManifest`](../reference/api/io/storage-and-manifests.md#dronalize.io.DatasetManifest)
 - one or more split directories that contain scene data in the selected backend format
 
 Split directory names follow the split strategy:

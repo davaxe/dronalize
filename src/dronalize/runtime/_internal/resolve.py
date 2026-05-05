@@ -149,14 +149,8 @@ def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBa
 def _resolve_dataset_config(
     *, descriptor: DatasetSpec, config_path: Path | None, cli_override: RuntimeOverride
 ) -> DatasetConfig:
-    project = _parse_config(config_path)
+    project = parse_config(config_path) if config_path is not None else ProcessingConfig()
     defaults = descriptor.default_config
     config = project.resolve(descriptor.name, defaults)
     logger.debug("Resolved dataset config", extra={"dataset": descriptor.name})
     return cli_override.apply_to(None).apply_to(config)
-
-
-def _parse_config(config_path: Path | None) -> ProcessingConfig:
-    if config_path is None:
-        return ProcessingConfig()
-    return parse_config(config_path)

@@ -1,11 +1,12 @@
+import sys
 from pathlib import Path
 
 from dronalize.config.file import ProcessingConfig
 from dronalize.core.errors import ConfigurationError
 
-try:
-    import tomllib
-except ModuleNotFoundError:
+if sys.version_info >= (3, 11):
+    import tomllib  # pyright: ignore[reportUnreachable]
+else:
     import tomli as tomllib
 
 

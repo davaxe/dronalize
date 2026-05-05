@@ -165,6 +165,10 @@ class SceneRecord:
     `map_edge_indices` according to the edge-type encoding.
     """
 
+    def unsplit(self) -> UnsplitSceneRecord:
+        """Collapse the record into the unsplit representation."""
+        return join_raw_scene_record(self)
+
 
 @dataclass(slots=True)
 class UnsplitSceneRecord:
@@ -200,6 +204,10 @@ class UnsplitSceneRecord:
     """Integer-encoded map node types, shape `(M,)`."""
     map_edge_types: npt.NDArray[np.int32]
     """Integer-encoded map edge types, shape `(E,)`."""
+
+    def split(self, observation_length: int) -> SceneRecord:
+        """Split the record into observation and prediction tensors."""
+        return split_unsplit_raw_scene_record(self, observation_length=observation_length)
 
 
 def make_raw_scene_record(

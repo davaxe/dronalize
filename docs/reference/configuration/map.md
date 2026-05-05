@@ -14,7 +14,7 @@ Map settings control how map data is processed when a run includes maps. The mos
     Map data cannot currently be disabled through TOML. To exclude maps at runtime, use `--no-map`
     on the CLI or pass `include_map=False` in the Python runtime request.
 
-## [`map.extraction`] section
+## `map.extraction` section
 
 The extraction decides whether the full map is kept or if cropped around the current scene. It is defined
 by a `mode` and a set of parameters that depend on the mode.
@@ -71,7 +71,7 @@ mode = "trajectory_buffer"
 radius = 8.0
 ```
 
-## [`map.edge_types`] section
+## `map.edge_types` section
 
 Use this section when you want to simplify the semantic map vocabulary without changing the dataset loader itself.
 

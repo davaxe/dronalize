@@ -3,7 +3,6 @@ site_name = "dronalize"
 site_url = "https://westny.github.io/dronalize/"
 site_description = "CLI-first preprocessing and scene generation for motion forecasting datasets."
 site_author = "Theodor Westny, David Axelsson"
-copyright = "&copy; 2026 Dronalize contributors"
 docs_dir = "docs"
 site_dir = "site"
 repo_url = "https://github.com/davaxe/dronalize"
@@ -130,8 +129,8 @@ nav = [
       { "Framework adapters" = "reference/api/io/adapters.md" },
       { "Backend extension API" = "reference/api/io/backends.md" },
     ] },
-    { Plotting = [
-      "reference/api/plot/index.md",
+    {  Visualization = [
+      "reference/api/visualization/index.md",
     ] },
   ] },
 ]

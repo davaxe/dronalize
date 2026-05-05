@@ -36,7 +36,7 @@ This makes new dataset integrations easier to add without duplicating the rest o
 
 ## Main runtime concepts
 
-A few public types define that flow. [`DatasetSpec`][dronalize.datasets.DatasetSpec] describes one dataset integration. [`ProcessingConfig`][dronalize.config.ProcessingConfig] represents optional user configuration. [`ExecutionRequest`][dronalize.runtime.ExecutionRequest] describes the requested run, and [`ExecutionPlan`][dronalize.runtime.ExecutionPlan] is the resolved, execution-ready result.
+A few public types define that flow. [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) describes one dataset integration. [`ProcessingConfig`](../reference/api/config/project.md#dronalize.config.ProcessingConfig) represents optional user configuration. [`ExecutionRequest`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest) describes the requested run, and [`ExecutionPlan`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionPlan) is the resolved, execution-ready result.
 
 Together, these types separate what the user asked for from what the runtime is actually going to execute.
 

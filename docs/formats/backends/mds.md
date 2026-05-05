@@ -138,7 +138,7 @@ exist_ok = false
 ## How to read produced datasets
 
 See [Reading data](../reading.md) for
-[`MDSReader`][dronalize.io.readers.MDSReader] usage and optional Torch/PyG
+[`MDSReader`](../../reference/api/io/readers.md#dronalize.io.readers.MDSReader) usage and optional Torch/PyG
 adapters.
 
 *[COO]: Edge format for sparse graphs compatible with PyTorch Geometric.
