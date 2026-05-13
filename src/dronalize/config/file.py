@@ -20,7 +20,7 @@ class PartialDatasetEntryConfig(PartialDatasetConfigBase):
             scenes=self.scenes,
             runtime=self.runtime,
             screening=self.screening,
-            dataset=self.dataset,
+            loader_options=self.loader_options,
             output=self.output,
             map=self.map,
             read=self.read,

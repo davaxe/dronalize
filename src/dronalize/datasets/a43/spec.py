@@ -13,6 +13,6 @@ DATASET_SPEC = DatasetSpec(
     ),
     native_schema=A43Loader.native_trajectory_schema(),
     feature_support=DatasetFeatureSupport(map=True),
-    dataset_options_model=A43LoaderOptions,
+    loader_options_model=A43LoaderOptions,
     split_support=DatasetSplitSupport(scene=True, time_block=True),
 )

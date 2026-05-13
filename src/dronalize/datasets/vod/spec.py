@@ -4,7 +4,7 @@ from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, Data
 from dronalize.datasets.shared.resources import single_shared_map_resource_factory
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 from dronalize.datasets.vod.loader import VodLoader, VodLoaderOptions
-from dronalize.datasets.vod.maps.builder import VODMapBuilder
+from dronalize.datasets.vod.maps import VODMapBuilder
 
 _open_vod_resources = single_shared_map_resource_factory(
     map_path=lambda root: root / "maps" / "expansion" / "delft.json",
@@ -22,7 +22,7 @@ DATASET_SPEC = DatasetSpec(
         screening=minimum_samples_screening(2),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
-    dataset_options_model=VodLoaderOptions,
+    loader_options_model=VodLoaderOptions,
     native_schema=VodLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
     resources_factory=_open_vod_resources,

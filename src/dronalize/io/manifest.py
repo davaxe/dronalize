@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any
 
 from dronalize.core.errors import ManifestCompatibilityError
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-FORMAT_VERSION: int = 1
+FORMAT_VERSION: int = 2
 MANIFEST_FILENAME: str = "manifest.json"
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,18 @@ class DatasetManifest:
 
     dataset: str
     """Name of the source dataset, e.g. 'lyft' or 'waymo'."""
+    storage_backend: str
+    """Storage backend used to write the exported scene records."""
+    dronalize_version: str
+    """Package version that produced the manifest."""
     source_trajectory_schema: str
     """Trajectory schema emitted by the dataset loader before conversion."""
+    source_trajectory_schema_fields: tuple[str, ...]
+    """Semantic field names emitted by the dataset loader before conversion."""
     trajectory_schema: str
     """Trajectory schema stored in the exported records."""
+    trajectory_schema_fields: tuple[str, ...]
+    """Semantic field names stored in exported trajectory records."""
     derived_features: tuple[str, ...]
     """Output features derived during schema conversion."""
     feature_columns: tuple[str, ...]
@@ -67,10 +76,14 @@ class DatasetManifest:
         return cls(
             dataset=str(payload["dataset"]),
             format_version=format_version,
+            storage_backend=str(payload["storage_backend"]),
+            dronalize_version=str(payload["dronalize_version"]),
             source_trajectory_schema=str(
                 payload.get("source_trajectory_schema", payload["trajectory_schema"])
             ),
+            source_trajectory_schema_fields=tuple(payload["source_trajectory_schema_fields"]),
             trajectory_schema=str(payload["trajectory_schema"]),
+            trajectory_schema_fields=tuple(payload["trajectory_schema_fields"]),
             derived_features=tuple(payload.get("derived_features", ())),
             feature_columns=tuple(payload["feature_columns"]),
             history_frames=int(payload["history_frames"]),
@@ -81,6 +94,14 @@ class DatasetManifest:
             sample_time=float(payload["sample_time"]),
             original_sample_time=float(payload["original_sample_time"]),
         )
+
+
+def package_version() -> str:
+    """Return the installed dronalize package version for manifest metadata."""
+    try:
+        return version("dronalize")
+    except PackageNotFoundError:
+        return "0+unknown"
 
 
 def manifest_path(root: Path) -> Path:

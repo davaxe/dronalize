@@ -25,6 +25,7 @@ from dronalize.io import read_manifest
 
 manifest = read_manifest(Path("output"))
 print(manifest.feature_columns)
+print(manifest.trajectory_schema_fields)
 print(manifest.history_frames, manifest.future_frames)
 ```
 

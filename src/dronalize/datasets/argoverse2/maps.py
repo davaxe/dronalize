@@ -5,12 +5,15 @@ from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
+
+from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
+from dronalize.processing.maps import FeatureMapBuilder, PathFeature, Point
 
 if TYPE_CHECKING:
-    from dronalize.processing.maps.builder import Point
+    from collections.abc import Iterable
 
 
 class Argoverse2Map:
@@ -182,3 +185,48 @@ class DrivableArea:
         return cls(
             id=data["id"], boundary=[(node["x"], node["y"]) for node in data["area_boundary"]]
         )
+
+
+class Argoverse2MapBuilder(FeatureMapBuilder):
+    """A builder for creating a graph representation of an Argoverse2 map."""
+
+    def __init__(self, map_data: Argoverse2Map) -> None:
+        self.map: Argoverse2Map = map_data
+
+    @classmethod
+    def from_json_file(cls, json_file: Path) -> Argoverse2MapBuilder:
+        """Create a map builder from an Argoverse 2 JSON file."""
+        map_data = Argoverse2Map(json_file)
+        return cls(map_data)
+
+    @override
+    def iter_features(self) -> Iterable[PathFeature]:
+        """Yield map features from pedestrian crossings and lane boundaries."""
+        for crossing in self.map.pedestrian_crossings.values():
+            yield PathFeature(
+                points=tuple(crossing.first_edge), edge_types=EdgeType.PEDESTRIAN_MARKING
+            )
+            yield PathFeature(
+                points=tuple(crossing.second_edge), edge_types=EdgeType.PEDESTRIAN_MARKING
+            )
+
+        for segment in self.map.segments.values():
+            left = self._lane_segment_points(segment, side="left")
+            if left is not None:
+                points, edge = left
+                yield PathFeature(points=tuple(points), edge_types=edge)
+
+            right = self._lane_segment_points(segment, side="right")
+            if right is not None:
+                points, edge = right
+                yield PathFeature(points=tuple(points), edge_types=edge)
+
+    @staticmethod
+    def _lane_segment_points(
+        segment: LaneSegment, side: Literal["left", "right"]
+    ) -> tuple[list[Point], EdgeType] | None:
+        boundary = segment.left_boundary if side == "left" else segment.right_boundary
+        if boundary is None:
+            return None
+
+        return boundary.points, boundary.get_edge_type()

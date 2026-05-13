@@ -97,16 +97,19 @@ coordinates = ["x1", "x2"]
     
 ## `[scenes.lane_change]` section
 
-Use lane-change sampling only for lane-change-oriented highway datasets that expose this behavior.
+Use lane-change sampling only for lane-change-oriented highway datasets that explicitly expose this
+behavior through dataset feature support.
 
-If a dataset does not support lane-change sampling, adding this block is a configuration error.
+If a dataset does not support lane-change sampling, adding this block is a configuration error. This
+block also requires `[scenes.window]`; lane-change sampling is a window-selection policy and cannot
+run without window extraction.
 
 | Key | Type | Description | Default |
 |---|---|---|---|
 | `persist` | `int` | Number of frames a lane change must persist to count as a positive event. | `required` |
 | `margin_before` | `int` | Required number of frames before the lane change event. | `0` |
 | `margin_after` | `int` | Required number of frames after the lane change event. | `0` |
-| `required_lane_changes` | `int` | Minimum number of lane change events required for a positive scene window. | `1` |
+| `required_lane_changes` | positive `int` | Minimum number of lane change events required for a positive scene window. | `1` |
 | `negative_keep_every` | `int` | Keep every Nth negative scene window. Set to `1` to keep all negatives. | `3` |
 
 ## Example

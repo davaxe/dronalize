@@ -41,7 +41,8 @@ class LaneChangeSamplingExtension:
     def compile(self, ctx: BuildContext) -> StageContributions:
         """Compile lane-change transforms against an immutable build context."""
         if not ctx.has_window:
-            return StageContributions()
+            msg = "LaneChangeSamplingExtension requires window sampling to be enabled."
+            raise ValueError(msg)
 
         pre = Pipeline().then(
             tr.valid_lane_change(

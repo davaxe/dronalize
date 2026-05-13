@@ -1,11 +1,11 @@
-# `[dataset]` section
+# `[loader_options]` section
 
-`dataset` is a dataset-specific table for dataset-owned parameters. It is validated against the selected dataset's typed dataset config model and is only valid for datasets that expose dataset-specific config.
+`loader_options` is a dataset-specific table for dataset-owned loader parameters. It is validated against the selected dataset's typed loader options model and is only valid for datasets that expose dataset-specific config.
 
 Example for a dataset that supports loader options:
 
 ```toml
-[datasets.argoverse1.dataset]
+[datasets.argoverse1.loader_options]
 file_batch_size = 8
 ```
 

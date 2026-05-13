@@ -15,8 +15,8 @@ from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
-from dronalize.io.formats import StorageBackend
-from dronalize.io.manifest import DatasetManifest, write_manifest
+from dronalize.io.formats import StorageBackend, storage_backend_name
+from dronalize.io.manifest import DatasetManifest, package_version, write_manifest
 from dronalize.processing.models import AssignmentRequest, LoaderRequest, ReadRequest
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
     from dronalize.config.models import DatasetConfig, MDSOutputConfig, OutputConfig, RuntimeConfig
     from dronalize.datasets.registry import DatasetSpec
-    from dronalize.processing.loading.options import DatasetOptionsModel
+    from dronalize.processing.loading.models import DatasetOptionsModel
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +40,7 @@ class ExecutionResult:
     """Dataset key used for the run."""
     output_dir: Path
     """Root directory where processed output was written."""
-    storage_backend: StorageBackend
+    storage_backend: StorageBackend | str
     """Storage backend used for the exported records."""
     processed_sources: int
     """Number of raw source units the executor started processing."""
@@ -100,7 +100,7 @@ class ExecutionPlan:
     """Input dataset root."""
     output_dir: Path
     """Output dataset root."""
-    storage_backend: StorageBackend
+    storage_backend: StorageBackend | str
     """Storage backend selected for writing output records."""
     resolved_config: DatasetConfig
     """Dataset config after defaults, config files, and overrides are merged."""
@@ -153,11 +153,15 @@ class ExecutionPlan:
         export_config: OutputConfig = self.resolved_config.output
         return DatasetManifest(
             dataset=self.dataset,
+            storage_backend=storage_backend_name(self.storage_backend),
+            dronalize_version=package_version(),
             precision=export_config.precision,
             feature_columns=self.output.trajectory_schema.feature_columns(),
             trajectory_schema=self.output.trajectory_schema.name,
+            trajectory_schema_fields=self.output.trajectory_schema.semantic_fields(),
             recenter_positions=export_config.recenter_positions,
             source_trajectory_schema=self.descriptor.native_schema.name,
+            source_trajectory_schema_fields=self.descriptor.native_schema.semantic_fields(),
             sample_time=self.effective_sample_time,
             original_sample_time=self.resolved_config.scenes.sample_time,
             future_frames=self.effective_future_frames,
@@ -188,7 +192,9 @@ def compile_loader_request(
     *, descriptor: DatasetSpec, resolved_config: DatasetConfig, include_map: bool | None
 ) -> LoaderRequest:
     """Compile the loader-facing request for one resolved dataset config."""
-    dataset_options: DatasetOptionsModel = descriptor.parse_dataset_config(resolved_config.dataset)
+    loader_options: DatasetOptionsModel = descriptor.parse_loader_options(
+        resolved_config.loader_options
+    )
     map_config = (
         None
         if (include_map is False or not descriptor.feature_support.map)
@@ -200,7 +206,7 @@ def compile_loader_request(
         read=ReadRequest.from_config(
             resolved_config.read, supported_native_splits=descriptor.supported_native_splits
         ),
-        dataset=dataset_options,
+        loader_options=loader_options,
         map=map_config,
     )
 

@@ -12,8 +12,8 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.functional import yaw_from_vel_expr
 from dronalize.core.scene.schema import POSITIONS_VELOCITY_YAW
 from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
+from dronalize.processing.loading.models import LoadedSourceData, Source
+from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

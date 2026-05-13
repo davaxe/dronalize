@@ -1,8 +1,8 @@
 """Writer backends used by the runtime.
 
 This package is the extension point for persisted output backends. The runtime
-selects a backend from :class:`dronalize.io.formats.StorageBackend` and resolves
-it to a worker-local writer factory through :func:`build_writer_factory`.
+selects a backend by string name and resolves it to a worker-local writer
+factory through :func:`build_writer_factory`.
 
 Built-in backends:
 

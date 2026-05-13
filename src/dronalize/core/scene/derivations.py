@@ -1,4 +1,10 @@
-"""Planning and execution helpers for scene-field derivations."""
+"""Planning and execution helpers for scene-field derivations.
+
+The derivation logic for the schema conversion is designed in a way that adding
+new derivation rules is straightforward and does not require changes to the core
+derivation logic, which at first glance might seem overly complex but helps
+keep the code maintainable and extensible as we add more fields and rules.
+"""
 
 from __future__ import annotations
 

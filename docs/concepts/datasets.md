@@ -17,8 +17,8 @@ integration contract:
 - `default_config` for the dataset's starting point
 - `native_schema` for the loader's physical trajectory fields
 - `supported_native_splits` when the dataset ships with fixed partitions
-- `feature_support` for optional capabilities such as map data and lane-change sampling
-- `dataset_options_model` for typed `[datasets.<name>.dataset]` config
+- `feature_support` for explicit optional capabilities such as map data and lane-change sampling
+- `loader_options_model` for typed `[datasets.<name>.loader_options]` config
 - `resources_factory` for run-scoped shared resources such as maps
 - `split_support` when scene-, source-, or time-based split modes are valid
 
@@ -45,8 +45,8 @@ Different datasets support different workflows. Common differences are:
 - native benchmark splits vs. source discovery only
 - map support vs. no map support
 - time-based split support vs. only scene or source routing
-- dataset-owned config options
-- lane-change-aware defaults for some highway datasets
+- dataset-owned loader options
+- lane-change-aware defaults for some highway datasets that explicitly support lane-change sampling
 
 So choosing a dataset key also chooses the capabilities you can rely on.
 

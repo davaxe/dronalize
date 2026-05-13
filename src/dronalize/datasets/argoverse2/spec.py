@@ -13,11 +13,11 @@ DATASET_SPEC = DatasetSpec(
         scenes=scenes_config(history_frames=50, future_frames=60, sample_time=0.1),
         screening=minimum_samples_screening(2),
         map=MapConfig(extraction=FullMapExtraction()),
-        dataset=Argoverse2LoaderOptions().model_dump(),
+        loader_options=Argoverse2LoaderOptions().model_dump(),
     ),
     native_schema=Argoverse2Loader.native_trajectory_schema(),
     supported_native_splits=_NATIVE_SPLITS,
-    dataset_options_model=Argoverse2LoaderOptions,
+    loader_options_model=Argoverse2LoaderOptions,
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
 )

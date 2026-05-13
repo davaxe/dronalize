@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import multiprocessing as mp
+from dataclasses import replace
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -11,7 +12,10 @@ from dronalize.core.errors import (
     DatasetNotFoundError,
     UnsupportedStorageBackendError,
 )
+from dronalize.datasets import DatasetFeatureSupport
 from dronalize.io import StorageBackend, read_manifest
+from dronalize.io.backends.null import NullWriter
+from dronalize.io.backends.registry import register_writer_backend
 from dronalize.runtime import ExecutionRequest, execute_request, resolve_request, stream_plan
 from tests.support import DemoOptions, demo_descriptor
 
@@ -55,7 +59,7 @@ def test_resolve_request_compiles_runtime_and_loader_requests(
 
     assert plan.dataset == "demo"
     assert plan.storage_backend == StorageBackend.NULL
-    dataset_options = cast("DemoOptions", plan.loader.dataset)
+    dataset_options = cast("DemoOptions", plan.loader.loader_options)
     assert dataset_options.batch_size == 2
     assert plan.map is None
     assert plan.effective_history_frames == 2
@@ -69,6 +73,17 @@ def test_resolve_request_rejects_unknown_storage_backend(
 
     with pytest.raises(UnsupportedStorageBackendError, match="Unsupported storage backend"):
         _ = resolve_request(_request(tmp_path, storage_backend="bad-backend"))
+
+
+def test_resolve_request_accepts_registered_string_storage_backend(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_get_demo_descriptor(monkeypatch)
+    register_writer_backend("test-null", lambda _plan: NullWriter.as_factory(log=False))
+
+    plan = resolve_request(_request(tmp_path, storage_backend="test-null"))
+
+    assert plan.storage_backend == "test-null"
 
 
 def test_resolve_request_rejects_unsupported_lane_change_sampling(
@@ -85,6 +100,30 @@ persist = 3
     )
 
     with pytest.raises(ConfigurationError, match="does not support lane-change sampling"):
+        _ = resolve_request(_request(tmp_path, config_path=config_path))
+
+
+def test_resolve_request_rejects_lane_change_without_window(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor = replace(
+        demo_descriptor(),
+        feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
+    )
+    _patch_descriptor(monkeypatch, descriptor)
+    config_path = tmp_path / "dronalize.toml"
+    _ = config_path.write_text(
+        """
+[datasets.demo.scenes]
+window = false
+
+[datasets.demo.scenes.lane_change]
+persist = 3
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="requires window sampling"):
         _ = resolve_request(_request(tmp_path, config_path=config_path))
 
 
@@ -106,6 +145,19 @@ def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mon
     assert result.processed_sources == 1
 
     manifest = read_manifest(result.output_dir)
+    assert manifest.storage_backend == "null"
+    assert manifest.source_trajectory_schema_fields == (
+        "frame",
+        "id",
+        "x",
+        "y",
+        "vx",
+        "vy",
+        "ax",
+        "ay",
+        "yaw",
+        "agent_category",
+    )
     assert manifest.history_frames == 2
     assert manifest.future_frames == 1
 

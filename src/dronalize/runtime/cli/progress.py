@@ -15,13 +15,13 @@ from rich.panel import Panel
 from rich.text import Text
 from typing_extensions import override
 
-from dronalize.runtime._internal.state import SplitCounts
+from dronalize.runtime.state import SplitCounts
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.runtime._internal.executor import Executor
-    from dronalize.runtime._internal.state import Progress
+    from dronalize.runtime.executor import Executor
+    from dronalize.runtime.state import Progress
 
 T = TypeVar("T")
 

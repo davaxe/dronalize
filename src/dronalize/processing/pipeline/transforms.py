@@ -9,7 +9,7 @@ import polars as pl
 from dronalize.core import functional as f
 from dronalize.core.functional import ResampleSpec
 from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.screening.apply import screen_scene as _screen_scene
+from dronalize.processing.screening.screen import screen_scene as _screen_scene
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

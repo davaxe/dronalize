@@ -1,7 +1,8 @@
-"""Map-graph builder for the Argoverse 1 dataset."""
-
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET  # noqa: S405
+from dataclasses import dataclass, field
+from enum import IntEnum, auto
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -9,30 +10,221 @@ import numpy.typing as npt
 from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
-from dronalize.datasets.argoverse1.maps import parser
-from dronalize.processing.maps.builder import FeatureMapBuilder, Point
-from dronalize.processing.maps.features import PathFeature
+from dronalize.processing.maps import FeatureMapBuilder, PathFeature, Point
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
     from pathlib import Path
+
+    from dronalize.processing.maps import Point
+
+
+class Argoverse1Map:
+    """Represents the Argoverse map, containing lane segments and nodes.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the Argoverse XML map file.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path: Path = path
+        self.lane_segments: dict[int, LaneSegment] = {}
+        self.nodes: dict[int, Point] = {}
+        self._parsed: bool = False
+
+    @classmethod
+    def from_xml_file(cls, path: Path) -> Argoverse1Map:
+        """Create an `ArgoverseMap` instance from an XML file."""
+        return cls(path)
+
+    def is_parsed(self) -> bool:
+        """Check if the map has been parsed."""
+        return self._parsed
+
+    def parse(self) -> None:
+        """Parse the XML file and extract nodes and lane segments."""
+        if self._parsed:
+            return
+        tree = ET.parse(self.path)  # noqa: S314
+        root = tree.getroot()
+
+        all_graph_nodes: dict[int, Point] = {}
+        # Mapping from original ID in the XML to new sequential ID.
+        id_map: dict[int, int] = {}
+        next_id = 0
+        for child in root:
+            if child.tag == "node":
+                base_node = Node.from_xml_element(child)
+                point: Point = (base_node.x, base_node.y)
+                id_map[base_node.id] = next_id
+                all_graph_nodes[next_id] = point
+                next_id += 1
+            elif child.tag == "way":
+                lane_segment = LaneSegment.from_xml_element(child)
+                self.lane_segments[lane_segment.id] = lane_segment
+            else:
+                msg = f"Unknown XML item: {child.tag} with attributes {child.attrib}"
+                raise ValueError(msg)
+
+        for lane_segment in self.lane_segments.values():
+            # Map the lane segment's node IDs to the new node IDs
+            lane_segment.map_node_ids(lambda node_id: id_map[node_id])
+
+        # Dictionary respect ordering, which means that the order of nodes is
+        # preserved
+        self.nodes = all_graph_nodes
+        self._parsed = True
+
+
+class TurnType(IntEnum):
+    """Represents the turn direction of a lane segment (way)."""
+
+    NONE = auto()
+    LEFT = auto()
+    RIGHT = auto()
+
+
+@dataclass
+class Node:
+    """Represents a node in the Argoverse map."""
+
+    id: int
+    x: float
+    y: float
+
+    @classmethod
+    def from_dict(cls, data: dict[str, str]) -> Node:
+        """Create a `Node` instance from a dictionary."""
+        return cls(id=int(data["id"]), x=float(data["x"]), y=float(data["y"]))
+
+    @classmethod
+    def from_xml_element(cls, element: ET.Element) -> Node:
+        """Create a `Node` instance from an XML element."""
+        node_fields = element.attrib
+        return cls.from_dict(node_fields)
+
+
+@dataclass
+class LaneSegment:
+    """Represents a lane segment (way) in the Argoverse map."""
+
+    id: int
+    node_ids: list[int]
+    l_neighbor_id: int | None = None
+    r_neighbor_id: int | None = None
+    turn_direction: TurnType = TurnType.NONE
+    is_intersection: bool = False
+    has_traffic_control: bool = False
+    successors: list[int] = field(default_factory=list)
+    predecessors: list[int] = field(default_factory=list)
+
+    @classmethod
+    def from_xml_element(cls, element: ET.Element) -> LaneSegment:
+        """Create a `LaneSegment` instance from an XML element."""
+        lane_id = int(element.attrib["lane_id"])
+        segment = cls._default()
+        segment.id = lane_id
+        for sub_element in element:
+            # Cast inspired from argoverse1 official code
+            way_field: list[tuple[str, str]] = list(sub_element.items())
+            field_name = way_field[0][0]
+            if field_name == "ref":
+                node_id = int(way_field[0][1])
+                segment.node_ids.append(node_id)
+                continue
+
+            match way_field[0], way_field[1]:
+                case ("k", "is_intersection"), ("v", v):
+                    segment.is_intersection = v == "True"
+                case ("k", "has_traffic_control"), ("v", v):
+                    segment.has_traffic_control = v == "True"
+                case ("k", "turn_direction"), ("v", v):
+                    segment.turn_direction = TurnType[v]
+                case ("k", "l_neighbor_id"), ("v", v):
+                    segment.l_neighbor_id = None if v == "None" else int(v)
+                case ("k", "r_neighbor_id"), ("v", v):
+                    segment.r_neighbor_id = None if v == "None" else int(v)
+                case ("k", "predecessor"), ("v", v):
+                    segment.predecessors.append(int(v))
+                case ("k", "successor"), ("v", v):
+                    segment.successors.append(int(v))
+                case _:
+                    ...
+
+        return segment
+
+    def map_node_ids(self, map_fn: Callable[[int], int]) -> None:
+        """Map the node IDs using a provided function."""
+        self.node_ids = [map_fn(node_id) for node_id in self.node_ids]
+
+    def get_edge_type(self) -> EdgeType:
+        """Determine the edge type based on the lane segment's properties."""
+        ln, rn, inter = (
+            self.l_neighbor_id is not None,
+            self.r_neighbor_id is not None,
+            self.is_intersection,
+        )
+        if ln and rn:
+            return EdgeType.LINE_THIN
+        if not ln and not rn and not inter:
+            return EdgeType.LINE_THIN
+        if not inter:
+            return EdgeType.CURB
+        return EdgeType.NONE
+
+    def get_border_edge_types(self) -> tuple[EdgeType, EdgeType]:
+        """Determine the border edge types based on the lane segment's neighbors.
+
+        Returns
+        -------
+        left_edge_type : EdgeType
+            Edge type for the left border.
+        right_edge_type : EdgeType
+            Edge type for the right border.
+
+        """
+        ln, rn = (self.l_neighbor_id is not None, self.r_neighbor_id is not None)
+        left_edge_type = EdgeType.VIRTUAL if ln else EdgeType.CURB
+        right_edge_type = EdgeType.VIRTUAL if rn else EdgeType.CURB
+
+        if self.is_intersection:
+            left_edge_type, right_edge_type = EdgeType.VIRTUAL, EdgeType.VIRTUAL
+
+        return left_edge_type, right_edge_type
+
+    @classmethod
+    def _default(cls) -> LaneSegment:
+        """Create a default `LaneSegment` instance."""
+        return cls(
+            id=0,
+            node_ids=[],
+            l_neighbor_id=None,
+            r_neighbor_id=None,
+            turn_direction=TurnType.NONE,
+            is_intersection=False,
+            has_traffic_control=False,
+            successors=[],
+            predecessors=[],
+        )
 
 
 class Argoverse1MapBuilder(FeatureMapBuilder):
     """A builder for creating a graph representation of an Argoverse1 map."""
 
-    def __init__(self, argoverse_map: parser.Argoverse1Map) -> None:
+    def __init__(self, argoverse_map: Argoverse1Map) -> None:
         if not argoverse_map.is_parsed():
             argoverse_map.parse()
 
-        self._lane_segments: dict[int, parser.LaneSegment] = argoverse_map.lane_segments
+        self._lane_segments: dict[int, LaneSegment] = argoverse_map.lane_segments
         self._map_nodes: dict[int, Point] = argoverse_map.nodes
         self._max_distance_between_connections: float = 1.0
 
     @classmethod
     def from_xml_file(cls, path: Path) -> Argoverse1MapBuilder:
         """Create a map builder from an Argoverse 1 XML file."""
-        return cls(parser.Argoverse1Map.from_xml_file(path))
+        return cls(Argoverse1Map.from_xml_file(path))
 
     @override
     def iter_features(self) -> Iterable[PathFeature]:
@@ -40,14 +232,14 @@ class Argoverse1MapBuilder(FeatureMapBuilder):
             yield from self._segment_features(segment)
         yield from self._connection_features()
 
-    def _segment_features(self, segment: parser.LaneSegment) -> Iterable[PathFeature]:
+    def _segment_features(self, segment: LaneSegment) -> Iterable[PathFeature]:
         node_ids = list(segment.node_ids)
         centerline = [self._map_nodes[i] for i in node_ids]
         left_key = f"lane:{segment.id}:left"
         right_key = f"lane:{segment.id}:right"
 
         add_as_polygon = (
-            lane_segment_is_regulatory(segment) and segment.turn_direction == parser.TurnType.NONE
+            lane_segment_is_regulatory(segment) and segment.turn_direction == TurnType.NONE
         )
         add_as_polygon &= not any_lane_segment_is_regulatory(
             lane_segment_successors(segment, self._lane_segments)
@@ -237,20 +429,20 @@ def edge_borders_from_centerline(
 
 
 def lane_segment_successors(
-    lane_segment: parser.LaneSegment, lane_segments: dict[int, parser.LaneSegment]
-) -> Iterable[parser.LaneSegment]:
+    lane_segment: LaneSegment, lane_segments: dict[int, LaneSegment]
+) -> Iterable[LaneSegment]:
     """Get successors of a lane segment."""
     return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.successors)
 
 
 def lane_segment_predecessors(
-    lane_segment: parser.LaneSegment, lane_segments: dict[int, parser.LaneSegment]
-) -> Iterable[parser.LaneSegment]:
+    lane_segment: LaneSegment, lane_segments: dict[int, LaneSegment]
+) -> Iterable[LaneSegment]:
     """Get predecessors of a lane segment."""
     return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.predecessors)
 
 
-def lane_segment_is_regulatory(lane_segment: parser.LaneSegment) -> bool:
+def lane_segment_is_regulatory(lane_segment: LaneSegment) -> bool:
     """Check if a lane segment is regulatory.
 
     Parameters
@@ -267,6 +459,6 @@ def lane_segment_is_regulatory(lane_segment: parser.LaneSegment) -> bool:
     return lane_segment.is_intersection and lane_segment.has_traffic_control
 
 
-def any_lane_segment_is_regulatory(lane_segments: Iterable[parser.LaneSegment]) -> bool:
+def any_lane_segment_is_regulatory(lane_segments: Iterable[LaneSegment]) -> bool:
     """Check if any lane segment in the iterable is regulatory."""
     return any(lane_segment_is_regulatory(lane_segment) for lane_segment in lane_segments)

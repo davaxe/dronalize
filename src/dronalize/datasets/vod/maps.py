@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import Self, override
 
 from dronalize.core.categories import EdgeType
-from dronalize.datasets.nuscenes.maps.builder import NuScenesMapBuilder
-from dronalize.datasets.nuscenes.maps.parser import NuScenesMap
+from dronalize.datasets.nuscenes.maps import NuScenesMap, NuScenesMapBuilder
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable

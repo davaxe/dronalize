@@ -54,7 +54,7 @@ nav = [
     { "[assign] section" = "reference/configuration/assign.md" },
     { "[map] section" = "reference/configuration/map.md" },
     { "[output] section" = "reference/configuration/output.md" },
-    { "[dataset] section" = "reference/configuration/dataset.md" },
+    { "[loader_options] section" = "reference/configuration/dataset.md" },
   ] },
 
   { "Dataset reference" = [

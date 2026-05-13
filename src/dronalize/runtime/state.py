@@ -1,3 +1,4 @@
+# ruff: noqa: D102
 """Shared multiprocessing state used by the internal parallel runner."""
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
     from multiprocessing.synchronize import Event, Lock
 
     from dronalize.io.base import DatasetWriter
-    from dronalize.runtime._internal.processor import RuntimeProcessor
+    from dronalize.runtime.processor import RuntimeProcessor
 
 
 class SplitCounts(TypedDict, total=True):

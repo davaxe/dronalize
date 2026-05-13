@@ -10,7 +10,7 @@ describes how that loader should be configured and discovered.
 
 1. Implement a [`BaseSceneLoader`](../reference/api/processing/loading.md#dronalize.processing.loading.BaseSceneLoader) subclass that finds
    raw sources and loads them into the shared trajectory representation.
-2. Define a [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) with a unique `name`, `loader_type`,
+2. Define a [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) with a unique `name`, `loader_factory`,
    `default_config`, and `native_schema`.
 3. Register it before resolving or executing a request. For Python code, call
    [`dronalize.datasets.register()`](../reference/api/datasets/registry.md#dronalize.datasets.register) directly. For CLI usage, expose the
@@ -96,8 +96,33 @@ Limitations:
 ## Keep the first integration small
 
 Start with one source format, one default scene window, and no optional map handling. Add native
-splits, dataset-specific options, maps, or specialized screening only after the basic loader can
-produce valid scenes.
+splits, loader options, maps, or specialized screening only after the basic loader can produce valid
+scenes.
+
+Optional dataset capabilities are explicit. Set
+[`DatasetFeatureSupport`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetFeatureSupport)
+on the spec when the loader can provide maps or lane-change sampling. Leave a flag disabled until
+the loader really supports it; request planning fails early when a user enables an unsupported
+feature.
+
+Dataset-owned loader settings belong in `loader_options_model`, and users configure them under
+`[datasets.<name>.loader_options]`. Avoid adding dataset-specific keys to unrelated generic config
+sections.
+
+<!-- no-validate -->
+```python
+from dronalize.datasets import DatasetFeatureSupport, DatasetSpec
+from my_project.options import MyLoaderOptions
+
+MY_DATASET_SPEC = DatasetSpec(
+    name="my-dataset",
+    loader_factory=MyLoader.unified_factory,
+    default_config=MY_DEFAULT_CONFIG,
+    native_schema=MY_NATIVE_SCHEMA,
+    loader_options_model=MyLoaderOptions,
+    feature_support=DatasetFeatureSupport(map=True),
+)
+```
 
 ## Simple example
 

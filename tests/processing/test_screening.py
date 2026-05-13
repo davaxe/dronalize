@@ -6,7 +6,7 @@ from dronalize.config.models import Tolerance
 from dronalize.core import AgentCategory
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.screening import Screen, agent, cleanup, scene, screen_scene
-from dronalize.processing.screening.apply import AGENT_PASS_COLUMN, SCENE_PASS_COLUMN
+from dronalize.processing.screening.screen import AGENT_PASS_COLUMN, SCENE_PASS_COLUMN
 
 
 def test_cleanup_exclude_categories_removes_only_matching_rows() -> None:

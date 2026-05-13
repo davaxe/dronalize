@@ -33,7 +33,7 @@ class DatasetConfig(FullConfig):
     """Input selection configuration used to choose raw dataset sources."""
     assign: AssignConfig = Field(default_factory=lambda: AssignConfig(NoAssign()))
     """Output assignment configuration used to label generated scenes."""
-    dataset: dict[str, Any] | None = Field(default=None)
+    loader_options: dict[str, Any] | None = Field(default=None)
     """Dataset-specific loader options forwarded to the selected dataset plugin."""
 
 
@@ -57,7 +57,7 @@ class PartialDatasetConfigBase(ConfigBase):
     """Replacement input selection strategy for the target dataset config."""
     assign: AssignConfig | None = Field(default=None)
     """Replacement output assignment strategy for the target dataset config."""
-    dataset: dict[str, Any] | None = Field(default=None)
+    loader_options: dict[str, Any] | None = Field(default=None)
     """Dataset-specific loader option overrides for the target config."""
 
 
@@ -80,7 +80,9 @@ class PartialDatasetConfig(PartialDatasetConfigBase, PartialConfig[DatasetConfig
             scenes=self.scenes.apply_to(target.scenes) if self.scenes else target.scenes,
             runtime=self.runtime.apply_to(target.runtime) if self.runtime else target.runtime,
             screening=apply_optional(self.screening, target.screening),
-            dataset=self.dataset if self.dataset is not None else target.dataset,
+            loader_options=(
+                self.loader_options if self.loader_options is not None else target.loader_options
+            ),
             output=self.output.apply_to(target.output) if self.output else target.output,
             map=self.map.apply_to(target.map) if self.map else target.map,
             read=self.read if self.read is not None else target.read,

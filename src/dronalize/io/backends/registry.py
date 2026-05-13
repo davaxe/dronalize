@@ -1,9 +1,8 @@
 """Registry-driven writer backend resolution.
 
 The runtime keeps backend selection separate from scene encoding. A resolved
-`RunPlan` chooses a :class:`dronalize.io.formats.StorageBackend`, and this
-registry maps that backend to a builder that can create worker-local
-`DatasetWriter` instances.
+`RunPlan` chooses a storage backend name, and this registry maps that name to a
+builder that can create worker-local `DatasetWriter` instances.
 
 The built-in registry entries are:
 
@@ -20,7 +19,7 @@ from typing import TYPE_CHECKING
 
 from dronalize.core.errors import UnsupportedStorageBackendError
 from dronalize.io.base import DatasetWriter
-from dronalize.io.formats import StorageBackend
+from dronalize.io.formats import StorageBackend, StorageBackendId, storage_backend_name
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
@@ -28,27 +27,35 @@ if TYPE_CHECKING:
 
 WriterFactory = Callable[[int | None], DatasetWriter]
 WriterFactoryBuilder = Callable[["ExecutionPlan"], WriterFactory]
-
-_WRITER_BACKENDS: dict[StorageBackend, WriterFactoryBuilder] = {}
+_WRITER_BACKENDS: dict[str, WriterFactoryBuilder] = {}
 logger = logging.getLogger(__name__)
 
 
-def register_writer_backend(backend: StorageBackend, builder: WriterFactoryBuilder) -> None:
+def registered_writer_backends() -> tuple[str, ...]:
+    """Return registered writer backend names in deterministic order."""
+    return tuple(sorted(_WRITER_BACKENDS))
+
+
+def is_writer_backend_registered(backend: StorageBackendId) -> bool:
+    """Return whether a writer backend has been registered."""
+    return storage_backend_name(backend) in _WRITER_BACKENDS
+
+
+def register_writer_backend(backend: StorageBackendId, builder: WriterFactoryBuilder) -> None:
     """Register a writer backend factory builder."""
-    _WRITER_BACKENDS[backend] = builder
-    logger.debug("Registered writer backend", extra={"storage_backend": backend.value})
+    backend_name = storage_backend_name(backend)
+    _WRITER_BACKENDS[backend_name] = builder
+    logger.debug("Registered writer backend", extra={"storage_backend": backend_name})
 
 
 def build_writer_factory(plan: ExecutionPlan) -> WriterFactory:
     """Build the writer factory for one resolved processing plan."""
-    builder = _WRITER_BACKENDS.get(plan.storage_backend)
+    backend_name = storage_backend_name(plan.storage_backend)
+    builder = _WRITER_BACKENDS.get(backend_name)
     if builder is None:
-        raise UnsupportedStorageBackendError(
-            plan.storage_backend.value, tuple(backend.value for backend in _WRITER_BACKENDS)
-        )
+        raise UnsupportedStorageBackendError(backend_name, registered_writer_backends())
     logger.debug(
-        "Building writer factory",
-        extra={"dataset": plan.dataset, "storage_backend": plan.storage_backend.value},
+        "Building writer factory", extra={"dataset": plan.dataset, "storage_backend": backend_name}
     )
     return builder(plan)
 

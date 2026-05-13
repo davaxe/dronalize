@@ -44,7 +44,7 @@ Default scene settings
   Effective window │ 20/50 @ 10.0 Hz
   Windowing        │ 70 frames, step 25
   Screening rules  │ cleanup: min_samples
-  Dataset config   │ rows_per_source=40000
+  Loader options   │ rows_per_source=40000
 ```
 
 For simple information, prefer the CLI because it is generated from the actual

@@ -98,8 +98,23 @@ def test_mds_encoder_decoder_roundtrip_preserves_data(scene: Scene) -> None:
 def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     manifest = DatasetManifest(
         dataset="test_dataset",
+        storage_backend="pickle",
+        dronalize_version="2.0.0",
         source_trajectory_schema="positions_only",
+        source_trajectory_schema_fields=("frame", "id", "x", "y", "agent_category"),
         trajectory_schema="canonical",
+        trajectory_schema_fields=(
+            "frame",
+            "id",
+            "x",
+            "y",
+            "vx",
+            "vy",
+            "ax",
+            "ay",
+            "yaw",
+            "agent_category",
+        ),
         derived_features=("vx", "vy", "yaw"),
         feature_columns=("x", "y", "vx", "vy", "ax", "ay", "yaw"),
         history_frames=4,

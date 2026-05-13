@@ -10,16 +10,17 @@ from typing_extensions import override
 
 from dronalize.config.models import Range  # noqa: TC001
 from dronalize.core.categories import AgentCategory, AgentCategoryInput
-from dronalize.processing.screening.base import RuleId, SceneCheckRuleBase
-from dronalize.processing.screening.context import (
+from dronalize.processing.screening.base import (
     AgentSelector,
     FrameInput,
     FrameSet,
+    RuleId,
+    SceneCheckRuleBase,
     coerce_frame_set,
 )
 
 if TYPE_CHECKING:
-    from dronalize.processing.screening.context import ScreeningContext
+    from dronalize.processing.screening.base import ScreeningContext
 
 
 class AgentRange(SceneCheckRuleBase):

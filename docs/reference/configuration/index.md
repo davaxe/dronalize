@@ -60,7 +60,7 @@ Inside either `profiles.<profile-name>` or `datasets.<dataset-name>`, the curren
 | [`assign`](./assign.md) | Output split assignment, ratios, and temporal assignment parameters. |
 | [`map`](./map.md) | Map extraction and interpolation settings. |
 | [`output`](./output.md) | Persisted trajectory schema, precision, offsets, storage backend tuning. |
-| [`dataset`](./dataset.md) | Dataset-specific options that don't fit into the other categories. |
+| [`loader_options`](./dataset.md) | Dataset-specific loader options that don't fit into the other categories. |
 
 !!! note "Section roots"
     In general, roots can be left unspecified (not present in the file), but if

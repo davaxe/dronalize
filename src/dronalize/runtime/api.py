@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING
 
 from dronalize.datasets.registry import get
 from dronalize.io.backends.registry import build_writer_factory
-from dronalize.runtime._internal.resolve import build_plan
-from dronalize.runtime._internal.runner import open_execution_session
+from dronalize.io.formats import storage_backend_name
+from dronalize.runtime.executor import open_execution_session
+from dronalize.runtime.resolve import build_plan
 from dronalize.runtime.types import ExecutionResult
 
 if TYPE_CHECKING:
@@ -81,7 +82,10 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
     """
     logger.info(
         "Executing plan",
-        extra={"dataset": plan.dataset, "storage_backend": plan.storage_backend.value},
+        extra={
+            "dataset": plan.dataset,
+            "storage_backend": storage_backend_name(plan.storage_backend),
+        },
     )
     with open_execution_session(plan) as run:
         run.executor.execute(writer_factory=build_writer_factory(plan))

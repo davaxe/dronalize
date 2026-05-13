@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, ClassVar, Generic
+
+from pydantic import BaseModel, ConfigDict
+from typing_extensions import Self
 
 from dronalize.core.typing import SourceId, SourceT
 
@@ -11,7 +14,7 @@ if TYPE_CHECKING:
     import polars as pl
 
     from dronalize.core.categories import DatasetSplit
-    from dronalize.processing.maps.resolver import MapKey
+    from dronalize.processing.maps import MapKey
 
 
 @dataclass(slots=True, frozen=True)
@@ -40,6 +43,23 @@ class LoadedSourceData:
 
 
 @dataclass(slots=True, frozen=True)
+class DatasetResources:
+    """Shared resources prepared once for a processing run.
+
+    The main current use case is shared-memory map lookup tables, but the
+    container stays intentionally generic so datasets can grow into additional
+    run-scoped resources without reintroducing loader-global state.
+    """
+
+    shared_maps: dict[MapKey, str] | str | None = None
+
+    @classmethod
+    def empty(cls) -> DatasetResources:
+        """Create an empty DatasetResources instance."""
+        return cls()
+
+
+@dataclass(slots=True, frozen=True)
 class Source(Generic[SourceT]):
     """Lightweight unit of raw input that yields one or more scenes."""
 
@@ -55,3 +75,18 @@ class Source(Generic[SourceT]):
     def with_predefined_split(self, split_assignment: DatasetSplit | None) -> Source[SourceT]:
         """Return a copy with a concrete split assignment."""
         return replace(self, predefined_split=split_assignment)
+
+
+class DatasetOptionsModel(BaseModel):
+    """Base model for dataset-specific declarative config."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+    @classmethod
+    def parse(cls, payload: dict[str, object] | None = None) -> Self:
+        """Validate one plain dataset-owned config mapping."""
+        return cls(**(payload or {}))
+
+
+class NoDatasetOptions(DatasetOptionsModel):
+    """Empty dataset config for datasets without dataset-owned settings."""

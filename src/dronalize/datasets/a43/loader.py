@@ -10,19 +10,18 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION, Scene
-from dronalize.datasets.a43.maps.builder import A43MapBuilder
+from dronalize.datasets.a43.maps import A43MapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.loading.options import DatasetOptionsModel
-from dronalize.processing.maps.resolver import MapResolver
+from dronalize.processing.loading.models import DatasetOptionsModel, LoadedSourceData, Source
+from dronalize.processing.maps import MapResolver
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.maps import MapResolver
 
 
 class A43LoaderOptions(DatasetOptionsModel):

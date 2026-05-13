@@ -84,7 +84,7 @@ class LaneChangeConfig(FullConfig):
     """Extra context frames to keep before the detected lane change."""
     margin_after: int = Field(default=0, ge=0)
     """Extra context frames to keep after the detected lane change."""
-    required_lane_changes: int = Field(default=1, ge=0)
+    required_lane_changes: int = Field(default=1, gt=0)
     """Minimum number of lane changes required for a positive sample."""
     negative_keep_every: int = Field(default=3, ge=1)
     """Keep one negative sample out of every N candidates."""

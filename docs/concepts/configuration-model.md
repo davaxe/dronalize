@@ -32,7 +32,7 @@ Profiles are opted into with `uses`, in the order they should be applied.
 | `read` | Raw input selection, including dataset-native partitions. |
 | `assign` | Train, val, and test output routing. |
 | `output` | Output schema, precision, recentering, and MDS-specific tuning. |
-| `dataset` | Dataset-owned options validated by the selected dataset integration. |
+| `loader_options` | Dataset-owned loader options validated by the selected dataset integration. |
 
 ## Profiles and dataset entries
 
@@ -113,7 +113,7 @@ The merge behavior depends on the section:
 - nested config sections such as `scenes`, `runtime`, `map`, and `output` merge into inherited values
 - `read` and `assign` are replaced as whole strategy configs
 - `screening` can either replace or extend inherited named rules
-- `dataset` is dataset-owned and validated by the selected dataset integration
+- `loader_options` is dataset-owned and validated by the selected dataset integration
 
 That makes it practical to change only the pieces you care about while keeping the dataset's built-in
 defaults intact.

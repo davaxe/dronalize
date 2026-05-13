@@ -11,6 +11,7 @@ from rich.table import Table
 from dronalize.config import models
 from dronalize.core.categories import DatasetSplit, EdgeType
 from dronalize.core.scene import get_trajectory_schema
+from dronalize.io.formats import storage_backend_name
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -41,7 +42,7 @@ def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
         ("Dataset", plan.dataset),
         ("Input", str(plan.data_root)),
         ("Output", str(plan.output_dir)),
-        ("Backend", plan.storage_backend.value),
+        ("Backend", storage_backend_name(plan.storage_backend)),
         ("Workers", str(plan.runtime.jobs)),
         ("Limit", "none" if plan.limit is None else str(plan.limit)),
         ("Schema", get_trajectory_schema(output_config.trajectory_schema).name),
@@ -51,7 +52,7 @@ def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
             "Assign",
             _inline_config_rows(_assignment_request_rows(plan.assignment, plan.loader.read)),
         ),
-        ("Options", _format_options(plan.loader.dataset)),
+        ("Options", _format_options(plan.loader.loader_options)),
     )
 
 
@@ -159,8 +160,8 @@ def _dataset_inspect_sections(descriptor: DatasetSpec) -> tuple[Section, ...]:
         ("Assignment", _assign_config_rows(default_config.assign)),
         ("Map", _map_config_rows(map_config)),
     ]
-    if descriptor.dataset_options_model.model_fields:
-        sections.append(("Dataset config", tuple(_loader_option_rows(descriptor))))
+    if descriptor.loader_options_model.model_fields:
+        sections.append(("Loader options", tuple(_loader_option_rows(descriptor))))
     return tuple(sections)
 
 
@@ -325,7 +326,7 @@ def _loader_option_rows(descriptor: DatasetSpec) -> tuple[Row, ...]:
             if field.is_required()
             else repr(field.get_default(call_default_factory=True)),
         )
-        for name, field in descriptor.dataset_options_model.model_fields.items()
+        for name, field in descriptor.loader_options_model.model_fields.items()
     )
 
 

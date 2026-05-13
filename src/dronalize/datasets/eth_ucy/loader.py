@@ -10,7 +10,7 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
+from dronalize.processing.loading.models import LoadedSourceData, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

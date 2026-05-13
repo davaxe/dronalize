@@ -36,7 +36,8 @@ Two choices define the output dataset:
 1. **Trajectory schema**
    Determines which per-timestep features are written (for example position-only vs. velocity + yaw).
 2. **Storage backend**
-   Determines how scene records are serialized on disk (`pickle`, `mds`, or `null`).
+   Determines how scene records are serialized on disk. Built-ins include `pickle`, `mds`, and
+   `null`, and applications can register additional backend names.
 
 This separation lets you keep one feature definition while switching storage format as needed.
 

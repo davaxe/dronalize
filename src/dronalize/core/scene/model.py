@@ -154,8 +154,16 @@ class Scene:
         return self.map_resolver(self)
 
     def has_map(self) -> bool:
-        """Return whether this scene can materialize a map graph."""
+        """Return whether this scene has a lazy map resolver attached."""
+        return self.has_map_resolver()
+
+    def has_map_resolver(self) -> bool:
+        """Return whether this scene has a lazy map resolver attached."""
         return self.map_resolver is not None
+
+    def can_resolve_map(self) -> bool:
+        """Return whether `resolve_map()` may return a map graph."""
+        return self.has_map_resolver()
 
     def as_schema(self, schema: TrajectorySchema = CANONICAL) -> Scene:
         """Return a copy converted to the requested trajectory schema."""

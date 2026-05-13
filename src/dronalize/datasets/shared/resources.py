@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.core.maps import MapGraph
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.resources import DatasetResources
+from dronalize.processing.loading.models import DatasetResources
 
 if TYPE_CHECKING:
     from collections.abc import Generator

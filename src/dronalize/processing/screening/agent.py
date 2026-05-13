@@ -8,17 +8,18 @@ import polars as pl
 from pydantic import Field, model_validator
 from typing_extensions import override
 
-from dronalize.processing.screening.base import AgentCheckRuleBase, RuleId
-from dronalize.processing.screening.context import (
+from dronalize.processing.screening.base import (
+    AgentCheckRuleBase,
     AgentSelector,
     FrameInput,
     FrameSet,
+    RuleId,
     coerce_frame_set,
 )
 
 if TYPE_CHECKING:
     from dronalize.config.models.screening import Tolerance
-    from dronalize.processing.screening.context import ScreeningContext
+    from dronalize.processing.screening.base import ScreeningContext
 
 
 class MinDistance(AgentCheckRuleBase):

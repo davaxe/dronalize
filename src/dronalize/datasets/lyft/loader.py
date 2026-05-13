@@ -17,9 +17,8 @@ from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.loading.options import DatasetOptionsModel
-from dronalize.processing.maps.resolver import no_map, shared_map
+from dronalize.processing.loading.models import DatasetOptionsModel, LoadedSourceData, Source
+from dronalize.processing.maps import no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -28,8 +27,8 @@ if TYPE_CHECKING:
     from zarr import Array
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
-    from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.loading.models import DatasetResources
+    from dronalize.processing.maps import MapResolver
     from dronalize.processing.models import LoaderRequest
 
 

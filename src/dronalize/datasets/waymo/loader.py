@@ -11,10 +11,10 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.shared import utils
-from dronalize.datasets.waymo.maps.builder import WaymoMapBuilder
+from dronalize.datasets.waymo.maps import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
 from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
+from dronalize.processing.loading.models import LoadedSourceData, MapBinding, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

@@ -1,24 +1,89 @@
-"""Compilation of semantic map features into `MapGraph`."""
+"""Public map-processing API and semantic map compilation helpers."""
 
 from __future__ import annotations
 
 import math
+from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from math import ceil
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, TypeAlias
 
 import numpy as np
+from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
 from dronalize.core.maps import MapGraph
-from dronalize.processing.maps.features import MapFeature, PathFeature, Point
-from dronalize.processing.maps.features import PointFeature as MapPointFeature
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Mapping
 
-    from dronalize.processing.maps.options import MapBuildOptions
+    from dronalize.core.scene.model import Scene
+
+
+Point: TypeAlias = tuple[float, float]
+"""A 2-D point as `(x, y)`."""
+
+
+@dataclass(frozen=True, slots=True)
+class PointFeature:
+    """A standalone map point."""
+
+    point: Point
+
+
+@dataclass(frozen=True, slots=True)
+class PathFeature:
+    """A polyline or polygon map feature."""
+
+    points: tuple[Point, ...]
+    edge_types: EdgeType | tuple[EdgeType, ...]
+    closed: bool = False
+    key: str | None = None
+    min_distance: float | None = None
+    interp_distance: float | None = None
+
+
+MapFeature: TypeAlias = PointFeature | PathFeature
+
+
+@dataclass(frozen=True, slots=True)
+class MapBuildOptions:
+    """Global sampling and edge-remapping options for map compilation."""
+
+    min_distance: float
+    interp_distance: float
+    edge_remap: dict[EdgeType, EdgeType] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate distance parameters after initialization."""
+        if self.interp_distance <= 0.0:
+            msg = "interp_distance must be greater than 0."
+            raise ValueError(msg)
+        if not (0.0 <= self.min_distance <= self.interp_distance):
+            msg = (
+                "min_distance must be in the range "
+                f"[0, interp_distance] ([0, {self.interp_distance}])."
+            )
+            raise ValueError(msg)
+
+    @classmethod
+    def from_distances(
+        cls,
+        min_distance: float | None,
+        interp_distance: float | None,
+        *,
+        edge_remap: Mapping[EdgeType, EdgeType] | None = None,
+    ) -> MapBuildOptions:
+        """Create validated options from nullable distance inputs."""
+        resolved_min_distance = 0.0 if min_distance is None else min_distance
+        resolved_interp_distance = np.inf if interp_distance is None else interp_distance
+        return cls(
+            min_distance=resolved_min_distance,
+            interp_distance=resolved_interp_distance,
+            edge_remap={} if edge_remap is None else dict(edge_remap),
+        )
 
 
 class InterpolationStage(IntEnum):
@@ -75,7 +140,7 @@ class MapGraphCompiler:
     def compile(self, features: Iterable[MapFeature]) -> MapGraph:
         """Compile semantic features into a `MapGraph`."""
         for feature in features:
-            if isinstance(feature, MapPointFeature):
+            if isinstance(feature, PointFeature):
                 _ = self._add_node(*feature.point)
             else:
                 self._compile_path(feature)
@@ -231,3 +296,129 @@ def _sample_path(
 
 def _distance_sq(src: Point, dst: Point) -> float:
     return (src[0] - dst[0]) ** 2 + (src[1] - dst[1]) ** 2
+
+
+class MapBuilder(Protocol):
+    """Minimal protocol for building a map graph."""
+
+    def build(
+        self, min_distance: float | None = None, interp_distance: float | None = None
+    ) -> MapGraph:
+        """Build the final `MapGraph`."""
+        ...
+
+
+class MapGeometrySource(Protocol):
+    """Semantic source for map geometry features."""
+
+    def iter_features(self) -> Iterable[MapFeature]:
+        """Yield semantic map features."""
+        ...
+
+    def edge_remap(self) -> Mapping[EdgeType, EdgeType]:
+        """Return edge remapping applied during compilation."""
+        ...
+
+
+class FeatureMapBuilder(MapBuilder, MapGeometrySource, ABC):
+    """Base class for map builders that emit semantic geometry features."""
+
+    @abstractmethod
+    @override
+    def iter_features(self) -> Iterable[MapFeature]: ...
+
+    @override
+    def edge_remap(self) -> Mapping[EdgeType, EdgeType]:
+        return {}
+
+    @override
+    def build(
+        self, min_distance: float | None = None, interp_distance: float | None = None
+    ) -> MapGraph:
+        options = MapBuildOptions.from_distances(
+            min_distance=min_distance, interp_distance=interp_distance, edge_remap=self.edge_remap()
+        )
+        compiler = MapGraphCompiler(options)
+        return compiler.compile(self.iter_features())
+
+
+def build_map(
+    source: MapGeometrySource,
+    *,
+    min_distance: float | None = None,
+    interp_distance: float | None = None,
+) -> MapGraph:
+    """Compile a geometry source directly into a `MapGraph`."""
+    options = MapBuildOptions.from_distances(
+        min_distance=min_distance, interp_distance=interp_distance, edge_remap=source.edge_remap()
+    )
+    compiler = MapGraphCompiler(options)
+    return compiler.compile(source.iter_features())
+
+
+MapKey = str | None
+"""Stable identifier for a map associated with a scene or source.
+
+This alias mirrors [`dronalize.core.scene.MapKey`][] so runtime map helpers can
+depend on the processing package without importing higher-level scene APIs.
+"""
+
+MapResolver = Callable[["Scene"], MapGraph | None]
+"""Callable signature for lazily resolving a map graph for a scene.
+
+Processing loaders attach resolvers to scenes so map materialization can be
+deferred until a downstream consumer actually needs the graph.
+"""
+
+
+def no_map() -> MapResolver:
+    """Create a resolver for datasets that do not expose map data.
+
+    Returns
+    -------
+    MapResolver
+        Resolver that always returns `None`.
+
+    """
+
+    def _resolve(_scene: Scene) -> None:
+        return None
+
+    _resolve.__name__ = "no_map"
+    return _resolve
+
+
+def shared_map(
+    shared_name: dict[MapKey, str] | str, f: Callable[[Scene, MapGraph], MapGraph] | None = None
+) -> MapResolver:
+    """Create a resolver that materializes a scene map from shared memory.
+
+    Parameters
+    ----------
+    shared_name : dict[MapKey, str] | str
+        Shared-memory name or lookup table keyed by `scene.map_key`.
+    f : Callable[[Scene, MapGraph], MapGraph] | None
+        A function to apply to the map graph before returning it.
+        If `None`, the map graph is returned as-is.
+
+    Returns
+    -------
+    MapResolver
+        Resolver that opens the shared-memory map, optionally applies `f`,
+        and returns a detached copy.
+
+    """
+
+    def _resolve(scene: Scene) -> MapGraph | None:
+        name = shared_name.get(scene.map_key) if isinstance(shared_name, dict) else shared_name
+        if name is None:
+            return None
+
+        with MapGraph.from_shared(name) as map_graph:
+            if f is None:
+                return map_graph.copy()
+
+            return f(scene, map_graph).copy()
+
+    _resolve.__name__ = "shared_map"
+    return _resolve

@@ -95,8 +95,7 @@ Seed = Annotated[
     ),
 ]
 StorageBackendOption = Annotated[
-    StorageBackend,
-    typer.Option("--storage-backend", "--sb", help="Storage backend for processed data."),
+    str, typer.Option("--storage-backend", "--sb", help="Storage backend for processed data.")
 ]
 TrajectorySchema = Annotated[
     str | None, typer.Option("--scene-schema", help="Scene schema to persist in exported output.")
@@ -181,7 +180,7 @@ def process(
     progress: Progress = True,
     limit: Limit = None,
     seed: Seed = None,
-    storage_backend: StorageBackendOption = StorageBackend.PICKLE,
+    storage_backend: StorageBackendOption = StorageBackend.PICKLE.value,
     trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,
@@ -191,8 +190,8 @@ def process(
     include_map: IncludeMap = None,
 ) -> None:
     """[bold]Process a specified dataset[/bold]."""
-    from dronalize.runtime._internal.runner import open_execution_session
     from dronalize.runtime.api import execute_plan
+    from dronalize.runtime.executor import open_execution_session
 
     plan = _run_cli_action(
         lambda: _resolve_cli_plan(
@@ -276,7 +275,7 @@ def show_config(
     assign: Assign = None,
     config: Config = None,
     jobs: Jobs = None,
-    storage_backend: StorageBackendOption = StorageBackend.PICKLE,
+    storage_backend: StorageBackendOption = StorageBackend.PICKLE.value,
     trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,
@@ -362,7 +361,7 @@ def _resolve_cli_plan(
     dataset: str,
     input_dir: Path,
     output_dir: Path,
-    storage_backend: StorageBackend,
+    storage_backend: StorageBackend | str,
     config: Path | None,
     read: ReadStrategy | None,
     read_split: list[DatasetSplit] | None,

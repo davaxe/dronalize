@@ -10,8 +10,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from typing_extensions import Self, override
 
 from dronalize.core.categories import EdgeType
-from dronalize.processing.maps.builder import FeatureMapBuilder, Point
-from dronalize.processing.maps.features import PathFeature
+from dronalize.processing.maps import FeatureMapBuilder, PathFeature, Point
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

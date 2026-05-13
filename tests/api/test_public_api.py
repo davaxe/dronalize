@@ -66,7 +66,7 @@ def test_reader_and_adapter_root_exports_are_declared() -> None:
     assert "IterableHeteroSceneDataset" in io_adapters.__all__
 
 
-def test_removed_runtime_executors_remain_internal() -> None:
+def test_runtime_executors_are_not_root_exports() -> None:
     runtime_module = __import__("dronalize.runtime", fromlist=["ParallelExecutor"])
     assert not hasattr(runtime_module, "ParallelExecutor")
     assert not hasattr(runtime_module, "SequentialExecutor")

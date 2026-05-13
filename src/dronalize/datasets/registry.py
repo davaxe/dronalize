@@ -10,7 +10,7 @@ from collections.abc import Callable, Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from pydantic import ValidationError
 
@@ -21,13 +21,17 @@ from dronalize.core.errors import (
     LoaderConfigError,
     MissingOptionalDependencyError,
 )
-from dronalize.processing.loading.options import DatasetOptionsModel, NoDatasetOptions
-from dronalize.processing.loading.resources import DatasetResources
+from dronalize.processing.loading.models import (
+    DatasetOptionsModel,
+    DatasetResources,
+    NoDatasetOptions,
+)
 from dronalize.processing.models import LoaderRequest, ReadRequest
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.base import BaseSceneLoader
 
 
 _REGISTRY: dict[str, DatasetSpec] = {}
@@ -81,7 +85,7 @@ class LoaderFactory(Protocol):
         data_root: Path | str,
         request: LoaderRequest,
         resources: DatasetResources | None = None,
-    ) -> object:
+    ) -> BaseSceneLoader[Any, Any]:
         """Create a scene loader for the dataset with the given configuration."""
         ...
 
@@ -117,8 +121,8 @@ class DatasetSpec:
         Dataset-provided partitions available to `read.strategy = "native"` and
         `assign.strategy = "preserve-native"`. Use `None` for datasets without
         native partitions.
-    dataset_options_model : type[DatasetOptionsModel], optional
-        Typed model for dataset-owned options under `[datasets.<name>.dataset]`.
+    loader_options_model : type[DatasetOptionsModel], optional
+        Typed model for dataset-owned options under `[datasets.<name>.loader_options]`.
     resources_factory : ResourcesFactory or None, optional
         Optional context-manager factory for shared per-run resources such as
         maps or cached metadata.
@@ -134,21 +138,21 @@ class DatasetSpec:
     default_config: DatasetConfig
     native_schema: TrajectorySchema
     supported_native_splits: tuple[DatasetSplit, ...] | None = None
-    dataset_options_model: type[DatasetOptionsModel] = NoDatasetOptions
+    loader_options_model: type[DatasetOptionsModel] = NoDatasetOptions
     resources_factory: ResourcesFactory | None = None
     feature_support: DatasetFeatureSupport = DatasetFeatureSupport()
     split_support: DatasetSplitSupport = DatasetSplitSupport()
 
-    def default_dataset_options(self) -> DatasetOptionsModel:
+    def default_loader_options(self) -> DatasetOptionsModel:
         """Return the default typed dataset-owned config block."""
-        return self.dataset_options_model()
+        return self.loader_options_model()
 
-    def parse_dataset_config(self, payload: Mapping[str, object] | None) -> DatasetOptionsModel:
+    def parse_loader_options(self, payload: Mapping[str, object] | None) -> DatasetOptionsModel:
         """Parse and validate dataset-owned config from plain data."""
         try:
-            return self.dataset_options_model.parse(dict(payload or {}))
+            return self.loader_options_model.parse(dict(payload or {}))
         except ValidationError as exc:
-            msg = f"Invalid dataset config for dataset '{self.name}': {exc}"
+            msg = f"Invalid loader options for dataset '{self.name}': {exc}"
             raise LoaderConfigError(msg) from exc
 
     @contextmanager
@@ -170,13 +174,13 @@ class DatasetSpec:
             read=ReadRequest.from_config(
                 self.default_config.read, supported_native_splits=self.supported_native_splits
             ),
-            dataset=self.default_dataset_options(),
+            loader_options=self.default_loader_options(),
             map=self.default_config.map if self.feature_support.map else None,
         )
 
     def build_loader(
         self, *, root: Path, request: LoaderRequest, resources: DatasetResources | None = None
-    ) -> object:
+    ) -> BaseSceneLoader[Any, Any]:
         """Construct one loader instance for this dataset specification."""
         return self.loader_factory(data_root=root, request=request, resources=resources)
 

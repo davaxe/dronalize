@@ -12,18 +12,22 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
-from dronalize.datasets.argoverse2.maps.builder import Argoverse2MapBuilder
+from dronalize.datasets.argoverse2.maps import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
-from dronalize.processing.loading.options import DatasetOptionsModel
+from dronalize.processing.loading.models import (
+    DatasetOptionsModel,
+    LoadedSourceData,
+    MapBinding,
+    Source,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.maps import MapResolver
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)

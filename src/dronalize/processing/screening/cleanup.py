@@ -10,11 +10,10 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategoryInput, coerce_agent_categories
 from dronalize.processing.screening.agent import AgentCheckRule  # noqa: TC001
-from dronalize.processing.screening.base import CleanupRuleBase, RuleId
-from dronalize.processing.screening.context import AgentSet  # noqa: TC001
+from dronalize.processing.screening.base import AgentSet, CleanupRuleBase, RuleId
 
 if TYPE_CHECKING:
-    from dronalize.processing.screening.context import ScreeningContext
+    from dronalize.processing.screening.base import ScreeningContext
 
 
 class PruneByRule(CleanupRuleBase):

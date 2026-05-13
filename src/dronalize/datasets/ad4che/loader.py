@@ -10,18 +10,18 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION
-from dronalize.datasets.ad4che.maps.builder import AD4CHEMapBuilder
+from dronalize.datasets.ad4che.maps import AD4CHEMapBuilder
 from dronalize.datasets.levelx.loader import LevelXDataLoader, SourceData
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.loader import Source
+from dronalize.processing.loading.models import Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
-    from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.loading.models import DatasetResources
+    from dronalize.processing.maps import MapResolver
     from dronalize.processing.models import LoaderRequest
 
 

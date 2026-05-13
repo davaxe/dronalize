@@ -26,7 +26,7 @@ if TYPE_CHECKING:
         ScenesConfig,
         ScreeningConfig,
     )
-    from dronalize.processing.loading.options import DatasetOptionsModel
+    from dronalize.processing.loading.models import DatasetOptionsModel
 
 
 def _ordered_splits(
@@ -140,7 +140,7 @@ class LoaderRequest:
     """Narrow loader-facing request derived from a resolved dataset config."""
 
     scenes: ScenesConfig
-    dataset: DatasetOptionsModel
+    loader_options: DatasetOptionsModel
     read: ReadRequest
     screening: ScreeningConfig | None = None
     map: MapConfig | None = None

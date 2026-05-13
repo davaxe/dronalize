@@ -26,8 +26,8 @@ from dronalize.datasets.registry import (
 from dronalize.processing.loading import DatasetResources
 
 __all__ = [
-    "DatasetResources",
     "DatasetFeatureSupport",
+    "DatasetResources",
     "DatasetSpec",
     "MapConfig",
     "ResourcesFactory",

@@ -19,7 +19,8 @@ from dronalize.config.models.split import (
     TimeBlockAssign,
 )
 from dronalize.config.parse import parse_config
-from dronalize.io.formats import StorageBackend
+from dronalize.io.backends.registry import is_writer_backend_registered, registered_writer_backends
+from dronalize.io.formats import StorageBackend, storage_backend_name
 from dronalize.processing.models import AssignmentRequest
 from dronalize.runtime.types import (
     ExecutionPlan,
@@ -49,13 +50,6 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
     resolved_config = _resolve_dataset_config(
         descriptor=descriptor, config_path=request.config_path, cli_override=request.overrides
     )
-    loader_request = compile_loader_request(
-        descriptor=descriptor, resolved_config=resolved_config, include_map=include_map
-    )
-    assignment_request = AssignmentRequest.from_config(resolved_config.assign, seed=request.seed)
-    effective_history_frames, effective_future_frames, effective_sample_time = (
-        compile_effective_scene_metrics(resolved_config)
-    )
     if not _validate_read_support(descriptor, resolved_config.read):
         msg = f"Dataset {descriptor.name} does not support the requested read configuration."
         raise dronalize_exceptions.ConfigurationError(msg)
@@ -65,11 +59,18 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
     if not _validate_feature_support(descriptor, resolved_config):
         msg = f"Dataset {descriptor.name} does not support lane-change sampling."
         raise dronalize_exceptions.ConfigurationError(msg)
+    loader_request = compile_loader_request(
+        descriptor=descriptor, resolved_config=resolved_config, include_map=include_map
+    )
+    assignment_request = AssignmentRequest.from_config(resolved_config.assign, seed=request.seed)
+    effective_history_frames, effective_future_frames, effective_sample_time = (
+        compile_effective_scene_metrics(resolved_config)
+    )
     logger.debug(
         "Built execution plan",
         extra={
             "dataset": descriptor.name,
-            "storage_backend": storage_backend.value,
+            "storage_backend": storage_backend_name(storage_backend),
             "parallel": resolved_config.runtime.jobs > 1,
             "include_map": loader_request.map is not None,
         },
@@ -128,6 +129,9 @@ def _validate_assignment_support(spec: DatasetSpec, config: AssignConfig | None)
 def _validate_feature_support(spec: DatasetSpec, config: DatasetConfig) -> bool:
     if config.scenes.lane_change is None:
         return True
+    if config.scenes.window is None:
+        msg = "Lane-change sampling requires window sampling to be enabled."
+        raise dronalize_exceptions.ConfigurationError(msg)
     return spec.feature_support.lane_change_sampling
 
 
@@ -146,13 +150,16 @@ def _validate_output_path(request: ExecutionRequest) -> None:
         raise NotADirectoryError(msg)
 
 
-def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBackend:
+def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBackend | str:
     try:
-        return StorageBackend(storage_backend)
-    except ValueError as exc:
-        raise dronalize_exceptions.UnsupportedStorageBackendError(
-            storage_backend, tuple(f.value for f in StorageBackend)
-        ) from exc
+        resolved: StorageBackend | str = StorageBackend(storage_backend)
+    except ValueError:
+        resolved = str(storage_backend)
+    if is_writer_backend_registered(resolved):
+        return resolved
+    raise dronalize_exceptions.UnsupportedStorageBackendError(
+        storage_backend_name(resolved), registered_writer_backends()
+    )
 
 
 def _resolve_dataset_config(

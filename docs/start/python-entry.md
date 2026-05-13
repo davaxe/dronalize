@@ -13,6 +13,8 @@ from dronalize.datasets import get
 spec = get("a43")
 print(spec.name)
 print(spec.feature_support.map)
+print(spec.feature_support.lane_change_sampling)
+print(spec.loader_options_model.model_fields)
 print(spec.native_schema.name)
 print(spec.supported_native_splits)
 ```

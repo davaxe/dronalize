@@ -8,8 +8,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
 from dronalize.datasets.waymo.protos import lean_map_pb2
-from dronalize.processing.maps.builder import FeatureMapBuilder
-from dronalize.processing.maps.features import PathFeature, PointFeature
+from dronalize.processing.maps import FeatureMapBuilder, PathFeature, PointFeature
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

@@ -18,8 +18,7 @@ from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
 from dronalize.datasets import DatasetFeatureSupport, DatasetSpec
 from dronalize.io.records import SceneRecord
 from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.loading.options import DatasetOptionsModel
+from dronalize.processing.loading.models import DatasetOptionsModel, LoadedSourceData, Source
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -87,10 +86,10 @@ def demo_descriptor() -> DatasetSpec:
             scenes=ScenesConfig(
                 history_frames=2, future_frames=1, sample_time=1.0, window=WindowConfig(step=1)
             ),
-            dataset={"batch_size": 2, "use_cache": False},
+            loader_options={"batch_size": 2, "use_cache": False},
         ),
         native_schema=CANONICAL,
-        dataset_options_model=DemoOptions,
+        loader_options_model=DemoOptions,
         feature_support=DatasetFeatureSupport(map=True),
     )
 

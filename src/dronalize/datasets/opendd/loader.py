@@ -12,17 +12,17 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
+from dronalize.datasets.opendd.maps import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
+from dronalize.processing.loading.models import LoadedSourceData, Source
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.maps import MapResolver
 
 
 def _table_query(table_name: str) -> str:

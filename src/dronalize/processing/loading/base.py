@@ -9,9 +9,12 @@ from typing import TYPE_CHECKING, Generic, cast
 from typing_extensions import Self, TypeVar
 
 from dronalize.core.typing import SourceT
-from dronalize.processing.loading.options import DatasetOptionsModel, NoDatasetOptions
-from dronalize.processing.loading.resources import DatasetResources
-from dronalize.processing.maps.resolver import MapResolver, no_map
+from dronalize.processing.loading.models import (
+    DatasetOptionsModel,
+    DatasetResources,
+    NoDatasetOptions,
+)
+from dronalize.processing.maps import MapResolver, no_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -20,7 +23,7 @@ if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
+    from dronalize.processing.loading.models import LoadedSourceData, MapBinding, Source
     from dronalize.processing.models import LoaderRequest, ReadRequest
 
 
@@ -66,7 +69,7 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         self.read_config: ReadRequest = request.read
         self.map_config: MapConfig | None = request.map
         self.resources: DatasetResources = DatasetResources() if resources is None else resources
-        self.loader_options: _LoaderOptionsT = cast("_LoaderOptionsT", request.dataset)
+        self.loader_options: _LoaderOptionsT = cast("_LoaderOptionsT", request.loader_options)
 
     def __init_subclass__(cls) -> None:
         """Ensure subclasses implement required source enumeration methods."""
