@@ -13,7 +13,7 @@ from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 from dronalize.processing.loading.models import LoadedSourceData, MapBinding, Source
 from dronalize.processing.models import AssignmentRequest, PipelinePlan
-from dronalize.processing.pipeline import spec as pipeline_spec
+from dronalize.processing.pipeline.trajectory import build_trajectory_pipeline
 from dronalize.processing.screening.screen import AGENT_PASS_COLUMN, SCENE_PASS_COLUMN
 
 if TYPE_CHECKING:
@@ -189,11 +189,7 @@ class SceneExtractor:
             assignment=self.split_assigner.request,
         )
         columns = TrajectoryColumns.from_schema(self.loader.native_trajectory_schema())
-        self._pipeline = pipeline_spec.trajectory_pipeline(
-            pipeline_spec.lane_change_sampling(plan, columns=columns)
-            if self.loader.scenes_config.lane_change is not None
-            else pipeline_spec.standard(plan, columns=columns)
-        )
+        self._pipeline = build_trajectory_pipeline(plan, columns=columns)
         return self._pipeline
 
     @staticmethod

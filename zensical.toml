@@ -118,7 +118,6 @@ nav = [
     { Processing = [
       "reference/api/processing/index.md",
       { Screening = "reference/api/processing/screening.md" },
-      { Pipeline = "reference/api/processing/pipeline.md" },
       { "Map processing" = "reference/api/processing/maps.md" },
       { "Loader extension API" = "reference/api/processing/loading.md" },
     ] },
