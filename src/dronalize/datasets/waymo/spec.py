@@ -1,6 +1,6 @@
 from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import DatasetSplit
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 from dronalize.datasets.waymo.loader import WaymoLoader
 
@@ -14,6 +14,6 @@ DATASET_SPEC = DatasetSpec(
     ),
     native_schema=WaymoLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
-    has_map=True,
+    feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
 )

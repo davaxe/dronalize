@@ -189,7 +189,11 @@ def compile_loader_request(
 ) -> LoaderRequest:
     """Compile the loader-facing request for one resolved dataset config."""
     dataset_options: DatasetOptionsModel = descriptor.parse_dataset_config(resolved_config.dataset)
-    map_config = None if (include_map is False or not descriptor.has_map) else resolved_config.map
+    map_config = (
+        None
+        if (include_map is False or not descriptor.feature_support.map)
+        else resolved_config.map
+    )
     return LoaderRequest(
         scenes=resolved_config.scenes,
         screening=resolved_config.screening,

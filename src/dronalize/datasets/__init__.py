@@ -15,11 +15,19 @@ map stores.
 """
 
 from dronalize.config.models import MapConfig, ScenesConfig
-from dronalize.datasets.registry import DatasetSpec, ResourcesFactory, available, get, register
+from dronalize.datasets.registry import (
+    DatasetFeatureSupport,
+    DatasetSpec,
+    ResourcesFactory,
+    available,
+    get,
+    register,
+)
 from dronalize.processing.loading import DatasetResources
 
 __all__ = [
     "DatasetResources",
+    "DatasetFeatureSupport",
     "DatasetSpec",
     "MapConfig",
     "ResourcesFactory",

@@ -1,5 +1,5 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
@@ -28,6 +28,6 @@ DATASET_SPEC = DatasetSpec(
     ),
     native_schema=SindLoader.native_trajectory_schema(),
     resources_factory=_open_sind_resources,
-    has_map=True,
+    feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, source=True),
 )

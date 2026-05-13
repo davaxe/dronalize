@@ -2,7 +2,7 @@ import polars as pl
 
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.ngsim.loader import NGSimLoader
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.highway_builder import HighwayLaneMapBuilder, LaneDescription
 from dronalize.datasets.shared.resources import ResourcesFactory, single_shared_map_resource_factory
 from dronalize.datasets.shared.specs import (
@@ -61,7 +61,7 @@ DATASET_SPECS = {
         resources_factory=ngsim_resources(
             LaneDescription(ids=list(range(1, 8)), direction=[True] * 7)
         ),
-        has_map=True,
+        feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, time_block=True),
     ),
     "us101": DatasetSpec(
@@ -72,7 +72,7 @@ DATASET_SPECS = {
         resources_factory=ngsim_resources(
             LaneDescription(ids=list(range(1, 9)), direction=[True] * 8)
         ),
-        has_map=True,
+        feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, time_block=True),
     ),
 }

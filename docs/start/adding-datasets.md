@@ -27,6 +27,7 @@ by unrelated external code.
 
 That means this works for Python-driven runs:
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 
@@ -49,6 +50,7 @@ It does not make the dataset visible to a later, separate `dronalize ...` shell 
 For CLI workflows, put the dataset registration in an importable Python module and expose a
 `register_dronalize_datasets()` hook. The hook can register specs itself:
 
+<!-- no-validate -->
 ```python
 from dronalize.datasets import register
 from my_project.datasets import MY_DATASET_SPEC
@@ -61,6 +63,7 @@ def register_dronalize_datasets():
 The hook may also return one [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) or an iterable of
 specs instead:
 
+<!-- no-validate -->
 ```python
 from my_project.datasets import MY_DATASET_SPEC
 

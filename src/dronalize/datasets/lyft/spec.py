@@ -2,7 +2,7 @@ from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferEx
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.datasets.lyft.loader import LyftLoader, LyftLoaderOptions
 from dronalize.datasets.lyft.maps.builder import LyftMapBuilder
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import single_shared_map_resource_factory
 from dronalize.datasets.shared.specs import (
     combine_screenings,
@@ -34,6 +34,6 @@ DATASET_SPEC = DatasetSpec(
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     dataset_options_model=LyftLoaderOptions,
     resources_factory=_open_lyft_resources,
-    has_map=True,
+    feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
 )

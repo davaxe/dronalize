@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from dronalize.config.runtime import RuntimeOverride
-from dronalize.core.errors import DatasetNotFoundError, UnsupportedStorageBackendError
+from dronalize.core.errors import (
+    ConfigurationError,
+    DatasetNotFoundError,
+    UnsupportedStorageBackendError,
+)
 from dronalize.io import StorageBackend, read_manifest
 from dronalize.runtime import ExecutionRequest, execute_request, resolve_request, stream_plan
 from tests.support import DemoOptions, demo_descriptor
@@ -65,6 +69,23 @@ def test_resolve_request_rejects_unknown_storage_backend(
 
     with pytest.raises(UnsupportedStorageBackendError, match="Unsupported storage backend"):
         _ = resolve_request(_request(tmp_path, storage_backend="bad-backend"))
+
+
+def test_resolve_request_rejects_unsupported_lane_change_sampling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_get_demo_descriptor(monkeypatch)
+    config_path = tmp_path / "dronalize.toml"
+    _ = config_path.write_text(
+        """
+[datasets.demo.scenes.lane_change]
+persist = 3
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="does not support lane-change sampling"):
+        _ = resolve_request(_request(tmp_path, config_path=config_path))
 
 
 def test_execute_request_surfaces_unknown_dataset_errors(tmp_path: Path) -> None:

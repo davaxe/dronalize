@@ -52,6 +52,7 @@ Each `.pkl` file contains one framework-neutral
 
 ## Reading Pickle output
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 from dronalize.io.readers import PickleReader

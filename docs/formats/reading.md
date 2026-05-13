@@ -18,6 +18,7 @@ Use the same post-processing logic regardless of backend.
 
 ## Read the manifest first
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 from dronalize.io import read_manifest
@@ -38,6 +39,7 @@ schema, horizon, and precision.
 
 ## Read from Pickle output
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 from dronalize.io.readers import PickleReader
@@ -56,6 +58,7 @@ For unsplit exports, use `split=None` (the default), which reads from `unsplit/`
 !!! warning "MDS requires extra dependencies"
     Install the MDS extra before using MDS readers: `pip install dronalize[mds]`.
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 from dronalize.io.readers import MDSReader

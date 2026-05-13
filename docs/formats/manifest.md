@@ -30,6 +30,7 @@ When no split strategy is active, scene data is written to `unsplit/`.
 
 | Field | Type | Description |
 | --- | --- | --- |
+| `dataset` | `str` | Name of the dataset. |
 | `format_version` | `int` | Manifest format version used for compatibility checks. |
 | `source_trajectory_schema` | `str` | Native schema of the source dataset before conversion. |
 | `trajectory_schema` | `str` | Schema written to output. |
@@ -43,23 +44,14 @@ When no split strategy is active, scene data is written to `unsplit/`.
 | `sample_time` | `float` | Effective sample interval (seconds) after any resampling. |
 | `original_sample_time` | `float` | Source sample interval (seconds) before resampling. |
 
-## Why it matters
-
-The manifest enables robust downstream loading by making key assumptions explicit:
-
-- feature order is known (`feature_columns`)
-- scene horizon is known (`history_frames`, `future_frames`)
-- numeric and coordinate conventions are known (`precision`, `recenter_positions`)
-- map availability is explicit (`has_map`)
-
 ## Read it programmatically
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 from dronalize.io import read_manifest
 
 manifest = read_manifest(Path("output"))
-
 print(manifest.trajectory_schema)
 print(manifest.feature_columns)
 print(manifest.history_frames, manifest.future_frames)

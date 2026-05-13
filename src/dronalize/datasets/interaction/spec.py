@@ -4,7 +4,7 @@ from dronalize.config.models import DatasetConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.interaction.loader import InteractionLoader
 from dronalize.datasets.interaction.maps.builder import InteractionMapBuilder
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 
@@ -32,6 +32,6 @@ DATASET_SPEC = DatasetSpec(
     native_schema=InteractionLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
     resources_factory=_open_interaction_resources,
-    has_map=True,
+    feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
 )

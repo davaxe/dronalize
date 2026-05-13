@@ -18,11 +18,6 @@ scenes are built, how screening and splits behave, and how outputs are written.
 | [Outputs and schemas](../formats/schema.md) | Separate schema choice from backend choice. |
 | [Lane-change sampling](lane-change-sampling.md) | Follow the current lane-change-aware window selection model. |
 
-## Reading path
-
-Start with [Architecture](architecture.md), then [Configuration model](configuration-model.md),
-then whichever page matches the part of the runtime you are changing or trying to understand.
-
 ## Related sections
 
 - [Start](../start/index.md)

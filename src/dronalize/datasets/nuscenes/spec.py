@@ -2,7 +2,7 @@ from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferEx
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.nuscenes.loader import NuScenesLoader, NuScenesLoaderOptions
 from dronalize.datasets.nuscenes.maps.builder import NuScenesMapBuilder
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 from dronalize.datasets.shared.specs import (
     linear_resample,
@@ -38,7 +38,7 @@ DATASET_SPEC = DatasetSpec(
     dataset_options_model=NuScenesLoaderOptions,
     native_schema=NuScenesLoader.native_trajectory_schema(),
     resources_factory=_open_nuscenes_resources,
-    has_map=True,
+    feature_support=DatasetFeatureSupport(map=True),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     split_support=DatasetSplitSupport(scene=True, source=True),
 )

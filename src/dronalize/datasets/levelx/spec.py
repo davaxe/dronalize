@@ -1,6 +1,11 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.levelx.loader import ExiDLoader, HighDLoader, StandardLevelXLoader
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport, LoaderFactory
+from dronalize.datasets.registry import (
+    DatasetFeatureSupport,
+    DatasetSpec,
+    DatasetSplitSupport,
+    LoaderFactory,
+)
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 from dronalize.datasets.shared.specs import (
@@ -54,7 +59,11 @@ def _highd_config() -> DatasetConfig:
 
 
 def _levelx_spec(
-    name: str, loader_factory: LoaderFactory, default_config: DatasetConfig
+    name: str,
+    loader_factory: LoaderFactory,
+    default_config: DatasetConfig,
+    *,
+    lane_change_sampling_support: bool = False,
 ) -> DatasetSpec:
     return DatasetSpec(
         name=name,
@@ -62,7 +71,9 @@ def _levelx_spec(
         default_config=default_config,
         native_schema=StandardLevelXLoader.native_trajectory_schema(),
         resources_factory=_open_levelx_osm_resources,
-        has_map=True,
+        feature_support=DatasetFeatureSupport(
+            map=True, lane_change_sampling=lane_change_sampling_support
+        ),
         split_support=DatasetSplitSupport(scene=True, source=True),
     )
 
@@ -73,11 +84,16 @@ DATASET_SPECS = {
         loader_factory=HighDLoader.unified_factory,
         default_config=_highd_config(),
         native_schema=HighDLoader.native_trajectory_schema(),
-        has_map=True,
+        feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, source=True),
     ),
     "ind": _levelx_spec("ind", StandardLevelXLoader.unified_factory, _levelx_config()),
-    "exid": _levelx_spec("exid", ExiDLoader.unified_factory, _levelx_config(lane_change=True)),
+    "exid": _levelx_spec(
+        "exid",
+        ExiDLoader.unified_factory,
+        _levelx_config(lane_change=True),
+        lane_change_sampling_support=True,
+    ),
     "round": _levelx_spec("round", StandardLevelXLoader.unified_factory, _levelx_config()),
     "unid": _levelx_spec("unid", StandardLevelXLoader.unified_factory, _levelx_config()),
 }

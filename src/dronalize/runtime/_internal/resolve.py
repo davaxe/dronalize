@@ -62,6 +62,9 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
     if not _validate_assignment_support(descriptor, resolved_config.assign):
         msg = f"Dataset {descriptor.name} does not support the requested assignment configuration."
         raise dronalize_exceptions.ConfigurationError(msg)
+    if not _validate_feature_support(descriptor, resolved_config):
+        msg = f"Dataset {descriptor.name} does not support lane-change sampling."
+        raise dronalize_exceptions.ConfigurationError(msg)
     logger.debug(
         "Built execution plan",
         extra={
@@ -120,6 +123,12 @@ def _validate_assignment_support(spec: DatasetSpec, config: AssignConfig | None)
             return support.scene
         case SourceAssign():
             return support.source
+
+
+def _validate_feature_support(spec: DatasetSpec, config: DatasetConfig) -> bool:
+    if config.scenes.lane_change is None:
+        return True
+    return spec.feature_support.lane_change_sampling
 
 
 def _validate_input_path(request: ExecutionRequest) -> None:

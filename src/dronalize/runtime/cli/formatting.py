@@ -79,7 +79,7 @@ def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, detail
         table.add_row(
             descriptor.name,
             _format_window_config(descriptor.default_config.scenes),
-            _format_flag(enabled=descriptor.has_map),
+            _format_flag(enabled=descriptor.feature_support.map),
             _format_splits(descriptor.supported_native_splits, empty="[dim]none[/dim]"),
             _format_assignment_modes(descriptor, compact=True),
         )
@@ -113,7 +113,7 @@ def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
 def _dataset_inspect_sections(descriptor: DatasetSpec) -> tuple[Section, ...]:
     default_config = descriptor.default_config
     scenes = default_config.scenes
-    map_config = default_config.map if descriptor.has_map else None
+    map_config = default_config.map if descriptor.feature_support.map else None
     output_config = default_config.output
     schema = descriptor.native_schema
 
@@ -130,7 +130,11 @@ def _dataset_inspect_sections(descriptor: DatasetSpec) -> tuple[Section, ...]:
                 ),
                 ("Read modes", "all, native" if descriptor.supported_native_splits else "all"),
                 ("Assignment modes", _format_assignment_modes(descriptor)),
-                ("Map", _format_flag(enabled=descriptor.has_map)),
+                ("Map", _format_flag(enabled=descriptor.feature_support.map)),
+                (
+                    "Lane-change sampling",
+                    _format_flag(enabled=descriptor.feature_support.lane_change_sampling),
+                ),
             ),
         ),
         (

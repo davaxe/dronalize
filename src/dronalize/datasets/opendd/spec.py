@@ -1,6 +1,6 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.opendd.loader import OpenDDLoader
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import (
     linear_resample,
     minimum_samples_screening,
@@ -22,6 +22,6 @@ DATASET_SPEC = DatasetSpec(
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=OpenDDLoader.native_trajectory_schema(),
-    has_map=True,
+    feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, source=True),
 )

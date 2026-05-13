@@ -17,7 +17,7 @@ integration contract:
 - `default_config` for the dataset's starting point
 - `native_schema` for the loader's physical trajectory fields
 - `supported_native_splits` when the dataset ships with fixed partitions
-- `has_map` for map availability
+- `feature_support` for optional capabilities such as map data and lane-change sampling
 - `dataset_options_model` for typed `[datasets.<name>.dataset]` config
 - `resources_factory` for run-scoped shared resources such as maps
 - `split_support` when scene-, source-, or time-based split modes are valid

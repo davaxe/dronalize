@@ -1,6 +1,6 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.a43.loader import A43Loader, A43LoaderOptions
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
 from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 
 DATASET_SPEC = DatasetSpec(
@@ -12,7 +12,7 @@ DATASET_SPEC = DatasetSpec(
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=A43Loader.native_trajectory_schema(),
-    has_map=True,
+    feature_support=DatasetFeatureSupport(map=True),
     dataset_options_model=A43LoaderOptions,
     split_support=DatasetSplitSupport(scene=True, time_block=True),
 )

@@ -97,6 +97,7 @@ def test_mds_encoder_decoder_roundtrip_preserves_data(scene: Scene) -> None:
 
 def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     manifest = DatasetManifest(
+        dataset="test_dataset",
         source_trajectory_schema="positions_only",
         trajectory_schema="canonical",
         derived_features=("vx", "vy", "yaw"),

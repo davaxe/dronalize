@@ -63,6 +63,16 @@ class DatasetSplitSupport:
     """Whether source timelines may be divided into contiguous split blocks."""
 
 
+@dataclass(slots=True, frozen=True, kw_only=True)
+class DatasetFeatureSupport:
+    """Optional dataset features supported by a dataset integration."""
+
+    map: bool = False
+    """Whether the dataset can provide map data when map inclusion is enabled."""
+    lane_change_sampling: bool = False
+    """Whether lane-change-aware sampling is supported through a `lane_id` signal."""
+
+
 class LoaderFactory(Protocol):
     """Protocol for functions that create dataset loaders with flexible arguments."""
 
@@ -112,8 +122,8 @@ class DatasetSpec:
     resources_factory : ResourcesFactory or None, optional
         Optional context-manager factory for shared per-run resources such as
         maps or cached metadata.
-    has_map : bool, optional
-        Whether the dataset can provide map data when map inclusion is enabled.
+    feature_support : DatasetFeatureSupport, optional
+        Optional dataset features supported by this integration.
     split_support : DatasetSplitSupport, optional
         Custom assignment modes supported by this dataset in addition to native
         split preservation.
@@ -126,7 +136,7 @@ class DatasetSpec:
     supported_native_splits: tuple[DatasetSplit, ...] | None = None
     dataset_options_model: type[DatasetOptionsModel] = NoDatasetOptions
     resources_factory: ResourcesFactory | None = None
-    has_map: bool = False
+    feature_support: DatasetFeatureSupport = DatasetFeatureSupport()
     split_support: DatasetSplitSupport = DatasetSplitSupport()
 
     def default_dataset_options(self) -> DatasetOptionsModel:
@@ -161,7 +171,7 @@ class DatasetSpec:
                 self.default_config.read, supported_native_splits=self.supported_native_splits
             ),
             dataset=self.default_dataset_options(),
-            map=self.default_config.map,
+            map=self.default_config.map if self.feature_support.map else None,
         )
 
     def build_loader(

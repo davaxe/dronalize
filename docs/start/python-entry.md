@@ -12,7 +12,7 @@ from dronalize.datasets import get
 
 spec = get("a43")
 print(spec.name)
-print(spec.has_map)
+print(spec.feature_support.map)
 print(spec.native_schema.name)
 print(spec.supported_native_splits)
 ```
@@ -22,6 +22,7 @@ print(spec.supported_native_splits)
 
 ## Resolve a config file
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 
@@ -29,7 +30,7 @@ from dronalize.config import parse_config
 from dronalize.datasets import get
 
 spec = get("a43")
-project = parse_config(Path("config.toml"))
+project = parse_config(Path("dronalize.toml"))
 resolved = project.resolve("a43", spec.default_config)
 
 print(resolved.scenes.history_frames, resolved.scenes.future_frames)
@@ -44,6 +45,7 @@ result.
 
 ## Plan or run a request
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 

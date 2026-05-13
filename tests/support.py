@@ -15,7 +15,7 @@ from dronalize.config.models.screening import MinSamplesSpec, ScreeningConfig
 from dronalize.core.categories import AgentCategory, AgentCategoryLike
 from dronalize.core.maps import MapGraph
 from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
-from dronalize.datasets import DatasetSpec
+from dronalize.datasets import DatasetFeatureSupport, DatasetSpec
 from dronalize.io.records import SceneRecord
 from dronalize.processing.loading.base import BaseSceneLoader
 from dronalize.processing.loading.loader import LoadedSourceData, Source
@@ -91,7 +91,7 @@ def demo_descriptor() -> DatasetSpec:
         ),
         native_schema=CANONICAL,
         dataset_options_model=DemoOptions,
-        has_map=True,
+        feature_support=DatasetFeatureSupport(map=True),
     )
 
 
