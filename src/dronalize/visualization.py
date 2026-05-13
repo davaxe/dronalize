@@ -7,9 +7,13 @@ This module requires the visualization extra to be installed, for example:
 
     pip install dronalize[viz]
 
-!!! info "Comming soon"
+!!! tip "Comming soon"
     This module is currently a placeholder and will be populated with visualization
     utilities in a future release.
+
+!!! warning "Not yet implemented"
+    This module might be renamed or restructured in the future as the
+    visualization utilities are developed.
 """
 
 from dronalize.core.optional import raise_missing_optional_dependency

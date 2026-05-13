@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from dronalize.config.models import (
     LaneChangeConfig,
@@ -90,11 +90,16 @@ def linear_resample(up: int, down: int = 1) -> ResampleConfig:
 
 
 def spline_resample(
-    up: int, down: int = 1, *, emit_velocity: bool = True, emit_acceleration: bool = True
+    up: int,
+    down: int = 1,
+    *,
+    emit_velocity: bool = True,
+    emit_acceleration: bool = True,
+    method: Literal["cubic", "pchip"] = "pchip",
 ) -> ResampleConfig:
     """Return the default cubic resampling config used by most trajectory datasets."""
     return resample_config(
-        method="cubic",
+        method=method,
         up=up,
         down=down,
         emit_velocity=emit_velocity,

@@ -152,6 +152,7 @@ class ExecutionPlan:
         """Return the dataset manifest for this plan."""
         export_config: OutputConfig = self.resolved_config.output
         return DatasetManifest(
+            dataset=self.dataset,
             precision=export_config.precision,
             feature_columns=self.output.trajectory_schema.feature_columns(),
             trajectory_schema=self.output.trajectory_schema.name,

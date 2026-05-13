@@ -27,6 +27,8 @@ class DatasetManifest:
     horizons, coordinate handling, map availability, and manifest compatibility.
     """
 
+    dataset: str
+    """Name of the source dataset, e.g. 'lyft' or 'waymo'."""
     source_trajectory_schema: str
     """Trajectory schema emitted by the dataset loader before conversion."""
     trajectory_schema: str
@@ -63,6 +65,7 @@ class DatasetManifest:
         if format_version != FORMAT_VERSION:
             raise ManifestCompatibilityError(format_version, FORMAT_VERSION)
         return cls(
+            dataset=str(payload["dataset"]),
             format_version=format_version,
             source_trajectory_schema=str(
                 payload.get("source_trajectory_schema", payload["trajectory_schema"])
