@@ -7,11 +7,11 @@ from typing import cast
 
 import click
 
-from dronalize.datasets import DatasetSpec, register
+from dronalize.datasets import DatasetDescriptor, register_dataset
 
 _REGISTER_HOOK_NAME = "register_dronalize_datasets"
 
-DatasetHook = Callable[[], DatasetSpec | Iterable[DatasetSpec] | None]
+DatasetHook = Callable[[], DatasetDescriptor | Iterable[DatasetDescriptor] | None]
 
 
 def register_custom_datasets(dataset_modules: list[str] | None) -> None:
@@ -29,7 +29,7 @@ def register_custom_datasets(dataset_modules: list[str] | None) -> None:
     There are two ways the modules specified in `dataset_modules` can register
     datasets:
         1. Define a function named `register_dronalize_datasets` that returns a
-        single `DatasetSpec` or an iterable of `DatasetSpec` objects.
+        single `DatasetDescriptor` or an iterable of `DatasetDescriptor` objects.
         2. Importing the module has side effects that register datasets directly
         with the `register` function.
 
@@ -49,8 +49,8 @@ def register_custom_datasets(dataset_modules: list[str] | None) -> None:
 
         specs = _call_dataset_register_hook(hook, module_name)
 
-        for spec in _normalize_dataset_specs(specs, module_name):
-            register(spec)
+        for spec in _normalize_dataset_descriptors(specs, module_name):
+            register_dataset(spec)
 
 
 def _import_dataset_module(module_name: str) -> ModuleType:
@@ -87,7 +87,7 @@ def _get_dataset_register_hook(module: ModuleType, module_name: str) -> DatasetH
 
 def _call_dataset_register_hook(
     hook: DatasetHook, module_name: str
-) -> DatasetSpec | Iterable[DatasetSpec] | None:
+) -> DatasetDescriptor | Iterable[DatasetDescriptor] | None:
     try:
         return hook()
     except click.ClickException:
@@ -97,30 +97,30 @@ def _call_dataset_register_hook(
         raise click.ClickException(msg) from exc
 
 
-def _normalize_dataset_specs(
-    specs: DatasetSpec | Iterable[DatasetSpec | object] | None, module_name: str
-) -> Iterable[DatasetSpec]:
+def _normalize_dataset_descriptors(
+    specs: DatasetDescriptor | Iterable[DatasetDescriptor | object] | None, module_name: str
+) -> Iterable[DatasetDescriptor]:
     if specs is None:
         return ()
 
-    if isinstance(specs, DatasetSpec):
+    if isinstance(specs, DatasetDescriptor):
         return (specs,)
 
     try:
-        iterator: Iterator[DatasetSpec | object] = iter(specs)
+        iterator: Iterator[DatasetDescriptor | object] = iter(specs)
     except TypeError as exc:
         msg = (
             f"Dataset module '{module_name}' returned unsupported value from {_REGISTER_HOOK_NAME}."
         )
         raise click.UsageError(msg) from exc
 
-    normalized_specs: list[DatasetSpec] = []
+    normalized_specs: list[DatasetDescriptor] = []
 
     for spec in iterator:
-        if not isinstance(spec, DatasetSpec):
+        if not isinstance(spec, DatasetDescriptor):
             msg = (
                 f"Dataset module '{module_name}' returned "
-                f"{type(spec).__name__}, expected DatasetSpec."
+                f"{type(spec).__name__}, expected DatasetDescriptor."
             )
             raise click.UsageError(msg)
 

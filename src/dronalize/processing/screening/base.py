@@ -38,7 +38,7 @@ AgentSet = Annotated[
 """Set of agent categories."""
 
 
-class AgentSelector(BaseModel):
+class AgentCategorySelector(BaseModel):
     """Restrict a rule to agents matching category predicates."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
@@ -49,17 +49,17 @@ class AgentSelector(BaseModel):
     @classmethod
     def define(
         cls, mode: Literal["include", "exclude"], categories: AgentCategoryInput
-    ) -> AgentSelector:
+    ) -> AgentCategorySelector:
         """Create a selector from flexible category inputs."""
         return cls(mode=mode, categories=coerce_agent_categories(categories, frozenset))
 
     @classmethod
-    def include(cls, categories: AgentCategoryInput) -> AgentSelector:
+    def include(cls, categories: AgentCategoryInput) -> AgentCategorySelector:
         """Create a selector that keeps only the given categories in scope."""
         return cls.define("include", categories)
 
     @classmethod
-    def exclude(cls, categories: AgentCategoryInput) -> AgentSelector:
+    def exclude(cls, categories: AgentCategoryInput) -> AgentCategorySelector:
         """Create a selector that excludes the given categories from scope."""
         return cls.define("exclude", categories)
 
@@ -100,7 +100,7 @@ class ScreeningContext:
         """Return the ending frame of the current scene."""
         return self.over_scene_window(pl.col(self.columns.frame).max())
 
-    def selector_mask(self, selector: AgentSelector | None) -> pl.Expr:
+    def selector_mask(self, selector: AgentCategorySelector | None) -> pl.Expr:
         """Return a row mask for the given selector."""
         if selector is None:
             return pl.lit(value=True)
@@ -108,7 +108,7 @@ class ScreeningContext:
         in_scope = pl.col(self.columns.category).is_in(selector.categories)
         return in_scope if selector.mode == "include" else ~in_scope
 
-    def retained_agent_count(self, selector: AgentSelector | None = None) -> pl.Expr:
+    def retained_agent_count(self, selector: AgentCategorySelector | None = None) -> pl.Expr:
         """Return the number of retained agents in the current scene."""
         return self.over_scene_window(
             pl.col(self.columns.agent_id).filter(self.selector_mask(selector)).n_unique()
@@ -127,7 +127,7 @@ class Rule(BaseModel, ABC):  # pyright: ignore[reportUnsafeMultipleInheritance]:
     rule_id: RuleId | None = Field(default=None, repr=False)
 
     @abstractmethod
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the Polars expression that evaluates the rule."""
 
     def name(self) -> str:
@@ -142,7 +142,7 @@ class CheckRuleBase(Rule, ABC):
 class AgentCheckRuleBase(CheckRuleBase, ABC):
     """Base class for per-agent check rules."""
 
-    selector: AgentSelector | None = None
+    selector: AgentCategorySelector | None = None
     tolerance: Tolerance | None = Field(default=None)
 
     @override

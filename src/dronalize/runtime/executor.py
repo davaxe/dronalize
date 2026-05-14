@@ -24,7 +24,7 @@ from dronalize.runtime.state import Progress, SharedResources, SplitCounts, Work
 
 if TYPE_CHECKING:
     from dronalize.core.typing import P
-    from dronalize.processing.loading.models import Source
+    from dronalize.processing.loading.models import DatasetSource
     from dronalize.runtime.types import ExecutionPlan
 
 AnyEvent = Event | threading.Event
@@ -334,7 +334,7 @@ class ParallelExecutor(Executor):
         return self._running
 
     @staticmethod
-    def _process_fn_write(source: Source[Any]) -> int:
+    def _process_fn_write(source: DatasetSource[Any]) -> int:
         if _ctx.writer is None:
             msg = "DatasetWriter was not initialized for this worker process."
             raise ValueError(msg)
@@ -352,7 +352,7 @@ class ParallelExecutor(Executor):
         return selected_scenes
 
     @staticmethod
-    def _process_fn_yield(source: Source[Any]) -> list[Scene]:
+    def _process_fn_yield(source: DatasetSource[Any]) -> list[Scene]:
         if _ctx.processor is None:
             msg = "Runtime processor was not initialized for this worker process."
             raise ValueError(msg)
@@ -365,7 +365,9 @@ class ParallelExecutor(Executor):
         return scenes
 
     @staticmethod
-    def _generate_scenes(processor: RuntimeProcessor, source: Source[Any]) -> Iterator[Scene]:
+    def _generate_scenes(
+        processor: RuntimeProcessor, source: DatasetSource[Any]
+    ) -> Iterator[Scene]:
         if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
             return
         claim_selected_scene = functools.partial(
@@ -382,8 +384,8 @@ class ParallelExecutor(Executor):
 
     def _execute_parallel(
         self,
-        process_fn: Callable[[Source[Any]], ReturnT],
-        payloads: Iterable[Source[Any]],
+        process_fn: Callable[[DatasetSource[Any]], ReturnT],
+        payloads: Iterable[DatasetSource[Any]],
         initializer: Callable[P, object],
         *args: P.args,
         **kwargs: P.kwargs,

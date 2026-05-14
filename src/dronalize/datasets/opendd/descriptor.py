@@ -1,15 +1,19 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.opendd.loader import OpenDDLoader
-from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
-from dronalize.datasets.shared.specs import (
+from dronalize.datasets.registry import (
+    DatasetDescriptor,
+    DatasetFeatureSupport,
+    DatasetSplitSupport,
+)
+from dronalize.datasets.shared.presets import (
     linear_resample,
     minimum_samples_screening,
     scenes_config,
 )
 
-DATASET_SPEC = DatasetSpec(
+DATASET_DESCRIPTOR = DatasetDescriptor(
     name="opendd",
-    loader_factory=OpenDDLoader.unified_factory,
+    loader_factory=OpenDDLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=60,

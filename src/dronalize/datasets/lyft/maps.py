@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from dronalize.processing.maps import Point
 
 
-class LyftLVL5Map:
+class LyftLevel5Map:
     """Represents a Lyft Level 5 map.
 
     The class provides access to various map elements such as lanes,
@@ -399,13 +399,13 @@ class LaneBoundary:
         )
 
     def get_edge_type_from_src(self, src_idx: int) -> EdgeType:
-        """Get the edge type for the lane boundary from a source index.
+        """Get the edge type for the lane boundary from a DatasetSource index.
 
-        This is the edge that start at the source index and goes to the next
-        node in the lane boundary. If the source index is negative, it is
+        This is the edge that start at the DatasetSource index and goes to the next
+        node in the lane boundary. If the DatasetSource index is negative, it is
         interpreted as an index from the end of the list of nodes.
 
-        Same results as using `get_edge_types()[src_idx]` if the source index
+        Same results as using `get_edge_types()[src_idx]` if the DatasetSource index
         is in the range of the number of nodes.
         """
         if src_idx < 0:
@@ -709,13 +709,13 @@ def _enu_to_uvw(
 class LyftMapBuilder(FeatureMapBuilder):
     """Builder for a map graph from a Lyft LVL5 map."""
 
-    def __init__(self, lyft_map: LyftLVL5Map) -> None:
-        self.map: LyftLVL5Map = lyft_map
+    def __init__(self, lyft_map: LyftLevel5Map) -> None:
+        self.map: LyftLevel5Map = lyft_map
 
     @classmethod
     def from_files(cls, map_path: Path, meta_json: Path) -> LyftMapBuilder:
         """Create a map builder from map and metadata files."""
-        return cls(LyftLVL5Map(map_path, meta_json))
+        return cls(LyftLevel5Map(map_path, meta_json))
 
     @override
     def iter_features(self) -> Iterable[PathFeature]:

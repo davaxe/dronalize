@@ -13,8 +13,8 @@ from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import CANONICAL, POSITIONS_VELOCITY_ACCELERATION
 from dronalize.datasets.levelx.maps import HighDMapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.models import LoadedSourceData, Source
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
 from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
@@ -22,18 +22,18 @@ if TYPE_CHECKING:
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.models import DatasetResources
-    from dronalize.processing.models import LoaderRequest
+    from dronalize.processing.loading.models import DatasetRunResources
+    from dronalize.processing.models import LoaderPlan
 
 
 @dataclass(slots=True, frozen=True)
-class SourceData:
+class LevelXSourceData:
     path: Path
     x0: float | None = None
     y0: float | None = None
 
 
-class LevelXDataLoader(BaseSceneLoader[SourceData]):
+class LevelXDataLoader(SceneLoader[LevelXSourceData]):
     """Common recording CSV loader for LevelX-style datasets."""
 
     @staticmethod
@@ -93,7 +93,7 @@ class LevelXDataLoader(BaseSceneLoader[SourceData]):
         return _TRACK_SCHEMA
 
     @override
-    def iter_sources(self) -> Iterable[Source[SourceData]]:
+    def iter_sources(self) -> Iterable[DatasetSource[LevelXSourceData]]:
         for recording_id in self._recording_ids():
             recording_meta = self.root / f"{recording_id:0>2}_recordingMeta.csv"
             recording_meta_data = pl.read_csv(recording_meta)
@@ -106,16 +106,16 @@ class LevelXDataLoader(BaseSceneLoader[SourceData]):
                 utm_x0 = recording_meta_data.select(pl.col("xUtmOrigin")).item()
                 utm_y0 = recording_meta_data.select(pl.col("yUtmOrigin")).item()
 
-            yield Source(
+            yield DatasetSource(
                 identifier=recording_id,
-                data=SourceData(self.root, x0=utm_x0, y0=utm_y0),
+                payload=LevelXSourceData(self.root, x0=utm_x0, y0=utm_y0),
                 map_key=str(location_id),
             )
 
     @override
-    def load_source(self, source: Source[SourceData]) -> Iterable[LoadedSourceData]:
-        tracks = source.data.path / f"{source.identifier:0>2}_tracks.csv"
-        meta = source.data.path / f"{source.identifier:0>2}_tracksMeta.csv"
+    def load_source(self, source: DatasetSource[LevelXSourceData]) -> Iterable[LoadedSourceFrame]:
+        tracks = source.payload.path / f"{source.identifier:0>2}_tracks.csv"
+        meta = source.payload.path / f"{source.identifier:0>2}_tracksMeta.csv"
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
             *self.meta_data_select()
         )
@@ -124,10 +124,10 @@ class LevelXDataLoader(BaseSceneLoader[SourceData]):
         )
         combined = tracks_df.join(meta_df, left_on="id", right_on="id")
         combined = combined.with_columns(
-            (pl.col("x") + (source.data.x0 or 0.0)).alias("x"),
-            (pl.col("y") + (source.data.y0 or 0.0)).alias("y"),
+            (pl.col("x") + (source.payload.x0 or 0.0)).alias("x"),
+            (pl.col("y") + (source.payload.y0 or 0.0)).alias("y"),
         )
-        yield LoadedSourceData(combined)
+        yield LoadedSourceFrame(combined)
 
     @override
     def count_sources(self) -> int | None:
@@ -160,8 +160,8 @@ class StandardLevelXLoader(LevelXDataLoader):
     def __init__(
         self,
         data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
+        request: LoaderPlan,
+        resources: DatasetRunResources | None = None,
     ) -> None:
         super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
 
@@ -190,8 +190,8 @@ class HighDLoader(LevelXDataLoader):
     def __init__(
         self,
         data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
+        request: LoaderPlan,
+        resources: DatasetRunResources | None = None,
     ) -> None:
         super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
 
@@ -260,7 +260,9 @@ class HighDLoader(LevelXDataLoader):
             max_x = scene.frame.select(pl.col("x")).max().item()
             dist = max_x - min_x
             builder = HighDMapBuilder(Path(scene.map_key), min_x - dist * 0.1, max_x + dist * 0.1)
-            map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
+            map_graph = builder.build(
+                self.map_config.min_distance, self.map_config.interpolation_distance
+            )
             return utils.extract_configured_map(map_graph, scene, self.map_config)
 
         return _resolver

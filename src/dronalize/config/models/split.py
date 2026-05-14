@@ -6,12 +6,12 @@ from typing import Annotated, Literal
 
 from pydantic import Field, RootModel, model_validator
 
-from dronalize.config.base import FullConfig
+from dronalize.config.base import ResolvedConfig
 from dronalize.core.categories import DatasetSplit  # noqa: TC001
 from dronalize.core.errors import ConfigurationError
 
 
-class SplitWeights(FullConfig):
+class SplitWeights(ResolvedConfig):
     """Weights used when routing data into train/val/test assignments."""
 
     train: float = Field(ge=0, default=0.0)
@@ -32,18 +32,18 @@ class SplitWeights(FullConfig):
         return self
 
 
-class ReadAll(FullConfig):
+class ReadAll(ResolvedConfig):
     """Read the full dataset input surface."""
 
     strategy: Literal["all"] = Field("all", repr=False, init=False)
 
 
-class ReadNative(FullConfig):
+class ReadNative(ResolvedConfig):
     """Read only selected dataset-native partitions."""
 
     strategy: Literal["native"] = Field("native", repr=False, init=False)
     splits: frozenset[DatasetSplit] | None = None
-    """Native dataset partitions to read from the source dataset."""
+    """Native dataset partitions to read from the DatasetSource dataset."""
 
 
 ReadUnion = Annotated[ReadAll | ReadNative, Field(discriminator="strategy")]
@@ -55,33 +55,33 @@ class ReadConfig(RootModel[ReadUnion]):
     root: ReadUnion
 
 
-class NoAssign(FullConfig):
+class NoAssign(ResolvedConfig):
     """No output split assignment."""
 
     strategy: Literal["none"] = Field("none", repr=False, init=False)
 
 
-class PreserveNativeAssign(FullConfig):
+class PreserveNativeAssign(ResolvedConfig):
     """Preserve dataset-native split labels in output."""
 
     strategy: Literal["preserve-native"] = Field("preserve-native", repr=False, init=False)
 
 
-class SceneAssign(FullConfig):
+class SceneAssign(ResolvedConfig):
     """Scene-based output split assignment."""
 
     strategy: Literal["scene"] = Field("scene", repr=False, init=False)
     ratio: SplitWeights = Field(default_factory=SplitWeights)
 
 
-class SourceAssign(FullConfig):
-    """Source-based output split assignment."""
+class SourceAssign(ResolvedConfig):
+    """DatasetSource-based output split assignment."""
 
     strategy: Literal["source"] = Field("source", repr=False, init=False)
     ratio: SplitWeights = Field(default_factory=SplitWeights)
 
 
-class TimeBlockAssign(FullConfig):
+class TimeBlockAssign(ResolvedConfig):
     """Time-block output split assignment."""
 
     gap: int = Field(ge=0, default=0)
@@ -89,7 +89,7 @@ class TimeBlockAssign(FullConfig):
     ratio: SplitWeights = Field(default_factory=SplitWeights)
 
 
-class ShuffledTimeBlockAssign(FullConfig):
+class ShuffledTimeBlockAssign(ResolvedConfig):
     """Shuffled time-block output split assignment."""
 
     segments: int = Field(ge=1)

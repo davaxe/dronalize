@@ -13,8 +13,8 @@ from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.shared import utils
 from dronalize.datasets.waymo.maps import WaymoMapBuilder
 from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.models import LoadedSourceData, MapBinding, Source
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, MapReference
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -27,18 +27,18 @@ if TYPE_CHECKING:
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
-class WaymoLoader(BaseSceneLoader):
+class WaymoLoader(SceneLoader):
     """Loader for Waymo scenarios stored in TFRecord format."""
 
     @staticmethod
-    def _sources_from_dir(data_dir: Path) -> Iterable[Source[Path]]:
+    def _sources_from_dir(data_dir: Path) -> Iterable[DatasetSource[Path]]:
         if not data_dir.is_dir():
             return
         for tfrecord_path in sorted(data_dir.glob("*.tfrecord*")):
-            yield Source(identifier=tfrecord_path.stem, data=tfrecord_path)
+            yield DatasetSource(identifier=tfrecord_path.stem, payload=tfrecord_path)
 
     @override
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[Path]]:
         if split is DatasetSplit.TRAIN:
             yield from self._sources_from_dir(self.root / "training")
         elif split is DatasetSplit.VAL:
@@ -55,12 +55,12 @@ class WaymoLoader(BaseSceneLoader):
         return self._count_sources(self.root / "testing")
 
     @override
-    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
-        for scenario_index, raw_data in enumerate(_read_tfrecord(source.data)):
+    def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
+        for scenario_index, raw_data in enumerate(_read_tfrecord(source.payload)):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
-            yield LoadedSourceData(
+            yield LoadedSourceFrame(
                 frame=_scenario_to_polars(scenario).lazy().with_columns(pl.col("id").add(1)),
-                map_binding=MapBinding(
+                map_binding=MapReference(
                     map_key=f"{source.identifier}:{scenario_index}",
                     map_payload=raw_data if self.map_config is not None else None,
                 ),
@@ -72,7 +72,7 @@ class WaymoLoader(BaseSceneLoader):
         return POSITIONS_VELOCITY_YAW
 
     @override
-    def resolve_map(self, scene: Scene, map_binding: MapBinding | None = None) -> MapGraph | None:
+    def resolve_map(self, scene: Scene, map_binding: MapReference | None = None) -> MapGraph | None:
         if map_binding is None or self.map_config is None:
             return None
         if map_binding.map_payload is None:
@@ -80,7 +80,8 @@ class WaymoLoader(BaseSceneLoader):
         map_data = lean_map_pb2.LeanMapContainer.FromString(map_binding.map_payload)
         map_config = self.map_config
         map_graph = WaymoMapBuilder.from_proto(map_data.map_features).build(
-            min_distance=map_config.min_distance, interp_distance=map_config.interp_distance
+            min_distance=map_config.min_distance,
+            interpolation_distance=map_config.interpolation_distance,
         )
         return utils.extract_configured_map(map_graph, scene, map_config)
 

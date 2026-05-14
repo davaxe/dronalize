@@ -2,11 +2,11 @@
 
 ## ::: dronalize.config.models.screening.PartialScreeningConfig
 
-## ::: dronalize.config.models.screening.AgentSelector
+## ::: dronalize.config.models.screening.AgentSelectorConfig
 
 ## ::: dronalize.config.models.screening.Tolerance
 
-## ::: dronalize.config.models.screening.Range
+## ::: dronalize.config.models.screening.CountRange
 
 ## ::: dronalize.config.models.screening.RequireFramesSpec
 

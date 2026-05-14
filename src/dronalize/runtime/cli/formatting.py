@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from dronalize.config.models import MapConfig, ScenesConfig, ScreeningConfig
-    from dronalize.datasets.registry import DatasetSpec
-    from dronalize.processing.models import AssignmentRequest, ReadRequest
+    from dronalize.datasets.registry import DatasetDescriptor
+    from dronalize.processing.models import ReadSelection, SplitAssignmentPlan
     from dronalize.runtime.types import ExecutionPlan
 
 PLAN_NOTICE = (
@@ -37,7 +37,7 @@ def build_processing_summary_table(plan: ExecutionPlan) -> Table:
 
 def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
     """Return label/value rows for a resolved plan summary."""
-    output_config = plan.output.inner
+    output_config = plan.output.config
     return (
         ("Dataset", plan.dataset),
         ("Input", str(plan.data_root)),
@@ -56,7 +56,9 @@ def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
     )
 
 
-def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, details: bool) -> Table:
+def build_available_datasets_table(
+    descriptors: Sequence[DatasetDescriptor], *, details: bool
+) -> Table:
     """Build a rich table showing the available dataset registry entries."""
     table = Table(
         title="Available datasets",
@@ -87,7 +89,7 @@ def build_available_datasets_table(descriptors: Sequence[DatasetSpec], *, detail
     return table
 
 
-def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
+def build_dataset_inspect_tables(descriptor: DatasetDescriptor) -> tuple[Table, ...]:
     """Build one or more inspection tables for a dataset descriptor."""
     return (
         _section_table(
@@ -97,7 +99,7 @@ def build_dataset_inspect_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     )
 
 
-def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
+def build_split_support_tables(descriptor: DatasetDescriptor) -> tuple[Table, ...]:
     """Build rich tables describing read and assignment support for one dataset."""
     rows: tuple[Row, ...] = (
         ("Dataset", descriptor.name),
@@ -111,7 +113,7 @@ def build_split_support_tables(descriptor: DatasetSpec) -> tuple[Table, ...]:
     return (_detail_table(title=f"Split support: {descriptor.name}", rows=rows),)
 
 
-def _dataset_inspect_sections(descriptor: DatasetSpec) -> tuple[Section, ...]:
+def _dataset_inspect_sections(descriptor: DatasetDescriptor) -> tuple[Section, ...]:
     default_config = descriptor.default_config
     scenes = default_config.scenes
     map_config = default_config.map if descriptor.feature_support.map else None
@@ -141,7 +143,7 @@ def _dataset_inspect_sections(descriptor: DatasetSpec) -> tuple[Section, ...]:
         (
             "Scenes",
             (
-                ("Source window", _format_window_config(scenes)),
+                ("source window", _format_window_config(scenes)),
                 ("Effective window", _format_window(*models.effective_scene_window(scenes))),
                 ("Resampling", _format_resampling(scenes)),
                 ("Windowing", _format_windowing(scenes)),
@@ -198,7 +200,7 @@ def _format_flag(*, enabled: bool) -> str:
     return "[green]yes[/green]" if enabled else "[dim]no[/dim]"
 
 
-def _format_assignment_modes(descriptor: DatasetSpec, *, compact: bool = False) -> str:
+def _format_assignment_modes(descriptor: DatasetDescriptor, *, compact: bool = False) -> str:
     modes = [] if compact else ["none"]
     if descriptor.supported_native_splits:
         modes.append("native" if compact else "preserve-native")
@@ -318,7 +320,7 @@ def _format_optional_float(value: float | None) -> str:
     return f"{value:g}" if value is not None else "[dim]none[/dim]"
 
 
-def _loader_option_rows(descriptor: DatasetSpec) -> tuple[Row, ...]:
+def _loader_option_rows(descriptor: DatasetDescriptor) -> tuple[Row, ...]:
     return tuple(
         (
             name,
@@ -330,7 +332,7 @@ def _loader_option_rows(descriptor: DatasetSpec) -> tuple[Row, ...]:
     )
 
 
-def _read_request_rows(read: ReadRequest) -> tuple[Row, ...]:
+def _read_request_rows(read: ReadSelection) -> tuple[Row, ...]:
     return _read_rows(read.config, native_splits=read.native_splits)
 
 
@@ -352,7 +354,7 @@ def _read_rows(
 
 
 def _assignment_request_rows(
-    assignment: AssignmentRequest, read: ReadRequest | None = None
+    assignment: SplitAssignmentPlan, read: ReadSelection | None = None
 ) -> tuple[Row, ...]:
     return _assignment_rows(
         assignment.config, native_splits=None if read is None else read.native_splits
@@ -397,7 +399,7 @@ def _map_config_rows(map_config: MapConfig | None) -> tuple[Row, ...]:
         ("Enabled", _format_flag(enabled=True)),
         ("Extraction", _format_map_extraction(map_config)),
         ("Min distance", _format_optional_float(map_config.min_distance)),
-        ("Interp distance", _format_optional_float(map_config.interp_distance)),
+        ("Interp distance", _format_optional_float(map_config.interpolation_distance)),
         ("Edge types", _format_map_edge_types(map_config)),
     )
 

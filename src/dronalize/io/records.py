@@ -32,12 +32,12 @@ class SceneRecord:
     -----
     - Arrays are expected to be internally consistent in shape.
     - Masks use `True` for valid entries and `False` for invalid entries.
-    - Invalid entries can arise from either missing source data or padding to
+    - Invalid entries can arise from either missing DatasetSource data or padding to
         fixed-size tensors.
     """
 
     scene_number: int
-    """Scene identifier within the source dataset.
+    """Scene identifier within the DatasetSource dataset.
 
     This value is intended as a per-dataset scene key for indexing and tracing
     records back to their origin.
@@ -69,7 +69,7 @@ class SceneRecord:
     project's canonical agent-type mapping.
     """
 
-    passed_agent_mask: npt.NDArray[np.bool_]
+    screened_agent_mask: npt.NDArray[np.bool_]
     """Mask indicating which agents passed dataset screening / validation.
 
     Shape:
@@ -81,7 +81,7 @@ class SceneRecord:
     depends on quality-controlled trajectories.
     """
 
-    input_features: npt.NDArray[np.float32 | np.float64]
+    history_features: npt.NDArray[np.float32 | np.float64]
     """Observed per-agent input features over the history horizon.
 
     Shape:
@@ -92,8 +92,8 @@ class SceneRecord:
     consistent within the record.
     """
 
-    input_mask: npt.NDArray[np.bool_]
-    """Validity mask for `input_features`.
+    history_mask: npt.NDArray[np.bool_]
+    """Validity mask for `history_features`.
 
     Shape:
         `(N, T_in)`
@@ -103,7 +103,7 @@ class SceneRecord:
     introduced to obtain a fixed temporal length.
     """
 
-    output_features: npt.NDArray[np.float32 | np.float64]
+    future_features: npt.NDArray[np.float32 | np.float64]
     """Target per-agent output features over the prediction horizon.
 
     Shape:
@@ -111,11 +111,11 @@ class SceneRecord:
 
     Contains the future trajectory/features associated with each agent over the
     prediction interval. The feature layout is expected to match that of
-    `input_features` unless explicitly documented otherwise by the backend.
+    `history_features` unless explicitly documented otherwise by the backend.
     """
 
-    output_mask: npt.NDArray[np.bool_]
-    """Validity mask for `output_features`.
+    future_mask: npt.NDArray[np.bool_]
+    """Validity mask for `future_features`.
 
     Shape:
         `(N, T_out)`
@@ -165,13 +165,13 @@ class SceneRecord:
     `map_edge_indices` according to the edge-type encoding.
     """
 
-    def unsplit(self) -> UnsplitSceneRecord:
+    def unsplit(self) -> FullHorizonSceneRecord:
         """Collapse the record into the unsplit representation."""
         return join_raw_scene_record(self)
 
 
 @dataclass(slots=True)
-class UnsplitSceneRecord:
+class FullHorizonSceneRecord:
     """Canonical scene record before observation/prediction splitting.
 
     This is the storage-facing intermediary used by formats that store one
@@ -181,14 +181,14 @@ class UnsplitSceneRecord:
     """
 
     scene_number: int
-    """Scene identifier within the source dataset."""
+    """Scene identifier within the DatasetSource dataset."""
     position_offset: npt.NDArray[np.float64]
     """Global 2D translation offset with shape `(2,)`."""
 
     # Agent data
     agent_types: npt.NDArray[np.int32]
     """Integer-encoded agent type for each agent, shape `(N,)`."""
-    passed_agent_mask: npt.NDArray[np.bool_]
+    screened_agent_mask: npt.NDArray[np.bool_]
     """Mask indicating which agents passed screening, shape `(N,)`."""
     features: npt.NDArray[np.float32 | np.float64]
     """Contiguous per-agent trajectory features, shape `(N, T, F)`."""
@@ -210,16 +210,16 @@ class UnsplitSceneRecord:
         return split_unsplit_raw_scene_record(self, observation_length=observation_length)
 
 
-def make_raw_scene_record(
+def make_scene_record(
     *,
     scene_number: int,
     position_offset: npt.NDArray[np.float64],
     agent_types: npt.NDArray[np.int32],
-    passed_agent_mask: npt.NDArray[np.bool_],
-    input_features: npt.NDArray[np.float32 | np.float64],
-    input_mask: npt.NDArray[np.bool_],
-    output_features: npt.NDArray[np.float32 | np.float64],
-    output_mask: npt.NDArray[np.bool_],
+    screened_agent_mask: npt.NDArray[np.bool_],
+    history_features: npt.NDArray[np.float32 | np.float64],
+    history_mask: npt.NDArray[np.bool_],
+    future_features: npt.NDArray[np.float32 | np.float64],
+    future_mask: npt.NDArray[np.bool_],
     map_node_positions: npt.NDArray[np.float32 | np.float64],
     map_edge_indices: npt.NDArray[np.int32],
     map_node_types: npt.NDArray[np.int32],
@@ -230,11 +230,11 @@ def make_raw_scene_record(
         scene_number=scene_number,
         position_offset=position_offset,
         agent_types=agent_types,
-        passed_agent_mask=passed_agent_mask,
-        input_features=input_features,
-        input_mask=input_mask,
-        output_features=output_features,
-        output_mask=output_mask,
+        screened_agent_mask=screened_agent_mask,
+        history_features=history_features,
+        history_mask=history_mask,
+        future_features=future_features,
+        future_mask=future_mask,
         map_node_positions=map_node_positions,
         map_edge_indices=map_edge_indices,
         map_node_types=map_node_types,
@@ -247,20 +247,20 @@ def make_unsplit_raw_scene_record(
     scene_number: int,
     position_offset: npt.NDArray[np.float64],
     agent_types: npt.NDArray[np.int32],
-    passed_agent_mask: npt.NDArray[np.bool_],
+    screened_agent_mask: npt.NDArray[np.bool_],
     features: npt.NDArray[np.float32 | np.float64],
     mask: npt.NDArray[np.bool_],
     map_node_positions: npt.NDArray[np.float32 | np.float64],
     map_edge_indices: npt.NDArray[np.int32],
     map_node_types: npt.NDArray[np.int32],
     map_edge_types: npt.NDArray[np.int32],
-) -> UnsplitSceneRecord:
-    """Construct one unsplit `UnsplitSceneRecord`."""
-    return UnsplitSceneRecord(
+) -> FullHorizonSceneRecord:
+    """Construct one unsplit `FullHorizonSceneRecord`."""
+    return FullHorizonSceneRecord(
         scene_number=scene_number,
         position_offset=position_offset,
         agent_types=agent_types,
-        passed_agent_mask=passed_agent_mask,
+        screened_agent_mask=screened_agent_mask,
         features=features,
         mask=mask,
         map_node_positions=map_node_positions,
@@ -271,7 +271,7 @@ def make_unsplit_raw_scene_record(
 
 
 def split_unsplit_raw_scene_record(
-    record: UnsplitSceneRecord, *, observation_length: int
+    record: FullHorizonSceneRecord, *, observation_length: int
 ) -> SceneRecord:
     """Split one unsplit scene record into observation and prediction tensors."""
     total_length = int(record.features.shape[1])
@@ -282,15 +282,15 @@ def split_unsplit_raw_scene_record(
         )
         raise ValueError(msg)
 
-    return make_raw_scene_record(
+    return make_scene_record(
         scene_number=record.scene_number,
         position_offset=record.position_offset,
         agent_types=record.agent_types,
-        passed_agent_mask=record.passed_agent_mask,
-        input_features=record.features[:, :observation_length],
-        input_mask=record.mask[:, :observation_length],
-        output_features=record.features[:, observation_length:],
-        output_mask=record.mask[:, observation_length:],
+        screened_agent_mask=record.screened_agent_mask,
+        history_features=record.features[:, :observation_length],
+        history_mask=record.mask[:, :observation_length],
+        future_features=record.features[:, observation_length:],
+        future_mask=record.mask[:, observation_length:],
         map_node_positions=record.map_node_positions,
         map_edge_indices=record.map_edge_indices,
         map_node_types=record.map_node_types,
@@ -298,15 +298,15 @@ def split_unsplit_raw_scene_record(
     )
 
 
-def join_raw_scene_record(record: SceneRecord) -> UnsplitSceneRecord:
+def join_raw_scene_record(record: SceneRecord) -> FullHorizonSceneRecord:
     """Collapse one canonical record into the unsplit representation."""
     return make_unsplit_raw_scene_record(
         scene_number=record.scene_number,
         position_offset=record.position_offset,
         agent_types=record.agent_types,
-        passed_agent_mask=record.passed_agent_mask,
-        features=np.concatenate((record.input_features, record.output_features), axis=1),
-        mask=np.concatenate((record.input_mask, record.output_mask), axis=1),
+        screened_agent_mask=record.screened_agent_mask,
+        features=np.concatenate((record.history_features, record.future_features), axis=1),
+        mask=np.concatenate((record.history_mask, record.future_mask), axis=1),
         map_node_positions=record.map_node_positions,
         map_edge_indices=record.map_edge_indices,
         map_node_types=record.map_node_types,

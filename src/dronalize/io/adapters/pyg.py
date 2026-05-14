@@ -77,13 +77,13 @@ def collate_hetero_with_time_padding(samples: Sequence[HeteroData]) -> Batch:
 def _convert_to_hetero(sample: TorchSceneRecord) -> HeteroData:
     data = HeteroData()
 
-    data["agent"].x = sample.input_features
-    data["agent"].x_mask = sample.input_mask
-    data["agent"].y = sample.output_features
-    data["agent"].y_mask = sample.output_mask
+    data["agent"].x = sample.history_features
+    data["agent"].x_mask = sample.history_mask
+    data["agent"].y = sample.future_features
+    data["agent"].y_mask = sample.future_mask
     data["agent"].agent_type = sample.agent_types
-    data["agent"].passed_mask = sample.passed_agent_mask
-    data["agent"].num_nodes = sample.input_features.size(0)
+    data["agent"].passed_mask = sample.screened_agent_mask
+    data["agent"].num_nodes = sample.history_features.size(0)
 
     data["map"].x = sample.map_node_positions
     data["map"].node_type = sample.map_node_types

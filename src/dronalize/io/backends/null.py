@@ -25,24 +25,23 @@ if TYPE_CHECKING:
 class NullWriter(DatasetWriter):
     """No-op writer used by tests and dry-run execution paths."""
 
-    def __init__(self, identifier: str | int | None = None) -> None:
-        self._identifier: str = "UNNAMED" if identifier is None else str(identifier)
+    def __init__(self, _identifier: str | int | None = None) -> None:
+        """Accept the worker identifier required by writer factories."""
 
     @classmethod
     @override
-    def as_factory(cls, *, log: bool = False) -> Callable[[int | None], NullWriter]:
-        """Create a factory that shares split counters across workers."""
+    def as_factory(cls) -> Callable[[int | None], NullWriter]:
+        """Create a worker-local no-op writer factory."""
         return functools.partial(cls)
 
     @override
     def write(self, scene: Scene) -> None:
-        return
+        _ = scene
 
     @override
     def finish_local(self) -> None:
-        return
+        """Finalize no worker-local state."""
 
     @override
     def finish_final(self) -> None:
-        """Optionally print the aggregated split counts for the full run."""
-        return
+        """Finalize no dataset-wide state."""

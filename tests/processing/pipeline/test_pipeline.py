@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import polars as pl
 
-from dronalize.processing.pipeline import Pipeline
+from dronalize.processing.pipeline.pipeline import Pipeline
 
 
 def test_pipeline_is_immutable_on_then() -> None:

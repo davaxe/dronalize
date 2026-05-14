@@ -72,7 +72,7 @@ def _build_null_writer_factory(plan: ExecutionPlan) -> WriterFactory:
     from dronalize.io.backends.null import NullWriter  # noqa: PLC0415
 
     _ = plan
-    return NullWriter.as_factory(log=True)
+    return NullWriter.as_factory()
 
 
 def _build_pickle_writer_factory(plan: ExecutionPlan) -> WriterFactory:

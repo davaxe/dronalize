@@ -1,19 +1,19 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.levelx.loader import ExiDLoader, HighDLoader, StandardLevelXLoader
 from dronalize.datasets.registry import (
+    DatasetDescriptor,
     DatasetFeatureSupport,
-    DatasetSpec,
     DatasetSplitSupport,
     LoaderFactory,
 )
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
-from dronalize.datasets.shared.resources import named_shared_map_resources_factory
-from dronalize.datasets.shared.specs import (
+from dronalize.datasets.shared.presets import (
     lane_change_sampling,
     linear_resample,
     minimum_samples_screening,
     scenes_config,
 )
+from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 
 _open_levelx_osm_resources = named_shared_map_resources_factory(
     named_paths=lambda root: (
@@ -21,7 +21,7 @@ _open_levelx_osm_resources = named_shared_map_resources_factory(
         for map_path in (root / "maps" / "lanelets").rglob("*.osm")
     ),
     build_map=lambda path, config: OSMMapBuilder(path).build(
-        config.min_distance, config.interp_distance
+        config.min_distance, config.interpolation_distance
     ),
 )
 
@@ -54,7 +54,7 @@ def _highd_config() -> DatasetConfig:
             lane_change=lane_change_sampling(required_lane_changes=3, negative_keep_every=3),
         ),
         screening=minimum_samples_screening(2),
-        map=MapConfig(extraction=FullMapExtraction(), interp_distance=10),
+        map=MapConfig(extraction=FullMapExtraction(), interpolation_distance=10),
     )
 
 
@@ -64,8 +64,8 @@ def _levelx_spec(
     default_config: DatasetConfig,
     *,
     lane_change_sampling_support: bool = False,
-) -> DatasetSpec:
-    return DatasetSpec(
+) -> DatasetDescriptor:
+    return DatasetDescriptor(
         name=name,
         loader_factory=loader_factory,
         default_config=default_config,
@@ -78,22 +78,22 @@ def _levelx_spec(
     )
 
 
-DATASET_SPECS = {
-    "highd": DatasetSpec(
+DATASET_DESCRIPTORS = {
+    "highd": DatasetDescriptor(
         name="highd",
-        loader_factory=HighDLoader.unified_factory,
+        loader_factory=HighDLoader.from_loader_request,
         default_config=_highd_config(),
         native_schema=HighDLoader.native_trajectory_schema(),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, source=True),
     ),
-    "ind": _levelx_spec("ind", StandardLevelXLoader.unified_factory, _levelx_config()),
+    "ind": _levelx_spec("ind", StandardLevelXLoader.from_loader_request, _levelx_config()),
     "exid": _levelx_spec(
         "exid",
-        ExiDLoader.unified_factory,
+        ExiDLoader.from_loader_request,
         _levelx_config(lane_change=True),
         lane_change_sampling_support=True,
     ),
-    "round": _levelx_spec("round", StandardLevelXLoader.unified_factory, _levelx_config()),
-    "unid": _levelx_spec("unid", StandardLevelXLoader.unified_factory, _levelx_config()),
+    "round": _levelx_spec("round", StandardLevelXLoader.from_loader_request, _levelx_config()),
+    "unid": _levelx_spec("unid", StandardLevelXLoader.from_loader_request, _levelx_config()),
 }

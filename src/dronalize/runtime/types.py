@@ -17,13 +17,13 @@ from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
 from dronalize.io.formats import StorageBackend, storage_backend_name
 from dronalize.io.manifest import DatasetManifest, package_version, write_manifest
-from dronalize.processing.models import AssignmentRequest, LoaderRequest, ReadRequest
+from dronalize.processing.models import LoaderPlan, ReadSelection, SplitAssignmentPlan
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.config.models import DatasetConfig, MDSOutputConfig, OutputConfig, RuntimeConfig
-    from dronalize.datasets.registry import DatasetSpec
+    from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.processing.loading.models import DatasetOptionsModel
 
 
@@ -31,8 +31,8 @@ if TYPE_CHECKING:
 class ExecutionResult:
     """Final result of a processing run.
 
-    `processed_sources` counts how many source units the executor started
-    processing, even when a scene limit stops the run before a source is fully
+    `processed_sources` counts how many DatasetSource units the executor started
+    processing, even when a scene limit stops the run before a DatasetSource is fully
     exhausted.
     """
 
@@ -43,7 +43,7 @@ class ExecutionResult:
     storage_backend: StorageBackend | str
     """Storage backend used for the exported records."""
     processed_sources: int
-    """Number of raw source units the executor started processing."""
+    """Number of raw DatasetSource units the executor started processing."""
     candidate_scenes: int
     """Number of scene candidates materialized before screening."""
     selected_scenes: int
@@ -56,29 +56,29 @@ class ExecutionResult:
 class OutputPlan:
     """Plan for output configuration."""
 
-    inner: OutputConfig
+    config: OutputConfig
     """Resolved output configuration used by the writer and manifest."""
 
     def precision(self) -> type[np.float32 | np.float64]:
         """Return the floating point precision for this output plan."""
-        if self.inner.precision == "float32":
+        if self.config.precision == "float32":
             return np.float32
         return np.float64
 
     @property
     def mds(self) -> MDSOutputConfig:
         """Return the MDS output config for this output plan."""
-        return self.inner.mds
+        return self.config.mds
 
     @property
     def recenter_positions(self) -> bool:
         """Return whether this output plan requests recentering of agent positions."""
-        return self.inner.recenter_positions
+        return self.config.recenter_positions
 
     @cached_property
     def trajectory_schema(self) -> TrajectorySchema:
         """Return the trajectory schema for this output plan."""
-        return get_trajectory_schema(self.inner.trajectory_schema)
+        return get_trajectory_schema(self.config.trajectory_schema)
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,7 +94,7 @@ class ExecutionPlan:
 
     """
 
-    descriptor: DatasetSpec
+    descriptor: DatasetDescriptor
     """Resolved dataset specification."""
     data_root: Path
     """Input dataset root."""
@@ -108,9 +108,9 @@ class ExecutionPlan:
     """Resolved runtime execution settings."""
     output: OutputPlan
     """Resolved output settings and derived output schema."""
-    loader: LoaderRequest
+    loader: LoaderPlan
     """Loader-facing subset of the resolved configuration."""
-    assignment: AssignmentRequest
+    assignment: SplitAssignmentPlan
     """Compiled split-assignment request."""
     map: MapConfig | None
     """Resolved map configuration, or `None` when map output is disabled."""
@@ -188,9 +188,9 @@ class ExecutionPlan:
             write_manifest(root, manifest)
 
 
-def compile_loader_request(
-    *, descriptor: DatasetSpec, resolved_config: DatasetConfig, include_map: bool | None
-) -> LoaderRequest:
+def build_loader_plan(
+    *, descriptor: DatasetDescriptor, resolved_config: DatasetConfig, include_map: bool | None
+) -> LoaderPlan:
     """Compile the loader-facing request for one resolved dataset config."""
     loader_options: DatasetOptionsModel = descriptor.parse_loader_options(
         resolved_config.loader_options
@@ -200,10 +200,10 @@ def compile_loader_request(
         if (include_map is False or not descriptor.feature_support.map)
         else resolved_config.map
     )
-    return LoaderRequest(
+    return LoaderPlan(
         scenes=resolved_config.scenes,
         screening=resolved_config.screening,
-        read=ReadRequest.from_config(
+        read=ReadSelection.from_config(
             resolved_config.read, supported_native_splits=descriptor.supported_native_splits
         ),
         loader_options=loader_options,
@@ -245,6 +245,6 @@ class ExecutionRequest(BaseModel):
     """Whether request resolution should require `input_dir` to exist."""
 
 
-def compile_effective_scene_metrics(config: DatasetConfig) -> tuple[int, int, float]:
+def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int, float]:
     """Return the effective scene window and sample time for one resolved config."""
     return effective_scene_window(config.scenes)

@@ -12,8 +12,8 @@ from typing_extensions import TypedDict
 from dronalize.core.categories import AgentCategory
 from dronalize.core.typing import FloatScalarT
 from dronalize.io.records import (
+    FullHorizonSceneRecord,
     SceneRecord,
-    UnsplitSceneRecord,
     make_unsplit_raw_scene_record,
     split_unsplit_raw_scene_record,
 )
@@ -87,7 +87,7 @@ def encode_unsplit_scene_record(
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> UnsplitSceneRecord: ...
+) -> FullHorizonSceneRecord: ...
 
 
 @overload
@@ -98,7 +98,7 @@ def encode_unsplit_scene_record(
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> UnsplitSceneRecord: ...
+) -> FullHorizonSceneRecord: ...
 
 
 def encode_unsplit_scene_record(
@@ -108,7 +108,7 @@ def encode_unsplit_scene_record(
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> UnsplitSceneRecord:
+) -> FullHorizonSceneRecord:
     """Encode one scene into the backend-neutral unsplit record representation."""
     if trajectory_schema is not None:
         scene = scene.as_schema(trajectory_schema)
@@ -158,9 +158,9 @@ def encode_unsplit_scene_record(
     else:
         agent_types = raw_categories.astype(np.int32)
 
-    passed_agent_mask = np.ones((num_agents,), dtype=bool)
+    screened_agent_mask = np.ones((num_agents,), dtype=bool)
     if scene.passed_agent_ids is not None:
-        passed_agent_mask = np.array(
+        screened_agent_mask = np.array(
             [agent_id in scene.passed_agent_ids for agent_id in sorted_ids], dtype=bool
         )
 
@@ -169,7 +169,7 @@ def encode_unsplit_scene_record(
         scene_number=scene.scene_number,
         position_offset=offset,
         agent_types=agent_types,
-        passed_agent_mask=passed_agent_mask,
+        screened_agent_mask=screened_agent_mask,
         features=features,
         mask=mask,
         map_node_positions=map_record["map_node_positions"],

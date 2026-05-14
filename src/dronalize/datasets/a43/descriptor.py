@@ -1,11 +1,15 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.a43.loader import A43Loader, A43LoaderOptions
-from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
-from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
+from dronalize.datasets.registry import (
+    DatasetDescriptor,
+    DatasetFeatureSupport,
+    DatasetSplitSupport,
+)
+from dronalize.datasets.shared.presets import minimum_samples_screening, scenes_config
 
-DATASET_SPEC = DatasetSpec(
+DATASET_DESCRIPTOR = DatasetDescriptor(
     name="a43",
-    loader_factory=A43Loader.unified_factory,
+    loader_factory=A43Loader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=25),
         screening=minimum_samples_screening(2),

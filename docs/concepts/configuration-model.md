@@ -13,7 +13,7 @@ For exact field tables and TOML syntax, see the [configuration reference](../ref
 Think of one resolved dataset config as four layers:
 
 1. built-in dataset defaults from the
-   [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec)
+   [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor)
 2. profile fragments from `[profiles.<name>]`
 3. one dataset entry under `[datasets.<name>]`
 4. runtime overrides from the CLI or

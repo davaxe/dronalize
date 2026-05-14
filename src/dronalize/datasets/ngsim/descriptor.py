@@ -2,14 +2,18 @@ import polars as pl
 
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.ngsim.loader import NGSimLoader
-from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import (
+    DatasetDescriptor,
+    DatasetFeatureSupport,
+    DatasetSplitSupport,
+)
 from dronalize.datasets.shared.highway_builder import HighwayLaneMapBuilder, LaneDescription
-from dronalize.datasets.shared.resources import ResourcesFactory, single_shared_map_resource_factory
-from dronalize.datasets.shared.specs import (
+from dronalize.datasets.shared.presets import (
     lane_change_sampling,
     minimum_samples_screening,
     scenes_config,
 )
+from dronalize.datasets.shared.resources import ResourcesFactory, single_shared_map_resource_factory
 
 _SELECT_EXPR = (
     pl.col("Vehicle_ID").alias("id"),
@@ -48,14 +52,14 @@ def ngsim_resources(
             lane_description=lane_description,
             include_outer_borders=include_outer_borders,
             smoothing=smoothing,
-        ).build(config.min_distance, config.interp_distance),
+        ).build(config.min_distance, config.interpolation_distance),
     )
 
 
-DATASET_SPECS = {
-    "i80": DatasetSpec(
+DATASET_DESCRIPTORS = {
+    "i80": DatasetDescriptor(
         name="i80",
-        loader_factory=NGSimLoader.unified_factory,
+        loader_factory=NGSimLoader.from_loader_request,
         default_config=_DEFAULT_CONFIG,
         native_schema=NGSimLoader.native_trajectory_schema(),
         resources_factory=ngsim_resources(
@@ -64,9 +68,9 @@ DATASET_SPECS = {
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, time_block=True),
     ),
-    "us101": DatasetSpec(
+    "us101": DatasetDescriptor(
         name="us101",
-        loader_factory=NGSimLoader.unified_factory,
+        loader_factory=NGSimLoader.from_loader_request,
         default_config=_DEFAULT_CONFIG,
         native_schema=NGSimLoader.native_trajectory_schema(),
         resources_factory=ngsim_resources(

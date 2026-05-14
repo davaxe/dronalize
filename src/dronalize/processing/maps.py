@@ -42,7 +42,7 @@ class PathFeature:
     closed: bool = False
     key: str | None = None
     min_distance: float | None = None
-    interp_distance: float | None = None
+    interpolation_distance: float | None = None
 
 
 MapFeature: TypeAlias = PointFeature | PathFeature
@@ -53,18 +53,18 @@ class MapBuildOptions:
     """Global sampling and edge-remapping options for map compilation."""
 
     min_distance: float
-    interp_distance: float
+    interpolation_distance: float
     edge_remap: dict[EdgeType, EdgeType] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate distance parameters after initialization."""
-        if self.interp_distance <= 0.0:
-            msg = "interp_distance must be greater than 0."
+        if self.interpolation_distance <= 0.0:
+            msg = "interpolation_distance must be greater than 0."
             raise ValueError(msg)
-        if not (0.0 <= self.min_distance <= self.interp_distance):
+        if not (0.0 <= self.min_distance <= self.interpolation_distance):
             msg = (
                 "min_distance must be in the range "
-                f"[0, interp_distance] ([0, {self.interp_distance}])."
+                f"[0, interpolation_distance] ([0, {self.interpolation_distance}])."
             )
             raise ValueError(msg)
 
@@ -72,16 +72,18 @@ class MapBuildOptions:
     def from_distances(
         cls,
         min_distance: float | None,
-        interp_distance: float | None,
+        interpolation_distance: float | None,
         *,
         edge_remap: Mapping[EdgeType, EdgeType] | None = None,
     ) -> MapBuildOptions:
         """Create validated options from nullable distance inputs."""
         resolved_min_distance = 0.0 if min_distance is None else min_distance
-        resolved_interp_distance = np.inf if interp_distance is None else interp_distance
+        resolved_interpolation_distance = (
+            np.inf if interpolation_distance is None else interpolation_distance
+        )
         return cls(
             min_distance=resolved_min_distance,
-            interp_distance=resolved_interp_distance,
+            interpolation_distance=resolved_interpolation_distance,
             edge_remap={} if edge_remap is None else dict(edge_remap),
         )
 
@@ -182,7 +184,7 @@ class MapGraphCompiler:
                 src_point=prev_point,
                 dst_id=dst_node,
                 dst_point=dst_point,
-                interp_distance=self.options.interp_distance,
+                interpolation_distance=self.options.interpolation_distance,
                 edge_type=sampled_edge_types[segment_index],
             )
             prev_node = dst_node
@@ -195,7 +197,7 @@ class MapGraphCompiler:
                 src_point=prev_point,
                 dst_id=first_node,
                 dst_point=sampled_points[0],
-                interp_distance=self.options.interp_distance,
+                interpolation_distance=self.options.interpolation_distance,
                 edge_type=sampled_edge_types[-1],
             )
 
@@ -214,12 +216,12 @@ class MapGraphCompiler:
         src_point: Point,
         dst_id: int,
         dst_point: Point,
-        interp_distance: float,
+        interpolation_distance: float,
         edge_type: EdgeType,
     ) -> None:
         prev_id = src_id
         for stage, _, point in interpolate_position(
-            src_point, dst_point, target_distance=interp_distance
+            src_point, dst_point, target_distance=interpolation_distance
         ):
             new_id = dst_id if stage == InterpolationStage.LAST else self._add_node(*point)
             self._add_edge(prev_id, new_id, edge_type)
@@ -302,7 +304,7 @@ class MapBuilder(Protocol):
     """Minimal protocol for building a map graph."""
 
     def build(
-        self, min_distance: float | None = None, interp_distance: float | None = None
+        self, min_distance: float | None = None, interpolation_distance: float | None = None
     ) -> MapGraph:
         """Build the final `MapGraph`."""
         ...
@@ -333,10 +335,12 @@ class FeatureMapBuilder(MapBuilder, MapGeometrySource, ABC):
 
     @override
     def build(
-        self, min_distance: float | None = None, interp_distance: float | None = None
+        self, min_distance: float | None = None, interpolation_distance: float | None = None
     ) -> MapGraph:
         options = MapBuildOptions.from_distances(
-            min_distance=min_distance, interp_distance=interp_distance, edge_remap=self.edge_remap()
+            min_distance=min_distance,
+            interpolation_distance=interpolation_distance,
+            edge_remap=self.edge_remap(),
         )
         compiler = MapGraphCompiler(options)
         return compiler.compile(self.iter_features())
@@ -346,11 +350,13 @@ def build_map(
     source: MapGeometrySource,
     *,
     min_distance: float | None = None,
-    interp_distance: float | None = None,
+    interpolation_distance: float | None = None,
 ) -> MapGraph:
     """Compile a geometry source directly into a `MapGraph`."""
     options = MapBuildOptions.from_distances(
-        min_distance=min_distance, interp_distance=interp_distance, edge_remap=source.edge_remap()
+        min_distance=min_distance,
+        interpolation_distance=interpolation_distance,
+        edge_remap=source.edge_remap(),
     )
     compiler = MapGraphCompiler(options)
     return compiler.compile(source.iter_features())

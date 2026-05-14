@@ -2,16 +2,16 @@
 
 <div class="section-intro" markdown="1">
 A dataset key in `dronalize` is not just a name. It resolves to a
-[`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec), which defines how that dataset
+[`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor), which defines how that dataset
 is discovered, loaded, configured, and processed.
 </div>
 
 For the full built-in dataset list and dataset-specific notes, see the
 [dataset reference](../reference/datasets/index.md).
 
-## What a [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) provides
+## What a [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor) provides
 
-Each [`DatasetSpec`](../reference/api/datasets/spec.md#dronalize.datasets.DatasetSpec) carries the dataset
+Each [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor) carries the dataset
 integration contract:
 
 - `default_config` for the dataset's starting point
@@ -32,9 +32,9 @@ That keeps optional dependencies isolated.
 
 In practice:
 
-- [`dronalize.datasets.get("waymo")`](../reference/api/datasets/registry.md#dronalize.datasets.get) requires the
+- [`dronalize.datasets.get_dataset_dataset("waymo")`](../reference/api/datasets/registry.md#dronalize.datasets.get_dataset) requires the
   `waymo` extra
-- [`dronalize.datasets.available()`](../reference/api/datasets/registry.md#dronalize.datasets.available) only lists
+- [`dronalize.datasets.list_datasets()`](../reference/api/datasets/registry.md#dronalize.datasets.list_datasets) only lists
   built-ins whose optional dependencies are installed
 - the CLI commands `available`, `inspect`, and `split-support` are direct views of the registry
 

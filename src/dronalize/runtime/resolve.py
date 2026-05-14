@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 import dronalize.core.errors as dronalize_exceptions
-from dronalize.config.file import ProcessingConfig
 from dronalize.config.models.split import (
     AssignConfig,
     NoAssign,
@@ -19,14 +18,15 @@ from dronalize.config.models.split import (
     TimeBlockAssign,
 )
 from dronalize.config.parse import parse_config
+from dronalize.config.project import ProjectConfig
 from dronalize.io.backends.registry import is_writer_backend_registered, registered_writer_backends
 from dronalize.io.formats import StorageBackend, storage_backend_name
-from dronalize.processing.models import AssignmentRequest
+from dronalize.processing.models import SplitAssignmentPlan
 from dronalize.runtime.types import (
     ExecutionPlan,
     OutputPlan,
-    compile_effective_scene_metrics,
-    compile_loader_request,
+    build_loader_plan,
+    resolve_effective_scene_window,
 )
 
 if TYPE_CHECKING:
@@ -34,14 +34,16 @@ if TYPE_CHECKING:
 
     from dronalize.config.models import DatasetConfig
     from dronalize.config.runtime import RuntimeOverride
-    from dronalize.datasets.registry import DatasetSpec
+    from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.runtime.types import ExecutionRequest
 
 
 logger = logging.getLogger(__name__)
 
 
-def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> ExecutionPlan:
+def build_execution_plan(
+    *, descriptor: DatasetDescriptor, request: ExecutionRequest
+) -> ExecutionPlan:
     """Build a full runtime plan from a public execution request."""
     _validate_input_path(request)
     _validate_output_path(request)
@@ -59,12 +61,12 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
     if not _validate_feature_support(descriptor, resolved_config):
         msg = f"Dataset {descriptor.name} does not support lane-change sampling."
         raise dronalize_exceptions.ConfigurationError(msg)
-    loader_request = compile_loader_request(
+    loader_request = build_loader_plan(
         descriptor=descriptor, resolved_config=resolved_config, include_map=include_map
     )
-    assignment_request = AssignmentRequest.from_config(resolved_config.assign, seed=request.seed)
+    assignment_request = SplitAssignmentPlan.from_config(resolved_config.assign, seed=request.seed)
     effective_history_frames, effective_future_frames, effective_sample_time = (
-        compile_effective_scene_metrics(resolved_config)
+        resolve_effective_scene_window(resolved_config)
     )
     logger.debug(
         "Built execution plan",
@@ -81,7 +83,7 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
         output_dir=request.output_dir,
         storage_backend=storage_backend,
         runtime=resolved_config.runtime,
-        output=OutputPlan(inner=resolved_config.output),
+        output=OutputPlan(config=resolved_config.output),
         loader=loader_request,
         assignment=assignment_request,
         map=loader_request.map,
@@ -94,7 +96,7 @@ def build_plan(*, descriptor: DatasetSpec, request: ExecutionRequest) -> Executi
     )
 
 
-def _validate_read_support(spec: DatasetSpec, config: ReadConfig | None) -> bool:
+def _validate_read_support(spec: DatasetDescriptor, config: ReadConfig | None) -> bool:
     if config is None:
         return True
     match config.root:
@@ -109,7 +111,7 @@ def _validate_read_support(spec: DatasetSpec, config: ReadConfig | None) -> bool
             return True
 
 
-def _validate_assignment_support(spec: DatasetSpec, config: AssignConfig | None) -> bool:
+def _validate_assignment_support(spec: DatasetDescriptor, config: AssignConfig | None) -> bool:
     if config is None:
         return True
     support = spec.split_support
@@ -126,7 +128,7 @@ def _validate_assignment_support(spec: DatasetSpec, config: AssignConfig | None)
             return support.source
 
 
-def _validate_feature_support(spec: DatasetSpec, config: DatasetConfig) -> bool:
+def _validate_feature_support(spec: DatasetDescriptor, config: DatasetConfig) -> bool:
     if config.scenes.lane_change is None:
         return True
     if config.scenes.window is None:
@@ -163,10 +165,10 @@ def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBa
 
 
 def _resolve_dataset_config(
-    *, descriptor: DatasetSpec, config_path: Path | None, cli_override: RuntimeOverride
+    *, descriptor: DatasetDescriptor, config_path: Path | None, cli_override: RuntimeOverride
 ) -> DatasetConfig:
-    project = parse_config(config_path) if config_path is not None else ProcessingConfig()
+    project = parse_config(config_path) if config_path is not None else ProjectConfig()
     defaults = descriptor.default_config
-    config = project.resolve(descriptor.name, defaults)
+    config = project.resolve_dataset_config(descriptor.name, defaults)
     logger.debug("Resolved dataset config", extra={"dataset": descriptor.name})
-    return cli_override.apply_to(None).apply_to(config)
+    return cli_override.merge_into(None).merge_into(config)

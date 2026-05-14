@@ -12,8 +12,12 @@ from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION, Scene
 from dronalize.datasets.a43.maps import A43MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.models import DatasetOptionsModel, LoadedSourceData, Source
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import (
+    DatasetOptionsModel,
+    DatasetSource,
+    LoadedSourceFrame,
+)
 from dronalize.processing.maps import MapResolver
 
 if TYPE_CHECKING:
@@ -28,23 +32,23 @@ class A43LoaderOptions(DatasetOptionsModel):
     rows_per_source: int = 40_000
 
 
-class A43Loader(BaseSceneLoader[tuple[Path, int], A43LoaderOptions]):
+class A43Loader(SceneLoader[tuple[Path, int], A43LoaderOptions]):
     """Scene loader for the A43 dataset."""
 
     _dt: ClassVar[float] = 0.1
     _eps: ClassVar[float] = 1e-9
 
     @override
-    def iter_sources(self) -> Iterable[Source[tuple[Path, int]]]:
+    def iter_sources(self) -> Iterable[DatasetSource[tuple[Path, int]]]:
         for i, csv_file in enumerate(self.root.glob("*.csv")):
             rows: int = pl.scan_csv(csv_file, infer_schema=False).select(pl.len()).collect().item()
             for j in range(0, rows, self.loader_options.rows_per_source):
-                yield Source(identifier=i, data=(csv_file, j), map_key=csv_file.stem)
+                yield DatasetSource(identifier=i, payload=(csv_file, j), map_key=csv_file.stem)
 
     @override
-    def load_source(self, source: Source[tuple[Path, int]]) -> Iterable[LoadedSourceData]:
-        path, i = source.data
-        yield LoadedSourceData(
+    def load_source(self, source: DatasetSource[tuple[Path, int]]) -> Iterable[LoadedSourceFrame]:
+        path, i = source.payload
+        yield LoadedSourceFrame(
             pl
             .scan_csv(path, skip_rows=i, n_rows=self.loader_options.rows_per_source, schema=_SCHEMA)
             .with_columns(t0=pl.col("tseconds").min())
@@ -94,7 +98,9 @@ class A43Loader(BaseSceneLoader[tuple[Path, int], A43LoaderOptions]):
             min_x = scene.frame.select(pl.col("x")).min().item()
             max_x = scene.frame.select(pl.col("x")).max().item()
             builder = A43MapBuilder(scene.map_key, min_x, max_x)
-            map_graph = builder.build(self.map_config.min_distance, self.map_config.interp_distance)
+            map_graph = builder.build(
+                self.map_config.min_distance, self.map_config.interpolation_distance
+            )
             return utils.extract_configured_map(map_graph, scene, self.map_config)
 
         return _resolver

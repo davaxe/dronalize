@@ -3,16 +3,16 @@
     options:
         members: false
 
-## ::: dronalize.processing.loading.BaseSceneLoader
+## ::: dronalize.processing.loading.SceneLoader
 
 ## ::: dronalize.processing.loading.DatasetOptionsModel
 
 ## ::: dronalize.processing.loading.NoDatasetOptions
 
-## ::: dronalize.processing.loading.DatasetResources
+## ::: dronalize.processing.loading.DatasetRunResources
 
-## ::: dronalize.processing.loading.Source
+## ::: dronalize.processing.loading.DatasetSource
 
-## ::: dronalize.processing.loading.LoadedSourceData
+## ::: dronalize.processing.loading.LoadedSourceFrame
 
-## ::: dronalize.processing.loading.MapBinding
+## ::: dronalize.processing.loading.MapReference

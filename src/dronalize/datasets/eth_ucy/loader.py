@@ -9,8 +9,8 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.models import LoadedSourceData, Source
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -22,20 +22,20 @@ if TYPE_CHECKING:
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
-class EthUcyLoader(BaseSceneLoader):
+class EthUcyLoader(SceneLoader):
     """Loader for ETH/UCY pedestrian trajectory datasets."""
 
     @override
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[Path]]:
         data_dir = self.root / split.value
         for data_file in sorted(data_dir.iterdir()):
-            yield Source(identifier=data_file.name, data=data_file)
+            yield DatasetSource(identifier=data_file.name, payload=data_file)
 
     @override
-    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
-        yield LoadedSourceData(
+    def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
+        yield LoadedSourceFrame(
             pl.scan_csv(
-                source.data,
+                source.payload,
                 has_header=False,
                 separator="\t",
                 new_columns=["frame", "id", "x", "y"],

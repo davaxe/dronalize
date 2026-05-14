@@ -1,5 +1,5 @@
-## ::: dronalize.datasets.available
+## ::: dronalize.datasets.list_datasets
 
-## ::: dronalize.datasets.get
+## ::: dronalize.datasets.get_dataset
 
-## ::: dronalize.datasets.register
+## ::: dronalize.datasets.register_dataset

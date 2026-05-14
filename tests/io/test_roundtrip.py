@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from dronalize.config.models.output import OutputConfig
 from dronalize.io import DatasetManifest, read_manifest
 from dronalize.io.backends.pickle import PickleWriter
 from dronalize.io.encoding import encode_scene_record, encode_unsplit_scene_record
@@ -14,21 +13,12 @@ from dronalize.io.encoding.mds import decode_mds_sample, encode_mds_sample
 from dronalize.io.manifest import write_manifest
 from dronalize.io.readers import PickleReader
 from dronalize.io.records import join_raw_scene_record, split_unsplit_raw_scene_record
-from dronalize.runtime.types import OutputPlan
-from tests.support import assert_scene_record_equal
+from tests.support import assert_scene_record_equal, output_plan
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import Scene
-
-
-def _output_plan() -> OutputPlan:
-    return OutputPlan(
-        inner=OutputConfig(
-            trajectory_schema="canonical", precision="float32", recenter_positions=True
-        )
-    )
 
 
 def test_unsplit_split_helpers_roundtrip_record_contents(scene: Scene) -> None:
@@ -40,20 +30,20 @@ def test_unsplit_split_helpers_roundtrip_record_contents(scene: Scene) -> None:
 
     np.testing.assert_allclose(unsplit.features, rejoined.features)
     np.testing.assert_array_equal(unsplit.mask, rejoined.mask)
-    np.testing.assert_allclose(split.input_features, rebuilt.input_features)
-    np.testing.assert_allclose(split.output_features, rebuilt.output_features)
+    np.testing.assert_allclose(split.history_features, rebuilt.history_features)
+    np.testing.assert_allclose(split.future_features, rebuilt.future_features)
 
 
 def test_encode_scene_record_uses_passed_agent_ids(scene: Scene) -> None:
     scene = replace(scene, passed_agent_ids=frozenset({10}))
     record = encode_scene_record(scene, dtype=np.float32)
 
-    np.testing.assert_array_equal(record.passed_agent_mask, np.array([True, False]))
+    np.testing.assert_array_equal(record.screened_agent_mask, np.array([True, False]))
 
 
 def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     output_dir = tmp_path / "pickle"
-    writer = PickleWriter(output_dir=output_dir, config=_output_plan(), splits=None)
+    writer = PickleWriter(output_dir=output_dir, config=output_plan(), splits=None)
 
     expected = encode_scene_record(scene, dtype=np.float32)
     writer.write(scene)
@@ -73,7 +63,7 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
     output_dir = tmp_path / "mds"
     writer = MDSDatasetWriter(
-        output_dir=output_dir, config=_output_plan(), splits=None, parallel=False
+        output_dir=output_dir, config=output_plan(), splits=None, parallel=False
     )
 
     expected = encode_scene_record(scene, dtype=np.float32)

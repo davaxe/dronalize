@@ -2,9 +2,9 @@
 
 ## ::: dronalize.config.models.map.PartialMapConfig
 
-## ::: dronalize.config.models.map.MapEdgeTypesConfig
+## ::: dronalize.config.models.map.MapEdgeTypeRules
 
-## ::: dronalize.config.models.map.PartialMapEdgeTypesConfig
+## ::: dronalize.config.models.map.PartialMapEdgeTypeRules
 
 ## ::: dronalize.config.models.map.SceneExtentExtraction
 

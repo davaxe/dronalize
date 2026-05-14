@@ -97,10 +97,10 @@ This means a scene can survive even if a small number of selected agents fail th
 
     In practice this means the scene can still be emitted, but the runtime keeps
     track of which agent ids passed screening and which did not. When the scene
-    is encoded, that information is exported as a per-agent `passed_agent_mask`.
+    is encoded, that information is exported as a per-agent `screened_agent_mask`.
 
     This is useful when you want to keep borderline or context agents in the
-    scene graph while still training, evaluating, or plotting with a stricter
+    scene graph while still training, evaluating, or visualizing with a stricter
     subset. For example, a downstream model can use all agents as context but
     only compute loss on agents whose screening mask is `true`.
 

@@ -11,7 +11,7 @@ from typing_extensions import Self, TypeVar
 from dronalize.core.typing import SourceT
 from dronalize.processing.loading.models import (
     DatasetOptionsModel,
-    DatasetResources,
+    DatasetRunResources,
     NoDatasetOptions,
 )
 from dronalize.processing.maps import MapResolver, no_map
@@ -23,32 +23,32 @@ if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.models import LoadedSourceData, MapBinding, Source
-    from dronalize.processing.models import LoaderRequest, ReadRequest
+    from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, MapReference
+    from dronalize.processing.models import LoaderPlan, ReadSelection
 
 
 _LoaderOptionsT = TypeVar("_LoaderOptionsT", bound=DatasetOptionsModel, default=NoDatasetOptions)
 
 
-class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
+class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
     """Base class for turning raw dataset sources into canonical trajectory frames.
 
     Parameters
     ----------
     data_root : Path or str
-        The root directory of the dataset, which may be used for source
-        discovery or as a base path for source data.
-    request : LoaderRequest
+        The root directory of the dataset, which may be used for DatasetSource
+        discovery or as a base path for DatasetSource data.
+    request : LoaderPlan
         The full loader request, which may be used to configure loading behavior
         and is retained for potential use by subclasses.
-    resources : DatasetResources, optional
+    resources : DatasetRunResources, optional
         Optional shared resources for loading, which may be used by loaders that
         need to share expensive resources like maps across multiple sources or
         splits.
 
     Notes
     -----
-    - `SourceT` is the type of the raw source data used by this loader, such as
+    - `SourceT` is the type of the raw DatasetSource data used by this loader, such as
       a file path or database query.
     - `_LoaderOptionsT` is the type of the dataset-specific options for this
       loader, which must be a subclass of `DatasetOptionsModel` and defaults to
@@ -59,36 +59,38 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         self,
         *,
         data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
+        request: LoaderPlan,
+        resources: DatasetRunResources | None = None,
     ) -> None:
         self.root: Path = Path(data_root)
-        self.request: LoaderRequest = request
+        self.request: LoaderPlan = request
         self.scenes_config: ScenesConfig = request.scenes
         self.screening_config: ScreeningConfig | None = request.screening
-        self.read_config: ReadRequest = request.read
+        self.read_config: ReadSelection = request.read
         self.map_config: MapConfig | None = request.map
-        self.resources: DatasetResources = DatasetResources() if resources is None else resources
+        self.resources: DatasetRunResources = (
+            DatasetRunResources() if resources is None else resources
+        )
         self.loader_options: _LoaderOptionsT = cast("_LoaderOptionsT", request.loader_options)
 
     def __init_subclass__(cls) -> None:
-        """Ensure subclasses implement required source enumeration methods."""
-        if cls is BaseSceneLoader:
+        """Ensure subclasses implement required DatasetSource enumeration methods."""
+        if cls is SceneLoader:
             return
 
         if (
-            cls.iter_sources_for is BaseSceneLoader.iter_sources_for
-            and cls.iter_sources is BaseSceneLoader.iter_sources
+            cls.iter_sources_for is SceneLoader.iter_sources_for
+            and cls.iter_sources is SceneLoader.iter_sources
         ):
             msg = f"{cls.__name__} must implement either iter_sources_for() or iter_sources()"
             raise TypeError(msg)
 
     @classmethod
-    def unified_factory(
+    def from_loader_request(
         cls,
         data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
+        request: LoaderPlan,
+        resources: DatasetRunResources | None = None,
     ) -> Self:
         """Construct a concrete loader instance from the unified request interface.
 
@@ -96,10 +98,10 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         ----------
         data_root : Path or str
             Root directory or base path for the dataset.
-        request : LoaderRequest
+        request : LoaderPlan
             Full loader request containing all generic and dataset-specific
             options.
-        resources : DatasetResources, optional
+        resources : DatasetRunResources, optional
             Optional shared resource container.
 
         Returns
@@ -140,21 +142,21 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         """
 
     @abstractmethod
-    def load_source(self, source: Source[SourceT]) -> Iterable[LoadedSourceData]:
-        """Load one dataset source into one or more lazily consumable scene records.
+    def load_source(self, source: DatasetSource[SourceT]) -> Iterable[LoadedSourceFrame]:
+        """Load one dataset DatasetSource into one or more lazily consumable scene records.
 
         Parameters
         ----------
-        source : Source[SourceT]
-            A source descriptor wrapping the dataset-specific raw source object.
+        DatasetSource : DatasetSource[SourceT]
+            A DatasetSource descriptor wrapping the dataset-specific raw DatasetSource object.
             Depending on the loader, this may represent a file, shard, query, or
             any other unit of dataset input.
 
         Returns
         -------
-        Iterable[LoadedSourceData]
-            An iterable of loaded source records. Each record typically contains
-            lazy frame data and may optionally include source-level metadata such
+        Iterable[LoadedSourceFrame]
+            An iterable of loaded DatasetSource records. Each record typically contains
+            lazy frame data and may optionally include DatasetSource-level metadata such
             as map bindings or split annotations.
 
         Notes
@@ -164,13 +166,13 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
 
         The iterable may be lazy. This is often preferable for large datasets,
         since it allows streaming scene materialization rather than requiring the
-        entire source to be loaded into memory at once.
+        entire DatasetSource to be loaded into memory at once.
         """
 
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[SourceT]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[SourceT]]:
         """Yield sources matching a specific selection request.
 
-        !!! warning "Implement at least one source enumeration method"
+        !!! warning "Implement at least one DatasetSource enumeration method"
             Subclasses should implement either `iter_sources_for()` with native
             split support or `iter_sources()` for full enumeration. The default
             implementation of `iter_sources_for()` raises `NotImplementedError`
@@ -184,13 +186,13 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
 
         Returns
         -------
-        Iterable[Source[SourceT]]
-            An iterable of source descriptors matching the selection.
+        Iterable[DatasetSource[SourceT]]
+            An iterable of DatasetSource descriptors matching the selection.
 
         Raises
         ------
         NotImplementedError
-            If the concrete loader does not implement source enumeration.
+            If the concrete loader does not implement DatasetSource enumeration.
 
         Notes
         -----
@@ -200,16 +202,16 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         """  # noqa: DOC202
         _ = split
         msg = (
-            f"{self.__class__.__name__} does not implement source enumeration"
+            f"{self.__class__.__name__} does not implement DatasetSource enumeration"
             " by split. Either implement iter_sources_for() with native split"
             " support or iter_sources() for full enumeration."
         )
         raise NotImplementedError(msg)
 
-    def iter_sources(self) -> Iterable[Source[SourceT]]:
+    def iter_sources(self) -> Iterable[DatasetSource[SourceT]]:
         """Yield all sources for the effective read scope.
 
-        !!! warning "Implement at least one source enumeration method"
+        !!! warning "Implement at least one DatasetSource enumeration method"
             Subclasses should implement either `iter_sources_for()` with native
             split support or `iter_sources()` for full enumeration. The default
             implementation of `iter_sources_for()` raises `NotImplementedError`
@@ -258,14 +260,14 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         _ = self
         return no_map()
 
-    def resolve_map(self, scene: Scene, map_binding: MapBinding | None = None) -> MapGraph | None:
+    def resolve_map(self, scene: Scene, map_binding: MapReference | None = None) -> MapGraph | None:
         """Resolve the map graph associated with a scene.
 
         Parameters
         ----------
         scene : Scene
             The scene for which a map should be resolved.
-        map_binding : MapBinding, optional
+        map_binding : MapReference, optional
             Optional explicit binding information that may be used by custom
             implementations to refine map lookup.
 
@@ -291,12 +293,12 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         return self.map_resolver()(scene)
 
     def count_sources_for(self, split: DatasetSplit) -> int | None:
-        """Return the source count for a selection when cheaply knowable.
+        """Return the DatasetSource count for a selection when cheaply knowable.
 
-        !!! info "Override when source counts are cheaply knowable"
+        !!! info "Override when DatasetSource counts are cheaply knowable"
             The default implementation returns `None` to indicate that the count
             is unknown or expensive to compute. Loaders with native split
-            support and cheaply knowable source counts should override this
+            support and cheaply knowable DatasetSource counts should override this
             method to enable accurate progress reporting and diagnostics.
 
             If the native splits is not defined, overrides should implement
@@ -325,7 +327,7 @@ class BaseSceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         This method is primarily useful for progress reporting, scheduling, and
         diagnostics. Implementations should only return an integer when doing so
         does not require materializing or exhaustively traversing the full
-        source iterator unless that cost is acceptable.
+        DatasetSource iterator unless that cost is acceptable.
         """
         native_splits = self.read_config.native_splits
         if native_splits is None:

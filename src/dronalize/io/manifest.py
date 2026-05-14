@@ -29,7 +29,7 @@ class DatasetManifest:
     """
 
     dataset: str
-    """Name of the source dataset, e.g. 'lyft' or 'waymo'."""
+    """Name of the DatasetSource dataset, e.g. 'lyft' or 'waymo'."""
     storage_backend: str
     """Storage backend used to write the exported scene records."""
     dronalize_version: str

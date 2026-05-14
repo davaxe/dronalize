@@ -68,7 +68,7 @@ Assign = Annotated[
         "--assign",
         help="Output assignment mode to use.",
         show_default=False,
-        rich_help_panel="Assign",
+        rich_help_panel="Assign splits",
     ),
 ]
 Config = Annotated[
@@ -105,19 +105,21 @@ SplitRatio = Annotated[
     typer.Option(
         "--ratio",
         help="Train/val/test ratio used by scene, source, time, and shuffled-time assignment.",
-        rich_help_panel="Assign",
+        rich_help_panel="Assign splits",
     ),
 ]
 SplitGap = Annotated[
     int | None,
-    typer.Option("--gap", help="Gap inserted between time partitions.", rich_help_panel="Assign"),
+    typer.Option(
+        "--gap", help="Gap inserted between time partitions.", rich_help_panel="Assign splits"
+    ),
 ]
 SplitSegments = Annotated[
     int | None,
     typer.Option(
         "--segments",
         help="Number of contiguous temporal segments used by shuffled-time assignment.",
-        rich_help_panel="Assign",
+        rich_help_panel="Assign splits",
     ),
 ]
 Force = Annotated[
@@ -251,19 +253,19 @@ def available(
     ] = True,
 ) -> None:
     """[bold]List available datasets[/bold]."""
-    from dronalize.datasets import available as available_datasets
-    from dronalize.datasets.registry import get
+    from dronalize.datasets import list_datasets
+    from dronalize.datasets.registry import get_dataset
 
-    descriptors = _run_cli_action(lambda: [get(dataset) for dataset in available_datasets()])
+    descriptors = _run_cli_action(lambda: [get_dataset(dataset) for dataset in list_datasets()])
     rprint("\n", build_available_datasets_table(descriptors, details=details))
 
 
 @app.command()
 def inspect(dataset: DatasetName) -> None:
     """[bold]Inspect details for a specified dataset[/bold]."""
-    from dronalize.datasets.registry import get
+    from dronalize.datasets.registry import get_dataset
 
-    descriptor = _run_cli_action(lambda: get(dataset))
+    descriptor = _run_cli_action(lambda: get_dataset(dataset))
     _print_tables(build_dataset_inspect_tables(descriptor))
 
 
@@ -309,9 +311,9 @@ def show_config(
 @app.command()
 def split_support(dataset: DatasetName) -> None:
     """[bold]Show the split support for a specified dataset[/bold]."""
-    from dronalize.datasets.registry import get
+    from dronalize.datasets.registry import get_dataset
 
-    descriptor = _run_cli_action(lambda: get(dataset))
+    descriptor = _run_cli_action(lambda: get_dataset(dataset))
     _print_tables(build_split_support_tables(descriptor))
 
 

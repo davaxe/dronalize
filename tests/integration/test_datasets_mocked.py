@@ -31,7 +31,7 @@ def test_datasets_mocked_registry_smoke(
     if jobs > 1:
         mp.set_start_method("spawn", force=True)
 
-    monkeypatch.setattr("dronalize.runtime.api.get", lambda _name: demo_descriptor())
+    monkeypatch.setattr("dronalize.runtime.api.get_dataset", lambda _name: demo_descriptor())
 
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"

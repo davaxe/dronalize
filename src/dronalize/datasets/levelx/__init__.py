@@ -1,3 +1,3 @@
-from dronalize.datasets.levelx.spec import DATASET_SPECS
+from dronalize.datasets.levelx.descriptor import DATASET_DESCRIPTORS
 
-__all__ = ["DATASET_SPECS"]
+__all__ = ["DATASET_DESCRIPTORS"]

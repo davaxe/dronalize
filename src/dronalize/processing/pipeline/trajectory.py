@@ -13,13 +13,13 @@ from dronalize.core.functional import ResampleMethod, ResampleSpec
 from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.pipeline.pipeline import Pipeline
-from dronalize.processing.screening.screen import Screen
+from dronalize.processing.screening.screen import ScreeningRuleSet
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from dronalize.config.models import ScenesConfig
-    from dronalize.processing.models import AssignmentRequest, PipelinePlan
+    from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
 
 
 _SPLIT_PARTITION_COLUMN = "_split_partition"
@@ -35,7 +35,7 @@ _RAW_SPLIT_SEGMENT_COLUMN = "_split_segment"
 
 
 def build_trajectory_pipeline(
-    plan: PipelinePlan,
+    plan: TrajectoryPipelinePlan,
     *,
     columns: TrajectoryColumns | None = None,
     window_by: str | Sequence[str] | None = None,
@@ -63,7 +63,7 @@ def build_trajectory_pipeline(
 
 @dataclass(frozen=True, slots=True)
 class _TrajectoryPipelineState:
-    plan: PipelinePlan
+    plan: TrajectoryPipelinePlan
     columns: TrajectoryColumns
     window_by: tuple[str, ...]
     lane_id_column: str
@@ -86,12 +86,12 @@ class _TrajectoryPipelineState:
         return self.plan.scenes
 
     @property
-    def assignment_request(self) -> AssignmentRequest | None:
+    def assignment_request(self) -> SplitAssignmentPlan | None:
         return self.plan.assignment
 
 
 def _compile_state(
-    plan: PipelinePlan,
+    plan: TrajectoryPipelinePlan,
     *,
     columns: TrajectoryColumns,
     window_by: str | Sequence[str] | None,
@@ -136,7 +136,7 @@ def _compile_state(
     )
 
 
-def _uses_lane_change_sampling(plan: PipelinePlan) -> bool:
+def _uses_lane_change_sampling(plan: TrajectoryPipelinePlan) -> bool:
     config = plan.scenes.lane_change
     return config is not None and config.negative_keep_every != 1
 
@@ -223,7 +223,9 @@ def _build_scene_id_stage(state: _TrajectoryPipelineState) -> Pipeline:
 
 def _build_screening_stage(state: _TrajectoryPipelineState) -> Pipeline:
     screening_spec = (
-        Screen.from_config(state.plan.screening) if state.plan.screening is not None else None
+        ScreeningRuleSet.from_config(state.plan.screening)
+        if state.plan.screening is not None
+        else None
     )
     if screening_spec is None:
         return Pipeline()
@@ -348,7 +350,7 @@ def _finalize_split_pipeline(
 
 
 def _split_partition_pipeline(
-    request: AssignmentRequest,
+    request: SplitAssignmentPlan,
     *,
     time_column: str = "frame",
     group_by: str | Sequence[str] | None = None,

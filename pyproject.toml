@@ -33,7 +33,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
@@ -112,7 +111,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["src/dronalize"]
+DatasetSource = ["src/dronalize"]
 branch = true
 omit = [
     "src/dronalize/datasets/*/protos/*.py",

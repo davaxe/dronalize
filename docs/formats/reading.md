@@ -49,7 +49,7 @@ reader = PickleReader(Path("output"), split="train")
 
 print(len(reader))
 scene = reader[0]
-print(scene.input_features.shape, scene.output_features.shape)
+print(scene.history_features.shape, scene.future_features.shape)
 ```
 
 For unsplit exports, use `split=None` (the default), which reads from `unsplit/`.
@@ -68,7 +68,7 @@ reader = MDSReader(path=Path("output"), split="train")
 
 print(len(reader))
 scene = reader[0]
-print(scene.input_features.shape, scene.output_features.shape)
+print(scene.history_features.shape, scene.future_features.shape)
 ```
 
 For unsplit exports, use `split=None` (default), which reads from `unsplit/`.

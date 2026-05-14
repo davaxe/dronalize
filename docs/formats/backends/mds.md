@@ -82,7 +82,7 @@ Every sample written to a shard contains the following fields.
 | `observation_length` | `int` | scalar | Number of history frames used to split features into input/output windows during reading. |
 | `position_offset` | `float64` | `[2]` | The `(x, y)` offset subtracted from all positions before writing when `recenter_positions = true`. Zero otherwise. |
 | `agent_types` | `int32` | `[A]` | Integer agent category for each agent. |
-| `passed_agent_mask` | `uint8` | `[A]` | Per-agent screening pass mask (`1` means passed). |
+| `screened_agent_mask` | `uint8` | `[A]` | Per-agent screening pass mask (`1` means passed). |
 | `features` | `float32` or `float64` | `[A, T, F]` | Per-agent feature tensor in canonical column order. |
 | `mask` | `uint8` | `[A, T]` | Presence mask. `1` where the agent is observed at that timestep, `0` otherwise. |
 | `map_node_positions` | `float32` or `float64` | `[N, 2]` | Map lane node coordinates, offset-corrected when applicable. |

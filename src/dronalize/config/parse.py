@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-from dronalize.config.file import ProcessingConfig
+from dronalize.config.project import ProjectConfig
 from dronalize.core.errors import ConfigurationError
 
 if sys.version_info >= (3, 11):
@@ -10,7 +10,7 @@ else:
     import tomli as tomllib
 
 
-def parse_config(path: Path) -> ProcessingConfig:
+def parse_config(path: Path) -> ProjectConfig:
     """Parse configuration from a TOML file.
 
     !!! note "Completeness of the returned config"
@@ -18,7 +18,7 @@ def parse_config(path: Path) -> ProcessingConfig:
         specific datasets.
 
         See the
-        [`ProcessingConfig.resolve`][dronalize.config.ProcessingConfig.resolve]
+        [`ProjectConfig.resolve_dataset_config`][dronalize.config.ProjectConfig.resolve_dataset_config]
         method for applying dataset-specific overrides returned by this loader
         on top of a fully resolved `DatasetConfig` to get a complete
         configuration for a specific dataset.
@@ -30,7 +30,7 @@ def parse_config(path: Path) -> ProcessingConfig:
 
     Returns
     -------
-    ProcessingConfig
+    ProjectConfig
         The parsed configuration, validated and ready for dataset-specific resolution.
     """
     with path.open("rb") as handle:
@@ -39,4 +39,4 @@ def parse_config(path: Path) -> ProcessingConfig:
         except tomllib.TOMLDecodeError as exc:
             msg = f"Invalid TOML in config file '{path}': {exc}"
             raise ConfigurationError(msg) from exc
-    return ProcessingConfig.model_validate(data)
+    return ProjectConfig.model_validate(data)

@@ -127,54 +127,54 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
     n_agents = int(record.agent_types.shape[0])
     history_frames = scene.history_frames
     future_frames = scene.future_frames
-    input_feature_dim = int(record.input_features.shape[2])
-    output_feature_dim = int(record.output_features.shape[2])
+    input_feature_dim = int(record.history_features.shape[2])
+    output_feature_dim = int(record.future_features.shape[2])
 
-    _assert_shape(record.passed_agent_mask, (n_agents,), "passed_agent_mask")
-    _assert_dtype(record.passed_agent_mask, np.bool_, "passed_agent_mask")
+    _assert_shape(record.screened_agent_mask, (n_agents,), "screened_agent_mask")
+    _assert_dtype(record.screened_agent_mask, np.bool_, "screened_agent_mask")
 
-    _assert_ndim(record.input_features, 3, "input_features")
-    _assert_ndim(record.output_features, 3, "output_features")
-    _assert_ndim(record.input_mask, 2, "input_mask")
-    _assert_ndim(record.output_mask, 2, "output_mask")
+    _assert_ndim(record.history_features, 3, "history_features")
+    _assert_ndim(record.future_features, 3, "future_features")
+    _assert_ndim(record.history_mask, 2, "history_mask")
+    _assert_ndim(record.future_mask, 2, "future_mask")
 
-    assert record.input_features.shape[0] == n_agents, "input_features agent dim mismatch"
-    assert record.output_features.shape[0] == n_agents, "output_features agent dim mismatch"
-    assert record.input_mask.shape[0] == n_agents, "input_mask agent dim mismatch"
-    assert record.output_mask.shape[0] == n_agents, "output_mask agent dim mismatch"
+    assert record.history_features.shape[0] == n_agents, "history_features agent dim mismatch"
+    assert record.future_features.shape[0] == n_agents, "future_features agent dim mismatch"
+    assert record.history_mask.shape[0] == n_agents, "history_mask agent dim mismatch"
+    assert record.future_mask.shape[0] == n_agents, "future_mask agent dim mismatch"
 
-    assert record.input_features.shape[1] == history_frames, (
-        "input_features time dim must match scene.history_frames"
+    assert record.history_features.shape[1] == history_frames, (
+        "history_features time dim must match scene.history_frames"
     )
-    assert record.output_features.shape[1] == future_frames, (
-        "output_features time dim must match scene.future_frames"
+    assert record.future_features.shape[1] == future_frames, (
+        "future_features time dim must match scene.future_frames"
     )
-    assert record.input_mask.shape[1] == history_frames, (
-        "input_mask time dim must match scene.history_frames"
+    assert record.history_mask.shape[1] == history_frames, (
+        "history_mask time dim must match scene.history_frames"
     )
-    assert record.output_mask.shape[1] == future_frames, (
-        "output_mask time dim must match scene.future_frames"
+    assert record.future_mask.shape[1] == future_frames, (
+        "future_mask time dim must match scene.future_frames"
     )
 
     assert input_feature_dim > 0, "feature dimension must be > 0"
     assert input_feature_dim == output_feature_dim, (
-        "input_features and output_features feature dims must match"
+        "history_features and future_features feature dims must match"
     )
 
-    _assert_dtype(record.input_mask, np.bool_, "input_mask")
-    _assert_dtype(record.output_mask, np.bool_, "output_mask")
+    _assert_dtype(record.history_mask, np.bool_, "history_mask")
+    _assert_dtype(record.future_mask, np.bool_, "future_mask")
 
-    if record.input_mask.any():
-        assert np.isfinite(record.input_features[record.input_mask]).all(), (
-            "input_features contain NaN/Inf at valid mask positions"
+    if record.history_mask.any():
+        assert np.isfinite(record.history_features[record.history_mask]).all(), (
+            "history_features contain NaN/Inf at valid mask positions"
         )
-    if record.output_mask.any():
-        assert np.isfinite(record.output_features[record.output_mask]).all(), (
-            "output_features contain NaN/Inf at valid mask positions"
+    if record.future_mask.any():
+        assert np.isfinite(record.future_features[record.future_mask]).all(), (
+            "future_features contain NaN/Inf at valid mask positions"
         )
 
     if n_agents > 0:
-        assert record.passed_agent_mask.any(), "no passing agents in encoded record"
+        assert record.screened_agent_mask.any(), "no passing agents in encoded record"
 
     map_num_nodes = record.map_node_positions.shape[0]
     map_num_edges = record.map_edge_indices.shape[1]

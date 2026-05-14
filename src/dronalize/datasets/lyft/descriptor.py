@@ -2,26 +2,30 @@ from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferEx
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.datasets.lyft.loader import LyftLoader, LyftLoaderOptions
 from dronalize.datasets.lyft.maps import LyftMapBuilder
-from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
-from dronalize.datasets.shared.resources import single_shared_map_resource_factory
-from dronalize.datasets.shared.specs import (
+from dronalize.datasets.registry import (
+    DatasetDescriptor,
+    DatasetFeatureSupport,
+    DatasetSplitSupport,
+)
+from dronalize.datasets.shared.presets import (
     combine_screenings,
     exclude_category_screening,
     minimum_samples_screening,
     scenes_config,
 )
+from dronalize.datasets.shared.resources import single_shared_map_resource_factory
 
 _open_lyft_resources = single_shared_map_resource_factory(
     map_path=lambda root: root / "semantic_map" / "semantic_map.pb",
     build_map=lambda path, config: LyftMapBuilder.from_files(
         path, path.with_name("meta.json")
-    ).build(config.min_distance, config.interp_distance),
+    ).build(config.min_distance, config.interpolation_distance),
 )
 
 
-DATASET_SPEC = DatasetSpec(
+DATASET_DESCRIPTOR = DatasetDescriptor(
     name="lyft",
-    loader_factory=LyftLoader.unified_factory,
+    loader_factory=LyftLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=20),
         screening=combine_screenings(

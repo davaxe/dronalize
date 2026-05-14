@@ -1,8 +1,12 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
-from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import (
+    DatasetDescriptor,
+    DatasetFeatureSupport,
+    DatasetSplitSupport,
+)
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
+from dronalize.datasets.shared.presets import minimum_samples_screening, scenes_config
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
-from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 from dronalize.datasets.sind.loader import SindLoader
 
 _open_sind_resources = named_shared_map_resources_factory(
@@ -14,13 +18,13 @@ _open_sind_resources = named_shared_map_resources_factory(
     ),
     build_map=lambda path, config: OSMMapBuilder(
         path, force_zone_from_origin=(0, 0), local_origin_latlon=(0, 0)
-    ).build(config.min_distance, config.interp_distance),
+    ).build(config.min_distance, config.interpolation_distance),
 )
 
 
-DATASET_SPEC = DatasetSpec(
+DATASET_DESCRIPTOR = DatasetDescriptor(
     name="sind",
-    loader_factory=SindLoader.unified_factory,
+    loader_factory=SindLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=25),
         screening=minimum_samples_screening(2),

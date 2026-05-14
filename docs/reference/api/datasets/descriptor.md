@@ -1,4 +1,4 @@
-## ::: dronalize.datasets.DatasetSpec
+## ::: dronalize.datasets.DatasetDescriptor
 
 ## ::: dronalize.datasets.DatasetFeatureSupport
 

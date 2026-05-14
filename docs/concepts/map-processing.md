@@ -39,10 +39,10 @@ As a rule of thumb:
 
 ## Geometry density
 
-`min_distance` and `interp_distance` control how dense the retained geometry is.
+`min_distance` and `interpolation_distance` control how dense the retained geometry is.
 
 - `min_distance` removes overly dense points
-- `interp_distance` controls the spacing used when geometry is reconstructed
+- `interpolation_distance` controls the spacing used when geometry is reconstructed
 
 These settings matter most for storage size, rendering cost, and graph density. If you do not have
 a reason to tune them, dataset defaults are usually a good starting point.
@@ -60,7 +60,7 @@ The optional `[datasets.<name>.map.edge_types]` block lets you reshape the seman
 ```toml
 [datasets.a43.map]
 min_distance = 1.0
-interp_distance = 2.5
+interpolation_distance = 2.5
 
 [datasets.a43.map.extraction]
 mode = "scene_extent"

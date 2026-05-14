@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from dronalize.datasets import available
+from dronalize.datasets import list_datasets
 
 
 @dataclass(slots=True)
@@ -13,5 +13,5 @@ class DatasetCase:
 
 
 ALL_CASES_DEFAULT: dict[str, DatasetCase] = {
-    name: DatasetCase(name, path_rel_root=name) for name in available()
+    name: DatasetCase(name, path_rel_root=name) for name in list_datasets()
 }

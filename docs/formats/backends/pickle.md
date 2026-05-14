@@ -61,7 +61,7 @@ reader = PickleReader(Path("output"), split="train")
 record = reader[0]
 
 print(record.scene_number)
-print(record.input_features.shape, record.output_features.shape)
+print(record.history_features.shape, record.future_features.shape)
 ```
 
 Use `split=None` (default) for unsplit exports.

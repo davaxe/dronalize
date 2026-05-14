@@ -5,11 +5,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from dronalize.datasets.registry import get
+from dronalize.datasets.registry import get_dataset
 from dronalize.io.backends.registry import build_writer_factory
 from dronalize.io.formats import storage_backend_name
 from dronalize.runtime.executor import open_execution_session
-from dronalize.runtime.resolve import build_plan
+from dronalize.runtime.resolve import build_execution_plan
 from dronalize.runtime.types import ExecutionResult
 
 if TYPE_CHECKING:
@@ -41,9 +41,9 @@ def resolve_request(request: ExecutionRequest) -> ExecutionPlan:
         [`stream_plan`][dronalize.runtime.stream_plan], respectively.
 
     """
-    descriptor = get(request.dataset)
+    descriptor = get_dataset(request.dataset)
     logger.debug("Resolving execution request", extra={"dataset": request.dataset})
-    return build_plan(descriptor=descriptor, request=request)
+    return build_execution_plan(descriptor=descriptor, request=request)
 
 
 def execute_request(request: ExecutionRequest) -> ExecutionResult:

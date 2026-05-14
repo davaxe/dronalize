@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dronalize.config import ProcessingConfig, RuntimeOverride, parse_config
+from dronalize.config import ProjectConfig, RuntimeOverride, parse_config
 from dronalize.config.models import (
     AgentRangeSpec,
     DatasetConfig,
     ExcludeCategoriesSpec,
-    MapEdgeTypesConfig,
+    MapEdgeTypeRules,
     MinSamplesSpec,
     RequireSceneFramesSpec,
     RequireSceneWindowSpec,
@@ -54,7 +54,7 @@ def test_parse_config_parses_profiles_and_dataset_entries(tmp_path: Path) -> Non
         )
     )
 
-    assert isinstance(cfg, ProcessingConfig)
+    assert isinstance(cfg, ProjectConfig)
     assert "fast" in cfg.profiles
     assert "demo" in cfg.datasets
 
@@ -71,7 +71,7 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ConfigurationError, match="Profile 'missing' not found"):
-        _ = cfg.resolve(
+        _ = cfg.resolve_dataset_config(
             "demo",
             DatasetConfig.model_validate({
                 "scenes": {"history_frames": 1, "future_frames": 1, "sample_time": 0.1}
@@ -168,7 +168,7 @@ def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:
         )
     )
 
-    resolved = cfg.resolve("demo", inherited_optional_blocks_descriptor())
+    resolved = cfg.resolve_dataset_config("demo", inherited_optional_blocks_descriptor())
 
     assert resolved.screening is None
     assert resolved.scenes.window is None
@@ -188,7 +188,7 @@ def test_screening_extend_is_default_and_keeps_rules_without_inheritance(tmp_pat
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert resolved.screening is not None
     assert resolved.screening.cleanup == {}
@@ -218,7 +218,7 @@ def test_screening_extend_merges_namespaces_and_overrides_same_rule_name(tmp_pat
         )
     )
 
-    resolved = cfg.resolve(
+    resolved = cfg.resolve_dataset_config(
         "demo",
         _dataset_config(
             screening={
@@ -256,7 +256,7 @@ def test_screening_replace_discards_inherited_rules_not_redeclared(tmp_path: Pat
         )
     )
 
-    resolved = cfg.resolve(
+    resolved = cfg.resolve_dataset_config(
         "demo",
         _dataset_config(
             screening={
@@ -286,7 +286,7 @@ def test_screening_remove_drops_matching_names_across_all_namespaces(tmp_path: P
         )
     )
 
-    resolved = cfg.resolve(
+    resolved = cfg.resolve_dataset_config(
         "demo",
         _dataset_config(
             screening={
@@ -337,7 +337,7 @@ def test_screening_remove_is_applied_after_replace_and_can_drop_current_rules(
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert resolved.screening is not None
     assert resolved.screening.cleanup == {}
@@ -397,7 +397,7 @@ def test_screening_multiple_profiles_resolve_in_uses_order_then_dataset_block(
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert resolved.screening is not None
     assert set(resolved.screening.cleanup) == {"trim_static"}
@@ -428,7 +428,7 @@ def test_map_config_parses_scene_extent_shape_and_edge_type_rules(tmp_path: Path
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert isinstance(resolved.map.extraction, SceneExtentExtraction)
     assert resolved.map.extraction.padding == pytest.approx(1.25)
@@ -441,7 +441,7 @@ def test_map_config_parses_scene_extent_shape_and_edge_type_rules(tmp_path: Path
 
 def test_map_edge_types_validation_rejects_include_exclude_overlap() -> None:
     with pytest.raises(ValueError, match="Conflict"):
-        _ = MapEdgeTypesConfig.model_validate({
+        _ = MapEdgeTypeRules.model_validate({
             "include": ["CURB", "VIRTUAL"],
             "exclude": ["VIRTUAL"],
         })
@@ -449,10 +449,7 @@ def test_map_edge_types_validation_rejects_include_exclude_overlap() -> None:
 
 def test_map_edge_types_validation_normalizes_mixed_inputs_for_conflicts() -> None:
     with pytest.raises(ValueError, match="VIRTUAL"):
-        _ = MapEdgeTypesConfig.model_validate({
-            "include": ["VIRTUAL"],
-            "exclude": [EdgeType.VIRTUAL],
-        })
+        _ = MapEdgeTypeRules.model_validate({"include": ["VIRTUAL"], "exclude": [EdgeType.VIRTUAL]})
 
 
 def test_map_config_parses_trajectory_buffer_extraction(tmp_path: Path) -> None:
@@ -467,7 +464,7 @@ def test_map_config_parses_trajectory_buffer_extraction(tmp_path: Path) -> None:
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert isinstance(resolved.map.extraction, TrajectoryBufferExtraction)
     assert resolved.map.extraction.radius == pytest.approx(6.5)

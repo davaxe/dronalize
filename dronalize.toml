@@ -136,7 +136,7 @@ gap = 2
 
 [datasets.a43.map]
 min_distance = 1.0
-interp_distance = 2.5
+interpolation_distance = 2.5
 
 [datasets.a43.map.extraction]
 mode = "circle"

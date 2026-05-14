@@ -1,4 +1,4 @@
-"""Loader-side data structures for source-to-scene processing."""
+"""Loader-side data structures for DatasetSource-to-scene processing."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(slots=True, frozen=True)
-class MapBinding:
+class MapReference:
     """Loader-side map attachment carried alongside ingested or processed data.
 
     The binding intentionally stays lightweight. Datasets can attach a stable
@@ -34,16 +34,16 @@ class MapBinding:
 
 
 @dataclass(slots=True, frozen=True)
-class LoadedSourceData:
-    """One source-derived lazy frame plus any scene-level map binding."""
+class LoadedSourceFrame:
+    """One DatasetSource-derived lazy frame plus any scene-level map binding."""
 
     frame: pl.LazyFrame
-    map_binding: MapBinding = field(default_factory=MapBinding)
+    map_binding: MapReference = field(default_factory=MapReference)
     predefined_split: DatasetSplit | None = None
 
 
 @dataclass(slots=True, frozen=True)
-class DatasetResources:
+class DatasetRunResources:
     """Shared resources prepared once for a processing run.
 
     The main current use case is shared-memory map lookup tables, but the
@@ -54,25 +54,27 @@ class DatasetResources:
     shared_maps: dict[MapKey, str] | str | None = None
 
     @classmethod
-    def empty(cls) -> DatasetResources:
-        """Create an empty DatasetResources instance."""
+    def empty(cls) -> DatasetRunResources:
+        """Create an empty DatasetRunResources instance."""
         return cls()
 
 
 @dataclass(slots=True, frozen=True)
-class Source(Generic[SourceT]):
+class DatasetSource(Generic[SourceT]):
     """Lightweight unit of raw input that yields one or more scenes."""
 
     identifier: SourceId
     """Stable identifier for the source, e.g., file name, URL, database key."""
-    data: SourceT
-    """Lightweight source payload, usually a path or small tuple of lookup values."""
+    payload: SourceT
+    """Lightweight DatasetSource payload, usually a path or small tuple of lookup values."""
     predefined_split: DatasetSplit | None = None
     """Predefined split, if any."""
     map_key: MapKey = None
-    """Optional map key associated with this source."""
+    """Optional map key associated with this DatasetSource."""
 
-    def with_predefined_split(self, split_assignment: DatasetSplit | None) -> Source[SourceT]:
+    def with_predefined_split(
+        self, split_assignment: DatasetSplit | None
+    ) -> DatasetSource[SourceT]:
         """Return a copy with a concrete split assignment."""
         return replace(self, predefined_split=split_assignment)
 

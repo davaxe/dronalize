@@ -2,13 +2,17 @@ from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferEx
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.nuscenes.loader import NuScenesLoader, NuScenesLoaderOptions
 from dronalize.datasets.nuscenes.maps import NuScenesMapBuilder
-from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
-from dronalize.datasets.shared.resources import named_shared_map_resources_factory
-from dronalize.datasets.shared.specs import (
+from dronalize.datasets.registry import (
+    DatasetDescriptor,
+    DatasetFeatureSupport,
+    DatasetSplitSupport,
+)
+from dronalize.datasets.shared.presets import (
     linear_resample,
     minimum_samples_screening,
     scenes_config,
 )
+from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 
 _open_nuscenes_resources = named_shared_map_resources_factory(
     named_paths=lambda root: (
@@ -16,14 +20,14 @@ _open_nuscenes_resources = named_shared_map_resources_factory(
         for path in (root / "nuScenes-map-expansion-v1.3" / "expansion").glob("*.json")
     ),
     build_map=lambda path, config: NuScenesMapBuilder.from_json_file(path).build(
-        config.min_distance, config.interp_distance
+        config.min_distance, config.interpolation_distance
     ),
 )
 
 
-DATASET_SPEC = DatasetSpec(
+DATASET_DESCRIPTOR = DatasetDescriptor(
     name="nuscenes",
-    loader_factory=NuScenesLoader.unified_factory,
+    loader_factory=NuScenesLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=4,

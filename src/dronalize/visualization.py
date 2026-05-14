@@ -1,6 +1,6 @@
 """Visualization utilities.
 
-This module re-exports selected plotting and visualization symbols from the
+This module re-exports selected visualization symbols from the
 ``dronalize-viz`` package for convenient access through the main package API.
 
 This module requires the visualization extra to be installed, for example:

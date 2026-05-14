@@ -1,12 +1,16 @@
 from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import DatasetSplit
-from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
-from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
+from dronalize.datasets.registry import (
+    DatasetDescriptor,
+    DatasetFeatureSupport,
+    DatasetSplitSupport,
+)
+from dronalize.datasets.shared.presets import minimum_samples_screening, scenes_config
 from dronalize.datasets.waymo.loader import WaymoLoader
 
-DATASET_SPEC = DatasetSpec(
+DATASET_DESCRIPTOR = DatasetDescriptor(
     name="waymo",
-    loader_factory=WaymoLoader.unified_factory,
+    loader_factory=WaymoLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=11, future_frames=80, sample_time=0.1),
         screening=minimum_samples_screening(2),

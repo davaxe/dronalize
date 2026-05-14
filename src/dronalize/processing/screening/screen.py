@@ -1,4 +1,4 @@
-"""Screen containers, declarative configs, and application helpers."""
+"""ScreeningRuleSet containers, declarative configs, and application helpers."""
 
 from __future__ import annotations
 
@@ -35,12 +35,12 @@ _RuleSpecT = TypeVar("_RuleSpecT", bound=BaseModel)
 AgentCheckSpecs = Annotated[tuple[AgentCheckRule, ...], BeforeValidator(tuple)]
 CleanupSpecs = Annotated[tuple[CleanupRule, ...], BeforeValidator(tuple)]
 SceneCheckSpecs = Annotated[tuple[SceneCheckRule, ...], BeforeValidator(tuple)]
-SCENE_PASS_COLUMN: Final[str] = "_scene_passes"  # noqa: S105
-AGENT_PASS_COLUMN: Final[str] = "_agent_passes"  # noqa: S105
+SCENE_SCREENING_PASS_COLUMN: Final[str] = "_scene_passes"  # noqa: S105
+AGENT_SCREENING_PASS_COLUMN: Final[str] = "_agent_passes"  # noqa: S105
 
 
 @dataclass(slots=True, frozen=True)
-class Screen:
+class ScreeningRuleSet:
     """Collection of cleanup and check rules used during screening."""
 
     cleanup_rules: tuple[CleanupRule, ...] = ()
@@ -63,8 +63,8 @@ class Screen:
         cleanup_rules: Iterable[CleanupRule | AgentCheckRule] = (),
         scene_rules: Iterable[SceneCheckRule] = (),
         agent_rules: Iterable[AgentCheckRule] = (),
-    ) -> Screen:
-        """Return a new Screen instance with the given rules, validating uniqueness."""
+    ) -> ScreeningRuleSet:
+        """Return a new ScreeningRuleSet instance with the given rules, validating uniqueness."""
         rules: list[CleanupRule] = []
         for rule in cleanup_rules:
             if isinstance(rule, AgentCheckRuleBase):
@@ -78,8 +78,8 @@ class Screen:
         )
 
     @classmethod
-    def from_config(cls, config: ScreeningConfig) -> Screen:
-        """Return a Screen instance compiled from a ScreeningConfig."""
+    def from_config(cls, config: ScreeningConfig) -> ScreeningRuleSet:
+        """Return a ScreeningRuleSet instance compiled from a ScreeningConfig."""
         return cls.define(
             cleanup_rules=_CleanupRuleCompiler.compile(config.cleanup),
             scene_rules=_SceneCheckRuleCompiler.compile(config.scene),
@@ -147,7 +147,7 @@ class _RuleColumns:
 
 def screen_scene(
     data: DataFrameT,
-    scene_screening: Screen | None,
+    scene_screening: ScreeningRuleSet | None,
     columns: TrajectoryColumns,
     scene_group_by: str | Sequence[str] | None = None,
     *,
@@ -166,12 +166,12 @@ def screen_scene(
     )
     df = df.with_columns(
         _and_all([pl.col(name) for name in [*scene_columns, *agent_columns]]).alias(
-            SCENE_PASS_COLUMN
+            SCENE_SCREENING_PASS_COLUMN
         )
     )
     return _finalize_screened(
         df,
-        diagnostic_columns=[*scene_columns, *agent_columns, SCENE_PASS_COLUMN],
+        diagnostic_columns=[*scene_columns, *agent_columns, SCENE_SCREENING_PASS_COLUMN],
         include_passed_agent_ids=mark_passed_agents,
         retain_scene_passes=retain_scene_passes,
     )
@@ -190,7 +190,7 @@ def _build_context(
 def _apply_cleanup(
     data: DataFrameT, rules: tuple[CleanupRuleBase, ...], ctx: ScreeningContext
 ) -> DataFrameT:
-    return data.filter(_and_all([rule.expr(ctx) for rule in rules]))
+    return data.filter(_and_all([rule.predicate_expr(ctx) for rule in rules]))
 
 
 def _apply_scene_rules(
@@ -200,7 +200,7 @@ def _apply_scene_rules(
     scene_passes: list[str] = []
     for rule in rules:
         cols = _RuleColumns.from_rule(rule)
-        df = df.with_columns(rule.expr(ctx).alias(cols.scene_pass))
+        df = df.with_columns(rule.predicate_expr(ctx).alias(cols.scene_pass))
         scene_passes.append(cols.scene_pass)
 
     return df, scene_passes
@@ -223,7 +223,7 @@ def _apply_agent_rules(
         agent_passes.append(cols.agent_pass)
 
     if include_passed_agent_ids:
-        df = df.with_columns(_agent_pass_expr(agent_passes, ctx).alias(AGENT_PASS_COLUMN))
+        df = df.with_columns(_agent_pass_expr(agent_passes, ctx).alias(AGENT_SCREENING_PASS_COLUMN))
 
     df = df.drop(agent_passes)
     return df, scene_passes
@@ -236,7 +236,7 @@ def _apply_agent_rule(
     scope = ctx.selector_mask(rule.selector)
     scoped_agent_count = ctx.retained_agent_count(rule.selector)
 
-    agent_pass = pl.when(scope).then(rule.expr(ctx)).otherwise(pl.lit(value=True))
+    agent_pass = pl.when(scope).then(rule.predicate_expr(ctx)).otherwise(pl.lit(value=True))
     invalid_agents = ctx.over_scene_window(
         pl.col(ctx.columns.agent_id).filter(scope & ~agent_pass).n_unique()
     )
@@ -266,12 +266,12 @@ def _finalize_screened(
 ) -> DataFrameT:
     excluded = list(diagnostic_columns)
     if not include_passed_agent_ids:
-        excluded.append(AGENT_PASS_COLUMN)
+        excluded.append(AGENT_SCREENING_PASS_COLUMN)
     if retain_scene_passes:
-        excluded.remove(SCENE_PASS_COLUMN)
+        excluded.remove(SCENE_SCREENING_PASS_COLUMN)
         return data if not excluded else data.select(pl.all().exclude(excluded))
 
-    screened = data.filter(pl.col(SCENE_PASS_COLUMN))
+    screened = data.filter(pl.col(SCENE_SCREENING_PASS_COLUMN))
     return screened if not excluded else screened.select(pl.all().exclude(excluded))
 
 

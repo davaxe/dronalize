@@ -5,7 +5,7 @@ import polars as pl
 from dronalize.config.models import ScreeningConfig
 from dronalize.core import AgentCategory
 from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.screening import Screen, agent, cleanup, scene, screen_scene
+from dronalize.processing.screening import ScreeningRuleSet, agent, cleanup, scene, screen_scene
 
 
 def test_agent_specs_compile_into_runtime_agent_rules() -> None:
@@ -17,11 +17,11 @@ def test_agent_specs_compile_into_runtime_agent_rules() -> None:
         }
     })
 
-    compiled = Screen.from_config(config)
+    compiled = ScreeningRuleSet.from_config(config)
 
     assert len(compiled.agent_rules) == 3
-    assert isinstance(compiled.agent_rules[0], agent.RequireFrames)
-    assert isinstance(compiled.agent_rules[1], agent.RequireWindow)
+    assert isinstance(compiled.agent_rules[0], agent.AgentRequireFrames)
+    assert isinstance(compiled.agent_rules[1], agent.AgentRequireWindow)
     assert isinstance(compiled.agent_rules[2], agent.MaxGap)
     assert compiled.agent_rules[0].rule_id == "required_frames"
     assert compiled.agent_rules[1].rule_id == "coverage"
@@ -33,7 +33,7 @@ def test_scene_specs_compile_into_runtime_scene_rules() -> None:
         "scene": {"agent_bounds": {"rule": "agent_range", "minimum": 1, "maximum": 5}}
     })
 
-    compiled = Screen.from_config(config)
+    compiled = ScreeningRuleSet.from_config(config)
 
     assert len(compiled.scene_rules) == 1
     assert isinstance(compiled.scene_rules[0], scene.AgentRange)
@@ -51,7 +51,7 @@ def test_cleanup_specs_compile_and_wrap_nested_agent_rules() -> None:
         }
     })
 
-    compiled = Screen.from_config(config)
+    compiled = ScreeningRuleSet.from_config(config)
 
     assert len(compiled.cleanup_rules) == 2
     assert isinstance(compiled.cleanup_rules[0], cleanup.IncludeCategories)
@@ -67,7 +67,7 @@ def test_compiled_screen_rules_are_directly_usable_in_screen_scene() -> None:
         "scene": {"enough_agents": {"rule": "agent_range", "minimum": 1}},
         "agent": {"max_missing": {"rule": "max_missing_frames", "maximum": 1}},
     })
-    compiled = Screen.from_config(config)
+    compiled = ScreeningRuleSet.from_config(config)
 
     frame = pl.DataFrame({
         "scene": [1, 1, 1, 1, 1, 1, 1],

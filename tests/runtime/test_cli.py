@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from typer.testing import CliRunner
 
 import dronalize.runtime.cli.app as cli_app
-from dronalize.datasets import available
+from dronalize.datasets import list_datasets
 from dronalize.datasets.registry import _REGISTRY  # pyright: ignore[reportPrivateUsage]
 
 if TYPE_CHECKING:
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 )
 def test_cli_commands_smoke(tmp_path: Path, name: str) -> None:
     runner = CliRunner()
-    for dataset_name in available():
+    for dataset_name in list_datasets():
         output_dir = tmp_path / "cli-output"
         args_by_command: dict[str, list[str]] = {
             "process": [

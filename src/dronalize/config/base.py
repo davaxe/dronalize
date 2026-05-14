@@ -2,26 +2,14 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping, MutableMapping
-from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeAlias, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, Generic, Literal, TypeAlias, TypeVar, cast
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-PositiveInt: TypeAlias = Annotated[int, Field(gt=0)]
-NonNegativeInt: TypeAlias = Annotated[int, Field(ge=0)]
-PositiveFloat: TypeAlias = Annotated[float, Field(gt=0)]
-
-JobsValue: TypeAlias = int | Literal["auto"]
-Precision: TypeAlias = Literal["float32", "float64"]
-
-MapExtraction: TypeAlias = Literal["full", "scene_extent", "circle", "bounding_box"]
-SplitStrategy: TypeAlias = Literal["none", "native", "scene", "source", "time", "shuffled-time"]
-
-SelectorMode: TypeAlias = Literal["include", "exclude"]
-FilterMergeMode: TypeAlias = Literal["replace", "extend"]
 ResampleMethod: TypeAlias = Literal["linear", "cubic", "pchip"]
 
 
@@ -37,18 +25,20 @@ class ConfigBase(BaseModel):
                 yield name, field
 
 
-class FullConfig(ConfigBase):
+class ResolvedConfig(ConfigBase):
     """Full configuration with all fields required and defaults applied."""
 
 
-FullConfigT = TypeVar("FullConfigT", bound=ConfigBase)
+ResolvedConfigT = TypeVar("ResolvedConfigT", bound=ConfigBase)
 
 
-class PartialConfig(BaseModel, Generic[FullConfigT]):
+class ConfigPatch(BaseModel, Generic[ResolvedConfigT]):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
-    full_config_type: type[FullConfigT]
+    full_config_type: type[ResolvedConfigT]
 
-    def apply_to(self, target: FullConfigT | None, *, exclude_none: bool = True) -> FullConfigT:
+    def merge_into(
+        self, target: ResolvedConfigT | None, *, exclude_none: bool = True
+    ) -> ResolvedConfigT:
         """Apply partial config to a full config.
 
         By passing `None` as the target, the partial config can be applied to a
@@ -59,7 +49,7 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
 
         Parameters
         ----------
-        target : FullConfigT or None
+        target : ResolvedConfigT or None
             Full config to apply the partial config to. If `None`, the partial
             config is applied to a default full config with all non-required
             fields set to their default values.
@@ -70,7 +60,7 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
 
         Returns
         -------
-        FullConfigT
+        ResolvedConfigT
             Result of applying the partial config to the target full config.
 
         """
@@ -87,8 +77,8 @@ class PartialConfig(BaseModel, Generic[FullConfigT]):
         return self.full_config_type.model_validate(merged)
 
     @classmethod
-    def from_full_config(cls, full_config: FullConfigT) -> PartialConfig[FullConfigT]:
-        """Create a PartialConfig instance from a FullConfig instance."""
+    def from_full_config(cls, full_config: ResolvedConfigT) -> ConfigPatch[ResolvedConfigT]:
+        """Create a ConfigPatch instance from a ResolvedConfig instance."""
         data = full_config.model_dump()
         return cls.model_validate(data)
 
@@ -115,11 +105,11 @@ TargetT = TypeVar("TargetT", bound=ConfigBase)
 
 
 def apply_optional(
-    patch: PartialConfig[TargetT] | Literal[False] | None, target: TargetT | None
+    patch: ConfigPatch[TargetT] | Literal[False] | None, target: TargetT | None
 ) -> TargetT | None:
     """Apply a patch to an optional config block."""
     if patch is None:
         return target
     if patch is False:
         return None
-    return patch.apply_to(target)
+    return patch.merge_into(target)

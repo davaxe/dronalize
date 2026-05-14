@@ -2,11 +2,11 @@
 
 The dataset API is intentionally small:
 
-- [`available`][dronalize.datasets.available] lists built-in and dynamically
+- [`list_datasets`][dronalize.datasets.list_datasets] lists built-in and dynamically
   registered dataset keys
-- [`get`][dronalize.datasets.get] resolves one key to a
-  [`DatasetSpec`][dronalize.datasets.DatasetSpec]
-- [`register`][dronalize.datasets.register] adds a custom dataset descriptor to
+- [`get_dataset`][dronalize.datasets.get_dataset] resolves one key to a
+  [`DatasetDescriptor`][dronalize.datasets.DatasetDescriptor]
+- [`register_dataset`][dronalize.datasets.register_dataset] adds a custom dataset descriptor to
   the in-memory registry
 
 Use [`ResourcesFactory`][dronalize.datasets.ResourcesFactory] when authoring
@@ -16,23 +16,23 @@ map stores.
 
 from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.datasets.registry import (
+    DatasetDescriptor,
     DatasetFeatureSupport,
-    DatasetSpec,
     ResourcesFactory,
-    available,
-    get,
-    register,
+    get_dataset,
+    list_datasets,
+    register_dataset,
 )
-from dronalize.processing.loading import DatasetResources
+from dronalize.processing.loading import DatasetRunResources
 
 __all__ = [
+    "DatasetDescriptor",
     "DatasetFeatureSupport",
-    "DatasetResources",
-    "DatasetSpec",
+    "DatasetRunResources",
     "MapConfig",
     "ResourcesFactory",
     "ScenesConfig",
-    "available",
-    "get",
-    "register",
+    "get_dataset",
+    "list_datasets",
+    "register_dataset",
 ]

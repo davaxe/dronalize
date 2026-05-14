@@ -9,8 +9,8 @@ from pydantic import Field, model_validator
 from typing_extensions import override
 
 from dronalize.processing.screening.base import (
+    AgentCategorySelector,
     AgentCheckRuleBase,
-    AgentSelector,
     FrameInput,
     FrameSet,
     RuleId,
@@ -29,14 +29,14 @@ class MinDistance(AgentCheckRuleBase):
     minimum: float = Field(gt=0)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         x, y = pl.col(ctx.columns.require("x")), pl.col(ctx.columns.require("y"))
         dx, dy = x - x.shift(1), y - y.shift(1)
         step_distance = (dx.pow(2) + dy.pow(2)).sqrt()
         return ctx.over_agent_window(step_distance.sum()) >= self.minimum
 
 
-class RequireFrames(AgentCheckRuleBase):
+class AgentRequireFrames(AgentCheckRuleBase):
     """Require each retained agent to cover specific relative frames."""
 
     rule: Literal["frames"] = Field("frames", repr=False, init=False)
@@ -47,24 +47,24 @@ class RequireFrames(AgentCheckRuleBase):
         cls,
         frames: FrameInput,
         *,
-        selector: AgentSelector | None = None,
+        selector: AgentCategorySelector | None = None,
         tolerance: Tolerance | None = None,
         rule_id: RuleId | None = None,
-    ) -> RequireFrames:
+    ) -> AgentRequireFrames:
         """Return a defined rule."""
         return cls(
             frames=coerce_frame_set(frames), selector=selector, tolerance=tolerance, rule_id=rule_id
         )
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the configured frame set."""
         relative_frame = ctx.relative_frame()
         required = relative_frame.filter(relative_frame.is_in(self.frames)).n_unique()
         return ctx.over_agent_window(required) == len(self.frames)
 
 
-class RequireWindow(AgentCheckRuleBase):
+class AgentRequireWindow(AgentCheckRuleBase):
     """Require a minimum fraction of frames in a relative agent window."""
 
     rule: Literal["window"] = Field("window", repr=False, init=False)
@@ -73,14 +73,14 @@ class RequireWindow(AgentCheckRuleBase):
     min_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
 
     @model_validator(mode="after")
-    def _validate_window(self) -> RequireWindow:
+    def _validate_window(self) -> AgentRequireWindow:
         if self.end_frame < self.start_frame:
             msg = "end_frame must be greater than or equal to start_frame."
             raise ValueError(msg)
         return self
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the configured window."""
         relative_frame = ctx.relative_frame()
         in_window = relative_frame.is_between(self.start_frame, self.end_frame, closed="both")
@@ -96,19 +96,19 @@ class MinSamples(AgentCheckRuleBase):
     minimum: int = Field(ge=1)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the minimum sample count."""
         return ctx.over_agent_window(pl.len()) >= self.minimum
 
 
-class MaxMissingFrames(AgentCheckRuleBase):
+class AgentMaxMissingFrames(AgentCheckRuleBase):
     """Require a maximum number of missing frames per agent."""
 
     rule: Literal["max_missing_frames"] = Field("max_missing_frames", repr=False, init=False)
     maximum: int = Field(ge=0)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the missing-frame budget."""
         scene_length = ctx.scene_length()
         agent_length = ctx.over_agent_window(pl.col(ctx.columns.frame).n_unique())
@@ -123,7 +123,7 @@ class MaxGap(AgentCheckRuleBase):
     maximum: int = Field(ge=0)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the maximum frame gap."""
         frame_col = pl.col(ctx.columns.frame)
         gaps = frame_col - frame_col.shift(1) - 1
@@ -140,7 +140,7 @@ class MinConsecutiveFrames(AgentCheckRuleBase):
     minimum: int = Field(ge=1)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the longest consecutive run."""
         frame_col = pl.col(ctx.columns.frame)
         prev_frame = frame_col.shift(1)
@@ -162,7 +162,7 @@ class StartsByFrame(AgentCheckRuleBase):
     rule: Literal["starts_by_frame"] = Field("starts_by_frame", repr=False, init=False)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the first observed frame."""
         first_frame = ctx.over_agent_window(pl.col(ctx.columns.frame).min())
         return first_frame <= self.frame
@@ -175,7 +175,7 @@ class EndsAfterFrame(AgentCheckRuleBase):
     frame: int = Field(ge=0)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the last observed frame."""
         last_frame = ctx.over_agent_window(pl.col(ctx.columns.frame).max())
         return last_frame >= self.frame
@@ -188,7 +188,7 @@ class MinSpan(AgentCheckRuleBase):
     minimum: int = Field(ge=1)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the per-agent pass expression for the minimum frame span."""
         first_frame = ctx.over_agent_window(pl.col(ctx.columns.frame).min())
         last_frame = ctx.over_agent_window(pl.col(ctx.columns.frame).max())
@@ -213,9 +213,9 @@ def invalid_agent_tolerance_expr(
 
 AgentCheckRule = Annotated[
     MinDistance
-    | MaxMissingFrames
-    | RequireFrames
-    | RequireWindow
+    | AgentMaxMissingFrames
+    | AgentRequireFrames
+    | AgentRequireWindow
     | MinSamples
     | MaxGap
     | MinConsecutiveFrames
@@ -233,14 +233,14 @@ per-agent screening rule against a screening context.
 __all__ = [
     "AgentCheckRule",
     "AgentCheckRuleBase",
+    "AgentMaxMissingFrames",
+    "AgentRequireFrames",
+    "AgentRequireWindow",
     "EndsAfterFrame",
     "MaxGap",
-    "MaxMissingFrames",
     "MinConsecutiveFrames",
     "MinDistance",
     "MinSamples",
     "MinSpan",
-    "RequireFrames",
-    "RequireWindow",
     "StartsByFrame",
 ]

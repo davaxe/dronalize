@@ -4,9 +4,13 @@ from dronalize.config.models import DatasetConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.interaction.loader import InteractionLoader
 from dronalize.datasets.interaction.maps import InteractionMapBuilder
-from dronalize.datasets.registry import DatasetFeatureSupport, DatasetSpec, DatasetSplitSupport
+from dronalize.datasets.registry import (
+    DatasetDescriptor,
+    DatasetFeatureSupport,
+    DatasetSplitSupport,
+)
+from dronalize.datasets.shared.presets import minimum_samples_screening, scenes_config
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
-from dronalize.datasets.shared.specs import minimum_samples_screening, scenes_config
 
 
 def _interaction_map_paths(root: Path) -> list[tuple[str, Path]]:
@@ -17,14 +21,14 @@ def _interaction_map_paths(root: Path) -> list[tuple[str, Path]]:
 _open_interaction_resources = named_shared_map_resources_factory(
     named_paths=_interaction_map_paths,
     build_map=lambda path, config: InteractionMapBuilder(path).build(
-        config.min_distance, config.interp_distance
+        config.min_distance, config.interpolation_distance
     ),
 )
 
 
-DATASET_SPEC = DatasetSpec(
+DATASET_DESCRIPTOR = DatasetDescriptor(
     name="interaction",
-    loader_factory=InteractionLoader.unified_factory,
+    loader_factory=InteractionLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=10, future_frames=30, sample_time=0.1),
         screening=minimum_samples_screening(2),

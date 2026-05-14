@@ -9,12 +9,12 @@ from dronalize.config.models import DatasetConfig, PartialDatasetConfig, Partial
 from dronalize.core.errors import ConfigurationError
 
 
-class PartialDatasetEntryConfig(PartialDatasetConfigBase):
+class DatasetConfigEntry(PartialDatasetConfigBase):
     """Dataset-local authored config."""
 
     uses: tuple[str, ...] | None = None
 
-    def partial_config(self) -> PartialDatasetConfig:
+    def to_partial_dataset_config(self) -> PartialDatasetConfig:
         """Return config without the uses field."""
         return PartialDatasetConfig(
             scenes=self.scenes,
@@ -28,7 +28,7 @@ class PartialDatasetEntryConfig(PartialDatasetConfigBase):
         )
 
 
-class ProcessingConfig(ConfigBase):
+class ProjectConfig(ConfigBase):
     """Root config model for processing requests.
 
     This model is designed to be loaded from a TOML file with potentially
@@ -36,15 +36,15 @@ class ProcessingConfig(ConfigBase):
     [`DatasetConfig`][dronalize.config.models.DatasetConfig]s using the
     `resolve` method.
 
-    To load a `ProcessingConfig` from a TOML file, use the
+    To load a `ProjectConfig` from a TOML file, use the
     [`parse_config`][dronalize.config.reader.parse_config] function.
 
     """
 
     profiles: dict[str, PartialDatasetConfig] = Field(default_factory=dict)
-    datasets: dict[str, PartialDatasetEntryConfig] = Field(default_factory=dict)
+    datasets: dict[str, DatasetConfigEntry] = Field(default_factory=dict)
 
-    def resolve(self, dataset: str, dataset_config: DatasetConfig) -> DatasetConfig:
+    def resolve_dataset_config(self, dataset: str, dataset_config: DatasetConfig) -> DatasetConfig:
         """Resolve a specific dataset.
 
         Parameters
@@ -63,6 +63,6 @@ class ProcessingConfig(ConfigBase):
             if profile is None:
                 msg = f"Profile '{use}' not found for dataset '{dataset}'"
                 raise ConfigurationError(msg)
-            dataset_config = profile.apply_to(dataset_config)
+            dataset_config = profile.merge_into(dataset_config)
 
-        return partial.partial_config().apply_to(dataset_config)
+        return partial.to_partial_dataset_config().merge_into(dataset_config)

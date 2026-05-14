@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, Literal, TypeVar
 from pydantic import Field, model_validator
 from typing_extensions import override
 
-from dronalize.config.base import ConfigBase, FullConfig, PartialConfig, ResampleMethod
+from dronalize.config.base import ConfigBase, ConfigPatch, ResampleMethod, ResolvedConfig
 from dronalize.core.errors import ConfigurationError
 
 if TYPE_CHECKING:
     from dronalize.core.typing import T
 
 
-class ResampleConfig(FullConfig):
+class ResampleConfig(ResolvedConfig):
     """Validated specification for temporal resampling."""
 
     up: int = Field(default=1, gt=0)
@@ -40,7 +40,7 @@ class ResampleConfig(FullConfig):
         return self
 
 
-class PartialResampleConfig(PartialConfig[ResampleConfig]):
+class PartialResampleConfig(ConfigPatch[ResampleConfig]):
     """Patch model for partially overriding temporal resampling settings."""
 
     up: int | None = None
@@ -60,14 +60,14 @@ class PartialResampleConfig(PartialConfig[ResampleConfig]):
     full_config_type: type[ResampleConfig] = Field(default=ResampleConfig, init=False, repr=False)
 
 
-class WindowConfig(FullConfig):
+class WindowConfig(ResolvedConfig):
     """Configuration for sliding window sampling of scenes."""
 
     step: int = Field(gt=0)
     """Stride between consecutive sampled windows in frames."""
 
 
-class PartialWindowConfig(PartialConfig[WindowConfig]):
+class PartialWindowConfig(ConfigPatch[WindowConfig]):
     """Patch model for partially overriding sliding-window sampling settings."""
 
     step: int | None = None
@@ -75,7 +75,7 @@ class PartialWindowConfig(PartialConfig[WindowConfig]):
     full_config_type: type[WindowConfig] = Field(default=WindowConfig, init=False, repr=False)
 
 
-class LaneChangeConfig(FullConfig):
+class LaneChangeConfig(ResolvedConfig):
     """Configuration for lane-change-aware sampling."""
 
     persist: int = Field(gt=0)
@@ -90,7 +90,7 @@ class LaneChangeConfig(FullConfig):
     """Keep one negative sample out of every N candidates."""
 
 
-class PartialLaneChangeConfig(PartialConfig[LaneChangeConfig]):
+class PartialLaneChangeConfig(ConfigPatch[LaneChangeConfig]):
     """Patch model for partially overriding lane-change-aware sampling settings."""
 
     persist: int | None = None
@@ -108,7 +108,7 @@ class PartialLaneChangeConfig(PartialConfig[LaneChangeConfig]):
     )
 
 
-class ScenesConfig(FullConfig):
+class ScenesConfig(ResolvedConfig):
     """Base configuration class for scene construction and temporal transforms."""
 
     history_frames: int = Field(gt=0)
@@ -125,7 +125,7 @@ class ScenesConfig(FullConfig):
     """Optional lane-change-aware sampling configuration."""
 
 
-class PartialScenesConfig(PartialConfig[ScenesConfig]):
+class PartialScenesConfig(ConfigPatch[ScenesConfig]):
     """Patch model for partially overriding scene construction settings."""
 
     history_frames: int | None = None
@@ -143,7 +143,7 @@ class PartialScenesConfig(PartialConfig[ScenesConfig]):
     full_config_type: type[ScenesConfig] = Field(default=ScenesConfig, init=False, repr=False)
 
     @override
-    def apply_to(self, target: ScenesConfig | None, *, exclude_none: bool = True) -> ScenesConfig:
+    def merge_into(self, target: ScenesConfig | None, *, exclude_none: bool = True) -> ScenesConfig:
         """Apply this partial scenes config to an existing full scenes config."""
         return ScenesConfig(
             history_frames=_resolve_required(
@@ -183,14 +183,14 @@ ConfigT = TypeVar("ConfigT", bound=ConfigBase)
 
 
 def _apply_optional_block(
-    patch: PartialConfig[ConfigT] | Literal[False] | None, target: ConfigT | None
+    patch: ConfigPatch[ConfigT] | Literal[False] | None, target: ConfigT | None
 ) -> ConfigT | None:
     """Apply a patch to an optional nested config block."""
     if patch is None:
         return target
     if patch is False:
         return None
-    return patch.apply_to(target)
+    return patch.merge_into(target)
 
 
 def effective_scene_window(config: ScenesConfig) -> tuple[int, int, float]:

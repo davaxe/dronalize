@@ -14,12 +14,12 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.argoverse2.maps import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
+from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import (
     DatasetOptionsModel,
-    LoadedSourceData,
-    MapBinding,
-    Source,
+    DatasetSource,
+    LoadedSourceFrame,
+    MapReference,
 )
 
 if TYPE_CHECKING:
@@ -39,31 +39,31 @@ class Argoverse2LoaderOptions(DatasetOptionsModel):
     file_batch_size: int = Field(default=100, ge=1)
 
 
-class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
+class Argoverse2Loader(SceneLoader[list[Path], Argoverse2LoaderOptions]):
     """Loader for Argoverse 2 trajectory data stored in Parquet files."""
 
-    def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
+    def _sources_from_dir(self, data_dir: Path) -> Iterable[DatasetSource[list[Path]]]:
         if not data_dir.is_dir():
             return
         parquet_files = sorted(data_dir.glob("*/*.parquet"))
         for i in range(0, len(parquet_files), self.loader_options.file_batch_size):
-            yield Source(
-                identifier=i, data=parquet_files[i : i + self.loader_options.file_batch_size]
+            yield DatasetSource(
+                identifier=i, payload=parquet_files[i : i + self.loader_options.file_batch_size]
             )
 
     @override
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[list[Path]]]:
         yield from self._sources_from_dir(self.root / split.value)
 
     @override
-    def load_source(self, source: Source[list[Path]]) -> Iterable[LoadedSourceData]:
+    def load_source(self, source: DatasetSource[list[Path]]) -> Iterable[LoadedSourceFrame]:
         file_to_map: dict[str, str] = {}
-        for pq in source.data:
+        for pq in source.payload:
             json_candidates = list(pq.parent.glob("*.json"))
             if json_candidates:
                 file_to_map[str(pq)] = str(json_candidates[0])
 
-        batch_lf = pl.scan_parquet(source.data, include_file_paths="file_id").select(
+        batch_lf = pl.scan_parquet(source.payload, include_file_paths="file_id").select(
             pl.col("file_id"),
             self._map_object_type_expr("object_type").alias("agent_category"),
             pl.col("track_id").str.replace("AV", "0").cast(pl.Int32).alias("id"),
@@ -76,9 +76,9 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
         )
 
         for (file_id,), group in batch_lf.collect().group_by(["file_id"]):
-            yield LoadedSourceData(
+            yield LoadedSourceFrame(
                 frame=group.lazy().drop("file_id"),
-                map_binding=MapBinding(map_key=file_to_map.get(str(file_id))),
+                map_binding=MapReference(map_key=file_to_map.get(str(file_id))),
             )
 
     @override
@@ -101,7 +101,9 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
                 return None
             return utils.extract_configured_map(
                 self._get_map(
-                    scene.map_key, self.map_config.min_distance, self.map_config.interp_distance
+                    scene.map_key,
+                    self.map_config.min_distance,
+                    self.map_config.interpolation_distance,
                 ),
                 scene,
                 self.map_config,
@@ -111,8 +113,12 @@ class Argoverse2Loader(BaseSceneLoader[list[Path], Argoverse2LoaderOptions]):
 
     @staticmethod
     @functools.lru_cache(maxsize=10)
-    def _get_map(key: str, min_distance: float | None, interp_distance: float | None) -> MapGraph:
-        return Argoverse2MapBuilder.from_json_file(Path(key)).build(min_distance, interp_distance)
+    def _get_map(
+        key: str, min_distance: float | None, interpolation_distance: float | None
+    ) -> MapGraph:
+        return Argoverse2MapBuilder.from_json_file(Path(key)).build(
+            min_distance, interpolation_distance
+        )
 
     @staticmethod
     def _map_object_type_expr(col: str) -> pl.Expr:

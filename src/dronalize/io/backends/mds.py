@@ -121,7 +121,7 @@ class MDSDatasetWriter(DatasetWriter):
                 path_str = final_dir.as_posix()
             writers[split] = MDSWriter(
                 out=path_str,
-                columns=mds_columns(config.inner.precision),
+                columns=mds_columns(config.config.precision),
                 compression=config.mds.compression,
                 hashes=(list(config.mds.hashes) if config.mds.hashes is not None else None),
                 size_limit=config.mds.size_limit,

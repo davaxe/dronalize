@@ -11,8 +11,12 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.models import DatasetOptionsModel, LoadedSourceData, Source
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import (
+    DatasetOptionsModel,
+    DatasetSource,
+    LoadedSourceFrame,
+)
 from dronalize.processing.maps import no_map, shared_map
 
 if TYPE_CHECKING:
@@ -20,9 +24,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.models import DatasetResources
+    from dronalize.processing.loading.models import DatasetRunResources
     from dronalize.processing.maps import MapResolver
-    from dronalize.processing.models import LoaderRequest
+    from dronalize.processing.models import LoaderPlan
 
 
 class NuScenesStyleLoaderOptions(DatasetOptionsModel):
@@ -32,7 +36,7 @@ class NuScenesStyleLoaderOptions(DatasetOptionsModel):
     drop_full_category_regex: list[str] = Field(default_factory=lambda: ["object"])
 
 
-class NuScenesStyleLoader(BaseSceneLoader[str, NuScenesStyleLoaderOptions]):
+class NuScenesStyleLoader(SceneLoader[str, NuScenesStyleLoaderOptions]):
     """Shared base for datasets that follow the nuScenes metadata layout."""
 
     metadata_dir_parts: ClassVar[tuple[tuple[str, ...], ...]] = ()
@@ -44,16 +48,18 @@ class NuScenesStyleLoader(BaseSceneLoader[str, NuScenesStyleLoaderOptions]):
     def __init__(
         self,
         data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
+        request: LoaderPlan,
+        resources: DatasetRunResources | None = None,
     ) -> None:
         super().__init__(data_root=data_root, request=request, resources=resources)
         self._schemas: dict[str, pl.Schema | None] = _SCHEMAS
-        self._sources: dict[DatasetSplit, list[Source[str]]] | None = None
+        self._sources: dict[DatasetSplit, list[DatasetSource[str]]] | None = None
         self._scene_cache: dict[str, pl.DataFrame] = {}
 
-    def _build_sources_manifest(self) -> dict[DatasetSplit, list[Source[str]]]:
-        sources: dict[DatasetSplit, list[Source[str]]] = {split: [] for split in self.native_splits}
+    def _build_sources_manifest(self) -> dict[DatasetSplit, list[DatasetSource[str]]]:
+        sources: dict[DatasetSplit, list[DatasetSource[str]]] = {
+            split: [] for split in self.native_splits
+        }
 
         log_records = self._load_json_records("log")
         scene_records = self._load_json_records("scene")
@@ -68,16 +74,16 @@ class NuScenesStyleLoader(BaseSceneLoader[str, NuScenesStyleLoaderOptions]):
             if "token" not in row or "log_token" not in row:
                 continue
             sources[self.split_from_scene_row(row)].append(
-                Source(
+                DatasetSource(
                     identifier=self.source_identifier_from_scene_row(row),
-                    data=self.source_data_from_scene_row(row),
+                    payload=self.source_data_from_scene_row(row),
                     map_key=log_to_map.get(str(row["log_token"])),
                 )
             )
         return sources
 
     @override
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[str]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[str]]:
         if self._sources is None:
             self._sources = self._build_sources_manifest()
         yield from self._sources.get(split, [])
@@ -89,15 +95,15 @@ class NuScenesStyleLoader(BaseSceneLoader[str, NuScenesStyleLoaderOptions]):
         return len(self._sources.get(split, []))
 
     @override
-    def load_source(self, source: Source[str]) -> Iterable[LoadedSourceData]:
+    def load_source(self, source: DatasetSource[str]) -> Iterable[LoadedSourceFrame]:
         self._ensure_dataset_loaded()
-        scenes = self._scene_cache[source.data].drop(["scene_token", "scene_name", "map"]).lazy()
+        scenes = self._scene_cache[source.payload].drop(["scene_token", "scene_name", "map"]).lazy()
         filters = [~pl.col("status").is_in(self.loader_options.drop_status)]
         filters.extend(
             ~pl.col("full_category").str.contains(regex)
             for regex in self.loader_options.drop_full_category_regex
         )
-        yield LoadedSourceData(
+        yield LoadedSourceFrame(
             scenes.filter(*filters).drop(["status", "full_category", "full_status"])
         )
 
@@ -179,12 +185,12 @@ class NuScenesStyleLoader(BaseSceneLoader[str, NuScenesStyleLoaderOptions]):
 
     @classmethod
     def source_identifier_from_scene_row(cls, row: dict[str, Any]) -> str:
-        """Return the public source identifier for one scene row."""
+        """Return the public DatasetSource identifier for one scene row."""
         return str(row[cls.source_identifier_field])
 
     @classmethod
     def source_data_from_scene_row(cls, row: dict[str, Any]) -> str:
-        """Return the loader-internal source payload for one scene row."""
+        """Return the loader-internal DatasetSource payload for one scene row."""
         return str(row[cls.source_data_field])
 
 

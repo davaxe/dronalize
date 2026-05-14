@@ -29,7 +29,7 @@ configuration, dataset registry, and documented Python and CLI surfaces.
 - Add a Typer-based CLI with dataset inspection, config display, split-support checks,
   processing, dry-run planning, progress reporting, `--version`, and external dataset
   registration through `--dataset-module`.
-- Add a dataset registry built around `DatasetSpec`, with built-in integrations for the
+- Add a dataset registry built around `DatasetDescriptor`, with built-in integrations for the
   supported datasets and a documented path for custom dataset loaders.
 - Add shared scene, schema, category, split, and map domain models under `dronalize.core`.
 - Add a shared processing pipeline for scene windowing, resampling, split assignment,

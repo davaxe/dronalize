@@ -1,3 +1,3 @@
-from dronalize.datasets.ad4che.spec import DATASET_SPEC
+from dronalize.datasets.ad4che.descriptor import DATASET_DESCRIPTOR
 
-__all__ = ["DATASET_SPEC"]
+__all__ = ["DATASET_DESCRIPTOR"]

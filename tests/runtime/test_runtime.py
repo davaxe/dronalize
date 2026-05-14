@@ -22,7 +22,7 @@ from tests.support import DemoOptions, demo_descriptor
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.datasets import DatasetSpec
+    from dronalize.datasets import DatasetDescriptor
 
 
 def _request(tmp_path: Path, **kwargs: object) -> ExecutionRequest:
@@ -39,11 +39,11 @@ def _request(tmp_path: Path, **kwargs: object) -> ExecutionRequest:
     return ExecutionRequest.model_validate(base)
 
 
-def _patch_descriptor(monkeypatch: pytest.MonkeyPatch, descriptor: DatasetSpec) -> None:
-    def provider(_name: str) -> DatasetSpec:
+def _patch_descriptor(monkeypatch: pytest.MonkeyPatch, descriptor: DatasetDescriptor) -> None:
+    def provider(_name: str) -> DatasetDescriptor:
         return descriptor
 
-    monkeypatch.setattr("dronalize.runtime.api.get", provider)
+    monkeypatch.setattr("dronalize.runtime.api.get_dataset", provider)
 
 
 def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -79,7 +79,7 @@ def test_resolve_request_accepts_registered_string_storage_backend(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
-    register_writer_backend("test-null", lambda _plan: NullWriter.as_factory(log=False))
+    register_writer_backend("test-null", lambda _plan: NullWriter.as_factory())
 
     plan = resolve_request(_request(tmp_path, storage_backend="test-null"))
 

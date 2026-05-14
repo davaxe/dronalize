@@ -108,7 +108,7 @@ nav = [
     { Datasets = [
       "reference/api/datasets/index.md",
       { "Registry operations" = "reference/api/datasets/registry.md" },
-      { "Dataset specification" = "reference/api/datasets/spec.md" },
+      { "Dataset descriptor" = "reference/api/datasets/descriptor.md" },
     ] },
     { Runtime = [
       "reference/api/runtime/index.md",
@@ -136,7 +136,7 @@ nav = [
 
 [project.theme]
 variant = "modern"
-font.text = "Source Sans 3"
+font.text = "DatasetSource Sans 3"
 font.code = "IBM Plex Mono"
 features = [
   "navigation.tabs",

@@ -50,10 +50,6 @@ class SplitError(ValueError, DronalizeError):
     """Base class for dataset split-related errors."""
 
 
-class SplitConflictError(SplitError):
-    """Raised when mutually exclusive split options are combined."""
-
-
 class SplitNotSupportedError(SplitError):
     """Raised when a dataset does not support the requested split.
 
@@ -80,23 +76,6 @@ class SplitNotSupportedError(SplitError):
         super().__init__(f"{loader_name} does not support split '{', '.join(rendered)}'.")
         self.loader_name: str = loader_name
         self.split: list[str] = rendered
-
-
-class SplitStrategyNotSupportedError(SplitError):
-    """Raised when a loader does not implement the requested custom split strategy."""
-
-    def __init__(
-        self, loader_name: str, strategy_name: str, supported_strategies: tuple[str, ...]
-    ) -> None:
-        supported_display = ", ".join(supported_strategies) if supported_strategies else "none"
-        msg = (
-            f"{loader_name} does not support split strategy '{strategy_name}'. "
-            f"Supported strategies: {supported_display}."
-        )
-        super().__init__(msg)
-        self.loader_name: str = loader_name
-        self.strategy_name: str = strategy_name
-        self.supported_strategies: tuple[str, ...] = supported_strategies
 
 
 class SplitAssignmentError(SplitError):

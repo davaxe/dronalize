@@ -11,7 +11,7 @@ from dronalize.config.models import (
     TimeBlockAssign,
     WindowConfig,
 )
-from dronalize.processing.models import AssignmentRequest, PipelinePlan
+from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
 from dronalize.processing.pipeline.trajectory import build_trajectory_pipeline
 
 if TYPE_CHECKING:
@@ -39,10 +39,7 @@ def _scenes(
 
 
 def _run_pipeline(
-    frame: pl.DataFrame,
-    *,
-    plan: PipelinePlan,
-    window_by: str | None = None,
+    frame: pl.DataFrame, *, plan: TrajectoryPipelinePlan, window_by: str | None = None
 ) -> list[SceneDict]:
     return [
         scene.to_dict(as_series=False)
@@ -56,7 +53,7 @@ def test_standard_trajectory_pipeline_outputs_windowed_scenes(
     scene_df_presets: DataFramePresets,
 ) -> None:
     frame: pl.DataFrame = scene_df_presets["single_agent_windowed"]()
-    scenes = _run_pipeline(frame, plan=PipelinePlan(scenes=_scenes()))
+    scenes = _run_pipeline(frame, plan=TrajectoryPipelinePlan(scenes=_scenes()))
 
     assert scenes == [
         {
@@ -82,9 +79,9 @@ def test_standard_trajectory_pipeline_outputs_split_labeled_scenes(
     frame: pl.DataFrame = scene_df_presets["single_agent_time_split"]()
     scenes = _run_pipeline(
         frame,
-        plan=PipelinePlan(
+        plan=TrajectoryPipelinePlan(
             scenes=_scenes(),
-            assignment=AssignmentRequest(
+            assignment=SplitAssignmentPlan(
                 config=TimeBlockAssign(ratio=SplitWeights(train=0.5, val=0.5))
             ),
         ),
@@ -130,7 +127,7 @@ def test_lane_change_sampling_keeps_lane_change_windows_and_thins_steady_windows
     scene_df_presets: DataFramePresets,
 ) -> None:
     frame = scene_df_presets["lane_change_sequences"]()
-    plan = PipelinePlan(
+    plan = TrajectoryPipelinePlan(
         scenes=_scenes(
             lane_change=LaneChangeConfig(persist=1, negative_keep_every=2, required_lane_changes=1)
         )
@@ -193,14 +190,11 @@ def test_lane_change_sampling_keeps_lane_change_windows_and_thins_steady_windows
     ]
 
 
-def test_lane_change_sampling_requires_window_sampling(
-    scene_df_presets: DataFramePresets,
-) -> None:
+def test_lane_change_sampling_requires_window_sampling(scene_df_presets: DataFramePresets) -> None:
     frame = scene_df_presets["lane_change_sequences"]()
-    plan = PipelinePlan(
+    plan = TrajectoryPipelinePlan(
         scenes=_scenes(
-            window_step=None,
-            lane_change=LaneChangeConfig(persist=1, negative_keep_every=2),
+            window_step=None, lane_change=LaneChangeConfig(persist=1, negative_keep_every=2)
         )
     )
 
@@ -212,8 +206,8 @@ def test_lane_change_keep_every_one_matches_standard_pipeline(
     scene_df_presets: DataFramePresets,
 ) -> None:
     frame = scene_df_presets["lane_change_sequences"]()
-    standard_plan = PipelinePlan(scenes=_scenes())
-    lane_change_plan = PipelinePlan(
+    standard_plan = TrajectoryPipelinePlan(scenes=_scenes())
+    lane_change_plan = TrajectoryPipelinePlan(
         scenes=_scenes(lane_change=LaneChangeConfig(persist=1, negative_keep_every=1))
     )
 

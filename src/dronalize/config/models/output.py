@@ -7,7 +7,7 @@ from typing import Literal
 import numpy as np
 from pydantic import AliasChoices, Field
 
-from dronalize.config.base import FullConfig, PartialConfig
+from dronalize.config.base import ConfigPatch, ResolvedConfig
 from dronalize.core.scene import CANONICAL, TrajectorySchema
 from dronalize.core.scene.schema import TrajectorySchemaDefinition
 
@@ -28,7 +28,7 @@ name, or inline a full schema definition that resolves to a
 """
 
 
-class MDSOutputConfig(FullConfig):
+class MDSOutputConfig(ResolvedConfig):
     """Backend-specific tuning for Mosaic Streaming output."""
 
     compression: str | None = None
@@ -41,7 +41,7 @@ class MDSOutputConfig(FullConfig):
     """Whether an existing output location may be reused instead of raising an error."""
 
 
-class PartialMDSOutputConfig(PartialConfig[MDSOutputConfig]):
+class PartialMDSOutputConfig(ConfigPatch[MDSOutputConfig]):
     """Patch model for partially overriding Mosaic Streaming writer settings."""
 
     compression: str | None = None
@@ -55,7 +55,7 @@ class PartialMDSOutputConfig(PartialConfig[MDSOutputConfig]):
     full_config_type: type[MDSOutputConfig] = Field(default=MDSOutputConfig, init=False, repr=False)
 
 
-class OutputConfig(FullConfig):
+class OutputConfig(ResolvedConfig):
     """Resolved output configuration shared by storage backends."""
 
     trajectory_schema: TrajectorySchemaLike = Field(
@@ -72,7 +72,7 @@ class OutputConfig(FullConfig):
     """Backend-specific tuning for Mosaic Streaming outputs."""
 
 
-class PartialOutputConfig(PartialConfig[OutputConfig]):
+class PartialOutputConfig(ConfigPatch[OutputConfig]):
     """Patch model for partially overriding shared output settings."""
 
     trajectory_schema: TrajectorySchemaLike | None = Field(

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from dronalize.processing.maps import PathFeature
 
 
-class VODMapBuilder(NuScenesMapBuilder):
+class VodMapBuilder(NuScenesMapBuilder):
     """A builder for creating a MapGraph from a VOD map."""
 
     def __init__(self, path: Path, *, ignore_edge_types: set[str] | None = None) -> None:

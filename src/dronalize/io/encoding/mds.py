@@ -9,8 +9,8 @@ import numpy.typing as npt
 from typing_extensions import TypedDict
 
 from dronalize.io.records import (
+    FullHorizonSceneRecord,
     SceneRecord,
-    UnsplitSceneRecord,
     make_unsplit_raw_scene_record,
     split_unsplit_raw_scene_record,
 )
@@ -26,7 +26,7 @@ class MDSSample(TypedDict):
     observation_length: int
     position_offset: npt.NDArray[np.float64]
     agent_types: npt.NDArray[np.int32]
-    passed_agent_mask: npt.NDArray[np.uint8]
+    screened_agent_mask: npt.NDArray[np.uint8]
     features: npt.NDArray[np.float32 | np.float64]
     mask: npt.NDArray[np.uint8]
     map_node_positions: npt.NDArray[np.float32 | np.float64]
@@ -35,7 +35,7 @@ class MDSSample(TypedDict):
     map_edge_types: npt.NDArray[np.int32]
 
 
-def encode_mds_sample(record: UnsplitSceneRecord, *, observation_length: int) -> MDSSample:
+def encode_mds_sample(record: FullHorizonSceneRecord, *, observation_length: int) -> MDSSample:
     """Convert one unsplit raw scene record to the MDS payload layout."""
     map_node_positions, map_edge_indices, map_node_types, map_edge_types = _encode_mds_map_arrays(
         record.map_node_positions,
@@ -48,7 +48,7 @@ def encode_mds_sample(record: UnsplitSceneRecord, *, observation_length: int) ->
         "observation_length": int(observation_length),
         "position_offset": record.position_offset,
         "agent_types": record.agent_types,
-        "passed_agent_mask": record.passed_agent_mask.astype(np.uint8, copy=False),
+        "screened_agent_mask": record.screened_agent_mask.astype(np.uint8, copy=False),
         "features": record.features,
         "mask": record.mask.astype(np.uint8, copy=False),
         "map_node_positions": map_node_positions,
@@ -70,7 +70,7 @@ def decode_mds_sample(sample: Mapping[str, Any]) -> SceneRecord:
         scene_number=int(sample["scene_number"]),
         position_offset=np.asarray(sample["position_offset"], dtype=np.float64),
         agent_types=np.asarray(sample["agent_types"], dtype=np.int32),
-        passed_agent_mask=np.asarray(sample["passed_agent_mask"], dtype=bool),
+        screened_agent_mask=np.asarray(sample["screened_agent_mask"], dtype=bool),
         features=np.asarray(sample["features"]),
         mask=np.asarray(sample["mask"], dtype=bool),
         map_node_positions=map_node_positions,
@@ -90,7 +90,7 @@ def mds_columns(dtype: str) -> dict[str, str]:
         "observation_length": "int",
         "position_offset": "ndarray:float64:2",
         "agent_types": "ndarray:int32",
-        "passed_agent_mask": "ndarray:uint8",
+        "screened_agent_mask": "ndarray:uint8",
         "features": f"ndarray:{dtype}",
         "mask": "ndarray:uint8",
         "map_node_positions": f"ndarray:{dtype}",

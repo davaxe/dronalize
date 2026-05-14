@@ -1,16 +1,16 @@
 from dronalize.config.models import DatasetConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.apolloscape.loader import ApolloScapeLoader
-from dronalize.datasets.registry import DatasetSpec, DatasetSplitSupport
-from dronalize.datasets.shared.specs import (
+from dronalize.datasets.registry import DatasetDescriptor, DatasetSplitSupport
+from dronalize.datasets.shared.presets import (
     linear_resample,
     minimum_samples_screening,
     scenes_config,
 )
 
-DATASET_SPEC = DatasetSpec(
+DATASET_DESCRIPTOR = DatasetDescriptor(
     name="apolloscape",
-    loader_factory=ApolloScapeLoader.unified_factory,
+    loader_factory=ApolloScapeLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(
             history_frames=4,

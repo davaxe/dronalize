@@ -1,5 +1,5 @@
 # ruff: noqa: D102,D105
-"""Runtime source processing and scene materialization."""
+"""Runtime DatasetSource processing and scene materialization."""
 
 from __future__ import annotations
 
@@ -11,10 +11,13 @@ from dronalize.core.errors import SplitAssignmentError
 from dronalize.core.scene import Scene
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
-from dronalize.processing.loading.models import LoadedSourceData, MapBinding, Source
-from dronalize.processing.models import AssignmentRequest, PipelinePlan
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, MapReference
+from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
 from dronalize.processing.pipeline.trajectory import build_trajectory_pipeline
-from dronalize.processing.screening.screen import AGENT_PASS_COLUMN, SCENE_PASS_COLUMN
+from dronalize.processing.screening.screen import (
+    AGENT_SCREENING_PASS_COLUMN,
+    SCENE_SCREENING_PASS_COLUMN,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -23,7 +26,7 @@ if TYPE_CHECKING:
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.base import BaseSceneLoader
+    from dronalize.processing.loading.base import SceneLoader
     from dronalize.processing.loading.models import DatasetOptionsModel
     from dronalize.processing.maps import MapKey, MapResolver
     from dronalize.processing.pipeline.pipeline import Pipeline
@@ -32,7 +35,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class SceneIdentifier:
-    """Stable identifier for one candidate scene within a source."""
+    """Stable identifier for one candidate scene within a DatasetSource."""
 
     source_identifier: object
     source_local_scene_index: int
@@ -40,13 +43,13 @@ class SceneIdentifier:
 
 @dataclass(frozen=True, slots=True)
 class SceneCandidate:
-    """Runtime scene candidate produced from one processed source frame."""
+    """Runtime scene candidate produced from one processed DatasetSource frame."""
 
-    source: Source[Any]
+    source: DatasetSource[Any]
     stable_identifier: SceneIdentifier
     frame: pl.DataFrame
     passes_screening: bool
-    map_binding: MapBinding = field(default_factory=MapBinding)
+    map_binding: MapReference = field(default_factory=MapReference)
     passed_agent_ids: frozenset[int] | None = None
     split_assignment: DatasetSplit | None = None
 
@@ -55,8 +58,8 @@ class SceneCandidate:
 class DeferredMapResolver:
     """Picklable scene map resolver for deferred map materialization."""
 
-    loader: BaseSceneLoader[Any, DatasetOptionsModel]
-    map_binding: MapBinding | None = None
+    loader: SceneLoader[Any, DatasetOptionsModel]
+    map_binding: MapReference | None = None
 
     def __call__(self, scene: Scene) -> MapGraph | None:
         return self.loader.resolve_map(scene, self.map_binding)
@@ -64,11 +67,11 @@ class DeferredMapResolver:
 
 @dataclass(slots=True)
 class SourcePlanner:
-    """Resolve the effective source stream for one runtime plan."""
+    """Resolve the effective DatasetSource stream for one runtime plan."""
 
-    loader: BaseSceneLoader[Any, DatasetOptionsModel]
+    loader: SceneLoader[Any, DatasetOptionsModel]
 
-    def iter_sources(self) -> Iterable[Source[Any]]:
+    def iter_sources(self) -> Iterable[DatasetSource[Any]]:
         yield from self.loader.iter_sources()
 
     def total_sources(self) -> int | None:
@@ -79,7 +82,7 @@ class SourcePlanner:
 class SplitAssigner:
     """Assign output splits to selected scene candidates."""
 
-    request: AssignmentRequest | None
+    request: SplitAssignmentPlan | None
     _weighted_assigner: StatelessWeightedAssigner[DatasetSplit] | None = None
 
     def __post_init__(self) -> None:
@@ -91,7 +94,7 @@ class SplitAssigner:
         )
 
     def assign(
-        self, *, source: Source[Any], stable_identifier: SceneIdentifier, frame: pl.DataFrame
+        self, *, source: DatasetSource[Any], stable_identifier: SceneIdentifier, frame: pl.DataFrame
     ) -> DatasetSplit | None:
         split = self.request
         if split is None:
@@ -122,7 +125,7 @@ class SplitAssigner:
             raise SplitAssignmentError(msg) from exc
 
     def _resolve_scene_split(
-        self, source: Source[Any], stable_identifier: SceneIdentifier
+        self, source: DatasetSource[Any], stable_identifier: SceneIdentifier
     ) -> DatasetSplit | None:
         if self._weighted_assigner is None:
             return None
@@ -130,7 +133,7 @@ class SplitAssigner:
             stable_identifier.source_local_scene_index, str(source.identifier)
         )
 
-    def _resolve_source_split(self, source: Source[Any]) -> DatasetSplit | None:
+    def _resolve_source_split(self, source: DatasetSource[Any]) -> DatasetSplit | None:
         if self._weighted_assigner is None:
             return None
         return self._weighted_assigner.assign(str(source.identifier))
@@ -140,7 +143,7 @@ class SplitAssigner:
 class SceneExtractor:
     """Extract runtime scene candidates from dataset sources."""
 
-    loader: BaseSceneLoader[Any, DatasetOptionsModel]
+    loader: SceneLoader[Any, DatasetOptionsModel]
     split_assigner: SplitAssigner
     _pipeline: Pipeline | None = None
 
@@ -148,7 +151,7 @@ class SceneExtractor:
         config = self.loader.screening_config
         return config is not None and bool(config.agent or config.scene)
 
-    def iter_candidates(self, source: Source[Any]) -> Iterable[SceneCandidate]:
+    def iter_candidates(self, source: DatasetSource[Any]) -> Iterable[SceneCandidate]:
         source_local_scene_index = 0
         for data in self.loader.load_source(source):
             effective_source = self._effective_source(source, data)
@@ -183,7 +186,7 @@ class SceneExtractor:
         if self._pipeline is not None:
             return self._pipeline
 
-        plan = PipelinePlan(
+        plan = TrajectoryPipelinePlan(
             scenes=self.loader.scenes_config,
             screening=self.loader.screening_config,
             assignment=self.split_assigner.request,
@@ -193,32 +196,36 @@ class SceneExtractor:
         return self._pipeline
 
     @staticmethod
-    def _effective_source(source: Source[Any], data: LoadedSourceData) -> Source[Any]:
+    def _effective_source(
+        source: DatasetSource[Any], data: LoadedSourceFrame
+    ) -> DatasetSource[Any]:
         if data.predefined_split is None:
             return source
         return source.with_predefined_split(data.predefined_split)
 
     @staticmethod
     def _extract_scene_pass(frame: pl.DataFrame) -> tuple[bool, pl.DataFrame]:
-        if SCENE_PASS_COLUMN not in frame.columns:
+        if SCENE_SCREENING_PASS_COLUMN not in frame.columns:
             return True, frame
-        passes = bool(frame.get_column(SCENE_PASS_COLUMN).first())
-        return passes, frame.drop(SCENE_PASS_COLUMN)
+        passes = bool(frame.get_column(SCENE_SCREENING_PASS_COLUMN).first())
+        return passes, frame.drop(SCENE_SCREENING_PASS_COLUMN)
 
     @staticmethod
     def _extract_agent_pass(frame: pl.DataFrame) -> tuple[frozenset[int] | None, pl.DataFrame]:
-        if AGENT_PASS_COLUMN not in frame.columns:
+        if AGENT_SCREENING_PASS_COLUMN not in frame.columns:
             return None, frame
-        passed_ids = frame.filter(frame[AGENT_PASS_COLUMN]).get_column("id").unique().to_list()
+        passed_ids = (
+            frame.filter(frame[AGENT_SCREENING_PASS_COLUMN]).get_column("id").unique().to_list()
+        )
         passed_agent_ids = frozenset(int(agent_id) for agent_id in passed_ids)
-        return passed_agent_ids, frame.drop(AGENT_PASS_COLUMN)
+        return passed_agent_ids, frame.drop(AGENT_SCREENING_PASS_COLUMN)
 
 
 @dataclass(slots=True)
 class SceneMaterializer:
     """Materialize selected scene candidates into final scene objects."""
 
-    loader: BaseSceneLoader[Any, DatasetOptionsModel]
+    loader: SceneLoader[Any, DatasetOptionsModel]
     source_schema: TrajectorySchema
     target_schema: TrajectorySchema
     history_frames: int
@@ -253,7 +260,7 @@ class SceneMaterializer:
 
 @dataclass(slots=True)
 class RuntimeProcessor:
-    """Own the full runtime source-to-scene processing flow for one plan."""
+    """Own the full runtime DatasetSource-to-scene processing flow for one plan."""
 
     planner: SourcePlanner
     extractor: SceneExtractor
@@ -261,7 +268,7 @@ class RuntimeProcessor:
 
     @classmethod
     def from_plan(cls, plan: ExecutionPlan, loader: object) -> RuntimeProcessor:
-        typed_loader = cast("BaseSceneLoader[Any, DatasetOptionsModel]", loader)
+        typed_loader = cast("SceneLoader[Any, DatasetOptionsModel]", loader)
         split_assigner = SplitAssigner(plan.assignment)
         return cls(
             planner=SourcePlanner(loader=typed_loader),
@@ -276,7 +283,7 @@ class RuntimeProcessor:
             ),
         )
 
-    def iter_sources(self) -> Iterable[Source[Any]]:
+    def iter_sources(self) -> Iterable[DatasetSource[Any]]:
         yield from self.planner.iter_sources()
 
     def total_sources(self) -> int | None:
@@ -285,7 +292,7 @@ class RuntimeProcessor:
     def screening_enabled(self) -> bool:
         return self.extractor.screening_enabled()
 
-    def iter_candidates(self, source: Source[Any]) -> Iterable[SceneCandidate]:
+    def iter_candidates(self, source: DatasetSource[Any]) -> Iterable[SceneCandidate]:
         yield from self.extractor.iter_candidates(source)
 
     def materialize(self, candidate: SceneCandidate, scene_number: int) -> Scene:

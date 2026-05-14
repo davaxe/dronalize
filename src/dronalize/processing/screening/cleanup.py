@@ -23,10 +23,10 @@ class PruneByRule(CleanupRuleBase):
     rule: Literal["prune_by"] = Field("prune_by", repr=False, init=False)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression for the wrapped agent rule."""
         scope = ctx.selector_mask(self.agent_rule.selector)
-        agent_validity = self.agent_rule.expr(ctx)
+        agent_validity = self.agent_rule.predicate_expr(ctx)
         return pl.when(scope).then(agent_validity).otherwise(statement=True)
 
 
@@ -44,7 +44,7 @@ class ExcludeCategories(CleanupRuleBase):
         return cls(categories=coerce_agent_categories(categories, frozenset), rule_id=rule_id)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression that excludes selected categories."""
         return ~pl.col(ctx.columns.category).is_in(self.categories)
 
@@ -63,7 +63,7 @@ class IncludeCategories(CleanupRuleBase):
         return cls(categories=coerce_agent_categories(categories, frozenset), rule_id=rule_id)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression that keeps selected categories."""
         return pl.col(ctx.columns.category).is_in(self.categories)
 
