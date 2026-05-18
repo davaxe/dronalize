@@ -14,12 +14,13 @@ Think of one resolved dataset config as four layers:
 
 1. built-in dataset defaults from the
    [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor)
-2. profile fragments from `[profiles.<name>]`
-3. one dataset entry under `[datasets.<name>]`
+2. project-wide defaults from `[defaults]`, including any profiles it uses
+3. dataset-local profile fragments and settings from `[datasets.<name>]`
 4. runtime overrides from the CLI or
    [`RuntimeOverride`](../reference/api/config/project.md#dronalize.config.RuntimeOverride)
 
-Profiles are opted into with `uses`, in the order they should be applied.
+Profiles are opted into with `uses`, in the order they should be applied. Put policy that should
+apply to every dataset under `[defaults]`; use dataset entries only where a dataset needs to differ.
 
 ## Current top-level sections
 
@@ -34,9 +35,43 @@ Profiles are opted into with `uses`, in the order they should be applied.
 | `output` | Output schema, precision, recentering, and MDS-specific tuning. |
 | `loader_options` | Dataset-owned loader options validated by the selected dataset integration. |
 
+## Project-wide defaults
+
+Use `[defaults]` for shared policy that should affect every dataset resolved from the config file:
+
+```toml
+[defaults.runtime]
+jobs = 8
+
+[defaults.output]
+schema = "canonical"
+precision = "float32"
+recenter_positions = true
+
+[defaults.output.mds]
+compression = "zstd:3"
+```
+
+Dataset-specific entries can still refine or override those defaults:
+
+```toml
+[datasets.waymo.output.mds]
+compression = "zstd:7"
+```
+
+Defaults can also opt into named profiles:
+
+```toml
+[profiles.common.runtime]
+jobs = 8
+
+[defaults]
+uses = ["common"]
+```
+
 ## Profiles and dataset entries
 
-Use profiles for shared policy:
+Use profiles for reusable policy that is shared by some datasets but not all:
 
 ```toml
 [profiles.fast.runtime]
@@ -76,16 +111,16 @@ uses = ["fast", "high_precision"]
 ## Example
 
 ```toml
-[profiles.fast.runtime]
+[defaults.runtime]
 jobs = "auto"
 
-[profiles.high_precision.output]
-schema = "positions_velocity_yaw"
-precision = "float64"
+[defaults.output]
+schema = "canonical"
+precision = "float32"
 recenter_positions = true
 
-[datasets.a43]
-uses = ["fast", "high_precision"]
+[defaults.output.mds]
+compression = "zstd:3"
 
 [datasets.a43.scenes]
 history_frames = 20
@@ -104,6 +139,9 @@ gap = 2
 [datasets.a43.map.extraction]
 mode = "circle"
 radius = 60.0
+
+[datasets.waymo.output.mds]
+compression = "zstd:7"
 ```
 
 ## How merging works
@@ -133,6 +171,7 @@ default config and your TOML file.
 ## Practical workflow
 
 1. Start from the dataset defaults and inspect them with `dronalize inspect <dataset>`.
-2. Add a minimal `[datasets.<name>]` entry that changes only what your project needs.
-3. Move repeated policy into profiles and opt datasets in with `uses`.
-4. Use CLI overrides for temporary run-to-run experiments, not for long-term project config.
+2. Put project-wide policy in `[defaults]`.
+3. Add minimal `[datasets.<name>]` entries only for dataset-specific changes.
+4. Move repeated subset policy into profiles and opt datasets or defaults in with `uses`.
+5. Use CLI overrides for temporary run-to-run experiments, not for long-term project config.

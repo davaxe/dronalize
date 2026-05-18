@@ -73,8 +73,6 @@ apolloscape/
 │   ├── result_9048_1.frame.txt
 │   ├── result_9048_3.frame.txt
 │   └── ...
-├── val_split/
-│   └── ...
 └── prediction_test/
-    └── prediction_test.txt  # present in the raw benchmark, not used by the current loader
+    └── prediction_test.txt
 ```

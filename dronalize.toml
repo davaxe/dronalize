@@ -40,6 +40,12 @@ stationary = { rule = "min_distance", minimum = 4, tolerance = { absolute = 100}
 [profiles.strict_screening.screening.scene]
 min_agents = { rule = "agent_range", minimum = 12 }
 
+[defaults]
+uses = ["fast", "high_precision"]
+
+[defaults.output.mds]
+compression = "zstd:3"
+
 
 # --------------------------------------------------------------------------------------
 # Dataset: waymo
@@ -51,15 +57,12 @@ uses = ["strict_screening"]
 [datasets.waymo.screening]
 mode = "extend"
 
-[datasets.waymo.output.mds]
-compression = "zstd:3"
-
 # --------------------------------------------------------------------------------------
 # Dataset: a43
 # --------------------------------------------------------------------------------------
 
 [datasets.a43]
-uses = ["fast", "high_precision", "basic_screening"]
+uses = ["basic_screening"]
 
 
 # Runtime ------------------------------------------------------------------------------

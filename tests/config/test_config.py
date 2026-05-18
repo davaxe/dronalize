@@ -45,6 +45,9 @@ def test_parse_config_parses_profiles_and_dataset_entries(tmp_path: Path) -> Non
         _write(
             tmp_path,
             """
+            [defaults.output]
+            precision = "float32"
+
             [profiles.fast.runtime]
             jobs = 2
 
@@ -55,8 +58,79 @@ def test_parse_config_parses_profiles_and_dataset_entries(tmp_path: Path) -> Non
     )
 
     assert isinstance(cfg, ProjectConfig)
+    assert cfg.defaults is not None
     assert "fast" in cfg.profiles
     assert "demo" in cfg.datasets
+
+
+def test_resolve_applies_defaults_without_dataset_entry(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [defaults.runtime]
+            jobs = 8
+
+            [defaults.output]
+            schema = "canonical"
+            precision = "float32"
+            recenter_positions = true
+
+            [defaults.output.mds]
+            compression = "zstd:3"
+            """,
+        )
+    )
+
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+
+    assert resolved.runtime.jobs == 8
+    assert resolved.output.trajectory_schema == "canonical"
+    assert resolved.output.precision == "float32"
+    assert resolved.output.recenter_positions is True
+    assert resolved.output.mds.compression == "zstd:3"
+
+
+def test_resolve_applies_defaults_before_dataset_entry(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [defaults.runtime]
+            jobs = 8
+
+            [defaults.output.mds]
+            compression = "zstd:3"
+
+            [datasets.demo.runtime]
+            jobs = 2
+            """,
+        )
+    )
+
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+
+    assert resolved.runtime.jobs == 2
+    assert resolved.output.mds.compression == "zstd:3"
+
+
+def test_defaults_can_use_profiles(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [profiles.common.runtime]
+            jobs = 8
+
+            [defaults]
+            uses = ["common"]
+            """,
+        )
+    )
+
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+
+    assert resolved.runtime.jobs == 8
 
 
 def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
@@ -77,6 +151,21 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
                 "scenes": {"history_frames": 1, "future_frames": 1, "sample_time": 0.1}
             }),
         )
+
+
+def test_resolve_raises_for_missing_defaults_profile(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [defaults]
+            uses = ["missing"]
+            """,
+        )
+    )
+
+    with pytest.raises(ConfigurationError, match="Profile 'missing' not found for defaults"):
+        _ = cfg.resolve_dataset_config("demo", _dataset_config())
 
 
 def test_parse_config_surfaces_invalid_toml(tmp_path: Path) -> None:

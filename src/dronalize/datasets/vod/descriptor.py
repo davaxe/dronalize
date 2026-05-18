@@ -31,5 +31,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
     resources_factory=_open_vod_resources,
     feature_support=DatasetFeatureSupport(map=True),
-    split_support=DatasetSplitSupport(scene=True, source=True),
+    split_support=DatasetSplitSupport(scene=True, source=False, time_block=True),
 )

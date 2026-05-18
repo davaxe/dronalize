@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from dronalize.core.scene import TrajectorySchema
 
 
-_NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
+_NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.TEST)
 
 
 class ApolloScapeLoader(SceneLoader):
@@ -39,7 +39,7 @@ class ApolloScapeLoader(SceneLoader):
             yield from self._sources_from_dir(self.root / "prediction_train")
             return
         if split is DatasetSplit.VAL:
-            yield from self._sources_from_dir(self.root / "val_split")
+            yield from self._sources_from_dir(self.root / "prediction_test")
             return
         raise SplitNotSupportedError(type(self).__name__, split)
 

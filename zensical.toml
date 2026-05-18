@@ -64,6 +64,7 @@ nav = [
     { apolloscape = "reference/datasets/apolloscape.md" },
     { argoverse1 = "reference/datasets/argoverse1.md" },
     { argoverse2 = "reference/datasets/argoverse2.md" },
+    { eth_ucy = "reference/datasets/eth_ucy.md" },
     { eth = "reference/datasets/eth.md" },
     { exid = "reference/datasets/exid.md" },
     { highd = "reference/datasets/highd.md" },

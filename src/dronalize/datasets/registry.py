@@ -201,6 +201,9 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetDescriptor] = {
     "apolloscape": _builtin("dronalize.datasets.apolloscape"),
     "argoverse1": _builtin("dronalize.datasets.argoverse1"),
     "argoverse2": _builtin("dronalize.datasets.argoverse2"),
+    "eth_ucy": _builtin(
+        "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="eth_ucy"
+    ),
     "eth": _builtin(
         "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="eth"
     ),

@@ -41,6 +41,7 @@ class ProjectConfig(ConfigBase):
 
     """
 
+    defaults: DatasetConfigEntry | None = Field(default=None)
     profiles: dict[str, PartialDatasetConfig] = Field(default_factory=dict)
     datasets: dict[str, DatasetConfigEntry] = Field(default_factory=dict)
 
@@ -54,15 +55,28 @@ class ProjectConfig(ConfigBase):
         dataset_config : DatasetConfig
             The full configuration before resolution.
         """
-        partial = self.datasets.get(dataset) if self.datasets else None
-        if partial is None:
-            return dataset_config
+        dataset_config = self._apply_entry(
+            entry=self.defaults,
+            target=dataset_config,
+            context="defaults",
+        )
+        return self._apply_entry(
+            entry=self.datasets.get(dataset) if self.datasets else None,
+            target=dataset_config,
+            context=f"dataset '{dataset}'",
+        )
 
-        for use in partial.uses or ():
+    def _apply_entry(
+        self, *, entry: DatasetConfigEntry | None, target: DatasetConfig, context: str
+    ) -> DatasetConfig:
+        if entry is None:
+            return target
+
+        for use in entry.uses or ():
             profile = self.profiles.get(use)
             if profile is None:
-                msg = f"Profile '{use}' not found for dataset '{dataset}'"
+                msg = f"Profile '{use}' not found for {context}"
                 raise ConfigurationError(msg)
-            dataset_config = profile.merge_into(dataset_config)
+            target = profile.merge_into(target)
 
-        return partial.to_partial_dataset_config().merge_into(dataset_config)
+        return entry.to_partial_dataset_config().merge_into(target)

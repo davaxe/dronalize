@@ -27,5 +27,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     ),
     native_schema=OpenDDLoader.native_trajectory_schema(),
     feature_support=DatasetFeatureSupport(map=True),
-    split_support=DatasetSplitSupport(scene=True, source=True),
+    split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
 )

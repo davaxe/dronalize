@@ -74,7 +74,7 @@ def _levelx_spec(
         feature_support=DatasetFeatureSupport(
             map=True, lane_change_sampling=lane_change_sampling_support
         ),
-        split_support=DatasetSplitSupport(scene=True, source=True),
+        split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
     )
 
 

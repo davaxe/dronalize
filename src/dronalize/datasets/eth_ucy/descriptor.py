@@ -20,8 +20,9 @@ _DEFAULT_CONFIG = DatasetConfig(
     screening=minimum_samples_screening(2),
 )
 
-DATASET_DESCRIPTORS = {
-    name: DatasetDescriptor(
+
+def _descriptor(name: str) -> DatasetDescriptor:
+    return DatasetDescriptor(
         name=name,
         loader_factory=EthUcyLoader.from_loader_request,
         default_config=_DEFAULT_CONFIG,
@@ -29,5 +30,8 @@ DATASET_DESCRIPTORS = {
         supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),
     )
-    for name in ("eth", "hotel", "univ", "zara1", "zara2")
+
+
+DATASET_DESCRIPTORS = {
+    name: _descriptor(name) for name in ("eth_ucy", "eth", "hotel", "univ", "zara1", "zara2")
 }
