@@ -81,8 +81,9 @@ class A43Loader(SceneLoader[tuple[Path, int], A43LoaderOptions]):
     def count_sources(self) -> int | None:
         total, rows_per_source = 0, self.loader_options.rows_per_source
         for csv_file in self.root.glob("*.csv"):
-            rows: int = pl.scan_csv(csv_file, infer_schema=False).select(pl.len()).collect().item()
-            total += (rows + rows_per_source - 1) // rows_per_source
+            with csv_file.open() as f:
+                row_count = sum(1 for _ in f) - 1
+            total += (row_count + rows_per_source - 1) // rows_per_source
         return total
 
     @classmethod

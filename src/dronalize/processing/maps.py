@@ -424,7 +424,8 @@ def shared_map(
             if f is None:
                 return map_graph.copy()
 
-            return f(scene, map_graph).copy()
+            extracted = f(scene, map_graph)
+            return extracted.copy() if extracted is map_graph else extracted
 
     _resolve.__name__ = "shared_map"
     return _resolve

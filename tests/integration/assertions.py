@@ -200,6 +200,15 @@ def save_scene_artifacts(
     """Save scene artifacts like trajectories and maps for debugging."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        import dronalize_viz as dviz  # noqa: PLC0415
+
+        chart = dviz.trajectory_figure(scene)
+        chart.save(out_dir / "trajectories.html")
+    except ImportError:
+        pass
+
     frame = scene.frame.select("frame", "id", "x", "y")
     summary_frame = frame.select(
         pl.col("x").min().alias("x_min"),

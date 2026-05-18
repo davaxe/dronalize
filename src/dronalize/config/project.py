@@ -56,9 +56,7 @@ class ProjectConfig(ConfigBase):
             The full configuration before resolution.
         """
         dataset_config = self._apply_entry(
-            entry=self.defaults,
-            target=dataset_config,
-            context="defaults",
+            entry=self.defaults, target=dataset_config, context="defaults"
         )
         return self._apply_entry(
             entry=self.datasets.get(dataset) if self.datasets else None,

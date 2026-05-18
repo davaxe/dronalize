@@ -185,6 +185,4 @@ def run_with_rich_progress(executor: Executor, run: Callable[[], T], *, enable: 
             thread.join()
 
     monitor.raise_if_failed()
-    logger.debug("Rich progress monitor stopped successfully.")
-    logger.info("Result: %s", result)
     return result

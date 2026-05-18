@@ -111,11 +111,9 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-DatasetSource = ["src/dronalize"]
 branch = true
 omit = [
     "src/dronalize/datasets/*/protos/*.py",
-    "src/dronalize/datasets/shared/_debug.py",
 ]
 
 [tool.ty.src]

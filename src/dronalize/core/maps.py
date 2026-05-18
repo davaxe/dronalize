@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from scipy.spatial import cKDTree
 from typing_extensions import Self, override
 
 from dronalize.core.categories import EdgeType
@@ -439,13 +440,19 @@ class MapGraph:
                 edge_types=np.zeros((0,), dtype=np.int32),
             )
 
+        positions = np.asarray(relevant_positions, dtype=np.float64)
+        if positions.ndim != 2 or positions.shape[1] != 2:
+            msg = f"relevant_positions must have shape (N, 2), got {positions.shape!r}"
+            raise ValueError(msg)
+
+        if self.num_nodes == 0:
+            return self.copy()
+
         within_mask = np.zeros(self.num_nodes, dtype=bool)
-        radius_sq = radius * radius
-        for point in relevant_positions:
-            diff = self.node_positions - np.asarray(point, dtype=np.float64)
-            within_mask |= np.sum(diff * diff, axis=1) <= radius_sq
-            if within_mask.all():
-                break
+        tree = cKDTree(self.node_positions)
+        neighbor_groups = tree.query_ball_point(positions, r=radius)
+        for node_indices in neighbor_groups:
+            within_mask[node_indices] = True
 
         return self._subgraph_from_mask(within_mask)
 
