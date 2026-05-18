@@ -3,6 +3,7 @@
 # ruff: noqa: PLC0415
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, TypeVar
 
@@ -162,8 +163,16 @@ def global_options(
         ),
     ] = None,
     dataset_module: DatasetModule = None,
+    log_level: Annotated[
+        str, typer.Option("--log-level", envvar="DRONALIZE_LOG_LEVEL", help="Python logging level.")
+    ] = "WARNING",
 ) -> None:
     """Global CLI options."""
+    logging.basicConfig(
+        level=getattr(logging, log_level.upper()),
+        format="%(levelname)s:%(name)s:%(message)s",
+        force=True,
+    )
     _ = version
     register_custom_datasets(dataset_module)
 

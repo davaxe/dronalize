@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import random
 import threading
 import time
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
     from dronalize.runtime.state import Progress
 
 T = TypeVar("T")
+
+logger = logging.getLogger(__name__)
 
 
 class _ExecutorDisplay(RichCast):
@@ -182,4 +185,6 @@ def run_with_rich_progress(executor: Executor, run: Callable[[], T], *, enable: 
             thread.join()
 
     monitor.raise_if_failed()
+    logger.debug("Rich progress monitor stopped successfully.")
+    logger.info("Result: %s", result)
     return result
