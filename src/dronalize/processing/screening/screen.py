@@ -11,7 +11,11 @@ from pydantic import BaseModel, BeforeValidator, TypeAdapter
 from typing_extensions import override
 
 from dronalize.core.functional.basic import normalize_group_by
-from dronalize.processing.screening.agent import AgentCheckRule, invalid_agent_tolerance_expr
+from dronalize.processing.screening.agent import (
+    AgentCheckRule,
+    invalid_agent_tolerance_expr,
+    passing_requirement_expr,
+)
 from dronalize.processing.screening.base import (
     AgentCheckRuleBase,
     Rule,
@@ -243,15 +247,27 @@ def _apply_agent_rule(
     invalid_fraction = (
         pl.when(scoped_agent_count > 0).then(invalid_agents / scoped_agent_count).otherwise(0.0)
     )
-    scene_pass = (
-        pl
-        .when(scoped_agent_count > 0)
-        .then(
-            invalid_agent_tolerance_expr(
-                rule.tolerance, invalid_agents=invalid_agents, invalid_fraction=invalid_fraction
-            )
+    passing_agents = ctx.over_scene_window(
+        pl.col(ctx.columns.agent_id).filter(scope & agent_pass).n_unique()
+    )
+    passing_fraction = (
+        pl.when(scoped_agent_count > 0).then(passing_agents / scoped_agent_count).otherwise(0.0)
+    )
+    tolerance_expr = (
+        pl.lit(value=True)
+        if rule.tolerance is None and rule.require is not None
+        else invalid_agent_tolerance_expr(
+            rule.tolerance, invalid_agents=invalid_agents, invalid_fraction=invalid_fraction
         )
-        .otherwise(pl.lit(value=True))
+    )
+    tolerance_pass = (
+        pl.when(scoped_agent_count > 0).then(tolerance_expr).otherwise(pl.lit(value=True))
+    )
+    scene_pass = pl.all_horizontal(
+        tolerance_pass,
+        passing_requirement_expr(
+            rule.require, passing_agents=passing_agents, passing_fraction=passing_fraction
+        ),
     )
     df = data.with_columns(agent_pass.alias(cols.agent_pass), scene_pass.alias(cols.scene_pass))
     return df, cols

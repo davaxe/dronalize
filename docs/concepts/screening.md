@@ -14,7 +14,7 @@ Screening has three rule families:
 | --- | --- | --- |
 | `cleanup` | Should these rows or agents be removed before validation? | Drops data before scene checks run. |
 | `scene` | Is this scene usable as a sample? | Keeps or rejects the whole scene. |
-| `agent` | Which agents satisfy per-agent quality rules? | Marks agents as passed or failed, with optional tolerance. |
+| `agent` | Which agents satisfy per-agent quality rules? | Marks agents as passed or failed, with optional scene-level aggregate thresholds. |
 
 They run in that order.
 
@@ -65,7 +65,7 @@ Examples:
 - limit gaps for pedestrians only
 - keep the scene, but mark which agents passed the quality bar
 
-## Selectors and tolerance
+## Selectors, tolerance, and pass requirements
 
 Agent rules can be narrowed with a selector:
 
@@ -90,10 +90,23 @@ tolerance = { absolute = 2, relative = 0.2 }
 
 This means a scene can survive even if a small number of selected agents fail the rule; in this case 2 absolute failures or 20% relative failures would be allowed. Both absolute and relative tolerances are applied, so if either threshold is breached the agent-based screening rule fails for the scene.
 
+Agent rules can also require a minimum number or fraction of selected agents to pass:
+
+```toml
+[datasets.a43.screening.agent.anchor_present]
+rule = "frames"
+frames = [19]
+require = { absolute = 3, relative = 0.75 }
+```
+
+This keeps a scene only when at least 3 selected agents pass the rule and at least 75% of selected agents pass the rule. `require` is evaluated after the agent rule selector. If no selected agents exist, a positive requirement fails.
+
+`tolerance` and `require` may be used together. In that case, both aggregate checks must pass: the scene must stay within the invalid-agent tolerance and satisfy the minimum passing-agent requirement.
+
 !!! tip "Non-passing agents will be marked"
-    If tolerances is used it means that agents that fail the rule still exist
-    in the scenes. Importantly, they will be marked both in the output records
-    so downstream code can handle them differently, if needed.
+    If `tolerance` or `require` allows a scene to survive with failed agents, those
+    agents still exist in the scenes. Importantly, they will be marked in the
+    output records so downstream code can handle them differently, if needed.
 
     In practice this means the scene can still be emitted, but the runtime keeps
     track of which agent ids passed screening and which did not. When the scene

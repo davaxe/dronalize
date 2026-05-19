@@ -165,6 +165,9 @@ class SceneRecord:
     `map_edge_indices` according to the edge-type encoding.
     """
 
+    dataset: str | None = None
+    """Dataset label associated with this record, if known."""
+
     def unsplit(self) -> FullHorizonSceneRecord:
         """Collapse the record into the unsplit representation."""
         return join_raw_scene_record(self)
@@ -205,6 +208,9 @@ class FullHorizonSceneRecord:
     map_edge_types: npt.NDArray[np.int32]
     """Integer-encoded map edge types, shape `(E,)`."""
 
+    dataset: str | None = None
+    """Dataset label associated with this record, if known."""
+
     def split(self, observation_length: int) -> SceneRecord:
         """Split the record into observation and prediction tensors."""
         return split_unsplit_raw_scene_record(self, observation_length=observation_length)
@@ -224,6 +230,7 @@ def make_scene_record(
     map_edge_indices: npt.NDArray[np.int32],
     map_node_types: npt.NDArray[np.int32],
     map_edge_types: npt.NDArray[np.int32],
+    dataset: str | None = None,
 ) -> SceneRecord:
     """Construct one canonical split `SceneRecord`."""
     return SceneRecord(
@@ -239,6 +246,7 @@ def make_scene_record(
         map_edge_indices=map_edge_indices,
         map_node_types=map_node_types,
         map_edge_types=map_edge_types,
+        dataset=dataset,
     )
 
 
@@ -254,6 +262,7 @@ def make_unsplit_raw_scene_record(
     map_edge_indices: npt.NDArray[np.int32],
     map_node_types: npt.NDArray[np.int32],
     map_edge_types: npt.NDArray[np.int32],
+    dataset: str | None = None,
 ) -> FullHorizonSceneRecord:
     """Construct one unsplit `FullHorizonSceneRecord`."""
     return FullHorizonSceneRecord(
@@ -267,6 +276,7 @@ def make_unsplit_raw_scene_record(
         map_edge_indices=map_edge_indices,
         map_node_types=map_node_types,
         map_edge_types=map_edge_types,
+        dataset=dataset,
     )
 
 
@@ -295,6 +305,7 @@ def split_unsplit_raw_scene_record(
         map_edge_indices=record.map_edge_indices,
         map_node_types=record.map_node_types,
         map_edge_types=record.map_edge_types,
+        dataset=record.dataset,
     )
 
 
@@ -311,4 +322,5 @@ def join_raw_scene_record(record: SceneRecord) -> FullHorizonSceneRecord:
         map_edge_indices=record.map_edge_indices,
         map_node_types=record.map_node_types,
         map_edge_types=record.map_edge_types,
+        dataset=record.dataset,
     )

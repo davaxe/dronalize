@@ -18,7 +18,7 @@ from dronalize.processing.screening.base import (
 )
 
 if TYPE_CHECKING:
-    from dronalize.config.models.screening import Tolerance
+    from dronalize.config.models.screening import PassingRequirement, Tolerance
     from dronalize.processing.screening.base import ScreeningContext
 
 
@@ -208,6 +208,21 @@ def invalid_agent_tolerance_expr(
         return invalid_agents <= tolerance.absolute
     return pl.all_horizontal(
         invalid_agents <= tolerance.absolute, invalid_fraction <= tolerance.relative
+    )
+
+
+def passing_requirement_expr(
+    requirement: PassingRequirement | None, *, passing_agents: pl.Expr, passing_fraction: pl.Expr
+) -> pl.Expr:
+    """Return the scene-pass expression for configured passing-agent requirements."""
+    if requirement is None:
+        return pl.lit(value=True)
+    if requirement.relative is not None and requirement.absolute is None:
+        return passing_fraction >= requirement.relative
+    if requirement.absolute is not None and requirement.relative is None:
+        return passing_agents >= requirement.absolute
+    return pl.all_horizontal(
+        passing_agents >= requirement.absolute, passing_fraction >= requirement.relative
     )
 
 

@@ -13,7 +13,11 @@ from dronalize.config.models import (
     ScreeningConfig,
     WindowConfig,
 )
-from dronalize.config.models.screening import ExcludeCategoriesSpec
+from dronalize.config.models.screening import (
+    ExcludeCategoriesSpec,
+    PassingRequirement,
+    RequireFramesSpec,
+)
 
 if TYPE_CHECKING:
     from dronalize.config.base import ResampleMethod
@@ -22,7 +26,7 @@ if TYPE_CHECKING:
 
 
 def combine_screenings(*screenings: ScreeningConfig) -> ScreeningConfig:
-    """Combine multiple screenings into one by merging their cleanup rules."""
+    """Combine multiple screening configs by merging named rule maps."""
     combined_cleanup: dict[str, CleanupSpec] = {}
     combined_agent: dict[str, AgentCheckSpec] = {}
     combined_scene: dict[str, SceneCheckSpec] = {}
@@ -41,10 +45,52 @@ def exclude_category_screening(*category: AgentCategory) -> ScreeningConfig:
     return ScreeningConfig(cleanup={"category": ExcludeCategoriesSpec(categories=category)})
 
 
-def minimum_samples_screening(minimum: int) -> ScreeningConfig:
-    """Return the standard cleanup-only screening used by built-in dataset specs."""
-    return ScreeningConfig(
+def minimum_samples_screening(
+    minimum: int, *, prediction_frame: int | None = None
+) -> ScreeningConfig:
+    """Return the standard screening used by built-in dataset specs.
+
+    Parameters
+    ----------
+    minimum : int
+        Minimum number of samples required for each agent to be retained in the
+        scene. This will cleanup all agents that do not meet this requirement.
+    prediction_frame : int | None, optional
+        If not None, also require that each retained agent has a valid sample at
+        the given frame index (relative to the start of the scene) in order for
+        the scene to be retained. This rule requires only that at least one
+        agent meets the requirement.
+
+    Returns
+    -------
+    ScreeningConfig
+        Screening config that applies the screening.
+
+    """
+    screening = ScreeningConfig(
         cleanup={"min_samples": PruneByRuleSpec(agent_rule=MinSamplesSpec(minimum=minimum))}
+    )
+    if prediction_frame is None:
+        return screening
+    if prediction_frame < 0:
+        msg = "prediction_frame must be non-negative."
+        raise ValueError(msg)
+    return combine_screenings(
+        screening, require_frames_screening(prediction_frame, require_absolute=1)
+    )
+
+
+def require_frames_screening(
+    *frames: int, require_absolute: int | None = None, require_relative: float | None = None
+) -> ScreeningConfig:
+    """Return an agent-screening config that requires specific frames."""
+    require = (
+        PassingRequirement(absolute=require_absolute, relative=require_relative)
+        if require_absolute is not None or require_relative is not None
+        else None
+    )
+    return ScreeningConfig(
+        agent={"require_frames": RequireFramesSpec(frames=frames, require=require)}
     )
 
 

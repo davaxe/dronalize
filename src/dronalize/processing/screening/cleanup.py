@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import polars as pl
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategoryInput, coerce_agent_categories
@@ -21,6 +21,13 @@ class PruneByRule(CleanupRuleBase):
 
     agent_rule: AgentCheckRule
     rule: Literal["prune_by"] = Field("prune_by", repr=False, init=False)
+
+    @model_validator(mode="after")
+    def _reject_aggregate_requirements(self) -> PruneByRule:
+        if self.agent_rule.require is not None:
+            msg = "`require` is only valid for agent screening rules, not cleanup pruning."
+            raise ValueError(msg)
+        return self
 
     @override
     def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:

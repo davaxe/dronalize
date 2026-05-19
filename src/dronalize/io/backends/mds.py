@@ -15,6 +15,7 @@ Notes
 from __future__ import annotations
 
 import functools
+import logging
 import multiprocessing as mp
 import os
 import sys
@@ -186,9 +187,18 @@ class MDSDatasetWriter(DatasetWriter):
 
 @contextmanager
 def _suppress_output() -> Generator[None, None, None]:
-    with (
-        Path(os.devnull).open("w", encoding="utf-8") as devnull,
-        redirect_stdout(devnull),
-        redirect_stderr(devnull),
-    ):
-        yield
+    logger = logging.getLogger("streaming.base.storage.upload")
+    old_level = logger.level
+    old_disabled = logger.disabled
+    try:
+        logger.setLevel(logging.CRITICAL + 1)
+        logger.disabled = True
+        with (
+            Path(os.devnull).open("w", encoding="utf-8") as devnull,
+            redirect_stdout(devnull),
+            redirect_stderr(devnull),
+        ):
+            yield
+    finally:
+        logger.setLevel(old_level)
+        logger.disabled = old_disabled

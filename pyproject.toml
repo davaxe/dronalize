@@ -197,3 +197,4 @@ reportAny = false
 reportExplicitAny = false
 reportMissingTypeStubs = false
 reportPrivateImportUsage = false
+reportUnknownMemberType = false

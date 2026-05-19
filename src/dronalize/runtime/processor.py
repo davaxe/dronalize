@@ -225,6 +225,7 @@ class SceneExtractor:
 class SceneMaterializer:
     """Materialize selected scene candidates into final scene objects."""
 
+    dataset: str
     loader: SceneLoader[Any, DatasetOptionsModel]
     source_schema: TrajectorySchema
     target_schema: TrajectorySchema
@@ -245,6 +246,7 @@ class SceneMaterializer:
             map_resolver=map_resolver,
             passed_agent_ids=candidate.passed_agent_ids,
             split_assignment=candidate.split_assignment,
+            dataset=self.dataset,
         )
         if self.target_schema == self.source_schema:
             return scene
@@ -274,6 +276,7 @@ class RuntimeProcessor:
             planner=SourcePlanner(loader=typed_loader),
             extractor=SceneExtractor(loader=typed_loader, split_assigner=split_assigner),
             materializer=SceneMaterializer(
+                dataset=plan.dataset,
                 loader=typed_loader,
                 source_schema=plan.descriptor.native_schema,
                 target_schema=plan.output.trajectory_schema,

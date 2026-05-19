@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.errors import SplitNotSupportedError
+from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_YAW
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
@@ -20,28 +19,13 @@ if TYPE_CHECKING:
     from dronalize.core.scene import TrajectorySchema
 
 
-_NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.TEST)
-
-
 class ApolloScapeLoader(SceneLoader):
     """Loader for ApolloScape prediction trajectories."""
 
-    @staticmethod
-    def _sources_from_dir(data_dir: Path) -> Iterable[DatasetSource[Path]]:
-        if not data_dir.is_dir():
-            return
-        for data_file in sorted(data_dir.glob("*.txt")):
-            yield DatasetSource(identifier=data_file.stem, payload=data_file)
-
     @override
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[Path]]:
-        if split is DatasetSplit.TRAIN:
-            yield from self._sources_from_dir(self.root / "prediction_train")
-            return
-        if split is DatasetSplit.VAL:
-            yield from self._sources_from_dir(self.root / "prediction_test")
-            return
-        raise SplitNotSupportedError(type(self).__name__, split)
+    def iter_sources(self) -> Iterable[DatasetSource[Path]]:
+        for datafile in (self.root / "prediction_train").glob("*.txt"):
+            yield DatasetSource(identifier=datafile.stem, payload=datafile)
 
     @override
     def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
@@ -61,12 +45,8 @@ class ApolloScapeLoader(SceneLoader):
         )
 
     @override
-    def count_sources_for(self, split: DatasetSplit) -> int | None:
-        if split is DatasetSplit.TRAIN:
-            return sum(1 for _ in (self.root / "prediction_train").glob("*.txt"))
-        if split is DatasetSplit.VAL:
-            return sum(1 for _ in (self.root / "val_split").glob("*.txt"))
-        raise SplitNotSupportedError(type(self).__name__, split)
+    def count_sources(self) -> int | None:
+        return sum(1 for _ in (self.root / "prediction_train").glob("*.txt"))
 
     @classmethod
     @override

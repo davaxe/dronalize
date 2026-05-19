@@ -30,7 +30,7 @@ _DEFAULT_CONFIG = DatasetConfig(
         window_step=25,
         lane_change=lane_change_sampling(required_lane_changes=3, negative_keep_every=3),
     ),
-    screening=minimum_samples_screening(2),
+    screening=minimum_samples_screening(2, prediction_frame=19),
     map=MapConfig(extraction=FullMapExtraction()),
 )
 

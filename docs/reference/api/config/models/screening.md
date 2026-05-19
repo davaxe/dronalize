@@ -6,6 +6,8 @@
 
 ## ::: dronalize.config.models.screening.Tolerance
 
+## ::: dronalize.config.models.screening.PassingRequirement
+
 ## ::: dronalize.config.models.screening.CountRange
 
 ## ::: dronalize.config.models.screening.RequireFramesSpec

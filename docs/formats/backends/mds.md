@@ -79,6 +79,7 @@ Every sample written to a shard contains the following fields.
 | Field | dtype | Shape | Description |
 | --- | --- | --- | --- |
 | `scene_number` | `int` | scalar | Global scene index assigned during processing. |
+| `dataset` | `str` | scalar | Dataset label associated with the sample. |
 | `observation_length` | `int` | scalar | Number of history frames used to split features into input/output windows during reading. |
 | `position_offset` | `float64` | `[2]` | The `(x, y)` offset subtracted from all positions before writing when `recenter_positions = true`. Zero otherwise. |
 | `agent_types` | `int32` | `[A]` | Integer agent category for each agent. |

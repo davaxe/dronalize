@@ -28,7 +28,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     loader_factory=Argoverse1Loader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=30, sample_time=0.1),
-        screening=minimum_samples_screening(2),
+        screening=minimum_samples_screening(2, prediction_frame=19),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
         loader_options=Argoverse1LoaderOptions().model_dump(),
     ),

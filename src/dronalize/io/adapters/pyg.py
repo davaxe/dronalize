@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Generic
 
 from typing_extensions import override
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
     import torch
     from torch_geometric.data.dataset import BaseData
 
+HeteroDataTransform = Callable[[HeteroData], HeteroData]
+
 
 class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
     """PyG dataset view over Dronalize scene records.
@@ -32,8 +35,10 @@ class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
     as `agent.x` and `agent.y` with matching validity masks.
     """
 
-    def __init__(self, reader: ReaderT, *, copy: bool = True) -> None:
-        super().__init__()  # pyright: ignore[reportUnknownMemberType]
+    def __init__(
+        self, reader: ReaderT, *, copy: bool = True, transform: HeteroDataTransform | None = None
+    ) -> None:
+        super().__init__(transform=transform)
         self.dataset: TorchSceneDataset[ReaderT] = TorchSceneDataset(reader, copy=copy)
 
     @override
@@ -93,6 +98,7 @@ def _convert_to_hetero(sample: TorchSceneRecord) -> HeteroData:
     data["map", "connects", "map"].edge_type = sample.map_edge_types
 
     data.scene_number = int(sample.scene_number)
+    data.dataset = sample.dataset
     data.position_offset = sample.position_offset
     return data
 

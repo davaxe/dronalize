@@ -1,5 +1,4 @@
 from dronalize.config.models import DatasetConfig
-from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.apolloscape.loader import ApolloScapeLoader
 from dronalize.datasets.registry import DatasetDescriptor, DatasetSplitSupport
 from dronalize.datasets.shared.presets import (
@@ -19,9 +18,8 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
             window_step=1,
             resample=linear_resample(up=5),
         ),
-        screening=minimum_samples_screening(2),
+        screening=minimum_samples_screening(2, prediction_frame=3),
     ),
     native_schema=ApolloScapeLoader.native_trajectory_schema(),
-    supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     split_support=DatasetSplitSupport(scene=True, source=True),
 )

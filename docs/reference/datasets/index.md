@@ -33,20 +33,39 @@ prints the current `a43` defaults and capabilities:
 
 ```text
 Dataset inspect: a43
-  Native schema    │ positions_velocity_acceleration (6 features)
-  Native splits    │ none
-  Read modes       │ all
-  Assignment modes │ none, scene, time, shuffled-time
-  Map              │ yes
-
-Default scene settings
-  Source window    │ 20/50 @ 10.0 Hz
-  Effective window │ 20/50 @ 10.0 Hz
-  Windowing        │ 70 frames, step 25
-  Screening rules  │ cleanup: min_samples
-  Loader options   │ rows_per_source=40000
+                 ╷                      ╷
+  Section        │ Setting              │ Value
+ ════════════════╪══════════════════════╪═════════════════════════════════════════════════
+  Dataset        │ Name                 │ a43
+                 │ Native schema        │ positions_velocity_acceleration (6 features)
+                 │ Schema fields        │ frame, id, x, y, vx, vy, ax, ay, agent_category
+                 │ Native splits        │ none
+                 │ Read modes           │ all
+                 │ Assignment modes     │ none, scene, time, shuffled-time
+                 │ Map                  │ yes
+                 │ Lane-change sampling │ no
+ ────────────────┼──────────────────────┼─────────────────────────────────────────────────
+  Scenes         │ source window        │ 20/50 @ 10.0 Hz
+                 │ Effective window     │ 20/50 @ 10.0 Hz
+                 │ Resampling           │ none
+                 │ Windowing            │ 70 frames, step 25
+                 │ Screening rules      │ cleanup: min_samples | agent: require_frames
+ ────────────────┼──────────────────────┼─────────────────────────────────────────────────
+  Output         │ Schema               │ canonical
+                 │ Precision            │ float32
+                 │ Recenter positions   │ yes
+ ────────────────┼──────────────────────┼─────────────────────────────────────────────────
+  Read           │ Strategy             │ all
+                 │ Selection            │ all available inputs
+ ────────────────┼──────────────────────┼─────────────────────────────────────────────────
+  Assignment     │ Strategy             │ none
+                 │ Selection            │ unsplit output
+ ────────────────┼──────────────────────┼─────────────────────────────────────────────────
+  Map            │ Enabled              │ yes
+                 │ Extraction           │ full map
+                 │ Min distance         │ 2
+                 │ Interp distance      │ 5
+                 │ Edge types           │ all
+ ────────────────┼──────────────────────┼─────────────────────────────────────────────────
+  Loader options │ rows_per_source      │ 40000
 ```
-
-For simple information, prefer the CLI because it is generated from the actual
-registry and config models. This reference remains useful for details that the
-CLI omits, such as expected dataset structure on disk.

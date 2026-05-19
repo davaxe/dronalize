@@ -92,5 +92,5 @@ eth_ucy/
 
 ## Notes
 
-- The individual dataset keys `eth`, `hotel`, `univ`, `zara1`, and `zara2` remain available when you want to process one scene family member independently.
+- The individual dataset keys [`eth`](eth.md), [`hotel`](hotel.md), [`univ`](univ.md), [`zara1`](zara1.md), and [`zara2`](zara2.md) remain available when you want to process one scene family member independently.
 - If a certain subset of the combined dataset is more relevant to your use case, you can remove the irrelevant files. For example, if you only care about the `eth` and `hotel` scenes, you can remove the `univ`, `zara1`, and `zara2` directories from the root before processing.

@@ -70,7 +70,7 @@ def test_cli_imports_dataset_module_before_resolving_dataset(
         ),
         encoding="utf-8",
     )
-    monkeypatch.syspath_prepend(str(tmp_path))  # pyright: ignore[reportUnknownMemberType]
+    monkeypatch.syspath_prepend(str(tmp_path))
     _ = _REGISTRY.pop("cli_demo", None)
 
     try:
@@ -103,7 +103,7 @@ def test_cli_reports_invalid_dataset_module_hook(
 ) -> None:
     module_path = tmp_path / "bad_datasets.py"
     _ = module_path.write_text(module_body, encoding="utf-8")
-    monkeypatch.syspath_prepend(str(tmp_path))  # pyright: ignore[reportUnknownMemberType]
+    monkeypatch.syspath_prepend(str(tmp_path))
     _ = sys.modules.pop("bad_datasets", None)
 
     runner = CliRunner()

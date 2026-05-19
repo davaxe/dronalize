@@ -73,7 +73,7 @@ class InteractionLoader(SceneLoader[Path]):
                 .otherwise(pl.col("yaw_rad"))
                 .alias("yaw"),
             )
-            .drop("agent_type")
+            .drop("agent_type", "yaw_rad")
         )
 
         for _, group in data.collect().group_by(["case_id"]):
@@ -107,7 +107,7 @@ class InteractionLoader(SceneLoader[Path]):
                 .then(AgentCategory.PEDESTRIAN.value)
                 .otherwise(AgentCategory.BICYCLE.value)
             )
-            .otherwise(pl.col("agent_type"))
+            .otherwise(AgentCategory.UNKNOWN.value)
         )
 
     @staticmethod
