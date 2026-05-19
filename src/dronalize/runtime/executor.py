@@ -463,6 +463,3 @@ def _init_write_worker(
             _ = _ctx.shared.progress.worker_stopped()
 
     _ = Finalize(obj=None, callback=cleanup, exitpriority=10)
-
-
-__all__ = ["AnyEvent", "Executor", "ParallelExecutor", "SequentialExecutor", "WriterFactory"]

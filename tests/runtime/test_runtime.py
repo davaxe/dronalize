@@ -214,5 +214,6 @@ def test_parallel_stream_plan_smoke_yields_demo_dataset(
 
     assert len(scenes) == 1
     assert scenes[0].scene_number == 0
+    assert scenes[0].dataset == "demo"
     assert scenes[0].has_map()
     assert scenes[0].resolve_map() is None

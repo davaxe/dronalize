@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 
 def test_unsplit_split_helpers_roundtrip_record_contents(scene: Scene) -> None:
+    scene = replace(scene, dataset="demo")
     split = encode_scene_record(scene, dtype=np.float64)
     unsplit = encode_unsplit_scene_record(scene, dtype=np.float64)
 
@@ -32,6 +33,9 @@ def test_unsplit_split_helpers_roundtrip_record_contents(scene: Scene) -> None:
     np.testing.assert_array_equal(unsplit.mask, rejoined.mask)
     np.testing.assert_allclose(split.history_features, rebuilt.history_features)
     np.testing.assert_allclose(split.future_features, rebuilt.future_features)
+    assert unsplit.dataset == "demo"
+    assert rebuilt.dataset == "demo"
+    assert rejoined.dataset == "demo"
 
 
 def test_encode_scene_record_uses_passed_agent_ids(scene: Scene) -> None:
@@ -42,6 +46,7 @@ def test_encode_scene_record_uses_passed_agent_ids(scene: Scene) -> None:
 
 
 def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
+    scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
     writer = PickleWriter(output_dir=output_dir, config=output_plan(), splits=None)
 
@@ -57,6 +62,7 @@ def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
 def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("streaming")
+    scene = replace(scene, dataset="demo")
 
     from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
     from dronalize.io.readers import MDSReader  # noqa: PLC0415
@@ -77,6 +83,7 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
 
 def test_mds_encoder_decoder_roundtrip_preserves_data(scene: Scene) -> None:
+    scene = replace(scene, dataset="demo")
     unsplit = encode_unsplit_scene_record(scene, dtype=np.float32)
     sample = encode_mds_sample(unsplit, observation_length=scene.history_frames)
     decoded = decode_mds_sample(sample)

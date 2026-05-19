@@ -38,7 +38,7 @@ def _levelx_config(*, lane_change: bool = False) -> DatasetConfig:
             if lane_change
             else None,
         ),
-        screening=minimum_samples_screening(2),
+        screening=minimum_samples_screening(2, prediction_frame=49),
         map=MapConfig(extraction=FullMapExtraction()),
     )
 
@@ -53,7 +53,7 @@ def _highd_config() -> DatasetConfig:
             resample=linear_resample(up=2, down=5),
             lane_change=lane_change_sampling(required_lane_changes=3, negative_keep_every=3),
         ),
-        screening=minimum_samples_screening(2),
+        screening=minimum_samples_screening(2, prediction_frame=49),
         map=MapConfig(extraction=FullMapExtraction(), interpolation_distance=10),
     )
 

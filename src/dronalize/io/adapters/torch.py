@@ -38,6 +38,8 @@ class TorchSceneRecord:
 
     scene_number: int
     """Scene identifier within the DatasetSource dataset."""
+    dataset: str | None
+    """Dataset label associated with this scene, if known."""
     position_offset: torch.Tensor
     """Global 2D translation offset with shape `(2,)`."""
     agent_types: torch.Tensor
@@ -78,6 +80,7 @@ class TorchSceneDataset(Dataset[TorchSceneRecord], Generic[ReaderT]):
     """
 
     def __init__(self, reader: ReaderT, *, copy: bool = True) -> None:
+        super().__init__()
         self.reader: ReaderT = reader
         self._copy: bool = copy
 
@@ -102,6 +105,7 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
     # writable, stable buffers without emitting warnings.
     return TorchSceneRecord(
         scene_number=record.scene_number,
+        dataset=record.dataset,
         position_offset=torch.asarray(record.position_offset, copy=copy),
         agent_types=torch.asarray(record.agent_types, copy=copy),
         screened_agent_mask=torch.asarray(record.screened_agent_mask, copy=copy),

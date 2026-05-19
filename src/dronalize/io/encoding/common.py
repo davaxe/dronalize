@@ -176,6 +176,7 @@ def encode_unsplit_scene_record(
         map_edge_indices=map_record["map_edge_indices"],
         map_node_types=map_record["map_node_types"],
         map_edge_types=map_record["map_edge_types"],
+        dataset=scene.dataset,
     )
 
 

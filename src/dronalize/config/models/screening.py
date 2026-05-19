@@ -32,8 +32,31 @@ class Tolerance(ResolvedConfig):
 
     absolute: float | None = Field(default=None, gt=0.0)
     """Absolute tolerance applied when evaluating numeric thresholds."""
-    relative: float | None = Field(default=None, gt=0.0)
+    relative: float | None = Field(default=None, gt=0.0, le=1.0)
     """Relative tolerance applied when evaluating numeric thresholds."""
+
+    @model_validator(mode="after")
+    def _require_tolerance(self) -> Tolerance:
+        if self.absolute is None and self.relative is None:
+            msg = "at least one of absolute or relative must be set."
+            raise ValueError(msg)
+        return self
+
+
+class PassingRequirement(ResolvedConfig):
+    """Minimum selected-agent pass thresholds for agent-rule scene acceptance."""
+
+    absolute: int | None = Field(default=None, ge=1)
+    """Absolute number of selected agents that must pass the rule."""
+    relative: float | None = Field(default=None, gt=0.0, le=1.0)
+    """Relative fraction of selected agents that must pass the rule."""
+
+    @model_validator(mode="after")
+    def _require_threshold(self) -> PassingRequirement:
+        if self.absolute is None and self.relative is None:
+            msg = "at least one of absolute or relative must be set."
+            raise ValueError(msg)
+        return self
 
 
 class CountRange(ResolvedConfig):
@@ -59,6 +82,8 @@ class _AgentRuleSpecBase(ResolvedConfig):
     """Optional category selector limiting which agents the rule evaluates."""
     tolerance: Tolerance | None = Field(default=None)
     """Optional tolerance thresholds used to relax rule comparisons."""
+    require: PassingRequirement | None = Field(default=None)
+    """Optional minimum selected-agent pass thresholds required to keep the scene."""
 
 
 class MinDistanceSpec(_AgentRuleSpecBase):
@@ -239,6 +264,13 @@ class PruneByRuleSpec(ResolvedConfig):
     rule: Literal["prune_by"] = Field("prune_by", repr=False, init=False)
     agent_rule: AgentCheckSpec
     """Nested agent rule used to remove matching agents from the scene."""
+
+    @model_validator(mode="after")
+    def _reject_aggregate_requirements(self) -> PruneByRuleSpec:
+        if self.agent_rule.require is not None:
+            msg = "`require` is only valid for agent screening rules, not cleanup pruning."
+            raise ValueError(msg)
+        return self
 
 
 class ExcludeCategoriesSpec(ResolvedConfig):

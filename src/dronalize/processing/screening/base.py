@@ -11,7 +11,7 @@ import polars as pl
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
 from typing_extensions import override
 
-from dronalize.config.models.screening import Tolerance  # noqa: TC001
+from dronalize.config.models.screening import PassingRequirement, Tolerance  # noqa: TC001
 from dronalize.core.categories import AgentCategory, AgentCategoryInput, coerce_agent_categories
 
 if TYPE_CHECKING:
@@ -144,6 +144,7 @@ class AgentCheckRuleBase(CheckRuleBase, ABC):
 
     selector: AgentCategorySelector | None = None
     tolerance: Tolerance | None = Field(default=None)
+    require: PassingRequirement | None = Field(default=None)
 
     @override
     def __repr_args__(self) -> Iterator[tuple[str | None, object]]:

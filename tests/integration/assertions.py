@@ -120,6 +120,7 @@ def assert_basic_map_sanity(graph: MapGraph | None, *, expect_map: bool) -> None
 
 def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
     assert record.scene_number == scene.scene_number, "scene_number mismatch"
+    assert record.dataset == scene.dataset, "dataset mismatch"
 
     _assert_shape(record.position_offset, (2,), "position_offset")
     _assert_finite(record.position_offset, "position_offset")
@@ -200,14 +201,6 @@ def save_scene_artifacts(
     """Save scene artifacts like trajectories and maps for debugging."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    try:
-        import dronalize_viz as dviz  # noqa: PLC0415
-
-        chart = dviz.trajectory_figure(scene)
-        chart.save(out_dir / "trajectories.html")
-    except ImportError:
-        pass
 
     frame = scene.frame.select("frame", "id", "x", "y")
     summary_frame = frame.select(

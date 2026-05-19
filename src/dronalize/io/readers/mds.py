@@ -35,7 +35,7 @@ class MDSReaderInitArgs(TypedDict, total=False):
     download_timeout: float
     validate_hash: str
     keep_zip: bool
-    epoch_size: int | str
+    epoch_size: int | str | None
     predownload: int
     cache_limit: int | str
     sampling_method: str

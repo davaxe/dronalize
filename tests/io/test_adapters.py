@@ -1,6 +1,7 @@
 # ruff: noqa: PLC0415
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -25,6 +26,7 @@ NDArrayAny = npt.NDArray[Any]
 
 
 def _build_pickle_reader(tmp_path: Path, scene: Scene) -> tuple[PickleReader, SceneRecord]:
+    scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
     writer = PickleWriter(output_dir=output_dir, config=output_plan(), splits=None)
 
@@ -37,7 +39,7 @@ def _build_pickle_reader(tmp_path: Path, scene: Scene) -> tuple[PickleReader, Sc
 
 
 def _to_numpy(tensor: torch.Tensor) -> NDArrayAny:
-    return cast("NDArrayAny", tensor.detach().cpu().numpy())  # pyright: ignore[reportUnknownMemberType]
+    return cast("NDArrayAny", tensor.detach().cpu().numpy())
 
 
 def _assert_tensor_allclose(tensor: torch.Tensor, expected: NDArrayAny) -> None:
@@ -56,6 +58,7 @@ def test_torch_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     sample = TorchSceneDataset(reader)[0]
 
     assert sample.scene_number == expected.scene_number
+    assert sample.dataset == expected.dataset
     _assert_tensor_allclose(sample.position_offset, expected.position_offset)
     _assert_tensor_array_equal(sample.agent_types, expected.agent_types)
     _assert_tensor_array_equal(sample.screened_agent_mask, expected.screened_agent_mask)
@@ -77,6 +80,7 @@ def test_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     sample = HeteroSceneDataset(reader).get(0)
 
     assert sample.scene_number == expected.scene_number
+    assert sample.dataset == expected.dataset
     _assert_tensor_allclose(sample.position_offset, expected.position_offset)
     _assert_tensor_allclose(sample["agent"].x, expected.history_features)
     _assert_tensor_array_equal(sample["agent"].x_mask, expected.history_mask)

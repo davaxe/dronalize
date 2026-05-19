@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import polars as pl
+import pytest
 
-from dronalize.config.models import Tolerance
+from dronalize.config.models import PassingRequirement, Tolerance
 from dronalize.core import AgentCategory
 from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.screening import ScreeningRuleSet, agent, cleanup, scene, screen_scene
+from dronalize.processing.screening import (
+    AgentCategorySelector,
+    ScreeningRuleSet,
+    agent,
+    cleanup,
+    scene,
+    screen_scene,
+)
 from dronalize.processing.screening.screen import (
     AGENT_SCREENING_PASS_COLUMN,
     SCENE_SCREENING_PASS_COLUMN,
@@ -58,6 +66,84 @@ def test_agent_rule_tolerance_keeps_scene_but_marks_failed_agents() -> None:
     assert AGENT_SCREENING_PASS_COLUMN in tolerant_result.columns
     assert tolerant_result.filter(pl.col("id") == 1)[AGENT_SCREENING_PASS_COLUMN].all()
     assert not tolerant_result.filter(pl.col("id") == 2)[AGENT_SCREENING_PASS_COLUMN].all()
+
+
+def test_agent_rule_require_keeps_scene_when_enough_agents_pass() -> None:
+    df = pl.DataFrame({"scene": [1, 1, 1, 1, 1], "id": [1, 1, 2, 2, 3], "frame": [0, 1, 0, 1, 0]})
+    rules = ScreeningRuleSet.define(
+        agent_rules=[agent.MinSamples(minimum=2, require=PassingRequirement(absolute=2))]
+    )
+
+    result = screen_scene(
+        df, rules, scene_group_by="scene", mark_passed_agents=True, columns=TrajectoryColumns()
+    )
+
+    assert len(result) == len(df)
+    assert result.filter(pl.col("id") == 1)[AGENT_SCREENING_PASS_COLUMN].all()
+    assert result.filter(pl.col("id") == 2)[AGENT_SCREENING_PASS_COLUMN].all()
+    assert not result.filter(pl.col("id") == 3)[AGENT_SCREENING_PASS_COLUMN].all()
+
+
+def test_agent_rule_require_relative_filters_scene_when_too_few_agents_pass() -> None:
+    df = pl.DataFrame({"scene": [1, 1, 1, 1, 1], "id": [1, 1, 2, 2, 3], "frame": [0, 1, 0, 1, 0]})
+    rules = ScreeningRuleSet.define(
+        agent_rules=[agent.MinSamples(minimum=2, require=PassingRequirement(relative=0.75))]
+    )
+
+    result = screen_scene(df, rules, scene_group_by="scene", columns=TrajectoryColumns())
+
+    assert result.is_empty()
+
+
+def test_agent_rule_require_and_tolerance_must_both_pass() -> None:
+    df = pl.DataFrame({
+        "scene": [1, 1, 1, 1, 1, 1, 1, 1],
+        "id": [1, 1, 2, 2, 3, 3, 4, 5],
+        "frame": [0, 1, 0, 1, 0, 1, 0, 0],
+    })
+    rule = agent.MinSamples(
+        minimum=2, require=PassingRequirement(absolute=3), tolerance=Tolerance(relative=0.25)
+    )
+
+    result = screen_scene(
+        df,
+        ScreeningRuleSet.define(agent_rules=[rule]),
+        scene_group_by="scene",
+        columns=TrajectoryColumns(),
+    )
+
+    assert result.is_empty()
+
+
+def test_agent_rule_require_fails_when_selector_matches_no_agents() -> None:
+    df = pl.DataFrame({
+        "scene": [1, 1],
+        "id": [1, 1],
+        "frame": [0, 1],
+        "category": [AgentCategory.CAR, AgentCategory.CAR],
+    })
+    rules = ScreeningRuleSet.define(
+        agent_rules=[
+            agent.MinSamples(
+                minimum=2,
+                selector=AgentCategorySelector.include(AgentCategory.PEDESTRIAN),
+                require=PassingRequirement(absolute=1),
+            )
+        ]
+    )
+
+    result = screen_scene(
+        df, rules, scene_group_by="scene", columns=TrajectoryColumns(category="category")
+    )
+
+    assert result.is_empty()
+
+
+def test_cleanup_prune_by_rejects_agent_rule_require() -> None:
+    with pytest.raises(ValueError, match="require"):
+        _ = cleanup.PruneByRule(
+            agent_rule=agent.MinSamples(minimum=2, require=PassingRequirement(absolute=1))
+        )
 
 
 def test_scene_agent_range_filters_out_of_bounds_scenes() -> None:

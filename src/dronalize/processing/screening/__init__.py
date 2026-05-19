@@ -4,7 +4,12 @@
 
 ```python
 from dronalize.processing import screening
-from dronalize.processing.screening import ScreeningRuleSet, AgentCategorySelector, Tolerance, tol
+from dronalize.processing.screening import (
+    AgentCategorySelector,
+    PassingRequirement,
+    ScreeningRuleSet,
+    Tolerance,
+)
 ```
 
 This package is organized around three kinds of public symbols:
@@ -28,8 +33,18 @@ type into one package namespace.
 - [`dronalize.processing.screening.agent`][] for agent-rule definitions
 """
 
+from dronalize.config.models.screening import PassingRequirement, Tolerance
 from dronalize.processing.screening import agent, cleanup, scene
 from dronalize.processing.screening.base import AgentCategorySelector
 from dronalize.processing.screening.screen import ScreeningRuleSet, screen_scene
 
-__all__ = ["AgentCategorySelector", "ScreeningRuleSet", "agent", "cleanup", "scene", "screen_scene"]
+__all__ = [
+    "AgentCategorySelector",
+    "PassingRequirement",
+    "ScreeningRuleSet",
+    "Tolerance",
+    "agent",
+    "cleanup",
+    "scene",
+    "screen_scene",
+]

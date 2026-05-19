@@ -23,7 +23,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     loader_factory=VodLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=5, future_frames=30, sample_time=0.1, window_step=5),
-        screening=minimum_samples_screening(2),
+        screening=minimum_samples_screening(2, prediction_frame=4),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
     loader_options_model=VodLoaderOptions,

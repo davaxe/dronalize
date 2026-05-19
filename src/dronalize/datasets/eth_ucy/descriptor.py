@@ -17,7 +17,7 @@ _DEFAULT_CONFIG = DatasetConfig(
         window_step=1,
         resample=linear_resample(up=4),
     ),
-    screening=minimum_samples_screening(2),
+    screening=minimum_samples_screening(2, prediction_frame=7),
 )
 
 

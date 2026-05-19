@@ -63,6 +63,8 @@ class Scene:
     """Optional set of agents that passed screening and are retained for outputs."""
     split_assignment: DatasetSplit | None = None
     """Split assignment for this scene (train/val/test)."""
+    dataset: str | None = None
+    """Dataset label associated with this scene, if known."""
 
     @classmethod
     def create(
@@ -77,6 +79,7 @@ class Scene:
         map_key: MapKey = None,
         map_resolver: MapResolver | None = None,
         split_assignment: DatasetSplit | None = None,
+        dataset: str | None = None,
         passed_agent_ids: frozenset[int] | None = None,
         cast_schema: bool = True,
     ) -> Scene:
@@ -113,6 +116,8 @@ class Scene:
             demand.
         split_assignment : DatasetSplit or None, optional
             Split assignment for this scene (train/val/test).
+        dataset : str or None, optional
+            Dataset label associated with this scene, if known.
         passed_agent_ids : frozenset of int or None, optional
             Optional set of agents that passed screening and should be explictly
             added to the scene metadata.
@@ -135,6 +140,7 @@ class Scene:
             map_resolver=map_resolver,
             passed_agent_ids=passed_agent_ids,
             split_assignment=split_assignment,
+            dataset=dataset,
         )
 
     def __post_init__(self) -> None:
@@ -178,6 +184,7 @@ class Scene:
             f"history_frames={self.history_frames}, "
             f"future_frames={self.future_frames}, "
             f"schema={self.schema.name}, "
+            f"dataset={self.dataset!r}, "
             f"map_key={self.map_key!r}, "
             f"frame=DataFrame({rows} rows x {cols} cols)"
             ")"

@@ -22,7 +22,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
             window_step=75,
             resample=linear_resample(up=1, down=3),
         ),
-        screening=minimum_samples_screening(6),
+        screening=minimum_samples_screening(6, prediction_frame=59),
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=OpenDDLoader.native_trajectory_schema(),

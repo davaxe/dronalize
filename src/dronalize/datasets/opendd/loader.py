@@ -67,7 +67,7 @@ class OpenDDLoader(SceneLoader[tuple[Path, str]]):
         with sqlite3.connect(db_path) as connection:
             yield LoadedSourceFrame(
                 pl
-                .read_database(_table_query(table_name), connection)  # pyright: ignore[reportUnknownMemberType]
+                .read_database(_table_query(table_name), connection)
                 .lazy()
                 .with_columns(
                     ((pl.col("TIMESTAMP") * 1000).round(4).rank(method="dense") - 1)

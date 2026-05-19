@@ -25,7 +25,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
             lane_change=lane_change_sampling(required_lane_changes=5, negative_keep_every=3),
         ),
         map=MapConfig(extraction=FullMapExtraction(), interpolation_distance=8),
-        screening=minimum_samples_screening(6),
+        screening=minimum_samples_screening(6, prediction_frame=60),
     ),
     native_schema=AD4CHELoader.native_trajectory_schema(),
     split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),

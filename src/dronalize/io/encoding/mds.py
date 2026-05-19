@@ -23,6 +23,7 @@ class MDSSample(TypedDict):
     """Serialized MDS payload for one scene sample."""
 
     scene_number: int
+    dataset: str
     observation_length: int
     position_offset: npt.NDArray[np.float64]
     agent_types: npt.NDArray[np.int32]
@@ -45,6 +46,7 @@ def encode_mds_sample(record: FullHorizonSceneRecord, *, observation_length: int
     )
     return {
         "scene_number": int(record.scene_number),
+        "dataset": record.dataset or "",
         "observation_length": int(observation_length),
         "position_offset": record.position_offset,
         "agent_types": record.agent_types,
@@ -68,6 +70,7 @@ def decode_mds_sample(sample: Mapping[str, Any]) -> SceneRecord:
     )
     record = make_unsplit_raw_scene_record(
         scene_number=int(sample["scene_number"]),
+        dataset=str(sample["dataset"]) if sample.get("dataset") else None,
         position_offset=np.asarray(sample["position_offset"], dtype=np.float64),
         agent_types=np.asarray(sample["agent_types"], dtype=np.int32),
         screened_agent_mask=np.asarray(sample["screened_agent_mask"], dtype=bool),
@@ -87,6 +90,7 @@ def mds_columns(dtype: str) -> dict[str, str]:
     """Return the MDS column schema for one serialized scene sample."""
     return {
         "scene_number": "int",
+        "dataset": "str",
         "observation_length": "int",
         "position_offset": "ndarray:float64:2",
         "agent_types": "ndarray:int32",
@@ -111,15 +115,15 @@ def _encode_mds_map_arrays(
     npt.NDArray[np.int32],
     npt.NDArray[np.int32],
 ]:
-    if map_node_positions.size != 0:
-        return map_node_positions, map_edge_indices, map_node_types, map_edge_types
-
-    return (
-        np.full((1, 2), dtype=map_node_positions.dtype, fill_value=np.nan),
-        np.full((2, 1), dtype=np.int32, fill_value=-1),
-        np.full((1,), dtype=np.int32, fill_value=-1),
-        np.full((1,), dtype=np.int32, fill_value=-1),
-    )
+    if map_node_positions.size == 0:
+        map_node_positions = np.full((1, 2), dtype=map_node_positions.dtype, fill_value=np.nan)
+    if map_edge_indices.size == 0:
+        map_edge_indices = np.full((2, 1), dtype=np.int32, fill_value=-1)
+    if map_node_types.size == 0:
+        map_node_types = np.full((1,), dtype=np.int32, fill_value=-1)
+    if map_edge_types.size == 0:
+        map_edge_types = np.full((1,), dtype=np.int32, fill_value=-1)
+    return map_node_positions, map_edge_indices, map_node_types, map_edge_types
 
 
 def _decode_mds_map_arrays(
@@ -133,22 +137,12 @@ def _decode_mds_map_arrays(
     npt.NDArray[np.int32],
     npt.NDArray[np.int32],
 ]:
-    is_empty_map = (
-        map_node_positions.shape == (1, 2)
-        and np.isnan(map_node_positions).all()
-        and map_edge_indices.shape == (2, 1)
-        and (map_edge_indices == -1).all()
-        and map_node_types.shape == (1,)
-        and (map_node_types == -1).all()
-        and map_edge_types.shape == (1,)
-        and (map_edge_types == -1).all()
-    )
-    if not is_empty_map:
-        return map_node_positions, map_edge_indices, map_node_types, map_edge_types
-
-    return (
-        np.empty((0, 2), dtype=map_node_positions.dtype),
-        np.empty((2, 0), dtype=map_edge_indices.dtype),
-        np.empty((0,), dtype=map_node_types.dtype),
-        np.empty((0,), dtype=map_edge_types.dtype),
-    )
+    if map_node_positions.shape == (1, 2) and np.isnan(map_node_positions).all():
+        map_node_positions = np.empty((0, 2), dtype=map_node_positions.dtype)
+    if map_edge_indices.shape == (2, 1) and (map_edge_indices == -1).all():
+        map_edge_indices = np.empty((2, 0), dtype=map_edge_indices.dtype)
+    if map_node_types.shape == (1,) and (map_node_types == -1).all():
+        map_node_types = np.empty((0,), dtype=map_node_types.dtype)
+    if map_edge_types.shape == (1,) and (map_edge_types == -1).all():
+        map_edge_types = np.empty((0,), dtype=map_edge_types.dtype)
+    return map_node_positions, map_edge_indices, map_node_types, map_edge_types

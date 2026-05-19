@@ -63,11 +63,17 @@ class Argoverse2Loader(SceneLoader[list[Path], Argoverse2LoaderOptions]):
             if json_candidates:
                 file_to_map[str(pq)] = str(json_candidates[0])
 
-        batch_lf = pl.scan_parquet(source.payload, include_file_paths="file_id").select(
+        batch_lf = pl.scan_parquet(
+            source.payload,
+            include_file_paths="file_id",
+            schema=_SCHEMA,
+            extra_columns="ignore",
+            cast_options=pl.ScanCastOptions(integer_cast="allow-float"),
+        ).select(
             pl.col("file_id"),
             self._map_object_type_expr("object_type").alias("agent_category"),
             pl.col("track_id").str.replace("AV", "0").cast(pl.Int32).alias("id"),
-            pl.col("timestep").alias("frame"),
+            pl.col("timestep").alias("frame").cast(pl.Int64),
             pl.col("position_x").alias("x"),
             pl.col("position_y").alias("y"),
             pl.col("velocity_x").alias("vx"),
@@ -142,3 +148,15 @@ class Argoverse2Loader(SceneLoader[list[Path], Argoverse2LoaderOptions]):
         num_files = sum(1 for _ in data_dir.glob("*/*.parquet"))
         batches, extra = divmod(num_files, self.loader_options.file_batch_size)
         return batches + int(extra > 0)
+
+
+_SCHEMA: pl.Schema = pl.Schema({
+    "object_type": pl.Utf8,
+    "track_id": pl.Utf8,
+    "timestep": pl.Float64,
+    "position_x": pl.Float64,
+    "position_y": pl.Float64,
+    "velocity_x": pl.Float64,
+    "velocity_y": pl.Float64,
+    "heading": pl.Float64,
+})

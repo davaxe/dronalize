@@ -30,6 +30,7 @@ rule = "frames"
 frames = [19]
 selector = { mode = "include", categories = ["CAR"] }
 tolerance = { absolute = 1, relative = 0.05 }
+require = { absolute = 3 }
 ```
 
 The rule name is the final TOML path segment, for example:
@@ -167,6 +168,37 @@ relative = 0.05
     the invalid agents are still marked as invalid in the output. When both are set
     the stricter of the two thresholds determines whether the scene is retained or discarded.
 
+### `require`
+
+Agent rules may define a `require` table to keep a scene only when enough selected
+agents pass that rule.
+
+Example:
+
+```toml
+[datasets.a43.screening.agent.anchor_present]
+rule = "frames"
+frames = [19]
+
+[datasets.a43.screening.agent.anchor_present.require]
+absolute = 3
+relative = 0.75
+```
+
+| Key | Type | Description | Default |
+|---|---|---|---|
+| `absolute` | `int` | Minimum number of selected agents that must pass the rule. | `none` |
+| `relative` | `float` | Minimum selected-agent pass fraction required to keep the scene. | `none` |
+
+At least one of `absolute` or `relative` must be set. When both are set, both
+thresholds must pass. The requirement is evaluated after the agent rule selector,
+so a positive requirement fails when no selected agents exist.
+
+`require` can be used with `tolerance`. In that case, both aggregate conditions
+must pass: the scene must stay within the invalid-agent tolerance and satisfy the
+minimum passing-agent requirement. `require` is only valid for regular agent
+screening rules; it is not valid inside cleanup `prune_by` rules.
+
 ## Cleanup rules
 
 Cleanup rules remove rows before scene and agent checks run.
@@ -301,6 +333,7 @@ All agent rules may optionally define:
 
 - `selector` to target specific categories for that rule, and
 - `tolerance` to allow some tolerance for invalid agents at scene level without discarding the entire scene. This means that if only a few agents fail the rule, it may still be retained depending on the tolerance thresholds.
+- `require` to require a minimum number or fraction of selected agents to pass the rule before the scene is retained.
 
 ### `rule = "frames"`
 

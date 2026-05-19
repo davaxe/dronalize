@@ -29,7 +29,8 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=20),
         screening=combine_screenings(
-            minimum_samples_screening(2), exclude_category_screening(AgentCategory.UNKNOWN)
+            minimum_samples_screening(2, prediction_frame=19),
+            exclude_category_screening(AgentCategory.UNKNOWN),
         ),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
         loader_options=LyftLoaderOptions().model_dump(),

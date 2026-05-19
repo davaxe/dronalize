@@ -12,7 +12,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     loader_factory=A43Loader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=25),
-        screening=minimum_samples_screening(2),
+        screening=minimum_samples_screening(2, prediction_frame=19),
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=A43Loader.native_trajectory_schema(),

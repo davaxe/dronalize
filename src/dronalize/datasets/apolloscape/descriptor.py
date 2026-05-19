@@ -19,7 +19,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
             window_step=1,
             resample=linear_resample(up=5),
         ),
-        screening=minimum_samples_screening(2),
+        screening=minimum_samples_screening(2, prediction_frame=3),
     ),
     native_schema=ApolloScapeLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
