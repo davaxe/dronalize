@@ -16,7 +16,8 @@ dronalize split-support a43
 ```
 
 `available` lists the datasets that are usable in the current environment. `inspect` shows a
-dataset's defaults, native schema, read and assignment support, feature support, and loader options.
+dataset's defaults, native schema, source-sequence bounds before windowing, read and assignment
+support, feature support, and loader options.
 `split-support` shows which read and assignment strategies are available for that dataset.
 Use `available --no-details` for a compact registry listing.
 

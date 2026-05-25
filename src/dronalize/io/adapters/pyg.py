@@ -14,7 +14,13 @@ try:
     from torch_geometric.data import Batch, HeteroData
     from torch_geometric.data import Dataset as PyGDataset
 
-    from dronalize.io.adapters.torch import ReaderT, TorchSceneDataset, TorchSceneRecord
+    from dronalize.io.adapters.torch import (
+        ReaderT,
+        TorchSceneDataset,
+        TorchSceneRecord,
+        TorchSplitSceneDataset,
+        TorchSplitSceneRecord,
+    )
 except ModuleNotFoundError as error:
     raise_missing_optional_dependency(error, feature="The PyG scene dataset adapter", extra="pyg")
 
@@ -28,11 +34,11 @@ HeteroDataTransform = Callable[[HeteroData], HeteroData]
 
 
 class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
-    """PyG dataset view over Dronalize scene records.
+    """PyG dataset view over full-horizon Dronalize scene records.
 
     Each sample is a `HeteroData` object with `agent` and `map` node stores and
     a `("map", "connects", "map")` edge store. Agent trajectories are exposed
-    as `agent.x` and `agent.y` with matching validity masks.
+    as `agent.features` with a matching `agent.mask`.
     """
 
     def __init__(
@@ -45,12 +51,12 @@ class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
     def __iter__(self) -> Iterator[HeteroData]:
         """Iterate over the wrapped dataset, yielding samples converted to `HeteroData`."""
         for record in self.dataset:
-            yield _convert_to_hetero(record)
+            yield _convert_full_to_hetero(record)
 
     @override
     def get(self, idx: int) -> HeteroData:
         """Return one sample converted to `HeteroData`."""
-        return _convert_to_hetero(self.dataset[idx])
+        return _convert_full_to_hetero(self.dataset[idx])
 
     @override
     def len(self) -> int:
@@ -59,7 +65,51 @@ class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
 
 
 class IterableHeteroSceneDataset(HeteroSceneDataset[ReaderT], IterableDataset[HeteroData]):
-    """Iterable PyG dataset view over Dronalize scene records."""
+    """Iterable PyG dataset view over full-horizon Dronalize scene records."""
+
+
+class SplitHeteroSceneDataset(PyGDataset, Generic[ReaderT]):
+    """PyG dataset view over Dronalize scene records split on read.
+
+    Each sample is a `HeteroData` object with `agent.x` / `agent.x_mask` for
+    the observation prefix and `agent.y` / `agent.y_mask` for the remaining
+    target horizon.
+    """
+
+    def __init__(
+        self,
+        reader: ReaderT,
+        *,
+        observation_length: int,
+        copy: bool = True,
+        transform: HeteroDataTransform | None = None,
+    ) -> None:
+        super().__init__(transform=transform)
+        self.dataset: TorchSplitSceneDataset[ReaderT] = TorchSplitSceneDataset(
+            reader, observation_length=observation_length, copy=copy
+        )
+
+    @override
+    def __iter__(self) -> Iterator[HeteroData]:
+        """Iterate over the wrapped dataset, yielding samples converted to `HeteroData`."""
+        for record in self.dataset:
+            yield _convert_split_to_hetero(record)
+
+    @override
+    def get(self, idx: int) -> HeteroData:
+        """Return one split sample converted to `HeteroData`."""
+        return _convert_split_to_hetero(self.dataset[idx])
+
+    @override
+    def len(self) -> int:
+        """Return the number of samples visible through the wrapped dataset."""
+        return len(self.dataset)
+
+
+class IterableSplitHeteroSceneDataset(
+    SplitHeteroSceneDataset[ReaderT], IterableDataset[HeteroData]
+):
+    """Iterable PyG dataset view over split Dronalize scene records."""
 
 
 def collate_hetero_with_time_padding(samples: Sequence[HeteroData]) -> Batch:
@@ -68,20 +118,46 @@ def collate_hetero_with_time_padding(samples: Sequence[HeteroData]) -> Batch:
         msg = "`samples` must contain at least one HeteroData object."
         raise ValueError(msg)
 
-    max_history_frames = max(int(sample["agent"].x.size(1)) for sample in samples)
-    max_future_frames = max(int(sample["agent"].y.size(1)) for sample in samples)
-    padded_samples: list[BaseData] = [
-        _pad_hetero_time_axes(
-            sample, history_frames=max_history_frames, future_frames=max_future_frames
-        )
-        for sample in samples
+    if _is_split_sample(samples[0]):
+        max_observation_frames = max(int(sample["agent"].x.size(1)) for sample in samples)
+        max_target_frames = max(int(sample["agent"].y.size(1)) for sample in samples)
+        padded_samples: list[BaseData] = [
+            _pad_split_hetero_time_axes(
+                sample, observation_frames=max_observation_frames, target_frames=max_target_frames
+            )
+            for sample in samples
+        ]
+        return Batch.from_data_list(padded_samples)
+
+    max_horizon_frames = max(int(sample["agent"].features.size(1)) for sample in samples)
+    padded_samples = [
+        _pad_full_hetero_time_axes(sample, horizon_frames=max_horizon_frames) for sample in samples
     ]
     return Batch.from_data_list(padded_samples)
 
 
-def _convert_to_hetero(sample: TorchSceneRecord) -> HeteroData:
+def _convert_full_to_hetero(sample: TorchSceneRecord) -> HeteroData:
     data = HeteroData()
 
+    data["agent"].features = sample.features
+    data["agent"].mask = sample.mask
+    data["agent"].agent_type = sample.agent_types
+    data["agent"].passed_mask = sample.screened_agent_mask
+    data["agent"].num_nodes = sample.features.size(0)
+
+    _attach_map_store(
+        data,
+        sample.map_node_positions,
+        sample.map_node_types,
+        sample.map_edge_indices,
+        sample.map_edge_types,
+    )
+    _attach_common_metadata(data, sample.scene_number, sample.dataset, sample.position_offset)
+    return data
+
+
+def _convert_split_to_hetero(sample: TorchSplitSceneRecord) -> HeteroData:
+    data = HeteroData()
     data["agent"].x = sample.history_features
     data["agent"].x_mask = sample.history_mask
     data["agent"].y = sample.future_features
@@ -90,27 +166,62 @@ def _convert_to_hetero(sample: TorchSceneRecord) -> HeteroData:
     data["agent"].passed_mask = sample.screened_agent_mask
     data["agent"].num_nodes = sample.history_features.size(0)
 
-    data["map"].x = sample.map_node_positions
-    data["map"].node_type = sample.map_node_types
-    data["map"].num_nodes = sample.map_node_positions.size(0)
-
-    data["map", "connects", "map"].edge_index = sample.map_edge_indices.long()
-    data["map", "connects", "map"].edge_type = sample.map_edge_types
-
-    data.scene_number = int(sample.scene_number)
-    data.dataset = sample.dataset
-    data.position_offset = sample.position_offset
+    _attach_map_store(
+        data,
+        sample.map_node_positions,
+        sample.map_node_types,
+        sample.map_edge_indices,
+        sample.map_edge_types,
+    )
+    _attach_common_metadata(data, sample.scene_number, sample.dataset, sample.position_offset)
     return data
 
 
-def _pad_hetero_time_axes(
-    sample: HeteroData, *, history_frames: int, future_frames: int
+def _attach_map_store(
+    data: HeteroData,
+    node_positions: torch.Tensor,
+    node_types: torch.Tensor,
+    edge_index: torch.Tensor,
+    edge_types: torch.Tensor,
+) -> None:
+    data["map"].x = node_positions
+    data["map"].node_type = node_types
+    data["map"].num_nodes = node_positions.size(0)
+    data["map", "connects", "map"].edge_index = edge_index.long()
+    data["map", "connects", "map"].edge_type = edge_types
+
+
+def _attach_common_metadata(
+    data: HeteroData, scene_number: int, dataset: str | None, position_offset: torch.Tensor
+) -> None:
+    data.scene_number = int(scene_number)
+    data.dataset = dataset
+    data.position_offset = position_offset
+
+
+def _is_split_sample(sample: HeteroData) -> bool:
+    return hasattr(sample["agent"], "x") and hasattr(sample["agent"], "y")
+
+
+def _pad_full_hetero_time_axes(sample: HeteroData, *, horizon_frames: int) -> HeteroData:
+    padded = sample.clone()
+    padded["agent"].features = _pad_along_dim(
+        sample["agent"].features, target=horizon_frames, dim=1
+    )
+    padded["agent"].mask = _pad_along_dim(sample["agent"].mask, target=horizon_frames, dim=1)
+    return padded
+
+
+def _pad_split_hetero_time_axes(
+    sample: HeteroData, *, observation_frames: int, target_frames: int
 ) -> HeteroData:
     padded = sample.clone()
-    padded["agent"].x = _pad_along_dim(sample["agent"].x, target=history_frames, dim=1)
-    padded["agent"].x_mask = _pad_along_dim(sample["agent"].x_mask, target=history_frames, dim=1)
-    padded["agent"].y = _pad_along_dim(sample["agent"].y, target=future_frames, dim=1)
-    padded["agent"].y_mask = _pad_along_dim(sample["agent"].y_mask, target=future_frames, dim=1)
+    padded["agent"].x = _pad_along_dim(sample["agent"].x, target=observation_frames, dim=1)
+    padded["agent"].x_mask = _pad_along_dim(
+        sample["agent"].x_mask, target=observation_frames, dim=1
+    )
+    padded["agent"].y = _pad_along_dim(sample["agent"].y, target=target_frames, dim=1)
+    padded["agent"].y_mask = _pad_along_dim(sample["agent"].y_mask, target=target_frames, dim=1)
     return padded
 
 

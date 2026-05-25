@@ -80,7 +80,6 @@ Every sample written to a shard contains the following fields.
 | --- | --- | --- | --- |
 | `scene_number` | `int` | scalar | Global scene index assigned during processing. |
 | `dataset` | `str` | scalar | Dataset label associated with the sample. |
-| `observation_length` | `int` | scalar | Number of history frames used to split features into input/output windows during reading. |
 | `position_offset` | `float64` | `[2]` | The `(x, y)` offset subtracted from all positions before writing when `recenter_positions = true`. Zero otherwise. |
 | `agent_types` | `int32` | `[A]` | Integer agent category for each agent. |
 | `screened_agent_mask` | `uint8` | `[A]` | Per-agent screening pass mask (`1` means passed). |
@@ -94,7 +93,7 @@ Every sample written to a shard contains the following fields.
 **Dimension key:**
 
 - `A` — number of agents in the scene (varies per sample)
-- `T` — total timesteps: `history_frames + future_frames` (fixed for a given dataset and config)
+- `T` — total full-horizon timesteps (fixed for a given dataset and config)
 - `F` — number of feature columns determined by the configured schema
 - `N` — number of map nodes (varies per sample)
 - `E` — number of map edges (varies per sample)

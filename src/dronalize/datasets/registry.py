@@ -8,9 +8,9 @@ import importlib.util
 import logging
 from collections.abc import Callable, Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from pydantic import ValidationError
 
@@ -48,6 +48,18 @@ such as cached metadata tables, shared-memory map stores, or handles reused
 across loader instances.
 """
 
+SourceTemporalUnit = Literal["recording", "scenario", "case", "scene", "batch", "unknown"]
+"""Logical sequence unit represented by one source before scene windowing."""
+
+FrameBoundConfidence = Literal["exact", "documented", "observed", "estimated", "unknown"]
+"""Confidence level for descriptor-reported source-frame bounds."""
+
+WindowPolicyName = Literal["strict", "anchored", "partial"]
+"""Supported sliding-window completeness policies."""
+
+WindowValidationMode = Literal["error", "warn", "off"]
+"""How request resolution should handle windows outside descriptor bounds."""
+
 
 @dataclass(slots=True, frozen=True, kw_only=True)
 class DatasetSplitSupport:
@@ -75,6 +87,53 @@ class DatasetFeatureSupport:
     """Whether the dataset can provide map data when map inclusion is enabled."""
     lane_change_sampling: bool = False
     """Whether lane-change-aware sampling is supported through a `lane_id` signal."""
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class FrameBounds:
+    """Frame-count bounds for the source sequence before windowing.
+
+    Bounds describe the logical unit emitted by the loader before generic
+    scene-window extraction. Use `None` when a bound is not known without
+    scanning the dataset.
+    """
+
+    min_frames: int | None = None
+    """Smallest known source sequence length, in source frames."""
+    max_frames: int | None = None
+    """Largest known source sequence length, in source frames."""
+    varying: bool = False
+    """Whether source sequence lengths vary within the dataset."""
+    confidence: FrameBoundConfidence = "unknown"
+    """How reliable the reported bounds are."""
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class DatasetWindowingSupport:
+    """Dataset-level support metadata for generic sliding-window extraction."""
+
+    enabled_by_default: bool = False
+    """Whether the built-in dataset defaults enable scene windowing."""
+    default_policy: WindowPolicyName = "strict"
+    """Completeness policy expected by the dataset defaults."""
+    supported_policies: tuple[WindowPolicyName, ...] = ("strict",)
+    """Windowing policies that are meaningful for this dataset."""
+    max_window_frames: int | None = None
+    """Largest supported requested window length, when statically known."""
+    validation: WindowValidationMode = "error"
+    """How strictly runtime planning validates known window bounds."""
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class DatasetTemporalSupport:
+    """Minimal temporal metadata for reasoning about dataset windowing."""
+
+    source_unit: SourceTemporalUnit = "unknown"
+    """Logical source unit being windowed, such as a recording or scenario."""
+    source_frame_bounds: FrameBounds = field(default_factory=FrameBounds)
+    """Frame-count bounds for the source unit before windowing."""
+    windowing: DatasetWindowingSupport = field(default_factory=DatasetWindowingSupport)
+    """Supported generic windowing behavior for this dataset."""
 
 
 class LoaderFactory(Protocol):
@@ -131,6 +190,9 @@ class DatasetDescriptor:
     split_support : DatasetSplitSupport, optional
         Custom assignment modes supported by this dataset in addition to native
         split preservation.
+    temporal_support : DatasetTemporalSupport or None, optional
+        Optional metadata describing source sequence lengths and generic
+        windowing semantics.
     """
 
     name: str
@@ -142,6 +204,7 @@ class DatasetDescriptor:
     resources_factory: ResourcesFactory | None = None
     feature_support: DatasetFeatureSupport = DatasetFeatureSupport()
     split_support: DatasetSplitSupport = DatasetSplitSupport()
+    temporal_support: DatasetTemporalSupport | None = None
 
     def parse_loader_options(self, payload: Mapping[str, object] | None) -> DatasetOptionsModel:
         """Parse and validate dataset-owned config from plain data."""

@@ -8,7 +8,7 @@ from dronalize.io.encoding.common import (
     empty_map_record,
     encode_map_from_scene,
     encode_scene_record,
-    encode_unsplit_scene_record,
+    encode_split_scene_record,
 )
 
 __all__ = [
@@ -19,5 +19,5 @@ __all__ = [
     "empty_map_record",
     "encode_map_from_scene",
     "encode_scene_record",
-    "encode_unsplit_scene_record",
+    "encode_split_scene_record",
 ]

@@ -11,6 +11,7 @@ from dronalize.datasets.shared.presets import (
     linear_resample,
     minimum_samples_screening,
     scenes_config,
+    temporal_support,
 )
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 
@@ -30,13 +31,13 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     loader_factory=NuScenesLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(
-            history_frames=4,
-            future_frames=12,
+            horizon_frames=16,
+            default_observation_length=4,
             sample_time=0.5,
             window_step=1,
             resample=linear_resample(up=5),
         ),
-        screening=minimum_samples_screening(2, prediction_frame=3),
+        screening=minimum_samples_screening(2, required_frame=3),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
     loader_options_model=NuScenesLoaderOptions,
@@ -45,4 +46,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     feature_support=DatasetFeatureSupport(map=True),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     split_support=DatasetSplitSupport(scene=True, source=True),
+    temporal_support=temporal_support(
+        source_unit="scene", min_frames=32, max_frames=41, enabled_by_default=True
+    ),
 )

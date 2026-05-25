@@ -11,7 +11,10 @@ from dronalize.config.base import ConfigBase, ConfigPatch, ResampleMethod, Resol
 from dronalize.core.errors import ConfigurationError
 
 if TYPE_CHECKING:
+    from dronalize.core.functional.window import WindowPolicy
     from dronalize.core.typing import T
+else:
+    WindowPolicy = Literal["strict", "anchored", "partial"]
 
 
 class ResampleConfig(ResolvedConfig):
@@ -65,6 +68,8 @@ class WindowConfig(ResolvedConfig):
 
     step: int = Field(gt=0)
     """Stride between consecutive sampled windows in frames."""
+    policy: WindowPolicy = "strict"
+    """Completeness policy for sources that do not fully cover a window."""
 
 
 class PartialWindowConfig(ConfigPatch[WindowConfig]):
@@ -72,6 +77,8 @@ class PartialWindowConfig(ConfigPatch[WindowConfig]):
 
     step: int | None = None
     """Replacement stride between consecutive sampled windows in frames."""
+    policy: WindowPolicy | None = None
+    """Replacement completeness policy for incomplete windows."""
     full_config_type: type[WindowConfig] = Field(default=WindowConfig, init=False, repr=False)
 
 
@@ -111,10 +118,10 @@ class PartialLaneChangeConfig(ConfigPatch[LaneChangeConfig]):
 class ScenesConfig(ResolvedConfig):
     """Base configuration class for scene construction and temporal transforms."""
 
-    history_frames: int = Field(gt=0)
-    """Number of history frames included in each scene."""
-    future_frames: int = Field(gt=0)
-    """Number of prediction frames included in each scene."""
+    horizon_frames: int = Field(gt=0)
+    """Number of frames included in each scene horizon."""
+    default_observation_length: int | None = Field(default=None, ge=0)
+    """Optional default split point for reader/adaptor convenience."""
     sample_time: float = Field(gt=0)
     """Time interval between consecutive frames in seconds."""
     window: WindowConfig | None = Field(default=None)
@@ -124,14 +131,27 @@ class ScenesConfig(ResolvedConfig):
     lane_change: LaneChangeConfig | None = Field(default=None)
     """Optional lane-change-aware sampling configuration."""
 
+    @model_validator(mode="after")
+    def _validate(self) -> ScenesConfig:
+        if (
+            self.default_observation_length is not None
+            and self.default_observation_length > self.horizon_frames
+        ):
+            msg = (
+                "`default_observation_length` must be less than or equal to "
+                f"`horizon_frames` ({self.horizon_frames})."
+            )
+            raise ConfigurationError(msg)
+        return self
+
 
 class PartialScenesConfig(ConfigPatch[ScenesConfig]):
     """Patch model for partially overriding scene construction settings."""
 
-    history_frames: int | None = None
-    """Replacement number of history frames per scene."""
-    future_frames: int | None = None
-    """Replacement number of prediction frames per scene."""
+    horizon_frames: int | None = None
+    """Replacement number of frames per scene horizon."""
+    default_observation_length: int | None = None
+    """Replacement default reader/adaptor split point."""
     sample_time: float | None = None
     """Replacement frame interval in seconds."""
     window: PartialWindowConfig | Literal[False] | None = None
@@ -146,15 +166,15 @@ class PartialScenesConfig(ConfigPatch[ScenesConfig]):
     def merge_into(self, target: ScenesConfig | None, *, exclude_none: bool = True) -> ScenesConfig:
         """Apply this partial scenes config to an existing full scenes config."""
         return ScenesConfig(
-            history_frames=_resolve_required(
-                "history_frames",
-                self.history_frames,
-                target.history_frames if target is not None else None,
+            horizon_frames=_resolve_required(
+                "horizon_frames",
+                self.horizon_frames,
+                target.horizon_frames if target is not None else None,
             ),
-            future_frames=_resolve_required(
-                "future_frames",
-                self.future_frames,
-                target.future_frames if target is not None else None,
+            default_observation_length=(
+                self.default_observation_length
+                if self.default_observation_length is not None
+                else (target.default_observation_length if target is not None else None)
             ),
             sample_time=_resolve_required(
                 "sample_time", self.sample_time, target.sample_time if target is not None else None
@@ -193,16 +213,24 @@ def _apply_optional_block(
     return patch.merge_into(target)
 
 
-def effective_scene_window(config: ScenesConfig) -> tuple[int, int, float]:
-    """Return history frames, future frames, and sample time after resampling."""
+def effective_scene_window(config: ScenesConfig) -> tuple[int, int | None, float]:
+    """Return horizon frames, default observation length, and sample time after resampling."""
     if config.resample is None:
-        return config.history_frames, config.future_frames, config.sample_time
+        return config.horizon_frames, config.default_observation_length, config.sample_time
 
     up = config.resample.up
     down = config.resample.down
     ratio = up / down
-    total_len = config.history_frames + config.future_frames
-    total_resampled_len = int((total_len - 1) * ratio + 1)
-    history_resampled = int((config.history_frames - 1) * ratio + 1)
-    future_resampled = total_resampled_len - history_resampled
-    return (history_resampled, future_resampled, config.sample_time * down / up)
+    horizon_resampled = _resample_length(config.horizon_frames, ratio)
+    observation_resampled = (
+        None
+        if config.default_observation_length is None
+        else _resample_length(config.default_observation_length, ratio)
+    )
+    return (horizon_resampled, observation_resampled, config.sample_time * down / up)
+
+
+def _resample_length(length: int, ratio: float) -> int:
+    if length <= 0:
+        return 0
+    return int((length - 1) * ratio + 1)

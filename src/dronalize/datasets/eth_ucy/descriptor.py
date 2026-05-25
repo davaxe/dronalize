@@ -6,22 +6,32 @@ from dronalize.datasets.shared.presets import (
     linear_resample,
     minimum_samples_screening,
     scenes_config,
+    temporal_support,
 )
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 _DEFAULT_CONFIG = DatasetConfig(
     scenes=scenes_config(
-        history_frames=8,
-        future_frames=12,
+        horizon_frames=20,
+        default_observation_length=8,
         sample_time=0.4,
         window_step=1,
         resample=linear_resample(up=4),
     ),
-    screening=minimum_samples_screening(2, prediction_frame=7),
+    screening=minimum_samples_screening(2, required_frame=7),
 )
 
 
 def _descriptor(name: str) -> DatasetDescriptor:
+    bounds = {
+        "eth_ucy": (89, 1807),
+        "eth": (89, 1440),
+        "hotel": (89, 1807),
+        "univ": (148, 1440),
+        "zara1": (89, 1440),
+        "zara2": (89, 1440),
+    }
+    min_frames, max_frames = bounds[name]
     return DatasetDescriptor(
         name=name,
         loader_factory=EthUcyLoader.from_loader_request,
@@ -29,6 +39,12 @@ def _descriptor(name: str) -> DatasetDescriptor:
         native_schema=EthUcyLoader.native_trajectory_schema(),
         supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),
+        temporal_support=temporal_support(
+            source_unit="recording",
+            min_frames=min_frames,
+            max_frames=max_frames,
+            enabled_by_default=True,
+        ),
     )
 
 

@@ -7,7 +7,11 @@ from dronalize.datasets.registry import (
     DatasetFeatureSupport,
     DatasetSplitSupport,
 )
-from dronalize.datasets.shared.presets import minimum_samples_screening, scenes_config
+from dronalize.datasets.shared.presets import (
+    minimum_samples_screening,
+    scenes_config,
+    temporal_support,
+)
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -27,8 +31,8 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     name="argoverse1",
     loader_factory=Argoverse1Loader.from_loader_request,
     default_config=DatasetConfig(
-        scenes=scenes_config(history_frames=20, future_frames=30, sample_time=0.1),
-        screening=minimum_samples_screening(2, prediction_frame=19),
+        scenes=scenes_config(horizon_frames=50, default_observation_length=20, sample_time=0.1),
+        screening=minimum_samples_screening(2, required_frame=19),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
         loader_options=Argoverse1LoaderOptions().model_dump(),
     ),
@@ -38,4 +42,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     resources_factory=_open_argoverse1_resources,
     split_support=DatasetSplitSupport(scene=True),
     feature_support=DatasetFeatureSupport(map=True),
+    temporal_support=temporal_support(
+        source_unit="scenario", min_frames=20, max_frames=50, enabled_by_default=False
+    ),
 )

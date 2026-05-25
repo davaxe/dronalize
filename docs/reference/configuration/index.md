@@ -42,8 +42,8 @@ jobs = 8
 uses = ["fast"]
 
 [datasets.a43.scenes]
-history_frames = 20
-future_frames = 60
+horizon_frames = 80
+default_observation_length = 20
 sample_time = 0.1
 
 [datasets.a43.output]
@@ -151,8 +151,8 @@ recenter_positions = true
 compression = "zstd:3"
 
 [datasets.a43.scenes]
-history_frames = 20
-future_frames = 60
+horizon_frames = 80
+default_observation_length = 20
 sample_time = 0.1
 
 [datasets.a43.map.extraction]

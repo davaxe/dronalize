@@ -180,8 +180,9 @@ def _build_window_stage(state: _TrajectoryPipelineState) -> Pipeline:
 
     return Pipeline().then(
         tr.window(
-            state.scenes.history_frames + state.scenes.future_frames,
+            state.scenes.horizon_frames,
             window_spec.step,
+            policy=window_spec.policy,
             group_by=list(state.window_group_columns) or None,
             sliding_col=state.frame_column,
         )

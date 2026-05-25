@@ -139,13 +139,13 @@ class MaxGapSpec(_AgentRuleSpecBase):
 
 
 class MinConsecutiveFramesSpec(_AgentRuleSpecBase):
-    """Require a minimum uninterrupted run of observed frames."""
+    """Require a minimum uninterrupted run of valid frames."""
 
     rule: Literal["min_consecutive_frames"] = Field(
         "min_consecutive_frames", repr=False, init=False
     )
     minimum: int = Field(ge=1)
-    """Minimum uninterrupted run of observed frames required per selected agent."""
+    """Minimum uninterrupted run of valid frames required per selected agent."""
 
 
 class StartsByFrameSpec(_AgentRuleSpecBase):

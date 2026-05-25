@@ -62,10 +62,8 @@ def test_torch_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     _assert_tensor_allclose(sample.position_offset, expected.position_offset)
     _assert_tensor_array_equal(sample.agent_types, expected.agent_types)
     _assert_tensor_array_equal(sample.screened_agent_mask, expected.screened_agent_mask)
-    _assert_tensor_allclose(sample.history_features, expected.history_features)
-    _assert_tensor_array_equal(sample.history_mask, expected.history_mask)
-    _assert_tensor_allclose(sample.future_features, expected.future_features)
-    _assert_tensor_array_equal(sample.future_mask, expected.future_mask)
+    _assert_tensor_allclose(sample.features, expected.features)
+    _assert_tensor_array_equal(sample.mask, expected.mask)
     _assert_tensor_allclose(sample.map_node_positions, expected.map_node_positions)
     _assert_tensor_array_equal(sample.map_edge_indices, expected.map_edge_indices)
     _assert_tensor_array_equal(sample.map_node_types, expected.map_node_types)
@@ -82,10 +80,8 @@ def test_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     assert sample.scene_number == expected.scene_number
     assert sample.dataset == expected.dataset
     _assert_tensor_allclose(sample.position_offset, expected.position_offset)
-    _assert_tensor_allclose(sample["agent"].x, expected.history_features)
-    _assert_tensor_array_equal(sample["agent"].x_mask, expected.history_mask)
-    _assert_tensor_allclose(sample["agent"].y, expected.future_features)
-    _assert_tensor_array_equal(sample["agent"].y_mask, expected.future_mask)
+    _assert_tensor_allclose(sample["agent"].features, expected.features)
+    _assert_tensor_array_equal(sample["agent"].mask, expected.mask)
     _assert_tensor_array_equal(sample["agent"].agent_type, expected.agent_types)
     _assert_tensor_array_equal(sample["agent"].passed_mask, expected.screened_agent_mask)
     _assert_tensor_allclose(sample["map"].x, expected.map_node_positions)
@@ -96,12 +92,54 @@ def test_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     _assert_tensor_array_equal(sample["map", "connects", "map"].edge_type, expected.map_edge_types)
 
 
-def test_pyg_collate_hetero_with_time_padding(tmp_path: Path, scene: Scene) -> None:
+def test_split_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
+
+    reader, expected = _build_pickle_reader(tmp_path, scene)
+    observation_length = 2
+    sample = SplitHeteroSceneDataset(reader, observation_length=observation_length).get(0)
+    split_expected = expected.split(observation_length)
+
+    assert sample.scene_number == expected.scene_number
+    assert sample.dataset == expected.dataset
+    _assert_tensor_allclose(sample.position_offset, expected.position_offset)
+    _assert_tensor_allclose(sample["agent"].x, split_expected.history_features)
+    _assert_tensor_array_equal(sample["agent"].x_mask, split_expected.history_mask)
+    _assert_tensor_allclose(sample["agent"].y, split_expected.future_features)
+    _assert_tensor_array_equal(sample["agent"].y_mask, split_expected.future_mask)
+    _assert_tensor_array_equal(sample["agent"].agent_type, expected.agent_types)
+    _assert_tensor_array_equal(sample["agent"].passed_mask, expected.screened_agent_mask)
+    _assert_tensor_allclose(sample["map"].x, expected.map_node_positions)
+    _assert_tensor_array_equal(sample["map"].node_type, expected.map_node_types)
+    _assert_tensor_array_equal(
+        sample["map", "connects", "map"].edge_index, expected.map_edge_indices
+    )
+    _assert_tensor_array_equal(sample["map", "connects", "map"].edge_type, expected.map_edge_types)
+
+
+def test_pyg_collate_full_horizon_with_time_padding(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import HeteroSceneDataset, collate_hetero_with_time_padding
 
     reader, _ = _build_pickle_reader(tmp_path, scene)
     sample = HeteroSceneDataset(reader).get(0)
+
+    shorter = sample.clone()
+    shorter["agent"].features = shorter["agent"].features[:, :1, :]
+    shorter["agent"].mask = shorter["agent"].mask[:, :1]
+
+    batch = collate_hetero_with_time_padding([shorter, sample])
+
+    assert int(batch["agent"].features.size(1)) == int(sample["agent"].features.size(1))
+
+
+def test_pyg_collate_split_with_time_padding(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import SplitHeteroSceneDataset, collate_hetero_with_time_padding
+
+    reader, _ = _build_pickle_reader(tmp_path, scene)
+    sample = SplitHeteroSceneDataset(reader, observation_length=2).get(0)
 
     shorter = sample.clone()
     shorter["agent"].x = shorter["agent"].x[:, :1, :]

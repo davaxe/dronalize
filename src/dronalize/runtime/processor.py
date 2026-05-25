@@ -229,17 +229,15 @@ class SceneMaterializer:
     loader: SceneLoader[Any, DatasetOptionsModel]
     source_schema: TrajectorySchema
     target_schema: TrajectorySchema
-    history_frames: int
-    future_frames: int
+    horizon_frames: int
     sample_time: float
 
     def materialize(self, candidate: SceneCandidate, scene_number: int) -> Scene:
         map_key, map_resolver = self._resolve_scene_map(candidate)
-        scene = Scene.create(
+        scene: Scene = Scene.create(
             frame=candidate.frame,
             scene_number=scene_number,
-            history_frames=self.history_frames,
-            future_frames=self.future_frames,
+            horizon_frames=self.horizon_frames,
             schema=self.source_schema,
             sample_time=self.sample_time,
             map_key=map_key,
@@ -280,8 +278,7 @@ class RuntimeProcessor:
                 loader=typed_loader,
                 source_schema=plan.descriptor.native_schema,
                 target_schema=plan.output.trajectory_schema,
-                history_frames=plan.effective_history_frames,
-                future_frames=plan.effective_future_frames,
+                horizon_frames=plan.effective_horizon_frames,
                 sample_time=plan.effective_sample_time,
             ),
         )

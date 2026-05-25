@@ -5,18 +5,27 @@ from dronalize.datasets.registry import (
     DatasetFeatureSupport,
     DatasetSplitSupport,
 )
-from dronalize.datasets.shared.presets import minimum_samples_screening, scenes_config
+from dronalize.datasets.shared.presets import (
+    minimum_samples_screening,
+    scenes_config,
+    temporal_support,
+)
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="a43",
     loader_factory=A43Loader.from_loader_request,
     default_config=DatasetConfig(
-        scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=25),
-        screening=minimum_samples_screening(2, prediction_frame=19),
+        scenes=scenes_config(
+            horizon_frames=70, default_observation_length=20, sample_time=0.1, window_step=25
+        ),
+        screening=minimum_samples_screening(2, required_frame=19),
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=A43Loader.native_trajectory_schema(),
     feature_support=DatasetFeatureSupport(map=True),
     loader_options_model=A43LoaderOptions,
     split_support=DatasetSplitSupport(scene=True, time_block=True),
+    temporal_support=temporal_support(
+        source_unit="recording", min_frames=1353, max_frames=50814, enabled_by_default=True
+    ),
 )

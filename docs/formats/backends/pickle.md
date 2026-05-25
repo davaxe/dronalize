@@ -62,7 +62,7 @@ record = reader[0]
 
 print(record.scene_number)
 print(record.dataset)
-print(record.history_features.shape, record.future_features.shape)
+print(record.features.shape, record.mask.shape)
 ```
 
 Use `split=None` (default) for unsplit exports.

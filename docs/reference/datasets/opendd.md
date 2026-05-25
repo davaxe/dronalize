@@ -19,10 +19,12 @@ These are the default Dronalize settings used when processing this dataset.
 
 | Setting | Default |
 | ------- | ------- |
-| Source sequence | 60 obs / 150 pred @ 30 Hz |
-| Effective sequence | 20 obs / 50 pred @ 10 Hz |
-| Resampling | Linear 1:3 |
-| Windowing | 210-frame window, step 75 |
+| Configured horizon | 210 frames (default split after 60) @ 30.0 Hz |
+| Effective horizon | 70 frames (default split after 20) @ 10.0 Hz |
+| Source unit | Recording |
+| Source bounds | 456-16916 frames (observed) |
+| Resampling | 1:3 (linear) |
+| Sliding windows | Enabled, strict, step 75 |
 | Screening | Prune agents with fewer than 6 samples |
 | Maps | Full map |
 

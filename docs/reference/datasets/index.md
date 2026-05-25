@@ -17,6 +17,8 @@ The supported datasets span several common trajectory-prediction settings:
 ## How to use this section
 
 - Start with the dataset page if you want a quick sense of whether a benchmark fits your use case.
+- Use the default processing profile on each page to see the configured horizon, effective horizon,
+  and known source-unit bounds before windowing.
 - Check the expected structure before downloading or arranging files locally.
 - Use the reference links on each page when you need the original paper, official dataset page, or benchmark source.
 
@@ -29,43 +31,51 @@ For example:
 ```bash
 dronalize inspect a43
 ```
-prints the current `a43` defaults and capabilities:
+prints the current `a43` defaults, source-sequence bounds, and capabilities:
 
 ```text
 Dataset inspect: a43
-                 ╷                      ╷
-  Section        │ Setting              │ Value
- ════════════════╪══════════════════════╪═════════════════════════════════════════════════
-  Dataset        │ Name                 │ a43
-                 │ Native schema        │ positions_velocity_acceleration (6 features)
-                 │ Schema fields        │ frame, id, x, y, vx, vy, ax, ay, agent_category
-                 │ Native splits        │ none
-                 │ Read modes           │ all
-                 │ Assignment modes     │ none, scene, time, shuffled-time
-                 │ Map                  │ yes
-                 │ Lane-change sampling │ no
- ────────────────┼──────────────────────┼─────────────────────────────────────────────────
-  Scenes         │ source window        │ 20/50 @ 10.0 Hz
-                 │ Effective window     │ 20/50 @ 10.0 Hz
-                 │ Resampling           │ none
-                 │ Windowing            │ 70 frames, step 25
-                 │ Screening rules      │ cleanup: min_samples | agent: require_frames
- ────────────────┼──────────────────────┼─────────────────────────────────────────────────
-  Output         │ Schema               │ canonical
-                 │ Precision            │ float32
-                 │ Recenter positions   │ yes
- ────────────────┼──────────────────────┼─────────────────────────────────────────────────
-  Read           │ Strategy             │ all
-                 │ Selection            │ all available inputs
- ────────────────┼──────────────────────┼─────────────────────────────────────────────────
-  Assignment     │ Strategy             │ none
-                 │ Selection            │ unsplit output
- ────────────────┼──────────────────────┼─────────────────────────────────────────────────
-  Map            │ Enabled              │ yes
-                 │ Extraction           │ full map
-                 │ Min distance         │ 2
-                 │ Interp distance      │ 5
-                 │ Edge types           │ all
- ────────────────┼──────────────────────┼─────────────────────────────────────────────────
-  Loader options │ rows_per_source      │ 40000
+                 ╷                         ╷
+  Section        │ Setting                 │ Value
+ ════════════════╪═════════════════════════╪══════════════════════════════════════════════
+  Dataset        │ Name                    │ a43
+                 │ Native schema           │ positions_velocity_acceleration (6 features)
+                 │ Schema fields           │ frame, id, x, y, vx, vy, ax, ay, agent_category
+                 │ Native splits           │ none
+                 │ Read modes              │ all
+                 │ Assignment modes        │ none, scene, time, shuffled-time
+                 │ Map                     │ yes
+                 │ Lane-change sampling    │ no
+ ────────────────┼─────────────────────────┼──────────────────────────────────────────────
+  Scenes         │ Configured horizon      │ 70 frames (default split after 20) @ 10.0 Hz
+                 │ Effective horizon       │ 70 frames (default split after 20) @ 10.0 Hz
+                 │ Resampling              │ none
+                 │ Sliding windows         │ enabled, strict, step 25
+                 │ Screening rules         │ cleanup: min_samples | agent: require_frames
+ ────────────────┼─────────────────────────┼──────────────────────────────────────────────
+  Temporal       │ Source unit             │ recording
+                 │ Source bounds           │ 1353-50814 frames, observed
+                 │ Configured horizon fits │ yes (70 <= 50814 frames)
+                 │ Windowing default       │ yes
+                 │ Supported policies      │ strict (default), anchored, partial
+                 │ Window validation       │ error
+                 │ Max supported horizon   │ 50814 frames
+ ────────────────┼─────────────────────────┼──────────────────────────────────────────────
+  Output         │ Schema                  │ canonical
+                 │ Precision               │ float32
+                 │ Recenter positions      │ yes
+ ────────────────┼─────────────────────────┼──────────────────────────────────────────────
+  Read           │ Strategy                │ all
+                 │ Selection               │ all available inputs
+ ────────────────┼─────────────────────────┼──────────────────────────────────────────────
+  Assignment     │ Strategy                │ none
+                 │ Selection               │ unsplit output
+ ────────────────┼─────────────────────────┼──────────────────────────────────────────────
+  Map            │ Enabled                 │ yes
+                 │ Extraction              │ full map
+                 │ Min distance            │ 2
+                 │ Interp distance         │ 5
+                 │ Edge types              │ all
+ ────────────────┼─────────────────────────┼──────────────────────────────────────────────
+  Loader options │ rows_per_source         │ 40000
 ```

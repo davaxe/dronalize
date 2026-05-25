@@ -5,7 +5,11 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
-from dronalize.datasets.shared.presets import minimum_samples_screening, scenes_config
+from dronalize.datasets.shared.presets import (
+    minimum_samples_screening,
+    scenes_config,
+    temporal_support,
+)
 from dronalize.datasets.shared.resources import named_shared_map_resources_factory
 from dronalize.datasets.sind.loader import SindLoader
 
@@ -26,12 +30,17 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     name="sind",
     loader_factory=SindLoader.from_loader_request,
     default_config=DatasetConfig(
-        scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=25),
-        screening=minimum_samples_screening(2, prediction_frame=19),
+        scenes=scenes_config(
+            horizon_frames=70, default_observation_length=20, sample_time=0.1, window_step=25
+        ),
+        screening=minimum_samples_screening(2, required_frame=19),
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=SindLoader.native_trajectory_schema(),
     resources_factory=_open_sind_resources,
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
+    temporal_support=temporal_support(
+        source_unit="recording", min_frames=4715, max_frames=16023, enabled_by_default=True
+    ),
 )

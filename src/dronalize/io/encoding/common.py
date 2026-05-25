@@ -12,10 +12,10 @@ from typing_extensions import TypedDict
 from dronalize.core.categories import AgentCategory
 from dronalize.core.typing import FloatScalarT
 from dronalize.io.records import (
-    FullHorizonSceneRecord,
     SceneRecord,
-    make_unsplit_raw_scene_record,
-    split_unsplit_raw_scene_record,
+    SplitSceneRecord,
+    make_scene_record,
+    split_scene_record,
 )
 
 if TYPE_CHECKING:
@@ -68,54 +68,13 @@ def encode_scene_record(
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
 ) -> SceneRecord:
-    """Encode one scene into the canonical split `SceneRecord`."""
-    record = encode_unsplit_scene_record(
-        scene,
-        dtype=dtype,
-        recenter_position=recenter_position,
-        trajectory_schema=trajectory_schema,
-        category_mapping=category_mapping,
-    )
-    return split_unsplit_raw_scene_record(record, observation_length=scene.history_frames)
-
-
-@overload
-def encode_unsplit_scene_record(
-    scene: Scene,
-    *,
-    dtype: type[np.float32],
-    recenter_position: bool = True,
-    trajectory_schema: TrajectorySchema | None = None,
-    category_mapping: dict[AgentCategory, int] | None = None,
-) -> FullHorizonSceneRecord: ...
-
-
-@overload
-def encode_unsplit_scene_record(
-    scene: Scene,
-    *,
-    dtype: type[np.float64],
-    recenter_position: bool = True,
-    trajectory_schema: TrajectorySchema | None = None,
-    category_mapping: dict[AgentCategory, int] | None = None,
-) -> FullHorizonSceneRecord: ...
-
-
-def encode_unsplit_scene_record(
-    scene: Scene,
-    *,
-    dtype: FloatDType,
-    recenter_position: bool = True,
-    trajectory_schema: TrajectorySchema | None = None,
-    category_mapping: dict[AgentCategory, int] | None = None,
-) -> FullHorizonSceneRecord:
-    """Encode one scene into the backend-neutral unsplit record representation."""
+    """Encode one scene into the canonical full-horizon `SceneRecord`."""
     if trajectory_schema is not None:
         scene = scene.as_schema(trajectory_schema)
 
     data = scene.frame
     feature_columns = scene.schema.feature_columns()
-    time_steps = scene.history_frames + scene.future_frames
+    time_steps = scene.horizon_frames
     start_frame = data["frame"].min()
     unique_ids: list[int] = data["id"].unique().to_list()
     sorted_ids = sorted(unique_ids)
@@ -165,7 +124,7 @@ def encode_unsplit_scene_record(
         )
 
     map_record = encode_map_from_scene(scene, dtype=dtype, offset=offset)
-    return make_unsplit_raw_scene_record(
+    return make_scene_record(
         scene_number=scene.scene_number,
         position_offset=offset,
         agent_types=agent_types,
@@ -178,6 +137,50 @@ def encode_unsplit_scene_record(
         map_edge_types=map_record["map_edge_types"],
         dataset=scene.dataset,
     )
+
+
+@overload
+def encode_split_scene_record(
+    scene: Scene,
+    *,
+    dtype: type[np.float32],
+    observation_length: int,
+    recenter_position: bool = True,
+    trajectory_schema: TrajectorySchema | None = None,
+    category_mapping: dict[AgentCategory, int] | None = None,
+) -> SplitSceneRecord: ...
+
+
+@overload
+def encode_split_scene_record(
+    scene: Scene,
+    *,
+    dtype: type[np.float64],
+    observation_length: int,
+    recenter_position: bool = True,
+    trajectory_schema: TrajectorySchema | None = None,
+    category_mapping: dict[AgentCategory, int] | None = None,
+) -> SplitSceneRecord: ...
+
+
+def encode_split_scene_record(
+    scene: Scene,
+    *,
+    dtype: FloatDType,
+    observation_length: int,
+    recenter_position: bool = True,
+    trajectory_schema: TrajectorySchema | None = None,
+    category_mapping: dict[AgentCategory, int] | None = None,
+) -> SplitSceneRecord:
+    """Encode one scene and split it into observation/prediction tensors."""
+    record = encode_scene_record(
+        scene,
+        dtype=dtype,
+        recenter_position=recenter_position,
+        trajectory_schema=trajectory_schema,
+        category_mapping=category_mapping,
+    )
+    return split_scene_record(record, observation_length=observation_length)
 
 
 @overload

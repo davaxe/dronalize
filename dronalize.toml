@@ -72,8 +72,8 @@ uses = ["basic_screening"]
 # - should trajectories be resampled before scene construction?
 
 [datasets.a43.scenes]
-history_frames = 20
-future_frames = 60
+horizon_frames = 80
+default_observation_length = 20
 sample_time = 0.1
 
 [datasets.a43.scenes.window]

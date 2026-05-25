@@ -46,10 +46,10 @@ class DatasetManifest:
     """Output features derived during schema conversion."""
     feature_columns: tuple[str, ...]
     """Per-timestep feature columns stored in record tensors."""
-    history_frames: int
-    """Number of observation frames per record."""
-    future_frames: int
-    """Number of prediction frames per record."""
+    horizon_frames: int
+    """Number of full-horizon frames per persisted record."""
+    default_observation_length: int | None
+    """Default observation length for split-on-read convenience, if known."""
     precision: str
     """Floating-point precision used for exported feature arrays."""
     recenter_positions: bool
@@ -62,6 +62,21 @@ class DatasetManifest:
     """Dataset sample interval in seconds before resampling."""
     format_version: int = FORMAT_VERSION
     """Manifest schema version used for compatibility checks."""
+
+    def __post_init__(self) -> None:
+        """Validate temporal manifest fields."""
+        if self.horizon_frames <= 0:
+            msg = f"`horizon_frames` must be positive, but got {self.horizon_frames}."
+            raise ValueError(msg)
+        if (
+            self.default_observation_length is not None
+            and not 0 <= self.default_observation_length <= self.horizon_frames
+        ):
+            msg = (
+                "`default_observation_length` must be between 0 and "
+                f"{self.horizon_frames}, but got {self.default_observation_length}."
+            )
+            raise ValueError(msg)
 
     def to_json_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation of the manifest."""
@@ -86,8 +101,12 @@ class DatasetManifest:
             trajectory_schema_fields=tuple(payload["trajectory_schema_fields"]),
             derived_features=tuple(payload.get("derived_features", ())),
             feature_columns=tuple(payload["feature_columns"]),
-            history_frames=int(payload["history_frames"]),
-            future_frames=int(payload["future_frames"]),
+            horizon_frames=int(payload["horizon_frames"]),
+            default_observation_length=(
+                None
+                if payload.get("default_observation_length") is None
+                else int(payload["default_observation_length"])
+            ),
             precision=str(payload["precision"]),
             recenter_positions=bool(payload["recenter_positions"]),
             has_map=bool(payload["has_map"]),

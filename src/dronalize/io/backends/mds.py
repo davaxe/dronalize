@@ -28,7 +28,7 @@ from typing_extensions import override
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.optional import raise_missing_optional_dependency
 from dronalize.io.base import DatasetWriter, split_directory_name
-from dronalize.io.encoding import encode_unsplit_scene_record
+from dronalize.io.encoding import encode_scene_record
 from dronalize.io.encoding.mds import encode_mds_sample, mds_columns
 
 try:
@@ -41,6 +41,7 @@ except ModuleNotFoundError as error:
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
 
+    from dronalize.config.models.output import OutputPrecision
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import Scene
     from dronalize.runtime.types import OutputPlan
@@ -98,8 +99,31 @@ class MDSDatasetWriter(DatasetWriter):
             _create_writer, output_dir=output_dir, config=config, splits=splits, parallel=parallel
         )
 
-    @staticmethod
+    @classmethod
+    def mds_columns(cls, precision: OutputPrecision) -> dict[str, str]:
+        """Get the MDS column configuration for the given output precision.
+
+        This can be overridden by subclasses if they need to customize the
+        column configuration, for example to add additional columns or change
+        dtypes.
+
+        Parameters
+        ----------
+        precision : OutputPrecision
+            The output precision to use for the `features` and map node position
+            columns.
+
+        Returns
+        -------
+        dict[str, str]
+            The MDS column configuration dictionary for one serialized scene
+            sample.
+        """
+        return mds_columns(precision)
+
+    @classmethod
     def _init_writers(
+        cls,
         output_dir: Path,
         *,
         splits: tuple[DatasetSplit, ...] | None,
@@ -122,7 +146,7 @@ class MDSDatasetWriter(DatasetWriter):
                 path_str = final_dir.as_posix()
             writers[split] = MDSWriter(
                 out=path_str,
-                columns=mds_columns(config.config.precision),
+                columns=cls.mds_columns(config.config.precision),
                 compression=config.mds.compression,
                 hashes=(list(config.mds.hashes) if config.mds.hashes is not None else None),
                 size_limit=config.mds.size_limit,
@@ -150,15 +174,13 @@ class MDSDatasetWriter(DatasetWriter):
             )
             raise ConfigurationError(msg)
 
-        encoded_scene = encode_unsplit_scene_record(
+        encoded_scene = encode_scene_record(
             scene.with_split_assignment(split) if split is not None else scene,
             dtype=self._config.precision(),
             recenter_position=self._config.recenter_positions,
             trajectory_schema=self._config.trajectory_schema,
         )
-        self._writers[split].write(
-            dict(encode_mds_sample(encoded_scene, observation_length=scene.history_frames))
-        )
+        self._writers[split].write(dict(encode_mds_sample(encoded_scene)))
 
     @override
     def finish_local(self) -> None:

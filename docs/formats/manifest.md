@@ -42,8 +42,8 @@ Current manifests use `format_version = 2`.
 | `trajectory_schema_fields` | `list[str]` | Ordered semantic fields in the exported schema. |
 | `derived_features` | `list[str]` | Features derived during schema conversion instead of read directly from source data. |
 | `feature_columns` | `list[str]` | Ordered feature column names in the persisted tensors. |
-| `history_frames` | `int` | Number of history timesteps in each scene. |
-| `future_frames` | `int` | Number of future timesteps in each scene. |
+| `horizon_frames` | `int` | Number of full-horizon timesteps in each persisted scene. |
+| `default_observation_length` | `int` or `null` | Default split point for reader-side observation/prediction views. |
 | `precision` | `str` | Floating-point precision used for persisted features (`"float32"` or `"float64"`). |
 | `recenter_positions` | `bool` | Whether per-scene position recentering was applied. |
 | `has_map` | `bool` | Whether the run requested map output and records may contain map topology arrays. |
@@ -62,7 +62,7 @@ print(manifest.trajectory_schema)
 print(manifest.trajectory_schema_fields)
 print(manifest.storage_backend)
 print(manifest.feature_columns)
-print(manifest.history_frames, manifest.future_frames)
+print(manifest.horizon_frames, manifest.default_observation_length)
 ```
 
 See [`read_manifest()`](../reference/api/io/storage-and-manifests.md#dronalize.io.read_manifest) for the full reader API.

@@ -8,12 +8,7 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import TypedDict
 
-from dronalize.io.records import (
-    FullHorizonSceneRecord,
-    SceneRecord,
-    make_unsplit_raw_scene_record,
-    split_unsplit_raw_scene_record,
-)
+from dronalize.io.records import SceneRecord, make_scene_record
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -24,7 +19,6 @@ class MDSSample(TypedDict):
 
     scene_number: int
     dataset: str
-    observation_length: int
     position_offset: npt.NDArray[np.float64]
     agent_types: npt.NDArray[np.int32]
     screened_agent_mask: npt.NDArray[np.uint8]
@@ -36,8 +30,8 @@ class MDSSample(TypedDict):
     map_edge_types: npt.NDArray[np.int32]
 
 
-def encode_mds_sample(record: FullHorizonSceneRecord, *, observation_length: int) -> MDSSample:
-    """Convert one unsplit raw scene record to the MDS payload layout."""
+def encode_mds_sample(record: SceneRecord) -> MDSSample:
+    """Convert one scene record to the MDS payload layout."""
     map_node_positions, map_edge_indices, map_node_types, map_edge_types = _encode_mds_map_arrays(
         record.map_node_positions,
         record.map_edge_indices,
@@ -47,7 +41,6 @@ def encode_mds_sample(record: FullHorizonSceneRecord, *, observation_length: int
     return {
         "scene_number": int(record.scene_number),
         "dataset": record.dataset or "",
-        "observation_length": int(observation_length),
         "position_offset": record.position_offset,
         "agent_types": record.agent_types,
         "screened_agent_mask": record.screened_agent_mask.astype(np.uint8, copy=False),
@@ -61,14 +54,14 @@ def encode_mds_sample(record: FullHorizonSceneRecord, *, observation_length: int
 
 
 def decode_mds_sample(sample: Mapping[str, Any]) -> SceneRecord:
-    """Convert one MDS sample payload into the canonical raw scene record."""
+    """Convert one MDS sample payload into the canonical scene record."""
     map_node_positions, map_edge_indices, map_node_types, map_edge_types = _decode_mds_map_arrays(
         np.asarray(sample["map_node_positions"]),
         np.asarray(sample["map_edge_indices"]),
         np.asarray(sample["map_node_types"]),
         np.asarray(sample["map_edge_types"]),
     )
-    record = make_unsplit_raw_scene_record(
+    return make_scene_record(
         scene_number=int(sample["scene_number"]),
         dataset=str(sample["dataset"]) if sample.get("dataset") else None,
         position_offset=np.asarray(sample["position_offset"], dtype=np.float64),
@@ -81,9 +74,6 @@ def decode_mds_sample(sample: Mapping[str, Any]) -> SceneRecord:
         map_node_types=map_node_types,
         map_edge_types=map_edge_types,
     )
-    return split_unsplit_raw_scene_record(
-        record, observation_length=int(sample["observation_length"])
-    )
 
 
 def mds_columns(dtype: str) -> dict[str, str]:
@@ -91,7 +81,6 @@ def mds_columns(dtype: str) -> dict[str, str]:
     return {
         "scene_number": "int",
         "dataset": "str",
-        "observation_length": "int",
         "position_offset": "ndarray:float64:2",
         "agent_types": "ndarray:int32",
         "screened_agent_mask": "ndarray:uint8",

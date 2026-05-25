@@ -135,14 +135,14 @@ class LoaderPlan:
     map: MapConfig | None = None
 
     @property
-    def history_frames(self) -> int:
-        """Return the number of history frames per scene."""
-        return self.scenes.history_frames
+    def horizon_frames(self) -> int:
+        """Return the number of frames per scene horizon."""
+        return self.scenes.horizon_frames
 
     @property
-    def future_frames(self) -> int:
-        """Return the number of future frames per scene."""
-        return self.scenes.future_frames
+    def default_observation_length(self) -> int | None:
+        """Return the default reader/adaptor split point, if configured."""
+        return self.scenes.default_observation_length
 
 
 @dataclass(frozen=True, slots=True)
