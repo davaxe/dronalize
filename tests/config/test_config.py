@@ -33,7 +33,7 @@ def _write(path: Path, body: str) -> Path:
 
 def _dataset_config(*, screening: dict[str, object] | None = None) -> DatasetConfig:
     payload: dict[str, object] = {
-        "scenes": {"history_frames": 1, "future_frames": 1, "sample_time": 0.1}
+        "scenes": {"horizon_frames": 2, "default_observation_length": 1, "sample_time": 0.1}
     }
     if screening is not None:
         payload["screening"] = screening
@@ -61,6 +61,30 @@ def test_parse_config_parses_profiles_and_dataset_entries(tmp_path: Path) -> Non
     assert cfg.defaults is not None
     assert "fast" in cfg.profiles
     assert "demo" in cfg.datasets
+
+
+def test_parse_config_parses_window_policy(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.scenes]
+            horizon_frames = 8
+            default_observation_length = 3
+            sample_time = 0.1
+
+            [datasets.demo.scenes.window]
+            step = 2
+            policy = "partial"
+            """,
+        )
+    )
+
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+
+    assert resolved.scenes.window is not None
+    assert resolved.scenes.window.step == 2
+    assert resolved.scenes.window.policy == "partial"
 
 
 def test_resolve_applies_defaults_without_dataset_entry(tmp_path: Path) -> None:
@@ -148,7 +172,7 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
         _ = cfg.resolve_dataset_config(
             "demo",
             DatasetConfig.model_validate({
-                "scenes": {"history_frames": 1, "future_frames": 1, "sample_time": 0.1}
+                "scenes": {"horizon_frames": 2, "default_observation_length": 1, "sample_time": 0.1}
             }),
         )
 

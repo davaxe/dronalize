@@ -18,11 +18,13 @@ from dronalize.config.models.screening import (
     PassingRequirement,
     RequireFramesSpec,
 )
+from dronalize.datasets.registry import DatasetTemporalSupport, DatasetWindowingSupport, FrameBounds
 
 if TYPE_CHECKING:
     from dronalize.config.base import ResampleMethod
     from dronalize.config.models.screening import AgentCheckSpec, CleanupSpec, SceneCheckSpec
     from dronalize.core.categories import AgentCategory
+    from dronalize.datasets.registry import FrameBoundConfidence, SourceTemporalUnit
 
 
 def combine_screenings(*screenings: ScreeningConfig) -> ScreeningConfig:
@@ -46,7 +48,7 @@ def exclude_category_screening(*category: AgentCategory) -> ScreeningConfig:
 
 
 def minimum_samples_screening(
-    minimum: int, *, prediction_frame: int | None = None
+    minimum: int, *, required_frame: int | None = None
 ) -> ScreeningConfig:
     """Return the standard screening used by built-in dataset specs.
 
@@ -55,7 +57,7 @@ def minimum_samples_screening(
     minimum : int
         Minimum number of samples required for each agent to be retained in the
         scene. This will cleanup all agents that do not meet this requirement.
-    prediction_frame : int | None, optional
+    required_frame : int | None, optional
         If not None, also require that each retained agent has a valid sample at
         the given frame index (relative to the start of the scene) in order for
         the scene to be retained. This rule requires only that at least one
@@ -70,13 +72,13 @@ def minimum_samples_screening(
     screening = ScreeningConfig(
         cleanup={"min_samples": PruneByRuleSpec(agent_rule=MinSamplesSpec(minimum=minimum))}
     )
-    if prediction_frame is None:
+    if required_frame is None:
         return screening
-    if prediction_frame < 0:
-        msg = "prediction_frame must be non-negative."
+    if required_frame < 0:
+        msg = "required_frame must be non-negative."
         raise ValueError(msg)
     return combine_screenings(
-        screening, require_frames_screening(prediction_frame, require_absolute=1)
+        screening, require_frames_screening(required_frame, require_absolute=1)
     )
 
 
@@ -155,19 +157,49 @@ def spline_resample(
 
 def scenes_config(
     *,
-    history_frames: int,
-    future_frames: int,
+    horizon_frames: int,
+    default_observation_length: int | None = None,
     sample_time: float,
     window_step: int | None = None,
+    window_policy: Literal["strict", "anchored", "partial"] = "strict",
     resample: ResampleConfig | None = None,
     lane_change: LaneChangeConfig | None = None,
 ) -> ScenesConfig:
     """Build an explicit `ScenesConfig` while keeping specs concise."""
     return ScenesConfig(
-        history_frames=history_frames,
-        future_frames=future_frames,
+        horizon_frames=horizon_frames,
+        default_observation_length=default_observation_length,
         sample_time=sample_time,
-        window=WindowConfig(step=window_step) if window_step is not None else None,
+        window=WindowConfig(step=window_step, policy=window_policy)
+        if window_step is not None
+        else None,
         resample=resample,
         lane_change=lane_change,
+    )
+
+
+def temporal_support(
+    *,
+    source_unit: SourceTemporalUnit,
+    min_frames: int,
+    max_frames: int,
+    enabled_by_default: bool,
+    confidence: FrameBoundConfidence = "observed",
+) -> DatasetTemporalSupport:
+    """Build standard temporal-support metadata from known source frame bounds."""
+    return DatasetTemporalSupport(
+        source_unit=source_unit,
+        source_frame_bounds=FrameBounds(
+            min_frames=min_frames,
+            max_frames=max_frames,
+            varying=min_frames != max_frames,
+            confidence=confidence,
+        ),
+        windowing=DatasetWindowingSupport(
+            enabled_by_default=enabled_by_default,
+            default_policy="strict",
+            supported_policies=("strict", "anchored", "partial"),
+            max_window_frames=max_frames,
+            validation="error",
+        ),
     )

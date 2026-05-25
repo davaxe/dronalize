@@ -12,7 +12,12 @@ from dronalize.core.errors import (
     DatasetNotFoundError,
     UnsupportedStorageBackendError,
 )
-from dronalize.datasets import DatasetFeatureSupport
+from dronalize.datasets import (
+    DatasetFeatureSupport,
+    DatasetTemporalSupport,
+    DatasetWindowingSupport,
+    FrameBounds,
+)
 from dronalize.io import StorageBackend, read_manifest
 from dronalize.io.backends.null import NullWriter
 from dronalize.io.backends.registry import register_writer_backend
@@ -62,8 +67,8 @@ def test_resolve_request_compiles_runtime_and_loader_requests(
     dataset_options = cast("DemoOptions", plan.loader.loader_options)
     assert dataset_options.batch_size == 2
     assert plan.map is None
-    assert plan.effective_history_frames == 2
-    assert plan.effective_future_frames == 1
+    assert plan.effective_horizon_frames == 3
+    assert plan.effective_default_observation_length == 2
 
 
 def test_resolve_request_rejects_unknown_storage_backend(
@@ -127,6 +132,51 @@ persist = 3
         _ = resolve_request(_request(tmp_path, config_path=config_path))
 
 
+def test_resolve_request_rejects_window_longer_than_temporal_support(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor = replace(
+        demo_descriptor(),
+        temporal_support=DatasetTemporalSupport(
+            source_unit="scene",
+            source_frame_bounds=FrameBounds(max_frames=2, confidence="documented"),
+            windowing=DatasetWindowingSupport(enabled_by_default=True),
+        ),
+    )
+    _patch_descriptor(monkeypatch, descriptor)
+
+    with pytest.raises(ConfigurationError, match="supports windows up to 2 source frames"):
+        _ = resolve_request(_request(tmp_path))
+
+
+def test_resolve_request_rejects_unsupported_window_policy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor = replace(
+        demo_descriptor(),
+        temporal_support=DatasetTemporalSupport(
+            source_unit="scene",
+            source_frame_bounds=FrameBounds(max_frames=10, confidence="documented"),
+            windowing=DatasetWindowingSupport(
+                enabled_by_default=True, supported_policies=("strict",)
+            ),
+        ),
+    )
+    _patch_descriptor(monkeypatch, descriptor)
+    config_path = tmp_path / "config.toml"
+    _ = config_path.write_text(
+        """
+[datasets.demo.scenes.window]
+step = 1
+policy = "partial"
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="does not support window policy 'partial'"):
+        _ = resolve_request(_request(tmp_path, config_path=config_path))
+
+
 def test_execute_request_surfaces_unknown_dataset_errors(tmp_path: Path) -> None:
     request = _request(tmp_path, dataset="this-dataset-does-not-exist")
 
@@ -158,8 +208,8 @@ def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mon
         "yaw",
         "agent_category",
     )
-    assert manifest.history_frames == 2
-    assert manifest.future_frames == 1
+    assert manifest.horizon_frames == 3
+    assert manifest.default_observation_length == 2
 
 
 def test_parallel_execution_smoke_processes_demo_dataset(
@@ -190,8 +240,8 @@ def test_parallel_execution_smoke_processes_demo_dataset(
     assert result.split_counts["unsplit"] == 1
 
     manifest = read_manifest(output_dir)
-    assert manifest.history_frames == 2
-    assert manifest.future_frames == 1
+    assert manifest.horizon_frames == 3
+    assert manifest.default_observation_length == 2
 
 
 def test_parallel_stream_plan_smoke_yields_demo_dataset(

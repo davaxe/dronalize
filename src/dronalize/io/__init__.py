@@ -6,6 +6,7 @@
 from dronalize.io import (
     DatasetManifest,
     SceneRecord,
+    SplitSceneRecord,
     read_manifest,
     write_manifest,
 )
@@ -21,11 +22,12 @@ runtime and CLI share one canonical configuration surface.
 
 from dronalize.io.formats import StorageBackend
 from dronalize.io.manifest import DatasetManifest, manifest_path, read_manifest, write_manifest
-from dronalize.io.records import SceneRecord
+from dronalize.io.records import SceneRecord, SplitSceneRecord
 
 __all__ = [
     "DatasetManifest",
     "SceneRecord",
+    "SplitSceneRecord",
     "StorageBackend",
     "manifest_path",
     "read_manifest",

@@ -17,7 +17,11 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from dronalize.config.models import MapConfig, ScenesConfig, ScreeningConfig
-    from dronalize.datasets.registry import DatasetDescriptor
+    from dronalize.datasets.registry import (
+        DatasetDescriptor,
+        DatasetTemporalSupport,
+        DatasetWindowingSupport,
+    )
     from dronalize.processing.models import ReadSelection, SplitAssignmentPlan
     from dronalize.runtime.types import ExecutionPlan
 
@@ -119,6 +123,7 @@ def _dataset_inspect_sections(descriptor: DatasetDescriptor) -> tuple[Section, .
     map_config = default_config.map if descriptor.feature_support.map else None
     output_config = default_config.output
     schema = descriptor.native_schema
+    effective_horizon, _, effective_sample_time = models.effective_scene_window(scenes)
 
     sections: list[Section] = [
         (
@@ -143,13 +148,14 @@ def _dataset_inspect_sections(descriptor: DatasetDescriptor) -> tuple[Section, .
         (
             "Scenes",
             (
-                ("source window", _format_window_config(scenes)),
-                ("Effective window", _format_window(*models.effective_scene_window(scenes))),
+                ("Configured horizon", _format_window_config(scenes)),
+                ("Effective horizon", _format_window(effective_horizon, effective_sample_time)),
                 ("Resampling", _format_resampling(scenes)),
-                ("Windowing", _format_windowing(scenes)),
+                ("Sliding windows", _format_windowing(scenes)),
                 ("Screening rules", _format_screening_rules(default_config.screening)),
             ),
         ),
+        ("Temporal", _temporal_support_rows(descriptor.temporal_support, scenes)),
         (
             "Output",
             (
@@ -214,11 +220,11 @@ def _format_assignment_modes(descriptor: DatasetDescriptor, *, compact: bool = F
 
 
 def _format_window_config(config: ScenesConfig) -> str:
-    return _format_window(config.history_frames, config.future_frames, config.sample_time)
+    return _format_window(config.horizon_frames, config.sample_time)
 
 
-def _format_window(history_frames: int, future_frames: int, sample_time: float) -> str:
-    return f"{history_frames}/{future_frames} @ {1 / sample_time:.1f} Hz"
+def _format_window(horizon_frames: int, sample_time: float) -> str:
+    return f"{horizon_frames} @ {1 / sample_time:.1f} Hz"
 
 
 def _format_resampling(config: ScenesConfig) -> str:
@@ -241,8 +247,66 @@ def _format_windowing(config: ScenesConfig) -> str:
     window = config.window
     if window is None:
         return "disabled"
-    total_frames = config.history_frames + config.future_frames
-    return f"{total_frames} frames, step {window.step}"
+    return f"enabled, {window.policy}, step {window.step}"
+
+
+def _temporal_support_rows(
+    support: DatasetTemporalSupport | None, scenes: ScenesConfig
+) -> tuple[Row, ...]:
+    if support is None:
+        return (
+            ("Source unit", "[dim]unknown[/dim]"),
+            ("Source bounds", "[dim]unknown[/dim]"),
+            ("Configured horizon fits", "[dim]unknown[/dim]"),
+        )
+
+    windowing = support.windowing
+    rows: list[Row] = [
+        ("Source unit", support.source_unit),
+        ("Source bounds", _format_frame_bounds(support)),
+        ("Configured horizon fits", _format_horizon_fit(scenes.horizon_frames, support)),
+        ("Windowing default", _format_flag(enabled=windowing.enabled_by_default)),
+        ("Supported policies", _format_window_policies(windowing)),
+        ("Window validation", windowing.validation),
+    ]
+    if windowing.max_window_frames is not None:
+        rows.append(("Max supported horizon", f"{windowing.max_window_frames} frames"))
+    return tuple(rows)
+
+
+def _format_frame_bounds(support: DatasetTemporalSupport) -> str:
+    bounds = support.source_frame_bounds
+    if bounds.min_frames is None and bounds.max_frames is None:
+        return f"unknown ({bounds.confidence})"
+
+    pieces: list[str] = []
+    if bounds.min_frames is not None or bounds.max_frames is not None:
+        lo = "?" if bounds.min_frames is None else str(bounds.min_frames)
+        hi = "?" if bounds.max_frames is None else str(bounds.max_frames)
+        pieces.append(f"{lo}-{hi} frames")
+    pieces.append(bounds.confidence)
+    return ", ".join(pieces)
+
+
+def _format_horizon_fit(horizon_frames: int, support: DatasetTemporalSupport) -> str:
+    max_frames = support.windowing.max_window_frames
+    if max_frames is None:
+        max_frames = support.source_frame_bounds.max_frames
+    if max_frames is None:
+        return "[dim]unknown[/dim]"
+    if horizon_frames <= max_frames:
+        return f"[green]yes[/green] ({horizon_frames} <= {max_frames} frames)"
+    return f"[red]no[/red] ({horizon_frames} > {max_frames} frames)"
+
+
+def _format_window_policies(windowing: DatasetWindowingSupport) -> str:
+    policies = list(windowing.supported_policies)
+    if windowing.default_policy in policies:
+        policies.remove(windowing.default_policy)
+        ordered = [f"{windowing.default_policy} (default)", *policies]
+    else:
+        ordered = [f"{windowing.default_policy} (default, unsupported)", *policies]
+    return ", ".join(ordered)
 
 
 def _format_screening_rules(config: ScreeningConfig | None) -> str:

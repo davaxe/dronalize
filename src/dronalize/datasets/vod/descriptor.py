@@ -5,7 +5,11 @@ from dronalize.datasets.registry import (
     DatasetFeatureSupport,
     DatasetSplitSupport,
 )
-from dronalize.datasets.shared.presets import minimum_samples_screening, scenes_config
+from dronalize.datasets.shared.presets import (
+    minimum_samples_screening,
+    scenes_config,
+    temporal_support,
+)
 from dronalize.datasets.shared.resources import single_shared_map_resource_factory
 from dronalize.datasets.vod.loader import VodLoader, VodLoaderOptions
 from dronalize.datasets.vod.maps import VodMapBuilder
@@ -22,8 +26,10 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     name="vod",
     loader_factory=VodLoader.from_loader_request,
     default_config=DatasetConfig(
-        scenes=scenes_config(history_frames=5, future_frames=30, sample_time=0.1, window_step=5),
-        screening=minimum_samples_screening(2, prediction_frame=4),
+        scenes=scenes_config(
+            horizon_frames=35, default_observation_length=5, sample_time=0.1, window_step=5
+        ),
+        screening=minimum_samples_screening(2, required_frame=4),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
     loader_options_model=VodLoaderOptions,
@@ -32,4 +38,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     resources_factory=_open_vod_resources,
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, source=False, time_block=True),
+    temporal_support=temporal_support(
+        source_unit="recording", min_frames=36, max_frames=784, enabled_by_default=True
+    ),
 )

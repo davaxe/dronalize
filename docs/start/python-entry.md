@@ -35,7 +35,7 @@ spec = get_dataset("a43")
 project = parse_config(Path("dronalize.toml"))
 resolved = project.resolve_dataset_config("a43", spec.default_config)
 
-print(resolved.scenes.history_frames, resolved.scenes.future_frames)
+print(resolved.scenes.horizon_frames, resolved.scenes.default_observation_length)
 print(resolved.output.precision)
 print(resolved.read.root.strategy)
 print(resolved.assign.root.strategy)

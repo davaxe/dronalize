@@ -91,4 +91,4 @@ Persisted scene records always include map arrays.
 All backends feed the same reader-side mental model:
 
 - `PickleReader` and `MDSReader` yield framework-neutral `SceneRecord` objects
-- `TorchSceneDataset` and `HeteroSceneDataset` build on top of readers.
+- `TorchSceneDataset`, `HeteroSceneDataset`, and `SplitHeteroSceneDataset` build on top of readers.

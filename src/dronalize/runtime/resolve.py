@@ -61,11 +61,12 @@ def build_execution_plan(
     if not _validate_feature_support(descriptor, resolved_config):
         msg = f"Dataset {descriptor.name} does not support lane-change sampling."
         raise dronalize_exceptions.ConfigurationError(msg)
+    _validate_temporal_support(descriptor, resolved_config)
     loader_request = build_loader_plan(
         descriptor=descriptor, resolved_config=resolved_config, include_map=include_map
     )
     assignment_request = SplitAssignmentPlan.from_config(resolved_config.assign, seed=request.seed)
-    effective_history_frames, effective_future_frames, effective_sample_time = (
+    effective_horizon_frames, effective_default_observation_length, effective_sample_time = (
         resolve_effective_scene_window(resolved_config)
     )
     logger.debug(
@@ -87,8 +88,8 @@ def build_execution_plan(
         loader=loader_request,
         assignment=assignment_request,
         map=loader_request.map,
-        effective_history_frames=effective_history_frames,
-        effective_future_frames=effective_future_frames,
+        effective_horizon_frames=effective_horizon_frames,
+        effective_default_observation_length=effective_default_observation_length,
         effective_sample_time=effective_sample_time,
         limit=request.limit,
         seed=request.seed,
@@ -135,6 +136,41 @@ def _validate_feature_support(spec: DatasetDescriptor, config: DatasetConfig) ->
         msg = "Lane-change sampling requires window sampling to be enabled."
         raise dronalize_exceptions.ConfigurationError(msg)
     return spec.feature_support.lane_change_sampling
+
+
+def _validate_temporal_support(spec: DatasetDescriptor, config: DatasetConfig) -> None:
+    support = spec.temporal_support
+    window = config.scenes.window
+    if support is None or window is None:
+        return
+
+    windowing = support.windowing
+    if window.policy not in windowing.supported_policies:
+        msg = (
+            f"Dataset {spec.name} does not support window policy '{window.policy}'. "
+            f"Supported policies: {', '.join(windowing.supported_policies)}."
+        )
+        raise dronalize_exceptions.ConfigurationError(msg)
+    if windowing.validation == "off":
+        return
+
+    requested_frames = config.scenes.horizon_frames
+    max_frames = (
+        windowing.max_window_frames
+        if windowing.max_window_frames is not None
+        else support.source_frame_bounds.max_frames
+    )
+    if max_frames is None or requested_frames <= max_frames:
+        return
+
+    msg = (
+        f"Dataset {spec.name} supports windows up to {max_frames} source frames, "
+        f"but the resolved scene window requests {requested_frames} frames."
+    )
+    if windowing.validation == "warn":
+        logger.warning(msg)
+        return
+    raise dronalize_exceptions.ConfigurationError(msg)
 
 
 def _validate_input_path(request: ExecutionRequest) -> None:

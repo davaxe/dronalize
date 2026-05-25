@@ -12,6 +12,7 @@ from dronalize.datasets.shared.presets import (
     exclude_category_screening,
     minimum_samples_screening,
     scenes_config,
+    temporal_support,
 )
 from dronalize.datasets.shared.resources import single_shared_map_resource_factory
 
@@ -27,9 +28,11 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     name="lyft",
     loader_factory=LyftLoader.from_loader_request,
     default_config=DatasetConfig(
-        scenes=scenes_config(history_frames=20, future_frames=50, sample_time=0.1, window_step=20),
+        scenes=scenes_config(
+            horizon_frames=70, default_observation_length=20, sample_time=0.1, window_step=20
+        ),
         screening=combine_screenings(
-            minimum_samples_screening(2, prediction_frame=19),
+            minimum_samples_screening(2, required_frame=19),
             exclude_category_screening(AgentCategory.UNKNOWN),
         ),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
@@ -41,4 +44,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     resources_factory=_open_lyft_resources,
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
+    temporal_support=temporal_support(
+        source_unit="scene", min_frames=152, max_frames=250, enabled_by_default=True
+    ),
 )

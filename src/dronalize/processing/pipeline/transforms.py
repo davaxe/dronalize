@@ -14,6 +14,7 @@ from dronalize.processing.screening.screen import screen_scene as _screen_scene
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from dronalize.core.functional.window import WindowPolicy
     from dronalize.processing.pipeline.pipeline import FlatMapTransform, Transform
     from dronalize.processing.screening import ScreeningRuleSet
 
@@ -218,6 +219,7 @@ def window(
     sliding_col: str = "frame",
     group_by: str | Sequence[str] | None = None,
     offset_sliding_col: bool = True,
+    policy: WindowPolicy = "strict",
 ) -> Transform:
     """Create a sliding-window fan-out transform.
 
@@ -234,6 +236,8 @@ def window(
         Column to slide over.
     offset_sliding_col : bool, optional
         Whether to zero-offset the sliding column in each window.
+    policy : WindowPolicy, optional
+        Windowing policy to apply when the last window does not have enough rows.
 
     """
 
@@ -245,6 +249,7 @@ def window(
             sliding_col=sliding_col,
             group_by=group_by,
             offset_sliding_col=offset_sliding_col,
+            policy=policy,
         )
 
     func_to_return = _window_single

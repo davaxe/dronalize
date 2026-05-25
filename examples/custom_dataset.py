@@ -67,7 +67,10 @@ MINI_CSV_SPEC = DatasetDescriptor(
     loader_factory=MiniCsvLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=ScenesConfig(
-            history_frames=2, future_frames=1, sample_time=0.1, window=WindowConfig(step=1)
+            horizon_frames=3,
+            default_observation_length=2,
+            sample_time=0.1,
+            window=WindowConfig(step=1),
         )
     ),
     native_schema=MiniCsvLoader.native_trajectory_schema(),

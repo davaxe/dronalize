@@ -1,6 +1,6 @@
 """Pickle writer backend.
 
-This backend writes one pickled `SceneRecord` per scene inside split
+This backend writes one pickled full-horizon `SceneRecord` per scene inside split
 subdirectories such as `train` or `unsplit`. It is the simplest persisted
 backend, requires no optional storage dependency, and is a practical default
 when inspectability matters more than shard-based streaming.
@@ -38,7 +38,7 @@ def _create_writer(
 
 @final
 class PickleWriter(DatasetWriter):
-    """Write one pickled `SceneRecord` per scene."""
+    """Write one pickled full-horizon `SceneRecord` per scene."""
 
     def __init__(
         self,
@@ -70,7 +70,7 @@ class PickleWriter(DatasetWriter):
 
     @override
     def write(self, scene: Scene) -> None:
-        """Encode one scene and persist it directly as a `SceneRecord` pickle."""
+        """Encode one scene and persist it directly as a full-horizon record pickle."""
         output_dir = self._dir_map[scene.split_assignment]
         file_path = output_dir / f"{scene.scene_number:06d}.pkl"
         scene_data = encode_scene_record(

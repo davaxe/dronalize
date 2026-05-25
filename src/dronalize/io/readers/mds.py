@@ -54,7 +54,7 @@ class MDSReaderInitArgs(TypedDict, total=False):
     stream_config: dict[str, Any]
 
 
-class MDSReader(DatasetReader):
+class MDSReader(DatasetReader["SceneRecord"]):
     """Read raw scene records from an MDS dataset split."""
 
     def __init__(

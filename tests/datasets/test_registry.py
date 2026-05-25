@@ -12,7 +12,7 @@ def test_all_available_builtin_datasets_resolve_to_matching_descriptors(name: st
 
 
 @pytest.mark.parametrize("name", list_datasets())
-def test_builtin_default_screening_requires_agent_at_prediction_frame(name: str) -> None:
+def test_builtin_default_screening_requires_agent_at_default_observation_end(name: str) -> None:
     descriptor = get_dataset(name)
     screening = descriptor.default_config.screening
 
@@ -21,7 +21,21 @@ def test_builtin_default_screening_requires_agent_at_prediction_frame(name: str)
     assert "require_frames" in screening.agent
     rule = screening.agent["require_frames"]
     assert isinstance(rule, RequireFramesSpec)
-    assert rule.frames == (descriptor.default_config.scenes.history_frames - 1,)
+    assert descriptor.default_config.scenes.default_observation_length is not None
+    assert rule.frames == (descriptor.default_config.scenes.default_observation_length - 1,)
     assert rule.require is not None
     assert rule.require.absolute == 1
     assert rule.require.relative is None
+
+
+@pytest.mark.parametrize("name", list_datasets())
+def test_builtin_datasets_expose_temporal_support(name: str) -> None:
+    descriptor = get_dataset(name)
+    temporal = descriptor.temporal_support
+
+    assert temporal is not None
+    assert temporal.source_frame_bounds.min_frames is not None
+    assert temporal.source_frame_bounds.max_frames is not None
+    assert temporal.source_frame_bounds.min_frames <= temporal.source_frame_bounds.max_frames
+    assert temporal.windowing.max_window_frames == temporal.source_frame_bounds.max_frames
+    assert temporal.windowing.default_policy in temporal.windowing.supported_policies

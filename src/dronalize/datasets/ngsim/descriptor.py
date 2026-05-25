@@ -12,6 +12,7 @@ from dronalize.datasets.shared.presets import (
     lane_change_sampling,
     minimum_samples_screening,
     scenes_config,
+    temporal_support,
 )
 from dronalize.datasets.shared.resources import ResourcesFactory, single_shared_map_resource_factory
 
@@ -24,13 +25,13 @@ _SELECT_EXPR = (
 
 _DEFAULT_CONFIG = DatasetConfig(
     scenes=scenes_config(
-        history_frames=20,
-        future_frames=50,
+        horizon_frames=70,
+        default_observation_length=20,
         sample_time=0.1,
         window_step=25,
         lane_change=lane_change_sampling(required_lane_changes=3, negative_keep_every=3),
     ),
-    screening=minimum_samples_screening(2, prediction_frame=19),
+    screening=minimum_samples_screening(2, required_frame=19),
     map=MapConfig(extraction=FullMapExtraction()),
 )
 
@@ -67,6 +68,9 @@ DATASET_DESCRIPTORS = {
         ),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, time_block=True),
+        temporal_support=temporal_support(
+            source_unit="recording", min_frames=7887, max_frames=8738, enabled_by_default=True
+        ),
     ),
     "us101": DatasetDescriptor(
         name="us101",
@@ -78,5 +82,8 @@ DATASET_DESCRIPTORS = {
         ),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, time_block=True),
+        temporal_support=temporal_support(
+            source_unit="recording", min_frames=7180, max_frames=8899, enabled_by_default=True
+        ),
     ),
 }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import polars as pl
 import pytest
 
 from dronalize.config.models import (
@@ -15,8 +16,7 @@ from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelineP
 from dronalize.processing.pipeline.trajectory import build_trajectory_pipeline
 
 if TYPE_CHECKING:
-    import polars as pl
-
+    from dronalize.core.functional.window import WindowPolicy
     from tests.support import DataFramePresets
 
 SceneDict = dict[str, list[Any]]
@@ -24,16 +24,21 @@ SceneDict = dict[str, list[Any]]
 
 def _scenes(
     *,
-    history_frames: int = 2,
-    future_frames: int = 1,
+    horizon_frames: int = 3,
+    default_observation_length: int | None = 2,
     window_step: int | None = 1,
+    window_policy: WindowPolicy = "strict",
     lane_change: LaneChangeConfig | None = None,
 ) -> ScenesConfig:
     return ScenesConfig(
-        history_frames=history_frames,
-        future_frames=future_frames,
+        horizon_frames=horizon_frames,
+        default_observation_length=default_observation_length,
         sample_time=1.0,
-        window=WindowConfig(step=window_step) if window_step is not None else None,
+        window=(
+            WindowConfig(step=window_step, policy=window_policy)
+            if window_step is not None
+            else None
+        ),
         lane_change=lane_change,
     )
 
@@ -70,6 +75,40 @@ def test_standard_trajectory_pipeline_outputs_windowed_scenes(
             "x": [1.0, 2.0, 3.0],
             "y": [0.0, 0.0, 0.0],
         },
+    ]
+
+
+def test_partial_window_policy_keeps_incomplete_edge_window() -> None:
+    frame = pl.DataFrame({
+        "frame": [0, 1, 2],
+        "id": [1, 1, 1],
+        "agent_category": [4, 4, 4],
+        "x": [0.0, 1.0, 2.0],
+        "y": [0.0, 0.0, 0.0],
+    })
+
+    scenes = _run_pipeline(
+        frame,
+        plan=TrajectoryPipelinePlan(
+            scenes=_scenes(
+                horizon_frames=5,
+                default_observation_length=2,
+                window_step=1,
+                window_policy="partial",
+            )
+        ),
+    )
+
+    assert scenes == [
+        {
+            "frame": [0, 1, 2],
+            "id": [1, 1, 1],
+            "agent_category": [4, 4, 4],
+            "x": [0.0, 1.0, 2.0],
+            "y": [0.0, 0.0, 0.0],
+        },
+        {"frame": [0, 1], "id": [1, 1], "agent_category": [4, 4], "x": [1.0, 2.0], "y": [0.0, 0.0]},
+        {"frame": [0], "id": [1], "agent_category": [4], "x": [2.0], "y": [0.0]},
     ]
 
 

@@ -114,10 +114,10 @@ class ExecutionPlan:
     """Compiled split-assignment request."""
     map: MapConfig | None
     """Resolved map configuration, or `None` when map output is disabled."""
-    effective_history_frames: int
-    """History frame count after resampling/window configuration is applied."""
-    effective_future_frames: int
-    """Future frame count after resampling/window configuration is applied."""
+    effective_horizon_frames: int
+    """Horizon frame count after resampling/window configuration is applied."""
+    effective_default_observation_length: int | None
+    """Default reader/adaptor split point after resampling, if configured."""
     effective_sample_time: float
     """Sample interval in seconds after resampling is applied."""
     limit: int | None = None
@@ -164,8 +164,8 @@ class ExecutionPlan:
             source_trajectory_schema_fields=self.descriptor.native_schema.semantic_fields(),
             sample_time=self.effective_sample_time,
             original_sample_time=self.resolved_config.scenes.sample_time,
-            future_frames=self.effective_future_frames,
-            history_frames=self.effective_history_frames,
+            horizon_frames=self.effective_horizon_frames,
+            default_observation_length=self.effective_default_observation_length,
             has_map=self.map is not None,
             derived_features=tuple(
                 field.to_str()
@@ -245,6 +245,6 @@ class ExecutionRequest(BaseModel):
     """Whether request resolution should require `input_dir` to exist."""
 
 
-def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int, float]:
+def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int | None, float]:
     """Return the effective scene window and sample time for one resolved config."""
     return effective_scene_window(config.scenes)

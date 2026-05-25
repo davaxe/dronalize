@@ -55,6 +55,18 @@ def test_cli_help_smoke() -> None:
     assert result.exit_code == 0
 
 
+def test_inspect_reports_temporal_support_summary() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli_app.app, ["inspect", "a43"])
+
+    assert result.exit_code == 0, result.output
+    assert "Configured horizon" in result.output
+    assert "Sliding windows" in result.output
+    assert "Source bounds" in result.output
+    assert "Configured horizon fits" in result.output
+    assert "Supported policies" in result.output
+
+
 def test_cli_imports_dataset_module_before_resolving_dataset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -90,7 +90,10 @@ def demo_descriptor() -> DatasetDescriptor:
         loader_factory=DemoLoader.from_loader_request,
         default_config=DatasetConfig(
             scenes=ScenesConfig(
-                history_frames=2, future_frames=1, sample_time=1.0, window=WindowConfig(step=1)
+                horizon_frames=3,
+                default_observation_length=2,
+                sample_time=1.0,
+                window=WindowConfig(step=1),
             ),
             loader_options={"batch_size": 2, "use_cache": False},
         ),
@@ -103,8 +106,8 @@ def demo_descriptor() -> DatasetDescriptor:
 def inherited_optional_blocks_descriptor() -> DatasetConfig:
     return DatasetConfig(
         scenes=ScenesConfig(
-            history_frames=2,
-            future_frames=1,
+            horizon_frames=3,
+            default_observation_length=2,
             sample_time=1.0,
             window=WindowConfig(step=2),
             resample=ResampleConfig(up=2, down=1, method="cubic"),
@@ -146,8 +149,7 @@ def make_scene(*, passed_agent_ids: frozenset[int] | None = None) -> Scene:
     return Scene.create(
         frame=frame,
         scene_number=7,
-        history_frames=2,
-        future_frames=1,
+        horizon_frames=3,
         schema=CANONICAL,
         sample_time=1.0,
         map_key="demo-map",
