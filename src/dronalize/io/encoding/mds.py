@@ -19,6 +19,7 @@ class MDSSample(TypedDict):
 
     scene_number: int
     dataset: str
+    default_observation_length: int
     position_offset: npt.NDArray[np.float64]
     agent_types: npt.NDArray[np.int32]
     screened_agent_mask: npt.NDArray[np.uint8]
@@ -41,6 +42,11 @@ def encode_mds_sample(record: SceneRecord) -> MDSSample:
     return {
         "scene_number": int(record.scene_number),
         "dataset": record.dataset or "",
+        "default_observation_length": (
+            -1
+            if record.default_observation_length is None
+            else int(record.default_observation_length)
+        ),
         "position_offset": record.position_offset,
         "agent_types": record.agent_types,
         "screened_agent_mask": record.screened_agent_mask.astype(np.uint8, copy=False),
@@ -64,6 +70,11 @@ def decode_mds_sample(sample: Mapping[str, Any]) -> SceneRecord:
     return make_scene_record(
         scene_number=int(sample["scene_number"]),
         dataset=str(sample["dataset"]) if sample.get("dataset") else None,
+        default_observation_length=(
+            None
+            if int(sample.get("default_observation_length", -1)) < 0
+            else int(sample["default_observation_length"])
+        ),
         position_offset=np.asarray(sample["position_offset"], dtype=np.float64),
         agent_types=np.asarray(sample["agent_types"], dtype=np.int32),
         screened_agent_mask=np.asarray(sample["screened_agent_mask"], dtype=bool),
@@ -81,6 +92,7 @@ def mds_columns(dtype: str) -> dict[str, str]:
     return {
         "scene_number": "int",
         "dataset": "str",
+        "default_observation_length": "int",
         "position_offset": "ndarray:float64:2",
         "agent_types": "ndarray:int32",
         "screened_agent_mask": "ndarray:uint8",

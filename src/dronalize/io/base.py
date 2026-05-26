@@ -2,19 +2,38 @@ from __future__ import annotations
 
 import functools
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generic, Protocol, runtime_checkable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeAlias, runtime_checkable
 
 from typing_extensions import Self, TypeVar
 
 from dronalize.core.categories import DatasetSplit
+from dronalize.core.scene import Scene
 from dronalize.io.records import SceneRecord
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Iterator
 
-    from dronalize.core.scene import Scene
 
 SampleT = TypeVar("SampleT", default=SceneRecord)
+
+
+RecordTransform: TypeAlias = Callable[[SceneRecord], SampleT]
+"""Callable that converts a canonical `SceneRecord` into a persisted sample.
+
+This is the preferred customization hook for user-defined persisted sample
+layouts because it preserves Dronalize's standard output semantics before
+materializing the custom payload.
+"""
+
+
+SceneTransform: TypeAlias = Callable[[Scene], SampleT]
+"""Callable that converts a runtime `Scene` directly into a persisted sample.
+
+This is an advanced escape hatch for users who intentionally want to bypass
+`SceneRecord` encoding. Callers using this hook own schema conversion,
+dtype policy, recentering, map resolution, and reader compatibility.
+"""
 
 
 class DatasetReader(ABC, Generic[SampleT]):
@@ -61,3 +80,12 @@ def split_directory_name(split: DatasetSplit | str | None) -> str:
     if split is None:
         return "unsplit"
     return split.value if isinstance(split, DatasetSplit) else str(split)
+
+
+def validate_transform_choice(
+    *, record_transform: object | None, scene_transform: object | None
+) -> None:
+    """Validate that at most one sample customization hook is configured."""
+    if record_transform is not None and scene_transform is not None:
+        msg = "Use either `record_transform` or `scene_transform`, not both."
+        raise ValueError(msg)

@@ -5,7 +5,11 @@ from __future__ import annotations
 from pydantic import Field
 
 from dronalize.config.base import ConfigBase
-from dronalize.config.models import DatasetConfig, PartialDatasetConfig, PartialDatasetConfigBase
+from dronalize.config.models.dataset import (
+    DatasetConfig,
+    PartialDatasetConfig,
+    PartialDatasetConfigBase,
+)
 from dronalize.core.errors import ConfigurationError
 
 

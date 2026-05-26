@@ -1,4 +1,4 @@
-from dronalize.config.models import DatasetConfig
+from dronalize.config.models.dataset import DatasetConfig
 from dronalize.datasets.apolloscape.loader import ApolloScapeLoader
 from dronalize.datasets.registry import DatasetDescriptor, DatasetSplitSupport
 from dronalize.datasets.shared.presets import (

@@ -46,6 +46,7 @@ def encode_scene_record(
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
+    default_observation_length: int | None = None,
 ) -> SceneRecord: ...
 
 
@@ -57,6 +58,7 @@ def encode_scene_record(
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
+    default_observation_length: int | None = None,
 ) -> SceneRecord: ...
 
 
@@ -67,6 +69,7 @@ def encode_scene_record(
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
+    default_observation_length: int | None = None,
 ) -> SceneRecord:
     """Encode one scene into the canonical full-horizon `SceneRecord`."""
     if trajectory_schema is not None:
@@ -136,6 +139,7 @@ def encode_scene_record(
         map_node_types=map_record["map_node_types"],
         map_edge_types=map_record["map_edge_types"],
         dataset=scene.dataset,
+        default_observation_length=default_observation_length,
     )
 
 

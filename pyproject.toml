@@ -177,7 +177,6 @@ split-on-trailing-comma = false
 pythonVersion = "3.10"
 pythonPlatform = "All"
 typeCheckingMode = "recommended"
-reportIgnoreCommentWithoutRule = true
 include = ["src", "tests"]
 exclude = [
     "protos",

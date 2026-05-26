@@ -87,11 +87,13 @@ On top of the readers, `dronalize` provides optional adapters:
 - [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) for full-horizon
   Torch tensor records
 - [`TorchSplitSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSplitSceneDataset) for Torch
-  tensor records split at an explicit `observation_length`
+  tensor records split at an explicit `observation_length`, a callable resolver, or the per-record
+  `default_observation_length`
 - [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) for full-horizon
   PyTorch Geometric `HeteroData`
 - [`SplitHeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.SplitHeteroSceneDataset)
-  for PyTorch Geometric `HeteroData` split at an explicit `observation_length`
+  for PyTorch Geometric `HeteroData` split at an explicit `observation_length`, a callable resolver,
+  or the per-record `default_observation_length`
 
 Use these when your training stack expects framework-native dataset objects.
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from dronalize.config.runtime import RuntimeOverride
+from dronalize.config import RuntimeOverride
 from dronalize.io import StorageBackend
 from dronalize.io.encoding.common import encode_scene_record
 from dronalize.runtime import ExecutionRequest, resolve_request

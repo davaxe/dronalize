@@ -19,6 +19,7 @@ from dronalize.runtime import (
     ExecutionPlan,
     ExecutionRequest,
     ExecutionResult,
+    OutputSample,
     execute_plan,
     execute_request,
     resolve_request,
@@ -49,6 +50,7 @@ def test_core_and_runtime_exports_are_present() -> None:
     assert ExecutionPlan is not None
     assert ExecutionRequest is not None
     assert ExecutionResult is not None
+    assert OutputSample is not None
     assert execute_plan is not None
     assert resolve_request is not None
     assert execute_request is not None

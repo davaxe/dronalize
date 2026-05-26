@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from dronalize.core.errors import UnsupportedStorageBackendError
 from dronalize.io.base import DatasetWriter
@@ -23,6 +23,7 @@ from dronalize.io.formats import StorageBackend, StorageBackendId, storage_backe
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
+    from dronalize.io.base import RecordTransform, SceneTransform
     from dronalize.runtime.types import ExecutionPlan
 
 WriterFactory = Callable[[int | None], DatasetWriter]
@@ -63,8 +64,23 @@ def build_writer_factory(plan: ExecutionPlan) -> WriterFactory:
 def _build_mds_writer_factory(plan: ExecutionPlan) -> WriterFactory:
     from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
 
+    sample = plan.output_sample
     return MDSDatasetWriter.as_factory(
-        plan.output_dir, config=plan.output, splits=_output_splits(plan), parallel=plan.parallel
+        plan.output_dir,
+        config=plan.output,
+        splits=_output_splits(plan),
+        parallel=plan.parallel,
+        record_transform=(
+            None
+            if sample is None
+            else cast("RecordTransform[dict[str, Any]] | None", sample.record_transform)
+        ),
+        scene_transform=(
+            None
+            if sample is None
+            else cast("SceneTransform[dict[str, Any]] | None", sample.scene_transform)
+        ),
+        sample_columns=None if sample is None else sample.mds_columns,
     )
 
 
@@ -78,8 +94,13 @@ def _build_null_writer_factory(plan: ExecutionPlan) -> WriterFactory:
 def _build_pickle_writer_factory(plan: ExecutionPlan) -> WriterFactory:
     from dronalize.io.backends.pickle import PickleWriter  # noqa: PLC0415
 
+    sample = plan.output_sample
     return PickleWriter.as_factory(
-        output_dir=plan.output_dir, config=plan.output, splits=_output_splits(plan)
+        output_dir=plan.output_dir,
+        config=plan.output,
+        splits=_output_splits(plan),
+        record_transform=(None if sample is None else sample.record_transform),
+        scene_transform=(None if sample is None else sample.scene_transform),
     )
 
 

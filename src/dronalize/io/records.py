@@ -29,11 +29,6 @@ class SceneRecord:
     - `F`: number of per-timestep agent features
     """
 
-    scene_number: int
-    """Scene identifier within the exported dataset."""
-    position_offset: npt.NDArray[np.float64]
-    """Global 2D translation offset with shape `(2,)`."""
-
     # Agent data
     agent_types: npt.NDArray[np.int32]
     """Integer-encoded agent type for each agent, shape `(N,)`."""
@@ -54,8 +49,15 @@ class SceneRecord:
     map_edge_types: npt.NDArray[np.int32]
     """Integer-encoded map edge types, shape `(E,)`."""
 
+    # Metadata
+    scene_number: int
+    """Scene identifier within the exported dataset."""
+    position_offset: npt.NDArray[np.float64]
+    """Global 2D translation offset with shape `(2,)`."""
     dataset: str | None = None
     """Dataset label associated with this record, if known."""
+    default_observation_length: int | None = None
+    """Default split point for reader/adaptor convenience, if known."""
 
     @property
     def horizon_frames(self) -> int:
@@ -106,6 +108,8 @@ class SplitSceneRecord:
 
     dataset: str | None = None
     """Dataset label associated with this record, if known."""
+    default_observation_length: int | None = None
+    """Default split point associated with this record, if known."""
 
     @property
     def observation_length(self) -> int:
@@ -135,6 +139,7 @@ def make_scene_record(
     map_node_types: npt.NDArray[np.int32],
     map_edge_types: npt.NDArray[np.int32],
     dataset: str | None = None,
+    default_observation_length: int | None = None,
 ) -> SceneRecord:
     """Construct one canonical full-horizon `SceneRecord`."""
     return SceneRecord(
@@ -149,6 +154,7 @@ def make_scene_record(
         map_node_types=map_node_types,
         map_edge_types=map_edge_types,
         dataset=dataset,
+        default_observation_length=default_observation_length,
     )
 
 
@@ -167,6 +173,7 @@ def make_split_scene_record(
     map_node_types: npt.NDArray[np.int32],
     map_edge_types: npt.NDArray[np.int32],
     dataset: str | None = None,
+    default_observation_length: int | None = None,
 ) -> SplitSceneRecord:
     """Construct one split convenience record."""
     return SplitSceneRecord(
@@ -183,6 +190,7 @@ def make_split_scene_record(
         map_node_types=map_node_types,
         map_edge_types=map_edge_types,
         dataset=dataset,
+        default_observation_length=default_observation_length,
     )
 
 
@@ -210,6 +218,7 @@ def split_scene_record(record: SceneRecord, *, observation_length: int) -> Split
         map_node_types=record.map_node_types,
         map_edge_types=record.map_edge_types,
         dataset=record.dataset,
+        default_observation_length=record.default_observation_length,
     )
 
 
@@ -227,4 +236,5 @@ def join_split_scene_record(record: SplitSceneRecord) -> SceneRecord:
         map_node_types=record.map_node_types,
         map_edge_types=record.map_edge_types,
         dataset=record.dataset,
+        default_observation_length=record.default_observation_length,
     )

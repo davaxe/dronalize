@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from dronalize.datasets.registry import get_dataset
@@ -87,6 +88,7 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
             "storage_backend": storage_backend_name(plan.storage_backend),
         },
     )
+    start_time = time.time()
     with open_execution_session(plan) as run:
         run.executor.execute(writer_factory=build_writer_factory(plan))
         plan.write_manifests()
@@ -107,6 +109,7 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
             candidate_scenes=progress.candidate_scenes,
             selected_scenes=progress.selected_scenes,
             split_counts={k: v for k, v in progress.split_counts.items() if isinstance(v, int)},
+            elapsed_time_seconds=time.time() - start_time,
         )
 
 

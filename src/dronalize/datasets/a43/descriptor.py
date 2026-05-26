@@ -1,4 +1,5 @@
-from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
+from dronalize.config.models.dataset import DatasetConfig
+from dronalize.config.models.map import FullMapExtraction, MapConfig
 from dronalize.datasets.a43.loader import A43Loader, A43LoaderOptions
 from dronalize.datasets.registry import (
     DatasetDescriptor,
@@ -26,6 +27,6 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     loader_options_model=A43LoaderOptions,
     split_support=DatasetSplitSupport(scene=True, time_block=True),
     temporal_support=temporal_support(
-        source_unit="recording", min_frames=1353, max_frames=50814, enabled_by_default=True
+        source_unit="batch", min_frames=1353, max_frames=50814, enabled_by_default=True
     ),
 )

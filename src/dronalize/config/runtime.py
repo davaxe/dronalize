@@ -5,13 +5,10 @@ from typing import TYPE_CHECKING, Literal
 from pydantic import Field
 
 from dronalize.config.base import ConfigPatch
-from dronalize.config.models import (
-    AssignConfig,
-    PartialDatasetConfig,
-    PartialOutputConfig,
-    PartialRuntimeConfig,
-    ReadConfig,
-)
+from dronalize.config.models.dataset import PartialDatasetConfig
+from dronalize.config.models.output import PartialOutputConfig
+from dronalize.config.models.runtime import PartialRuntimeConfig
+from dronalize.config.models.split import AssignConfig, ReadConfig
 from dronalize.core.errors import ConfigurationError
 
 if TYPE_CHECKING:

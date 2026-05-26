@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, overload
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.config.models import (
+from dronalize.config.models.map import (
     BoundingBoxExtraction,
     CircularExtraction,
     FullMapExtraction,

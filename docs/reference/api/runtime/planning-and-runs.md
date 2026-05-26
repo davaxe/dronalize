@@ -3,3 +3,5 @@
 ## ::: dronalize.runtime.ExecutionPlan
 
 ## ::: dronalize.runtime.ExecutionResult
+
+## ::: dronalize.runtime.OutputSample

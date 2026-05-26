@@ -121,7 +121,16 @@ class ScenesConfig(ResolvedConfig):
     horizon_frames: int = Field(gt=0)
     """Number of frames included in each scene horizon."""
     default_observation_length: int | None = Field(default=None, ge=0)
-    """Optional default split point for reader/adaptor convenience."""
+    """Optional default split point for reader/adaptor convenience.
+
+    This is provided for datasets that have a natural split between observation
+    and prediction frames, but it is not required for correct operation. If set,
+    this value will be used as the default observation length for any reader or
+    adaptor that supports a separate observation/prediction split, but it can be
+    overridden at the reader or adaptor level if needed. If not set, readers and
+    adaptors will need to be configured with an explicit observation length or
+    callable to determine the split point.
+    """
     sample_time: float = Field(gt=0)
     """Time interval between consecutive frames in seconds."""
     window: WindowConfig | None = Field(default=None)

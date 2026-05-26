@@ -8,7 +8,15 @@ from pydantic import BaseModel
 from rich import box
 from rich.table import Table
 
-from dronalize.config import models
+from dronalize.config.models.map import (
+    BoundingBoxExtraction,
+    CircularExtraction,
+    FullMapExtraction,
+    SceneExtentExtraction,
+    TrajectoryBufferExtraction,
+)
+from dronalize.config.models.scenes import effective_scene_window
+from dronalize.config.models.split import NoAssign, PreserveNativeAssign, ReadAll, ReadNative
 from dronalize.core.categories import DatasetSplit, EdgeType
 from dronalize.core.scene import get_trajectory_schema
 from dronalize.io.formats import storage_backend_name
@@ -16,7 +24,16 @@ from dronalize.io.formats import storage_backend_name
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.config.models import MapConfig, ScenesConfig, ScreeningConfig
+    from dronalize.config.models.map import MapConfig
+    from dronalize.config.models.scenes import ScenesConfig
+    from dronalize.config.models.screening import ScreeningConfig
+    from dronalize.config.models.split import (
+        AssignConfig,
+        AssignUnion,
+        ReadConfig,
+        ReadUnion,
+        SplitWeights,
+    )
     from dronalize.datasets.registry import (
         DatasetDescriptor,
         DatasetTemporalSupport,
@@ -123,7 +140,7 @@ def _dataset_inspect_sections(descriptor: DatasetDescriptor) -> tuple[Section, .
     map_config = default_config.map if descriptor.feature_support.map else None
     output_config = default_config.output
     schema = descriptor.native_schema
-    effective_horizon, _, effective_sample_time = models.effective_scene_window(scenes)
+    effective_horizon, _, effective_sample_time = effective_scene_window(scenes)
 
     sections: list[Section] = [
         (
@@ -336,15 +353,15 @@ def _format_options(options: BaseModel | object | None) -> str:
 
 def _format_map_extraction(map_config: MapConfig) -> str:
     match map_config.extraction:
-        case models.FullMapExtraction():
+        case FullMapExtraction():
             return "full map"
-        case models.SceneExtentExtraction(padding=padding, shape=shape):
+        case SceneExtentExtraction(padding=padding, shape=shape):
             return f"scene extent (padding={padding:g}, shape={shape})"
-        case models.CircularExtraction(radius=radius):
+        case CircularExtraction(radius=radius):
             return f"circle (radius={radius:g})"
-        case models.TrajectoryBufferExtraction(radius=radius):
+        case TrajectoryBufferExtraction(radius=radius):
             return f"trajectory buffer (radius={radius:g})"
-        case models.BoundingBoxExtraction(width=width, height=height):
+        case BoundingBoxExtraction(width=width, height=height):
             return f"bounding box ({width:g} x {height:g})"
 
 
@@ -400,19 +417,19 @@ def _read_request_rows(read: ReadSelection) -> tuple[Row, ...]:
     return _read_rows(read.config, native_splits=read.native_splits)
 
 
-def _read_config_rows(read_config: models.ReadConfig) -> tuple[Row, ...]:
+def _read_config_rows(read_config: ReadConfig) -> tuple[Row, ...]:
     return _read_rows(read_config.root)
 
 
 def _read_rows(
-    read_config: models.ReadUnion, *, native_splits: Sequence[DatasetSplit] | None = None
+    read_config: ReadUnion, *, native_splits: Sequence[DatasetSplit] | None = None
 ) -> tuple[Row, ...]:
     rows: list[Row] = [("Strategy", read_config.strategy)]
     match read_config:
-        case models.ReadNative(splits=splits):
+        case ReadNative(splits=splits):
             selected = native_splits if native_splits is not None else splits
             rows.append(("Native splits", _format_splits(selected, empty="all native splits")))
-        case models.ReadAll():
+        case ReadAll():
             rows.append(("Selection", "all available inputs"))
     return tuple(rows)
 
@@ -425,19 +442,19 @@ def _assignment_request_rows(
     )
 
 
-def _assign_config_rows(assign_config: models.AssignConfig) -> tuple[Row, ...]:
+def _assign_config_rows(assign_config: AssignConfig) -> tuple[Row, ...]:
     return _assignment_rows(assign_config.root)
 
 
 def _assignment_rows(
-    assign_config: models.AssignUnion, *, native_splits: Sequence[DatasetSplit] | None = None
+    assign_config: AssignUnion, *, native_splits: Sequence[DatasetSplit] | None = None
 ) -> tuple[Row, ...]:
     rows: list[Row] = [("Strategy", assign_config.strategy)]
-    if isinstance(assign_config, models.NoAssign):
+    if isinstance(assign_config, NoAssign):
         rows.append(("Selection", "unsplit output"))
         return tuple(rows)
 
-    if isinstance(assign_config, models.PreserveNativeAssign):
+    if isinstance(assign_config, PreserveNativeAssign):
         detail = (
             _format_splits(native_splits, empty="native labels")
             if native_splits is not None
@@ -488,5 +505,5 @@ def _format_splits(
     )
 
 
-def _format_ratio(ratio: models.SplitWeights) -> str:
+def _format_ratio(ratio: SplitWeights) -> str:
     return f"train={ratio.train:g}, val={ratio.val:g}, test={ratio.test:g}"

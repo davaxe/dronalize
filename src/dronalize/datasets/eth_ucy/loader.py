@@ -41,12 +41,12 @@ class EthUcyLoader(SceneLoader):
                 has_header=False,
                 separator="\t",
                 new_columns=["frame", "id", "x", "y"],
-                schema=pl.Schema({
-                    "frame": pl.Int32,
-                    "id": pl.Int32,
+                schema_overrides={
+                    "frame": pl.Float64,
+                    "id": pl.Float64,
                     "x": pl.Float64,
                     "y": pl.Float64,
-                }),
+                },
             ).with_columns(
                 ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
                 pl.col("id").cast(pl.Int32),

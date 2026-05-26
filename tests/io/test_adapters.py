@@ -118,6 +118,45 @@ def test_split_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None
     _assert_tensor_array_equal(sample["map", "connects", "map"].edge_type, expected.map_edge_types)
 
 
+def test_split_pyg_scene_dataset_uses_record_default_observation_length(
+    tmp_path: Path, scene: Scene
+) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
+
+    scene = replace(scene, dataset="demo")
+    output_dir = tmp_path / "pickle"
+    writer = PickleWriter(
+        output_dir=output_dir, config=output_plan(default_observation_length=1), splits=None
+    )
+    writer.write(scene)
+    writer.finish_local()
+    writer.finish_final()
+
+    sample = SplitHeteroSceneDataset(PickleReader(output_dir)).get(0)
+
+    assert sample.default_observation_length == 1
+    assert sample.observation_length == 1
+    assert int(sample["agent"].x.size(1)) == 1
+    assert int(sample["agent"].y.size(1)) == 2
+
+
+def test_split_pyg_scene_dataset_accepts_observation_length_callable(
+    tmp_path: Path, scene: Scene
+) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
+
+    reader, _ = _build_pickle_reader(tmp_path, replace(scene, dataset="demo"))
+    sample = SplitHeteroSceneDataset(
+        reader, observation_length=lambda record: 1 if record.dataset == "demo" else 2
+    ).get(0)
+
+    assert sample.observation_length == 1
+    assert int(sample["agent"].x.size(1)) == 1
+    assert int(sample["agent"].y.size(1)) == 2
+
+
 def test_pyg_collate_full_horizon_with_time_padding(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import HeteroSceneDataset, collate_hetero_with_time_padding

@@ -1,21 +1,4 @@
-"""Typed configuration models grouped by processing concern.
-
-Import from this package when you need to build, validate, or introspect
-individual configuration sections directly in Python. The models are organized
-roughly the same way as the project configuration structure:
-
-- dataset-level composition via [`DatasetConfig`][dronalize.config.models.DatasetConfig]
-- scene sampling and temporal transforms via
-  [`ScenesConfig`][dronalize.config.models.ScenesConfig]
-- screening and cleanup rules via
-  [`ScreeningConfig`][dronalize.config.models.ScreeningConfig]
-- output encoding and storage options via
-  [`OutputConfig`][dronalize.config.models.OutputConfig]
-- runtime execution controls via
-  [`RuntimeConfig`][dronalize.config.models.RuntimeConfig]
-- read selection via [`ReadConfig`][dronalize.config.models.ReadConfig]
-- assignment strategies via [`AssignConfig`][dronalize.config.models.AssignConfig]
-"""
+"""Config models."""
 
 from dronalize.config.models.dataset import (
     DatasetConfig,

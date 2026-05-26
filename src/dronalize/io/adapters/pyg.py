@@ -15,6 +15,7 @@ try:
     from torch_geometric.data import Dataset as PyGDataset
 
     from dronalize.io.adapters.torch import (
+        ObservationLength,
         ReaderT,
         TorchSceneDataset,
         TorchSceneRecord,
@@ -80,7 +81,7 @@ class SplitHeteroSceneDataset(PyGDataset, Generic[ReaderT]):
         self,
         reader: ReaderT,
         *,
-        observation_length: int,
+        observation_length: ObservationLength | None = None,
         copy: bool = True,
         transform: HeteroDataTransform | None = None,
     ) -> None:
@@ -152,7 +153,13 @@ def _convert_full_to_hetero(sample: TorchSceneRecord) -> HeteroData:
         sample.map_edge_indices,
         sample.map_edge_types,
     )
-    _attach_common_metadata(data, sample.scene_number, sample.dataset, sample.position_offset)
+    _attach_common_metadata(
+        data,
+        sample.scene_number,
+        sample.dataset,
+        sample.position_offset,
+        default_observation_length=sample.default_observation_length,
+    )
     return data
 
 
@@ -173,7 +180,14 @@ def _convert_split_to_hetero(sample: TorchSplitSceneRecord) -> HeteroData:
         sample.map_edge_indices,
         sample.map_edge_types,
     )
-    _attach_common_metadata(data, sample.scene_number, sample.dataset, sample.position_offset)
+    _attach_common_metadata(
+        data,
+        sample.scene_number,
+        sample.dataset,
+        sample.position_offset,
+        default_observation_length=sample.default_observation_length,
+    )
+    data.observation_length = int(sample.history_features.size(1))
     return data
 
 
@@ -192,11 +206,17 @@ def _attach_map_store(
 
 
 def _attach_common_metadata(
-    data: HeteroData, scene_number: int, dataset: str | None, position_offset: torch.Tensor
+    data: HeteroData,
+    scene_number: int,
+    dataset: str | None,
+    position_offset: torch.Tensor,
+    *,
+    default_observation_length: int | None,
 ) -> None:
     data.scene_number = int(scene_number)
     data.dataset = dataset
     data.position_offset = position_offset
+    data.default_observation_length = default_observation_length
 
 
 def _is_split_sample(sample: HeteroData) -> bool:

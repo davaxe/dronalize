@@ -5,16 +5,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from dronalize.config.models import MapConfig, effective_scene_window
+from dronalize.config.models.scenes import effective_scene_window
 from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
+from dronalize.io.base import RecordTransform, SceneTransform, validate_transform_choice
 from dronalize.io.formats import StorageBackend, storage_backend_name
 from dronalize.io.manifest import DatasetManifest, package_version, write_manifest
 from dronalize.processing.models import LoaderPlan, ReadSelection, SplitAssignmentPlan
@@ -22,7 +23,10 @@ from dronalize.processing.models import LoaderPlan, ReadSelection, SplitAssignme
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.config.models import DatasetConfig, MDSOutputConfig, OutputConfig, RuntimeConfig
+    from dronalize.config.models.dataset import DatasetConfig
+    from dronalize.config.models.map import MapConfig
+    from dronalize.config.models.output import MDSOutputConfig, OutputConfig
+    from dronalize.config.models.runtime import RuntimeConfig
     from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.processing.loading.models import DatasetOptionsModel
 
@@ -50,6 +54,8 @@ class ExecutionResult:
     """Number of scenes accepted for output after screening and limits."""
     split_counts: dict[str, int]
     """Accepted scene count per output split."""
+    elapsed_time_seconds: float
+    """Total execution time in seconds."""
 
 
 @dataclass(frozen=True)
@@ -58,6 +64,8 @@ class OutputPlan:
 
     config: OutputConfig
     """Resolved output configuration used by the writer and manifest."""
+    default_observation_length: int | None = None
+    """Default split point to store on each output record, if known."""
 
     def precision(self) -> type[np.float32 | np.float64]:
         """Return the floating point precision for this output plan."""
@@ -120,6 +128,8 @@ class ExecutionPlan:
     """Default reader/adaptor split point after resampling, if configured."""
     effective_sample_time: float
     """Sample interval in seconds after resampling is applied."""
+    output_sample: OutputSample[object] | None = None
+    """Optional custom persisted-sample configuration for writer backends."""
     limit: int | None = None
     """Optional maximum number of selected scenes to write."""
     seed: int | None = None
@@ -188,6 +198,33 @@ class ExecutionPlan:
             write_manifest(root, manifest)
 
 
+SampleT = TypeVar("SampleT")
+
+
+@dataclass(frozen=True, slots=True)
+class OutputSample(Generic[SampleT]):
+    """Python API configuration for custom persisted output samples.
+
+    `record_transform` is the preferred hook because it receives the canonical
+    `SceneRecord` after Dronalize has applied normal output semantics.
+    `scene_transform` is an expert escape hatch for deriving samples directly
+    from runtime `Scene` objects.
+    """
+
+    record_transform: RecordTransform[SampleT] | None = None
+    """Optional transform from canonical `SceneRecord` to persisted sample."""
+    scene_transform: SceneTransform[SampleT] | None = None
+    """Optional transform from runtime `Scene` to persisted sample."""
+    mds_columns: dict[str, str] | None = None
+    """MDS column schema required when custom samples are written to MDS."""
+
+    def __post_init__(self) -> None:
+        """Validate that only one transform mode is configured."""
+        validate_transform_choice(
+            record_transform=self.record_transform, scene_transform=self.scene_transform
+        )
+
+
 def build_loader_plan(
     *, descriptor: DatasetDescriptor, resolved_config: DatasetConfig, include_map: bool | None
 ) -> LoaderPlan:
@@ -221,7 +258,9 @@ class ExecutionRequest(BaseModel):
     [`execute_request`][dronalize.runtime.api.execute_request] to run directly.
     """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        frozen=True, extra="forbid", arbitrary_types_allowed=True
+    )
 
     dataset: str
     """Dataset registry key, such as `a43` or `waymo`."""
@@ -243,6 +282,8 @@ class ExecutionRequest(BaseModel):
     """Optional seed used by deterministic runtime choices."""
     input_dir_exists: bool = True
     """Whether request resolution should require `input_dir` to exist."""
+    output_sample: OutputSample[object] | None = None
+    """Customized output sample configuration."""
 
 
 def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int | None, float]:

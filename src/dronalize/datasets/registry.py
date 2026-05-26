@@ -14,7 +14,8 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from pydantic import ValidationError
 
-from dronalize.config.models import DatasetConfig, MapConfig, ScenesConfig
+from dronalize.config.models.map import MapConfig
+from dronalize.config.models.scenes import ScenesConfig
 from dronalize.core.errors import (
     DatasetNotFoundError,
     DatasetRegistryError,
@@ -28,6 +29,7 @@ from dronalize.processing.loading.models import (
 )
 
 if TYPE_CHECKING:
+    from dronalize.config.models.dataset import DatasetConfig
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.loading.base import SceneLoader

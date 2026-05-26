@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from dronalize.config.runtime import RuntimeOverride
+from dronalize.config import RuntimeOverride
 from dronalize.core.errors import (
     ConfigurationError,
     DatasetNotFoundError,
@@ -21,13 +21,21 @@ from dronalize.datasets import (
 from dronalize.io import StorageBackend, read_manifest
 from dronalize.io.backends.null import NullWriter
 from dronalize.io.backends.registry import register_writer_backend
-from dronalize.runtime import ExecutionRequest, execute_request, resolve_request, stream_plan
+from dronalize.io.readers import PickleReader
+from dronalize.runtime import (
+    ExecutionRequest,
+    OutputSample,
+    execute_request,
+    resolve_request,
+    stream_plan,
+)
 from tests.support import DemoOptions, demo_descriptor
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.datasets import DatasetDescriptor
+    from dronalize.io.records import SceneRecord
 
 
 def _request(tmp_path: Path, **kwargs: object) -> ExecutionRequest:
@@ -210,6 +218,55 @@ def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mon
     )
     assert manifest.horizon_frames == 3
     assert manifest.default_observation_length == 2
+
+
+def test_execute_request_uses_output_sample_record_transform(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_get_demo_descriptor(monkeypatch)
+
+    def transform(record: SceneRecord) -> dict[str, object]:
+        return {
+            "scene_number": record.scene_number,
+            "dataset": record.dataset,
+            "feature_shape": record.features.shape,
+        }
+
+    output_sample = OutputSample(record_transform=transform)
+    request = _request(tmp_path, storage_backend=StorageBackend.PICKLE, output_sample=output_sample)
+
+    result = execute_request(request)
+    sample = cast("dict[str, object]", PickleReader(result.output_dir, sample_type=dict)[0])
+
+    assert sample == {"scene_number": 0, "dataset": "demo", "feature_shape": (1, 3, 7)}
+
+
+def test_execute_request_uses_output_sample_record_transform_with_custom_mds_format(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip(
+        "streaming", reason="Requires streaming package for custom MDS output sample format"
+    )
+    from dronalize.io.readers import MDSReader  # noqa: PLC0415
+
+    _patch_get_demo_descriptor(monkeypatch)
+
+    def transform(record: SceneRecord) -> dict[str, object]:
+        return {
+            "scene_number": record.scene_number,
+            "dataset": record.dataset,
+            "feature_shape": record.features.shape,
+        }
+
+    output_sample = OutputSample(
+        record_transform=transform,
+        mds_columns={"scene_number": "int", "dataset": "str", "feature_shape": "json"},
+    )
+    request = _request(tmp_path, storage_backend=StorageBackend.MDS, output_sample=output_sample)
+    result = execute_request(request)
+    reader = MDSReader(path=result.output_dir, convert_raw=dict)
+    sample = reader[0]
+    assert sample == {"scene_number": 0, "dataset": "demo", "feature_shape": [1, 3, 7]}
 
 
 def test_parallel_execution_smoke_processes_demo_dataset(

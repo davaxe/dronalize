@@ -32,7 +32,7 @@ from dronalize.runtime.types import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.config.models import DatasetConfig
+    from dronalize.config.models.dataset import DatasetConfig
     from dronalize.config.runtime import RuntimeOverride
     from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.runtime.types import ExecutionRequest
@@ -84,13 +84,17 @@ def build_execution_plan(
         output_dir=request.output_dir,
         storage_backend=storage_backend,
         runtime=resolved_config.runtime,
-        output=OutputPlan(config=resolved_config.output),
+        output=OutputPlan(
+            config=resolved_config.output,
+            default_observation_length=effective_default_observation_length,
+        ),
         loader=loader_request,
         assignment=assignment_request,
         map=loader_request.map,
         effective_horizon_frames=effective_horizon_frames,
         effective_default_observation_length=effective_default_observation_length,
         effective_sample_time=effective_sample_time,
+        output_sample=request.output_sample,
         limit=request.limit,
         seed=request.seed,
         resolved_config=resolved_config,

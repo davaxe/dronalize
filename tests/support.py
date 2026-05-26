@@ -9,9 +9,16 @@ import polars as pl
 from pydantic import Field
 from typing_extensions import NotRequired, TypedDict, override
 
-from dronalize.config.models import DatasetConfig, OutputConfig, ScenesConfig, WindowConfig
-from dronalize.config.models.scenes import LaneChangeConfig, ResampleConfig
-from dronalize.config.models.screening import MinSamplesSpec, ScreeningConfig
+from dronalize.config.models import (
+    DatasetConfig,
+    LaneChangeConfig,
+    MinSamplesSpec,
+    OutputConfig,
+    ResampleConfig,
+    ScenesConfig,
+    ScreeningConfig,
+    WindowConfig,
+)
 from dronalize.core.categories import AgentCategory, AgentCategoryLike
 from dronalize.core.maps import MapGraph
 from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
@@ -117,11 +124,12 @@ def inherited_optional_blocks_descriptor() -> DatasetConfig:
     )
 
 
-def output_plan() -> OutputPlan:
+def output_plan(default_observation_length: int | None = None) -> OutputPlan:
     return OutputPlan(
         config=OutputConfig(
             trajectory_schema="canonical", precision="float32", recenter_positions=True
-        )
+        ),
+        default_observation_length=default_observation_length,
     )
 
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 
 import dronalize.processing.pipeline.transforms as tr
-from dronalize.config.models import ShuffledTimeBlockAssign, TimeBlockAssign
+from dronalize.config.models.split import ShuffledTimeBlockAssign, TimeBlockAssign
 from dronalize.core.functional import ResampleMethod, ResampleSpec
 from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.columns import TrajectoryColumns
@@ -18,7 +18,7 @@ from dronalize.processing.screening.screen import ScreeningRuleSet
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from dronalize.config.models import ScenesConfig
+    from dronalize.config.models.scenes import ScenesConfig
     from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
 
 

@@ -11,6 +11,7 @@ from dronalize.config import parse_config
 from dronalize.io import StorageBackend
 from dronalize.runtime import (
     ExecutionRequest,
+    OutputSample,
     execute_plan,
     execute_request,
     resolve_request,
@@ -26,6 +27,7 @@ PYTHON_INFO_STRINGS = {"py", "python"}
 
 def test_documented_runtime_imports_match_public_api() -> None:
     assert ExecutionRequest is runtime.ExecutionRequest
+    assert OutputSample is runtime.OutputSample
     assert resolve_request is runtime.resolve_request
     assert execute_request is runtime.execute_request
     assert execute_plan is runtime.execute_plan

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeAlias, TypeVar
 
 from dronalize.core.optional import raise_missing_optional_dependency
 
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
 
 
 ReaderT = TypeVar("ReaderT", bound=DatasetReader[SceneRecord])
+ObservationLength: TypeAlias = int | Callable[[SceneRecord], int]
 
 
 @dataclass(slots=True)
@@ -35,6 +37,8 @@ class TorchSceneRecord:
     """Scene identifier within the exported dataset."""
     dataset: str | None
     """Dataset label associated with this scene, if known."""
+    default_observation_length: int | None
+    """Default split point associated with this scene, if known."""
     position_offset: torch.Tensor
     """Global 2D translation offset with shape `(2,)`."""
     agent_types: torch.Tensor
@@ -67,6 +71,7 @@ class TorchSceneRecord:
         return TorchSplitSceneRecord(
             scene_number=self.scene_number,
             dataset=self.dataset,
+            default_observation_length=self.default_observation_length,
             position_offset=self.position_offset,
             agent_types=self.agent_types,
             screened_agent_mask=self.screened_agent_mask,
@@ -87,6 +92,7 @@ class TorchSplitSceneRecord:
 
     scene_number: int
     dataset: str | None
+    default_observation_length: int | None
     position_offset: torch.Tensor
     agent_types: torch.Tensor
     screened_agent_mask: torch.Tensor
@@ -130,10 +136,16 @@ class IterableTorchSceneDataset(TorchSceneDataset[ReaderT], IterableDataset[Torc
 class TorchSplitSceneDataset(Dataset[TorchSplitSceneRecord], Generic[ReaderT]):
     """Map-style Torch dataset that splits full-horizon records on read."""
 
-    def __init__(self, reader: ReaderT, *, observation_length: int, copy: bool = True) -> None:
+    def __init__(
+        self,
+        reader: ReaderT,
+        *,
+        observation_length: ObservationLength | None = None,
+        copy: bool = True,
+    ) -> None:
         super().__init__()
         self.reader: ReaderT = reader
-        self.observation_length: int = observation_length
+        self.observation_length: ObservationLength | None = observation_length
         self._copy: bool = copy
 
     def __len__(self) -> int:
@@ -143,14 +155,15 @@ class TorchSplitSceneDataset(Dataset[TorchSplitSceneRecord], Generic[ReaderT]):
     def __iter__(self) -> Iterator[TorchSplitSceneRecord]:
         """Iterate over split scene records converted to Torch tensors."""
         for record in self.reader:
-            yield to_torch_scene_record(record, copy=self._copy).split(self.observation_length)
+            observation_length = resolve_observation_length(self.observation_length, record)
+            yield to_torch_scene_record(record, copy=self._copy).split(observation_length)
 
     @override
     def __getitem__(self, index: int) -> TorchSplitSceneRecord:
         """Return one split scene record converted to Torch tensors."""
-        return to_torch_scene_record(self.reader[index], copy=self._copy).split(
-            self.observation_length
-        )
+        record = self.reader[index]
+        observation_length = resolve_observation_length(self.observation_length, record)
+        return to_torch_scene_record(record, copy=self._copy).split(observation_length)
 
 
 class IterableTorchSplitSceneDataset(
@@ -166,6 +179,7 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
     return TorchSceneRecord(
         scene_number=record.scene_number,
         dataset=record.dataset,
+        default_observation_length=record.default_observation_length,
         position_offset=torch.asarray(record.position_offset, copy=copy),
         agent_types=torch.asarray(record.agent_types, copy=copy),
         screened_agent_mask=torch.asarray(record.screened_agent_mask, copy=copy),
@@ -176,3 +190,20 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
         map_node_types=torch.asarray(record.map_node_types, copy=copy),
         map_edge_types=torch.asarray(record.map_edge_types, copy=copy),
     )
+
+
+def resolve_observation_length(
+    observation_length: ObservationLength | None, record: SceneRecord
+) -> int:
+    """Resolve an explicit or record-local observation length for one sample."""
+    if observation_length is None:
+        if record.default_observation_length is None:
+            msg = (
+                "`observation_length` was not provided and the record does not "
+                "define `default_observation_length`."
+            )
+            raise ValueError(msg)
+        return record.default_observation_length
+    if callable(observation_length):
+        return int(observation_length(record))
+    return int(observation_length)

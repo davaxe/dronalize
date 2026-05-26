@@ -80,10 +80,7 @@ Every sample written to a shard contains the following fields.
 | --- | --- | --- | --- |
 | `scene_number` | `int` | scalar | Global scene index assigned during processing. |
 | `dataset` | `str` | scalar | Dataset label associated with the sample. |
-<<<<<<< HEAD
-| `observation_length` | `int` | scalar | Number of history frames used to split features into input/output windows during reading. |
-=======
->>>>>>> 70968fa7d4a32a920f9e9c2314e7286974cace31
+| `default_observation_length` | `int` | scalar | Default split point for input/output windows during reading, or `-1` when unset. |
 | `position_offset` | `float64` | `[2]` | The `(x, y)` offset subtracted from all positions before writing when `recenter_positions = true`. Zero otherwise. |
 | `agent_types` | `int32` | `[A]` | Integer agent category for each agent. |
 | `screened_agent_mask` | `uint8` | `[A]` | Per-agent screening pass mask (`1` means passed). |
@@ -116,6 +113,111 @@ config block. `position_offset` is always stored as `float64`.
     MDS shards.
     
     The reason for this design is that the MDS format does not currently support empty arrays.
+
+## Custom samples
+
+Python integrations can customize the sample dictionaries written to MDS by
+passing `output_sample` to an
+[`ExecutionRequest`](../../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest).
+
+MDS requires the column schema before any samples are written, so custom
+transforms must provide both:
+
+- `record_transform` or `scene_transform`
+- `mds_columns`
+
+The preferred hook is `record_transform`, which receives the standard
+`SceneRecord` after Dronalize has applied output schema conversion, precision,
+recentering, map extraction, and default observation length metadata.
+
+<!-- no-validate -->
+```python
+import numpy as np
+
+from dronalize.io.records import SceneRecord
+from dronalize.runtime import ExecutionRequest, OutputSample, execute_request
+
+
+def to_training_sample(record: SceneRecord) -> dict[str, object]:
+    observation_length = record.default_observation_length or 10
+    return {
+        "scene_number": int(record.scene_number),
+        "x": record.features[:, :observation_length],
+        "y": record.features[:, observation_length:],
+        "x_mask": record.mask[:, :observation_length].astype(np.uint8, copy=False),
+        "y_mask": record.mask[:, observation_length:].astype(np.uint8, copy=False),
+    }
+
+
+columns = {
+    "scene_number": "int",
+    "x": "ndarray:float32",
+    "y": "ndarray:float32",
+    "x_mask": "ndarray:uint8",
+    "y_mask": "ndarray:uint8",
+}
+
+request = ExecutionRequest(
+    dataset="a43",
+    input_dir=input_dir,
+    output_dir=output_dir,
+    storage_backend="mds",
+    output_sample=OutputSample(record_transform=to_training_sample, mds_columns=columns),
+)
+execute_request(request)
+```
+
+The lower-level
+[`MDSDatasetWriter`](../../reference/api/io/backends.md#dronalize.io.backends.mds.MDSDatasetWriter)
+constructor exposes the same capability as `record_transform` or
+`scene_transform` plus `sample_columns`.
+
+<!-- no-validate -->
+```python
+writer = MDSDatasetWriter(
+    output_dir=output_dir,
+    config=output_plan,
+    splits=None,
+    parallel=False,
+    record_transform=to_training_sample,
+    sample_columns=columns,
+)
+```
+
+For advanced cases, `scene_transform` can derive the MDS sample directly from
+the runtime `Scene`. This bypasses `SceneRecord` encoding, so the transform is
+responsible for any schema conversion, dtype policy, recentering, and map
+resolution it needs. `record_transform` and `scene_transform` are mutually
+exclusive.
+
+Custom MDS outputs should be read with `convert_raw`:
+
+<!-- no-validate -->
+```python
+from dataclasses import dataclass
+
+from dronalize.io.readers import MDSReader
+
+
+@dataclass(slots=True)
+class TrainingSample:
+    x: np.ndarray
+    y: np.ndarray
+    x_mask: np.ndarray
+    y_mask: np.ndarray
+
+
+def from_raw(sample: dict[str, object]) -> TrainingSample:
+    return TrainingSample(
+        x=np.asarray(sample["x"]),
+        y=np.asarray(sample["y"]),
+        x_mask=np.asarray(sample["x_mask"], dtype=bool),
+        y_mask=np.asarray(sample["y_mask"], dtype=bool),
+    )
+
+
+reader = MDSReader(path=output_dir, convert_raw=from_raw)
+```
 
 ## Configuration
 

@@ -4,19 +4,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from dronalize.config.models import (
+from dronalize.config.models.scenes import (
     LaneChangeConfig,
-    MinSamplesSpec,
-    PruneByRuleSpec,
     ResampleConfig,
     ScenesConfig,
-    ScreeningConfig,
     WindowConfig,
 )
 from dronalize.config.models.screening import (
     ExcludeCategoriesSpec,
+    MinSamplesSpec,
     PassingRequirement,
+    PruneByRuleSpec,
     RequireFramesSpec,
+    ScreeningConfig,
 )
 from dronalize.datasets.registry import DatasetTemporalSupport, DatasetWindowingSupport, FrameBounds
 

@@ -1,6 +1,7 @@
 """Public configuration entry points used by the CLI and Python API.
 
-This package exposes the smallest configuration surface most callers need:
+This module re-exports the main configuration models and utilities used by
+`dronalize`. The main entry points include:
 
 - [`ProjectConfig`][dronalize.config.ProjectConfig] for resolved project
   configuration loaded from a TOML file such as `config.toml`
@@ -9,9 +10,6 @@ This package exposes the smallest configuration surface most callers need:
 - [`parse_config`][dronalize.config.parse_config] for discovering
   and validating project configuration from disk
 
-Lower-level typed configuration models remain available from
-[`dronalize.config.models`][] when a caller needs to construct or validate
-individual config blocks directly.
 """
 
 from dronalize.config.parse import parse_config

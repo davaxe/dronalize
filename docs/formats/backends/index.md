@@ -40,6 +40,15 @@ register_writer_backend("my-backend", build_my_writer_factory)
 CLI selection is still just `--storage-backend <name>`, but the backend must already be registered in
 the Python process that resolves the request.
 
+## Custom samples
+
+The built-in `pickle` and `mds` writers also support Python-level sample
+customization without registering a new storage backend. Pass `output_sample`
+to an `ExecutionRequest` to have the writer call that function on each sample before writing.
+
+Custom MDS samples must also provide explicit `mds_columns`, because the MDS
+writer needs the column schema before the first sample is written.
+
 ## Backend pages
 
 - [MDS](mds.md)

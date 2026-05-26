@@ -37,9 +37,11 @@ class A43Loader(SceneLoader[tuple[Path, int], A43LoaderOptions]):
 
     _dt: ClassVar[float] = 0.1
     _eps: ClassVar[float] = 1e-9
+    _raw_data: dict[str, pl.DataFrame]
 
     @override
     def iter_sources(self) -> Iterable[DatasetSource[tuple[Path, int]]]:
+        self._load_all_data()
         for i, csv_file in enumerate(self.root.glob("*.csv")):
             rows: int = pl.scan_csv(csv_file, infer_schema=False).select(pl.len()).collect().item()
             for j in range(0, rows, self.loader_options.rows_per_source):
@@ -47,10 +49,15 @@ class A43Loader(SceneLoader[tuple[Path, int], A43LoaderOptions]):
 
     @override
     def load_source(self, source: DatasetSource[tuple[Path, int]]) -> Iterable[LoadedSourceFrame]:
+        if not hasattr(self, "_raw_data"):
+            self._load_all_data()
+
         path, i = source.payload
         yield LoadedSourceFrame(
-            pl
-            .scan_csv(path, skip_rows=i, n_rows=self.loader_options.rows_per_source, schema=_SCHEMA)
+            self
+            ._raw_data[str(path)]
+            .slice(i, self.loader_options.rows_per_source)
+            .lazy()
             .with_columns(t0=pl.col("tseconds").min())
             .with_columns(
                 frame=(
@@ -76,6 +83,13 @@ class A43Loader(SceneLoader[tuple[Path, int], A43LoaderOptions]):
                 .alias("agent_category"),
             )
         )
+
+    def _load_all_data(self) -> None:
+        if hasattr(self, "_raw_data"):
+            return
+        self._raw_data = {}
+        for csv_file in self.root.glob("*.csv"):
+            self._raw_data[str(csv_file)] = pl.read_csv(csv_file, schema=_SCHEMA).sort("tseconds")
 
     @override
     def count_sources(self) -> int | None:
