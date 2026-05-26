@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 class A43LoaderOptions(DatasetOptionsModel):
-    rows_per_source: int = 40_000
+    rows_per_source: int = 60_000
 
 
 class A43Loader(SceneLoader[tuple[Path, int], A43LoaderOptions]):

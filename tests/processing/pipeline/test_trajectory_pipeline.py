@@ -54,9 +54,7 @@ def _run_pipeline(
     ]
 
 
-def test_standard_trajectory_pipeline_outputs_windowed_scenes(
-    scene_df_presets: DataFramePresets,
-) -> None:
+def test_pipeline_outputs_windows(scene_df_presets: DataFramePresets) -> None:
     frame: pl.DataFrame = scene_df_presets["single_agent_windowed"]()
     scenes = _run_pipeline(frame, plan=TrajectoryPipelinePlan(scenes=_scenes()))
 
@@ -78,7 +76,7 @@ def test_standard_trajectory_pipeline_outputs_windowed_scenes(
     ]
 
 
-def test_partial_window_policy_keeps_incomplete_edge_window() -> None:
+def test_partial_window_keeps_edge_windows() -> None:
     frame = pl.DataFrame({
         "frame": [0, 1, 2],
         "id": [1, 1, 1],
@@ -112,7 +110,7 @@ def test_partial_window_policy_keeps_incomplete_edge_window() -> None:
     ]
 
 
-def test_standard_trajectory_pipeline_outputs_split_labeled_scenes(
+def test_pipeline_outputs_split_labels(
     scene_df_presets: DataFramePresets,
 ) -> None:
     frame: pl.DataFrame = scene_df_presets["single_agent_time_split"]()
@@ -162,7 +160,7 @@ def test_standard_trajectory_pipeline_outputs_split_labeled_scenes(
     ]
 
 
-def test_lane_change_sampling_keeps_lane_change_windows_and_thins_steady_windows(
+def test_lane_change_sampling_thins_steady_windows(
     scene_df_presets: DataFramePresets,
 ) -> None:
     frame = scene_df_presets["lane_change_sequences"]()
@@ -229,7 +227,7 @@ def test_lane_change_sampling_keeps_lane_change_windows_and_thins_steady_windows
     ]
 
 
-def test_lane_change_sampling_requires_window_sampling(scene_df_presets: DataFramePresets) -> None:
+def test_lane_change_sampling_requires_windows(scene_df_presets: DataFramePresets) -> None:
     frame = scene_df_presets["lane_change_sequences"]()
     plan = TrajectoryPipelinePlan(
         scenes=_scenes(
@@ -241,7 +239,7 @@ def test_lane_change_sampling_requires_window_sampling(scene_df_presets: DataFra
         _ = _run_pipeline(frame, plan=plan, window_by="sequence")
 
 
-def test_lane_change_keep_every_one_matches_standard_pipeline(
+def test_keep_every_one_matches_standard(
     scene_df_presets: DataFramePresets,
 ) -> None:
     frame = scene_df_presets["lane_change_sequences"]()

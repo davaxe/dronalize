@@ -18,7 +18,7 @@ from dronalize.core.scene import (
 from dronalize.io.encoding import encode_scene_record
 
 
-def test_schema_definition_normalizes_column_order() -> None:
+def test_schema_definition_normalizes_order() -> None:
     schema = TrajectorySchema.define(
         "custom",
         fields=(
@@ -36,14 +36,14 @@ def test_schema_definition_normalizes_column_order() -> None:
     assert schema.feature_columns() == ("x", "y", "vx", "vy")
 
 
-def test_schema_rejects_missing_required_base_fields() -> None:
+def test_schema_rejects_missing_base_fields() -> None:
     with pytest.raises(TrajectorySchemaError, match="base fields"):
         _ = TrajectorySchema.define(
             "invalid", fields=(TrajectoryField.FRAME, TrajectoryField.ID, TrajectoryField.X)
         )
 
 
-def test_scene_as_schema_derives_kinematics_from_positions() -> None:
+def test_as_schema_derives_kinematics() -> None:
     scene = Scene.create(
         frame=pl.DataFrame({
             "frame": [0, 1, 2],
@@ -63,7 +63,7 @@ def test_scene_as_schema_derives_kinematics_from_positions() -> None:
     np.testing.assert_allclose(converted.frame["ax"].to_numpy(), np.array([0.0, 0.0, 0.0]))
 
 
-def test_scene_as_schema_without_sample_time_fails_for_kinematics() -> None:
+def test_as_schema_requires_sample_time() -> None:
     scene = Scene.create(
         frame=pl.DataFrame({
             "frame": [0, 1, 2],
@@ -85,7 +85,7 @@ def test_scene_as_schema_without_sample_time_fails_for_kinematics() -> None:
     assert yaw_only.schema == POSITIONS_YAW
 
 
-def test_scene_map_resolver_is_deferred_and_usable_in_encoding() -> None:
+def test_map_resolver_is_lazy() -> None:
     graph = MapGraph(
         node_positions=np.array([[0.0, 0.0], [1.0, 0.0]], dtype=np.float64),
         edge_indices=np.array([[0], [1]], dtype=np.int32),

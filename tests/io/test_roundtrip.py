@@ -31,7 +31,7 @@ class CustomPickleSample:
     source: str
 
 
-def test_unsplit_split_helpers_roundtrip_record_contents(scene: Scene) -> None:
+def test_split_helpers_roundtrip(scene: Scene) -> None:
     scene = replace(scene, dataset="demo")
     record = encode_scene_record(scene, dtype=np.float64)
     split = encode_split_scene_record(scene, dtype=np.float64, observation_length=2)
@@ -46,18 +46,16 @@ def test_unsplit_split_helpers_roundtrip_record_contents(scene: Scene) -> None:
     assert rebuilt.dataset == "demo"
     assert rejoined.dataset == "demo"
     assert record.dataset == "demo"
-    assert rebuilt.dataset == "demo"
-    assert rejoined.dataset == "demo"
 
 
-def test_split_scene_record_rejects_out_of_bounds_observation_length(scene: Scene) -> None:
+def test_split_scene_record_rejects_bad_length(scene: Scene) -> None:
     record = encode_scene_record(scene, dtype=np.float64)
 
     with pytest.raises(ValueError, match="observation_length"):
         _ = split_scene_record(record, observation_length=record.horizon_frames + 1)
 
 
-def test_encode_scene_record_uses_passed_agent_ids(scene: Scene) -> None:
+def test_encode_scene_record_uses_passed_ids(scene: Scene) -> None:
     scene = replace(scene, passed_agent_ids=frozenset({10}))
     record = encode_scene_record(scene, dtype=np.float32)
 
@@ -134,7 +132,7 @@ def test_pickle_writer_accepts_scene_transform(tmp_path: Path, scene: Scene) -> 
     np.testing.assert_array_equal(sample.values, np.array([scene.horizon_frames], dtype=np.int32))
 
 
-def test_pickle_writer_rejects_multiple_sample_transforms(tmp_path: Path) -> None:
+def test_pickle_writer_rejects_multiple_transforms(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="record_transform"):
         _ = PickleWriter(
             output_dir=tmp_path,
@@ -167,7 +165,7 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     assert_scene_record_equal(reader[0], expected)
 
 
-def test_mds_writer_accepts_record_transform_with_columns(tmp_path: Path, scene: Scene) -> None:
+def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("streaming")
     scene = replace(scene, dataset="demo")
 
@@ -214,7 +212,7 @@ def test_mds_writer_accepts_record_transform_with_columns(tmp_path: Path, scene:
     np.testing.assert_array_equal(raw["future_mask"], expected.mask[:, 1:].astype(np.uint8))
 
 
-def test_mds_writer_rejects_custom_transform_without_columns(tmp_path: Path) -> None:
+def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> None:
     pytest.importorskip("streaming")
 
     from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
@@ -229,7 +227,7 @@ def test_mds_writer_rejects_custom_transform_without_columns(tmp_path: Path) -> 
         )
 
 
-def test_mds_encoder_decoder_roundtrip_preserves_data(scene: Scene) -> None:
+def test_mds_encoder_decoder_roundtrip(scene: Scene) -> None:
     scene = replace(scene, dataset="demo")
     expected = encode_scene_record(scene, dtype=np.float32, default_observation_length=2)
     sample = encode_mds_sample(expected)
@@ -275,7 +273,7 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     assert loaded == manifest
 
 
-def test_manifest_rejects_invalid_default_observation_length() -> None:
+def test_manifest_rejects_bad_default_obs_length() -> None:
     with pytest.raises(ValueError, match="default_observation_length"):
         _ = DatasetManifest(
             dataset="test_dataset",

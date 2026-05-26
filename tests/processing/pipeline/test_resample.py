@@ -44,7 +44,7 @@ def _straight_track(frames: list[int]) -> pl.DataFrame:
 
 
 @pytest.mark.parametrize("spec", _all_methods_spec(up=2, down=1, sample_time=1.0))
-def test_resample_straight_track_matches_expected_samples(spec: ResampleSpec) -> None:
+def test_resample_straight_track_matches_samples(spec: ResampleSpec) -> None:
     df = _straight_track([0, 1, 2])
     df_resampled = (
         resample(spec)(df.lazy())
@@ -61,7 +61,7 @@ def test_resample_straight_track_matches_expected_samples(spec: ResampleSpec) ->
 
 
 @pytest.mark.parametrize("spec", _all_methods_spec(up=2, down=1, max_gap=1, sample_time=1.0))
-def test_resample_max_gap_splits_large_gaps(spec: ResampleSpec) -> None:
+def test_resample_max_gap_splits_gaps(spec: ResampleSpec) -> None:
     df = _straight_track([0, 1, 4])
     df_resampled = resample(spec)(df.lazy()).collect().sort("frame")
 
@@ -70,7 +70,7 @@ def test_resample_max_gap_splits_large_gaps(spec: ResampleSpec) -> None:
 
 
 @pytest.mark.parametrize("spec", _all_methods_spec(up=2, down=1, max_gap=3, sample_time=1.0))
-def test_resample_max_gap_allows_configured_gaps(spec: ResampleSpec) -> None:
+def test_resample_max_gap_keeps_allowed_gaps(spec: ResampleSpec) -> None:
     df = _straight_track([0, 1, 4])
     df_resampled = resample(spec)(df.lazy()).collect().sort("frame")
 
@@ -103,7 +103,7 @@ def test_resample_simple(spec: ResampleSpec, scene_df_presets: DataFramePresets)
 @pytest.mark.parametrize(
     "spec", _all_methods_spec(up=2, down=1, emit_velocity=True, emit_acceleration=True)
 )
-def test_resample_simple_add_derivatives(
+def test_resample_adds_derivatives(
     spec: ResampleSpec, scene_df_presets: DataFramePresets
 ) -> None:
     # preset has 3 samples with no gaps

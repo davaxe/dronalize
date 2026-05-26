@@ -5,14 +5,14 @@ from dronalize.datasets import DatasetDescriptor, get_dataset, list_datasets
 
 
 @pytest.mark.parametrize("name", list_datasets())
-def test_all_available_builtin_datasets_resolve_to_matching_descriptors(name: str) -> None:
+def test_builtin_datasets_resolve(name: str) -> None:
     descriptor = get_dataset(name)
     assert isinstance(descriptor, DatasetDescriptor)
     assert descriptor.name == name
 
 
 @pytest.mark.parametrize("name", list_datasets())
-def test_builtin_default_screening_requires_agent_at_default_observation_end(name: str) -> None:
+def test_builtin_screening_requires_observation_end(name: str) -> None:
     descriptor = get_dataset(name)
     screening = descriptor.default_config.screening
 
@@ -29,7 +29,7 @@ def test_builtin_default_screening_requires_agent_at_default_observation_end(nam
 
 
 @pytest.mark.parametrize("name", list_datasets())
-def test_builtin_datasets_expose_temporal_support(name: str) -> None:
+def test_builtin_datasets_have_temporal_support(name: str) -> None:
     descriptor = get_dataset(name)
     temporal = descriptor.temporal_support
 

@@ -55,7 +55,7 @@ def test_cli_help_smoke() -> None:
     assert result.exit_code == 0
 
 
-def test_inspect_reports_temporal_support_summary() -> None:
+def test_inspect_reports_temporal_support() -> None:
     runner = CliRunner()
     result = runner.invoke(cli_app.app, ["inspect", "a43"])
 
@@ -67,7 +67,7 @@ def test_inspect_reports_temporal_support_summary() -> None:
     assert "Supported policies" in result.output
 
 
-def test_cli_imports_dataset_module_before_resolving_dataset(
+def test_cli_imports_dataset_module_before_lookup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module_path = tmp_path / "custom_datasets.py"
@@ -110,7 +110,7 @@ def test_cli_imports_dataset_module_before_resolving_dataset(
         ("def register_dronalize_datasets():\n    return [1]\n", "returned int"),
     ],
 )
-def test_cli_reports_invalid_dataset_module_hook(
+def test_cli_rejects_invalid_dataset_module_hook(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module_body: str, expected: str
 ) -> None:
     module_path = tmp_path / "bad_datasets.py"

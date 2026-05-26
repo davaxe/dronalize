@@ -63,7 +63,7 @@ def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_descriptor(monkeypatch, demo_descriptor())
 
 
-def test_resolve_request_compiles_runtime_and_loader_requests(
+def test_resolve_request_builds_plan(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
@@ -79,7 +79,7 @@ def test_resolve_request_compiles_runtime_and_loader_requests(
     assert plan.effective_default_observation_length == 2
 
 
-def test_resolve_request_rejects_unknown_storage_backend(
+def test_resolve_request_rejects_unknown_backend(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
@@ -88,7 +88,7 @@ def test_resolve_request_rejects_unknown_storage_backend(
         _ = resolve_request(_request(tmp_path, storage_backend="bad-backend"))
 
 
-def test_resolve_request_accepts_registered_string_storage_backend(
+def test_resolve_request_accepts_registered_backend(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
@@ -99,7 +99,7 @@ def test_resolve_request_accepts_registered_string_storage_backend(
     assert plan.storage_backend == "test-null"
 
 
-def test_resolve_request_rejects_unsupported_lane_change_sampling(
+def test_resolve_request_rejects_lane_change(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
@@ -116,7 +116,7 @@ persist = 3
         _ = resolve_request(_request(tmp_path, config_path=config_path))
 
 
-def test_resolve_request_rejects_lane_change_without_window(
+def test_resolve_request_requires_window_for_lane_change(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     descriptor = replace(
@@ -140,7 +140,7 @@ persist = 3
         _ = resolve_request(_request(tmp_path, config_path=config_path))
 
 
-def test_resolve_request_rejects_window_longer_than_temporal_support(
+def test_resolve_request_rejects_long_window(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     descriptor = replace(
@@ -157,7 +157,7 @@ def test_resolve_request_rejects_window_longer_than_temporal_support(
         _ = resolve_request(_request(tmp_path))
 
 
-def test_resolve_request_rejects_unsupported_window_policy(
+def test_resolve_request_rejects_window_policy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     descriptor = replace(
@@ -185,7 +185,7 @@ policy = "partial"
         _ = resolve_request(_request(tmp_path, config_path=config_path))
 
 
-def test_execute_request_surfaces_unknown_dataset_errors(tmp_path: Path) -> None:
+def test_execute_request_surfaces_unknown_dataset(tmp_path: Path) -> None:
     request = _request(tmp_path, dataset="this-dataset-does-not-exist")
 
     with pytest.raises(DatasetNotFoundError):
@@ -220,7 +220,7 @@ def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mon
     assert manifest.default_observation_length == 2
 
 
-def test_execute_request_uses_output_sample_record_transform(
+def test_execute_request_applies_record_transform(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
@@ -241,7 +241,7 @@ def test_execute_request_uses_output_sample_record_transform(
     assert sample == {"scene_number": 0, "dataset": "demo", "feature_shape": (1, 3, 7)}
 
 
-def test_execute_request_uses_output_sample_record_transform_with_custom_mds_format(
+def test_execute_request_writes_custom_mds(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     pytest.importorskip(
@@ -269,7 +269,7 @@ def test_execute_request_uses_output_sample_record_transform_with_custom_mds_for
     assert sample == {"scene_number": 0, "dataset": "demo", "feature_shape": [1, 3, 7]}
 
 
-def test_parallel_execution_smoke_processes_demo_dataset(
+def test_parallel_execution_smoke(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
 
@@ -301,7 +301,7 @@ def test_parallel_execution_smoke_processes_demo_dataset(
     assert manifest.default_observation_length == 2
 
 
-def test_parallel_stream_plan_smoke_yields_demo_dataset(
+def test_parallel_stream_plan_smoke(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     mp.set_start_method("spawn", force=True)

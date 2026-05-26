@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing as mp
 import time
 from typing import TYPE_CHECKING
 
@@ -89,8 +90,12 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
         },
     )
     start_time = time.time()
+    # Using default "fork" start method causes issues with Polars, resulting
+    # in processes hanging indefinitely.
+    mp.set_start_method("spawn", force=True)
     with open_execution_session(plan) as run:
         run.executor.execute(writer_factory=build_writer_factory(plan))
+        logger.debug("Execution complete, writing manifests", extra={"dataset": plan.dataset})
         plan.write_manifests()
         progress = run.executor.progress()
         logger.info(

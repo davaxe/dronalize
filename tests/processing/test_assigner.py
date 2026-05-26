@@ -8,7 +8,7 @@ import pytest
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 
 
-def test_weighted_assigner_is_deterministic_for_same_seed() -> None:
+def test_weighted_assigner_is_deterministic() -> None:
     assigner_a = StatelessWeightedAssigner(groups=["A", "B", "C"], weights=[0.5, 0.3, 0.2], seed=42)
     assigner_b = StatelessWeightedAssigner(groups=["A", "B", "C"], weights=[0.5, 0.3, 0.2], seed=42)
 
@@ -16,7 +16,7 @@ def test_weighted_assigner_is_deterministic_for_same_seed() -> None:
     assert [assigner_a.assign(v) for v in values] == [assigner_b.assign(v) for v in values]
 
 
-def test_weighted_assigner_distribution_is_close_to_requested_weights() -> None:
+def test_weighted_assigner_matches_weights() -> None:
     assigner = StatelessWeightedAssigner(groups=["A", "B", "C"], weights=[0.5, 0.3, 0.2], seed=100)
 
     counts = Counter(assigner.assign(v) for v in range(10_000))

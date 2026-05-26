@@ -20,7 +20,7 @@ from dronalize.processing.screening.screen import (
 )
 
 
-def test_cleanup_exclude_categories_removes_only_matching_rows() -> None:
+def test_exclude_categories_removes_matches() -> None:
     df = pl.DataFrame({
         "scene": [1, 1, 1],
         "id": [1, 2, 3],
@@ -38,7 +38,7 @@ def test_cleanup_exclude_categories_removes_only_matching_rows() -> None:
     assert screened["id"].to_list() == [1, 3]
 
 
-def test_agent_rule_tolerance_keeps_scene_but_marks_failed_agents() -> None:
+def test_tolerance_marks_failed_agents() -> None:
     df = pl.DataFrame({
         "scene": [1, 1, 1, 1, 1, 1, 1],
         "id": [1, 1, 1, 1, 2, 2, 2],
@@ -68,7 +68,7 @@ def test_agent_rule_tolerance_keeps_scene_but_marks_failed_agents() -> None:
     assert not tolerant_result.filter(pl.col("id") == 2)[AGENT_SCREENING_PASS_COLUMN].all()
 
 
-def test_agent_rule_require_keeps_scene_when_enough_agents_pass() -> None:
+def test_require_keeps_scene_with_enough_agents() -> None:
     df = pl.DataFrame({"scene": [1, 1, 1, 1, 1], "id": [1, 1, 2, 2, 3], "frame": [0, 1, 0, 1, 0]})
     rules = ScreeningRuleSet.define(
         agent_rules=[agent.MinSamples(minimum=2, require=PassingRequirement(absolute=2))]
@@ -84,7 +84,7 @@ def test_agent_rule_require_keeps_scene_when_enough_agents_pass() -> None:
     assert not result.filter(pl.col("id") == 3)[AGENT_SCREENING_PASS_COLUMN].all()
 
 
-def test_agent_rule_require_relative_filters_scene_when_too_few_agents_pass() -> None:
+def test_require_relative_filters_scene() -> None:
     df = pl.DataFrame({"scene": [1, 1, 1, 1, 1], "id": [1, 1, 2, 2, 3], "frame": [0, 1, 0, 1, 0]})
     rules = ScreeningRuleSet.define(
         agent_rules=[agent.MinSamples(minimum=2, require=PassingRequirement(relative=0.75))]
@@ -95,7 +95,7 @@ def test_agent_rule_require_relative_filters_scene_when_too_few_agents_pass() ->
     assert result.is_empty()
 
 
-def test_agent_rule_require_and_tolerance_must_both_pass() -> None:
+def test_require_and_tolerance_both_apply() -> None:
     df = pl.DataFrame({
         "scene": [1, 1, 1, 1, 1, 1, 1, 1],
         "id": [1, 1, 2, 2, 3, 3, 4, 5],
@@ -115,7 +115,7 @@ def test_agent_rule_require_and_tolerance_must_both_pass() -> None:
     assert result.is_empty()
 
 
-def test_agent_rule_require_fails_when_selector_matches_no_agents() -> None:
+def test_require_fails_without_matches() -> None:
     df = pl.DataFrame({
         "scene": [1, 1],
         "id": [1, 1],
@@ -139,14 +139,14 @@ def test_agent_rule_require_fails_when_selector_matches_no_agents() -> None:
     assert result.is_empty()
 
 
-def test_cleanup_prune_by_rejects_agent_rule_require() -> None:
+def test_prune_by_rejects_agent_require() -> None:
     with pytest.raises(ValueError, match="require"):
         _ = cleanup.PruneByRule(
             agent_rule=agent.MinSamples(minimum=2, require=PassingRequirement(absolute=1))
         )
 
 
-def test_scene_agent_range_filters_out_of_bounds_scenes() -> None:
+def test_scene_agent_range_filters_scenes() -> None:
     df = pl.DataFrame({
         "scene": [1, 1, 2, 2, 2],
         "id": [10, 11, 20, 21, 22],
@@ -159,7 +159,7 @@ def test_scene_agent_range_filters_out_of_bounds_scenes() -> None:
     assert screened["scene"].unique().to_list() == [1]
 
 
-def test_screen_scene_can_retain_scene_pass_flags_for_runtime() -> None:
+def test_screen_scene_retains_scene_pass_flags() -> None:
     df = pl.DataFrame({
         "scene": [1, 1, 2, 2, 2],
         "id": [10, 11, 20, 21, 22],

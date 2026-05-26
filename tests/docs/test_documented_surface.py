@@ -25,7 +25,7 @@ SKIP_VALIDATE_MARKER = "<!-- no-validate -->"
 PYTHON_INFO_STRINGS = {"py", "python"}
 
 
-def test_documented_runtime_imports_match_public_api() -> None:
+def test_documented_runtime_imports_match_api() -> None:
     assert ExecutionRequest is runtime.ExecutionRequest
     assert OutputSample is runtime.OutputSample
     assert resolve_request is runtime.resolve_request
@@ -70,7 +70,7 @@ def _documented_python_params() -> list[tuple[str, str, str]]:
 @pytest.mark.parametrize(
     ("block_id", "relative_path", "snippet"), _documented_config_params(), ids=lambda value: value
 )
-def test_documented_configuration_examples_validate(
+def test_documented_config_examples_validate(
     tmp_path: Path, block_id: str, relative_path: str, snippet: str
 ) -> None:
     """Test that TOML code blocks in the docs can be parsed as valid config."""
@@ -100,7 +100,7 @@ def test_config_file_parses() -> None:
     _ = parse_config(path)
 
 
-def test_local_markdown_links_resolve() -> None:
+def test_markdown_links_resolve() -> None:
     failures: list[str] = []
     for doc_path in sorted(DOCS_ROOT.rglob("*.md")):
         text = doc_path.read_text(encoding="utf-8")

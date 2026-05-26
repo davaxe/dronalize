@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import multiprocessing as mp
-
 _CLI_INSTALL_HINT = "Install dronalize[cli] to use the dronalize command line interface."
 _CLI_DEPENDENCIES = ("typer", "rich")
 
@@ -23,9 +21,6 @@ def main() -> None:
             raise ModuleNotFoundError(_CLI_INSTALL_HINT) from exc
         raise
 
-    # Using default "fork" start method causes issues with Polars, resulting
-    # in processes hanging indefinitely.
-    mp.set_start_method("spawn", force=True)
     cli_main()
 
 

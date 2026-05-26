@@ -50,7 +50,7 @@ def _assert_tensor_array_equal(tensor: torch.Tensor, expected: NDArrayAny) -> No
     np.testing.assert_array_equal(_to_numpy(tensor), expected)
 
 
-def test_torch_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
+def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch")
     from dronalize.io.adapters.torch import TorchSceneDataset
 
@@ -70,7 +70,7 @@ def test_torch_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     _assert_tensor_array_equal(sample.map_edge_types, expected.map_edge_types)
 
 
-def test_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
+def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import HeteroSceneDataset
 
@@ -92,7 +92,7 @@ def test_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     _assert_tensor_array_equal(sample["map", "connects", "map"].edge_type, expected.map_edge_types)
 
 
-def test_split_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
+def test_split_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
 
@@ -118,9 +118,7 @@ def test_split_pyg_scene_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None
     _assert_tensor_array_equal(sample["map", "connects", "map"].edge_type, expected.map_edge_types)
 
 
-def test_split_pyg_scene_dataset_uses_record_default_observation_length(
-    tmp_path: Path, scene: Scene
-) -> None:
+def test_split_pyg_dataset_uses_record_default_split(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
 
@@ -141,9 +139,7 @@ def test_split_pyg_scene_dataset_uses_record_default_observation_length(
     assert int(sample["agent"].y.size(1)) == 2
 
 
-def test_split_pyg_scene_dataset_accepts_observation_length_callable(
-    tmp_path: Path, scene: Scene
-) -> None:
+def test_split_pyg_dataset_accepts_callable_split(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
 
@@ -157,7 +153,7 @@ def test_split_pyg_scene_dataset_accepts_observation_length_callable(
     assert int(sample["agent"].y.size(1)) == 2
 
 
-def test_pyg_collate_full_horizon_with_time_padding(tmp_path: Path, scene: Scene) -> None:
+def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import HeteroSceneDataset, collate_hetero_with_time_padding
 
@@ -173,7 +169,7 @@ def test_pyg_collate_full_horizon_with_time_padding(tmp_path: Path, scene: Scene
     assert int(batch["agent"].features.size(1)) == int(sample["agent"].features.size(1))
 
 
-def test_pyg_collate_split_with_time_padding(tmp_path: Path, scene: Scene) -> None:
+def test_pyg_collate_pads_split(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import SplitHeteroSceneDataset, collate_hetero_with_time_padding
 

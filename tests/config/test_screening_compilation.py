@@ -10,7 +10,7 @@ from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.screening import ScreeningRuleSet, agent, cleanup, scene, screen_scene
 
 
-def test_agent_specs_compile_into_runtime_agent_rules() -> None:
+def test_agent_specs_compile() -> None:
     config = ScreeningConfig.model_validate({
         "agent": {
             "required_frames": {"rule": "frames", "frames": [0, 1, 2]},
@@ -37,7 +37,7 @@ def test_agent_specs_compile_into_runtime_agent_rules() -> None:
     assert compiled.agent_rules[2].require.relative == pytest.approx(0.75)
 
 
-def test_scene_specs_compile_into_runtime_scene_rules() -> None:
+def test_scene_specs_compile() -> None:
     config = ScreeningConfig.model_validate({
         "scene": {"agent_bounds": {"rule": "agent_range", "minimum": 1, "maximum": 5}}
     })
@@ -49,7 +49,7 @@ def test_scene_specs_compile_into_runtime_scene_rules() -> None:
     assert compiled.scene_rules[0].rule_id == "agent_bounds"
 
 
-def test_cleanup_specs_compile_and_wrap_nested_agent_rules() -> None:
+def test_cleanup_specs_compile_nested_agent_rules() -> None:
     config = ScreeningConfig.model_validate({
         "cleanup": {
             "keep_only_cars": {"rule": "include", "categories": ["car"]},
@@ -70,7 +70,7 @@ def test_cleanup_specs_compile_and_wrap_nested_agent_rules() -> None:
     assert compiled.cleanup_rules[1].rule_id == "prune_sparse"
 
 
-def test_cleanup_prune_by_rejects_nested_agent_require() -> None:
+def test_prune_by_rejects_nested_require() -> None:
     with pytest.raises(ValueError, match="require"):
         ScreeningConfig.model_validate({
             "cleanup": {
@@ -82,14 +82,14 @@ def test_cleanup_prune_by_rejects_nested_agent_require() -> None:
         })
 
 
-def test_agent_require_must_define_a_threshold() -> None:
+def test_require_must_define_threshold() -> None:
     with pytest.raises(ValueError, match="at least one"):
         ScreeningConfig.model_validate({
             "agent": {"sample_floor": {"rule": "min_samples", "minimum": 3, "require": {}}}
         })
 
 
-def test_compiled_screen_rules_are_directly_usable_in_screen_scene() -> None:
+def test_compiled_rules_work_with_screen_scene() -> None:
     config = ScreeningConfig.model_validate({
         "cleanup": {"drop_unimportant": {"rule": "exclude", "categories": ["unimportant"]}},
         "scene": {"enough_agents": {"rule": "agent_range", "minimum": 1}},
