@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING, Any, overload
 import numpy as np
 import numpy.typing as npt
 
-from dronalize.config.models import (
+from dronalize.config.models.map import (
     BoundingBoxExtraction,
     CircularExtraction,
     FullMapExtraction,
     MapConfig,
-    MapEdgeTypesConfig,
+    MapEdgeTypeRules,
     MapExtraction,
     SceneExtentExtraction,
     TrajectoryBufferExtraction,
@@ -110,7 +110,7 @@ def extract(
 
     match extraction:
         case BoundingBoxExtraction(width=width, height=height):
-            return graph.extract_bbox(center, width, height)
+            return graph.extract_bounding_box(center, width, height)
         case CircularExtraction(radius=radius):
             return graph.extract_radius(center, radius)
         case TrajectoryBufferExtraction(radius=radius):
@@ -122,14 +122,14 @@ def extract(
             if relevant_positions is None:
                 msg = "relevant_positions must be provided for SceneExtentExtraction"
                 raise ValueError(msg)
-            return graph.extract_relevant(
+            return graph.extract_extent_for_positions(
                 relevant_positions, padding, use_bbox=shape == "bounding_box"
             )
         case FullMapExtraction():
             return graph
 
 
-def apply_edge_type_config(map_graph: MapGraph, edge_types: MapEdgeTypesConfig | None) -> MapGraph:
+def apply_edge_type_config(map_graph: MapGraph, edge_types: MapEdgeTypeRules | None) -> MapGraph:
     """Apply edge-type remapping and filtering to a graph."""
     if edge_types is None or map_graph.num_edges == 0:
         return map_graph
@@ -175,7 +175,7 @@ def apply_edge_type_config(map_graph: MapGraph, edge_types: MapEdgeTypesConfig |
 
 
 def _normalize_edge_type_rules(
-    edge_types: MapEdgeTypesConfig,
+    edge_types: MapEdgeTypeRules,
 ) -> tuple[frozenset[EdgeType] | None, frozenset[EdgeType], dict[EdgeType, EdgeType]]:
     include = (
         None

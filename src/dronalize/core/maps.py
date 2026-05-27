@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+from scipy.spatial import cKDTree
 from typing_extensions import Self, override
 
 from dronalize.core.categories import EdgeType
@@ -92,9 +93,9 @@ class SharedMapGraph:
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_t: TracebackType | None,
+        _exc_type: type[BaseException] | None,
+        _exc_val: BaseException | None,
+        _exc_t: TracebackType | None,
     ) -> None:
         """Release resources when exiting the context."""
         self.close()
@@ -331,7 +332,7 @@ class MapGraph:
 
         return self._subgraph_from_mask(within_mask)
 
-    def extract_bbox(
+    def extract_bounding_box(
         self,
         center: tuple[float, float] | npt.NDArray[np.floating[Any]] | None,
         width: float,
@@ -375,7 +376,7 @@ class MapGraph:
 
         return self._subgraph_from_mask(within_mask)
 
-    def extract_relevant(
+    def extract_extent_for_positions(
         self,
         relevant_positions: npt.NDArray[np.floating[Any]],
         padding_factor: float = 1.0,
@@ -411,7 +412,7 @@ class MapGraph:
         half_w = (maxs[0] - mins[0]) * padding_factor
         half_h = (maxs[1] - mins[1]) * padding_factor
 
-        return self.extract_bbox(center, half_w, half_h)
+        return self.extract_bounding_box(center, half_w, half_h)
 
     def extract_trajectory_buffer(
         self, relevant_positions: npt.NDArray[np.floating[Any]], radius: float
@@ -439,13 +440,19 @@ class MapGraph:
                 edge_types=np.zeros((0,), dtype=np.int32),
             )
 
+        positions = np.asarray(relevant_positions, dtype=np.float64)
+        if positions.ndim != 2 or positions.shape[1] != 2:
+            msg = f"relevant_positions must have shape (N, 2), got {positions.shape!r}"
+            raise ValueError(msg)
+
+        if self.num_nodes == 0:
+            return self.copy()
+
         within_mask = np.zeros(self.num_nodes, dtype=bool)
-        radius_sq = radius * radius
-        for point in relevant_positions:
-            diff = self.node_positions - np.asarray(point, dtype=np.float64)
-            within_mask |= np.sum(diff * diff, axis=1) <= radius_sq
-            if within_mask.all():
-                break
+        tree = cKDTree(self.node_positions)
+        neighbor_groups = tree.query_ball_point(positions, r=radius)
+        for node_indices in neighbor_groups:
+            within_mask[node_indices] = True
 
         return self._subgraph_from_mask(within_mask)
 
@@ -555,7 +562,7 @@ def _extract_subgraph(
     node_mask : ndarray of bool, shape (N,)
         Boolean array indicating which nodes to keep.
     edge_indices : ndarray of int64, shape (2, M)
-        Source/destination indices for every edge.
+        DatasetSource/destination indices for every edge.
 
     Returns
     -------

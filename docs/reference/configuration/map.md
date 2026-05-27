@@ -7,7 +7,7 @@ Map settings control how map data is processed when a run includes maps. The mos
 | Key | Type | Description | Default |
 |---|---|---|---|
 | `min_distance` | `float` | Minimum spacing used when simplifying map geometry. Must be greater than `0`. | `inherited` |
-| `interp_distance` | `float` | Interpolation spacing used when densifying geometry. Must be greater than or equal to `min_distance`. | `inherited` |
+| `interpolation_distance` | `float` | Interpolation spacing used when densifying geometry. Must be greater than or equal to `min_distance`. | `inherited` |
 | `edge_types` | `table` | Optional semantic edge filtering and remapping rules. | `none` |
 
 !!! note "Disable map data"
@@ -64,7 +64,7 @@ When `mode` is set to `"scene_extent"`, the map is cropped adaptively around the
 ```toml
 [datasets.a43.map]
 min_distance = 1.0
-interp_distance = 2.5
+interpolation_distance = 2.5
 
 [datasets.a43.map.extraction]
 mode = "trajectory_buffer"

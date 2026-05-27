@@ -8,10 +8,10 @@ from typing import Literal
 from pydantic import Field
 from typing_extensions import override
 
-from dronalize.config.base import FullConfig, PartialConfig
+from dronalize.config.base import ConfigPatch, ResolvedConfig
 
 
-class RuntimeConfig(FullConfig):
+class RuntimeConfig(ResolvedConfig):
     """Execution controls for processing requests.
 
     Attributes
@@ -29,7 +29,7 @@ class RuntimeConfig(FullConfig):
     """Optional per-worker batch size for scene dispatch."""
 
 
-class PartialRuntimeConfig(PartialConfig[RuntimeConfig]):
+class PartialRuntimeConfig(ConfigPatch[RuntimeConfig]):
     """Patch model for partially overriding :class:`RuntimeConfig`."""
 
     jobs: int | Literal["auto"] | None = None
@@ -39,6 +39,8 @@ class PartialRuntimeConfig(PartialConfig[RuntimeConfig]):
     full_config_type: type[RuntimeConfig] = Field(default=RuntimeConfig, init=False, repr=False)
 
     @override
-    def apply_to(self, target: RuntimeConfig | None, *, exclude_none: bool = True) -> RuntimeConfig:
+    def merge_into(
+        self, target: RuntimeConfig | None, *, exclude_none: bool = True
+    ) -> RuntimeConfig:
         partial = self.model_copy(update={"jobs": mp.cpu_count()}) if self.jobs == "auto" else self
-        return PartialConfig[RuntimeConfig].apply_to(partial, target, exclude_none=exclude_none)
+        return ConfigPatch[RuntimeConfig].merge_into(partial, target, exclude_none=exclude_none)

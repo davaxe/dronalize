@@ -3,7 +3,7 @@
 
 ______________________________________________________________________
 
-[![CI](https://github.com/davaxe/dronalize/actions/workflows/ci.yml/badge.svg)](https://github.com/davaxe/dronalize/actions/workflows/ci.yml)
+[![CI](https://github.com/davaxe/dronalize/actions/workflows/ci.yml/badge.svg)](https://raw.githubusercontent.com/davaxe/dronalize/dev/docs/assets/dronalize-header.png)
 [![PyPI](https://img.shields.io/pypi/v/dronalize)](https://pypi.org/project/dronalize/)
 [![Python](https://img.shields.io/pypi/pyversions/dronalize)](https://pypi.org/project/dronalize/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-2F2F2F.svg)](LICENSE)

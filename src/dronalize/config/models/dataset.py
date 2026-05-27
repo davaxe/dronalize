@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import Field
 from typing_extensions import override
 
-from dronalize.config.base import ConfigBase, FullConfig, PartialConfig, apply_optional
+from dronalize.config.base import ConfigBase, ConfigPatch, ResolvedConfig, apply_optional
 from dronalize.config.models.map import MapConfig, PartialMapConfig
 from dronalize.config.models.output import OutputConfig, PartialOutputConfig
 from dronalize.config.models.runtime import PartialRuntimeConfig, RuntimeConfig
@@ -16,7 +16,7 @@ from dronalize.config.models.screening import PartialScreeningConfig, ScreeningC
 from dronalize.config.models.split import AssignConfig, NoAssign, ReadAll, ReadConfig
 
 
-class DatasetConfig(FullConfig):
+class DatasetConfig(ResolvedConfig):
     """Full dataset/profile-style configuration schema."""
 
     scenes: ScenesConfig
@@ -33,7 +33,7 @@ class DatasetConfig(FullConfig):
     """Input selection configuration used to choose raw dataset sources."""
     assign: AssignConfig = Field(default_factory=lambda: AssignConfig(NoAssign()))
     """Output assignment configuration used to label generated scenes."""
-    dataset: dict[str, Any] | None = Field(default=None)
+    loader_options: dict[str, Any] | None = Field(default=None)
     """Dataset-specific loader options forwarded to the selected dataset plugin."""
 
 
@@ -57,11 +57,11 @@ class PartialDatasetConfigBase(ConfigBase):
     """Replacement input selection strategy for the target dataset config."""
     assign: AssignConfig | None = Field(default=None)
     """Replacement output assignment strategy for the target dataset config."""
-    dataset: dict[str, Any] | None = Field(default=None)
+    loader_options: dict[str, Any] | None = Field(default=None)
     """Dataset-specific loader option overrides for the target config."""
 
 
-class PartialDatasetConfig(PartialDatasetConfigBase, PartialConfig[DatasetConfig]):
+class PartialDatasetConfig(PartialDatasetConfigBase, ConfigPatch[DatasetConfig]):
     """Patch model for applying partial values to a full dataset config.
 
     The merge strategy preserves existing nested defaults unless a matching
@@ -71,18 +71,22 @@ class PartialDatasetConfig(PartialDatasetConfigBase, PartialConfig[DatasetConfig
     full_config_type: type[DatasetConfig] = DatasetConfig
 
     @override
-    def apply_to(self, target: DatasetConfig | None, *, exclude_none: bool = True) -> DatasetConfig:
+    def merge_into(
+        self, target: DatasetConfig | None, *, exclude_none: bool = True
+    ) -> DatasetConfig:
         if target is None:
             msg = "Defaults must be provided to apply a PartialDatasetConfig."
             raise ValueError(msg)
 
         return DatasetConfig(
-            scenes=self.scenes.apply_to(target.scenes) if self.scenes else target.scenes,
-            runtime=self.runtime.apply_to(target.runtime) if self.runtime else target.runtime,
+            scenes=self.scenes.merge_into(target.scenes) if self.scenes else target.scenes,
+            runtime=self.runtime.merge_into(target.runtime) if self.runtime else target.runtime,
             screening=apply_optional(self.screening, target.screening),
-            dataset=self.dataset if self.dataset is not None else target.dataset,
-            output=self.output.apply_to(target.output) if self.output else target.output,
-            map=self.map.apply_to(target.map) if self.map else target.map,
+            loader_options=(
+                self.loader_options if self.loader_options is not None else target.loader_options
+            ),
+            output=self.output.merge_into(target.output) if self.output else target.output,
+            map=self.map.merge_into(target.map) if self.map else target.map,
             read=self.read if self.read is not None else target.read,
             assign=self.assign if self.assign is not None else target.assign,
         )

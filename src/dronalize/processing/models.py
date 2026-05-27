@@ -5,28 +5,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from dronalize.config.models import (
+from dronalize.config.models.split import (
     NoAssign,
+    PreserveNativeAssign,
     ReadAll,
+    ReadNative,
     SceneAssign,
-    ShuffledTimeBlockAssign,
     SourceAssign,
-    TimeBlockAssign,
 )
-from dronalize.config.models.split import PreserveNativeAssign, ReadNative
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
-    from dronalize.config.models import (
-        AssignConfig,
-        AssignUnion,
-        MapConfig,
-        ReadConfig,
-        ReadUnion,
-        ScenesConfig,
-        ScreeningConfig,
-    )
-    from dronalize.processing.loading.options import DatasetOptionsModel
+    from dronalize.config.models.map import MapConfig
+    from dronalize.config.models.scenes import ScenesConfig
+    from dronalize.config.models.screening import ScreeningConfig
+    from dronalize.config.models.split import AssignConfig, AssignUnion, ReadConfig, ReadUnion
+    from dronalize.processing.loading.models import DatasetOptionsModel
 
 
 def _ordered_splits(
@@ -37,8 +31,8 @@ def _ordered_splits(
 
 
 @dataclass(frozen=True, slots=True)
-class ReadRequest:
-    """Read scope for dataset source enumeration."""
+class ReadSelection:
+    """Read scope for dataset DatasetSource enumeration."""
 
     config: ReadUnion
     native_splits: tuple[DatasetSplit, ...] | None = None
@@ -46,7 +40,7 @@ class ReadRequest:
     @classmethod
     def from_config(
         cls, read: ReadConfig, *, supported_native_splits: tuple[DatasetSplit, ...] | None = None
-    ) -> ReadRequest:
+    ) -> ReadSelection:
         """Build a read scope from the public read configuration."""
         read_root = read.root
         match read_root:
@@ -64,14 +58,14 @@ class ReadRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class AssignmentRequest:
+class SplitAssignmentPlan:
     """Output split assignment plan derived from the resolved config."""
 
     config: AssignUnion
     seed: int | None = None
 
     @classmethod
-    def from_config(cls, assign: AssignConfig, *, seed: int | None = None) -> AssignmentRequest:
+    def from_config(cls, assign: AssignConfig, *, seed: int | None = None) -> SplitAssignmentPlan:
         """Build an output-assignment plan from the public config wrapper."""
         return cls(config=assign.root, seed=seed)
 
@@ -96,10 +90,6 @@ class AssignmentRequest:
     def active_weights(self) -> tuple[float, ...]:
         """Return active output split weights."""
         return tuple(weight for _, weight in self.active())
-
-    def uses_time_partition(self) -> bool:
-        """Return whether the assignment uses time-based partitioning."""
-        return isinstance(self.config, (TimeBlockAssign, ShuffledTimeBlockAssign))
 
     def uses_weighted_assignment(self) -> bool:
         """Return whether the assignment uses weighted routing."""
@@ -136,30 +126,30 @@ class AssignmentRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class LoaderRequest:
+class LoaderPlan:
     """Narrow loader-facing request derived from a resolved dataset config."""
 
     scenes: ScenesConfig
-    dataset: DatasetOptionsModel
-    read: ReadRequest
+    loader_options: DatasetOptionsModel
+    read: ReadSelection
     screening: ScreeningConfig | None = None
     map: MapConfig | None = None
 
     @property
-    def history_frames(self) -> int:
-        """Return the number of history frames per scene."""
-        return self.scenes.history_frames
+    def horizon_frames(self) -> int:
+        """Return the number of frames per scene horizon."""
+        return self.scenes.horizon_frames
 
     @property
-    def future_frames(self) -> int:
-        """Return the number of future frames per scene."""
-        return self.scenes.future_frames
+    def default_observation_length(self) -> int | None:
+        """Return the default reader/adaptor split point, if configured."""
+        return self.scenes.default_observation_length
 
 
 @dataclass(frozen=True, slots=True)
-class PipelinePlan:
+class TrajectoryPipelinePlan:
     """Trajectory-processing plan for one run."""
 
     scenes: ScenesConfig
     screening: ScreeningConfig | None = None
-    assignment: AssignmentRequest | None = None
+    assignment: SplitAssignmentPlan | None = None

@@ -1,21 +1,4 @@
-"""Typed configuration models grouped by processing concern.
-
-Import from this package when you need to build, validate, or introspect
-individual configuration sections directly in Python. The models are organized
-roughly the same way as the project configuration structure:
-
-- dataset-level composition via [`DatasetConfig`][dronalize.config.models.DatasetConfig]
-- scene sampling and temporal transforms via
-  [`ScenesConfig`][dronalize.config.models.ScenesConfig]
-- screening and cleanup rules via
-  [`ScreeningConfig`][dronalize.config.models.ScreeningConfig]
-- output encoding and storage options via
-  [`OutputConfig`][dronalize.config.models.OutputConfig]
-- runtime execution controls via
-  [`RuntimeConfig`][dronalize.config.models.RuntimeConfig]
-- read selection via [`ReadConfig`][dronalize.config.models.ReadConfig]
-- assignment strategies via [`AssignConfig`][dronalize.config.models.AssignConfig]
-"""
+"""Config models."""
 
 from dronalize.config.models.dataset import (
     DatasetConfig,
@@ -27,10 +10,10 @@ from dronalize.config.models.map import (
     CircularExtraction,
     FullMapExtraction,
     MapConfig,
-    MapEdgeTypesConfig,
+    MapEdgeTypeRules,
     MapExtraction,
     PartialMapConfig,
-    PartialMapEdgeTypesConfig,
+    PartialMapEdgeTypeRules,
     SceneExtentExtraction,
     TrajectoryBufferExtraction,
 )
@@ -57,9 +40,10 @@ from dronalize.config.models.scenes import (
 from dronalize.config.models.screening import (
     AgentCheckSpec,
     AgentRangeSpec,
-    AgentSelector,
+    AgentSelectorConfig,
     CategoryRangeSpec,
     CleanupSpec,
+    CountRange,
     EndsAfterFrameSpec,
     ExcludeCategoriesSpec,
     IncludeCategoriesSpec,
@@ -70,8 +54,8 @@ from dronalize.config.models.screening import (
     MinSamplesSpec,
     MinSpanSpec,
     PartialScreeningConfig,
+    PassingRequirement,
     PruneByRuleSpec,
-    Range,
     RequireFramesSpec,
     RequireSceneFramesSpec,
     RequireSceneWindowSpec,
@@ -100,13 +84,14 @@ from dronalize.config.models.split import (
 __all__ = [
     "AgentCheckSpec",
     "AgentRangeSpec",
-    "AgentSelector",
+    "AgentSelectorConfig",
     "AssignConfig",
     "AssignUnion",
     "BoundingBoxExtraction",
     "CategoryRangeSpec",
     "CircularExtraction",
     "CleanupSpec",
+    "CountRange",
     "DatasetConfig",
     "EndsAfterFrameSpec",
     "ExcludeCategoriesSpec",
@@ -115,7 +100,7 @@ __all__ = [
     "LaneChangeConfig",
     "MDSOutputConfig",
     "MapConfig",
-    "MapEdgeTypesConfig",
+    "MapEdgeTypeRules",
     "MapExtraction",
     "MaxGapSpec",
     "MaxMissingFramesSpec",
@@ -131,16 +116,16 @@ __all__ = [
     "PartialLaneChangeConfig",
     "PartialMDSOutputConfig",
     "PartialMapConfig",
-    "PartialMapEdgeTypesConfig",
+    "PartialMapEdgeTypeRules",
     "PartialOutputConfig",
     "PartialResampleConfig",
     "PartialRuntimeConfig",
     "PartialScenesConfig",
     "PartialScreeningConfig",
     "PartialWindowConfig",
+    "PassingRequirement",
     "PreserveNativeAssign",
     "PruneByRuleSpec",
-    "Range",
     "ReadAll",
     "ReadConfig",
     "ReadNative",

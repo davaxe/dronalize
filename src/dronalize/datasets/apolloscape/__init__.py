@@ -1,3 +1,3 @@
-from dronalize.datasets.apolloscape.spec import DATASET_SPEC
+from dronalize.datasets.apolloscape.descriptor import DATASET_DESCRIPTOR
 
-__all__ = ["DATASET_SPEC"]
+__all__ = ["DATASET_DESCRIPTOR"]

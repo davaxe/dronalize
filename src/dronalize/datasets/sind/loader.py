@@ -8,11 +8,11 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
-from dronalize.core.functional import yaw_from_pos_expr
+from dronalize.core.functional import yaw_from_position_expr
 from dronalize.core.scene import CANONICAL
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
+from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -21,18 +21,20 @@ if TYPE_CHECKING:
     from dronalize.core.scene import TrajectorySchema
 
 
-class SindLoader(BaseSceneLoader):
+class SindLoader(SceneLoader):
     """Loader for the SinD dataset."""
 
     @override
-    def iter_sources(self) -> Iterable[Source[Path]]:
+    def iter_sources(self) -> Iterable[DatasetSource[Path]]:
         for region in sorted(p for p in self.root.iterdir() if p.is_dir()):
             for data_dir in sorted(p for p in region.iterdir() if p.is_dir()):
-                yield Source(identifier=data_dir.name, data=data_dir, map_key=str(region.name))
+                yield DatasetSource(
+                    identifier=data_dir.name, payload=data_dir, map_key=str(region.name)
+                )
 
     @override
-    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
-        subdir = source.data
+    def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
+        subdir = source.payload
         pedestrian_data_path = subdir / "Ped_smoothed_tracks.csv"
         vehicle_data_path = subdir / "Veh_smoothed_tracks.csv"
         vehicle_df = pl.scan_csv(vehicle_data_path, schema_overrides=_VEHICLE_SCHEMA).select(
@@ -70,11 +72,11 @@ class SindLoader(BaseSceneLoader):
                 "animal": AgentCategory.ANIMAL.value,
             })
             .alias("agent_category"),
-            yaw_from_pos_expr().alias("yaw"),
+            yaw_from_position_expr().alias("yaw"),
             *("x", "y", "vx", "vy", "ax", "ay"),
         )
 
-        yield LoadedSourceData(pl.concat([vehicle_df, pedestrian_df]))
+        yield LoadedSourceFrame(pl.concat([vehicle_df, pedestrian_df]))
 
     @override
     def count_sources(self) -> int | None:

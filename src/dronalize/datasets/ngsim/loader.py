@@ -10,9 +10,9 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
+from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -21,18 +21,18 @@ if TYPE_CHECKING:
     from dronalize.core.scene import TrajectorySchema
 
 
-class NGSimLoader(BaseSceneLoader):
+class NGSimLoader(SceneLoader):
     """Scene loader for the I-80 dataset."""
 
     @override
-    def iter_sources(self) -> Iterable[Source[Path]]:
+    def iter_sources(self) -> Iterable[DatasetSource[Path]]:
         for i, csv_file in enumerate(sorted(self.root.rglob("trajectories*.csv"))):
-            yield Source(identifier=i, data=csv_file)
+            yield DatasetSource(identifier=i, payload=csv_file)
 
     @override
-    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
-        yield LoadedSourceData(
-            pl.scan_csv(source.data).select(
+    def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
+        yield LoadedSourceFrame(
+            pl.scan_csv(source.payload).select(
                 pl.col("Vehicle_ID").alias("id"),
                 pl.col("Frame_ID").alias("frame"),
                 pl.col("Local_X").alias("x").mul(0.3048),

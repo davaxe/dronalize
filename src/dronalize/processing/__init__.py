@@ -3,7 +3,7 @@
 ## Import guide
 
 ```python
-from dronalize.processing import maps, pipeline, screening
+from dronalize.processing import maps, screening
 ```
 
 Use this package as a lightweight namespace for the focused processing
@@ -13,8 +13,6 @@ subpackages:
   grouped rule families
 - [`maps`][dronalize.processing.maps] for map builders, extraction config, and
   resolver helpers
-- [`pipeline`][dronalize.processing.pipeline] for pipeline and transform
-  abstractions
 
 The advanced custom dataset loader API lives one level deeper in
 [`dronalize.processing.loading`][] instead of being flattened into this root
@@ -26,6 +24,6 @@ surface.
 - [`dronalize.runtime`][] for runtime config resolution and planning
 """
 
-from dronalize.processing import maps, pipeline, screening
+from dronalize.processing import maps, screening
 
-__all__ = ["maps", "pipeline", "screening"]
+__all__ = ["maps", "screening"]

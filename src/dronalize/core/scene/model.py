@@ -47,10 +47,8 @@ class Scene:
     """DataFrame containing the scene data."""
     scene_number: int
     """Unique scene number assigned during processing."""
-    history_frames: int
-    """Number of history frames."""
-    future_frames: int
-    """Number of future frames."""
+    horizon_frames: int
+    """Number of frames in the scene horizon."""
     schema: TrajectorySchema
     """Schema describing which fields this scene currently provides."""
     sample_time: float | None = None
@@ -63,6 +61,8 @@ class Scene:
     """Optional set of agents that passed screening and are retained for outputs."""
     split_assignment: DatasetSplit | None = None
     """Split assignment for this scene (train/val/test)."""
+    dataset: str | None = None
+    """Dataset label associated with this scene, if known."""
 
     @classmethod
     def create(
@@ -70,13 +70,13 @@ class Scene:
         frame: pl.DataFrame,
         scene_number: int,
         *,
-        history_frames: int,
-        future_frames: int,
+        horizon_frames: int,
         schema: TrajectorySchema,
         sample_time: float | None = None,
         map_key: MapKey = None,
         map_resolver: MapResolver | None = None,
         split_assignment: DatasetSplit | None = None,
+        dataset: str | None = None,
         passed_agent_ids: frozenset[int] | None = None,
         cast_schema: bool = True,
     ) -> Scene:
@@ -96,10 +96,8 @@ class Scene:
             fields defined in the provided `schema`.
         scene_number : int
             Unique scene number assigned during processing.
-        history_frames : int
-            Number of history frames included in the scene.
-        future_frames : int
-            Number of future frames included in the scene.
+        horizon_frames : int
+            Number of frames included in the scene horizon.
         schema : TrajectorySchema
             Schema describing which fields the scene currently provides. The
             input frame is expected to have columns matching the physical fields
@@ -113,6 +111,8 @@ class Scene:
             demand.
         split_assignment : DatasetSplit or None, optional
             Split assignment for this scene (train/val/test).
+        dataset : str or None, optional
+            Dataset label associated with this scene, if known.
         passed_agent_ids : frozenset of int or None, optional
             Optional set of agents that passed screening and should be explictly
             added to the scene metadata.
@@ -127,18 +127,21 @@ class Scene:
         return cls(
             frame=frame,
             scene_number=scene_number,
-            history_frames=history_frames,
-            future_frames=future_frames,
+            horizon_frames=horizon_frames,
             schema=schema,
             sample_time=sample_time,
             map_key=map_key,
             map_resolver=map_resolver,
             passed_agent_ids=passed_agent_ids,
             split_assignment=split_assignment,
+            dataset=dataset,
         )
 
     def __post_init__(self) -> None:
         """Cast and validate the trajectory schema."""
+        if self.horizon_frames <= 0:
+            msg = f"`horizon_frames` must be positive, but got {self.horizon_frames}."
+            raise ValueError(msg)
         if not _matches_physical_schema(self.frame.schema, self.schema.physical):
             msg = _get_schema_mismatch_message(
                 actual=self.frame.schema,
@@ -154,7 +157,7 @@ class Scene:
         return self.map_resolver(self)
 
     def has_map(self) -> bool:
-        """Return whether this scene can materialize a map graph."""
+        """Return whether this scene has a lazy map resolver attached."""
         return self.map_resolver is not None
 
     def as_schema(self, schema: TrajectorySchema = CANONICAL) -> Scene:
@@ -175,9 +178,9 @@ class Scene:
         return (
             "Scene("
             f"scene_number={self.scene_number}, "
-            f"history_frames={self.history_frames}, "
-            f"future_frames={self.future_frames}, "
+            f"horizon_frames={self.horizon_frames}, "
             f"schema={self.schema.name}, "
+            f"dataset={self.dataset!r}, "
             f"map_key={self.map_key!r}, "
             f"frame=DataFrame({rows} rows x {cols} cols)"
             ")"

@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene
     from dronalize.io import SceneRecord
-    from tests.integration.catalog import DatasetCase
 
 
 def _assert_shape(array: npt.NDArray[Any], expected: tuple[int, ...], name: str) -> None:
@@ -46,9 +45,7 @@ def _assert_edge_index_bounds(
 
 def assert_basic_scene_sanity(scene: Scene) -> None:
     assert scene.scene_number >= 0, "scene_number must be non-negative"
-    assert scene.history_frames >= 0, "history_frames must be >= 0"
-    assert scene.future_frames >= 0, "future_frames must be >= 0"
-    assert scene.history_frames + scene.future_frames > 0, "expected positive total horizon"
+    assert scene.horizon_frames > 0, "expected positive total horizon"
 
     frame = scene.frame
     assert frame.height > 0, "scene frame is empty"
@@ -120,61 +117,38 @@ def assert_basic_map_sanity(graph: MapGraph | None, *, expect_map: bool) -> None
 
 def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
     assert record.scene_number == scene.scene_number, "scene_number mismatch"
+    assert record.dataset == scene.dataset, "dataset mismatch"
 
     _assert_shape(record.position_offset, (2,), "position_offset")
     _assert_finite(record.position_offset, "position_offset")
 
     n_agents = int(record.agent_types.shape[0])
-    history_frames = scene.history_frames
-    future_frames = scene.future_frames
-    input_feature_dim = int(record.input_features.shape[2])
-    output_feature_dim = int(record.output_features.shape[2])
+    horizon_frames = scene.horizon_frames
+    feature_dim = int(record.features.shape[2])
 
-    _assert_shape(record.passed_agent_mask, (n_agents,), "passed_agent_mask")
-    _assert_dtype(record.passed_agent_mask, np.bool_, "passed_agent_mask")
+    _assert_shape(record.screened_agent_mask, (n_agents,), "screened_agent_mask")
+    _assert_dtype(record.screened_agent_mask, np.bool_, "screened_agent_mask")
 
-    _assert_ndim(record.input_features, 3, "input_features")
-    _assert_ndim(record.output_features, 3, "output_features")
-    _assert_ndim(record.input_mask, 2, "input_mask")
-    _assert_ndim(record.output_mask, 2, "output_mask")
+    _assert_ndim(record.features, 3, "features")
+    _assert_ndim(record.mask, 2, "mask")
 
-    assert record.input_features.shape[0] == n_agents, "input_features agent dim mismatch"
-    assert record.output_features.shape[0] == n_agents, "output_features agent dim mismatch"
-    assert record.input_mask.shape[0] == n_agents, "input_mask agent dim mismatch"
-    assert record.output_mask.shape[0] == n_agents, "output_mask agent dim mismatch"
+    assert record.features.shape[0] == n_agents, "features agent dim mismatch"
+    assert record.mask.shape[0] == n_agents, "mask agent dim mismatch"
 
-    assert record.input_features.shape[1] == history_frames, (
-        "input_features time dim must match scene.history_frames"
-    )
-    assert record.output_features.shape[1] == future_frames, (
-        "output_features time dim must match scene.future_frames"
-    )
-    assert record.input_mask.shape[1] == history_frames, (
-        "input_mask time dim must match scene.history_frames"
-    )
-    assert record.output_mask.shape[1] == future_frames, (
-        "output_mask time dim must match scene.future_frames"
-    )
+    assert record.features.shape[1] == horizon_frames, "features time dim must match scene horizon"
+    assert record.mask.shape[1] == horizon_frames, "mask time dim must match scene horizon"
 
-    assert input_feature_dim > 0, "feature dimension must be > 0"
-    assert input_feature_dim == output_feature_dim, (
-        "input_features and output_features feature dims must match"
-    )
+    assert feature_dim > 0, "feature dimension must be > 0"
 
-    _assert_dtype(record.input_mask, np.bool_, "input_mask")
-    _assert_dtype(record.output_mask, np.bool_, "output_mask")
+    _assert_dtype(record.mask, np.bool_, "mask")
 
-    if record.input_mask.any():
-        assert np.isfinite(record.input_features[record.input_mask]).all(), (
-            "input_features contain NaN/Inf at valid mask positions"
-        )
-    if record.output_mask.any():
-        assert np.isfinite(record.output_features[record.output_mask]).all(), (
-            "output_features contain NaN/Inf at valid mask positions"
+    if record.mask.any():
+        assert np.isfinite(record.features[record.mask]).all(), (
+            "features contain NaN/Inf at valid mask positions"
         )
 
     if n_agents > 0:
-        assert record.passed_agent_mask.any(), "no passing agents in encoded record"
+        assert record.screened_agent_mask.any(), "no passing agents in encoded record"
 
     map_num_nodes = record.map_node_positions.shape[0]
     map_num_edges = record.map_edge_indices.shape[1]
@@ -195,11 +169,12 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
 
 
 def save_scene_artifacts(
-    scene: Scene, graph: MapGraph | None, out_dir: Path, case: DatasetCase
+    scene: Scene, graph: MapGraph | None, out_dir: Path, dataset_name: str
 ) -> None:
     """Save scene artifacts like trajectories and maps for debugging."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
+
     frame = scene.frame.select("frame", "id", "x", "y")
     summary_frame = frame.select(
         pl.col("x").min().alias("x_min"),
@@ -212,7 +187,7 @@ def save_scene_artifacts(
     x_min, x_max, y_min, y_max, frame_min, frame_max = summary_frame.row(0)
 
     summary: dict[str, object] = {
-        "dataset": case.dataset,
+        "dataset": dataset_name,
         "scene_number": scene.scene_number,
         "rows": frame.height,
         "agents": int(frame["id"].n_unique()),

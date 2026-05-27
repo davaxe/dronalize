@@ -9,11 +9,11 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
-from dronalize.core.functional import yaw_from_vel_expr
+from dronalize.core.functional import yaw_from_velocity_expr
 from dronalize.core.scene.schema import POSITIONS_VELOCITY_YAW
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
+from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -24,15 +24,15 @@ if TYPE_CHECKING:
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
-class InteractionLoader(BaseSceneLoader[Path]):
+class InteractionLoader(SceneLoader[Path]):
     """Loader for the INTERACTION dataset."""
 
-    def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[Path]]:
+    def _sources_from_dir(self, data_dir: Path) -> Iterable[DatasetSource[Path]]:
         if not data_dir.is_dir():
             return
         for file in sorted(data_dir.glob("*.csv")):
-            yield Source(
-                identifier=file.stem, data=file, map_key=file.stem.rstrip(self._strip(file.stem))
+            yield DatasetSource(
+                identifier=file.stem, payload=file, map_key=file.stem.rstrip(self._strip(file.stem))
             )
 
     @staticmethod
@@ -48,7 +48,7 @@ class InteractionLoader(BaseSceneLoader[Path]):
         raise ValueError(msg)
 
     @override
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[Path]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[Path]]:
         if split is DatasetSplit.TRAIN:
             yield from self._sources_from_dir(self.root / "train")
         elif split is DatasetSplit.VAL:
@@ -58,10 +58,10 @@ class InteractionLoader(BaseSceneLoader[Path]):
             yield from self._sources_from_dir(self.root / "test_conditional-multi-agent")
 
     @override
-    def load_source(self, source: Source[Path]) -> Iterable[LoadedSourceData]:
+    def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
         data = (
             pl
-            .scan_csv(source.data, schema=_SCHEMA)
+            .scan_csv(source.payload, schema=_SCHEMA)
             .drop("track_to_predict", "interesting_agent", "width", "length", "timestamp_ms")
             .rename({"frame_id": "frame", "track_id": "id", "psi_rad": "yaw_rad"})
             .with_columns(
@@ -69,15 +69,15 @@ class InteractionLoader(BaseSceneLoader[Path]):
                 self._map_agent_category().alias("agent_category"),
                 pl
                 .when(pl.col("yaw_rad").is_null())
-                .then(yaw_from_vel_expr())
+                .then(yaw_from_velocity_expr())
                 .otherwise(pl.col("yaw_rad"))
                 .alias("yaw"),
             )
-            .drop("agent_type")
+            .drop("agent_type", "yaw_rad")
         )
 
         for _, group in data.collect().group_by(["case_id"]):
-            yield LoadedSourceData(frame=group.lazy().drop("case_id"))
+            yield LoadedSourceFrame(frame=group.lazy().drop("case_id"))
 
     @override
     def count_sources_for(self, split: DatasetSplit) -> int | None:
@@ -107,7 +107,7 @@ class InteractionLoader(BaseSceneLoader[Path]):
                 .then(AgentCategory.PEDESTRIAN.value)
                 .otherwise(AgentCategory.BICYCLE.value)
             )
-            .otherwise(pl.col("agent_type"))
+            .otherwise(AgentCategory.UNKNOWN.value)
         )
 
     @staticmethod

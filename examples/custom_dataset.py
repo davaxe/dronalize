@@ -15,8 +15,8 @@ from typing_extensions import override
 from dronalize.config.models import DatasetConfig, ScenesConfig, WindowConfig
 from dronalize.core import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY, TrajectorySchema
-from dronalize.datasets import DatasetSpec, register
-from dronalize.processing.loading import BaseSceneLoader, LoadedSourceData, Source
+from dronalize.datasets import DatasetDescriptor, register_dataset
+from dronalize.processing.loading import DatasetSource, LoadedSourceFrame, SceneLoader
 from dronalize.runtime import ExecutionRequest, resolve_request
 
 if TYPE_CHECKING:
@@ -32,25 +32,25 @@ DATA: str = """frame,id,x,y,category
 """
 
 
-class MiniCsvLoader(BaseSceneLoader[str]):
+class MiniCsvLoader(SceneLoader[str]):
     @override
-    def iter_sources(self) -> Iterable[Source[str]]:
-        # Only one source for this simple example.
-        yield Source(identifier="", data=DATA)
+    def iter_sources(self) -> Iterable[DatasetSource[str]]:
+        # Only one DatasetSource for this simple example.
+        yield DatasetSource(identifier="", payload=DATA)
 
     @override
-    def load_source(self, source: Source[str]) -> Iterable[LoadedSourceData]:
+    def load_source(self, source: DatasetSource[str]) -> Iterable[LoadedSourceFrame]:
         # Should normalize the raw data to match the expected native schema,
         # which in this case includes mapping string categories to
         # `AgentCategory` enums, and renaming the `category` column to
         # `agent_category`.
-        frame = pl.scan_csv(source.data, schema=_RAW_SCHEMA).with_columns(
+        frame = pl.scan_csv(source.payload, schema=_RAW_SCHEMA).with_columns(
             pl
             .col("category")
             .replace_strict({"car": AgentCategory.CAR, "pedestrian": AgentCategory.PEDESTRIAN})
             .alias("agent_category")
         )
-        yield LoadedSourceData(frame)
+        yield LoadedSourceFrame(frame)
 
     @override
     def count_sources(self) -> int | None:
@@ -62,19 +62,22 @@ class MiniCsvLoader(BaseSceneLoader[str]):
         return POSITIONS_ONLY
 
 
-MINI_CSV_SPEC = DatasetSpec(
+MINI_CSV_SPEC = DatasetDescriptor(
     name="mini-csv",
-    loader_factory=MiniCsvLoader.unified_factory,
+    loader_factory=MiniCsvLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=ScenesConfig(
-            history_frames=2, future_frames=1, sample_time=0.1, window=WindowConfig(step=1)
+            horizon_frames=3,
+            default_observation_length=2,
+            sample_time=0.1,
+            window=WindowConfig(step=1),
         )
     ),
     native_schema=MiniCsvLoader.native_trajectory_schema(),
 )
 
 
-def register_dronalize_datasets() -> DatasetSpec:
+def register_dronalize_datasets() -> DatasetDescriptor:
     """CLI hook used to register dataset."""
     return MINI_CSV_SPEC
 
@@ -88,7 +91,7 @@ _RAW_SCHEMA = pl.Schema({
 })
 
 if __name__ == "__main__":
-    register(MINI_CSV_SPEC)
+    register_dataset(MINI_CSV_SPEC)
     request = ExecutionRequest(
         # Dataset string should be same as `MINI_CSV_SPEC.name` to resolve to
         # the correct dataset.

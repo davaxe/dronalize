@@ -9,17 +9,18 @@ import polars as pl
 from dronalize.core import functional as f
 from dronalize.core.functional import ResampleSpec
 from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.screening.apply import screen_scene as _screen_scene
+from dronalize.processing.screening.screen import screen_scene as _screen_scene
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from dronalize.core.functional.window import WindowPolicy
     from dronalize.processing.pipeline.pipeline import FlatMapTransform, Transform
-    from dronalize.processing.screening import Screen
+    from dronalize.processing.screening import ScreeningRuleSet
 
 
 def screen_scene(
-    scene_screening: Screen | None = None,
+    scene_screening: ScreeningRuleSet | None = None,
     columns: TrajectoryColumns | None = None,
     *,
     group_by: str | Sequence[str] | None = None,
@@ -32,7 +33,7 @@ def screen_scene(
 
     Parameters
     ----------
-    scene_screening : Screen, optional
+    scene_screening : ScreeningRuleSet, optional
         Screening specification containing cleanup and check rules.
     columns : TrajectoryColumns, optional
         Column mapping for the input frame.
@@ -88,8 +89,8 @@ def resample(
 
 def derivative(
     *columns: str,
-    dt: float = 1.0,
-    n: int = 1,
+    sample_time: float = 1.0,
+    order: int = 1,
     include_intermediate: bool = False,
     group_by: str | Sequence[str] | None = None,
     derivative_rename: dict[int, list[str]] | None = None,
@@ -102,9 +103,9 @@ def derivative(
     ----------
     *columns : str
         Column names to differentiate.
-    dt : float, optional
+    sample_time : float, optional
         Time step.
-    n : int, optional
+    order : int, optional
         Derivative order.
     include_intermediate : bool, optional
         Keep all intermediate derivative orders.
@@ -119,8 +120,8 @@ def derivative(
         return f.derivative(
             df,
             *columns,
-            dt=dt,
-            n=n,
+            sample_time=sample_time,
+            order=order,
             include_intermediate=include_intermediate,
             group_by=group_by,
             derivative_rename=derivative_rename,
@@ -131,7 +132,7 @@ def derivative(
     return _derivative
 
 
-def yaw_from_vel(
+def yaw_from_velocity(
     vx_col: str = "vx", vy_col: str = "vy", yaw_col: str = "yaw", *, only_null: bool = False
 ) -> Transform:
     """Create a yaw-from-velocity transform.
@@ -151,31 +152,31 @@ def yaw_from_vel(
     """
     if only_null:
 
-        def _yaw_from_vel(df: pl.LazyFrame) -> pl.LazyFrame:
+        def _yaw_from_velocity(df: pl.LazyFrame) -> pl.LazyFrame:
             return df.with_columns(
                 pl
                 .when(pl.col(yaw_col).is_null())
-                .then(f.yaw_from_vel_expr(vx_col, vy_col, yaw_col))
+                .then(f.yaw_from_velocity_expr(vx_col, vy_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
                 .alias(yaw_col)
             )
 
     else:
 
-        def _yaw_from_vel(df: pl.LazyFrame) -> pl.LazyFrame:
-            return df.with_columns(f.yaw_from_vel_expr(vx_col, vy_col, yaw_col))
+        def _yaw_from_velocity(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.with_columns(f.yaw_from_velocity_expr(vx_col, vy_col, yaw_col))
 
-    _yaw_from_vel.__name__ = "yaw_from_vel"
-    _yaw_from_vel.__qualname__ = "transforms.yaw_from_vel"
-    return _yaw_from_vel
+    _yaw_from_velocity.__name__ = "yaw_from_velocity"
+    _yaw_from_velocity.__qualname__ = "transforms.yaw_from_velocity"
+    return _yaw_from_velocity
 
 
-def yaw_from_pos(
+def yaw_from_position(
     x_col: str = "x", y_col: str = "y", yaw_col: str = "yaw", *, only_null: bool = False
 ) -> Transform:
     """Create a yaw-from-position transform.
 
-    Wraps `~dronalize.common.trajectory.basic.yaw_from_pos`.
+    Wraps `~dronalize.common.trajectory.basic.yaw_from_position`.
 
     Parameters
     ----------
@@ -192,23 +193,23 @@ def yaw_from_pos(
     """
     if only_null:
 
-        def _yaw_from_pos(df: pl.LazyFrame) -> pl.LazyFrame:
+        def _yaw_from_position(df: pl.LazyFrame) -> pl.LazyFrame:
             return df.with_columns(
                 pl
                 .when(pl.col(yaw_col).is_null())
-                .then(f.yaw_from_pos_expr(x_col, y_col, yaw_col))
+                .then(f.yaw_from_position_expr(x_col, y_col, yaw_col))
                 .otherwise(pl.col(yaw_col))
                 .alias(yaw_col)
             )
 
     else:
 
-        def _yaw_from_pos(df: pl.LazyFrame) -> pl.LazyFrame:
-            return df.with_columns(f.yaw_from_pos_expr(x_col, y_col, yaw_col))
+        def _yaw_from_position(df: pl.LazyFrame) -> pl.LazyFrame:
+            return df.with_columns(f.yaw_from_position_expr(x_col, y_col, yaw_col))
 
-    _yaw_from_pos.__name__ = "yaw_from_pos"
-    _yaw_from_pos.__qualname__ = "transforms.yaw_from_pos"
-    return _yaw_from_pos
+    _yaw_from_position.__name__ = "yaw_from_position"
+    _yaw_from_position.__qualname__ = "transforms.yaw_from_position"
+    return _yaw_from_position
 
 
 def window(
@@ -218,6 +219,7 @@ def window(
     sliding_col: str = "frame",
     group_by: str | Sequence[str] | None = None,
     offset_sliding_col: bool = True,
+    policy: WindowPolicy = "strict",
 ) -> Transform:
     """Create a sliding-window fan-out transform.
 
@@ -234,6 +236,8 @@ def window(
         Column to slide over.
     offset_sliding_col : bool, optional
         Whether to zero-offset the sliding column in each window.
+    policy : WindowPolicy, optional
+        Windowing policy to apply when the last window does not have enough rows.
 
     """
 
@@ -245,6 +249,7 @@ def window(
             sliding_col=sliding_col,
             group_by=group_by,
             offset_sliding_col=offset_sliding_col,
+            policy=policy,
         )
 
     func_to_return = _window_single

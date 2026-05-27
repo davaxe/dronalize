@@ -2,11 +2,33 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from typing_extensions import override
+
 from dronalize.core.categories import DatasetSplit
 
 
 class DronalizeError(Exception):
     """Base class for all exceptions raised by Dronalize."""
+
+
+@dataclass(slots=True)
+class CliError(Exception):
+    """A formatted CLI error with an explicit process exit code."""
+
+    message: str
+    exit_code: int = 1
+
+    @override
+    def __str__(self) -> str:
+        """Return the error message for display."""
+        return self.message
+
+
+def cli_usage_error(message: str) -> CliError:
+    """Create a CLI error representing invalid user input."""
+    return CliError(message=message, exit_code=2)
 
 
 class ConfigurationError(ValueError, DronalizeError):
@@ -50,10 +72,6 @@ class SplitError(ValueError, DronalizeError):
     """Base class for dataset split-related errors."""
 
 
-class SplitConflictError(SplitError):
-    """Raised when mutually exclusive split options are combined."""
-
-
 class SplitNotSupportedError(SplitError):
     """Raised when a dataset does not support the requested split.
 
@@ -80,23 +98,6 @@ class SplitNotSupportedError(SplitError):
         super().__init__(f"{loader_name} does not support split '{', '.join(rendered)}'.")
         self.loader_name: str = loader_name
         self.split: list[str] = rendered
-
-
-class SplitStrategyNotSupportedError(SplitError):
-    """Raised when a loader does not implement the requested custom split strategy."""
-
-    def __init__(
-        self, loader_name: str, strategy_name: str, supported_strategies: tuple[str, ...]
-    ) -> None:
-        supported_display = ", ".join(supported_strategies) if supported_strategies else "none"
-        msg = (
-            f"{loader_name} does not support split strategy '{strategy_name}'. "
-            f"Supported strategies: {supported_display}."
-        )
-        super().__init__(msg)
-        self.loader_name: str = loader_name
-        self.strategy_name: str = strategy_name
-        self.supported_strategies: tuple[str, ...] = supported_strategies
 
 
 class SplitAssignmentError(SplitError):

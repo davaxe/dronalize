@@ -3,7 +3,7 @@
 ## Import guide
 
 ```python
-from dronalize.io.adapters import HeteroSceneDataset, TorchSceneDataset
+from dronalize.io.adapters import HeteroSceneDataset, SplitHeteroSceneDataset, TorchSceneDataset
 ```
 
 This package groups higher-level dataset adapters for downstream ML code. The
@@ -24,35 +24,56 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from dronalize.core._lazy import lazy_dir, resolve_lazy_export
+from dronalize.core.optional import lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
     from dronalize.io.adapters.pyg import (
         HeteroSceneDataset,
         IterableHeteroSceneDataset,
+        IterableSplitHeteroSceneDataset,
+        SplitHeteroSceneDataset,
         collate_hetero_with_time_padding,
     )
     from dronalize.io.adapters.torch import (
         IterableTorchSceneDataset,
+        IterableTorchSplitSceneDataset,
         TorchSceneDataset,
         TorchSceneRecord,
+        TorchSplitSceneDataset,
+        TorchSplitSceneRecord,
     )
 
 __all__ = [
     "HeteroSceneDataset",
     "IterableHeteroSceneDataset",
+    "IterableSplitHeteroSceneDataset",
     "IterableTorchSceneDataset",
+    "IterableTorchSplitSceneDataset",
+    "SplitHeteroSceneDataset",
     "TorchSceneDataset",
     "TorchSceneRecord",
+    "TorchSplitSceneDataset",
+    "TorchSplitSceneRecord",
     "collate_hetero_with_time_padding",
 ]
 
 __lazy_exports__: dict[str, tuple[str, str]] = {
     "IterableTorchSceneDataset": ("dronalize.io.adapters.torch", "IterableTorchSceneDataset"),
+    "IterableTorchSplitSceneDataset": (
+        "dronalize.io.adapters.torch",
+        "IterableTorchSplitSceneDataset",
+    ),
     "TorchSceneDataset": ("dronalize.io.adapters.torch", "TorchSceneDataset"),
     "TorchSceneRecord": ("dronalize.io.adapters.torch", "TorchSceneRecord"),
+    "TorchSplitSceneDataset": ("dronalize.io.adapters.torch", "TorchSplitSceneDataset"),
+    "TorchSplitSceneRecord": ("dronalize.io.adapters.torch", "TorchSplitSceneRecord"),
     "HeteroSceneDataset": ("dronalize.io.adapters.pyg", "HeteroSceneDataset"),
     "IterableHeteroSceneDataset": ("dronalize.io.adapters.pyg", "IterableHeteroSceneDataset"),
+    "IterableSplitHeteroSceneDataset": (
+        "dronalize.io.adapters.pyg",
+        "IterableSplitHeteroSceneDataset",
+    ),
+    "SplitHeteroSceneDataset": ("dronalize.io.adapters.pyg", "SplitHeteroSceneDataset"),
     "collate_hetero_with_time_padding": (
         "dronalize.io.adapters.pyg",
         "collate_hetero_with_time_padding",

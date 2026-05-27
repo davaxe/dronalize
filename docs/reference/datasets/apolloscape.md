@@ -19,12 +19,14 @@ These are the default Dronalize settings used when processing this dataset.
 
 | Setting | Default |
 | ------- | ------- |
-| Source sequence | 4 obs / 6 pred @ 2 Hz |
-| Effective sequence | 16 obs / 30 pred @ 10 Hz |
-| Resampling | Cubic 5:1 |
-| Windowing | 10-frame window, step 1 |
+| Configured horizon | 10 frames (default split after 4) @ 2.0 Hz |
+| Effective horizon | 46 frames (default split after 16) @ 10.0 Hz |
+| Source unit | Recording |
+| Source bounds | 37-119 frames (observed) |
+| Resampling | 5:1 (linear) |
+| Sliding windows | Enabled, strict, step 1 |
 | Screening | Prune agents with fewer than 2 samples |
-| Maps | Disabled |
+| Maps | None |
 
 ## Dataset compatibility
 
@@ -73,8 +75,6 @@ apolloscape/
 │   ├── result_9048_1.frame.txt
 │   ├── result_9048_3.frame.txt
 │   └── ...
-├── val_split/
-│   └── ...
 └── prediction_test/
-    └── prediction_test.txt  # present in the raw benchmark, not used by the current loader
+    └── prediction_test.txt
 ```

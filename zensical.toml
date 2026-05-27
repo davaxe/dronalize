@@ -54,7 +54,7 @@ nav = [
     { "[assign] section" = "reference/configuration/assign.md" },
     { "[map] section" = "reference/configuration/map.md" },
     { "[output] section" = "reference/configuration/output.md" },
-    { "[dataset] section" = "reference/configuration/dataset.md" },
+    { "[loader_options] section" = "reference/configuration/dataset.md" },
   ] },
 
   { "Dataset reference" = [
@@ -64,6 +64,7 @@ nav = [
     { apolloscape = "reference/datasets/apolloscape.md" },
     { argoverse1 = "reference/datasets/argoverse1.md" },
     { argoverse2 = "reference/datasets/argoverse2.md" },
+    { eth_ucy = "reference/datasets/eth_ucy.md" },
     { eth = "reference/datasets/eth.md" },
     { exid = "reference/datasets/exid.md" },
     { highd = "reference/datasets/highd.md" },
@@ -108,7 +109,7 @@ nav = [
     { Datasets = [
       "reference/api/datasets/index.md",
       { "Registry operations" = "reference/api/datasets/registry.md" },
-      { "Dataset specification" = "reference/api/datasets/spec.md" },
+      { "Dataset descriptor" = "reference/api/datasets/descriptor.md" },
     ] },
     { Runtime = [
       "reference/api/runtime/index.md",
@@ -118,7 +119,6 @@ nav = [
     { Processing = [
       "reference/api/processing/index.md",
       { Screening = "reference/api/processing/screening.md" },
-      { Pipeline = "reference/api/processing/pipeline.md" },
       { "Map processing" = "reference/api/processing/maps.md" },
       { "Loader extension API" = "reference/api/processing/loading.md" },
     ] },
@@ -137,7 +137,7 @@ nav = [
 
 [project.theme]
 variant = "modern"
-font.text = "Source Sans 3"
+font.text = "DatasetSource Sans 3"
 font.code = "IBM Plex Mono"
 features = [
   "navigation.tabs",

@@ -16,8 +16,9 @@ dronalize split-support a43
 ```
 
 `available` lists the datasets that are usable in the current environment. `inspect` shows a
-dataset's defaults, native schema, read and assignment support, map support, and dataset-owned
-options. `split-support` shows which read and assignment strategies are available for that dataset.
+dataset's defaults, native schema, source-sequence bounds before windowing, read and assignment
+support, feature support, and loader options.
+`split-support` shows which read and assignment strategies are available for that dataset.
 Use `available --no-details` for a compact registry listing.
 
 !!! note "`available` and `inspect` reflect the current environment"
@@ -36,7 +37,7 @@ dronalize show-config a43 --config config.toml
 
 `show-config` resolves the same dataset defaults, profile fragments, dataset entry, and CLI
 overrides that `process` uses, but it stops before execution. Use it when you want to confirm the
-effective `scenes`, `screening`, `read`, `assign`, `map`, `output`, and dataset-specific settings.
+effective `scenes`, `screening`, `read`, `assign`, `map`, `output`, and `loader_options` settings.
 
 `show-config` and `process` both default to the `pickle` backend. Pass
 `--storage-backend` when you want to preview a different backend.
@@ -63,7 +64,7 @@ effective `scenes`, `screening`, `read`, `assign`, `map`, `output`, and dataset-
 
 `--plan` resolves the full run and prints a summary without executing it. The summary includes the
 dataset, paths, backend, worker count, schema, map usage, read strategy, assignment strategy, and
-any dataset-owned options that affect the run.
+any loader options that affect the run.
 
 Add `--config config.toml` when you have a project config file. Add read or assignment overrides
 only after checking `dronalize split-support <dataset>`; for example, `a43` does not support
@@ -80,7 +81,7 @@ explicitly when needed:
 
 | Option | Effect |
 | --- | --- |
-| `--storage-backend` | Choose `pickle`, `mds`, or `null`. |
+| `--storage-backend` | Choose a registered storage backend such as `pickle`, `mds`, or `null`. |
 | `--scene-schema` | Override the output trajectory schema for this run. |
 | `--jobs` | Override worker count. Values above `1` enable parallel execution. |
 | `--progress/--no-progress` | Enable or disable the live progress display during processing. |

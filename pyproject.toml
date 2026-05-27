@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dronalize"
-version = "2.0.0"
+version = "2.0.0.dev2"
 description = "Trajectory data processing toolkit for autonomous driving datasets"
 authors = [
     { name = "Theodor Westny", email = "theodor.westny@liu.se" },
@@ -21,6 +21,7 @@ dependencies = [
     "typing-extensions>=4.15.0",
     "pydantic>=2.12.5",
     "tomli>=2.0.1; python_version < '3.11'",
+    "rich>=14.3.3"
 ]
 
 keywords = ["autonomous driving", "trajectory data", "data processing", "datasets", "machine learning"]
@@ -33,7 +34,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Typing :: Typed",
 ]
@@ -56,7 +56,7 @@ ad4che = ["opencv-python"]
 mds = ["mosaicml-streaming>=0.13.0"]
 torch = ["torch>=2.0.0"]
 pyg = ["torch>=2.0.0", "torch-geometric>=2.7.0"]
-cli = ["typer>=0.24.1", "rich>=14.3.3"]
+cli = ["typer>=0.24.1"]
 
 [dependency-groups]
 test = [
@@ -112,11 +112,9 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["src/dronalize"]
 branch = true
 omit = [
     "src/dronalize/datasets/*/protos/*.py",
-    "src/dronalize/datasets/shared/_debug.py",
 ]
 
 [tool.ty.src]
@@ -180,7 +178,6 @@ split-on-trailing-comma = false
 pythonVersion = "3.10"
 pythonPlatform = "All"
 typeCheckingMode = "recommended"
-reportIgnoreCommentWithoutRule = true
 include = ["src", "tests"]
 exclude = [
     "protos",
@@ -200,3 +197,4 @@ reportAny = false
 reportExplicitAny = false
 reportMissingTypeStubs = false
 reportPrivateImportUsage = false
+reportUnknownMemberType = false

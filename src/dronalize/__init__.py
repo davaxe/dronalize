@@ -19,7 +19,7 @@ Use the package namespaces directly:
 ```python
 import dronalize
 
-from dronalize import datasets, runtime, processing, io, plot
+from dronalize import datasets, runtime, processing, io, visualization
 from dronalize.core import AgentCategory, DatasetSplit
 ```
 

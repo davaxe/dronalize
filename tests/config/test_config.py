@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dronalize.config import ProcessingConfig, RuntimeOverride, parse_config
+from dronalize.config import ProjectConfig, RuntimeOverride, parse_config
 from dronalize.config.models import (
     AgentRangeSpec,
     DatasetConfig,
     ExcludeCategoriesSpec,
-    MapEdgeTypesConfig,
+    MapEdgeTypeRules,
     MinSamplesSpec,
     RequireSceneFramesSpec,
     RequireSceneWindowSpec,
@@ -33,18 +33,21 @@ def _write(path: Path, body: str) -> Path:
 
 def _dataset_config(*, screening: dict[str, object] | None = None) -> DatasetConfig:
     payload: dict[str, object] = {
-        "scenes": {"history_frames": 1, "future_frames": 1, "sample_time": 0.1}
+        "scenes": {"horizon_frames": 2, "default_observation_length": 1, "sample_time": 0.1}
     }
     if screening is not None:
         payload["screening"] = screening
     return DatasetConfig.model_validate(payload)
 
 
-def test_parse_config_parses_profiles_and_dataset_entries(tmp_path: Path) -> None:
+def test_parse_config_parses_profiles(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
             """
+            [defaults.output]
+            precision = "float32"
+
             [profiles.fast.runtime]
             jobs = 2
 
@@ -54,9 +57,104 @@ def test_parse_config_parses_profiles_and_dataset_entries(tmp_path: Path) -> Non
         )
     )
 
-    assert isinstance(cfg, ProcessingConfig)
+    assert isinstance(cfg, ProjectConfig)
+    assert cfg.defaults is not None
     assert "fast" in cfg.profiles
     assert "demo" in cfg.datasets
+
+
+def test_parse_config_parses_window(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo.scenes]
+            horizon_frames = 8
+            default_observation_length = 3
+            sample_time = 0.1
+
+            [datasets.demo.scenes.window]
+            step = 2
+            policy = "partial"
+            """,
+        )
+    )
+
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+
+    assert resolved.scenes.window is not None
+    assert resolved.scenes.window.step == 2
+    assert resolved.scenes.window.policy == "partial"
+
+
+def test_resolve_applies_defaults_without_dataset(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [defaults.runtime]
+            jobs = 8
+
+            [defaults.output]
+            schema = "canonical"
+            precision = "float32"
+            recenter_positions = true
+
+            [defaults.output.mds]
+            compression = "zstd:3"
+            """,
+        )
+    )
+
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+
+    assert resolved.runtime.jobs == 8
+    assert resolved.output.trajectory_schema == "canonical"
+    assert resolved.output.precision == "float32"
+    assert resolved.output.recenter_positions is True
+    assert resolved.output.mds.compression == "zstd:3"
+
+
+def test_resolve_applies_defaults_before_dataset(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [defaults.runtime]
+            jobs = 8
+
+            [defaults.output.mds]
+            compression = "zstd:3"
+
+            [datasets.demo.runtime]
+            jobs = 2
+            """,
+        )
+    )
+
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+
+    assert resolved.runtime.jobs == 2
+    assert resolved.output.mds.compression == "zstd:3"
+
+
+def test_defaults_can_use_profiles(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [profiles.common.runtime]
+            jobs = 8
+
+            [defaults]
+            uses = ["common"]
+            """,
+        )
+    )
+
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+
+    assert resolved.runtime.jobs == 8
 
 
 def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
@@ -71,15 +169,30 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ConfigurationError, match="Profile 'missing' not found"):
-        _ = cfg.resolve(
+        _ = cfg.resolve_dataset_config(
             "demo",
             DatasetConfig.model_validate({
-                "scenes": {"history_frames": 1, "future_frames": 1, "sample_time": 0.1}
+                "scenes": {"horizon_frames": 2, "default_observation_length": 1, "sample_time": 0.1}
             }),
         )
 
 
-def test_parse_config_surfaces_invalid_toml(tmp_path: Path) -> None:
+def test_resolve_raises_for_missing_defaults_profile(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [defaults]
+            uses = ["missing"]
+            """,
+        )
+    )
+
+    with pytest.raises(ConfigurationError, match="Profile 'missing' not found for defaults"):
+        _ = cfg.resolve_dataset_config("demo", _dataset_config())
+
+
+def test_parse_config_rejects_invalid_toml(tmp_path: Path) -> None:
     path = _write(
         tmp_path,
         """
@@ -92,7 +205,7 @@ def test_parse_config_surfaces_invalid_toml(tmp_path: Path) -> None:
         _ = parse_config(path)
 
 
-def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
+def test_runtime_override_sets_present_sections() -> None:
     override = RuntimeOverride.from_inputs(
         assign_strategy="scene",
         read_split=None,
@@ -125,34 +238,32 @@ def test_runtime_override_from_inputs_only_sets_provided_sections() -> None:
     assert empty.assign is None
 
 
-def test_runtime_override_from_inputs_rejects_read_split_without_native_read() -> None:
+def test_runtime_override_requires_native_read_for_splits() -> None:
     with pytest.raises(ConfigurationError, match="read_split"):
         _ = RuntimeOverride.from_inputs(read_split=[DatasetSplit.TRAIN])
 
 
-def test_runtime_override_from_inputs_rejects_assignment_options_without_strategy() -> None:
-    with pytest.raises(ConfigurationError, match="Assignment options require"):
-        _ = RuntimeOverride.from_inputs(ratio=(0.7, 0.2, 0.1))
+@pytest.mark.parametrize(
+    ("kwargs", "match"),
+    [
+        ({"ratio": (0.7, 0.2, 0.1)}, "Assignment options require"),
+        (
+            {"assign_strategy": "none", "ratio": (0.7, 0.2, 0.1)},
+            "only valid for scene, source, time, and shuffled-time",
+        ),
+        ({"assign_strategy": "scene", "gap": 2, "ratio": (0.7, 0.2, 0.1)}, "gap"),
+        ({"assign_strategy": "shuffled-time", "ratio": (0.7, 0.2, 0.1)}, "segments"),
+    ],
+    ids=["strategy-required", "ratio-strategy", "gap-strategy", "segments-required"],
+)
+def test_runtime_override_rejects_bad_assignment_inputs(
+    kwargs: dict[str, object], match: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=match):
+        _ = RuntimeOverride.from_inputs(**kwargs)  # pyright: ignore[reportArgumentType]
 
 
-def test_runtime_override_from_inputs_rejects_ratio_for_invalid_assign_strategy() -> None:
-    with pytest.raises(
-        ConfigurationError, match="only valid for scene, source, time, and shuffled-time"
-    ):
-        _ = RuntimeOverride.from_inputs(assign_strategy="none", ratio=(0.7, 0.2, 0.1))
-
-
-def test_runtime_override_from_inputs_rejects_gap_for_invalid_assign_strategy() -> None:
-    with pytest.raises(ConfigurationError, match="gap"):
-        _ = RuntimeOverride.from_inputs(assign_strategy="scene", gap=2, ratio=(0.7, 0.2, 0.1))
-
-
-def test_runtime_override_from_inputs_requires_segments_for_shuffled_time() -> None:
-    with pytest.raises(ConfigurationError, match="segments"):
-        _ = RuntimeOverride.from_inputs(assign_strategy="shuffled-time", ratio=(0.7, 0.2, 0.1))
-
-
-def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:
+def test_resolve_disables_inherited_optional_blocks(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -168,7 +279,7 @@ def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:
         )
     )
 
-    resolved = cfg.resolve("demo", inherited_optional_blocks_descriptor())
+    resolved = cfg.resolve_dataset_config("demo", inherited_optional_blocks_descriptor())
 
     assert resolved.screening is None
     assert resolved.scenes.window is None
@@ -176,7 +287,7 @@ def test_resolve_can_disable_inherited_optional_blocks(tmp_path: Path) -> None:
     assert resolved.scenes.lane_change is None
 
 
-def test_screening_extend_is_default_and_keeps_rules_without_inheritance(tmp_path: Path) -> None:
+def test_screening_extend_is_default(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -188,7 +299,7 @@ def test_screening_extend_is_default_and_keeps_rules_without_inheritance(tmp_pat
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert resolved.screening is not None
     assert resolved.screening.cleanup == {}
@@ -198,7 +309,7 @@ def test_screening_extend_is_default_and_keeps_rules_without_inheritance(tmp_pat
     assert resolved.screening.agent["sample_floor"].minimum == 8
 
 
-def test_screening_extend_merges_namespaces_and_overrides_same_rule_name(tmp_path: Path) -> None:
+def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -218,7 +329,7 @@ def test_screening_extend_merges_namespaces_and_overrides_same_rule_name(tmp_pat
         )
     )
 
-    resolved = cfg.resolve(
+    resolved = cfg.resolve_dataset_config(
         "demo",
         _dataset_config(
             screening={
@@ -240,7 +351,7 @@ def test_screening_extend_merges_namespaces_and_overrides_same_rule_name(tmp_pat
     assert resolved.screening.agent["sample_floor"].minimum == 8
 
 
-def test_screening_replace_discards_inherited_rules_not_redeclared(tmp_path: Path) -> None:
+def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -256,7 +367,7 @@ def test_screening_replace_discards_inherited_rules_not_redeclared(tmp_path: Pat
         )
     )
 
-    resolved = cfg.resolve(
+    resolved = cfg.resolve_dataset_config(
         "demo",
         _dataset_config(
             screening={
@@ -274,7 +385,7 @@ def test_screening_replace_discards_inherited_rules_not_redeclared(tmp_path: Pat
     assert isinstance(resolved.screening.scene["context_window"], RequireSceneWindowSpec)
 
 
-def test_screening_remove_drops_matching_names_across_all_namespaces(tmp_path: Path) -> None:
+def test_screening_remove_drops_names(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -286,7 +397,7 @@ def test_screening_remove_drops_matching_names_across_all_namespaces(tmp_path: P
         )
     )
 
-    resolved = cfg.resolve(
+    resolved = cfg.resolve_dataset_config(
         "demo",
         _dataset_config(
             screening={
@@ -315,9 +426,7 @@ def test_screening_remove_drops_matching_names_across_all_namespaces(tmp_path: P
     assert isinstance(resolved.screening.agent["keep_agent"], MinSamplesSpec)
 
 
-def test_screening_remove_is_applied_after_replace_and_can_drop_current_rules(
-    tmp_path: Path,
-) -> None:
+def test_screening_remove_applies_after_replace(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -337,7 +446,7 @@ def test_screening_remove_is_applied_after_replace_and_can_drop_current_rules(
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert resolved.screening is not None
     assert resolved.screening.cleanup == {}
@@ -346,9 +455,7 @@ def test_screening_remove_is_applied_after_replace_and_can_drop_current_rules(
     assert isinstance(resolved.screening.agent["keep_me"], MinSamplesSpec)
 
 
-def test_screening_multiple_profiles_resolve_in_uses_order_then_dataset_block(
-    tmp_path: Path,
-) -> None:
+def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -397,7 +504,7 @@ def test_screening_multiple_profiles_resolve_in_uses_order_then_dataset_block(
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert resolved.screening is not None
     assert set(resolved.screening.cleanup) == {"trim_static"}
@@ -408,7 +515,7 @@ def test_screening_multiple_profiles_resolve_in_uses_order_then_dataset_block(
     assert resolved.screening.agent == {}
 
 
-def test_map_config_parses_scene_extent_shape_and_edge_type_rules(tmp_path: Path) -> None:
+def test_map_config_parses_scene_extent(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -428,7 +535,7 @@ def test_map_config_parses_scene_extent_shape_and_edge_type_rules(tmp_path: Path
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert isinstance(resolved.map.extraction, SceneExtentExtraction)
     assert resolved.map.extraction.padding == pytest.approx(1.25)
@@ -439,23 +546,20 @@ def test_map_config_parses_scene_extent_shape_and_edge_type_rules(tmp_path: Path
     assert resolved.map.edge_types.remap == {EdgeType.LINE_THIN_DOUBLE: EdgeType.LINE_THIN}
 
 
-def test_map_edge_types_validation_rejects_include_exclude_overlap() -> None:
+def test_map_edge_types_reject_overlap() -> None:
     with pytest.raises(ValueError, match="Conflict"):
-        _ = MapEdgeTypesConfig.model_validate({
+        _ = MapEdgeTypeRules.model_validate({
             "include": ["CURB", "VIRTUAL"],
             "exclude": ["VIRTUAL"],
         })
 
 
-def test_map_edge_types_validation_normalizes_mixed_inputs_for_conflicts() -> None:
+def test_map_edge_types_normalize_conflicts() -> None:
     with pytest.raises(ValueError, match="VIRTUAL"):
-        _ = MapEdgeTypesConfig.model_validate({
-            "include": ["VIRTUAL"],
-            "exclude": [EdgeType.VIRTUAL],
-        })
+        _ = MapEdgeTypeRules.model_validate({"include": ["VIRTUAL"], "exclude": [EdgeType.VIRTUAL]})
 
 
-def test_map_config_parses_trajectory_buffer_extraction(tmp_path: Path) -> None:
+def test_map_config_parses_trajectory_buffer(tmp_path: Path) -> None:
     cfg = parse_config(
         _write(
             tmp_path,
@@ -467,7 +571,7 @@ def test_map_config_parses_trajectory_buffer_extraction(tmp_path: Path) -> None:
         )
     )
 
-    resolved = cfg.resolve("demo", _dataset_config())
+    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
 
     assert isinstance(resolved.map.extraction, TrajectoryBufferExtraction)
     assert resolved.map.extraction.radius == pytest.approx(6.5)

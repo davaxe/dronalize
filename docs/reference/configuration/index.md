@@ -8,8 +8,9 @@ Dataset-specific defaults, capabilities, and dataset-owned configuration behavio
 
 ## Expected file shape
 
-Authoring config has two top-level entry points:
+Authoring config has three top-level entry points:
 
+- `defaults` for project-wide settings applied to every dataset
 - `profiles.<name>` for reusable config fragments
 - `datasets.<dataset-name>` for settings that apply only to one dataset key
 
@@ -17,6 +18,8 @@ Minimal shape:
 
 <!-- no-validate -->
 ```toml
+[defaults]
+
 [profiles.<profile-name>]
 
 [datasets.<dataset-name>]
@@ -25,15 +28,22 @@ Minimal shape:
 Most useful config lives in nested blocks under one of those roots:
 
 ```toml
-[profiles.fast.runtime]
+[defaults.runtime]
 jobs = 4
+
+[defaults.output]
+schema = "canonical"
+precision = "float32"
+
+[profiles.fast.runtime]
+jobs = 8
 
 [datasets.a43]
 uses = ["fast"]
 
 [datasets.a43.scenes]
-history_frames = 20
-future_frames = 60
+horizon_frames = 80
+default_observation_length = 20
 sample_time = 0.1
 
 [datasets.a43.output]
@@ -43,13 +53,15 @@ precision = "float64"
 
 In other words:
 
+- `[defaults.runtime]` applies to every dataset resolved with this file.
 - `[profiles.fast.runtime]` defines reusable execution settings.
 - `[datasets.a43]` can opt into one or more profiles with `uses = [...]`.
 - `[datasets.a43.scenes]` affects only the `a43` dataset.
 
 ## Available section roots
 
-Inside either `profiles.<profile-name>` or `datasets.<dataset-name>`, the current section roots are:
+Inside `defaults`, `profiles.<profile-name>`, or `datasets.<dataset-name>`, the current section
+roots are:
 
 | Block | Purpose |
 | --- | --- |
@@ -60,7 +72,7 @@ Inside either `profiles.<profile-name>` or `datasets.<dataset-name>`, the curren
 | [`assign`](./assign.md) | Output split assignment, ratios, and temporal assignment parameters. |
 | [`map`](./map.md) | Map extraction and interpolation settings. |
 | [`output`](./output.md) | Persisted trajectory schema, precision, offsets, storage backend tuning. |
-| [`dataset`](./dataset.md) | Dataset-specific options that don't fit into the other categories. |
+| [`loader_options`](./dataset.md) | Dataset-specific loader options that don't fit into the other categories. |
 
 !!! note "Section roots"
     In general, roots can be left unspecified (not present in the file), but if
@@ -72,8 +84,8 @@ Inside either `profiles.<profile-name>` or `datasets.<dataset-name>`, the curren
 The reference pages describe the file format only, but the values are resolved in layers:
 
 1. Dataset spec defaults
-2. inherited profiles in declared order
-3. `[datasets.<dataset-name>]`
+2. `[defaults]`, including inherited profiles in declared order
+3. `[datasets.<dataset-name>]`, including inherited profiles in declared order
 4. runtime overrides (very limited set of fields that can be overridden at runtime)
 
 That matters because many fields do not start from a single hard-coded default. Instead, they begin from the dataset's built-in runtime config and are then overridden or merged by the configuration file.
@@ -121,21 +133,26 @@ Some pages also describe validation rules in notes below the table. Those notes 
 
 The page titles use TOML path notation:
 
-- `[scenes]` means the table directly under a dataset entry such as `[datasets.<dataset-name>.scenes]` or `[profiles.<profile-name>.scenes]`
+- `[scenes]` means the table directly under a config entry such as `[defaults.scenes]`, `[datasets.<dataset-name>.scenes]`, or `[profiles.<profile-name>.scenes]`
 - `[scenes.resample]` means a nested table inside `scenes` section, i.e., `[datasets.<dataset-name>.scenes.resample]`
 
 ## Example
 
 ```toml
-[profiles.global.runtime]
+[defaults.runtime]
 jobs = "auto"
 
-[datasets.a43]
-uses = ["global"]
+[defaults.output]
+schema = "canonical"
+precision = "float32"
+recenter_positions = true
+
+[defaults.output.mds]
+compression = "zstd:3"
 
 [datasets.a43.scenes]
-history_frames = 20
-future_frames = 60
+horizon_frames = 80
+default_observation_length = 20
 sample_time = 0.1
 
 [datasets.a43.map.extraction]
@@ -147,7 +164,6 @@ strategy = "shuffled-time"
 ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
 
-[datasets.a43.output]
-schema = "positions_velocity_yaw"
-precision = "float64"
+[datasets.waymo.output.mds]
+compression = "zstd:7"
 ```

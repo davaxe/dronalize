@@ -7,8 +7,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
 from dronalize.datasets.shared import utils
-from dronalize.processing.maps.builder import FeatureMapBuilder
-from dronalize.processing.maps.features import PathFeature, Point
+from dronalize.processing.maps import FeatureMapBuilder, PathFeature, Point
 
 
 @dataclass

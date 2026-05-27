@@ -12,17 +12,21 @@ from typing_extensions import override
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, MapBinding, Source
-from dronalize.processing.loading.options import DatasetOptionsModel
-from dronalize.processing.maps.resolver import MapResolver, no_map, shared_map
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import (
+    DatasetOptionsModel,
+    DatasetSource,
+    LoadedSourceFrame,
+    MapReference,
+)
+from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
-    from dronalize.processing.models import LoaderRequest
+    from dronalize.processing.loading.models import DatasetRunResources
+    from dronalize.processing.models import LoaderPlan
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -34,14 +38,14 @@ class Argoverse1LoaderOptions(DatasetOptionsModel):
     file_batch_size: int = Field(default=10, ge=1)
 
 
-class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
+class Argoverse1Loader(SceneLoader[list[Path], Argoverse1LoaderOptions]):
     """Loader for Argoverse 1 forecasting trajectories."""
 
     def __init__(
         self,
         data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
+        request: LoaderPlan,
+        resources: DatasetRunResources | None = None,
     ) -> None:
         super().__init__(data_root=data_root, request=request, resources=resources)
         self._train_dir: Path = self.root / "forecasting_train_v1.1" / "train" / "data"
@@ -49,7 +53,7 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         self._test_dir: Path = self.root / "forecasting_test_v1.1" / "test_obs" / "data"
 
     @override
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[list[Path]]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[list[Path]]]:
         if split is DatasetSplit.TRAIN:
             yield from self._sources_from_dir(self._train_dir)
         elif split is DatasetSplit.VAL:
@@ -58,10 +62,10 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
             yield from self._sources_from_dir(self._test_dir)
 
     @override
-    def load_source(self, source: Source[list[Path]]) -> Iterable[LoadedSourceData]:
+    def load_source(self, source: DatasetSource[list[Path]]) -> Iterable[LoadedSourceFrame]:
         batch_lf = (
             pl
-            .scan_csv(source.data, include_file_paths="file_id", schema=_SCHEMA)
+            .scan_csv(source.payload, include_file_paths="file_id", schema=_SCHEMA)
             .with_columns(
                 pl
                 .when(pl.col("OBJECT_TYPE") == "AV")
@@ -89,9 +93,9 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
         )
 
         for _, group in batch_lf.collect().group_by(["file_id"]):
-            yield LoadedSourceData(
+            yield LoadedSourceFrame(
                 frame=group.drop("file_id").lazy(),
-                map_binding=MapBinding(map_key=str(group["map"].first())),
+                map_binding=MapReference(map_key=str(group["map"].first())),
             )
 
     @override
@@ -114,13 +118,13 @@ class Argoverse1Loader(BaseSceneLoader[list[Path], Argoverse1LoaderOptions]):
             return no_map()
         return shared_map(shared_maps, utils.extract_fn(self.map_config.extraction))
 
-    def _sources_from_dir(self, data_dir: Path) -> Iterable[Source[list[Path]]]:
+    def _sources_from_dir(self, data_dir: Path) -> Iterable[DatasetSource[list[Path]]]:
         if not data_dir.is_dir():
             return
         files = sorted(data_dir.glob("*.csv"))
         for start in range(0, len(files), self.loader_options.file_batch_size):
-            yield Source(
-                identifier=start, data=files[start : start + self.loader_options.file_batch_size]
+            yield DatasetSource(
+                identifier=start, payload=files[start : start + self.loader_options.file_batch_size]
             )
 
     def _count_sources(self, data_dir: Path) -> int:

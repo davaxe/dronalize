@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass
+from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Any
 
 from dronalize.core.errors import ManifestCompatibilityError
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-FORMAT_VERSION: int = 1
+FORMAT_VERSION: int = 2
 MANIFEST_FILENAME: str = "manifest.json"
 logger = logging.getLogger(__name__)
 
@@ -27,18 +28,28 @@ class DatasetManifest:
     horizons, coordinate handling, map availability, and manifest compatibility.
     """
 
+    dataset: str
+    """Name of the DatasetSource dataset, e.g. 'lyft' or 'waymo'."""
+    storage_backend: str
+    """Storage backend used to write the exported scene records."""
+    dronalize_version: str
+    """Package version that produced the manifest."""
     source_trajectory_schema: str
     """Trajectory schema emitted by the dataset loader before conversion."""
+    source_trajectory_schema_fields: tuple[str, ...]
+    """Semantic field names emitted by the dataset loader before conversion."""
     trajectory_schema: str
     """Trajectory schema stored in the exported records."""
+    trajectory_schema_fields: tuple[str, ...]
+    """Semantic field names stored in exported trajectory records."""
     derived_features: tuple[str, ...]
     """Output features derived during schema conversion."""
     feature_columns: tuple[str, ...]
     """Per-timestep feature columns stored in record tensors."""
-    history_frames: int
-    """Number of observation frames per record."""
-    future_frames: int
-    """Number of prediction frames per record."""
+    horizon_frames: int
+    """Number of full-horizon frames per persisted record."""
+    default_observation_length: int | None
+    """Default observation length for split-on-read convenience, if known."""
     precision: str
     """Floating-point precision used for exported feature arrays."""
     recenter_positions: bool
@@ -52,6 +63,21 @@ class DatasetManifest:
     format_version: int = FORMAT_VERSION
     """Manifest schema version used for compatibility checks."""
 
+    def __post_init__(self) -> None:
+        """Validate temporal manifest fields."""
+        if self.horizon_frames <= 0:
+            msg = f"`horizon_frames` must be positive, but got {self.horizon_frames}."
+            raise ValueError(msg)
+        if (
+            self.default_observation_length is not None
+            and not 0 <= self.default_observation_length <= self.horizon_frames
+        ):
+            msg = (
+                "`default_observation_length` must be between 0 and "
+                f"{self.horizon_frames}, but got {self.default_observation_length}."
+            )
+            raise ValueError(msg)
+
     def to_json_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation of the manifest."""
         return asdict(self)
@@ -63,21 +89,38 @@ class DatasetManifest:
         if format_version != FORMAT_VERSION:
             raise ManifestCompatibilityError(format_version, FORMAT_VERSION)
         return cls(
+            dataset=str(payload["dataset"]),
             format_version=format_version,
+            storage_backend=str(payload["storage_backend"]),
+            dronalize_version=str(payload["dronalize_version"]),
             source_trajectory_schema=str(
                 payload.get("source_trajectory_schema", payload["trajectory_schema"])
             ),
+            source_trajectory_schema_fields=tuple(payload["source_trajectory_schema_fields"]),
             trajectory_schema=str(payload["trajectory_schema"]),
+            trajectory_schema_fields=tuple(payload["trajectory_schema_fields"]),
             derived_features=tuple(payload.get("derived_features", ())),
             feature_columns=tuple(payload["feature_columns"]),
-            history_frames=int(payload["history_frames"]),
-            future_frames=int(payload["future_frames"]),
+            horizon_frames=int(payload["horizon_frames"]),
+            default_observation_length=(
+                None
+                if payload.get("default_observation_length") is None
+                else int(payload["default_observation_length"])
+            ),
             precision=str(payload["precision"]),
             recenter_positions=bool(payload["recenter_positions"]),
             has_map=bool(payload["has_map"]),
             sample_time=float(payload["sample_time"]),
             original_sample_time=float(payload["original_sample_time"]),
         )
+
+
+def package_version() -> str:
+    """Return the installed dronalize package version for manifest metadata."""
+    try:
+        return version("dronalize")
+    except PackageNotFoundError:
+        return "0+unknown"
 
 
 def manifest_path(root: Path) -> Path:

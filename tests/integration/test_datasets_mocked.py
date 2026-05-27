@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from dronalize.config.runtime import RuntimeOverride
+from dronalize.config import RuntimeOverride
 from dronalize.io import StorageBackend
 from dronalize.io.encoding.common import encode_scene_record
 from dronalize.runtime import ExecutionRequest, resolve_request
@@ -31,7 +31,7 @@ def test_datasets_mocked_registry_smoke(
     if jobs > 1:
         mp.set_start_method("spawn", force=True)
 
-    monkeypatch.setattr("dronalize.runtime.api.get", lambda _name: demo_descriptor())
+    monkeypatch.setattr("dronalize.runtime.api.get_dataset", lambda _name: demo_descriptor())
 
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"

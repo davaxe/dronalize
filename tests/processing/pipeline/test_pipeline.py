@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import polars as pl
 
-from dronalize.processing.pipeline import Pipeline
+from dronalize.processing.pipeline.pipeline import Pipeline
 
 
-def test_pipeline_is_immutable_on_then() -> None:
+def test_then_returns_new_pipeline() -> None:
     base = Pipeline()
     updated = base.then(lambda df: df.with_columns((pl.col("x") + 1).alias("x")), name="increment")
 
@@ -13,7 +13,7 @@ def test_pipeline_is_immutable_on_then() -> None:
     assert len(updated) == 1
 
 
-def test_pipeline_compose_and_rshift_preserve_step_order() -> None:
+def test_compose_and_rshift_preserve_order() -> None:
     first = Pipeline().then(
         lambda df: df.with_columns((pl.col("x") + 1).alias("x")), name="plus_one"
     )
@@ -31,7 +31,7 @@ def test_pipeline_compose_and_rshift_preserve_step_order() -> None:
     assert shifted_result["x"].to_list() == [4]
 
 
-def test_execute_collect_filters_empty_frames_by_default() -> None:
+def test_execute_collect_drops_empty_frames() -> None:
     pipeline = Pipeline().then(lambda df: df.filter(pl.col("x") > 10), name="drop_all")
 
     collected = list(pipeline.execute(pl.DataFrame({"x": [1, 2]}), collect=True, filter_empty=True))

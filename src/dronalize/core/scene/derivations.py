@@ -1,4 +1,10 @@
-"""Planning and execution helpers for scene-field derivations."""
+"""Planning and execution helpers for scene-field derivations.
+
+The derivation logic for the schema conversion is designed in a way that adding
+new derivation rules is straightforward and does not require changes to the core
+derivation logic, which at first glance might seem overly complex but helps
+keep the code maintainable and extensible as we add more fields and rules.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +16,7 @@ from typing import Final
 import polars as pl
 
 from dronalize.core.errors import TrajectorySchemaError
-from dronalize.core.functional import derivative, yaw_from_pos, yaw_from_vel
+from dronalize.core.functional import derivative, yaw_from_position, yaw_from_velocity
 from dronalize.core.scene.schema import TrajectoryField
 
 _POSITION_FIELDS: Final[TrajectoryField] = TrajectoryField.X | TrajectoryField.Y
@@ -50,13 +56,6 @@ class DerivationRule:
     """Function that applies the rule to a dataframe."""
     needs_sample_time: bool = False
     """Flag to indicate if the rule requires sample time."""
-
-    def is_applicable(self, available: TrajectoryField, context: ConversionContext) -> bool:
-        """Return True if the rule can be applied in the current state."""
-        has_inputs = (available & self.requires) == self.requires
-        adds_new_fields = (available & self.outputs) != self.outputs
-        has_required_time = not self.needs_sample_time or context.sample_time is not None
-        return has_inputs and adds_new_fields and has_required_time
 
 
 def apply_derivation_plan(
@@ -140,15 +139,17 @@ def _apply_derivative(
     order: int,
     rename: dict[int, list[str]],
     include_intermediate: bool = False,
-    dt: float | None = None,
+    sample_time: float | None = None,
 ) -> pl.LazyFrame:
     """Shared helper for derivative-based field derivation."""
     return derivative(
         data,
         x_col,
         y_col,
-        dt=_require_sample_time(context.sample_time) if dt is None else dt,
-        n=order,
+        sample_time=_require_sample_time(context.sample_time)
+        if sample_time is None
+        else sample_time,
+        order=order,
         include_intermediate=include_intermediate,
         group_by=context.group_by,
         derivative_rename=rename,
@@ -182,11 +183,11 @@ def _kinematics_from_position(data: pl.LazyFrame, context: ConversionContext) ->
 
 
 def _yaw_from_velocity(data: pl.LazyFrame, _context: ConversionContext) -> pl.LazyFrame:
-    return yaw_from_vel(data, "vx", "vy", "yaw")
+    return yaw_from_velocity(data, "vx", "vy", "yaw")
 
 
 def _yaw_from_position(data: pl.LazyFrame, _context: ConversionContext) -> pl.LazyFrame:
-    return yaw_from_pos(data, "x", "y", "yaw")
+    return yaw_from_position(data, "x", "y", "yaw")
 
 
 DERIVATION_RULES: Final[tuple[DerivationRule, ...]] = (

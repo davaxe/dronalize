@@ -1,3 +1,3 @@
-from dronalize.datasets.interaction.spec import DATASET_SPEC
+from dronalize.datasets.interaction.descriptor import DATASET_DESCRIPTOR
 
-__all__ = ["DATASET_SPEC"]
+__all__ = ["DATASET_DESCRIPTOR"]

@@ -23,6 +23,9 @@ negative windows.
 Lane-change sampling lives under `scenes`:
 
 ```toml
+[datasets.highd.scenes.window]
+step = 25
+
 [datasets.highd.scenes.lane_change]
 persist = 2
 margin_before = 1
@@ -59,6 +62,8 @@ Use lane-change sampling when all of the following are true:
 
 - the dataset is lane-oriented highway traffic
 - the loader exposes a usable `lane_id` signal
+- the dataset spec has `feature_support.lane_change_sampling = true`
+- window sampling is enabled with `[datasets.<name>.scenes.window]`
 - your downstream task cares about lane-change behavior enough that the raw class imbalance matters
 
 Several built-in highway datasets ship with lane-change-aware defaults, including `highd`, `exid`,
@@ -70,6 +75,9 @@ Several built-in highway datasets ship with lane-change-aware defaults, includin
 - Increase `required_lane_changes` if you want denser maneuver windows.
 - Decrease `negative_keep_every` if you want to keep more straight-driving windows.
 - Set `negative_keep_every = 1` if you want the ordinary window distribution back.
+
+If lane-change sampling is configured for a dataset that does not explicitly support it, or if
+window sampling is disabled, request planning fails before any loader is created.
 
 ## Relationship to the rest of the pipeline
 

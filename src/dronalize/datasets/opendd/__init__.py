@@ -1,3 +1,3 @@
-from dronalize.datasets.opendd.spec import DATASET_SPEC
+from dronalize.datasets.opendd.descriptor import DATASET_DESCRIPTOR
 
-__all__ = ["DATASET_SPEC"]
+__all__ = ["DATASET_DESCRIPTOR"]

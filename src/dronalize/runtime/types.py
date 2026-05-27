@@ -5,34 +5,43 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from dronalize.config.models import MapConfig, effective_scene_window
+from dronalize.config.models.scenes import effective_scene_window
 from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
-from dronalize.io.formats import StorageBackend
-from dronalize.io.manifest import DatasetManifest, write_manifest
-from dronalize.processing.models import AssignmentRequest, LoaderRequest, ReadRequest
+from dronalize.io.base import (
+    RecordTransform,
+    SceneTransform,
+    StorageBackend,
+    storage_backend_name,
+    validate_transform_choice,
+)
+from dronalize.io.manifest import DatasetManifest, package_version, write_manifest
+from dronalize.processing.models import LoaderPlan, ReadSelection, SplitAssignmentPlan
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.config.models import DatasetConfig, MDSOutputConfig, OutputConfig, RuntimeConfig
-    from dronalize.datasets.registry import DatasetSpec
-    from dronalize.processing.loading.options import DatasetOptionsModel
+    from dronalize.config.models.dataset import DatasetConfig
+    from dronalize.config.models.map import MapConfig
+    from dronalize.config.models.output import MDSOutputConfig, OutputConfig
+    from dronalize.config.models.runtime import RuntimeConfig
+    from dronalize.datasets.registry import DatasetDescriptor
+    from dronalize.processing.loading.models import DatasetOptionsModel
 
 
 @dataclass(frozen=True, slots=True)
 class ExecutionResult:
     """Final result of a processing run.
 
-    `processed_sources` counts how many source units the executor started
-    processing, even when a scene limit stops the run before a source is fully
+    `processed_sources` counts how many DatasetSource units the executor started
+    processing, even when a scene limit stops the run before a DatasetSource is fully
     exhausted.
     """
 
@@ -40,45 +49,49 @@ class ExecutionResult:
     """Dataset key used for the run."""
     output_dir: Path
     """Root directory where processed output was written."""
-    storage_backend: StorageBackend
+    storage_backend: StorageBackend | str
     """Storage backend used for the exported records."""
     processed_sources: int
-    """Number of raw source units the executor started processing."""
+    """Number of raw DatasetSource units the executor started processing."""
     candidate_scenes: int
     """Number of scene candidates materialized before screening."""
     selected_scenes: int
     """Number of scenes accepted for output after screening and limits."""
     split_counts: dict[str, int]
     """Accepted scene count per output split."""
+    elapsed_time_seconds: float
+    """Total execution time in seconds."""
 
 
 @dataclass(frozen=True)
 class OutputPlan:
     """Plan for output configuration."""
 
-    inner: OutputConfig
+    config: OutputConfig
     """Resolved output configuration used by the writer and manifest."""
+    default_observation_length: int | None = None
+    """Default split point to store on each output record, if known."""
 
     def precision(self) -> type[np.float32 | np.float64]:
         """Return the floating point precision for this output plan."""
-        if self.inner.precision == "float32":
+        if self.config.precision == "float32":
             return np.float32
         return np.float64
 
     @property
     def mds(self) -> MDSOutputConfig:
         """Return the MDS output config for this output plan."""
-        return self.inner.mds
+        return self.config.mds
 
     @property
     def recenter_positions(self) -> bool:
         """Return whether this output plan requests recentering of agent positions."""
-        return self.inner.recenter_positions
+        return self.config.recenter_positions
 
     @cached_property
     def trajectory_schema(self) -> TrajectorySchema:
         """Return the trajectory schema for this output plan."""
-        return get_trajectory_schema(self.inner.trajectory_schema)
+        return get_trajectory_schema(self.config.trajectory_schema)
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,13 +107,13 @@ class ExecutionPlan:
 
     """
 
-    descriptor: DatasetSpec
+    descriptor: DatasetDescriptor
     """Resolved dataset specification."""
     data_root: Path
     """Input dataset root."""
     output_dir: Path
     """Output dataset root."""
-    storage_backend: StorageBackend
+    storage_backend: StorageBackend | str
     """Storage backend selected for writing output records."""
     resolved_config: DatasetConfig
     """Dataset config after defaults, config files, and overrides are merged."""
@@ -108,18 +121,20 @@ class ExecutionPlan:
     """Resolved runtime execution settings."""
     output: OutputPlan
     """Resolved output settings and derived output schema."""
-    loader: LoaderRequest
+    loader: LoaderPlan
     """Loader-facing subset of the resolved configuration."""
-    assignment: AssignmentRequest
+    assignment: SplitAssignmentPlan
     """Compiled split-assignment request."""
     map: MapConfig | None
     """Resolved map configuration, or `None` when map output is disabled."""
-    effective_history_frames: int
-    """History frame count after resampling/window configuration is applied."""
-    effective_future_frames: int
-    """Future frame count after resampling/window configuration is applied."""
+    effective_horizon_frames: int
+    """Horizon frame count after resampling/window configuration is applied."""
+    effective_default_observation_length: int | None
+    """Default reader/adaptor split point after resampling, if configured."""
     effective_sample_time: float
     """Sample interval in seconds after resampling is applied."""
+    output_sample: OutputSample[object] | None = None
+    """Optional custom persisted-sample configuration for writer backends."""
     limit: int | None = None
     """Optional maximum number of selected scenes to write."""
     seed: int | None = None
@@ -152,15 +167,20 @@ class ExecutionPlan:
         """Return the dataset manifest for this plan."""
         export_config: OutputConfig = self.resolved_config.output
         return DatasetManifest(
+            dataset=self.dataset,
+            storage_backend=storage_backend_name(self.storage_backend),
+            dronalize_version=package_version(),
             precision=export_config.precision,
             feature_columns=self.output.trajectory_schema.feature_columns(),
             trajectory_schema=self.output.trajectory_schema.name,
+            trajectory_schema_fields=self.output.trajectory_schema.semantic_fields(),
             recenter_positions=export_config.recenter_positions,
             source_trajectory_schema=self.descriptor.native_schema.name,
+            source_trajectory_schema_fields=self.descriptor.native_schema.semantic_fields(),
             sample_time=self.effective_sample_time,
             original_sample_time=self.resolved_config.scenes.sample_time,
-            future_frames=self.effective_future_frames,
-            history_frames=self.effective_history_frames,
+            horizon_frames=self.effective_horizon_frames,
+            default_observation_length=self.effective_default_observation_length,
             has_map=self.map is not None,
             derived_features=tuple(
                 field.to_str()
@@ -183,19 +203,52 @@ class ExecutionPlan:
             write_manifest(root, manifest)
 
 
-def compile_loader_request(
-    *, descriptor: DatasetSpec, resolved_config: DatasetConfig, include_map: bool | None
-) -> LoaderRequest:
+SampleT = TypeVar("SampleT")
+
+
+@dataclass(frozen=True, slots=True)
+class OutputSample(Generic[SampleT]):
+    """Python API configuration for custom persisted output samples.
+
+    `record_transform` is the preferred hook because it receives the canonical
+    `SceneRecord` after Dronalize has applied normal output semantics.
+    `scene_transform` is an expert escape hatch for deriving samples directly
+    from runtime `Scene` objects.
+    """
+
+    record_transform: RecordTransform[SampleT] | None = None
+    """Optional transform from canonical `SceneRecord` to persisted sample."""
+    scene_transform: SceneTransform[SampleT] | None = None
+    """Optional transform from runtime `Scene` to persisted sample."""
+    mds_columns: dict[str, str] | None = None
+    """MDS column schema required when custom samples are written to MDS."""
+
+    def __post_init__(self) -> None:
+        """Validate that only one transform mode is configured."""
+        validate_transform_choice(
+            record_transform=self.record_transform, scene_transform=self.scene_transform
+        )
+
+
+def build_loader_plan(
+    *, descriptor: DatasetDescriptor, resolved_config: DatasetConfig, include_map: bool | None
+) -> LoaderPlan:
     """Compile the loader-facing request for one resolved dataset config."""
-    dataset_options: DatasetOptionsModel = descriptor.parse_dataset_config(resolved_config.dataset)
-    map_config = None if (include_map is False or not descriptor.has_map) else resolved_config.map
-    return LoaderRequest(
+    loader_options: DatasetOptionsModel = descriptor.parse_loader_options(
+        resolved_config.loader_options
+    )
+    map_config = (
+        None
+        if (include_map is False or not descriptor.feature_support.map)
+        else resolved_config.map
+    )
+    return LoaderPlan(
         scenes=resolved_config.scenes,
         screening=resolved_config.screening,
-        read=ReadRequest.from_config(
+        read=ReadSelection.from_config(
             resolved_config.read, supported_native_splits=descriptor.supported_native_splits
         ),
-        dataset=dataset_options,
+        loader_options=loader_options,
         map=map_config,
     )
 
@@ -210,7 +263,9 @@ class ExecutionRequest(BaseModel):
     [`execute_request`][dronalize.runtime.api.execute_request] to run directly.
     """
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        frozen=True, extra="forbid", arbitrary_types_allowed=True
+    )
 
     dataset: str
     """Dataset registry key, such as `a43` or `waymo`."""
@@ -232,8 +287,10 @@ class ExecutionRequest(BaseModel):
     """Optional seed used by deterministic runtime choices."""
     input_dir_exists: bool = True
     """Whether request resolution should require `input_dir` to exist."""
+    output_sample: OutputSample[object] | None = None
+    """Customized output sample configuration."""
 
 
-def compile_effective_scene_metrics(config: DatasetConfig) -> tuple[int, int, float]:
+def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int | None, float]:
     """Return the effective scene window and sample time for one resolved config."""
     return effective_scene_window(config.scenes)

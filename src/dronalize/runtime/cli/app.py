@@ -3,25 +3,28 @@
 # ruff: noqa: PLC0415
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, TypeVar
 
-import click
 import typer
 from pydantic import ValidationError
 from rich import print as rprint
+from rich.panel import Panel
 
 from dronalize import __version__
 from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import (
+    CliError,
     ConfigurationError,
     DatasetNotFoundError,
     DronalizeError,
     MissingOptionalDependencyError,
     SplitError,
+    cli_usage_error,
 )
-from dronalize.io.formats import StorageBackend
+from dronalize.io.base import StorageBackend
 from dronalize.runtime.cli.formatting import (
     PLAN_NOTICE,
     build_available_datasets_table,
@@ -68,7 +71,7 @@ Assign = Annotated[
         "--assign",
         help="Output assignment mode to use.",
         show_default=False,
-        rich_help_panel="Assign",
+        rich_help_panel="Assign splits",
     ),
 ]
 Config = Annotated[
@@ -95,8 +98,7 @@ Seed = Annotated[
     ),
 ]
 StorageBackendOption = Annotated[
-    StorageBackend,
-    typer.Option("--storage-backend", "--sb", help="Storage backend for processed data."),
+    str, typer.Option("--storage-backend", "--sb", help="Storage backend for processed data.")
 ]
 TrajectorySchema = Annotated[
     str | None, typer.Option("--scene-schema", help="Scene schema to persist in exported output.")
@@ -106,19 +108,21 @@ SplitRatio = Annotated[
     typer.Option(
         "--ratio",
         help="Train/val/test ratio used by scene, source, time, and shuffled-time assignment.",
-        rich_help_panel="Assign",
+        rich_help_panel="Assign splits",
     ),
 ]
 SplitGap = Annotated[
     int | None,
-    typer.Option("--gap", help="Gap inserted between time partitions.", rich_help_panel="Assign"),
+    typer.Option(
+        "--gap", help="Gap inserted between time partitions.", rich_help_panel="Assign splits"
+    ),
 ]
 SplitSegments = Annotated[
     int | None,
     typer.Option(
         "--segments",
         help="Number of contiguous temporal segments used by shuffled-time assignment.",
-        rich_help_panel="Assign",
+        rich_help_panel="Assign splits",
     ),
 ]
 Force = Annotated[
@@ -161,8 +165,16 @@ def global_options(
         ),
     ] = None,
     dataset_module: DatasetModule = None,
+    log_level: Annotated[
+        str, typer.Option("--log-level", envvar="DRONALIZE_LOG_LEVEL", help="Python logging level.")
+    ] = "WARNING",
 ) -> None:
     """Global CLI options."""
+    logging.basicConfig(
+        level=getattr(logging, log_level.upper()),
+        format="%(levelname)s:%(name)s:%(message)s",
+        force=True,
+    )
     _ = version
     register_custom_datasets(dataset_module)
 
@@ -181,7 +193,7 @@ def process(
     progress: Progress = True,
     limit: Limit = None,
     seed: Seed = None,
-    storage_backend: StorageBackendOption = StorageBackend.PICKLE,
+    storage_backend: StorageBackendOption = StorageBackend.PICKLE.value,
     trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,
@@ -191,7 +203,6 @@ def process(
     include_map: IncludeMap = None,
 ) -> None:
     """[bold]Process a specified dataset[/bold]."""
-    from dronalize.runtime._internal.runner import open_execution_session
     from dronalize.runtime.api import execute_plan
 
     plan = _run_cli_action(
@@ -225,22 +236,7 @@ def process(
         rprint("\n", build_processing_summary_table(plan))
         _ = typer.confirm("Proceed with this processing plan?", abort=True)
 
-    if not progress:
-        _ = _run_cli_action(lambda: execute_plan(plan))
-        return
-
-    from dronalize.io.backends.registry import build_writer_factory
-    from dronalize.runtime.cli.progress import run_with_rich_progress
-
-    with open_execution_session(plan) as run:
-        run_with_rich_progress(
-            run.executor,
-            lambda: _run_cli_action(
-                lambda: run.executor.execute(writer_factory=build_writer_factory(plan))
-            ),
-            enable=True,
-        )
-        plan.write_manifests()
+    _ = _run_cli_action(lambda: execute_plan(plan, show_progress=progress))
 
 
 @app.command()
@@ -252,19 +248,19 @@ def available(
     ] = True,
 ) -> None:
     """[bold]List available datasets[/bold]."""
-    from dronalize.datasets import available as available_datasets
-    from dronalize.datasets.registry import get
+    from dronalize.datasets import list_datasets
+    from dronalize.datasets.registry import get_dataset
 
-    descriptors = _run_cli_action(lambda: [get(dataset) for dataset in available_datasets()])
+    descriptors = _run_cli_action(lambda: [get_dataset(dataset) for dataset in list_datasets()])
     rprint("\n", build_available_datasets_table(descriptors, details=details))
 
 
 @app.command()
 def inspect(dataset: DatasetName) -> None:
     """[bold]Inspect details for a specified dataset[/bold]."""
-    from dronalize.datasets.registry import get
+    from dronalize.datasets.registry import get_dataset
 
-    descriptor = _run_cli_action(lambda: get(dataset))
+    descriptor = _run_cli_action(lambda: get_dataset(dataset))
     _print_tables(build_dataset_inspect_tables(descriptor))
 
 
@@ -276,7 +272,7 @@ def show_config(
     assign: Assign = None,
     config: Config = None,
     jobs: Jobs = None,
-    storage_backend: StorageBackendOption = StorageBackend.PICKLE,
+    storage_backend: StorageBackendOption = StorageBackend.PICKLE.value,
     trajectory_schema: TrajectorySchema = None,
     ratio: SplitRatio = None,
     gap: SplitGap = None,
@@ -310,15 +306,19 @@ def show_config(
 @app.command()
 def split_support(dataset: DatasetName) -> None:
     """[bold]Show the split support for a specified dataset[/bold]."""
-    from dronalize.datasets.registry import get
+    from dronalize.datasets.registry import get_dataset
 
-    descriptor = _run_cli_action(lambda: get(dataset))
+    descriptor = _run_cli_action(lambda: get_dataset(dataset))
     _print_tables(build_split_support_tables(descriptor))
 
 
 def main() -> None:
     """Run the optional Dronalize CLI application."""
-    app()
+    try:
+        app()
+    except CliError as exc:
+        rprint(Panel(str(exc), title="Error", border_style="red"))
+        raise SystemExit(exc.exit_code) from None
 
 
 def _print_tables(tables: Iterable[object]) -> None:
@@ -329,24 +329,24 @@ def _print_tables(tables: Iterable[object]) -> None:
 def _run_cli_action(action: Callable[[], _T]) -> _T:
     try:
         return action()
-    except click.ClickException:
+    except CliError:
         raise
     except FileNotFoundError as exc:
         raise _file_error(exc) from exc
     except ValidationError as exc:
-        raise click.UsageError(_format_validation_error(exc)) from exc
+        raise cli_usage_error(_format_validation_error(exc)) from exc
     except (ConfigurationError, DatasetNotFoundError, SplitError) as exc:
-        raise click.UsageError(str(exc)) from exc
+        raise cli_usage_error(str(exc)) from exc
     except MissingOptionalDependencyError as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise CliError(str(exc)) from exc
     except DronalizeError as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise CliError(str(exc)) from exc
 
 
-def _file_error(exc: FileNotFoundError) -> click.ClickException:
+def _file_error(exc: FileNotFoundError) -> CliError:
     if exc.filename is None:
-        return click.UsageError(str(exc))
-    return click.FileError(filename=str(exc.filename))
+        return cli_usage_error(str(exc))
+    return CliError(f"Could not open file: {exc.filename}")
 
 
 def _format_validation_error(exc: ValidationError) -> str:
@@ -362,7 +362,7 @@ def _resolve_cli_plan(
     dataset: str,
     input_dir: Path,
     output_dir: Path,
-    storage_backend: StorageBackend,
+    storage_backend: StorageBackend | str,
     config: Path | None,
     read: ReadStrategy | None,
     read_split: list[DatasetSplit] | None,

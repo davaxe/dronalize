@@ -8,42 +8,45 @@ with `dronalize.datasets`, `dronalize.config`, and `dronalize.runtime`.
 ## Inspect a dataset programmatically
 
 ```python
-from dronalize.datasets import get
+from dronalize.datasets import get_dataset
 
-spec = get("a43")
+spec = get_dataset("a43")
 print(spec.name)
-print(spec.has_map)
+print(spec.feature_support.map)
+print(spec.feature_support.lane_change_sampling)
+print(spec.loader_options_model.model_fields)
 print(spec.native_schema.name)
 print(spec.supported_native_splits)
 ```
 
-`get()` returns a `DatasetSpec`, which is the same descriptor the CLI uses for `inspect` and
+`get_dataset()` returns a `DatasetDescriptor`, which is the same descriptor the CLI uses for `inspect` and
 `split-support`.
 
 ## Resolve a config file
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 
 from dronalize.config import parse_config
-from dronalize.datasets import get
+from dronalize.datasets import get_dataset
 
-spec = get("a43")
-project = parse_config(Path("config.toml"))
-resolved = project.resolve("a43", spec.default_config)
+spec = get_dataset("a43")
+project = parse_config(Path("dronalize.toml"))
+resolved = project.resolve_dataset_config("a43", spec.default_config)
 
-print(resolved.scenes.history_frames, resolved.scenes.future_frames)
+print(resolved.scenes.horizon_frames, resolved.scenes.default_observation_length)
 print(resolved.output.precision)
 print(resolved.read.root.strategy)
 print(resolved.assign.root.strategy)
 ```
 
-Use `resolve()` when you want the final dataset config with built-in defaults applied. The lower
-level `extract()` helper only returns the authored dataset entry from the file, not the fully merged
-result.
+Use `resolve_dataset_config()` when you want the final dataset config with built-in defaults
+applied.
 
 ## Plan or run a request
 
+<!-- no-validate -->
 ```python
 from pathlib import Path
 

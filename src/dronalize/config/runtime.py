@@ -4,14 +4,11 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field
 
-from dronalize.config.base import PartialConfig
-from dronalize.config.models import (
-    AssignConfig,
-    PartialDatasetConfig,
-    PartialOutputConfig,
-    PartialRuntimeConfig,
-    ReadConfig,
-)
+from dronalize.config.base import ConfigPatch
+from dronalize.config.models.dataset import PartialDatasetConfig
+from dronalize.config.models.output import PartialOutputConfig
+from dronalize.config.models.runtime import PartialRuntimeConfig
+from dronalize.config.models.split import AssignConfig, ReadConfig
 from dronalize.core.errors import ConfigurationError
 
 if TYPE_CHECKING:
@@ -32,7 +29,7 @@ The string values map directly to the concrete assignment config models in
 """
 
 
-class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
+class RuntimeOverride(ConfigPatch[PartialDatasetConfig]):
     """User-supplied overrides layered on top of a dataset's base config.
 
     `RuntimeOverride` is the bridge between unstructured runtime inputs such as
@@ -107,7 +104,7 @@ class RuntimeOverride(PartialConfig[PartialDatasetConfig]):
         Inputs are based on raw CLI arguments that are not validated.
 
         !!! note "`PartialDatasetConfig` conversion"
-            The `apply_to` method can be used to convert this `RuntimeOverride`
+            The `merge_into` method can be used to convert this `RuntimeOverride`
             into a `PartialDatasetConfig` that can be merged with the dataset's
             default config. This allows for applying overrides without needing
             to specify the full config structure.

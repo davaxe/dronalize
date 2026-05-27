@@ -40,7 +40,6 @@ stationary = { rule = "min_distance", minimum = 4, tolerance = { absolute = 100}
 [profiles.strict_screening.screening.scene]
 min_agents = { rule = "agent_range", minimum = 12 }
 
-
 # --------------------------------------------------------------------------------------
 # Dataset: waymo
 # --------------------------------------------------------------------------------------
@@ -51,15 +50,12 @@ uses = ["strict_screening"]
 [datasets.waymo.screening]
 mode = "extend"
 
-[datasets.waymo.output.mds]
-compression = "zstd:3"
-
 # --------------------------------------------------------------------------------------
 # Dataset: a43
 # --------------------------------------------------------------------------------------
 
 [datasets.a43]
-uses = ["fast", "high_precision", "basic_screening"]
+uses = ["basic_screening"]
 
 
 # Runtime ------------------------------------------------------------------------------
@@ -76,8 +72,8 @@ uses = ["fast", "high_precision", "basic_screening"]
 # - should trajectories be resampled before scene construction?
 
 [datasets.a43.scenes]
-history_frames = 20
-future_frames = 60
+horizon_frames = 80
+default_observation_length = 20
 sample_time = 0.1
 
 [datasets.a43.scenes.window]
@@ -136,7 +132,7 @@ gap = 2
 
 [datasets.a43.map]
 min_distance = 1.0
-interp_distance = 2.5
+interpolation_distance = 2.5
 
 [datasets.a43.map.extraction]
 mode = "circle"

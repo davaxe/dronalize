@@ -5,16 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import polars as pl
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategoryInput, coerce_agent_categories
 from dronalize.processing.screening.agent import AgentCheckRule  # noqa: TC001
-from dronalize.processing.screening.base import CleanupRuleBase, RuleId
-from dronalize.processing.screening.context import AgentSet  # noqa: TC001
+from dronalize.processing.screening.base import AgentSet, CleanupRuleBase, RuleId
 
 if TYPE_CHECKING:
-    from dronalize.processing.screening.context import ScreeningContext
+    from dronalize.processing.screening.base import ScreeningContext
 
 
 class PruneByRule(CleanupRuleBase):
@@ -23,11 +22,18 @@ class PruneByRule(CleanupRuleBase):
     agent_rule: AgentCheckRule
     rule: Literal["prune_by"] = Field("prune_by", repr=False, init=False)
 
+    @model_validator(mode="after")
+    def _reject_aggregate_requirements(self) -> PruneByRule:
+        if self.agent_rule.require is not None:
+            msg = "`require` is only valid for agent screening rules, not cleanup pruning."
+            raise ValueError(msg)
+        return self
+
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression for the wrapped agent rule."""
         scope = ctx.selector_mask(self.agent_rule.selector)
-        agent_validity = self.agent_rule.expr(ctx)
+        agent_validity = self.agent_rule.predicate_expr(ctx)
         return pl.when(scope).then(agent_validity).otherwise(statement=True)
 
 
@@ -45,7 +51,7 @@ class ExcludeCategories(CleanupRuleBase):
         return cls(categories=coerce_agent_categories(categories, frozenset), rule_id=rule_id)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression that excludes selected categories."""
         return ~pl.col(ctx.columns.category).is_in(self.categories)
 
@@ -64,7 +70,7 @@ class IncludeCategories(CleanupRuleBase):
         return cls(categories=coerce_agent_categories(categories, frozenset), rule_id=rule_id)
 
     @override
-    def expr(self, ctx: ScreeningContext) -> pl.Expr:
+    def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the row-retention expression that keeps selected categories."""
         return pl.col(ctx.columns.category).is_in(self.categories)
 

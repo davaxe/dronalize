@@ -19,12 +19,14 @@ These are the default Dronalize settings used when processing this dataset.
 
 | Setting | Default |
 | ------- | ------- |
-| Source sequence | 5 obs / 30 pred @ 10 Hz |
-| Effective sequence | 5 obs / 30 pred @ 10 Hz |
+| Configured horizon | 35 frames (default split after 5) @ 10.0 Hz |
+| Effective horizon | 35 frames (default split after 5) @ 10.0 Hz |
+| Source unit | Recording |
+| Source bounds | 36-784 frames (observed) |
 | Resampling | None |
-| Windowing | 35-frame window, step 5 |
+| Sliding windows | Enabled, strict, step 5 |
 | Screening | Drop parked and undefined actors, remove duplicate `vehicle.ego` instances, and prune agents with fewer than 2 samples |
-| Maps | Relevant area (padding 1.15) |
+| Maps | Trajectory buffer (radius=25) |
 
 ## Dataset compatibility
 

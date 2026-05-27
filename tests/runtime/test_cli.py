@@ -11,7 +11,8 @@ from typing import TYPE_CHECKING
 from typer.testing import CliRunner
 
 import dronalize.runtime.cli.app as cli_app
-from dronalize.datasets import available
+from dronalize.core.errors import CliError
+from dronalize.datasets import list_datasets
 from dronalize.datasets.registry import _REGISTRY  # pyright: ignore[reportPrivateUsage]
 
 if TYPE_CHECKING:
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
 )
 def test_cli_commands_smoke(tmp_path: Path, name: str) -> None:
     runner = CliRunner()
-    for dataset_name in available():
+    for dataset_name in list_datasets():
         output_dir = tmp_path / "cli-output"
         args_by_command: dict[str, list[str]] = {
             "process": [
@@ -55,7 +56,19 @@ def test_cli_help_smoke() -> None:
     assert result.exit_code == 0
 
 
-def test_cli_imports_dataset_module_before_resolving_dataset(
+def test_inspect_reports_temporal_support() -> None:
+    runner = CliRunner()
+    result = runner.invoke(cli_app.app, ["inspect", "argoverse1"])
+
+    assert result.exit_code == 0, result.output
+    assert "Configured horizon" in result.output
+    assert "Sliding windows" in result.output
+    assert "Source bounds" in result.output
+    assert "Configured horizon fits" in result.output
+    assert "Supported policies" in result.output
+
+
+def test_cli_imports_dataset_module_before_lookup(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     module_path = tmp_path / "custom_datasets.py"
@@ -70,7 +83,7 @@ def test_cli_imports_dataset_module_before_resolving_dataset(
         ),
         encoding="utf-8",
     )
-    monkeypatch.syspath_prepend(str(tmp_path))  # pyright: ignore[reportUnknownMemberType]
+    monkeypatch.syspath_prepend(str(tmp_path))
     _ = _REGISTRY.pop("cli_demo", None)
 
     try:
@@ -98,12 +111,12 @@ def test_cli_imports_dataset_module_before_resolving_dataset(
         ("def register_dronalize_datasets():\n    return [1]\n", "returned int"),
     ],
 )
-def test_cli_reports_invalid_dataset_module_hook(
+def test_cli_rejects_invalid_dataset_module_hook(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module_body: str, expected: str
 ) -> None:
     module_path = tmp_path / "bad_datasets.py"
     _ = module_path.write_text(module_body, encoding="utf-8")
-    monkeypatch.syspath_prepend(str(tmp_path))  # pyright: ignore[reportUnknownMemberType]
+    monkeypatch.syspath_prepend(str(tmp_path))
     _ = sys.modules.pop("bad_datasets", None)
 
     runner = CliRunner()
@@ -112,4 +125,6 @@ def test_cli_reports_invalid_dataset_module_hook(
     )
 
     assert result.exit_code != 0
-    assert expected in result.output
+    message = result.output or str(result.exception)
+    assert isinstance(result.exception, CliError)
+    assert expected in message

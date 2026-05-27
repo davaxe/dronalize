@@ -12,17 +12,17 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.datasets.opendd.maps.builder import OpenDDMapBuilder
+from dronalize.datasets.opendd.maps import OpenDDMapBuilder
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.maps.resolver import MapResolver
+    from dronalize.processing.maps import MapResolver
 
 
 def _table_query(table_name: str) -> str:
@@ -37,7 +37,7 @@ def _table_query(table_name: str) -> str:
     """  # noqa: S608
 
 
-class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
+class OpenDDLoader(SceneLoader[tuple[Path, str]]):
     """Loader for OpenDD data split across multiple SQLite databases."""
 
     def _db_paths(self) -> Iterable[Path]:
@@ -47,12 +47,14 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
                 yield db_file
 
     @override
-    def iter_sources(self) -> Iterable[Source[tuple[Path, str]]]:
+    def iter_sources(self) -> Iterable[DatasetSource[tuple[Path, str]]]:
         for db_path in self._db_paths():
             for table_name in _list_table_names(db_path):
                 identifier = f"{db_path.stem}:{table_name}"
-                yield Source(
-                    identifier=identifier, data=(db_path, table_name), map_key=str(db_path.parent)
+                yield DatasetSource(
+                    identifier=identifier,
+                    payload=(db_path, table_name),
+                    map_key=str(db_path.parent),
                 )
 
     @override
@@ -60,12 +62,12 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
         return sum(_count_tables(db_path) for db_path in self._db_paths())
 
     @override
-    def load_source(self, source: Source[tuple[Path, str]]) -> Iterable[LoadedSourceData]:
-        db_path, table_name = source.data
+    def load_source(self, source: DatasetSource[tuple[Path, str]]) -> Iterable[LoadedSourceFrame]:
+        db_path, table_name = source.payload
         with sqlite3.connect(db_path) as connection:
-            yield LoadedSourceData(
+            yield LoadedSourceFrame(
                 pl
-                .read_database(_table_query(table_name), connection)  # pyright: ignore[reportUnknownMemberType]
+                .read_database(_table_query(table_name), connection)
                 .lazy()
                 .with_columns(
                     ((pl.col("TIMESTAMP") * 1000).round(4).rank(method="dense") - 1)
@@ -103,7 +105,9 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
                 return None
             return utils.extract_configured_map(
                 self._get_map(
-                    scene.map_key, self.map_config.min_distance, self.map_config.interp_distance
+                    scene.map_key,
+                    self.map_config.min_distance,
+                    self.map_config.interpolation_distance,
                 ),
                 scene,
                 self.map_config,
@@ -113,10 +117,14 @@ class OpenDDLoader(BaseSceneLoader[tuple[Path, str]]):
 
     @staticmethod
     @functools.lru_cache(maxsize=10)
-    def _get_map(key: str, min_distance: float | None, interp_distance: float | None) -> MapGraph:
+    def _get_map(
+        key: str, min_distance: float | None, interpolation_distance: float | None
+    ) -> MapGraph:
         database = Path(key).name
         map_path = Path(key) / f"map_{database}" / f"map_{database}.sqlite"
-        return OpenDDMapBuilder.from_sqlite_file(map_path).build(min_distance, interp_distance)
+        return OpenDDMapBuilder.from_sqlite_file(map_path).build(
+            min_distance, interpolation_distance
+        )
 
 
 def _list_table_names(db_path: Path) -> list[str]:

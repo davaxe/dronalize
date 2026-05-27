@@ -1,4 +1,4 @@
-## ::: dronalize.config.ProcessingConfig
+## ::: dronalize.config.ProjectConfig
 
 ## ::: dronalize.config.RuntimeOverride
 

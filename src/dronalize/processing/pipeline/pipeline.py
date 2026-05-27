@@ -273,37 +273,9 @@ class Pipeline:
 
         return self.then(transform, name="cast")
 
-    # -- introspection ------------------------------------------------------
-
-    def inspect(self, f: Callable[[pl.LazyFrame], None]) -> Pipeline:
-        """Apply a side-effecting function to each pipeline step.
-
-        This is useful for debugging or logging the steps in a pipeline.
-
-        Parameters
-        ----------
-        f : Callable[[LazyFrame], None]
-            A function that takes a pipeline entry and performs side effects.
-
-        Returns
-        -------
-        Pipeline
-            The (functionally) unchanged pipeline, for chaining.
-        """
-
-        def _inspect_transform(df: pl.LazyFrame) -> pl.LazyFrame:
-            f(df)
-            return df
-
-        return self.then(_inspect_transform, name="inspect")
-
     def is_empty(self) -> bool:
         """Return True if the pipeline contains no steps."""
         return len(self._steps) == 0
-
-    def has_flat_map(self) -> bool:
-        """Return True if the pipeline contains any flat-map steps."""
-        return any(isinstance(entry, _FlatMapEntry) for entry in self._steps)
 
     def __len__(self) -> int:
         """Return the number of steps in the pipeline."""

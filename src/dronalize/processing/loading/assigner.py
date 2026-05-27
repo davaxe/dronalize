@@ -58,9 +58,6 @@ class ConstantAssigner(Assigner[T_co]):
         return self._group
 
 
-ConstantSplitAssigner = ConstantAssigner[DatasetSplit]
-
-
 class StatelessWeightedAssigner(Assigner[T_co]):
     """Stateless group assigner based on hashing.
 

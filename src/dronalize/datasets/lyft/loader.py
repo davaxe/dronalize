@@ -16,10 +16,13 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.base import BaseSceneLoader
-from dronalize.processing.loading.loader import LoadedSourceData, Source
-from dronalize.processing.loading.options import DatasetOptionsModel
-from dronalize.processing.maps.resolver import no_map, shared_map
+from dronalize.processing.loading.base import SceneLoader
+from dronalize.processing.loading.models import (
+    DatasetOptionsModel,
+    DatasetSource,
+    LoadedSourceFrame,
+)
+from dronalize.processing.maps import no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -28,9 +31,9 @@ if TYPE_CHECKING:
     from zarr import Array
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.resources import DatasetResources
-    from dronalize.processing.maps.resolver import MapResolver
-    from dronalize.processing.models import LoaderRequest
+    from dronalize.processing.loading.models import DatasetRunResources
+    from dronalize.processing.maps import MapResolver
+    from dronalize.processing.models import LoaderPlan
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
@@ -59,14 +62,14 @@ class _ArrayData:
         return self.scenes.shape[0]
 
 
-class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
+class LyftLoader(SceneLoader[_Source, LyftLoaderOptions]):
     """Loader for Lyft Level 5 scenes stored in Zarr format."""
 
     def __init__(
         self,
         data_root: Path | str,
-        request: LoaderRequest,
-        resources: DatasetResources | None = None,
+        request: LoaderPlan,
+        resources: DatasetRunResources | None = None,
     ) -> None:
         super().__init__(data_root=data_root, request=request, resources=resources)
         self._data: dict[DatasetSplit, _ArrayData] = {}
@@ -88,16 +91,16 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
             )
         return self._data[split]
 
-    def _generate_sources(self, split: DatasetSplit) -> Iterable[Source[_Source]]:
+    def _generate_sources(self, split: DatasetSplit) -> Iterable[DatasetSource[_Source]]:
         arrays = self._get_arrays(split)
         current: int = 0
         while current < arrays.total_scenes:
             end = min(current + self.loader_options.scene_batch_size, arrays.total_scenes)
-            yield Source(current, data=_Source(interval=(current, end), split=split))
+            yield DatasetSource(current, payload=_Source(interval=(current, end), split=split))
             current += self.loader_options.scene_batch_size
 
     @override
-    def iter_sources_for(self, split: DatasetSplit) -> Iterable[Source[_Source]]:
+    def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[_Source]]:
         if split == DatasetSplit.TEST:
             raise SplitNotSupportedError(type(self).__name__, split)
         yield from self._generate_sources(split)
@@ -113,9 +116,9 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
         return (total_scenes + batch_size - 1) // batch_size
 
     @override
-    def load_source(self, source: Source[_Source]) -> Iterable[LoadedSourceData]:
-        start, end = source.data.interval
-        arrays = self._get_arrays(source.data.split)
+    def load_source(self, source: DatasetSource[_Source]) -> Iterable[LoadedSourceFrame]:
+        start, end = source.payload.interval
+        arrays = self._get_arrays(source.payload.split)
         scenes_np = cast("npt.NDArray[np.void]", arrays.scenes[start:end])
 
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
@@ -126,7 +129,7 @@ class LyftLoader(BaseSceneLoader[_Source, LyftLoaderOptions]):
         agents_np = cast("npt.NDArray[np.void]", arrays.agents[agent_start:agent_end])
 
         for scene_data in scenes_np:
-            yield LoadedSourceData(
+            yield LoadedSourceFrame(
                 frame=_scene_to_polars(
                     scene_data,
                     frames=frames_np,

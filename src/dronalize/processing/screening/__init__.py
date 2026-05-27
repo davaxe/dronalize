@@ -4,13 +4,18 @@
 
 ```python
 from dronalize.processing import screening
-from dronalize.processing.screening import Screen, AgentSelector, Tolerance, tol
+from dronalize.processing.screening import (
+    AgentCategorySelector,
+    PassingRequirement,
+    ScreeningRuleSet,
+    Tolerance,
+)
 ```
 
 This package is organized around three kinds of public symbols:
 
 - root-level screen containers such as
-  [`Screen`][dronalize.processing.screening.Screen]
+  [`ScreeningRuleSet`][dronalize.processing.screening.ScreeningRuleSet]
 - helper functions such as
   [`screen_scene`][dronalize.processing.screening.screen_scene]
 - tolerance models for agent-rule aggregation
@@ -28,9 +33,18 @@ type into one package namespace.
 - [`dronalize.processing.screening.agent`][] for agent-rule definitions
 """
 
+from dronalize.config.models.screening import PassingRequirement, Tolerance
 from dronalize.processing.screening import agent, cleanup, scene
-from dronalize.processing.screening.apply import screen_scene
-from dronalize.processing.screening.context import AgentSelector
-from dronalize.processing.screening.screen import Screen
+from dronalize.processing.screening.base import AgentCategorySelector
+from dronalize.processing.screening.screen import ScreeningRuleSet, screen_scene
 
-__all__ = ["AgentSelector", "Screen", "agent", "cleanup", "scene", "screen_scene"]
+__all__ = [
+    "AgentCategorySelector",
+    "PassingRequirement",
+    "ScreeningRuleSet",
+    "Tolerance",
+    "agent",
+    "cleanup",
+    "scene",
+    "screen_scene",
+]

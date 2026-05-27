@@ -1,3 +1,3 @@
-from dronalize.datasets.argoverse1.spec import DATASET_SPEC
+from dronalize.datasets.argoverse1.descriptor import DATASET_DESCRIPTOR
 
-__all__ = ["DATASET_SPEC"]
+__all__ = ["DATASET_DESCRIPTOR"]
