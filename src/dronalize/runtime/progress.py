@@ -166,7 +166,9 @@ class _ProgressMonitor:
                 return
 
 
-def run_with_rich_progress(executor: Executor, run: Callable[[], T], *, enable: bool = True) -> T:
+def execute_with_rich_progress(
+    executor: Executor, run: Callable[[], T], *, enable: bool = True
+) -> T:
     """Run an executor callback while rendering a Rich progress bar."""
     if not enable:
         return run()

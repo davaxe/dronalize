@@ -22,7 +22,7 @@ from dronalize.core.errors import (
     MissingOptionalDependencyError,
     SplitError,
 )
-from dronalize.io.formats import StorageBackend
+from dronalize.io.base import StorageBackend
 from dronalize.runtime.cli.formatting import (
     PLAN_NOTICE,
     build_available_datasets_table,
@@ -202,7 +202,6 @@ def process(
 ) -> None:
     """[bold]Process a specified dataset[/bold]."""
     from dronalize.runtime.api import execute_plan
-    from dronalize.runtime.executor import open_execution_session
 
     plan = _run_cli_action(
         lambda: _resolve_cli_plan(
@@ -235,22 +234,7 @@ def process(
         rprint("\n", build_processing_summary_table(plan))
         _ = typer.confirm("Proceed with this processing plan?", abort=True)
 
-    if not progress:
-        _ = _run_cli_action(lambda: execute_plan(plan))
-        return
-
-    from dronalize.io.backends.registry import build_writer_factory
-    from dronalize.runtime.cli.progress import run_with_rich_progress
-
-    with open_execution_session(plan) as run:
-        run_with_rich_progress(
-            run.executor,
-            lambda: _run_cli_action(
-                lambda: run.executor.execute(writer_factory=build_writer_factory(plan))
-            ),
-            enable=True,
-        )
-        plan.write_manifests()
+    _ = _run_cli_action(lambda: execute_plan(plan, show_progress=progress))
 
 
 @app.command()

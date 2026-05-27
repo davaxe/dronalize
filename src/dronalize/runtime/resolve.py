@@ -20,7 +20,7 @@ from dronalize.config.models.split import (
 from dronalize.config.parse import parse_config
 from dronalize.config.project import ProjectConfig
 from dronalize.io.backends.registry import is_writer_backend_registered, registered_writer_backends
-from dronalize.io.formats import StorageBackend, storage_backend_name
+from dronalize.io.base import StorageBackend, storage_backend_name
 from dronalize.processing.models import SplitAssignmentPlan
 from dronalize.runtime.types import (
     ExecutionPlan,

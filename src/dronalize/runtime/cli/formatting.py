@@ -19,7 +19,7 @@ from dronalize.config.models.scenes import effective_scene_window
 from dronalize.config.models.split import NoAssign, PreserveNativeAssign, ReadAll, ReadNative
 from dronalize.core.categories import DatasetSplit, EdgeType
 from dronalize.core.scene import get_trajectory_schema
-from dronalize.io.formats import storage_backend_name
+from dronalize.io.base import storage_backend_name
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

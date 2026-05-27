@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING
 
 from dronalize.datasets.registry import get_dataset
 from dronalize.io.backends.registry import build_writer_factory
-from dronalize.io.formats import storage_backend_name
+from dronalize.io.base import storage_backend_name
 from dronalize.runtime.executor import open_execution_session
+from dronalize.runtime.progress import execute_with_rich_progress
 from dronalize.runtime.resolve import build_execution_plan
 from dronalize.runtime.types import ExecutionResult
 
@@ -48,7 +49,7 @@ def resolve_request(request: ExecutionRequest) -> ExecutionPlan:
     return build_execution_plan(descriptor=descriptor, request=request)
 
 
-def execute_request(request: ExecutionRequest) -> ExecutionResult:
+def execute_request(request: ExecutionRequest, *, show_progress: bool = True) -> ExecutionResult:
     """Resolve and execute one dataset-processing request.
 
     This is a convenience method that combines the resolution and execution
@@ -60,13 +61,21 @@ def execute_request(request: ExecutionRequest) -> ExecutionResult:
     request : ExecutionRequest
         The dataset-processing request to resolve and execute. This includes all
         user-provided parameters, paths, and overrides.
+    show_progress : bool, optional
+        Whether to display a rich progress bar during execution. Default is
+        True.
 
+    Returns
+    -------
+    ExecutionResult
+        Summary of the execution, including counters, output paths, and elapsed
+        time.
     """
     logger.info("Executing request", extra={"dataset": request.dataset})
-    return execute_plan(resolve_request(request))
+    return execute_plan(resolve_request(request), show_progress=show_progress)
 
 
-def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
+def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> ExecutionResult:
     """Execute one resolved plan and collect final counters and output paths.
 
     This will start the execution where the main objective is to process all
@@ -76,6 +85,9 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
     ----------
     plan : ExecutionPlan
         The execution plan to run. This should be a fully resolved plan.
+    show_progress : bool, optional
+        Whether to display a rich progress bar during execution. Default is
+        True.
 
     Returns
     -------
@@ -94,7 +106,11 @@ def execute_plan(plan: ExecutionPlan) -> ExecutionResult:
     # in processes hanging indefinitely.
     mp.set_start_method("spawn", force=True)
     with open_execution_session(plan) as run:
-        run.executor.execute(writer_factory=build_writer_factory(plan))
+        execute_with_rich_progress(
+            run.executor,
+            lambda: run.executor.execute(writer_factory=build_writer_factory(plan)),
+            enable=show_progress,
+        )
         logger.debug("Execution complete, writing manifests", extra={"dataset": plan.dataset})
         plan.write_manifests()
         progress = run.executor.progress()

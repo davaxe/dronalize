@@ -18,8 +18,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 from dronalize.core.errors import UnsupportedStorageBackendError
-from dronalize.io.base import DatasetWriter
-from dronalize.io.formats import StorageBackend, StorageBackendId, storage_backend_name
+from dronalize.io.base import DatasetWriter, StorageBackend, StorageBackendId, storage_backend_name
 
 if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
