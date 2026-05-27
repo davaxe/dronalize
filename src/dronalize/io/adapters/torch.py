@@ -18,7 +18,7 @@ except ModuleNotFoundError as error:
     )
 
 
-from dronalize.io.base import DatasetReader
+from dronalize.io.base import DatasetReader, IterableDatasetReader
 from dronalize.io.records import SceneRecord
 
 if TYPE_CHECKING:
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
 
 ReaderT = TypeVar("ReaderT", bound=DatasetReader[SceneRecord])
+IterableReaderT = TypeVar("IterableReaderT", bound=IterableDatasetReader[SceneRecord])
 ObservationLength: TypeAlias = int | Callable[[SceneRecord], int]
 
 
@@ -129,8 +130,23 @@ class TorchSceneDataset(Dataset[TorchSceneRecord], Generic[ReaderT]):
         return to_torch_scene_record(self.reader[index], copy=self._copy)
 
 
-class IterableTorchSceneDataset(TorchSceneDataset[ReaderT], IterableDataset[TorchSceneRecord]):
+class IterableTorchSceneDataset(IterableDataset[TorchSceneRecord], Generic[IterableReaderT]):
     """Iterable Torch dataset wrapper over any `DatasetReader[SceneRecord]`."""
+
+    def __init__(self, reader: IterableReaderT, *, copy: bool = True) -> None:
+        super().__init__()
+        self.reader: IterableReaderT = reader
+        self._copy: bool = copy
+
+    @override
+    def __iter__(self) -> Iterator[TorchSceneRecord]:
+        """Iterate over full-horizon scene records converted to Torch tensors."""
+        for record in self.reader:
+            yield to_torch_scene_record(record, copy=self._copy)
+
+    def __len__(self) -> int:
+        """Return the number of scene records visible through the wrapped reader."""
+        return len(self.reader)
 
 
 class TorchSplitSceneDataset(Dataset[TorchSplitSceneRecord], Generic[ReaderT]):
@@ -167,9 +183,32 @@ class TorchSplitSceneDataset(Dataset[TorchSplitSceneRecord], Generic[ReaderT]):
 
 
 class IterableTorchSplitSceneDataset(
-    TorchSplitSceneDataset[ReaderT], IterableDataset[TorchSplitSceneRecord]
+    IterableDataset[TorchSplitSceneRecord], Generic[IterableReaderT]
 ):
-    """Iterable Torch dataset that splits full-horizon records on read."""
+    """Iterable Torch dataset wrapper that splits full-horizon records on read."""
+
+    def __init__(
+        self,
+        reader: IterableReaderT,
+        *,
+        observation_length: ObservationLength | None = None,
+        copy: bool = True,
+    ) -> None:
+        super().__init__()
+        self.reader: IterableReaderT = reader
+        self.observation_length: ObservationLength | None = observation_length
+        self._copy: bool = copy
+
+    @override
+    def __iter__(self) -> Iterator[TorchSplitSceneRecord]:
+        """Iterate over split scene records converted to Torch tensors."""
+        for record in self.reader:
+            observation_length = resolve_observation_length(self.observation_length, record)
+            yield to_torch_scene_record(record, copy=self._copy).split(observation_length)
+
+    def __len__(self) -> int:
+        """Return the number of scene records visible through the wrapped reader."""
+        return len(self.reader)
 
 
 def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSceneRecord:
