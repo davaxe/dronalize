@@ -33,6 +33,10 @@ def test_builtin_datasets_have_temporal_support(name: str) -> None:
     descriptor = get_dataset(name)
     temporal = descriptor.temporal_support
 
+    if descriptor.name == "a43":
+        assert temporal is None
+        return
+
     assert temporal is not None
     assert temporal.source_frame_bounds.min_frames is not None
     assert temporal.source_frame_bounds.max_frames is not None

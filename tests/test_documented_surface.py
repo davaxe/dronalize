@@ -18,7 +18,7 @@ from dronalize.runtime import (
     stream_plan,
 )
 
-DOCS_ROOT = Path(__file__).resolve().parents[2] / "docs"
+DOCS_ROOT = Path(__file__).resolve().parents[1] / "docs"
 FENCED_BLOCK = re.compile(r"```(?P<info>[^\n`]*)\n(?P<body>.*?)\n```", re.DOTALL)
 MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]+\]\((?P<target>[^)]+)\)")
 SKIP_VALIDATE_MARKER = "<!-- no-validate -->"

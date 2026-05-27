@@ -2,11 +2,33 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from typing_extensions import override
+
 from dronalize.core.categories import DatasetSplit
 
 
 class DronalizeError(Exception):
     """Base class for all exceptions raised by Dronalize."""
+
+
+@dataclass(slots=True)
+class CliError(Exception):
+    """A formatted CLI error with an explicit process exit code."""
+
+    message: str
+    exit_code: int = 1
+
+    @override
+    def __str__(self) -> str:
+        """Return the error message for display."""
+        return self.message
+
+
+def cli_usage_error(message: str) -> CliError:
+    """Create a CLI error representing invalid user input."""
+    return CliError(message=message, exit_code=2)
 
 
 class ConfigurationError(ValueError, DronalizeError):

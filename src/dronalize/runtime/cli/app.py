@@ -7,20 +7,22 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal, TypeVar
 
-import click
 import typer
 from pydantic import ValidationError
 from rich import print as rprint
+from rich.panel import Panel
 
 from dronalize import __version__
 from dronalize.config.runtime import RuntimeOverride
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import (
+    CliError,
     ConfigurationError,
     DatasetNotFoundError,
     DronalizeError,
     MissingOptionalDependencyError,
     SplitError,
+    cli_usage_error,
 )
 from dronalize.io.base import StorageBackend
 from dronalize.runtime.cli.formatting import (
@@ -312,7 +314,11 @@ def split_support(dataset: DatasetName) -> None:
 
 def main() -> None:
     """Run the optional Dronalize CLI application."""
-    app()
+    try:
+        app()
+    except CliError as exc:
+        rprint(Panel(str(exc), title="Error", border_style="red"))
+        raise SystemExit(exc.exit_code) from None
 
 
 def _print_tables(tables: Iterable[object]) -> None:
@@ -323,24 +329,24 @@ def _print_tables(tables: Iterable[object]) -> None:
 def _run_cli_action(action: Callable[[], _T]) -> _T:
     try:
         return action()
-    except click.ClickException:
+    except CliError:
         raise
     except FileNotFoundError as exc:
         raise _file_error(exc) from exc
     except ValidationError as exc:
-        raise click.UsageError(_format_validation_error(exc)) from exc
+        raise cli_usage_error(_format_validation_error(exc)) from exc
     except (ConfigurationError, DatasetNotFoundError, SplitError) as exc:
-        raise click.UsageError(str(exc)) from exc
+        raise cli_usage_error(str(exc)) from exc
     except MissingOptionalDependencyError as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise CliError(str(exc)) from exc
     except DronalizeError as exc:
-        raise click.ClickException(str(exc)) from exc
+        raise CliError(str(exc)) from exc
 
 
-def _file_error(exc: FileNotFoundError) -> click.ClickException:
+def _file_error(exc: FileNotFoundError) -> CliError:
     if exc.filename is None:
-        return click.UsageError(str(exc))
-    return click.FileError(filename=str(exc.filename))
+        return cli_usage_error(str(exc))
+    return CliError(f"Could not open file: {exc.filename}")
 
 
 def _format_validation_error(exc: ValidationError) -> str:

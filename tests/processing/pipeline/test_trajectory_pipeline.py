@@ -110,9 +110,7 @@ def test_partial_window_keeps_edge_windows() -> None:
     ]
 
 
-def test_pipeline_outputs_split_labels(
-    scene_df_presets: DataFramePresets,
-) -> None:
+def test_pipeline_outputs_split_labels(scene_df_presets: DataFramePresets) -> None:
     frame: pl.DataFrame = scene_df_presets["single_agent_time_split"]()
     scenes = _run_pipeline(
         frame,
@@ -160,9 +158,7 @@ def test_pipeline_outputs_split_labels(
     ]
 
 
-def test_lane_change_sampling_thins_steady_windows(
-    scene_df_presets: DataFramePresets,
-) -> None:
+def test_lane_change_sampling_thins_steady_windows(scene_df_presets: DataFramePresets) -> None:
     frame = scene_df_presets["lane_change_sequences"]()
     plan = TrajectoryPipelinePlan(
         scenes=_scenes(
@@ -239,9 +235,7 @@ def test_lane_change_sampling_requires_windows(scene_df_presets: DataFramePreset
         _ = _run_pipeline(frame, plan=plan, window_by="sequence")
 
 
-def test_keep_every_one_matches_standard(
-    scene_df_presets: DataFramePresets,
-) -> None:
+def test_keep_every_one_matches_standard(scene_df_presets: DataFramePresets) -> None:
     frame = scene_df_presets["lane_change_sequences"]()
     standard_plan = TrajectoryPipelinePlan(scenes=_scenes())
     lane_change_plan = TrajectoryPipelinePlan(

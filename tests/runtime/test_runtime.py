@@ -63,9 +63,7 @@ def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_descriptor(monkeypatch, demo_descriptor())
 
 
-def test_resolve_request_builds_plan(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resolve_request_builds_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_get_demo_descriptor(monkeypatch)
 
     plan = resolve_request(_request(tmp_path, include_map=False))
@@ -241,9 +239,7 @@ def test_execute_request_applies_record_transform(
     assert sample == {"scene_number": 0, "dataset": "demo", "feature_shape": (1, 3, 7)}
 
 
-def test_execute_request_writes_custom_mds(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip(
         "streaming", reason="Requires streaming package for custom MDS output sample format"
     )
@@ -269,9 +265,7 @@ def test_execute_request_writes_custom_mds(
     assert sample == {"scene_number": 0, "dataset": "demo", "feature_shape": [1, 3, 7]}
 
 
-def test_parallel_execution_smoke(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
     mp.set_start_method("spawn", force=True)
     _patch_get_demo_descriptor(monkeypatch)
@@ -301,9 +295,7 @@ def test_parallel_execution_smoke(
     assert manifest.default_observation_length == 2
 
 
-def test_parallel_stream_plan_smoke(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_parallel_stream_plan_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     mp.set_start_method("spawn", force=True)
     _patch_get_demo_descriptor(monkeypatch)
 

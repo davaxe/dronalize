@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene
     from dronalize.io import SceneRecord
-    from tests.integration.catalog import DatasetCase
 
 
 def _assert_shape(array: npt.NDArray[Any], expected: tuple[int, ...], name: str) -> None:
@@ -170,7 +169,7 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
 
 
 def save_scene_artifacts(
-    scene: Scene, graph: MapGraph | None, out_dir: Path, case: DatasetCase
+    scene: Scene, graph: MapGraph | None, out_dir: Path, dataset_name: str
 ) -> None:
     """Save scene artifacts like trajectories and maps for debugging."""
 
@@ -188,7 +187,7 @@ def save_scene_artifacts(
     x_min, x_max, y_min, y_max, frame_min, frame_max = summary_frame.row(0)
 
     summary: dict[str, object] = {
-        "dataset": case.dataset,
+        "dataset": dataset_name,
         "scene_number": scene.scene_number,
         "rows": frame.height,
         "agents": int(frame["id"].n_unique()),

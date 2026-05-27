@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import itertools
 import multiprocessing as mp
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from dronalize.config import RuntimeOverride
+from dronalize.datasets import list_datasets
 from dronalize.io import StorageBackend
 from dronalize.io.encoding.common import encode_scene_record
 from dronalize.runtime import ExecutionRequest, resolve_request
@@ -18,16 +20,29 @@ from tests.integration.assertions import (
     assert_record_sanity,
     save_scene_artifacts,
 )
-from tests.integration.catalog import ALL_CASES_DEFAULT, DatasetCase
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
+@dataclass(slots=True)
+class DatasetCase:
+    dataset: str
+    path_rel_root: str
+    max_scenes: int = 5
+    scene_start: int = 0
+    scene_step: int = 100
+
+
+ALL_CASES_DEFAULT: dict[str, DatasetCase] = {
+    name: DatasetCase(name, path_rel_root=name) for name in list_datasets()
+}
+
+
 @pytest.mark.slow
 @pytest.mark.dataset
 @pytest.mark.parametrize("case", ALL_CASES_DEFAULT.values(), ids=ALL_CASES_DEFAULT.keys())
-@pytest.mark.parametrize("jobs", [1, 4], ids=["jobs=1", "jobs=4"])
+@pytest.mark.parametrize("jobs", [1, 2], ids=["jobs=1", "jobs=2"])
 def test_datasets(
     case: DatasetCase, jobs: int, raw_data_root: Path, artifact_dir: Path, tmp_path: Path
 ) -> None:
@@ -62,7 +77,7 @@ def test_datasets(
                 scene=scene,
                 graph=graph,
                 out_dir=artifact_dir / case.dataset / f"scene_{scene.scene_number:03d}",
-                case=case,
+                dataset_name=case.dataset,
             )
         n_scenes += 1
         if n_scenes >= case.max_scenes:

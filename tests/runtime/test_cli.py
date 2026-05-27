@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from typer.testing import CliRunner
 
 import dronalize.runtime.cli.app as cli_app
+from dronalize.core.errors import CliError
 from dronalize.datasets import list_datasets
 from dronalize.datasets.registry import _REGISTRY  # pyright: ignore[reportPrivateUsage]
 
@@ -57,7 +58,7 @@ def test_cli_help_smoke() -> None:
 
 def test_inspect_reports_temporal_support() -> None:
     runner = CliRunner()
-    result = runner.invoke(cli_app.app, ["inspect", "a43"])
+    result = runner.invoke(cli_app.app, ["inspect", "argoverse1"])
 
     assert result.exit_code == 0, result.output
     assert "Configured horizon" in result.output
@@ -124,4 +125,6 @@ def test_cli_rejects_invalid_dataset_module_hook(
     )
 
     assert result.exit_code != 0
-    assert expected in result.output
+    message = result.output or str(result.exception)
+    assert isinstance(result.exception, CliError)
+    assert expected in message
