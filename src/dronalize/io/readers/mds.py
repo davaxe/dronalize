@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, overload
 from typing_extensions import TypedDict, Unpack, override
 
 from dronalize.core.optional import raise_missing_optional_dependency
-from dronalize.io.base import DatasetReader, SampleT, split_directory_name
+from dronalize.io.base import DatasetReader, IterableDatasetReader, SampleT, split_directory_name
 from dronalize.io.encoding.mds import decode_mds_sample
 
 try:
@@ -53,7 +53,7 @@ class MDSReaderInitArgs(TypedDict, total=False):
     stream_config: dict[str, Any]
 
 
-class MDSReader(DatasetReader[SampleT]):
+class MDSReader(IterableDatasetReader[SampleT], DatasetReader[SampleT]):
     """Read raw scene records from an MDS dataset split.
 
     Parameters
