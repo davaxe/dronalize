@@ -8,13 +8,15 @@ from typing import TYPE_CHECKING, Generic
 from typing_extensions import override
 
 from dronalize.core.optional import raise_missing_optional_dependency
+from dronalize.io.adapters.torch import IterableTorchSceneDataset, IterableTorchSplitSceneDataset
 
 try:
-    from torch.utils.data import IterableDataset
+    from torch.utils.data import Dataset, IterableDataset
     from torch_geometric.data import Batch, HeteroData
     from torch_geometric.data import Dataset as PyGDataset
 
     from dronalize.io.adapters.torch import (
+        IterableReaderT,
         ObservationLength,
         ReaderT,
         TorchSceneDataset,
@@ -34,7 +36,7 @@ if TYPE_CHECKING:
 HeteroDataTransform = Callable[[HeteroData], HeteroData]
 
 
-class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
+class HeteroSceneDataset(PyGDataset, Dataset[HeteroData], Generic[ReaderT]):
     """PyG dataset view over full-horizon Dronalize scene records.
 
     Each sample is a `HeteroData` object with `agent` and `map` node stores and
@@ -65,11 +67,38 @@ class HeteroSceneDataset(PyGDataset, Generic[ReaderT]):
         return len(self.dataset)
 
 
-class IterableHeteroSceneDataset(HeteroSceneDataset[ReaderT], IterableDataset[HeteroData]):
+class IterableHeteroSceneDataset(IterableDataset[HeteroData], Generic[IterableReaderT]):
     """Iterable PyG dataset view over full-horizon Dronalize scene records."""
 
+    @override
+    def __init__(
+        self,
+        reader: IterableReaderT,
+        *,
+        copy: bool = True,
+        transform: HeteroDataTransform | None = None,
+    ) -> None:
+        super().__init__()
+        self._transform: HeteroDataTransform | None = transform
+        self.dataset: IterableTorchSceneDataset[IterableReaderT] = IterableTorchSceneDataset(
+            reader, copy=copy
+        )
 
-class SplitHeteroSceneDataset(PyGDataset, Generic[ReaderT]):
+    @override
+    def __iter__(self) -> Iterator[HeteroData]:
+        """Iterate over the wrapped dataset, yielding samples converted to `HeteroData`."""
+        for record in self.dataset:
+            hetero = _convert_full_to_hetero(record)
+            if self._transform is not None:
+                hetero = self._transform(hetero)
+            yield hetero
+
+    def __len__(self) -> int:
+        """Return the number of samples visible through the wrapped dataset."""
+        return len(self.dataset)
+
+
+class SplitHeteroSceneDataset(PyGDataset, Dataset[HeteroData], Generic[ReaderT]):
     """PyG dataset view over Dronalize scene records split on read.
 
     Each sample is a `HeteroData` object with `agent.x` / `agent.x_mask` for
@@ -107,10 +136,34 @@ class SplitHeteroSceneDataset(PyGDataset, Generic[ReaderT]):
         return len(self.dataset)
 
 
-class IterableSplitHeteroSceneDataset(
-    SplitHeteroSceneDataset[ReaderT], IterableDataset[HeteroData]
-):
+class IterableSplitHeteroSceneDataset(IterableDataset[HeteroData], Generic[IterableReaderT]):
     """Iterable PyG dataset view over split Dronalize scene records."""
+
+    def __init__(
+        self,
+        reader: IterableReaderT,
+        *,
+        observation_length: ObservationLength | None = None,
+        copy: bool = True,
+        transform: HeteroDataTransform | None = None,
+    ) -> None:
+        self._transform: HeteroDataTransform | None = transform
+        self.dataset: IterableTorchSplitSceneDataset[IterableReaderT] = (
+            IterableTorchSplitSceneDataset(reader, observation_length=observation_length, copy=copy)
+        )
+
+    @override
+    def __iter__(self) -> Iterator[HeteroData]:
+        """Iterate over the wrapped dataset, yielding samples converted to `HeteroData`."""
+        for record in self.dataset:
+            hetero = _convert_split_to_hetero(record)
+            if self._transform is not None:
+                hetero = self._transform(hetero)
+            yield hetero
+
+    def __len__(self) -> int:
+        """Return the number of samples visible through the wrapped dataset."""
+        return len(self.dataset)
 
 
 def collate_hetero_with_time_padding(samples: Sequence[HeteroData]) -> Batch:

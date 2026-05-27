@@ -77,6 +77,24 @@ class DatasetReader(ABC, Generic[SampleT]):
         """Return a single decoded scene record."""
 
 
+class IterableDatasetReader(ABC, Generic[SampleT]):
+    """Abstract base class for iterable scene readers.
+
+    This is a specialization of `DatasetReader` for backends that support
+    streaming data without random access or implement valid `__len__` semantics.
+
+    """
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[SampleT]:
+        """Iterate over decoded scene records."""
+
+    def __len__(self) -> int:
+        """Return the number of scene records, if known."""
+        msg = f"{self.__class__.__name__} does not implement __len__"
+        raise NotImplementedError(msg)
+
+
 @runtime_checkable
 class DatasetWriter(Protocol):
     """Protocol for writing processed scenes to persisted storage."""
