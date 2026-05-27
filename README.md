@@ -1,9 +1,9 @@
 <div align="center">
-  <img alt="Dronalize header" src="docs/assets/dronalize-header.png" width="800", style="max-width: 100%; height: auto;">
+  <img alt="Dronalize header" src="https://raw.githubusercontent.com/davaxe/dronalize/dev/docs/assets/dronalize-header.png" width="800", style="max-width: 100%; height: auto;">
 
 ______________________________________________________________________
 
-[![CI](https://github.com/davaxe/dronalize/actions/workflows/ci.yml/badge.svg)](https://raw.githubusercontent.com/davaxe/dronalize/dev/docs/assets/dronalize-header.png)
+[![CI](https://github.com/davaxe/dronalize/actions/workflows/ci.yml/badge.svg)](https://github.com/davaxe/dronalize/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/dronalize)](https://pypi.org/project/dronalize/)
 [![Python](https://img.shields.io/pypi/pyversions/dronalize)](https://pypi.org/project/dronalize/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-2F2F2F.svg)](LICENSE)
