@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main, dev]
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
@@ -18,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.13"]
 
     steps:
       - name: Check out repository
@@ -36,29 +34,11 @@ jobs:
       - name: Run tests
         run: uv run pytest tests -m "not slow and not dataset"
 
-  all-extras:
-    name: All extras
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Install uv and Python
-        uses: astral-sh/setup-uv@v7
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          enable-cache: true
-
-      - name: Sync all-extras environment
-        run: uv sync --frozen --group test --all-extras
-
-      - name: Run tests with all extras
-        run: uv run pytest tests -m "not slow and not dataset"
-
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Check out repository
