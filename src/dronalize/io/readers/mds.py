@@ -117,7 +117,22 @@ class MDSReader(IterableDatasetReader[SampleT], DatasetReader[SampleT]):
     def __getitem__(
         self, at: int | slice | list[int] | npt.NDArray[np.int64]
     ) -> SampleT | list[SampleT]:
-        """Return one or more decoded scene records."""
+        """Return one or more decoded scene records.
+
+        This will implicitly raise error if the specified index or indices are
+        out of bounds.
+
+        Parameters
+        ----------
+        at : int or slice or list of int
+            Index or indices of the scene record(s) to return.
+
+        Returns
+        -------
+        SampleT or list of SampleT
+            The decoded scene record(s) at the specified index or indices.
+
+        """
         out: Mapping[str, Any] | list[Mapping[str, Any]] = self._backend[at]
         if isinstance(out, list):
             return [self._convert_record(record) for record in out]

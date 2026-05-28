@@ -17,7 +17,7 @@ Think of one resolved dataset config as four layers:
 2. project-wide defaults from `[defaults]`, including any profiles it uses
 3. dataset-local profile fragments and settings from `[datasets.<name>]`
 4. runtime overrides from the CLI or
-   [`RuntimeOverride`](../reference/api/config/project.md#dronalize.config.RuntimeOverride)
+   [`RuntimeOverride`](../reference/api/config/index.md#dronalize.config.RuntimeOverride)
 
 Profiles are opted into with `uses`, in the order they should be applied. Put policy that should
 apply to every dataset under `[defaults]`; use dataset entries only where a dataset needs to differ.

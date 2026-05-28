@@ -167,23 +167,6 @@ request = ExecutionRequest(
 execute_request(request)
 ```
 
-The lower-level
-[`MDSDatasetWriter`](../../reference/api/io/backends.md#dronalize.io.backends.mds.MDSDatasetWriter)
-constructor exposes the same capability as `record_transform` or
-`scene_transform` plus `sample_columns`.
-
-<!-- no-validate -->
-```python
-writer = MDSDatasetWriter(
-    output_dir=output_dir,
-    config=output_plan,
-    splits=None,
-    parallel=False,
-    record_transform=to_training_sample,
-    sample_columns=columns,
-)
-```
-
 For advanced cases, `scene_transform` can derive the MDS sample directly from
 the runtime `Scene`. This bypasses `SceneRecord` encoding, so the transform is
 responsible for any schema conversion, dtype policy, recentering, and map

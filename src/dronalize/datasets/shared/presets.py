@@ -4,25 +4,23 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from dronalize.config.models.scenes import (
-    LaneChangeConfig,
-    ResampleConfig,
-    ScenesConfig,
-    WindowConfig,
-)
-from dronalize.config.models.screening import (
+from dronalize.config.models import (
     ExcludeCategoriesSpec,
+    LaneChangeConfig,
     MinSamplesSpec,
     PassingRequirement,
     PruneByRuleSpec,
     RequireFramesSpec,
+    ResampleConfig,
+    ScenesConfig,
     ScreeningConfig,
+    WindowConfig,
 )
 from dronalize.datasets.registry import DatasetTemporalSupport, DatasetWindowingSupport, FrameBounds
 
 if TYPE_CHECKING:
     from dronalize.config.base import ResampleMethod
-    from dronalize.config.models.screening import AgentCheckSpec, CleanupSpec, SceneCheckSpec
+    from dronalize.config.models import AgentCheckSpec, CleanupSpec, SceneCheckSpec
     from dronalize.core.categories import AgentCategory
     from dronalize.datasets.registry import FrameBoundConfidence, SourceTemporalUnit
 

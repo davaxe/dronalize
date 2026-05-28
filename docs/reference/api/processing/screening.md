@@ -1,7 +1,7 @@
 # ::: dronalize.processing.screening
-
   options:
     members: false
+    show_root_full_path: true
 
 ## ::: dronalize.processing.screening.ScreeningRuleSet
 

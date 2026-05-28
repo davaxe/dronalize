@@ -1,5 +1,4 @@
-from dronalize.config.models.dataset import DatasetConfig
-from dronalize.config.models.map import FullMapExtraction, MapConfig
+from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.ad4che.loader import AD4CHELoader
 from dronalize.datasets.registry import (
     DatasetDescriptor,

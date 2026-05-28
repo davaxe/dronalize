@@ -8,15 +8,18 @@ from pydantic import BaseModel
 from rich import box
 from rich.table import Table
 
-from dronalize.config.models.map import (
+from dronalize.config.models import (
     BoundingBoxExtraction,
     CircularExtraction,
     FullMapExtraction,
+    NoAssign,
+    PreserveNativeAssign,
+    ReadAll,
+    ReadNative,
     SceneExtentExtraction,
     TrajectoryBufferExtraction,
+    effective_scene_window,
 )
-from dronalize.config.models.scenes import effective_scene_window
-from dronalize.config.models.split import NoAssign, PreserveNativeAssign, ReadAll, ReadNative
 from dronalize.core.categories import DatasetSplit, EdgeType
 from dronalize.core.scene import get_trajectory_schema
 from dronalize.io.base import storage_backend_name
@@ -24,14 +27,14 @@ from dronalize.io.base import storage_backend_name
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.config.models.map import MapConfig
-    from dronalize.config.models.scenes import ScenesConfig
-    from dronalize.config.models.screening import ScreeningConfig
-    from dronalize.config.models.split import (
+    from dronalize.config.models import (
         AssignConfig,
         AssignUnion,
+        MapConfig,
         ReadConfig,
         ReadUnion,
+        ScenesConfig,
+        ScreeningConfig,
         SplitWeights,
     )
     from dronalize.datasets.registry import (
