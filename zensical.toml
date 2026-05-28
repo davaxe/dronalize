@@ -91,13 +91,11 @@ nav = [
     { Overview = "reference/api/index.md" },
     { "Core types" = [
       "reference/api/core/index.md",
-      { Enums = "reference/api/core/categories-and-splits.md" },
       { "Scene models and schemas" = "reference/api/core/scene.md" },
       { "Map graphs" = "reference/api/core/maps.md" },
     ] },
     { Configuration = [
       "reference/api/config/index.md",
-      { "Project configuration" = "reference/api/config/project.md" },
       { "Dataset models" = "reference/api/config/models/dataset.md" },
       { "Scene models" = "reference/api/config/models/scene.md" },
       { "Screening models" = "reference/api/config/models/screening.md" },
@@ -124,7 +122,6 @@ nav = [
     ] },
     { "I/O" = [
       "reference/api/io/index.md",
-      { "Storage and manifests" = "reference/api/io/storage-and-manifests.md" },
       { Readers = "reference/api/io/readers.md" },
       { "Framework adapters" = "reference/api/io/adapters.md" },
       { "Backend extension API" = "reference/api/io/backends.md" },

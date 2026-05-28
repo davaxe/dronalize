@@ -1,5 +1,4 @@
-from dronalize.config.models.dataset import DatasetConfig
-from dronalize.config.models.map import FullMapExtraction, MapConfig
+from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.levelx.loader import ExiDLoader, HighDLoader, StandardLevelXLoader
 from dronalize.datasets.registry import (
     DatasetDescriptor,

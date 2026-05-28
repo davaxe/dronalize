@@ -32,7 +32,7 @@ That keeps optional dependencies isolated.
 
 In practice:
 
-- [`dronalize.datasets.get_dataset_dataset("waymo")`](../reference/api/datasets/registry.md#dronalize.datasets.get_dataset) requires the
+- [`dronalize.datasets.get_dataset("waymo")`](../reference/api/datasets/registry.md#dronalize.datasets.get_dataset) requires the
   `waymo` extra
 - [`dronalize.datasets.list_datasets()`](../reference/api/datasets/registry.md#dronalize.datasets.list_datasets) only lists
   built-ins whose optional dependencies are installed

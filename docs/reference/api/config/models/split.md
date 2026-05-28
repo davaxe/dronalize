@@ -1,25 +1,30 @@
-## ::: dronalize.config.models.split.SplitWeights
+# ::: dronalize.config.models
+    options:
+        members: false
+        show_root_full_path: true
+        
+## ::: dronalize.config.models.SplitWeights
 
-## ::: dronalize.config.models.split.ReadAll
+## ::: dronalize.config.models.ReadAll
 
-## ::: dronalize.config.models.split.ReadNative
+## ::: dronalize.config.models.ReadNative
 
-## ::: dronalize.config.models.split.ReadUnion
+## ::: dronalize.config.models.ReadUnion
 
-## ::: dronalize.config.models.split.ReadConfig
+## ::: dronalize.config.models.ReadConfig
 
-## ::: dronalize.config.models.split.NoAssign
+## ::: dronalize.config.models.NoAssign
 
-## ::: dronalize.config.models.split.PreserveNativeAssign
+## ::: dronalize.config.models.PreserveNativeAssign
 
-## ::: dronalize.config.models.split.SceneAssign
+## ::: dronalize.config.models.SceneAssign
 
-## ::: dronalize.config.models.split.SourceAssign
+## ::: dronalize.config.models.SourceAssign
 
-## ::: dronalize.config.models.split.TimeBlockAssign
+## ::: dronalize.config.models.TimeBlockAssign
 
-## ::: dronalize.config.models.split.ShuffledTimeBlockAssign
+## ::: dronalize.config.models.ShuffledTimeBlockAssign
 
-## ::: dronalize.config.models.split.AssignUnion
+## ::: dronalize.config.models.AssignUnion
 
-## ::: dronalize.config.models.split.AssignConfig
+## ::: dronalize.config.models.AssignConfig

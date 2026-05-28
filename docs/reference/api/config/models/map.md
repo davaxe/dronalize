@@ -1,19 +1,24 @@
-## ::: dronalize.config.models.map.MapConfig
+# ::: dronalize.config.models
+    options:
+        members: false
+        show_root_full_path: true
+        
+## ::: dronalize.config.models.MapConfig
 
-## ::: dronalize.config.models.map.PartialMapConfig
+## ::: dronalize.config.models.PartialMapConfig
 
-## ::: dronalize.config.models.map.MapEdgeTypeRules
+## ::: dronalize.config.models.MapEdgeTypeRules
 
-## ::: dronalize.config.models.map.PartialMapEdgeTypeRules
+## ::: dronalize.config.models.PartialMapEdgeTypeRules
 
-## ::: dronalize.config.models.map.SceneExtentExtraction
+## ::: dronalize.config.models.SceneExtentExtraction
 
-## ::: dronalize.config.models.map.CircularExtraction
+## ::: dronalize.config.models.CircularExtraction
 
-## ::: dronalize.config.models.map.TrajectoryBufferExtraction
+## ::: dronalize.config.models.TrajectoryBufferExtraction
 
-## ::: dronalize.config.models.map.BoundingBoxExtraction
+## ::: dronalize.config.models.BoundingBoxExtraction
 
-## ::: dronalize.config.models.map.FullMapExtraction
+## ::: dronalize.config.models.FullMapExtraction
 
-## ::: dronalize.config.models.map.MapExtraction
+## ::: dronalize.config.models.MapExtraction

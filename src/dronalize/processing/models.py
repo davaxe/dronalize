@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from dronalize.config.models.split import (
+from dronalize.config.models import (
     NoAssign,
     PreserveNativeAssign,
     ReadAll,
@@ -16,10 +16,15 @@ from dronalize.config.models.split import (
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
-    from dronalize.config.models.map import MapConfig
-    from dronalize.config.models.scenes import ScenesConfig
-    from dronalize.config.models.screening import ScreeningConfig
-    from dronalize.config.models.split import AssignConfig, AssignUnion, ReadConfig, ReadUnion
+    from dronalize.config.models import (
+        AssignConfig,
+        AssignUnion,
+        MapConfig,
+        ReadConfig,
+        ReadUnion,
+        ScenesConfig,
+        ScreeningConfig,
+    )
     from dronalize.processing.loading.models import DatasetOptionsModel
 
 

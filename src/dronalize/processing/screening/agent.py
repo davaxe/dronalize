@@ -18,7 +18,7 @@ from dronalize.processing.screening.base import (
 )
 
 if TYPE_CHECKING:
-    from dronalize.config.models.screening import PassingRequirement, Tolerance
+    from dronalize.config.models import PassingRequirement, Tolerance
     from dronalize.processing.screening.base import ScreeningContext
 
 

@@ -2,6 +2,7 @@
 
     options:
         members: false
+        show_root_full_path: true
 
 ## ::: dronalize.core.maps.MapGraph
 

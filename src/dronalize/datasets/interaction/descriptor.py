@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from dronalize.config.models.dataset import DatasetConfig
+from dronalize.config.models import DatasetConfig
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.interaction.loader import InteractionLoader
 from dronalize.datasets.interaction.maps import InteractionMapBuilder

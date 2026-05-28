@@ -1,5 +1,4 @@
-from dronalize.config.models.dataset import DatasetConfig
-from dronalize.config.models.map import MapConfig, TrajectoryBufferExtraction
+from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.nuscenes.loader import NuScenesLoader, NuScenesLoaderOptions
 from dronalize.datasets.nuscenes.maps import NuScenesMapBuilder
