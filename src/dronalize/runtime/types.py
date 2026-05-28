@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cached_property
-from pathlib import Path
+from pathlib import Path  # noqa: TC003 - Pydantic resolves this forward reference at runtime.
 from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 import numpy as np
@@ -25,8 +25,6 @@ from dronalize.io.manifest import DatasetManifest, package_version, write_manife
 from dronalize.processing.models import LoaderPlan, ReadSelection, SplitAssignmentPlan
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from dronalize.config.models import (
         DatasetConfig,
         MapConfig,
@@ -233,10 +231,7 @@ class OutputSample(Generic[SampleT]):
 
 
 def build_loader_plan(
-    *,
-    descriptor: DatasetDescriptor,
-    resolved_config: DatasetConfig,
-    include_map: bool | None,
+    *, descriptor: DatasetDescriptor, resolved_config: DatasetConfig, include_map: bool | None
 ) -> LoaderPlan:
     """Compile the loader-facing request for one resolved dataset config."""
     loader_options: DatasetOptionsModel = descriptor.parse_loader_options(
@@ -251,8 +246,7 @@ def build_loader_plan(
         scenes=resolved_config.scenes,
         screening=resolved_config.screening,
         read=ReadSelection.from_config(
-            resolved_config.read,
-            supported_native_splits=descriptor.supported_native_splits,
+            resolved_config.read, supported_native_splits=descriptor.supported_native_splits
         ),
         loader_options=loader_options,
         map=map_config,
@@ -297,8 +291,6 @@ class ExecutionRequest(BaseModel):
     """Customized output sample configuration."""
 
 
-def resolve_effective_scene_window(
-    config: DatasetConfig,
-) -> tuple[int, int | None, float]:
+def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int | None, float]:
     """Return the effective scene window and sample time for one resolved config."""
     return effective_scene_window(config.scenes)

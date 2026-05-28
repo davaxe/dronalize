@@ -49,7 +49,7 @@ Changelog = "https://github.com/davaxe/dronalize/blob/main/CHANGELOG.md"
 dronalize = "dronalize.__main__:main"
 
 [project.optional-dependencies]
-viz = ["dronalize-viz"]
+# viz = ["dronalize-viz"]
 lyft = ["zarr<3", "numcodecs<=0.13.1", "protobuf>=4.25.8"]
 waymo = ["protobuf>=4.25.8"]
 ad4che = ["opencv-python"]
@@ -199,5 +199,5 @@ reportMissingTypeStubs = false
 reportPrivateImportUsage = false
 reportUnknownMemberType = false
 
-[tool.uv.sources]
-dronalize-viz = { path = "../dronalize-viz", editable = true }
+# [tool.uv.sources]
+# dronalize-viz = { path = "../dronalize-viz", editable = true }

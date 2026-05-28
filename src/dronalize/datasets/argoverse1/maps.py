@@ -16,8 +16,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
     from pathlib import Path
 
-    from dronalize.processing.maps import Point
-
 
 class Argoverse1Map:
     """Represents the Argoverse map, containing lane segments and nodes.

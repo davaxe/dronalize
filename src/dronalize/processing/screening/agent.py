@@ -50,10 +50,15 @@ class AgentRequireFrames(AgentCheckRuleBase):
         selector: AgentCategorySelector | None = None,
         tolerance: Tolerance | None = None,
         rule_id: RuleId | None = None,
+        require: PassingRequirement | None = None,
     ) -> AgentRequireFrames:
         """Return a defined rule."""
         return cls(
-            frames=coerce_frame_set(frames), selector=selector, tolerance=tolerance, rule_id=rule_id
+            frames=coerce_frame_set(frames),
+            selector=selector,
+            tolerance=tolerance,
+            rule_id=rule_id,
+            require=require,
         )
 
     @override

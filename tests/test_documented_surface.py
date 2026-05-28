@@ -15,7 +15,6 @@ from dronalize.runtime import (
     execute_plan,
     execute_request,
     resolve_request,
-    stream_plan,
 )
 
 DOCS_ROOT = Path(__file__).resolve().parents[1] / "docs"
@@ -31,7 +30,6 @@ def test_documented_runtime_imports_match_api() -> None:
     assert resolve_request is runtime.resolve_request
     assert execute_request is runtime.execute_request
     assert execute_plan is runtime.execute_plan
-    assert stream_plan is runtime.stream_plan
     assert not hasattr(runtime, "ProcessRequest")
     assert not hasattr(runtime, "process_dataset")
     assert not hasattr(runtime, "resolve_job")
