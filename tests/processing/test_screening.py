@@ -84,6 +84,44 @@ def test_require_keeps_scene_with_enough_agents() -> None:
     assert not result.filter(pl.col("id") == 3)[AGENT_SCREENING_PASS_COLUMN].all()
 
 
+def test_require_frames_marks_agents_using_scene_relative_frames() -> None:
+    df = pl.DataFrame({
+        "scene": [1, 1, 1, 1, 1, 1],
+        "id": [1, 1, 1, 2, 2, 2],
+        "frame": [0, 1, 2, 1, 2, 3],
+    })
+    rules = ScreeningRuleSet.define(
+        agent_rules=[
+            agent.AgentRequireFrames.define(frames={3}, require=PassingRequirement(absolute=1))
+        ]
+    )
+
+    result = screen_scene(
+        df, rules, scene_group_by="scene", mark_passed_agents=True, columns=TrajectoryColumns()
+    )
+
+    assert len(result) == len(df)
+    assert not result.filter(pl.col("id") == 1)[AGENT_SCREENING_PASS_COLUMN].any()
+    assert result.filter(pl.col("id") == 2)[AGENT_SCREENING_PASS_COLUMN].all()
+
+
+def test_require_frames_uses_pre_cleanup_scene_start() -> None:
+    df = pl.DataFrame({"scene": [1, 1, 1, 1], "id": [1, 2, 2, 2], "frame": [0, 1, 2, 3]})
+    rules = ScreeningRuleSet.define(
+        cleanup_rules=[agent.MinSamples(minimum=2)],
+        agent_rules=[
+            agent.AgentRequireFrames.define(frames={3}, require=PassingRequirement(absolute=1))
+        ],
+    )
+
+    result = screen_scene(
+        df, rules, scene_group_by="scene", mark_passed_agents=True, columns=TrajectoryColumns()
+    )
+
+    assert result["id"].unique().to_list() == [2]
+    assert result[AGENT_SCREENING_PASS_COLUMN].all()
+
+
 def test_require_relative_filters_scene() -> None:
     df = pl.DataFrame({"scene": [1, 1, 1, 1, 1], "id": [1, 1, 2, 2, 3], "frame": [0, 1, 0, 1, 0]})
     rules = ScreeningRuleSet.define(

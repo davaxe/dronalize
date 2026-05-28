@@ -14,7 +14,6 @@ from dronalize.datasets.a43.maps import A43MapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
-from dronalize.processing.maps import MapResolver
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

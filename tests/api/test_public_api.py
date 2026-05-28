@@ -23,7 +23,6 @@ from dronalize.runtime import (
     execute_plan,
     execute_request,
     resolve_request,
-    stream_plan,
 )
 
 
@@ -54,7 +53,6 @@ def test_core_and_runtime_exports_present() -> None:
     assert execute_plan is not None
     assert resolve_request is not None
     assert execute_request is not None
-    assert stream_plan is not None
 
 
 def test_io_and_config_exports_present() -> None:

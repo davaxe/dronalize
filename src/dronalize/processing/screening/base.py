@@ -71,6 +71,7 @@ class ScreeningContext:
     columns: TrajectoryColumns
     scene_window: tuple[str, ...]
     agent_window: tuple[str, ...]
+    relative_frame_column: str | None = None
 
     def over_scene_window(self, expr: pl.Expr) -> pl.Expr:
         """Apply the scene window to an expression."""
@@ -86,6 +87,8 @@ class ScreeningContext:
 
     def relative_frame(self) -> pl.Expr:
         """Return the scene-relative frame index expression."""
+        if self.relative_frame_column is not None:
+            return pl.col(self.relative_frame_column)
         return pl.col(self.columns.frame) - self.scene_start_frame()
 
     def scene_length(self) -> pl.Expr:
