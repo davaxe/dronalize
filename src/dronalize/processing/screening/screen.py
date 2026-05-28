@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Annotated, Final, Generic, TypeVar
 
 import polars as pl
@@ -41,6 +41,7 @@ CleanupSpecs = Annotated[tuple[CleanupRule, ...], BeforeValidator(tuple)]
 SceneCheckSpecs = Annotated[tuple[SceneCheckRule, ...], BeforeValidator(tuple)]
 SCENE_SCREENING_PASS_COLUMN: Final[str] = "_scene_passes"  # noqa: S105
 AGENT_SCREENING_PASS_COLUMN: Final[str] = "_agent_passes"  # noqa: S105
+RELATIVE_FRAME_COLUMN: Final[str] = "_screening_relative_frame"
 
 
 @dataclass(slots=True, frozen=True)
@@ -163,6 +164,9 @@ def screen_scene(
         return data
 
     ctx = _build_context(columns=columns, scene_group_by=scene_group_by)
+    relative_frame_column = _temporary_column_name(data, RELATIVE_FRAME_COLUMN)
+    data = data.with_columns(ctx.relative_frame().alias(relative_frame_column))
+    ctx = replace(ctx, relative_frame_column=relative_frame_column)
     df = _apply_cleanup(data, scene_screening.cleanup_rules, ctx)
     df, scene_columns = _apply_scene_rules(df, scene_screening.scene_rules, ctx)
     df, agent_columns = _apply_agent_rules(
@@ -175,20 +179,43 @@ def screen_scene(
     )
     return _finalize_screened(
         df,
-        diagnostic_columns=[*scene_columns, *agent_columns, SCENE_SCREENING_PASS_COLUMN],
+        diagnostic_columns=[
+            *scene_columns,
+            *agent_columns,
+            SCENE_SCREENING_PASS_COLUMN,
+            relative_frame_column,
+        ],
         include_passed_agent_ids=mark_passed_agents,
         retain_scene_passes=retain_scene_passes,
     )
 
 
 def _build_context(
-    *, columns: TrajectoryColumns, scene_group_by: str | Sequence[str] | None
+    *,
+    columns: TrajectoryColumns,
+    scene_group_by: str | Sequence[str] | None,
+    relative_frame_column: str | None = None,
 ) -> ScreeningContext:
     scene_window = list(normalize_group_by(scene_group_by))
     agent_window = [*scene_window, columns.agent_id] if scene_window else [columns.agent_id]
     return ScreeningContext(
-        columns=columns, scene_window=tuple(scene_window), agent_window=tuple(agent_window)
+        columns=columns,
+        scene_window=tuple(scene_window),
+        agent_window=tuple(agent_window),
+        relative_frame_column=relative_frame_column,
     )
+
+
+def _temporary_column_name(data: DataFrameT, base_name: str) -> str:
+    schema_names = (
+        data.collect_schema().names() if isinstance(data, pl.LazyFrame) else data.schema.names()
+    )
+    if base_name not in schema_names:
+        return base_name
+    index = 1
+    while f"{base_name}_{index}" in schema_names:
+        index += 1
+    return f"{base_name}_{index}"
 
 
 def _apply_cleanup(

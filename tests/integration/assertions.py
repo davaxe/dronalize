@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import contextlib
 import json
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
-
-from dronalize.core.categories import EdgeType
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -177,13 +174,6 @@ def save_scene_artifacts(
     """Save scene artifacts like trajectories and maps for debugging."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    with contextlib.suppress(ImportError):
-        import dronalize_viz as dviz  # noqa: PLC0415
-
-        dviz.trajectory_figure(scene, ignore_edges={EdgeType.VIRTUAL}).save(
-            out_dir / "trajectories.html"
-        )
-
     frame = scene.frame.select("frame", "id", "x", "y")
     summary_frame = frame.select(
         pl.col("x").min().alias("x_min"),
