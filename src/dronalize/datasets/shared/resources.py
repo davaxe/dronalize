@@ -7,8 +7,7 @@ from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from dronalize.config.models.map import MapConfig
-from dronalize.config.models.scenes import ScenesConfig
+from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.core.maps import MapGraph
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.models import DatasetRunResources

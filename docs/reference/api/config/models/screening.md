@@ -1,51 +1,56 @@
-## ::: dronalize.config.models.screening.ScreeningConfig
+# ::: dronalize.config.models
+    options:
+        members: false
+        show_root_full_path: true
+        
+## ::: dronalize.config.models.ScreeningConfig
 
-## ::: dronalize.config.models.screening.PartialScreeningConfig
+## ::: dronalize.config.models.PartialScreeningConfig
 
-## ::: dronalize.config.models.screening.AgentSelectorConfig
+## ::: dronalize.config.models.AgentSelectorConfig
 
-## ::: dronalize.config.models.screening.Tolerance
+## ::: dronalize.config.models.Tolerance
 
-## ::: dronalize.config.models.screening.PassingRequirement
+## ::: dronalize.config.models.PassingRequirement
 
-## ::: dronalize.config.models.screening.CountRange
+## ::: dronalize.config.models.CountRange
 
-## ::: dronalize.config.models.screening.RequireFramesSpec
+## ::: dronalize.config.models.RequireFramesSpec
 
-## ::: dronalize.config.models.screening.RequireWindowSpec
+## ::: dronalize.config.models.RequireWindowSpec
 
-## ::: dronalize.config.models.screening.MinSamplesSpec
+## ::: dronalize.config.models.MinSamplesSpec
 
-## ::: dronalize.config.models.screening.MaxMissingFramesSpec
+## ::: dronalize.config.models.MaxMissingFramesSpec
 
-## ::: dronalize.config.models.screening.MaxGapSpec
+## ::: dronalize.config.models.MaxGapSpec
 
-## ::: dronalize.config.models.screening.MinConsecutiveFramesSpec
+## ::: dronalize.config.models.MinConsecutiveFramesSpec
 
-## ::: dronalize.config.models.screening.StartsByFrameSpec
+## ::: dronalize.config.models.StartsByFrameSpec
 
-## ::: dronalize.config.models.screening.EndsAfterFrameSpec
+## ::: dronalize.config.models.EndsAfterFrameSpec
 
-## ::: dronalize.config.models.screening.MinSpanSpec
+## ::: dronalize.config.models.MinSpanSpec
 
-## ::: dronalize.config.models.screening.AgentCheckSpec
+## ::: dronalize.config.models.AgentCheckSpec
 
-## ::: dronalize.config.models.screening.AgentRangeSpec
+## ::: dronalize.config.models.AgentRangeSpec
 
-## ::: dronalize.config.models.screening.CategoryRangeSpec
+## ::: dronalize.config.models.CategoryRangeSpec
 
-## ::: dronalize.config.models.screening.RequireSceneFramesSpec
+## ::: dronalize.config.models.RequireSceneFramesSpec
 
-## ::: dronalize.config.models.screening.RequireSceneWindowSpec
+## ::: dronalize.config.models.RequireSceneWindowSpec
 
-## ::: dronalize.config.models.screening.MaxMissingSceneFramesSpec
+## ::: dronalize.config.models.MaxMissingSceneFramesSpec
 
-## ::: dronalize.config.models.screening.SceneCheckSpec
+## ::: dronalize.config.models.SceneCheckSpec
 
-## ::: dronalize.config.models.screening.PruneByRuleSpec
+## ::: dronalize.config.models.PruneByRuleSpec
 
-## ::: dronalize.config.models.screening.ExcludeCategoriesSpec
+## ::: dronalize.config.models.ExcludeCategoriesSpec
 
-## ::: dronalize.config.models.screening.IncludeCategoriesSpec
+## ::: dronalize.config.models.IncludeCategoriesSpec
 
-## ::: dronalize.config.models.screening.CleanupSpec
+## ::: dronalize.config.models.CleanupSpec

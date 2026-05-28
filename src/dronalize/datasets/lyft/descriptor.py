@@ -1,5 +1,4 @@
-from dronalize.config.models.dataset import DatasetConfig
-from dronalize.config.models.map import MapConfig, TrajectoryBufferExtraction
+from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.datasets.lyft.loader import LyftLoader, LyftLoaderOptions
 from dronalize.datasets.lyft.maps import LyftMapBuilder

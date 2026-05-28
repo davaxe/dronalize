@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 import dronalize.core.errors as dronalize_exceptions
-from dronalize.config.models.split import (
+from dronalize.config.models import (
     AssignConfig,
     NoAssign,
     PreserveNativeAssign,
@@ -17,8 +17,7 @@ from dronalize.config.models.split import (
     SourceAssign,
     TimeBlockAssign,
 )
-from dronalize.config.parse import parse_config
-from dronalize.config.project import ProjectConfig
+from dronalize.config.parse import ProjectConfig, parse_config
 from dronalize.io.backends.registry import is_writer_backend_registered, registered_writer_backends
 from dronalize.io.base import StorageBackend, storage_backend_name
 from dronalize.processing.models import SplitAssignmentPlan
@@ -32,8 +31,7 @@ from dronalize.runtime.types import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.config.models.dataset import DatasetConfig
-    from dronalize.config.runtime import RuntimeOverride
+    from dronalize.config.models import DatasetConfig, RuntimeOverride
     from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.runtime.types import ExecutionRequest
 

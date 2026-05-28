@@ -14,8 +14,7 @@ dataset integrations that need shared per-run state such as cached metadata or
 map stores.
 """
 
-from dronalize.config.models.map import MapConfig
-from dronalize.config.models.scenes import ScenesConfig
+from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.datasets.registry import (
     DatasetDescriptor,
     DatasetFeatureSupport,

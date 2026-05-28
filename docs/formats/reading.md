@@ -7,14 +7,14 @@ you can switch between `pickle` and `mds` without changing your downstream scene
 
 ## Reader model
 
-Framework-neutral readers return [`SceneRecord`](../reference/api/io/storage-and-manifests.md#dronalize.io.SceneRecord)
+Framework-neutral readers return [`SceneRecord`](../reference/api/io/index.md#dronalize.io.SceneRecord)
 objects with:
 
 - scene id and position offset
 - full-horizon agent features and masks
 - optional map graph arrays
 
-Use [`SceneRecord.split`](../reference/api/io/storage-and-manifests.md#dronalize.io.SceneRecord.split)
+Use [`SceneRecord.split`](../reference/api/io/index.md#dronalize.io.SceneRecord.split)
 when a model needs explicit observation and prediction tensors.
 
 Use the same post-processing logic regardless of backend.
@@ -33,7 +33,7 @@ print(manifest.horizon_frames, manifest.default_observation_length)
 ```
 
 Reading the manifest up front with
-[`read_manifest()`](../reference/api/io/storage-and-manifests.md#dronalize.io.read_manifest) is the easiest way to verify
+[`read_manifest()`](../reference/api/io/index.md#dronalize.io.read_manifest) is the easiest way to verify
 schema, horizon, and precision.
 
 !!! tip "Readable manifest"
@@ -104,4 +104,4 @@ Use these when your training stack expects framework-native dataset objects.
 - Use [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) for larger-scale or
   streaming-oriented training pipelines.
 - Keep reader-side code backend-neutral by depending on the shared
-  [`SceneRecord`](../reference/api/io/storage-and-manifests.md#dronalize.io.SceneRecord) contract.
+  [`SceneRecord`](../reference/api/io/index.md#dronalize.io.SceneRecord) contract.

@@ -1,3 +1,9 @@
-## ::: dronalize.config.models.runtime.RuntimeConfig
+# ::: dronalize.config.models
+    options:
+        members: false
+        show_root_full_path: true
 
-## ::: dronalize.config.models.runtime.PartialRuntimeConfig
+        
+## ::: dronalize.config.models.RuntimeConfig
+
+## ::: dronalize.config.models.PartialRuntimeConfig

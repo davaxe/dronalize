@@ -76,12 +76,32 @@ class DatasetReader(ABC, Generic[SampleT]):
     def __getitem__(self, at: int) -> SampleT:
         """Return a single decoded scene record."""
 
+    def get(self, at: int) -> SampleT | None:
+        """Return a single decoded scene record.
+
+        Parameters
+        ----------
+        at : int
+            Index of the scene record to return.
+
+        Returns
+        -------
+        SampleT or None
+            The decoded scene record at the specified index, or `None` if the
+            index is out of bounds.
+
+        """
+        try:
+            return self[at]
+        except IndexError:
+            return None
+
 
 class IterableDatasetReader(ABC, Generic[SampleT]):
     """Abstract base class for iterable scene readers.
 
     This is a specialization of `DatasetReader` for backends that support
-    streaming data without random access or implement valid `__len__` semantics.
+    streaming data without random access.
 
     """
 

@@ -36,7 +36,7 @@ This makes new dataset integrations easier to add without duplicating the rest o
 
 ## Main runtime concepts
 
-A few public types define that flow. [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor) describes one dataset integration. [`ProjectConfig`](../reference/api/config/project.md#dronalize.config.ProjectConfig) represents optional user configuration. [`ExecutionRequest`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest) describes the requested run, and [`ExecutionPlan`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionPlan) is the resolved, execution-ready result.
+A few public types define that flow. [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor) describes one dataset integration. [`ProjectConfig`](../reference/api/config/index.md#dronalize.config.ProjectConfig) represents optional user configuration. [`ExecutionRequest`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest) describes the requested run, and [`ExecutionPlan`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionPlan) is the resolved, execution-ready result.
 
 Together, these types separate what the user asked for from what the runtime is actually going to execute.
 
@@ -60,7 +60,3 @@ Different backends can store those scenes in different formats, but that choice 
 | `dronalize.processing` | source loading, shared processing flow, scene preparation, and map helpers |
 | `dronalize.core` | Shared domain types such as scenes, schemas, maps, and common errors |
 | `dronalize.io` | Encoding, manifests, storage backends, and dataset readers |
-
-## In summary
-
-`dronalize` is a shared runtime for turning raw dataset sources into normalized scenes. Its architecture is meant to keep dataset-specific concerns local, keep the core execution flow shared, and make new dataset integrations fit into the same overall model.

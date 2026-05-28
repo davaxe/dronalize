@@ -1,17 +1,22 @@
-## ::: dronalize.config.models.scenes.ScenesConfig
+# ::: dronalize.config.models
+    options:
+        members: false
+        show_root_full_path: true
+        
+## ::: dronalize.config.models.ScenesConfig
 
-## ::: dronalize.config.models.scenes.PartialScenesConfig
+## ::: dronalize.config.models.PartialScenesConfig
 
-## ::: dronalize.config.models.scenes.WindowConfig
+## ::: dronalize.config.models.WindowConfig
 
-## ::: dronalize.config.models.scenes.PartialWindowConfig
+## ::: dronalize.config.models.PartialWindowConfig
 
-## ::: dronalize.config.models.scenes.ResampleConfig
+## ::: dronalize.config.models.ResampleConfig
 
-## ::: dronalize.config.models.scenes.PartialResampleConfig
+## ::: dronalize.config.models.PartialResampleConfig
 
-## ::: dronalize.config.models.scenes.LaneChangeConfig
+## ::: dronalize.config.models.LaneChangeConfig
 
-## ::: dronalize.config.models.scenes.PartialLaneChangeConfig
+## ::: dronalize.config.models.PartialLaneChangeConfig
 
-## ::: dronalize.config.models.scenes.effective_scene_window
+## ::: dronalize.config.models.effective_scene_window

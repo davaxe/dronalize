@@ -13,7 +13,7 @@ from rich import print as rprint
 from rich.panel import Panel
 
 from dronalize import __version__
-from dronalize.config.runtime import RuntimeOverride
+from dronalize.config.models import RuntimeOverride
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import (
     CliError,

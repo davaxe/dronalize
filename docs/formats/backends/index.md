@@ -17,7 +17,7 @@ request.
 | Backend | Purpose |
 | --- | --- |
 | `mds` | Production runs. Writes binary shards and a shard index readable by the Mosaic Streaming library. |
-| `pickle` | Simpler alternative to MDS. Writes one pickled [`SceneRecord`](../../reference/api/io/storage-and-manifests.md#dronalize.io.SceneRecord) per scene. No extra dependency. |
+| `pickle` | Simpler alternative to MDS. Writes one pickled [`SceneRecord`](../../reference/api/io/index.md#dronalize.io.SceneRecord) per scene. No extra dependency. |
 | `null` | Debugging and config validation. Runs the full pipeline without writing any files to disk. |
 
 The `null` backend is useful when you want to verify that a config is valid, check how many scenes

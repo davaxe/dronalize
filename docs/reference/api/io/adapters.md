@@ -1,7 +1,8 @@
 # ::: dronalize.io.adapters
     options:
         members: false
-
+        show_root_full_path: true
+        
 ## ::: dronalize.io.adapters.TorchSceneDataset
 
 ## ::: dronalize.io.adapters.IterableTorchSceneDataset

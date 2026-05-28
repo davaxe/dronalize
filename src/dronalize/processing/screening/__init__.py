@@ -33,7 +33,7 @@ type into one package namespace.
 - [`dronalize.processing.screening.agent`][] for agent-rule definitions
 """
 
-from dronalize.config.models.screening import PassingRequirement, Tolerance
+from dronalize.config.models import PassingRequirement, Tolerance
 from dronalize.processing.screening import agent, cleanup, scene
 from dronalize.processing.screening.base import AgentCategorySelector
 from dronalize.processing.screening.screen import ScreeningRuleSet, screen_scene

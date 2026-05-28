@@ -48,7 +48,7 @@ output/
 ```
 
 Each `.pkl` file contains one framework-neutral
-[`SceneRecord`](../../reference/api/io/storage-and-manifests.md#dronalize.io.SceneRecord).
+[`SceneRecord`](../../reference/api/io/index.md#dronalize.io.SceneRecord).
 
 ## Custom samples
 
@@ -94,18 +94,6 @@ request = ExecutionRequest(
     output_sample=OutputSample(record_transform=to_training_sample),
 )
 execute_request(request)
-```
-
-The lower-level
-[`PickleWriter`](../../reference/api/io/backends.md#dronalize.io.backends.pickle.PickleWriter)
-constructor exposes the same capability as `record_transform` or
-`scene_transform`.
-
-<!-- no-validate -->
-```python
-writer = PickleWriter(
-    output_dir=output_dir, config=output_plan, splits=None, record_transform=to_training_sample
-)
 ```
 
 For advanced cases, `scene_transform` can derive the persisted object directly

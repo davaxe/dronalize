@@ -1,11 +1,17 @@
-## ::: dronalize.config.models.output.OutputConfig
+# ::: dronalize.config.models
+    options:
+        members: false
+        show_root_full_path: true
 
-## ::: dronalize.config.models.output.PartialOutputConfig
+        
+## ::: dronalize.config.models.OutputConfig
 
-## ::: dronalize.config.models.output.MDSOutputConfig
+## ::: dronalize.config.models.PartialOutputConfig
 
-## ::: dronalize.config.models.output.PartialMDSOutputConfig
+## ::: dronalize.config.models.MDSOutputConfig
 
-## ::: dronalize.config.models.output.OutputPrecision
+## ::: dronalize.config.models.PartialMDSOutputConfig
 
-## ::: dronalize.config.models.output.TrajectorySchemaLike
+## ::: dronalize.config.models.OutputPrecision
+
+## ::: dronalize.config.models.TrajectorySchemaLike

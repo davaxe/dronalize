@@ -1,6 +1,7 @@
 # ::: dronalize.processing.maps
     options:
         members: false
+        show_root_full_path: true
 
 ## ::: dronalize.processing.maps.MapBuilder
 

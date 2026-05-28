@@ -19,9 +19,7 @@ from dronalize.processing.maps import MapResolver, no_map
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.config.models.map import MapConfig
-    from dronalize.config.models.scenes import ScenesConfig
-    from dronalize.config.models.screening import ScreeningConfig
+    from dronalize.config.models import MapConfig, ScenesConfig, ScreeningConfig
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene, TrajectorySchema

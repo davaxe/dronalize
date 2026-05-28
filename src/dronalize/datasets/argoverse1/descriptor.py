@@ -1,5 +1,4 @@
-from dronalize.config.models.dataset import DatasetConfig
-from dronalize.config.models.map import MapConfig, TrajectoryBufferExtraction
+from dronalize.config.models import DatasetConfig, MapConfig, TrajectoryBufferExtraction
 from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.argoverse1.loader import Argoverse1Loader, Argoverse1LoaderOptions
 from dronalize.datasets.argoverse1.maps import Argoverse1MapBuilder

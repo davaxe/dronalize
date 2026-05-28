@@ -1,7 +1,6 @@
 import polars as pl
 
-from dronalize.config.models.dataset import DatasetConfig
-from dronalize.config.models.map import FullMapExtraction, MapConfig
+from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.ngsim.loader import NGSimLoader
 from dronalize.datasets.registry import (
     DatasetDescriptor,

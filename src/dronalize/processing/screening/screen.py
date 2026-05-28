@@ -28,7 +28,7 @@ from dronalize.processing.screening.scene import SceneCheckRule
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
-    from dronalize.config.models.screening import ScreeningConfig
+    from dronalize.config.models import ScreeningConfig
     from dronalize.core.typing import DataFrameT
     from dronalize.processing.columns import TrajectoryColumns
     from dronalize.processing.screening.base import CleanupRuleBase, SceneCheckRuleBase

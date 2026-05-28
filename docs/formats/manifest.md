@@ -9,7 +9,7 @@ files directly.
 ## Location
 
 `dronalize` writes one `manifest.json` at the output root directory. The parsed
-Python representation is [`DatasetManifest`](../reference/api/io/storage-and-manifests.md#dronalize.io.DatasetManifest).
+Python representation is [`DatasetManifest`](../reference/api/io/index.md#dronalize.io.DatasetManifest).
 
 Typical layout:
 
@@ -65,4 +65,4 @@ print(manifest.feature_columns)
 print(manifest.horizon_frames, manifest.default_observation_length)
 ```
 
-See [`read_manifest()`](../reference/api/io/storage-and-manifests.md#dronalize.io.read_manifest) for the full reader API.
+See [`read_manifest()`](../reference/api/io/index.md#dronalize.io.read_manifest) for the full reader API.
