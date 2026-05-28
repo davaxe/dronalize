@@ -439,12 +439,15 @@ def valid_lane_change(
     return _valid_lane_change
 
 
-def group_by_yield(*by: str, drop_group_cols: bool = True) -> FlatMapTransform:
+def group_by_yield(
+    *by: str, drop_group_cols: bool = True, batch_size: int = 100_000
+) -> FlatMapTransform:
     """Create a fan-out that partitions by column(s) and yields each group.
 
-    This collects the LazyFrame, groups it, and yields each group as
-    a new LazyFrame.  Useful for datasets that pack multiple scenes
-    into a single file (e.g., batched Parquet loading in Argoverse).
+    This consumes the LazyFrame in batches, groups completed contiguous key
+    ranges, and yields each group as a new LazyFrame. Useful for datasets that
+    pack multiple scenes into a single file without requiring every scene group
+    to be materialized at once.
 
     Parameters
     ----------
@@ -452,23 +455,56 @@ def group_by_yield(*by: str, drop_group_cols: bool = True) -> FlatMapTransform:
         Column names to group by.
     drop_group_cols : bool, optional
         Whether to drop the grouping columns from each yielded frame.
+    batch_size : int, optional
+        Number of rows to collect per batch before yielding completed groups.
 
     """
     by_tuple = tuple(by)
 
     def _group_by_yield(df: pl.LazyFrame) -> Iterable[pl.LazyFrame]:
-        collected = df.collect()
+        if not by_tuple:
+            yield df
+            return
 
-        parts = collected.partition_by(
-            *by_tuple, maintain_order=True, as_dict=False, include_key=not drop_group_cols
-        )
+        pending: pl.DataFrame | None = None
+        for collected_batch in df.collect_batches(chunk_size=batch_size, maintain_order=True):
+            batch = collected_batch
+            if pending is not None:
+                batch = pl.concat([pending, batch], how="vertical")
+                pending = None
+            if batch.is_empty():
+                continue
 
-        for part in parts:
-            yield part.lazy()
+            last_key = batch.select(*by_tuple).tail(1).row(0, named=True)
+            last_key_mask = pl.all_horizontal(
+                *(pl.col(column).eq_missing(value) for column, value in last_key.items())
+            )
+            complete = batch.filter(~last_key_mask)
+            pending = batch.filter(last_key_mask)
+
+            if complete.is_empty():
+                continue
+            yield from _yield_partitions(
+                complete, by_tuple=by_tuple, drop_group_cols=drop_group_cols
+            )
+
+        if pending is not None and not pending.is_empty():
+            yield from _yield_partitions(
+                pending, by_tuple=by_tuple, drop_group_cols=drop_group_cols
+            )
 
     _group_by_yield.__name__ = "group_by_yield"
     _group_by_yield.__qualname__ = "transforms.group_by_yield"
     return _group_by_yield
+
+
+def _yield_partitions(
+    frame: pl.DataFrame, *, by_tuple: tuple[str, ...], drop_group_cols: bool
+) -> Iterable[pl.LazyFrame]:
+    for part in frame.partition_by(
+        *by_tuple, maintain_order=True, as_dict=False, include_key=not drop_group_cols
+    ):
+        yield part.lazy()
 
 
 def select(*expr: pl.Expr, **named_expr: pl.Expr) -> Transform:

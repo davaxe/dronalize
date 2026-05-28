@@ -13,11 +13,7 @@ from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION, Scene
 from dronalize.datasets.a43.maps import A43MapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
-from dronalize.processing.loading.models import (
-    DatasetOptionsModel,
-    DatasetSource,
-    LoadedSourceFrame,
-)
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
 from dronalize.processing.maps import MapResolver
 
 if TYPE_CHECKING:
@@ -28,36 +24,24 @@ if TYPE_CHECKING:
     from dronalize.processing.maps import MapResolver
 
 
-class A43LoaderOptions(DatasetOptionsModel):
-    rows_per_source: int = 60_000
-
-
-class A43Loader(SceneLoader[tuple[Path, int], A43LoaderOptions]):
+class A43Loader(SceneLoader[Path]):
     """Scene loader for the A43 dataset."""
 
     _dt: ClassVar[float] = 0.1
     _eps: ClassVar[float] = 1e-9
-    _raw_data: dict[str, pl.DataFrame]
 
     @override
-    def iter_sources(self) -> Iterable[DatasetSource[tuple[Path, int]]]:
-        self._load_all_data()
+    def iter_sources(self) -> Iterable[DatasetSource[Path]]:
         for i, csv_file in enumerate(self.root.glob("*.csv")):
-            rows: int = pl.scan_csv(csv_file, infer_schema=False).select(pl.len()).collect().item()
-            for j in range(0, rows, self.loader_options.rows_per_source):
-                yield DatasetSource(identifier=i, payload=(csv_file, j), map_key=csv_file.stem)
+            yield DatasetSource(identifier=i, payload=csv_file, map_key=csv_file.stem)
 
     @override
-    def load_source(self, source: DatasetSource[tuple[Path, int]]) -> Iterable[LoadedSourceFrame]:
-        if not hasattr(self, "_raw_data"):
-            self._load_all_data()
+    def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
 
-        path, i = source.payload
+        path = source.payload
         yield LoadedSourceFrame(
-            self
-            ._raw_data[str(path)]
-            .slice(i, self.loader_options.rows_per_source)
-            .lazy()
+            pl
+            .scan_csv(path, schema=_SCHEMA)
             .with_columns(t0=pl.col("tseconds").min())
             .with_columns(
                 frame=(
@@ -84,21 +68,9 @@ class A43Loader(SceneLoader[tuple[Path, int], A43LoaderOptions]):
             )
         )
 
-    def _load_all_data(self) -> None:
-        if hasattr(self, "_raw_data"):
-            return
-        self._raw_data = {}
-        for csv_file in self.root.glob("*.csv"):
-            self._raw_data[str(csv_file)] = pl.read_csv(csv_file, schema=_SCHEMA).sort("tseconds")
-
     @override
     def count_sources(self) -> int | None:
-        total, rows_per_source = 0, self.loader_options.rows_per_source
-        for csv_file in self.root.glob("*.csv"):
-            with csv_file.open() as f:
-                row_count = sum(1 for _ in f) - 1
-            total += (row_count + rows_per_source - 1) // rows_per_source
-        return total
+        return sum(1 for _ in self.iter_sources())
 
     @classmethod
     @override
