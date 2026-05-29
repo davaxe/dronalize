@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cached_property
+from pathlib import Path  # noqa: TC003 - Pydantic resolves this forward reference at runtime.
 from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 import numpy as np
@@ -24,8 +25,6 @@ from dronalize.io.manifest import DatasetManifest, package_version, write_manife
 from dronalize.processing.models import LoaderPlan, ReadSelection, SplitAssignmentPlan
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from dronalize.config.models import (
         DatasetConfig,
         MapConfig,

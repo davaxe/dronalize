@@ -13,6 +13,7 @@ from typing_extensions import TypedDict
 from dronalize.core.categories import DatasetSplit
 
 if TYPE_CHECKING:
+    from multiprocessing.context import BaseContext
     from multiprocessing.sharedctypes import Synchronized
     from multiprocessing.synchronize import Event, Lock
 
@@ -58,8 +59,9 @@ class WorkerRegistry:
     next_worker_id: Synchronized[int]
 
     @classmethod
-    def create(cls) -> WorkerRegistry:
-        return cls(next_worker_id=mp.Value("i", 0))
+    def create(cls, mp_context: BaseContext | None = None) -> WorkerRegistry:
+        ctx = mp_context or mp.get_context()
+        return cls(next_worker_id=ctx.Value("i", 0))
 
     def reset(self) -> None:
         with self.next_worker_id.get_lock():
@@ -86,18 +88,19 @@ class ProgressState:
     update_event: Event
 
     @classmethod
-    def create(cls) -> ProgressState:
+    def create(cls, mp_context: BaseContext | None = None) -> ProgressState:
+        ctx = mp_context or mp.get_context()
         return cls(
-            active_workers=mp.Value("i", 0),
-            candidate_scene_counter=mp.Value("i", 0),
-            selected_scene_counter=mp.Value("i", 0),
-            source_counter=mp.Value("i", 0),
-            unsplit_counter=mp.Value("i", 0),
-            train_counter=mp.Value("i", 0),
-            val_counter=mp.Value("i", 0),
-            test_counter=mp.Value("i", 0),
-            snapshot_lock=mp.Lock(),
-            update_event=mp.Event(),
+            active_workers=ctx.Value("i", 0),
+            candidate_scene_counter=ctx.Value("i", 0),
+            selected_scene_counter=ctx.Value("i", 0),
+            source_counter=ctx.Value("i", 0),
+            unsplit_counter=ctx.Value("i", 0),
+            train_counter=ctx.Value("i", 0),
+            val_counter=ctx.Value("i", 0),
+            test_counter=ctx.Value("i", 0),
+            snapshot_lock=ctx.Lock(),
+            update_event=ctx.Event(),
         )
 
     def reset(self) -> None:
@@ -186,10 +189,12 @@ class SharedResources:
     scene_limit: int | None = None
 
     @classmethod
-    def create(cls, *, scene_limit: int | None = None) -> SharedResources:
+    def create(
+        cls, *, scene_limit: int | None = None, mp_context: BaseContext | None = None
+    ) -> SharedResources:
         return cls(
-            registry=WorkerRegistry.create(),
-            progress=ProgressState.create(),
+            registry=WorkerRegistry.create(mp_context),
+            progress=ProgressState.create(mp_context),
             scene_limit=scene_limit,
         )
 

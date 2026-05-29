@@ -25,7 +25,7 @@ configuration, dataset registry, and documented Python and CLI surfaces.
 ### New
 
 - Add the public runtime request/plan API: `ExecutionRequest`, `resolve_request()`,
-  `execute_request()`, and `stream_plan()`.
+  `execute_request()`.
 - Add a Typer-based CLI with dataset inspection, config display, split-support checks,
   processing, dry-run planning, progress reporting, `--version`, and external dataset
   registration through `--dataset-module`.

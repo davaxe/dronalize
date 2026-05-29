@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import multiprocessing as mp
 from dataclasses import replace
 from typing import TYPE_CHECKING, cast
 
@@ -22,13 +21,7 @@ from dronalize.io import StorageBackend, read_manifest
 from dronalize.io.backends.null import NullWriter
 from dronalize.io.backends.registry import register_writer_backend
 from dronalize.io.readers import PickleReader
-from dronalize.runtime import (
-    ExecutionRequest,
-    OutputSample,
-    execute_request,
-    resolve_request,
-    stream_plan,
-)
+from dronalize.runtime import ExecutionRequest, OutputSample, execute_request, resolve_request
 from tests.support import DemoOptions, demo_descriptor
 
 if TYPE_CHECKING:
@@ -267,7 +260,6 @@ def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.M
 
 def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
-    mp.set_start_method("spawn", force=True)
     _patch_get_demo_descriptor(monkeypatch)
 
     input_dir = tmp_path / "input"
@@ -293,26 +285,3 @@ def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     manifest = read_manifest(output_dir)
     assert manifest.horizon_frames == 3
     assert manifest.default_observation_length == 2
-
-
-def test_parallel_stream_plan_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    mp.set_start_method("spawn", force=True)
-    _patch_get_demo_descriptor(monkeypatch)
-
-    request = ExecutionRequest(
-        dataset="demo",
-        input_dir=tmp_path / "input",
-        output_dir=tmp_path / "output",
-        storage_backend=StorageBackend.NULL,
-        overrides=RuntimeOverride.from_inputs(jobs=2),
-    )
-    request.input_dir.mkdir()
-
-    plan = resolve_request(request)
-    scenes = list(stream_plan(plan))
-
-    assert len(scenes) == 1
-    assert scenes[0].scene_number == 0
-    assert scenes[0].dataset == "demo"
-    assert scenes[0].has_map()
-    assert scenes[0].resolve_map() is None

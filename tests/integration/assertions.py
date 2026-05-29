@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+import functools
 import json
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from dronalize.io.encoding.common import encode_scene_record
+from dronalize.runtime.executor import open_execution_session
+
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene
+    from dronalize.core.scene.schema import TrajectorySchema
     from dronalize.io import SceneRecord
+    from dronalize.runtime.state import Progress
+    from dronalize.runtime.types import ExecutionPlan
 
 
 def _assert_shape(array: npt.NDArray[Any], expected: tuple[int, ...], name: str) -> None:
@@ -166,6 +175,133 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
     has_record_map = map_num_nodes > 0 or map_num_edges > 0
     if not scene.has_map():
         assert not has_record_map, "encoded map payload present for scene without map"
+
+
+@dataclass(frozen=True, slots=True)
+class PlanSceneAssertionResult:
+    checked_scenes: int
+    selected_scenes: int
+    progress: Progress
+
+
+class AssertingSceneWriter:
+    def __init__(
+        self,
+        *,
+        output_dir: Path,
+        trajectory_schema: TrajectorySchema,
+        artifact_dir: Path | None = None,
+        dataset_name: str,
+        scene_start: int = 0,
+        scene_step: int = 1,
+    ) -> None:
+        self._marker_dir: Path = output_dir / ".integration-scene-assertions"
+        self._marker_dir.mkdir(parents=True, exist_ok=True)
+        self._trajectory_schema: TrajectorySchema = trajectory_schema
+        self._artifact_dir: Path | None = artifact_dir
+        self._dataset_name: str = dataset_name
+        self._scene_start: int = scene_start
+        self._scene_step: int = scene_step
+
+    @classmethod
+    def as_factory(
+        cls,
+        *,
+        output_dir: Path,
+        trajectory_schema: TrajectorySchema,
+        artifact_dir: Path | None = None,
+        dataset_name: str,
+        scene_start: int = 0,
+        scene_step: int = 1,
+    ) -> Callable[[int | None], AssertingSceneWriter]:
+        return functools.partial(
+            _create_asserting_scene_writer,
+            writer_cls=cls,
+            output_dir=output_dir,
+            trajectory_schema=trajectory_schema,
+            artifact_dir=artifact_dir,
+            dataset_name=dataset_name,
+            scene_start=scene_start,
+            scene_step=scene_step,
+        )
+
+    def write(self, scene: Scene) -> None:
+        if scene.scene_number < self._scene_start:
+            return
+        if (scene.scene_number - self._scene_start) % self._scene_step != 0:
+            return
+
+        assert_basic_scene_sanity(scene)
+        graph = scene.resolve_map()
+        assert_basic_map_sanity(graph, expect_map=scene.has_map())
+        record = encode_scene_record(
+            scene, dtype=np.float32, trajectory_schema=self._trajectory_schema
+        )
+        assert_record_sanity(record, scene)
+        if self._artifact_dir is not None:
+            save_scene_artifacts(
+                scene=scene,
+                graph=graph,
+                out_dir=self._artifact_dir / f"scene_{scene.scene_number:03d}",
+                dataset_name=self._dataset_name,
+            )
+
+        marker_path = self._marker_dir / f"{scene.scene_number:06d}.json"
+        with marker_path.open("w", encoding="utf-8") as file_handle:
+            json.dump({"scene_number": scene.scene_number}, file_handle)
+
+    def finish_local(self) -> None: ...
+
+    def finish_final(self) -> None: ...
+
+
+def _create_asserting_scene_writer(
+    _identifier: int | None,
+    *,
+    writer_cls: type[AssertingSceneWriter],
+    output_dir: Path,
+    trajectory_schema: TrajectorySchema,
+    artifact_dir: Path | None,
+    dataset_name: str,
+    scene_start: int,
+    scene_step: int,
+) -> AssertingSceneWriter:
+    return writer_cls(
+        output_dir=output_dir,
+        trajectory_schema=trajectory_schema,
+        artifact_dir=artifact_dir,
+        dataset_name=dataset_name,
+        scene_start=scene_start,
+        scene_step=scene_step,
+    )
+
+
+def assert_plan_scene_outputs(
+    plan: ExecutionPlan,
+    *,
+    artifact_dir: Path | None = None,
+    dataset_name: str,
+    scene_start: int = 0,
+    scene_step: int = 1,
+) -> PlanSceneAssertionResult:
+    writer_factory = AssertingSceneWriter.as_factory(
+        output_dir=plan.output_dir,
+        trajectory_schema=plan.output.trajectory_schema,
+        artifact_dir=artifact_dir,
+        dataset_name=dataset_name,
+        scene_start=scene_start,
+        scene_step=scene_step,
+    )
+    with open_execution_session(plan) as run:
+        run.executor.execute(writer_factory)
+        progress = run.executor.progress()
+
+    checked_scenes = sum(
+        1 for _ in (plan.output_dir / ".integration-scene-assertions").glob("*.json")
+    )
+    return PlanSceneAssertionResult(
+        checked_scenes=checked_scenes, selected_scenes=progress.selected_scenes, progress=progress
+    )
 
 
 def save_scene_artifacts(
