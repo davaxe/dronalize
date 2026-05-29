@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import SplitAssignmentError
@@ -267,15 +267,16 @@ class RuntimeProcessor:
     materializer: SceneMaterializer
 
     @classmethod
-    def from_plan(cls, plan: ExecutionPlan, loader: object) -> RuntimeProcessor:
-        typed_loader = cast("SceneLoader[Any, DatasetOptionsModel]", loader)
+    def from_plan(
+        cls, plan: ExecutionPlan, loader: SceneLoader[Any, DatasetOptionsModel]
+    ) -> RuntimeProcessor:
         split_assigner = SplitAssigner(plan.assignment)
         return cls(
-            planner=SourcePlanner(loader=typed_loader),
-            extractor=SceneExtractor(loader=typed_loader, split_assigner=split_assigner),
+            planner=SourcePlanner(loader=loader),
+            extractor=SceneExtractor(loader=loader, split_assigner=split_assigner),
             materializer=SceneMaterializer(
                 dataset=plan.dataset,
-                loader=typed_loader,
+                loader=loader,
                 source_schema=plan.descriptor.native_schema,
                 target_schema=plan.output.trajectory_schema,
                 horizon_frames=plan.effective_horizon_frames,
