@@ -6,6 +6,7 @@ import polars as pl
 import polars.selectors as cs
 import pytest
 from polars.testing import assert_frame_equal
+from typing_extensions import TypedDict, Unpack
 
 from dronalize.config.models import (
     LaneChangeConfig,
@@ -14,17 +15,49 @@ from dronalize.config.models import (
     TimeBlockAssign,
     WindowConfig,
 )
+from dronalize.core.functional import ResampleMethod, ResampleSpec
 from dronalize.core.functional.basic import normalize_group_by
 from dronalize.core.functional.window import sliding_window
 from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
 from dronalize.processing.pipeline import transforms as tr
+from dronalize.processing.pipeline.pipeline import Pipeline
 from dronalize.processing.pipeline.trajectory import build_trajectory_pipeline
+from dronalize.processing.pipeline.transforms import resample
 
 if TYPE_CHECKING:
     from dronalize.core.functional.window import WindowPolicy
     from tests.support import DataFramePresets
 
 SceneDict = dict[str, list[Any]]
+
+
+class _ResampleArgs(TypedDict, total=False):
+    up: int
+    down: int
+    coordinates: tuple[str, ...]
+    max_gap: int
+    sample_time: float
+    emit_velocity: bool
+    emit_acceleration: bool
+
+
+def _all_methods_spec(**kwargs: Unpack[_ResampleArgs]) -> list[ResampleSpec]:
+    add_derivatives = kwargs.get("emit_velocity", False) or kwargs.get("emit_acceleration", False)
+    return [
+        ResampleSpec(method=ResampleMethod.PCHIP, **kwargs),
+        ResampleSpec(method=ResampleMethod.CUBIC, **kwargs),
+        *([ResampleSpec(method=ResampleMethod.LINEAR, **kwargs)] if not add_derivatives else []),
+    ]
+
+
+def _straight_track(frames: list[int]) -> pl.DataFrame:
+    return pl.DataFrame({
+        "frame": frames,
+        "id": [1] * len(frames),
+        "x": [float(frame) for frame in frames],
+        "y": [0.0] * len(frames),
+        "agent_category": [1] * len(frames),
+    })
 
 
 def _scenes(
@@ -57,6 +90,104 @@ def _run_pipeline(
             frame, collect=True
         )
     ]
+
+
+def test_then_returns_new_pipeline() -> None:
+    base = Pipeline()
+    updated = base.then(lambda df: df.with_columns((pl.col("x") + 1).alias("x")), name="increment")
+
+    assert base.is_empty()
+    assert len(updated) == 1
+
+
+def test_compose_and_rshift_preserve_order() -> None:
+    first = Pipeline().then(
+        lambda df: df.with_columns((pl.col("x") + 1).alias("x")), name="plus_one"
+    )
+    second = Pipeline().then(
+        lambda df: df.with_columns((pl.col("x") * 2).alias("x")), name="times_two"
+    )
+
+    composed = first.compose(second)
+    shifted = first >> second
+
+    data = pl.DataFrame({"x": [1]})
+    composed_result = next(composed.execute(data, collect=True))
+    shifted_result = next(shifted.execute(data, collect=True))
+    assert composed_result["x"].to_list() == [4]
+    assert shifted_result["x"].to_list() == [4]
+
+
+def test_execute_collect_drops_empty_frames() -> None:
+    pipeline = Pipeline().then(lambda df: df.filter(pl.col("x") > 10), name="drop_all")
+
+    collected = list(pipeline.execute(pl.DataFrame({"x": [1, 2]}), collect=True, filter_empty=True))
+    unfiltered = list(
+        pipeline.execute(pl.DataFrame({"x": [1, 2]}), collect=True, filter_empty=False)
+    )
+
+    assert collected == []
+    assert len(unfiltered) == 1
+    assert unfiltered[0].is_empty()
+
+
+@pytest.mark.parametrize("spec", _all_methods_spec(up=2, down=1, sample_time=1.0))
+def test_resample_straight_track_matches_samples(spec: ResampleSpec) -> None:
+    df = _straight_track([0, 1, 2])
+    df_resampled = (
+        resample(spec)(df.lazy())
+        .collect()
+        .sort("frame")
+        .select("frame", "id", "x", "y", "agent_category")
+    )
+
+    assert df_resampled["frame"].to_list() == [0, 1, 2, 3, 4]
+    assert df_resampled["id"].to_list() == [1, 1, 1, 1, 1]
+    assert df_resampled["agent_category"].to_list() == [1, 1, 1, 1, 1]
+    assert df_resampled["x"].to_list() == pytest.approx([0.0, 0.5, 1.0, 1.5, 2.0])
+    assert df_resampled["y"].to_list() == pytest.approx([0.0, 0.0, 0.0, 0.0, 0.0])
+
+
+@pytest.mark.parametrize("spec", _all_methods_spec(up=2, down=1, max_gap=1, sample_time=1.0))
+def test_resample_max_gap_splits_gaps(spec: ResampleSpec) -> None:
+    df = _straight_track([0, 1, 4])
+    df_resampled = resample(spec)(df.lazy()).collect().sort("frame")
+
+    assert df_resampled["frame"].to_list() == [0, 1, 2, 8]
+    assert df_resampled["x"].to_list() == pytest.approx([0.0, 0.5, 1.0, 4.0])
+
+
+@pytest.mark.parametrize("spec", _all_methods_spec(up=2, down=1, max_gap=3, sample_time=1.0))
+def test_resample_max_gap_keeps_allowed_gaps(spec: ResampleSpec) -> None:
+    df = _straight_track([0, 1, 4])
+    df_resampled = resample(spec)(df.lazy()).collect().sort("frame")
+
+    assert df_resampled["frame"].to_list() == list(range(9))
+    assert df_resampled["x"].to_list() == pytest.approx([
+        0.0,
+        0.5,
+        1.0,
+        1.5,
+        2.0,
+        2.5,
+        3.0,
+        3.5,
+        4.0,
+    ])
+
+
+@pytest.mark.parametrize(
+    "spec", _all_methods_spec(up=2, down=1, emit_velocity=True, emit_acceleration=True)
+)
+def test_resample_adds_derivatives(spec: ResampleSpec, scene_df_presets: DataFramePresets) -> None:
+    df = scene_df_presets["single_agent"]()
+    df_resampled = resample(spec)(df.lazy()).collect()
+
+    assert df.height == 3
+    assert df_resampled.height == 5
+    assert df_resampled.select("vx", "vy", "ax", "ay").null_count().sum_horizontal().item() == 0
+    for column in ("vx", "vy", "ax", "ay"):
+        assert column in df_resampled.columns
 
 
 def test_pipeline_outputs_windows(scene_df_presets: DataFramePresets) -> None:
