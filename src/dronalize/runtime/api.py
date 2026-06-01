@@ -7,7 +7,7 @@ import time
 from typing import TYPE_CHECKING
 
 from dronalize.datasets.registry import get_dataset
-from dronalize.io.backends.registry import build_writer_factory
+from dronalize.io.backends.registry import build_writer_provider
 from dronalize.io.base import storage_backend_name
 from dronalize.runtime.executor import open_execution_session
 from dronalize.runtime.progress import execute_with_rich_progress
@@ -97,14 +97,14 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
     )
     start_time = time.time()
     with open_execution_session(plan) as run:
-        execute_with_rich_progress(
-            run.executor,
-            lambda: run.executor.execute(writer_factory=build_writer_factory(plan)),
+        writer_provider = build_writer_provider(plan)
+        progress = execute_with_rich_progress(
+            run.executor.progress,
+            lambda: run.executor.execute(writer_provider),
             enable=show_progress,
         )
         logger.debug("Execution complete, writing manifests", extra={"dataset": plan.dataset})
         plan.write_manifests()
-        progress = run.executor.progress()
         logger.info(
             "Finished plan",
             extra={

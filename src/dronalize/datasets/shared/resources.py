@@ -31,7 +31,7 @@ def open_named_shared_map_resources(
     map_config: MapConfig | None,
     named_paths: Iterable[tuple[str | None, Path]],
     build_map: MapBuilder,
-) -> Generator[DatasetRunResources, None, None]:
+) -> Generator[DatasetRunResources]:
     """Open shared-memory map resources keyed by explicit names."""
     if map_config is None:
         yield DatasetRunResources()
@@ -55,7 +55,7 @@ def open_named_shared_map_resources(
 @contextmanager
 def open_single_shared_map_resource(
     *, map_config: MapConfig | None, map_path: Path, build_map: MapBuilder
-) -> Generator[DatasetRunResources, None, None]:
+) -> Generator[DatasetRunResources]:
     """Open a single shared-memory map resource."""
     if map_config is None:
         yield DatasetRunResources()
@@ -77,7 +77,7 @@ def named_shared_map_resources_factory(
     @contextmanager
     def _factory(
         root: Path, scenes: ScenesConfig, map_config: MapConfig | None
-    ) -> Generator[DatasetRunResources, None, None]:
+    ) -> Generator[DatasetRunResources]:
         _ = scenes
         with open_named_shared_map_resources(
             map_config=map_config, named_paths=named_paths(root), build_map=build_map
@@ -95,7 +95,7 @@ def single_shared_map_resource_factory(
     @contextmanager
     def _factory(
         root: Path, scenes: ScenesConfig, map_config: MapConfig | None
-    ) -> Generator[DatasetRunResources, None, None]:
+    ) -> Generator[DatasetRunResources]:
         _ = scenes
         with open_single_shared_map_resource(
             map_config=map_config, map_path=map_path(root), build_map=build_map

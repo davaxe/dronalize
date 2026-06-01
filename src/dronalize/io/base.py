@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import functools
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeAlias, runtime_checkable
+from typing import TYPE_CHECKING, Generic, Protocol, TypeAlias, runtime_checkable
 
-from typing_extensions import Self, TypeVar
+from typing_extensions import TypeVar, override
 
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.scene import Scene
@@ -125,16 +125,41 @@ class DatasetWriter(Protocol):
 
     def finish_local(self) -> None:
         """Finalize worker-local state once the current worker is done."""
-        ...
+        _ = self
+
+
+class WriterProvider(ABC):
+    """Provider that owns writer lifecycle for one execution run."""
+
+    @abstractmethod
+    def open_worker(self, worker_id: int) -> DatasetWriter:
+        """Create the writer used by one worker."""
 
     def finish_final(self) -> None:
-        """Finalize dataset-wide state once all workers are done."""
-        ...
+        """Finalize dataset-wide writer state after all workers finish."""
+        _ = self
 
-    @classmethod
-    def as_factory(cls, *args: Any, **kwargs: Any) -> Callable[[int | None], Self]:  # noqa: ANN401
-        """Create a worker-local writer factory for the configured backend."""
-        return functools.partial(cls, *args, **kwargs)
+
+def _noop_finish_final() -> None:
+    return
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerWriterProvider(WriterProvider):
+    """Pickleable writer provider backed by top-level callables."""
+
+    create_worker: Callable[[int], DatasetWriter]
+    finalize: Callable[[], None] = _noop_finish_final
+
+    @override
+    def open_worker(self, worker_id: int) -> DatasetWriter:
+        """Create the writer used by one worker."""
+        return self.create_worker(worker_id)
+
+    @override
+    def finish_final(self) -> None:
+        """Finalize dataset-wide writer state after all workers finish."""
+        self.finalize()
 
 
 def split_directory_name(split: DatasetSplit | str | None) -> str:
@@ -145,7 +170,9 @@ def split_directory_name(split: DatasetSplit | str | None) -> str:
 
 
 def validate_transform_choice(
-    *, record_transform: object | None, scene_transform: object | None
+    *,
+    record_transform: RecordTransform[object] | None,
+    scene_transform: SceneTransform[object] | None,
 ) -> None:
     """Validate that at most one sample customization hook is configured."""
     if record_transform is not None and scene_transform is not None:

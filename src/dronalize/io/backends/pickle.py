@@ -8,7 +8,6 @@ when inspectability matters more than shard-based streaming.
 
 from __future__ import annotations
 
-import functools
 import pickle  # noqa: S403
 from typing import TYPE_CHECKING
 
@@ -24,31 +23,12 @@ from dronalize.io.base import (
 from dronalize.io.encoding import encode_scene_record
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Iterable
     from pathlib import Path
 
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import Scene
     from dronalize.runtime.types import OutputPlan
-
-
-def _create_writer(
-    identifier: int | None,
-    *,
-    output_dir: Path,
-    config: OutputPlan,
-    splits: Iterable[DatasetSplit] | None,
-    record_transform: RecordTransform[object] | None,
-    scene_transform: SceneTransform[object] | None,
-) -> PickleWriter:
-    return PickleWriter(
-        output_dir=output_dir,
-        config=config,
-        splits=splits,
-        identifier=identifier,
-        record_transform=record_transform,
-        scene_transform=scene_transform,
-    )
 
 
 class PickleWriter(DatasetWriter):
@@ -85,26 +65,6 @@ class PickleWriter(DatasetWriter):
         for sub_dir in self._dir_map.values():
             sub_dir.mkdir(parents=True, exist_ok=True)
 
-    @classmethod
-    @override
-    def as_factory(
-        cls,
-        output_dir: Path,
-        config: OutputPlan,
-        splits: Iterable[DatasetSplit] | None = None,
-        record_transform: RecordTransform[object] | None = None,
-        scene_transform: SceneTransform[object] | None = None,
-    ) -> Callable[[int | None], PickleWriter]:
-        """Create a worker-local pickle writer factory."""
-        return functools.partial(
-            _create_writer,
-            output_dir=output_dir,
-            config=config,
-            splits=splits,
-            record_transform=record_transform,
-            scene_transform=scene_transform,
-        )
-
     @override
     def write(self, scene: Scene) -> None:
         """Encode one scene and persist the configured pickle sample."""
@@ -128,9 +88,3 @@ class PickleWriter(DatasetWriter):
         if self._record_transform is None:
             return record
         return self._record_transform(record)
-
-    @override
-    def finish_local(self) -> None: ...
-
-    @override
-    def finish_final(self) -> None: ...
