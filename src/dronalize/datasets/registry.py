@@ -216,9 +216,7 @@ class DatasetDescriptor:
             raise LoaderConfigError(msg) from exc
 
     @contextmanager
-    def open_resources(
-        self, root: Path, request: LoaderPlan
-    ) -> Generator[DatasetRunResources, None, None]:
+    def open_resources(self, root: Path, request: LoaderPlan) -> Generator[DatasetRunResources]:
         """Open per-run shared dataset resources."""
         if self.resources_factory is None:
             yield DatasetRunResources()

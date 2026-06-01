@@ -137,7 +137,7 @@ class RuntimeProcessor:
     horizon_frames: int
     sample_time: float
     split_assigner: SplitAssigner
-    _pipeline: Pipeline | None = None
+    _pipeline: Pipeline | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def from_plan(
