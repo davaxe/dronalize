@@ -1,7 +1,8 @@
+# ruff: noqa: PLC0415
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -19,8 +20,12 @@ from tests.support import assert_scene_record_equal, output_plan
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import torch
+
     from dronalize.core.scene import Scene
     from dronalize.io.records import SceneRecord
+
+NDArrayAny = npt.NDArray[Any]
 
 
 @dataclass(slots=True)
@@ -147,8 +152,8 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("streaming")
     scene = replace(scene, dataset="demo")
 
-    from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
-    from dronalize.io.readers import MDSReader  # noqa: PLC0415
+    from dronalize.io.backends.mds import MDSDatasetWriter
+    from dronalize.io.readers import MDSReader
 
     output_dir = tmp_path / "mds"
     writer = MDSDatasetWriter(
@@ -169,8 +174,8 @@ def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene)
     pytest.importorskip("streaming")
     scene = replace(scene, dataset="demo")
 
-    from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
-    from dronalize.io.readers import MDSReader  # noqa: PLC0415
+    from dronalize.io.backends.mds import MDSDatasetWriter
+    from dronalize.io.readers import MDSReader
 
     def transform(record: SceneRecord) -> dict[str, Any]:
         observation_length = 1
@@ -215,7 +220,7 @@ def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene)
 def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> None:
     pytest.importorskip("streaming")
 
-    from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
+    from dronalize.io.backends.mds import MDSDatasetWriter
 
     with pytest.raises(ValueError, match="sample_columns"):
         _ = MDSDatasetWriter(
@@ -304,3 +309,164 @@ def test_manifest_rejects_bad_default_obs_length() -> None:
             sample_time=0.1,
             original_sample_time=0.1,
         )
+
+
+def _build_pickle_reader(tmp_path: Path, scene: Scene) -> tuple[PickleReader, SceneRecord]:
+    scene = replace(scene, dataset="demo")
+    output_dir = tmp_path / "pickle"
+    writer = PickleWriter(output_dir=output_dir, config=output_plan(), splits=None)
+
+    expected = encode_scene_record(scene, dtype=np.float32)
+    writer.write(scene)
+    writer.finish_local()
+    writer.finish_final()
+
+    return PickleReader(output_dir), expected
+
+
+def _to_numpy(tensor: torch.Tensor) -> NDArrayAny:
+    return cast("NDArrayAny", tensor.detach().cpu().numpy())
+
+
+def _assert_tensor_allclose(tensor: torch.Tensor, expected: NDArrayAny) -> None:
+    np.testing.assert_allclose(_to_numpy(tensor), expected)
+
+
+def _assert_tensor_array_equal(tensor: torch.Tensor, expected: NDArrayAny) -> None:
+    np.testing.assert_array_equal(_to_numpy(tensor), expected)
+
+
+def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch")
+    from dronalize.io.adapters.torch import TorchSceneDataset
+
+    reader, expected = _build_pickle_reader(tmp_path, scene)
+    sample = TorchSceneDataset(reader)[0]
+
+    assert sample.scene_number == expected.scene_number
+    assert sample.dataset == expected.dataset
+    _assert_tensor_allclose(sample.position_offset, expected.position_offset)
+    _assert_tensor_array_equal(sample.agent_types, expected.agent_types)
+    _assert_tensor_array_equal(sample.screened_agent_mask, expected.screened_agent_mask)
+    _assert_tensor_allclose(sample.features, expected.features)
+    _assert_tensor_array_equal(sample.mask, expected.mask)
+    _assert_tensor_allclose(sample.map_node_positions, expected.map_node_positions)
+    _assert_tensor_array_equal(sample.map_edge_indices, expected.map_edge_indices)
+    _assert_tensor_array_equal(sample.map_node_types, expected.map_node_types)
+    _assert_tensor_array_equal(sample.map_edge_types, expected.map_edge_types)
+
+
+def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import HeteroSceneDataset
+
+    reader, expected = _build_pickle_reader(tmp_path, scene)
+    sample = HeteroSceneDataset(reader).get(0)
+
+    assert sample.scene_number == expected.scene_number
+    assert sample.dataset == expected.dataset
+    _assert_tensor_allclose(sample.position_offset, expected.position_offset)
+    _assert_tensor_allclose(sample["agent"].features, expected.features)
+    _assert_tensor_array_equal(sample["agent"].mask, expected.mask)
+    _assert_tensor_array_equal(sample["agent"].agent_type, expected.agent_types)
+    _assert_tensor_array_equal(sample["agent"].passed_mask, expected.screened_agent_mask)
+    _assert_tensor_allclose(sample["map"].x, expected.map_node_positions)
+    _assert_tensor_array_equal(sample["map"].node_type, expected.map_node_types)
+    _assert_tensor_array_equal(
+        sample["map", "connects", "map"].edge_index, expected.map_edge_indices
+    )
+    _assert_tensor_array_equal(sample["map", "connects", "map"].edge_type, expected.map_edge_types)
+
+
+def test_split_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
+
+    reader, expected = _build_pickle_reader(tmp_path, scene)
+    observation_length = 2
+    sample = SplitHeteroSceneDataset(reader, observation_length=observation_length).get(0)
+    split_expected = expected.split(observation_length)
+
+    assert sample.scene_number == expected.scene_number
+    assert sample.dataset == expected.dataset
+    _assert_tensor_allclose(sample.position_offset, expected.position_offset)
+    _assert_tensor_allclose(sample["agent"].x, split_expected.history_features)
+    _assert_tensor_array_equal(sample["agent"].x_mask, split_expected.history_mask)
+    _assert_tensor_allclose(sample["agent"].y, split_expected.future_features)
+    _assert_tensor_array_equal(sample["agent"].y_mask, split_expected.future_mask)
+    _assert_tensor_array_equal(sample["agent"].agent_type, expected.agent_types)
+    _assert_tensor_array_equal(sample["agent"].passed_mask, expected.screened_agent_mask)
+    _assert_tensor_allclose(sample["map"].x, expected.map_node_positions)
+    _assert_tensor_array_equal(sample["map"].node_type, expected.map_node_types)
+    _assert_tensor_array_equal(
+        sample["map", "connects", "map"].edge_index, expected.map_edge_indices
+    )
+    _assert_tensor_array_equal(sample["map", "connects", "map"].edge_type, expected.map_edge_types)
+
+
+def test_split_pyg_dataset_uses_record_default_split(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
+
+    scene = replace(scene, dataset="demo")
+    output_dir = tmp_path / "pickle"
+    writer = PickleWriter(
+        output_dir=output_dir, config=output_plan(default_observation_length=1), splits=None
+    )
+    writer.write(scene)
+    writer.finish_local()
+    writer.finish_final()
+
+    sample = SplitHeteroSceneDataset(PickleReader(output_dir)).get(0)
+
+    assert sample.default_observation_length == 1
+    assert sample.observation_length == 1
+    assert int(sample["agent"].x.size(1)) == 1
+    assert int(sample["agent"].y.size(1)) == 2
+
+
+def test_split_pyg_dataset_accepts_callable_split(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import SplitHeteroSceneDataset
+
+    reader, _ = _build_pickle_reader(tmp_path, replace(scene, dataset="demo"))
+    sample = SplitHeteroSceneDataset(
+        reader, observation_length=lambda record: 1 if record.dataset == "demo" else 2
+    ).get(0)
+
+    assert sample.observation_length == 1
+    assert int(sample["agent"].x.size(1)) == 1
+    assert int(sample["agent"].y.size(1)) == 2
+
+
+def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import HeteroSceneDataset, collate_hetero_with_time_padding
+
+    reader, _ = _build_pickle_reader(tmp_path, scene)
+    sample = HeteroSceneDataset(reader).get(0)
+
+    shorter = sample.clone()
+    shorter["agent"].features = shorter["agent"].features[:, :1, :]
+    shorter["agent"].mask = shorter["agent"].mask[:, :1]
+
+    batch = collate_hetero_with_time_padding([shorter, sample])
+
+    assert int(batch["agent"].features.size(1)) == int(sample["agent"].features.size(1))
+
+
+def test_pyg_collate_pads_split(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import SplitHeteroSceneDataset, collate_hetero_with_time_padding
+
+    reader, _ = _build_pickle_reader(tmp_path, scene)
+    sample = SplitHeteroSceneDataset(reader, observation_length=2).get(0)
+
+    shorter = sample.clone()
+    shorter["agent"].x = shorter["agent"].x[:, :1, :]
+    shorter["agent"].x_mask = shorter["agent"].x_mask[:, :1]
+
+    batch = collate_hetero_with_time_padding([shorter, sample])
+
+    assert int(batch["agent"].x.size(1)) == int(sample["agent"].x.size(1))
+    assert int(batch["agent"].y.size(1)) == int(sample["agent"].y.size(1))

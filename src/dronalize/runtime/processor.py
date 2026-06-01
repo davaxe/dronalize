@@ -61,6 +61,7 @@ class DeferredMapResolver:
     map_binding: MapReference | None = None
 
     def __call__(self, scene: Scene) -> MapGraph | None:
+        """Resolve the map for the given scene."""
         return self.loader.resolve_map(scene, self.map_binding)
 
 
