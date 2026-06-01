@@ -9,11 +9,11 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.encoding.common import encode_scene_record
 from dronalize.runtime.executor import open_execution_session
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
     from pathlib import Path
 
     from dronalize.core.maps import MapGraph
@@ -203,28 +203,6 @@ class AssertingSceneWriter:
         self._scene_start: int = scene_start
         self._scene_step: int = scene_step
 
-    @classmethod
-    def as_factory(
-        cls,
-        *,
-        output_dir: Path,
-        trajectory_schema: TrajectorySchema,
-        artifact_dir: Path | None = None,
-        dataset_name: str,
-        scene_start: int = 0,
-        scene_step: int = 1,
-    ) -> Callable[[int | None], AssertingSceneWriter]:
-        return functools.partial(
-            _create_asserting_scene_writer,
-            writer_cls=cls,
-            output_dir=output_dir,
-            trajectory_schema=trajectory_schema,
-            artifact_dir=artifact_dir,
-            dataset_name=dataset_name,
-            scene_start=scene_start,
-            scene_step=scene_step,
-        )
-
     def write(self, scene: Scene) -> None:
         if scene.scene_number < self._scene_start:
             return
@@ -256,9 +234,8 @@ class AssertingSceneWriter:
 
 
 def _create_asserting_scene_writer(
-    _identifier: int | None,
+    _worker_id: int,
     *,
-    writer_cls: type[AssertingSceneWriter],
     output_dir: Path,
     trajectory_schema: TrajectorySchema,
     artifact_dir: Path | None,
@@ -266,7 +243,7 @@ def _create_asserting_scene_writer(
     scene_start: int,
     scene_step: int,
 ) -> AssertingSceneWriter:
-    return writer_cls(
+    return AssertingSceneWriter(
         output_dir=output_dir,
         trajectory_schema=trajectory_schema,
         artifact_dir=artifact_dir,
@@ -284,17 +261,19 @@ def assert_plan_scene_outputs(
     scene_start: int = 0,
     scene_step: int = 1,
 ) -> PlanSceneAssertionResult:
-    writer_factory = AssertingSceneWriter.as_factory(
-        output_dir=plan.output_dir,
-        trajectory_schema=plan.output.trajectory_schema,
-        artifact_dir=artifact_dir,
-        dataset_name=dataset_name,
-        scene_start=scene_start,
-        scene_step=scene_step,
+    writer_provider = WorkerWriterProvider(
+        create_worker=functools.partial(
+            _create_asserting_scene_writer,
+            output_dir=plan.output_dir,
+            trajectory_schema=plan.output.trajectory_schema,
+            artifact_dir=artifact_dir,
+            dataset_name=dataset_name,
+            scene_start=scene_start,
+            scene_step=scene_step,
+        )
     )
     with open_execution_session(plan) as run:
-        run.executor.execute(writer_factory)
-        progress = run.executor.progress()
+        progress = run.executor.execute(writer_provider)
 
     checked_scenes = sum(
         1 for _ in (plan.output_dir / ".integration-scene-assertions").glob("*.json")

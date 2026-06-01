@@ -24,6 +24,7 @@ from dronalize.datasets.registry import _REGISTRY  # pyright: ignore[reportPriva
 from dronalize.io import StorageBackend, read_manifest
 from dronalize.io.backends.null import NullWriter
 from dronalize.io.backends.registry import register_writer_backend
+from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.readers import PickleReader
 from dronalize.runtime import ExecutionRequest, OutputSample, execute_request, resolve_request
 from tests.support import DemoOptions, demo_descriptor
@@ -98,7 +99,9 @@ def test_resolve_request_accepts_registered_backend(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
-    register_writer_backend("test-null", lambda _plan: NullWriter.as_factory())
+    register_writer_backend(
+        "test-null", lambda _plan: WorkerWriterProvider(lambda _i: NullWriter())
+    )
 
     plan = resolve_request(_request(tmp_path, storage_backend="test-null"))
 

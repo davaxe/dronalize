@@ -14,7 +14,6 @@ Notes
 
 from __future__ import annotations
 
-import functools
 import logging
 import multiprocessing as mp
 import os
@@ -45,34 +44,11 @@ except ModuleNotFoundError as error:
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Iterable
+    from collections.abc import Generator, Iterable
 
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import Scene
     from dronalize.runtime.types import OutputPlan
-
-
-def _create_writer(
-    parallel_group: int | None,
-    *,
-    output_dir: Path,
-    config: OutputPlan,
-    splits: Iterable[DatasetSplit] | None,
-    parallel: bool,
-    record_transform: RecordTransform[dict[str, Any]] | None,
-    scene_transform: SceneTransform[dict[str, Any]] | None,
-    sample_columns: dict[str, str] | None,
-) -> MDSDatasetWriter:
-    return MDSDatasetWriter(
-        output_dir=output_dir,
-        config=config,
-        splits=splits,
-        parallel=parallel,
-        parallel_group=parallel_group,
-        record_transform=record_transform,
-        scene_transform=scene_transform,
-        sample_columns=sample_columns,
-    )
 
 
 class MDSDatasetWriter(DatasetWriter):
@@ -152,30 +128,6 @@ class MDSDatasetWriter(DatasetWriter):
             sample_columns if sample_columns is not None else mds_columns(config.config.precision)
         )
         self._writers: dict[DatasetSplit | None, MDSWriter] | None = None
-
-    @override
-    @classmethod
-    def as_factory(
-        cls,
-        output_dir: Path,
-        config: OutputPlan,
-        splits: Iterable[DatasetSplit] | None,
-        parallel: bool,
-        record_transform: RecordTransform[dict[str, Any]] | None = None,
-        scene_transform: SceneTransform[dict[str, Any]] | None = None,
-        sample_columns: dict[str, str] | None = None,
-    ) -> Callable[[int | None], MDSDatasetWriter]:
-        """Create a worker-local factory for MDS scene writers."""
-        return functools.partial(
-            _create_writer,
-            output_dir=output_dir,
-            config=config,
-            splits=splits,
-            parallel=parallel,
-            record_transform=record_transform,
-            scene_transform=scene_transform,
-            sample_columns=sample_columns,
-        )
 
     @classmethod
     def _init_writers(
@@ -259,24 +211,31 @@ class MDSDatasetWriter(DatasetWriter):
             writer.finish()
         self._writers = None
 
-    @override
     def finish_final(self) -> None:
-        """Merge per-worker MDS indices when running in parallel."""
-        if not self._parallel:
+        """Finalize dataset-wide MDS output after all workers finish."""
+        self.finish_dataset(
+            output_dir=self._base_output_dir, splits=self._splits, parallel=self._parallel
+        )
+
+    @staticmethod
+    def finish_dataset(
+        *, output_dir: Path, splits: Iterable[DatasetSplit] | None, parallel: bool
+    ) -> None:
+        """Finalize dataset-wide MDS output after all workers finish."""
+        if not parallel:
             return
-        if self._splits:
-            for split in self._splits:
+        split_tuple = tuple(splits) if splits is not None else None
+        if split_tuple:
+            for split in split_tuple:
                 with _suppress_output():
-                    merge_index(
-                        str(self._base_output_dir / split_directory_name(split)), keep_local=True
-                    )
+                    merge_index(str(output_dir / split_directory_name(split)), keep_local=True)
             return
         with _suppress_output():
-            merge_index(str(self._base_output_dir / split_directory_name(None)), keep_local=True)
+            merge_index(str(output_dir / split_directory_name(None)), keep_local=True)
 
 
 @contextmanager
-def _suppress_output() -> Generator[None, None, None]:
+def _suppress_output() -> Generator[None]:
     logger = logging.getLogger("streaming.base.storage.upload")
     old_level = logger.level
     old_disabled = logger.disabled

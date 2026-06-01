@@ -21,7 +21,7 @@ from dronalize.runtime.state import SplitCounts
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.runtime.executor import Executor
+    from dronalize.runtime.executor import ProgressSource
     from dronalize.runtime.state import Progress
 
 T = TypeVar("T")
@@ -122,8 +122,8 @@ class _ExecutorDisplay(RichCast):
 
 
 class _ProgressMonitor:
-    def __init__(self, executor: Executor, display: _ExecutorDisplay) -> None:
-        self._executor: Executor = executor
+    def __init__(self, progress: ProgressSource, display: _ExecutorDisplay) -> None:
+        self._progress: ProgressSource = progress
         self._display: _ExecutorDisplay = display
         self._stop_event: threading.Event = threading.Event()
         self._error: BaseException | None = None
@@ -133,7 +133,7 @@ class _ProgressMonitor:
 
     def stop(self) -> None:
         self._stop_event.set()
-        self._executor.progress_event().set()
+        self._progress.changed().set()
 
     def raise_if_failed(self) -> None:
         if self._error is not None:
@@ -141,10 +141,10 @@ class _ProgressMonitor:
             raise RuntimeError(msg) from self._error
 
     def _wait_for_start(self, timeout: float | None) -> bool:
-        if not self._executor.progress_event().wait(timeout):
+        if not self._progress.changed().wait(timeout):
             return False
-        self._executor.progress_event().clear()
-        self._display.update(self._executor.progress())
+        self._progress.changed().clear()
+        self._display.update(self._progress.snapshot())
         return True
 
     def _work(self, timeout: float | None = 20, sleep: float | None = 0.5) -> None:
@@ -156,10 +156,7 @@ class _ProgressMonitor:
         while not self._stop_event.is_set():
             if sleep is not None:
                 time.sleep(sleep)
-            _ = self._executor.progress_event().wait()
-            self._executor.progress_event().clear()
-
-            progress = self._executor.progress()
+            progress = self._progress.wait_for_change()
             self._display.update(progress)
 
             if not progress.running:
@@ -167,14 +164,14 @@ class _ProgressMonitor:
 
 
 def execute_with_rich_progress(
-    executor: Executor, run: Callable[[], T], *, enable: bool = True
+    progress: ProgressSource, run: Callable[[], T], *, enable: bool = True
 ) -> T:
     """Run an executor callback while rendering a Rich progress bar."""
     if not enable:
         return run()
 
     display = _ExecutorDisplay()
-    monitor = _ProgressMonitor(executor, display)
+    monitor = _ProgressMonitor(progress, display)
     thread = monitor.thread()
 
     result: T

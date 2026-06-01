@@ -34,7 +34,7 @@ The registry key is a string, so application code can pass that same string as
 ```python
 from dronalize.io.backends import register_writer_backend
 
-register_writer_backend("my-backend", build_my_writer_factory)
+register_writer_backend("my-backend", build_my_writer_provider)
 ```
 
 CLI selection is still just `--storage-backend <name>`, but the backend must already be registered in

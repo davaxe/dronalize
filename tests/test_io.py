@@ -75,7 +75,6 @@ def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     expected = encode_scene_record(scene, dtype=np.float32)
     writer.write(scene)
     writer.finish_local()
-    writer.finish_final()
 
     reader = PickleReader(output_dir)
     assert len(reader) == 1
@@ -99,7 +98,6 @@ def test_pickle_writer_accepts_record_transform(tmp_path: Path, scene: Scene) ->
     )
     writer.write(scene)
     writer.finish_local()
-    writer.finish_final()
 
     reader = PickleReader(output_dir, sample_type=CustomPickleSample)
     sample = reader[0]
@@ -127,7 +125,6 @@ def test_pickle_writer_accepts_scene_transform(tmp_path: Path, scene: Scene) -> 
     )
     writer.write(scene)
     writer.finish_local()
-    writer.finish_final()
 
     sample = PickleReader(output_dir, sample_type=CustomPickleSample)[0]
 
@@ -319,7 +316,6 @@ def _build_pickle_reader(tmp_path: Path, scene: Scene) -> tuple[PickleReader, Sc
     expected = encode_scene_record(scene, dtype=np.float32)
     writer.write(scene)
     writer.finish_local()
-    writer.finish_final()
 
     return PickleReader(output_dir), expected
 
@@ -415,7 +411,6 @@ def test_split_pyg_dataset_uses_record_default_split(tmp_path: Path, scene: Scen
     )
     writer.write(scene)
     writer.finish_local()
-    writer.finish_final()
 
     sample = SplitHeteroSceneDataset(PickleReader(output_dir)).get(0)
 

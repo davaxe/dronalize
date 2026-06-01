@@ -6,8 +6,8 @@ import functools
 import logging
 import multiprocessing as mp
 import threading
+from abc import ABC, abstractmethod
 from collections import deque
-from collections.abc import Callable, Generator, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from multiprocessing.synchronize import Event
@@ -17,84 +17,60 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 from typing_extensions import override
 
 from dronalize.core.scene import Scene
-from dronalize.io.base import DatasetWriter
 from dronalize.runtime.processor import RuntimeProcessor
 from dronalize.runtime.state import Progress, SharedResources, SplitCounts, WorkerRuntime
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Generator, Iterable, Iterator
     from multiprocessing.context import BaseContext
     from multiprocessing.pool import Pool
 
     from dronalize.core.typing import P
+    from dronalize.io.base import DatasetWriter, WriterProvider
     from dronalize.processing.loading.models import DatasetSource
     from dronalize.runtime.types import ExecutionPlan
 
 AnyEvent = Event | threading.Event
-WriterFactory = Callable[[int | None], DatasetWriter]
 ReturnT = TypeVar("ReturnT", int, list[Scene])
 _ctx: WorkerRuntime
 
 logger = logging.getLogger(__name__)
 
 
+class ProgressSource(ABC):
+    """Read-only progress interface for execution observers."""
+
+    @abstractmethod
+    def snapshot(self) -> Progress:
+        """Return a point-in-time progress snapshot."""
+        ...
+
+    @abstractmethod
+    def changed(self) -> AnyEvent:
+        """Return the event set whenever progress changes."""
+        ...
+
+    def wait_for_change(self) -> Progress:
+        """Wait for the next progress change and return progress."""
+        _ = self.changed().wait()
+        self.changed().clear()
+        return self.snapshot()
+
+
 class Executor(Protocol):
     """Shared protocol for sequential and parallel execution of a plan."""
 
-    def execute(self, writer_factory: WriterFactory) -> None:
-        """Execute the plan, writing scenes based on the provided writer factory.
-
-        Parameters
-        ----------
-        writer_factory: Callable[[int], DatasetWriter]
-            A factory function that takes a worker ID and returns a
-            `DatasetWriter` instance for that worker to write scenes with.
-
-        Notes
-        -----
-        It is up to the dataset writer implementation to handle any necessary
-        synchronization for parallel execution, such as locking or buffering, to
-        ensure that scenes are written correctly without conflicts or data
-        corruption.
-
-        """
+    @property
+    def progress(self) -> ProgressSource:
+        """Return the progress interface for this executor."""
         ...
 
-    def progress_event(self) -> AnyEvent:
-        """Return an event that is set whenever progress is updated.
+    def execute(self, writer_provider: WriterProvider) -> Progress:
+        """Execute the plan and return the final progress snapshot.
 
-        This can be used by external code to wait for progress updates or to
-        trigger actions whenever progress changes.
+        The writer provider owns creation of worker-local writers and any
+        dataset-wide finalization required after workers finish.
 
-        Returns
-        -------
-        AnyEvent
-            An event object (either `threading.Event` or
-            `multiprocessing.synchronize.Event`) that is set whenever the
-            executor's progress is updated.
-
-        """
-        ...
-
-    def is_running(self) -> bool:
-        """Flag indicating whether the executor is currently running.
-
-        Returns
-        -------
-        bool
-            `True` if the executor is currently running, `False` otherwise.
-        """
-        ...
-
-    def progress(self) -> Progress:
-        """Return the current progress of the executor.
-
-        Returns
-        -------
-        Progress
-            A `Progress` object containing information about the current progress
-            of the executor, such as the number of processed sources, candidate
-            scenes, selected scenes, total sources, active workers, split counts,
-            and whether screening is enabled.
         """
         ...
 
@@ -106,7 +82,7 @@ class ExecutionSession:
 
 
 @contextmanager
-def open_execution_session(plan: ExecutionPlan) -> Generator[ExecutionSession, None, None]:
+def open_execution_session(plan: ExecutionPlan) -> Generator[ExecutionSession]:
     """Open one plan with initialized resources, processor, and executor."""
     with plan.descriptor.open_resources(plan.data_root, plan.loader) as resources:
         logger.debug("Opening execution session", extra={"dataset": plan.dataset})
@@ -128,7 +104,7 @@ def _build_executor(plan: ExecutionPlan, processor: RuntimeProcessor) -> Executo
     return SequentialExecutor(processor, limit=plan.limit)
 
 
-class SequentialExecutor(Executor):
+class SequentialExecutor(Executor, ProgressSource):
     """Single-process executor for internal runtime execution.
 
     Parameters
@@ -152,18 +128,26 @@ class SequentialExecutor(Executor):
         self._update_event: threading.Event = threading.Event()
         self._running: bool = False
 
+    @property
     @override
-    def execute(self, writer_factory: WriterFactory) -> None:
-        writer = writer_factory(0)
+    def progress(self) -> ProgressSource:
+        return self
+
+    @override
+    def execute(self, writer_provider: WriterProvider) -> Progress:
+        writer = writer_provider.open_worker(0)
         try:
             for scene in self._generate_and_track():
                 writer.write(scene)
         finally:
-            writer.finish_local()
-            writer.finish_final()
+            try:
+                writer.finish_local()
+            finally:
+                writer_provider.finish_final()
+        return self.snapshot()
 
     @override
-    def progress(self) -> Progress:
+    def snapshot(self) -> Progress:
         return Progress(
             running=self._running,
             processed_sources=self._source_counter,
@@ -177,12 +161,8 @@ class SequentialExecutor(Executor):
         )
 
     @override
-    def progress_event(self) -> threading.Event:
+    def changed(self) -> threading.Event:
         return self._update_event
-
-    @override
-    def is_running(self) -> bool:
-        return self._running
 
     def _generate_and_track(self) -> Iterable[Scene]:
         self._running = True
@@ -231,7 +211,7 @@ class SequentialExecutor(Executor):
         return self._limit is not None and self._selected_scene_counter >= self._limit
 
 
-class ParallelExecutor(Executor):
+class ParallelExecutor(Executor, ProgressSource):
     """Parallel executor for internal runtime execution.
 
     Parameters
@@ -275,8 +255,13 @@ class ParallelExecutor(Executor):
             scene_limit=limit, mp_context=self._mp_context
         )
 
+    @property
     @override
-    def execute(self, writer_factory: WriterFactory) -> None:
+    def progress(self) -> ProgressSource:
+        return self
+
+    @override
+    def execute(self, writer_provider: WriterProvider) -> Progress:
         _ = deque(
             self._execute_parallel(
                 self._process_fn_write,
@@ -284,14 +269,15 @@ class ParallelExecutor(Executor):
                 _init_write_worker,
                 self._shared,
                 self._processor,
-                writer_factory,
+                writer_provider,
             ),
             maxlen=0,
         )
-        writer_factory(None).finish_final()
+        writer_provider.finish_final()
+        return self.snapshot()
 
     @override
-    def progress(self) -> Progress:
+    def snapshot(self) -> Progress:
         with self._shared.progress.snapshot_lock:
             return Progress(
                 running=self._running,
@@ -306,12 +292,8 @@ class ParallelExecutor(Executor):
             )
 
     @override
-    def progress_event(self) -> Event:
+    def changed(self) -> Event:
         return self._shared.progress.update_event
-
-    @override
-    def is_running(self) -> bool:
-        return self._running
 
     @staticmethod
     def _process_fn_write(source: DatasetSource[Any]) -> int:
@@ -373,7 +355,7 @@ class ParallelExecutor(Executor):
         self._shared.reset()
         pool_initializer = functools.partial(initializer, *args, **kwargs)
         self._running = True
-        self.progress_event().set()
+        self.changed().set()
         pool: Pool | None = None
         completed = False
         try:
@@ -388,7 +370,7 @@ class ParallelExecutor(Executor):
                     pool.terminate()
                 pool.join()
             self._running = False
-            self.progress_event().set()
+            self.changed().set()
 
     @staticmethod
     def _optimal_chunksize(num_sources: int | None, num_processes: int | None) -> int:
@@ -419,15 +401,13 @@ def _init_worker(
 
 
 def _init_write_worker(
-    shared: SharedResources,
-    processor: RuntimeProcessor,
-    writer_factory: Callable[[int | None], DatasetWriter],
+    shared: SharedResources, processor: RuntimeProcessor, writer_provider: WriterProvider
 ) -> None:
     global _ctx  # noqa: PLW0602
     _init_worker(shared, processor, with_finalize=False)
     writer: DatasetWriter | None = None
     try:
-        writer = writer_factory(_ctx.worker_id)
+        writer = writer_provider.open_worker(_ctx.worker_id)
         _ctx.writer = writer
     except Exception:
         _ = _ctx.shared.progress.worker_stopped()
