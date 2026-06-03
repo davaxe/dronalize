@@ -86,16 +86,27 @@ On top of the readers, `dronalize` provides optional adapters:
 
 - [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) for full-horizon
   Torch tensor records
-- [`TorchSplitSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSplitSceneDataset) for Torch
-  tensor records split at an explicit `observation_length`, a callable resolver, or the per-record
-  `default_observation_length`
 - [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) for full-horizon
   PyTorch Geometric `HeteroData`
-- [`SplitHeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.SplitHeteroSceneDataset)
-  for PyTorch Geometric `HeteroData` split at an explicit `observation_length`, a callable resolver,
-  or the per-record `default_observation_length`
 
 Use these when your training stack expects framework-native dataset objects.
+
+For supervised train/target layouts, split records in your own dataset transform so naming and
+mask conventions match your model:
+
+<!-- no-validate -->
+```python
+def split_hetero(sample):
+    observation_length = sample.default_observation_length
+    if observation_length is None:
+        msg = "This record does not define a default observation length."
+        raise ValueError(msg)
+    sample["agent"].x = sample["agent"].features[:, :observation_length]
+    sample["agent"].x_mask = sample["agent"].mask[:, :observation_length]
+    sample["agent"].y = sample["agent"].features[:, observation_length:]
+    sample["agent"].y_mask = sample["agent"].mask[:, observation_length:]
+    return sample
+```
 
 ## Choosing a reader setup
 

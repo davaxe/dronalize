@@ -49,7 +49,7 @@ pip install "dronalize[cli,mds,torch,pyg]"
 | `cli` | Typer/Rich command-line interface |
 | `mds` | MDS writer backend and [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) |
 | `torch` | Torch dataset adapters such as [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) |
-| `pyg` | PyTorch Geometric adapters such as [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) and [`SplitHeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.SplitHeteroSceneDataset) |
+| `pyg` | PyTorch Geometric adapters such as [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) |
 | `viz` | Reserved placeholder extra for future visualization support. It currently adds no dependencies. |
 | `waymo` | Optional dependencies for the Waymo dataset |
 | `lyft` | Optional dependencies for the Lyft dataset |
@@ -73,7 +73,6 @@ pip install "dronalize[cli,mds,torch,pyg]"
 | [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) | `mds` |
 | [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) | `torch` |
 | [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) | `pyg` |
-| [`SplitHeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.SplitHeteroSceneDataset) | `pyg` |
 
 ## Dataset-specific dependencies
 
@@ -125,10 +124,4 @@ For full-horizon PyG adapters:
 
 ```bash
 python -c "from dronalize.io.adapters import HeteroSceneDataset"
-```
-
-For split PyG adapters:
-
-```bash
-python -c "from dronalize.io.adapters import SplitHeteroSceneDataset"
 ```

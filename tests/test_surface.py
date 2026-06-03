@@ -86,9 +86,9 @@ def test_reader_and_adapter_exports_declared() -> None:
     assert "DatasetReader" in io_readers.__all__
     assert "MDSReaderInitArgs" in io_readers.__all__
     assert "IterableTorchSceneDataset" in io_adapters.__all__
-    assert "TorchSplitSceneDataset" in io_adapters.__all__
+    assert "TorchSplitSceneRecord" in io_adapters.__all__
     assert "IterableHeteroSceneDataset" in io_adapters.__all__
-    assert "SplitHeteroSceneDataset" in io_adapters.__all__
+    assert "HeteroSceneDataset" in io_adapters.__all__
 
 
 def test_runtime_executors_not_root_exports() -> None:
