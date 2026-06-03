@@ -120,7 +120,7 @@ class SequentialExecutor(Executor, ProgressSource):
         self._processor: RuntimeProcessor = processor
         self._limit: int | None = limit
         self._candidate_scene_counter: int = 0
-        self._selected_scene_counter: int = 0
+        self._written_scene_counter: int = 0
         self._source_counter: int = 0
         self._split_counts: SplitCounts = {"unsplit": 0, "train": 0, "val": 0, "test": 0}
         self._screening_enabled: bool = processor.screening_enabled()
@@ -152,7 +152,7 @@ class SequentialExecutor(Executor, ProgressSource):
             running=self._running,
             processed_sources=self._source_counter,
             candidate_scenes=self._candidate_scene_counter,
-            selected_scenes=self._selected_scene_counter,
+            written_scenes=self._written_scene_counter,
             total_sources=self._total_sources,
             scene_limit=self._limit,
             active_workers=1 if self._running else 0,
@@ -176,7 +176,7 @@ class SequentialExecutor(Executor, ProgressSource):
 
     def _inner_iter_sources(self) -> Iterable[Scene]:
         for source in self._processor.iter_sources():
-            if self._selected_scene_limit_reached():
+            if self._written_scene_limit_reached():
                 break
             self._source_counter += 1
             self._update_event.set()
@@ -184,7 +184,7 @@ class SequentialExecutor(Executor, ProgressSource):
                 self._record_candidate_scene()
                 if not candidate.passes_screening:
                     continue
-                scene_number = self._claim_selected_scene()
+                scene_number = self._claim_written_scene()
                 if scene_number is None:
                     return
                 scene = self._processor.materialize(candidate, scene_number)
@@ -199,16 +199,16 @@ class SequentialExecutor(Executor, ProgressSource):
         self._candidate_scene_counter += 1
         self._update_event.set()
 
-    def _claim_selected_scene(self) -> int | None:
-        if self._selected_scene_limit_reached():
+    def _claim_written_scene(self) -> int | None:
+        if self._written_scene_limit_reached():
             return None
-        scene_number = self._selected_scene_counter
-        self._selected_scene_counter += 1
+        scene_number = self._written_scene_counter
+        self._written_scene_counter += 1
         self._update_event.set()
         return scene_number
 
-    def _selected_scene_limit_reached(self) -> bool:
-        return self._limit is not None and self._selected_scene_counter >= self._limit
+    def _written_scene_limit_reached(self) -> bool:
+        return self._limit is not None and self._written_scene_counter >= self._limit
 
 
 class ParallelExecutor(Executor, ProgressSource):
@@ -283,7 +283,7 @@ class ParallelExecutor(Executor, ProgressSource):
                 running=self._running,
                 processed_sources=self._shared.progress.source_counter.value,
                 candidate_scenes=self._shared.progress.candidate_scene_counter.value,
-                selected_scenes=self._shared.progress.selected_scene_counter.value,
+                written_scenes=self._shared.progress.written_scene_counter.value,
                 active_workers=self._shared.progress.active_workers.value,
                 total_sources=self._num_sources,
                 scene_limit=self._limit,
@@ -303,22 +303,22 @@ class ParallelExecutor(Executor, ProgressSource):
         if _ctx.processor is None:
             msg = "Runtime processor was not initialized for this worker process."
             raise ValueError(msg)
-        if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
+        if _ctx.shared.progress.written_scene_limit_reached(_ctx.shared.scene_limit):
             return 0
-        selected_scenes = 0
+        written_scenes = 0
         for scene in ParallelExecutor._generate_scenes(_ctx.processor, source):
             _ctx.shared.progress.record_split(scene.split_assignment)
             _ctx.writer.write(scene)
-            selected_scenes += 1
+            written_scenes += 1
         _ = _ctx.shared.progress.increment_source()
-        return selected_scenes
+        return written_scenes
 
     @staticmethod
     def _process_fn_yield(source: DatasetSource[Any]) -> list[Scene]:
         if _ctx.processor is None:
             msg = "Runtime processor was not initialized for this worker process."
             raise ValueError(msg)
-        if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
+        if _ctx.shared.progress.written_scene_limit_reached(_ctx.shared.scene_limit):
             return []
         _ = _ctx.shared.progress.increment_source()
         scenes = list(ParallelExecutor._generate_scenes(_ctx.processor, source))
@@ -330,16 +330,16 @@ class ParallelExecutor(Executor, ProgressSource):
     def _generate_scenes(
         processor: RuntimeProcessor, source: DatasetSource[Any]
     ) -> Iterator[Scene]:
-        if _ctx.shared.progress.selected_scene_limit_reached(_ctx.shared.scene_limit):
+        if _ctx.shared.progress.written_scene_limit_reached(_ctx.shared.scene_limit):
             return
-        claim_selected_scene = functools.partial(
-            _ctx.shared.progress.claim_selected_scene, _ctx.shared.scene_limit
+        claim_written_scene = functools.partial(
+            _ctx.shared.progress.claim_written_scene, _ctx.shared.scene_limit
         )
         for candidate in processor.iter_candidates(source):
             _ = _ctx.shared.progress.record_candidate_scene()
             if not candidate.passes_screening:
                 continue
-            scene_number = claim_selected_scene()
+            scene_number = claim_written_scene()
             if scene_number is None:
                 return
             yield processor.materialize(candidate, scene_number)

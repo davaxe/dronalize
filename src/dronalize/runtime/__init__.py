@@ -11,13 +11,18 @@ The public runtime surface is organized around four steps:
 from __future__ import annotations
 
 from dronalize.runtime.api import execute_plan, execute_request, resolve_request
-from dronalize.runtime.types import ExecutionPlan, ExecutionRequest, ExecutionResult, OutputSample
+from dronalize.runtime.types import (
+    ExecutionPlan,
+    ExecutionRequest,
+    ExecutionResult,
+    OutputTransform,
+)
 
 __all__ = [
     "ExecutionPlan",
     "ExecutionRequest",
     "ExecutionResult",
-    "OutputSample",
+    "OutputTransform",
     "execute_plan",
     "execute_request",
     "resolve_request",

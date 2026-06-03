@@ -12,11 +12,7 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
-from dronalize.processing.loading.models import (
-    DatasetOptionsModel,
-    DatasetSource,
-    LoadedSourceFrame,
-)
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, LoaderOptionsModel
 from dronalize.processing.maps import no_map, shared_map
 
 if TYPE_CHECKING:
@@ -29,7 +25,7 @@ if TYPE_CHECKING:
     from dronalize.processing.models import LoaderPlan
 
 
-class NuScenesStyleLoaderOptions(DatasetOptionsModel):
+class NuScenesStyleLoaderOptions(LoaderOptionsModel):
     """Common loader options for nuScenes-style metadata datasets."""
 
     drop_status: list[str] = Field(default_factory=list)
@@ -202,7 +198,7 @@ def load_cached_table(name: str, base_dir: Path, schema: pl.Schema | None = None
 def build_scene_timeline(
     sample_lf: pl.LazyFrame, scene_lf: pl.LazyFrame, log_lf: pl.LazyFrame
 ) -> pl.LazyFrame:
-    """Join sample, scene, and log metadata into a per-scene timeline."""
+    """Join nuScenes-style `sample`, `scene`, and `log` source tables into a timeline."""
     return (
         sample_lf
         .join(scene_lf, left_on="scene_token", right_on="token")
@@ -232,7 +228,7 @@ def drop_first_samples_with_large_ego_jump(
     *,
     threshold_meters: float,
 ) -> pl.LazyFrame:
-    """Drop scene-start samples whose next ego step exceeds a distance threshold."""
+    """Drop scene-start rows whose next ego step exceeds a distance threshold."""
     bad_first_samples_lf = (
         timeline_lf
         .join(sample_data_lf.select(["sample_token", "ego_pose_token"]), on="sample_token")

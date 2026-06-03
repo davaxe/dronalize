@@ -14,11 +14,11 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
-class MDSSample(TypedDict):
-    """Serialized MDS payload for one scene sample."""
+class MDSRow(TypedDict):
+    """Serialized MDS row for one scene record."""
 
     scene_number: int
-    dataset: str
+    dataset_id: int
     default_observation_length: int
     position_offset: npt.NDArray[np.float64]
     agent_types: npt.NDArray[np.int32]
@@ -31,7 +31,7 @@ class MDSSample(TypedDict):
     map_edge_types: npt.NDArray[np.int32]
 
 
-def encode_mds_sample(record: SceneRecord) -> MDSSample:
+def encode_mds_row(record: SceneRecord) -> MDSRow:
     """Convert one scene record to the MDS payload layout."""
     map_node_positions, map_edge_indices, map_node_types, map_edge_types = _encode_mds_map_arrays(
         record.map_node_positions,
@@ -41,7 +41,7 @@ def encode_mds_sample(record: SceneRecord) -> MDSSample:
     )
     return {
         "scene_number": int(record.scene_number),
-        "dataset": record.dataset or "",
+        "dataset_id": -1 if record.dataset_id is None else int(record.dataset_id),
         "default_observation_length": (
             -1
             if record.default_observation_length is None
@@ -59,27 +59,27 @@ def encode_mds_sample(record: SceneRecord) -> MDSSample:
     }
 
 
-def decode_mds_sample(sample: Mapping[str, Any]) -> SceneRecord:
-    """Convert one MDS sample payload into the canonical scene record."""
+def decode_mds_row(row: Mapping[str, Any]) -> SceneRecord:
+    """Convert one MDS row into the canonical scene record."""
     map_node_positions, map_edge_indices, map_node_types, map_edge_types = _decode_mds_map_arrays(
-        np.asarray(sample["map_node_positions"]),
-        np.asarray(sample["map_edge_indices"]),
-        np.asarray(sample["map_node_types"]),
-        np.asarray(sample["map_edge_types"]),
+        np.asarray(row["map_node_positions"]),
+        np.asarray(row["map_edge_indices"]),
+        np.asarray(row["map_node_types"]),
+        np.asarray(row["map_edge_types"]),
     )
     return make_scene_record(
-        scene_number=int(sample["scene_number"]),
-        dataset=str(sample["dataset"]) if sample.get("dataset") else None,
+        scene_number=int(row["scene_number"]),
+        dataset_id=(None if int(row.get("dataset_id", -1)) < 0 else int(row["dataset_id"])),
         default_observation_length=(
             None
-            if int(sample.get("default_observation_length", -1)) < 0
-            else int(sample["default_observation_length"])
+            if int(row.get("default_observation_length", -1)) < 0
+            else int(row["default_observation_length"])
         ),
-        position_offset=np.asarray(sample["position_offset"], dtype=np.float64),
-        agent_types=np.asarray(sample["agent_types"], dtype=np.int32),
-        screened_agent_mask=np.asarray(sample["screened_agent_mask"], dtype=bool),
-        features=np.asarray(sample["features"]),
-        mask=np.asarray(sample["mask"], dtype=bool),
+        position_offset=np.asarray(row["position_offset"], dtype=np.float64),
+        agent_types=np.asarray(row["agent_types"], dtype=np.int32),
+        screened_agent_mask=np.asarray(row["screened_agent_mask"], dtype=bool),
+        features=np.asarray(row["features"]),
+        mask=np.asarray(row["mask"], dtype=bool),
         map_node_positions=map_node_positions,
         map_edge_indices=map_edge_indices,
         map_node_types=map_node_types,
@@ -88,10 +88,10 @@ def decode_mds_sample(sample: Mapping[str, Any]) -> SceneRecord:
 
 
 def mds_columns(dtype: str) -> dict[str, str]:
-    """Return the MDS column schema for one serialized scene sample."""
+    """Return the MDS column schema for one serialized scene record."""
     return {
         "scene_number": "int",
-        "dataset": "str",
+        "dataset_id": "int",
         "default_observation_length": "int",
         "position_offset": "ndarray:float64:2",
         "agent_types": "ndarray:int32",

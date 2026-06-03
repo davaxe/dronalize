@@ -9,7 +9,7 @@ from dronalize.datasets.registry import (
 )
 from dronalize.datasets.shared.presets import (
     linear_resample,
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -37,7 +37,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
             window_step=1,
             resample=linear_resample(up=5),
         ),
-        screening=minimum_samples_screening(2, required_frame=3),
+        screening=minimum_observations_screening(2, required_frame=3),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
     loader_options_model=NuScenesLoaderOptions,

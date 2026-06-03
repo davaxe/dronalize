@@ -96,7 +96,7 @@ class _RuleCompiler(ABC, Generic[_RuleT]):
     @classmethod
     @abstractmethod
     def adapter(cls) -> TypeAdapter[_RuleT]:
-        """Return the TypeAdapter used to validate rule specs."""
+        """Return the TypeAdapter used to validate rule definitions."""
         ...
 
     @classmethod
@@ -114,7 +114,7 @@ class _CleanupRuleCompiler(_RuleCompiler[CleanupRule]):
     @classmethod
     @override
     def adapter(cls) -> TypeAdapter[CleanupRule]:
-        """Return the TypeAdapter used to validate cleanup rule specs."""
+        """Return the TypeAdapter used to validate cleanup rule definitions."""
         return TypeAdapter(CleanupRule)
 
 
@@ -122,7 +122,7 @@ class _SceneCheckRuleCompiler(_RuleCompiler[SceneCheckRule]):
     @classmethod
     @override
     def adapter(cls) -> TypeAdapter[SceneCheckRule]:
-        """Return the TypeAdapter used to validate scene check rule specs."""
+        """Return the TypeAdapter used to validate scene check rule definitions."""
         return TypeAdapter(SceneCheckRule)
 
 
@@ -130,7 +130,7 @@ class _AgentCheckRuleCompiler(_RuleCompiler[AgentCheckRule]):
     @classmethod
     @override
     def adapter(cls) -> TypeAdapter[AgentCheckRule]:
-        """Return the TypeAdapter used to validate agent check rule specs."""
+        """Return the TypeAdapter used to validate agent check rule definitions."""
         return TypeAdapter(AgentCheckRule)
 
 

@@ -6,7 +6,7 @@ Output settings control what is persisted after preprocessing. In practice, this
 
 | Key | Type | Description | Default |
 |---|---|---|---|
-| `schema` | `str` or `table` | Trajectory schema to persist. Use either a predefined schema name or a structured custom schema definition. | `"canonical"` |
+| `schema` | `str` or `table` | Output trajectory schema to persist. Use either a built-in trajectory schema name or a structured custom trajectory schema definition. | `"canonical"` |
 | `precision` | `"float32"` or `"float64"` | Floating-point precision of persisted data. | `"float32"` |
 | `recenter_positions` | `bool` | Offset all agent positions by the scene mean before writing. The offset is stored in the output. | `true` |
 
@@ -41,8 +41,11 @@ size_limit = 33554432
 exist_ok = true
 ```
 
-To use a custom schema instead of a predefined one it is possible to define
-a custom schema using a table. Custom schemas must include the base fields
+The canonical concept is the trajectory schema. The config key remains
+`output.schema` as the concise TOML alias for the output trajectory schema.
+
+To use a custom trajectory schema instead of a built-in one, define it with a
+table. Custom trajectory schemas must include the base fields
 `frame`, `id`, `agent_category`, `x`, and `y`:
 
 ```toml

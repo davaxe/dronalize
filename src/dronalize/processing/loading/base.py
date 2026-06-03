@@ -10,9 +10,9 @@ from typing_extensions import Self, TypeVar
 
 from dronalize.core.typing import SourceT
 from dronalize.processing.loading.models import (
-    DatasetOptionsModel,
     DatasetRunResources,
-    NoDatasetOptions,
+    LoaderOptionsModel,
+    NoLoaderOptions,
 )
 from dronalize.processing.maps import MapResolver, no_map
 
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from dronalize.processing.models import LoaderPlan, ReadSelection
 
 
-_LoaderOptionsT = TypeVar("_LoaderOptionsT", bound=DatasetOptionsModel, default=NoDatasetOptions)
+_LoaderOptionsT = TypeVar("_LoaderOptionsT", bound=LoaderOptionsModel, default=NoLoaderOptions)
 
 
 class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
@@ -51,8 +51,8 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
     - `SourceT` is the type of the raw DatasetSource data used by this loader, such as
       a file path or database query.
     - `_LoaderOptionsT` is the type of the dataset-specific options for this
-      loader, which must be a subclass of `DatasetOptionsModel` and defaults to
-      `NoDatasetOptions` for loaders without dataset-specific options.
+      loader, which must be a subclass of `LoaderOptionsModel` and defaults to
+      `NoLoaderOptions` for loaders without dataset-specific options.
     """
 
     def __init__(
@@ -157,7 +157,7 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         Iterable[LoadedSourceFrame]
             An iterable of loaded DatasetSource records. Each record typically contains
             lazy frame data and may optionally include DatasetSource-level metadata such
-            as map bindings or split annotations.
+            as map references or split annotations.
 
         Notes
         -----
@@ -231,7 +231,7 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         if native_splits is not None:
             for split in native_splits:
                 for source in self.iter_sources_for(split):
-                    yield source.with_predefined_split(split)
+                    yield source.with_source_split(split)
             return
         msg = (
             f"{self.__class__.__name__} does not implement iter_sources()"
@@ -260,15 +260,17 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         _ = self
         return no_map()
 
-    def resolve_map(self, scene: Scene, map_binding: MapReference | None = None) -> MapGraph | None:
+    def resolve_map(
+        self, scene: Scene, map_reference: MapReference | None = None
+    ) -> MapGraph | None:
         """Resolve the map graph associated with a scene.
 
         Parameters
         ----------
         scene : Scene
             The scene for which a map should be resolved.
-        map_binding : MapReference, optional
-            Optional explicit binding information that may be used by custom
+        map_reference : MapReference, optional
+            Optional explicit map reference information that may be used by custom
             implementations to refine map lookup.
 
         Returns
@@ -287,7 +289,7 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         `map_resolver()` depending on whether they need per-call logic or only a
         custom resolver object.
         """
-        _ = map_binding
+        _ = map_reference
         if self.map_config is None:
             return None
         return self.map_resolver()(scene)

@@ -9,6 +9,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from dronalize.datasets.registry import dataset_id_for_name
 from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.encoding.common import encode_scene_record
 from dronalize.runtime.executor import open_execution_session
@@ -126,7 +127,7 @@ def assert_basic_map_sanity(graph: MapGraph | None, *, expect_map: bool) -> None
 
 def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
     assert record.scene_number == scene.scene_number, "scene_number mismatch"
-    assert record.dataset == scene.dataset, "dataset mismatch"
+    assert record.dataset_id == _expected_dataset_id(scene.dataset), "dataset_id mismatch"
 
     _assert_shape(record.position_offset, (2,), "position_offset")
     _assert_finite(record.position_offset, "position_offset")
@@ -177,10 +178,16 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
         assert not has_record_map, "encoded map payload present for scene without map"
 
 
+def _expected_dataset_id(dataset: str | None) -> int | None:
+    if dataset is None:
+        return None
+    return dataset_id_for_name(dataset) or 0
+
+
 @dataclass(frozen=True, slots=True)
 class PlanSceneAssertionResult:
     checked_scenes: int
-    selected_scenes: int
+    written_scenes: int
     progress: Progress
 
 
@@ -279,7 +286,7 @@ def assert_plan_scene_outputs(
         1 for _ in (plan.output_dir / ".integration-scene-assertions").glob("*.json")
     )
     return PlanSceneAssertionResult(
-        checked_scenes=checked_scenes, selected_scenes=progress.selected_scenes, progress=progress
+        checked_scenes=checked_scenes, written_scenes=progress.written_scenes, progress=progress
     )
 
 

@@ -50,9 +50,9 @@ output/
 Each `.pkl` file contains one framework-neutral
 [`SceneRecord`](../../reference/api/io/index.md#dronalize.io.SceneRecord).
 
-## Custom samples
+## Custom output transforms
 
-Python integrations can customize what gets pickled by passing `output_sample`
+Python integrations can customize what gets pickled by passing `output_transform`
 to an
 [`ExecutionRequest`](../../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest).
 
@@ -67,19 +67,19 @@ from dataclasses import dataclass
 import numpy as np
 
 from dronalize.io.records import SceneRecord
-from dronalize.runtime import ExecutionRequest, OutputSample, execute_request
+from dronalize.runtime import ExecutionRequest, OutputTransform, execute_request
 
 
 @dataclass(slots=True)
-class TrainingSample:
+class TrainingRecord:
     x: np.ndarray
     y: np.ndarray
     scene_number: int
 
 
-def to_training_sample(record: SceneRecord) -> TrainingSample:
+def to_training_record(record: SceneRecord) -> TrainingRecord:
     observation_length = record.default_observation_length or 10
-    return TrainingSample(
+    return TrainingRecord(
         x=record.features[:, :observation_length],
         y=record.features[:, observation_length:],
         scene_number=record.scene_number,
@@ -91,7 +91,7 @@ request = ExecutionRequest(
     input_dir=input_dir,
     output_dir=output_dir,
     storage_backend="pickle",
-    output_sample=OutputSample(record_transform=to_training_sample),
+    output_transform=OutputTransform(record_transform=to_training_record),
 )
 execute_request(request)
 ```
@@ -113,18 +113,21 @@ reader = PickleReader(Path("output"), split="train")
 record = reader[0]
 
 print(record.scene_number)
-print(record.dataset)
+print(record.dataset_id)
 print(record.features.shape, record.mask.shape)
 ```
 
+Use `read_manifest(Path("output")).dataset_names[record.dataset_id]` to map a
+record dataset id back to the dataset name.
+
 Use `split=None` (default) for unsplit exports.
 
-For custom pickled samples, pass the expected sample type:
+For custom pickled records, pass the expected record type:
 
 <!-- no-validate -->
 ```python
-reader = PickleReader(Path("output"), sample_type=TrainingSample)
-sample = reader[0]
+reader = PickleReader(Path("output"), record_type=TrainingRecord)
+record = reader[0]
 ```
 
 ## Configuration

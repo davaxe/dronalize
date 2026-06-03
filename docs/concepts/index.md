@@ -9,6 +9,7 @@ scenes are built, how screening and splits behave, and how outputs are written.
 
 | Page | Use it for |
 | --- | --- |
+| [Terminology](terminology.md) | Confirm the canonical vocabulary for datasets, scenes, splits, horizons, records, schemas, and maps. |
 | [Architecture](architecture.md) | Understand the runtime flow from dataset lookup to backend writing. |
 | [Configuration model](configuration-model.md) | Learn how dataset defaults, profiles, dataset entries, and runtime overrides combine. |
 | [Datasets](datasets.md) | See what a dataset key means and what a [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor) provides. |

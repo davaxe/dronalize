@@ -1,7 +1,7 @@
 # Screening
 
 <div class="section-intro" markdown="1">
-Screening is the quality control stage of the processing pipeline. It has three main purposes: 1) to remove irrelevant data before validation, 2) to determine which scenes are usable as samples, and 3) to mark which agents satisfy per-agent quality rules. Screening rules are inherited and can be extended or removed in child profiles.
+Screening is the quality control stage of the processing pipeline. It has three main purposes: 1) to remove irrelevant data before validation, 2) to determine which scenes are usable, and 3) to mark which agents satisfy per-agent quality rules. Screening rules are inherited and can be extended or removed in child profiles.
 </div>
 
 For exact syntax and field tables, see the [screening reference](../reference/configuration/screening.md).
@@ -13,7 +13,7 @@ Screening has three rule families:
 | Rule family | Main question | Typical effect |
 | --- | --- | --- |
 | `cleanup` | Should these rows or agents be removed before validation? | Drops data before scene checks run. |
-| `scene` | Is this scene usable as a sample? | Keeps or rejects the whole scene. |
+| `scene` | Is this scene usable? | Keeps or rejects the whole scene. |
 | `agent` | Which agents satisfy per-agent quality rules? | Marks agents as passed or failed, with optional scene-level aggregate thresholds. |
 
 They run in that order.
@@ -32,12 +32,12 @@ categories = ["STATIC_OBJECT", "UNIMPORTANT"]
 rule = "agent_range"
 minimum = 2
 
-[datasets.a43.screening.agent.sample_floor]
-rule = "min_samples"
+[datasets.a43.screening.agent.observation_floor]
+rule = "min_observations"
 minimum = 8
 ```
 
-The rule names here are `trim_static`, `min_context`, and `sample_floor`.
+The rule names here are `trim_static`, `min_context`, and `observation_floor`.
 
 ## When to use each rule family
 
@@ -49,7 +49,7 @@ Examples:
 - prune obviously invalid tracks before the scene is judged
 - keep only a deliberate set of categories
 
-Use `scene` when the requirement is about the sample as a whole.
+Use `scene` when the requirement is about the scene as a whole.
 
 Examples:
 
@@ -61,7 +61,7 @@ Use `agent` when some agents may be weak but the scene can still be useful.
 
 Examples:
 
-- require a minimum number of samples per selected agent
+- require a minimum number of observations per selected agent
 - limit gaps for pedestrians only
 - keep the scene, but mark which agents passed the quality bar
 
@@ -151,7 +151,7 @@ Start with these three profiles:
 
 ```toml
 [profiles.base.screening.agent.min_obs]
-rule = "min_samples"
+rule = "min_observations"
 minimum = 4
 
 [profiles.base.screening.scene.min_context]
@@ -162,7 +162,7 @@ minimum = 2
 mode = "extend"
 
 [profiles.strict.screening.agent.min_obs]
-rule = "min_samples"
+rule = "min_observations"
 minimum = 8
 
 [profiles.strict.screening.agent.anchor_present]

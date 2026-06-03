@@ -132,7 +132,7 @@ def test_execute_collect_drops_empty_frames() -> None:
 
 
 @pytest.mark.parametrize("spec", _all_methods_spec(up=2, down=1, sample_time=1.0))
-def test_resample_straight_track_matches_samples(spec: ResampleSpec) -> None:
+def test_resample_straight_track_matches_observations(spec: ResampleSpec) -> None:
     df = _straight_track([0, 1, 2])
     df_resampled = (
         resample(spec)(df.lazy())

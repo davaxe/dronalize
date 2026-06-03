@@ -16,7 +16,7 @@ This package is the main home for scene-facing domain types:
   shape and fields
 - built-in schema constants such as [`CANONICAL`][dronalize.core.scene.CANONICAL]
   and [`POSITIONS_ONLY`][dronalize.core.scene.POSITIONS_ONLY] provide
-  stable predefined schema variants
+  stable built-in schema variants
 - helper functions expose registered schemas and resolve schema-like inputs
 
 The symbols exported here are intended to be imported directly by code that

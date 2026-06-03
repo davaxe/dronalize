@@ -55,7 +55,7 @@ class DerivationRule:
     apply: DerivationApply
     """Function that applies the rule to a dataframe."""
     needs_sample_time: bool = False
-    """Flag to indicate if the rule requires sample time."""
+    """Flag to indicate if the rule requires `sample_time`."""
 
 
 def apply_derivation_plan(

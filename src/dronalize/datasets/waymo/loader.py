@@ -60,7 +60,7 @@ class WaymoLoader(SceneLoader):
             scenario = lean_scenario_pb2.LeanScenario.FromString(raw_data)
             yield LoadedSourceFrame(
                 frame=_scenario_to_polars(scenario).lazy().with_columns(pl.col("id").add(1)),
-                map_binding=MapReference(
+                map_reference=MapReference(
                     map_key=f"{source.identifier}:{scenario_index}",
                     map_payload=raw_data if self.map_config is not None else None,
                 ),
@@ -72,12 +72,14 @@ class WaymoLoader(SceneLoader):
         return POSITIONS_VELOCITY_YAW
 
     @override
-    def resolve_map(self, scene: Scene, map_binding: MapReference | None = None) -> MapGraph | None:
-        if map_binding is None or self.map_config is None:
+    def resolve_map(
+        self, scene: Scene, map_reference: MapReference | None = None
+    ) -> MapGraph | None:
+        if map_reference is None or self.map_config is None:
             return None
-        if map_binding.map_payload is None:
+        if map_reference.map_payload is None:
             return None
-        map_data = lean_map_pb2.LeanMapContainer.FromString(map_binding.map_payload)
+        map_data = lean_map_pb2.LeanMapContainer.FromString(map_reference.map_payload)
         map_config = self.map_config
         map_graph = WaymoMapBuilder.from_proto(map_data.map_features).build(
             min_distance=map_config.min_distance,

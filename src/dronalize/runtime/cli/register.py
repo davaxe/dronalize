@@ -46,10 +46,10 @@ def register_custom_datasets(dataset_modules: list[str] | None) -> None:
         if hook is None:
             continue
 
-        specs = _call_dataset_register_hook(hook, module_name)
+        descriptors = _call_dataset_register_hook(hook, module_name)
 
-        for spec in _normalize_dataset_descriptors(specs, module_name):
-            register_dataset(spec)
+        for descriptor in _normalize_dataset_descriptors(descriptors, module_name):
+            register_dataset(descriptor)
 
 
 def _import_dataset_module(module_name: str) -> ModuleType:
@@ -97,32 +97,32 @@ def _call_dataset_register_hook(
 
 
 def _normalize_dataset_descriptors(
-    specs: DatasetDescriptor | Iterable[DatasetDescriptor | object] | None, module_name: str
+    descriptors: DatasetDescriptor | Iterable[DatasetDescriptor | object] | None, module_name: str
 ) -> Iterable[DatasetDescriptor]:
-    if specs is None:
+    if descriptors is None:
         return ()
 
-    if isinstance(specs, DatasetDescriptor):
-        return (specs,)
+    if isinstance(descriptors, DatasetDescriptor):
+        return (descriptors,)
 
     try:
-        iterator: Iterator[DatasetDescriptor | object] = iter(specs)
+        iterator: Iterator[DatasetDescriptor | object] = iter(descriptors)
     except TypeError as exc:
         msg = (
             f"Dataset module '{module_name}' returned unsupported value from {_REGISTER_HOOK_NAME}."
         )
         raise cli_usage_error(msg) from exc
 
-    normalized_specs: list[DatasetDescriptor] = []
+    normalized_descriptors: list[DatasetDescriptor] = []
 
-    for spec in iterator:
-        if not isinstance(spec, DatasetDescriptor):
+    for descriptor in iterator:
+        if not isinstance(descriptor, DatasetDescriptor):
             msg = (
                 f"Dataset module '{module_name}' returned "
-                f"{type(spec).__name__}, expected DatasetDescriptor."
+                f"{type(descriptor).__name__}, expected DatasetDescriptor."
             )
             raise cli_usage_error(msg)
 
-        normalized_specs.append(spec)
+        normalized_descriptors.append(descriptor)
 
-    return normalized_specs
+    return normalized_descriptors

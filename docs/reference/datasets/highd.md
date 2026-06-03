@@ -10,7 +10,7 @@ highD is a widely used naturalistic highway trajectory dataset collected from dr
   <div class="summary-item"><span>Primary agents</span><strong>Vehicles</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>Limited</strong></div>
-  <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
+  <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
 ## Default processing profile
@@ -25,7 +25,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Source bounds | 9729-31274 frames (observed) |
 | Resampling | 2:5 (linear) |
 | Sliding windows | Enabled, strict, step 25 |
-| Screening | Prune agents with fewer than 2 samples |
+| Screening | Prune agents with fewer than 2 observations |
 | Lane-change sampling | Require 3 lane changes; keep 1 in 3 negatives |
 | Maps | Full map |
 

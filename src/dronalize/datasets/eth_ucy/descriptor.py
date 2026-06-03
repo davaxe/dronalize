@@ -4,7 +4,7 @@ from dronalize.datasets.eth_ucy.loader import EthUcyLoader
 from dronalize.datasets.registry import DatasetDescriptor, DatasetSplitSupport
 from dronalize.datasets.shared.presets import (
     linear_resample,
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -18,18 +18,17 @@ _DEFAULT_CONFIG = DatasetConfig(
         window_step=1,
         resample=linear_resample(up=4),
     ),
-    screening=minimum_samples_screening(2, required_frame=7),
+    screening=minimum_observations_screening(2, required_frame=7),
 )
 
 
 def _descriptor(name: str) -> DatasetDescriptor:
     bounds = {
-        "eth_ucy": (89, 1807),
-        "eth": (89, 1440),
-        "hotel": (89, 1807),
-        "univ": (148, 1440),
-        "zara1": (89, 1440),
-        "zara2": (89, 1440),
+        "eth": (89, 934),
+        "hotel": (89, 1168),
+        "univ": (148, 934),
+        "zara1": (89, 934),
+        "zara2": (89, 1052),
     }
     min_frames, max_frames = bounds[name]
     return DatasetDescriptor(
@@ -49,5 +48,5 @@ def _descriptor(name: str) -> DatasetDescriptor:
 
 
 DATASET_DESCRIPTORS = {
-    name: _descriptor(name) for name in ("eth_ucy", "eth", "hotel", "univ", "zara1", "zara2")
+    name: _descriptor(name) for name in ("eth", "hotel", "univ", "zara1", "zara2")
 }

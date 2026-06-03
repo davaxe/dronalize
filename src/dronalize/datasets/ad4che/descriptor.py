@@ -8,7 +8,7 @@ from dronalize.datasets.registry import (
 from dronalize.datasets.shared.presets import (
     lane_change_sampling,
     linear_resample,
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -26,7 +26,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
             lane_change=lane_change_sampling(required_lane_changes=5, negative_keep_every=3),
         ),
         map=MapConfig(extraction=FullMapExtraction(), interpolation_distance=8),
-        screening=minimum_samples_screening(6, required_frame=60),
+        screening=minimum_observations_screening(6, required_frame=60),
     ),
     native_schema=AD4CHELoader.native_trajectory_schema(),
     split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),

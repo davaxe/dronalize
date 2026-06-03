@@ -54,8 +54,8 @@ class SceneRecord:
     """Scene identifier within the exported dataset."""
     position_offset: npt.NDArray[np.float64]
     """Global 2D translation offset with shape `(2,)`."""
-    dataset: str | None = None
-    """Dataset label associated with this record, if known."""
+    dataset_id: int | None = None
+    """Integer dataset identifier associated with this record, if known."""
     default_observation_length: int | None = None
     """Default split point for reader/adaptor convenience, if known."""
 
@@ -106,8 +106,8 @@ class SplitSceneRecord:
     map_edge_types: npt.NDArray[np.int32]
     """Integer-encoded map edge types, shape `(E,)`."""
 
-    dataset: str | None = None
-    """Dataset label associated with this record, if known."""
+    dataset_id: int | None = None
+    """Integer dataset identifier associated with this record, if known."""
     default_observation_length: int | None = None
     """Default split point associated with this record, if known."""
 
@@ -138,7 +138,7 @@ def make_scene_record(
     map_edge_indices: npt.NDArray[np.int32],
     map_node_types: npt.NDArray[np.int32],
     map_edge_types: npt.NDArray[np.int32],
-    dataset: str | None = None,
+    dataset_id: int | None = None,
     default_observation_length: int | None = None,
 ) -> SceneRecord:
     """Construct one canonical full-horizon `SceneRecord`."""
@@ -153,7 +153,7 @@ def make_scene_record(
         map_edge_indices=map_edge_indices,
         map_node_types=map_node_types,
         map_edge_types=map_edge_types,
-        dataset=dataset,
+        dataset_id=dataset_id,
         default_observation_length=default_observation_length,
     )
 
@@ -172,7 +172,7 @@ def make_split_scene_record(
     map_edge_indices: npt.NDArray[np.int32],
     map_node_types: npt.NDArray[np.int32],
     map_edge_types: npt.NDArray[np.int32],
-    dataset: str | None = None,
+    dataset_id: int | None = None,
     default_observation_length: int | None = None,
 ) -> SplitSceneRecord:
     """Construct one split convenience record."""
@@ -189,7 +189,7 @@ def make_split_scene_record(
         map_edge_indices=map_edge_indices,
         map_node_types=map_node_types,
         map_edge_types=map_edge_types,
-        dataset=dataset,
+        dataset_id=dataset_id,
         default_observation_length=default_observation_length,
     )
 
@@ -217,7 +217,7 @@ def split_scene_record(record: SceneRecord, *, observation_length: int) -> Split
         map_edge_indices=record.map_edge_indices,
         map_node_types=record.map_node_types,
         map_edge_types=record.map_edge_types,
-        dataset=record.dataset,
+        dataset_id=record.dataset_id,
         default_observation_length=record.default_observation_length,
     )
 
@@ -235,6 +235,6 @@ def join_split_scene_record(record: SplitSceneRecord) -> SceneRecord:
         map_edge_indices=record.map_edge_indices,
         map_node_types=record.map_node_types,
         map_edge_types=record.map_edge_types,
-        dataset=record.dataset,
+        dataset_id=record.dataset_id,
         default_observation_length=record.default_observation_length,
     )

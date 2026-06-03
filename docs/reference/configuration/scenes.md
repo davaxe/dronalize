@@ -6,8 +6,8 @@ The scenes config describes how raw trajectory data becomes model-ready scenes. 
 
 | Key | Type | Description | Default |
 |---|---|---|---|
-| `horizon_frames` | `int` | Number of frames per persisted scene horizon before resampling. | `dataset default` |
-| `default_observation_length` | `int` or omitted | Optional default split point for reader/adaptor convenience. | `dataset default` |
+| `horizon_frames` | `int` | Configured scene-window length before optional resampling. | `dataset default` |
+| `default_observation_length` | `int` or omitted | Optional default observation length for reader/adaptor convenience. | `dataset default` |
 | `sample_time` | `float` | Time between frames before resampling. | `dataset default` |
 | `window` | `table` or `false` | Sliding-window extraction settings. Use `false` to disable an inherited window block. | `inherited` |
 | `resample` | `table` or `false` | Temporal resampling and interpolation settings. Use `false` to disable an inherited resample block. | `inherited` |
@@ -34,7 +34,7 @@ sample_time = 0.1
 That defines one scene window as:
 
 - `80` total frames
-- a default online split after frame `20`
+- a default observation/prediction split after frame `20`
 - sampled at `0.1` seconds per frame
 
 ## `[scenes.window]` section
@@ -85,7 +85,7 @@ Use resampling when data should be interpolated to a different temporal resoluti
 
 !!! "Specifying coordinates"
   The coordinate keys must match the position column names in the source dataset. For example, if the dataset uses `x1` and `x2` for positions instead of `x` and `y`, those keys should be specified here.
-  Usually, it is preferred to use the standard `x` and `y` column names for positions, but this option allows resampling to work with datasets that use different naming conventions without requiring a custom dataset spec.
+  Usually, it is preferred to use the standard `x` and `y` column names for positions, but this option allows resampling to work with datasets that use different naming conventions without requiring a custom dataset integration.
 
 Example:
 

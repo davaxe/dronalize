@@ -17,11 +17,7 @@ from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
-from dronalize.processing.loading.models import (
-    DatasetOptionsModel,
-    DatasetSource,
-    LoadedSourceFrame,
-)
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, LoaderOptionsModel
 from dronalize.processing.maps import no_map, shared_map
 
 if TYPE_CHECKING:
@@ -39,7 +35,7 @@ if TYPE_CHECKING:
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL)
 
 
-class LyftLoaderOptions(DatasetOptionsModel):
+class LyftLoaderOptions(LoaderOptionsModel):
     """Dataset-owned config for the Lyft loader."""
 
     scene_batch_size: int = Field(default=100, ge=1)

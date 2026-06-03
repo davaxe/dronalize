@@ -24,10 +24,10 @@ if TYPE_CHECKING:
     import polars as pl
 
     from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import TrajectorySchema
+    from dronalize.core.scene import MapKey, TrajectorySchema
     from dronalize.processing.loading.base import SceneLoader
-    from dronalize.processing.loading.models import DatasetOptionsModel
-    from dronalize.processing.maps import MapKey, MapResolver
+    from dronalize.processing.loading.models import LoaderOptionsModel
+    from dronalize.processing.maps import MapResolver
     from dronalize.processing.pipeline.pipeline import Pipeline
     from dronalize.runtime.types import ExecutionPlan
 
@@ -48,7 +48,7 @@ class SceneCandidate:
     stable_identifier: SceneIdentifier
     frame: pl.DataFrame
     passes_screening: bool
-    map_binding: MapReference = field(default_factory=MapReference)
+    map_reference: MapReference = field(default_factory=MapReference)
     passed_agent_ids: frozenset[int] | None = None
     split_assignment: DatasetSplit | None = None
 
@@ -57,12 +57,12 @@ class SceneCandidate:
 class DeferredMapResolver:
     """Picklable scene map resolver for deferred map materialization."""
 
-    loader: SceneLoader[Any, DatasetOptionsModel]
-    map_binding: MapReference | None = None
+    loader: SceneLoader[Any, LoaderOptionsModel]
+    map_reference: MapReference | None = None
 
     def __call__(self, scene: Scene) -> MapGraph | None:
         """Resolve the map for the given scene."""
-        return self.loader.resolve_map(scene, self.map_binding)
+        return self.loader.resolve_map(scene, self.map_reference)
 
 
 class SplitAssigner:
@@ -92,7 +92,7 @@ class SplitAssigner:
             case "source":
                 return self._resolve_source_split(source)
             case "preserve-native":
-                return source.predefined_split
+                return source.source_split
             case _:
                 return None
 
@@ -131,7 +131,7 @@ class RuntimeProcessor:
     """Own the full runtime DatasetSource-to-scene processing flow for one plan."""
 
     dataset: str
-    loader: SceneLoader[Any, DatasetOptionsModel]
+    loader: SceneLoader[Any, LoaderOptionsModel]
     source_schema: TrajectorySchema
     target_schema: TrajectorySchema
     horizon_frames: int
@@ -141,7 +141,7 @@ class RuntimeProcessor:
 
     @classmethod
     def from_plan(
-        cls, plan: ExecutionPlan, loader: SceneLoader[Any, DatasetOptionsModel]
+        cls, plan: ExecutionPlan, loader: SceneLoader[Any, LoaderOptionsModel]
     ) -> RuntimeProcessor:
         """Create processor from execution plan and scene loader."""
         return cls(
@@ -196,7 +196,7 @@ class RuntimeProcessor:
                     stable_identifier=stable_identifier,
                     frame=frame,
                     passes_screening=passes_screening,
-                    map_binding=data.map_binding,
+                    map_reference=data.map_reference,
                     passed_agent_ids=passed_agent_ids,
                     split_assignment=split_assignment,
                 )
@@ -243,17 +243,17 @@ class RuntimeProcessor:
         if self.loader.map_config is None:
             return None, None
 
-        map_key = candidate.map_binding.map_key or candidate.source.map_key
-        return map_key, DeferredMapResolver(self.loader, candidate.map_binding)
+        map_key = candidate.map_reference.map_key or candidate.source.map_key
+        return map_key, DeferredMapResolver(self.loader, candidate.map_reference)
 
     @staticmethod
     def _effective_source(
         source: DatasetSource[Any], data: LoadedSourceFrame
     ) -> DatasetSource[Any]:
-        if data.predefined_split is None:
+        if data.source_split is None:
             return source
 
-        return source.with_predefined_split(data.predefined_split)
+        return source.with_source_split(data.source_split)
 
     @staticmethod
     def _extract_scene_pass(frame: pl.DataFrame) -> tuple[bool, pl.DataFrame]:
