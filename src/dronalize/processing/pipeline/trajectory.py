@@ -261,7 +261,7 @@ def _build_lane_change_post_screening_stage(state: _TrajectoryPipelineState) -> 
             .alias(_SCENE_LANE_CHANGE_COUNT_COLUMN)
         )
 
-    def _sample_scenes(df: pl.LazyFrame) -> pl.LazyFrame:
+    def _select_scenes(df: pl.LazyFrame) -> pl.LazyFrame:
         is_positive = (
             pl.col(_SCENE_LANE_CHANGE_COUNT_COLUMN).fill_null(value=0)
             >= config.required_lane_changes
@@ -274,7 +274,7 @@ def _build_lane_change_post_screening_stage(state: _TrajectoryPipelineState) -> 
     return (
         Pipeline()
         .then(_label_scenes, name="label_lane_change_scenes")
-        .then(_sample_scenes, name="sample_lane_change_scenes")
+        .then(_select_scenes, name="select_lane_change_scenes")
     )
 
 

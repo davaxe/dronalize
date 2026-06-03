@@ -243,7 +243,7 @@ For example to prune short car tracks before screening:
 ```toml
 [datasets.a43.screening.cleanup.prune_short_tracks]
 rule = "prune_by"
-agent_rule = { rule = "min_samples", minimum = 8, selector = { mode = "include", categories = ["CAR"] } }
+agent_rule = { rule = "min_observations", minimum = 8, selector = { mode = "include", categories = ["CAR"] } }
 ```
 
 or with a nested table for the agent rule:
@@ -253,7 +253,7 @@ or with a nested table for the agent rule:
 rule = "prune_by"
 
 [datasets.a43.screening.cleanup.prune_short_tracks.agent_rule]
-rule = "min_samples"
+rule = "min_observations"
 minimum = 8
 
 [datasets.a43.screening.cleanup.prune_short_tracks.agent_rule.selector]
@@ -355,11 +355,11 @@ All agent rules may optionally define:
 | `selector` | `table` | Optional category selector. | `none` |
 | `tolerance` | `table` | Optional scene-level tolerance for invalid agents. | `none` |
 
-### `rule = "min_samples"`
+### `rule = "min_observations"`
 
 | Key | Type | Description | Default |
 |---|---|---|---|
-| `rule` | `"min_samples"` | Require a minimum number of samples per agent. | `required` |
+| `rule` | `"min_observations"` | Require a minimum number of observations per agent. | `required` |
 | `minimum` | `int` | Minimum number of rows per agent. | `required` |
 | `selector` | `table` | Optional category selector. | `none` |
 | `tolerance` | `table` | Optional scene-level tolerance for invalid agents. | `none` |
@@ -452,7 +452,7 @@ frames = [19]
 tolerance = { absolute = 1, relative = 0.05 }
 selector = { mode = "include", categories = ["CAR"] }
 
-[datasets.a43.screening.agent.sample_floor]
-rule = "min_samples"
+[datasets.a43.screening.agent.observation_floor]
+rule = "min_observations"
 minimum = 8
 ```

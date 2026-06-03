@@ -110,7 +110,7 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
             extra={
                 "dataset": plan.dataset,
                 "processed_sources": progress.processed_sources,
-                "selected_scenes": progress.selected_scenes,
+                "written_scenes": progress.written_scenes,
             },
         )
         return ExecutionResult(
@@ -119,7 +119,7 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
             storage_backend=plan.storage_backend,
             processed_sources=progress.processed_sources,
             candidate_scenes=progress.candidate_scenes,
-            selected_scenes=progress.selected_scenes,
+            written_scenes=progress.written_scenes,
             split_counts={k: v for k, v in progress.split_counts.items() if isinstance(v, int)},
             elapsed_time_seconds=time.time() - start_time,
         )

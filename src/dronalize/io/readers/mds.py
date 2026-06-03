@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, overload
 from typing_extensions import TypedDict, Unpack, override
 
 from dronalize.core.optional import raise_missing_optional_dependency
-from dronalize.io.base import DatasetReader, IterableDatasetReader, SampleT, split_directory_name
-from dronalize.io.encoding.mds import decode_mds_sample
+from dronalize.io.base import DatasetReader, IterableDatasetReader, RecordT, split_directory_name
+from dronalize.io.encoding.mds import decode_mds_row
 
 try:
     from streaming import Stream, StreamingDataset
@@ -53,7 +53,7 @@ class MDSReaderInitArgs(TypedDict, total=False):
     stream_config: dict[str, Any]
 
 
-class MDSReader(IterableDatasetReader[SampleT], DatasetReader[SampleT]):
+class MDSReader(IterableDatasetReader[RecordT], DatasetReader[RecordT]):
     """Read raw scene records from an MDS dataset split.
 
     Parameters
@@ -67,10 +67,10 @@ class MDSReader(IterableDatasetReader[SampleT], DatasetReader[SampleT]):
     streams : Sequence[Stream], optional
         Pre-configured MDS `Stream` objects to read from. If not provided, the
         path and split arguments will be used to construct a `StreamingDataset`.
-    convert_raw : Callable[[dict[str, Any]], SampleT], optional
-        Function to convert raw MDS sample payloads into the desired output
+    convert_raw : Callable[[dict[str, Any]], RecordT], optional
+        Function to convert raw MDS rows into the desired output
         format. Only useful when customizing the output format; by default, this
-        decodes raw MDS samples into `SceneRecord` objects using the standard
+        decodes raw MDS rows into `SceneRecord` objects using the standard
         Dronalize MDS encoding scheme.
     reader_args : MDSReaderInitArgs, optional
         Additional keyword arguments forwarded to the `StreamingDataset`
@@ -83,11 +83,11 @@ class MDSReader(IterableDatasetReader[SampleT], DatasetReader[SampleT]):
         path: Path | None = None,
         split: DatasetSplit | str | None = None,
         streams: Sequence[Stream] | None = None,
-        convert_raw: Callable[[Mapping[str, Any]], SampleT] = decode_mds_sample,
+        convert_raw: Callable[[Mapping[str, Any]], RecordT] = decode_mds_row,
         **reader_args: Unpack[MDSReaderInitArgs],
     ) -> None:
         super().__init__()
-        self._convert_record: Callable[[Mapping[str, Any]], SampleT] = convert_raw
+        self._convert_record: Callable[[Mapping[str, Any]], RecordT] = convert_raw
         if path is None and streams is None:
             msg = "Either `path` or `streams` must be provided."
             raise ValueError(msg)
@@ -104,19 +104,19 @@ class MDSReader(IterableDatasetReader[SampleT], DatasetReader[SampleT]):
         return len(self._backend)
 
     @override
-    def __iter__(self) -> Iterator[SampleT]:
+    def __iter__(self) -> Iterator[RecordT]:
         yield from (self._convert_record(record) for record in self._backend)
 
     @overload
-    def __getitem__(self, at: int) -> SampleT: ...
+    def __getitem__(self, at: int) -> RecordT: ...
 
     @overload
-    def __getitem__(self, at: list[int] | npt.NDArray[np.int64] | slice) -> list[SampleT]: ...
+    def __getitem__(self, at: list[int] | npt.NDArray[np.int64] | slice) -> list[RecordT]: ...
 
     @override
     def __getitem__(
         self, at: int | slice | list[int] | npt.NDArray[np.int64]
-    ) -> SampleT | list[SampleT]:
+    ) -> RecordT | list[RecordT]:
         """Return one or more decoded scene records.
 
         This will implicitly raise error if the specified index or indices are
@@ -129,7 +129,7 @@ class MDSReader(IterableDatasetReader[SampleT], DatasetReader[SampleT]):
 
         Returns
         -------
-        SampleT or list of SampleT
+        RecordT or list of RecordT
             The decoded scene record(s) at the specified index or indices.
 
         """

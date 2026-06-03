@@ -19,6 +19,7 @@ from dronalize.core.maps import MapGraph
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
+    from dronalize.core.scene import MapKey
     from dronalize.core.scene.model import Scene
 
 
@@ -165,19 +166,19 @@ class MapGraphCompiler:
         edge_types = _normalize_edge_types(
             feature.edge_types, len(points) - 1 + int(feature.closed)
         )
-        sampled_points, sampled_edge_types = _sample_path(
+        retained_points, retained_edge_types = _filter_path_points(
             points=points,
             edge_types=edge_types,
             closed=feature.closed,
             min_distance=self.options.min_distance,
         )
-        if not sampled_points:
+        if not retained_points:
             return
 
-        first_node = self._add_node(*sampled_points[0])
+        first_node = self._add_node(*retained_points[0])
         prev_node = first_node
-        prev_point = sampled_points[0]
-        for segment_index, dst_point in enumerate(sampled_points[1:]):
+        prev_point = retained_points[0]
+        for segment_index, dst_point in enumerate(retained_points[1:]):
             dst_node = self._add_node(*dst_point)
             self._add_interpolated_edge(
                 src_id=prev_node,
@@ -185,20 +186,20 @@ class MapGraphCompiler:
                 dst_id=dst_node,
                 dst_point=dst_point,
                 interpolation_distance=self.options.interpolation_distance,
-                edge_type=sampled_edge_types[segment_index],
+                edge_type=retained_edge_types[segment_index],
             )
             prev_node = dst_node
             prev_point = dst_point
 
         end_node = prev_node
-        if feature.closed and len(sampled_points) > 1:
+        if feature.closed and len(retained_points) > 1:
             self._add_interpolated_edge(
                 src_id=prev_node,
                 src_point=prev_point,
                 dst_id=first_node,
-                dst_point=sampled_points[0],
+                dst_point=retained_points[0],
                 interpolation_distance=self.options.interpolation_distance,
-                edge_type=sampled_edge_types[-1],
+                edge_type=retained_edge_types[-1],
             )
 
         if feature.key is not None:
@@ -261,20 +262,20 @@ def _normalize_edge_types(
     return normalized
 
 
-def _sample_path(
+def _filter_path_points(
     *, points: list[Point], edge_types: list[EdgeType], closed: bool, min_distance: float
 ) -> tuple[list[Point], list[EdgeType]]:
     if len(points) < 2:
         return points[:1], []
 
     if min_distance <= 0.0:
-        sampled_points = list(points)
-        sampled_edge_types = list(edge_types)
-        return sampled_points, sampled_edge_types
+        retained_points = list(points)
+        retained_edge_types = list(edge_types)
+        return retained_points, retained_edge_types
 
     min_dist_sq = min_distance**2
-    sampled_points = [points[0]]
-    sampled_edge_types: list[EdgeType] = []
+    retained_points = [points[0]]
+    retained_edge_types: list[EdgeType] = []
     prev_point = points[0]
 
     i, j = 0, 1
@@ -284,16 +285,16 @@ def _sample_path(
             j += 1
             continue
 
-        sampled_points.append(dst_point)
-        sampled_edge_types.append(edge_types[i])
+        retained_points.append(dst_point)
+        retained_edge_types.append(edge_types[i])
         prev_point = dst_point
         i = j
         j = i + 1
 
-    if closed and len(sampled_points) > 1:
-        sampled_edge_types.append(edge_types[-1])
+    if closed and len(retained_points) > 1:
+        retained_edge_types.append(edge_types[-1])
 
-    return sampled_points, sampled_edge_types
+    return retained_points, retained_edge_types
 
 
 def _distance_sq(src: Point, dst: Point) -> float:
@@ -361,13 +362,6 @@ def build_map(
     compiler = MapGraphCompiler(options)
     return compiler.compile(source.iter_features())
 
-
-MapKey = str | None
-"""Stable identifier for a map associated with a scene or source.
-
-This alias mirrors [`dronalize.core.scene.MapKey`][] so runtime map helpers can
-depend on the processing package without importing higher-level scene APIs.
-"""
 
 MapResolver = Callable[["Scene"], MapGraph | None]
 """Callable signature for lazily resolving a map graph for a scene.

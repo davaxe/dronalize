@@ -83,7 +83,7 @@ roots are:
 
 The reference pages describe the file format only, but the values are resolved in layers:
 
-1. Dataset spec defaults
+1. Dataset descriptor defaults
 2. `[defaults]`, including inherited profiles in declared order
 3. `[datasets.<dataset-name>]`, including inherited profiles in declared order
 4. runtime overrides (very limited set of fields that can be overridden at runtime)
@@ -121,7 +121,7 @@ The `Default` column uses a few different notations:
 | Default notation | Meaning |
 | --- | --- |
 | A literal value such as `"float32"`, `0`, or `true` | The code supplies that concrete default directly. |
-| `dataset default` | The value comes from the dataset spec's built-in loader config. Different datasets may start with different values. |
+| `dataset default` | The value comes from the dataset descriptor's built-in loader config. Different datasets may start with different values. |
 | `inherited` | The value comes from the already-resolved parent runtime config. This is common for nested blocks that merge into existing defaults. |
 | `required` | You must provide the key when that table or mode is used. |
 | `required for ...` | The key is only mandatory in specific modes or shapes. |

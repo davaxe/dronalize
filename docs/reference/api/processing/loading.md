@@ -6,9 +6,9 @@
 
 ## ::: dronalize.processing.loading.SceneLoader
 
-## ::: dronalize.processing.loading.DatasetOptionsModel
+## ::: dronalize.processing.loading.LoaderOptionsModel
 
-## ::: dronalize.processing.loading.NoDatasetOptions
+## ::: dronalize.processing.loading.NoLoaderOptions
 
 ## ::: dronalize.processing.loading.DatasetRunResources
 

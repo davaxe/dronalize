@@ -57,14 +57,18 @@ class DatasetManifest:
     has_map: bool
     """Whether records may contain map topology arrays."""
     sample_time: float
-    """Output sample interval in seconds after resampling."""
+    """Output `sample_time` interval in seconds after resampling."""
     original_sample_time: float
-    """Dataset sample interval in seconds before resampling."""
+    """Dataset `sample_time` interval in seconds before resampling."""
     format_version: int = FORMAT_VERSION
     """Manifest schema version used for compatibility checks."""
+    dataset_names: tuple[str, ...] = ()
+    """Dataset names indexed by the integer dataset ids stored in records."""
 
     def __post_init__(self) -> None:
         """Validate temporal manifest fields."""
+        if not self.dataset_names:
+            object.__setattr__(self, "dataset_names", (self.dataset,))
         if self.horizon_frames <= 0:
             msg = f"`horizon_frames` must be positive, but got {self.horizon_frames}."
             raise ValueError(msg)
@@ -112,6 +116,7 @@ class DatasetManifest:
             has_map=bool(payload["has_map"]),
             sample_time=float(payload["sample_time"]),
             original_sample_time=float(payload["original_sample_time"]),
+            dataset_names=tuple(payload.get("dataset_names", (payload["dataset"],))),
         )
 
 

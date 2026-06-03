@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from dronalize.io.base import DatasetReader, SampleT, split_directory_name
+from dronalize.io.base import DatasetReader, RecordT, split_directory_name
 from dronalize.io.records import SceneRecord
 
 if TYPE_CHECKING:
@@ -16,16 +16,16 @@ if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
 
 
-class PickleReader(DatasetReader[SampleT]):
+class PickleReader(DatasetReader[RecordT]):
     """Read `SceneRecord` objects written by the pickle backend."""
 
     def __init__(
         self,
         path: Path,
         split: DatasetSplit | str | None = None,
-        sample_type: type[SampleT] = SceneRecord,
+        record_type: type[RecordT] = SceneRecord,
     ) -> None:
-        self._sample_type: type[SampleT] = sample_type
+        self._record_type: type[RecordT] = record_type
         self._path: Path = path / split_directory_name(split)
         self._files: tuple[Path, ...] = tuple(sorted(self._path.glob("*.pkl")))
 
@@ -34,10 +34,10 @@ class PickleReader(DatasetReader[SampleT]):
         return len(self._files)
 
     @override
-    def __getitem__(self, at: int) -> SampleT:
+    def __getitem__(self, at: int) -> RecordT:
         with self._files[at].open("rb") as file:
             record = pickle.load(file)  # noqa: S301
-        if not isinstance(record, self._sample_type):
+        if not isinstance(record, self._record_type):
             msg = f"Expected pickled SceneRecord, but got {type(record).__name__}."
             raise TypeError(msg)
         return record

@@ -10,7 +10,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -35,7 +35,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     loader_factory=InteractionLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(horizon_frames=40, default_observation_length=10, sample_time=0.1),
-        screening=minimum_samples_screening(2, required_frame=9),
+        screening=minimum_observations_screening(2, required_frame=9),
     ),
     native_schema=InteractionLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),

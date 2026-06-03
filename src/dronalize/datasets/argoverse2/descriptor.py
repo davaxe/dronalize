@@ -7,7 +7,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -19,7 +19,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     loader_factory=Argoverse2Loader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(horizon_frames=110, default_observation_length=50, sample_time=0.1),
-        screening=minimum_samples_screening(2, required_frame=49),
+        screening=minimum_observations_screening(2, required_frame=49),
         map=MapConfig(extraction=FullMapExtraction()),
         loader_options=Argoverse2LoaderOptions().model_dump(),
     ),

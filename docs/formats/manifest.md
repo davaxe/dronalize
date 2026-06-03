@@ -33,6 +33,7 @@ Current manifests use `format_version = 2`.
 | Field | Type | Description |
 | --- | --- | --- |
 | `dataset` | `str` | Name of the dataset. |
+| `dataset_names` | `list[str]` | Dataset names indexed by the integer `dataset_id` stored in scene records. |
 | `storage_backend` | `str` | Storage backend used to write scene records. |
 | `dronalize_version` | `str` | Package version that produced the export. |
 | `format_version` | `int` | Manifest format version used for compatibility checks. |
@@ -47,8 +48,8 @@ Current manifests use `format_version = 2`.
 | `precision` | `str` | Floating-point precision used for persisted features (`"float32"` or `"float64"`). |
 | `recenter_positions` | `bool` | Whether per-scene position recentering was applied. |
 | `has_map` | `bool` | Whether the run requested map output and records may contain map topology arrays. |
-| `sample_time` | `float` | Effective sample interval (seconds) after any resampling. |
-| `original_sample_time` | `float` | Source sample interval (seconds) before resampling. |
+| `sample_time` | `float` | Effective `sample_time` interval (seconds) after any resampling. |
+| `original_sample_time` | `float` | Source `sample_time` interval (seconds) before resampling. |
 
 ## Read it programmatically
 
@@ -63,6 +64,7 @@ print(manifest.trajectory_schema_fields)
 print(manifest.storage_backend)
 print(manifest.feature_columns)
 print(manifest.horizon_frames, manifest.default_observation_length)
+print(manifest.dataset_names)
 ```
 
 See [`read_manifest()`](../reference/api/io/index.md#dronalize.io.read_manifest) for the full reader API.

@@ -370,7 +370,7 @@ class MapConfig(ResolvedConfig):
     """Configuration for map data processing."""
 
     min_distance: float | None = Field(gt=0, default=2)
-    """Minimum spacing allowed between neighboring map samples after simplification."""
+    """Minimum spacing allowed between neighboring map points after simplification."""
     interpolation_distance: float | None = Field(gt=0, default=5.0)
     """Target spacing used when interpolating map geometry."""
     extraction: MapExtraction = Field(default_factory=FullMapExtraction)
@@ -407,7 +407,7 @@ class PartialMapConfig(ConfigPatch[MapConfig]):
     """Patch model for partially overriding :class:`MapConfig`."""
 
     min_distance: float | None = Field(gt=0, default=None)
-    """Replacement minimum spacing for simplified map samples."""
+    """Replacement minimum spacing for simplified map points."""
     interpolation_distance: float | None = Field(gt=0, default=None)
     """Replacement interpolation spacing for map geometry."""
     extraction: MapExtraction | None = Field(default=None)
@@ -450,7 +450,7 @@ class ResampleConfig(ResolvedConfig):
     emit_acceleration: bool = Field(default=False)
     """Whether acceleration derivatives should be emitted during resampling."""
     max_gap: int = Field(default=1, gt=0)
-    """Maximum consecutive missing frames allowed when interpolating samples."""
+    """Maximum consecutive missing frames allowed when interpolating observations."""
 
     @model_validator(mode="after")
     def _validate(self) -> ResampleConfig:
@@ -481,16 +481,16 @@ class PartialResampleConfig(ConfigPatch[ResampleConfig]):
 
 
 class WindowConfig(ResolvedConfig):
-    """Configuration for sliding window sampling of scenes."""
+    """Configuration for sliding-window extraction of scenes."""
 
     step: int = Field(gt=0)
-    """Stride between consecutive sampled windows in frames."""
+    """Stride between consecutive scene windows in frames."""
     policy: WindowPolicy = "strict"
     """Completeness policy for sources that do not fully cover a window."""
 
 
 class PartialWindowConfig(ConfigPatch[WindowConfig]):
-    """Patch model for partially overriding sliding-window sampling settings."""
+    """Patch model for partially overriding sliding-window extraction settings."""
 
     step: int | None = None
     """Replacement stride between consecutive sampled windows in frames."""
@@ -509,9 +509,9 @@ class LaneChangeConfig(ResolvedConfig):
     margin_after: int = Field(default=0, ge=0)
     """Extra context frames to keep after the detected lane change."""
     required_lane_changes: int = Field(default=1, gt=0)
-    """Minimum number of lane changes required for a positive sample."""
+    """Minimum number of lane changes required for a positive scene window."""
     negative_keep_every: int = Field(default=3, ge=1)
-    """Keep one negative sample out of every N candidates."""
+    """Keep one negative scene window out of every N candidates."""
 
 
 class PartialLaneChangeConfig(ConfigPatch[LaneChangeConfig]):
@@ -524,9 +524,9 @@ class PartialLaneChangeConfig(ConfigPatch[LaneChangeConfig]):
     margin_after: int | None = None
     """Replacement context margin after a detected lane change."""
     required_lane_changes: int | None = None
-    """Replacement minimum lane-change count for positive samples."""
+    """Replacement minimum lane-change count for positive scene windows."""
     negative_keep_every: int | None = None
-    """Replacement negative-sample retention interval."""
+    """Replacement negative scene-window retention interval."""
     full_config_type: type[LaneChangeConfig] = Field(
         default=LaneChangeConfig, init=False, repr=False
     )
@@ -640,7 +640,7 @@ def _apply_optional_block(
 
 
 def effective_scene_window(config: ScenesConfig) -> tuple[int, int | None, float]:
-    """Return horizon frames, default observation length, and sample time after resampling."""
+    """Return horizon frames, default observation length, and `sample_time` after resampling."""
     if config.resample is None:
         return config.horizon_frames, config.default_observation_length, config.sample_time
 
@@ -762,12 +762,12 @@ class RequireWindowSpec(_AgentRuleSpecBase):
     """Minimum fraction of frames within the window that must be present."""
 
 
-class MinSamplesSpec(_AgentRuleSpecBase):
-    """Require a minimum number of samples for each selected agent."""
+class MinObservationsSpec(_AgentRuleSpecBase):
+    """Require a minimum number of observations for each selected agent."""
 
-    rule: Literal["min_samples"] = Field("min_samples", repr=False, init=False)
+    rule: Literal["min_observations"] = Field("min_observations", repr=False, init=False)
     minimum: int = Field(ge=1)
-    """Minimum number of samples required for each selected agent."""
+    """Minimum number of observations required for each selected agent."""
 
 
 class MaxMissingFramesSpec(_AgentRuleSpecBase):
@@ -823,7 +823,7 @@ class MinSpanSpec(_AgentRuleSpecBase):
 AgentCheckSpec = Annotated[
     RequireFramesSpec
     | RequireWindowSpec
-    | MinSamplesSpec
+    | MinObservationsSpec
     | MaxMissingFramesSpec
     | MaxGapSpec
     | MinConsecutiveFramesSpec
@@ -941,7 +941,7 @@ CleanupSpec = Annotated[
 ]
 """Discriminated union of all declarative cleanup actions applied before screening.
 
-Cleanup specs can drop categories or prune agents based on nested screening
+Cleanup definitions can drop categories or prune agents based on nested screening
 rules before the main scene and agent checks run.
 """
 

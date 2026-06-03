@@ -16,9 +16,9 @@ from dronalize.datasets.argoverse2.maps import Argoverse2MapBuilder
 from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import (
-    DatasetOptionsModel,
     DatasetSource,
     LoadedSourceFrame,
+    LoaderOptionsModel,
     MapReference,
 )
 
@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
 
-class Argoverse2LoaderOptions(DatasetOptionsModel):
+class Argoverse2LoaderOptions(LoaderOptionsModel):
     """Dataset-owned config for the Argoverse 2 loader."""
 
     file_batch_size: int = Field(default=100, ge=1)
@@ -84,7 +84,7 @@ class Argoverse2Loader(SceneLoader[list[Path], Argoverse2LoaderOptions]):
         for (file_id,), group in batch_lf.collect().group_by(["file_id"]):
             yield LoadedSourceFrame(
                 frame=group.lazy().drop("file_id"),
-                map_binding=MapReference(map_key=file_to_map.get(str(file_id))),
+                map_reference=MapReference(map_key=file_to_map.get(str(file_id))),
             )
 
     @override

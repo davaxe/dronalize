@@ -10,7 +10,7 @@ from dronalize.datasets.registry import (
 from dronalize.datasets.shared.highway_builder import HighwayLaneMapBuilder, LaneDescription
 from dronalize.datasets.shared.presets import (
     lane_change_sampling,
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -31,7 +31,7 @@ _DEFAULT_CONFIG = DatasetConfig(
         window_step=25,
         lane_change=lane_change_sampling(required_lane_changes=3, negative_keep_every=3),
     ),
-    screening=minimum_samples_screening(2, required_frame=19),
+    screening=minimum_observations_screening(2, required_frame=19),
     map=MapConfig(extraction=FullMapExtraction()),
 )
 

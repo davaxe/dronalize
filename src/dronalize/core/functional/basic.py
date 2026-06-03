@@ -32,7 +32,7 @@ def yaw_from_position(
 
 
 def yaw_from_position_expr(x_col: str = "x", y_col: str = "y", yaw_col: str = "yaw") -> pl.Expr:
-    """Return a Polars expression estimating yaw from position samples."""
+    """Return a Polars expression estimating yaw from position observations."""
 
     def get_diff_expr(col_name: str) -> pl.Expr:
         forward = pl.col(col_name).shift(-1) - pl.col(col_name)

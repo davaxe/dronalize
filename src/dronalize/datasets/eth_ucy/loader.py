@@ -27,7 +27,7 @@ class EthUcyLoader(SceneLoader):
 
     @override
     def iter_sources_for(self, split: DatasetSplit) -> Iterable[DatasetSource[Path]]:
-        for data_file in self._source_files_for(split):
+        for data_file in (self.root / split.value).rglob("*.txt"):
             yield DatasetSource(
                 identifier=self._source_identifier(data_file=data_file, split=split),
                 payload=data_file,
@@ -61,21 +61,7 @@ class EthUcyLoader(SceneLoader):
 
     @override
     def count_sources_for(self, split: DatasetSplit) -> int | None:
-        return sum(1 for _ in self._source_files_for(split))
-
-    def _source_files_for(self, split: DatasetSplit) -> tuple[Path, ...]:
-        split_dirs = sorted(
-            path
-            for path in self.root.rglob(split.value)
-            if path.is_dir() and path.name == split.value
-        )
-        files = {
-            data_file
-            for split_dir in split_dirs
-            for data_file in split_dir.rglob("*")
-            if data_file.is_file()
-        }
-        return tuple(sorted(files))
+        return sum(1 for _ in (self.root / split.value).rglob("*.txt"))
 
     def _source_identifier(self, *, data_file: Path, split: DatasetSplit) -> str:
         direct_split_dir = self.root / split.value

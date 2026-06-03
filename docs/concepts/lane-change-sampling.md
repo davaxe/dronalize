@@ -62,7 +62,7 @@ Use lane-change sampling when all of the following are true:
 
 - the dataset is lane-oriented highway traffic
 - the loader exposes a usable `lane_id` signal
-- the dataset spec has `feature_support.lane_change_sampling = true`
+- the dataset descriptor has `feature_support.lane_change_sampling = true`
 - window sampling is enabled with `[datasets.<name>.scenes.window]`
 - your downstream task cares about lane-change behavior enough that the raw class imbalance matters
 

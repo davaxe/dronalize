@@ -34,7 +34,8 @@ from dronalize.io.base import (
     validate_transform_choice,
 )
 from dronalize.io.encoding import encode_scene_record
-from dronalize.io.encoding.mds import encode_mds_sample, mds_columns
+from dronalize.io.encoding.mds import encode_mds_row
+from dronalize.io.encoding.mds import mds_columns as default_mds_columns
 
 try:
     from streaming import MDSWriter
@@ -52,13 +53,13 @@ if TYPE_CHECKING:
 
 
 class MDSDatasetWriter(DatasetWriter):
-    """Write processed scene samples to MosaicML Streaming shards.
+    """Write processed scene records to MosaicML Streaming shards.
 
-    By default each shard sample contains the standard Dronalize `SceneRecord`
+    By default each shard row contains the standard Dronalize `SceneRecord`
     payload encoded as MDS columns. Advanced callers may provide
-    `record_transform` plus `sample_columns` to write custom MDS-compatible
+    `record_transform` plus `mds_columns` to write custom MDS-compatible
     dictionaries derived from the encoded record, or `scene_transform` plus
-    `sample_columns` to bypass record encoding and derive samples directly from
+    `mds_columns` to bypass record encoding and derive rows directly from
     the runtime `Scene`.
 
     Parameters
@@ -82,14 +83,14 @@ class MDSDatasetWriter(DatasetWriter):
         parallel execution. This is only relevant if `parallel` is True.
     record_transform : RecordTransform[dict[str, Any]], optional
         A callable that transforms the encoded `SceneRecord` into a dictionary
-        of MDS column values to be written as a sample. This is the preferred
+        of MDS column values to be written as a row. This is the preferred
         customization hook for users who want to write custom MDS-compatible
-        sample.
+        rows.
     scene_transform : SceneTransform[dict[str, Any]], optional
         A callable that transforms the runtime `Scene` directly into a
-        dictionary of MDS column values to be written as a sample.
-    sample_columns : dict[str, str], optional
-        A mapping from sample field names to MDS column names. This is required
+        dictionary of MDS column values to be written as a row.
+    mds_columns : dict[str, str], optional
+        A mapping from row field names to MDS column names. This is required
         if either `record_transform` or `scene_transform` is provided, and is
         ignored otherwise since the writer will use the default Dronalize MDS
         encoding scheme. See [MosaicML docs](https://docs.mosaicml.com/projects/streaming/en/stable/preparing_datasets/basic_dataset_conversion.html)
@@ -107,13 +108,13 @@ class MDSDatasetWriter(DatasetWriter):
         parallel_group: int | str | None = None,
         record_transform: RecordTransform[dict[str, Any]] | None = None,
         scene_transform: SceneTransform[dict[str, Any]] | None = None,
-        sample_columns: dict[str, str] | None = None,
+        mds_columns: dict[str, str] | None = None,
     ) -> None:
         validate_transform_choice(
             record_transform=record_transform, scene_transform=scene_transform
         )
-        if (record_transform is not None or scene_transform is not None) and sample_columns is None:
-            msg = "Custom MDS transforms require `sample_columns`."
+        if (record_transform is not None or scene_transform is not None) and mds_columns is None:
+            msg = "Custom MDS transforms require `mds_columns`."
             raise ValueError(msg)
         self._base_output_dir: Path = Path(output_dir)
         self._config: OutputPlan = config
@@ -124,8 +125,8 @@ class MDSDatasetWriter(DatasetWriter):
         self._parallel_group: str | int | None = parallel_group
         self._record_transform: RecordTransform[dict[str, Any]] | None = record_transform
         self._scene_transform: SceneTransform[dict[str, Any]] | None = scene_transform
-        self._sample_columns: dict[str, str] = (
-            sample_columns if sample_columns is not None else mds_columns(config.config.precision)
+        self._mds_columns: dict[str, str] = (
+            mds_columns if mds_columns is not None else default_mds_columns(config.config.precision)
         )
         self._writers: dict[DatasetSplit | None, MDSWriter] | None = None
 
@@ -138,7 +139,7 @@ class MDSDatasetWriter(DatasetWriter):
         parallel: bool,
         parallel_group: int | str | None,
         config: OutputPlan,
-        sample_columns: dict[str, str],
+        mds_columns: dict[str, str],
     ) -> dict[DatasetSplit | None, MDSWriter]:
         writers: dict[DatasetSplit | None, MDSWriter] = {}
         for split in splits or [None]:
@@ -155,7 +156,7 @@ class MDSDatasetWriter(DatasetWriter):
                 path_str = final_dir.as_posix()
             writers[split] = MDSWriter(
                 out=path_str,
-                columns=sample_columns,
+                columns=mds_columns,
                 compression=config.mds.compression,
                 hashes=(list(config.mds.hashes) if config.mds.hashes is not None else None),
                 size_limit=config.mds.size_limit,
@@ -173,7 +174,7 @@ class MDSDatasetWriter(DatasetWriter):
                 parallel=self._parallel,
                 parallel_group=self._parallel_group,
                 config=self._config,
-                sample_columns=self._sample_columns,
+                mds_columns=self._mds_columns,
             )
 
         split: DatasetSplit | None = scene.split_assignment
@@ -185,9 +186,9 @@ class MDSDatasetWriter(DatasetWriter):
             raise ConfigurationError(msg)
 
         effective_scene = scene.with_split_assignment(split) if split is not None else scene
-        self._writers[split].write(self._make_sample(effective_scene))
+        self._writers[split].write(self._make_row(effective_scene))
 
-    def _make_sample(self, scene: Scene) -> dict[str, Any]:
+    def _make_row(self, scene: Scene) -> dict[str, Any]:
         if self._scene_transform is not None:
             return dict(self._scene_transform(scene))
 
@@ -200,7 +201,7 @@ class MDSDatasetWriter(DatasetWriter):
         )
         if self._record_transform is not None:
             return dict(self._record_transform(encoded_scene))
-        return dict(encode_mds_sample(encoded_scene))
+        return dict(encode_mds_row(encoded_scene))
 
     @override
     def finish_local(self) -> None:

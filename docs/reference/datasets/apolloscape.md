@@ -10,7 +10,7 @@ ApolloScape is an urban trajectory benchmark built around heterogeneous traffic 
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Vehicle</strong></div>
   <div class="summary-item"><span>Map context</span><strong>None</strong></div>
-  <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
+  <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
 ## Default processing profile
@@ -25,7 +25,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Source bounds | 37-119 frames (observed) |
 | Resampling | 5:1 (linear) |
 | Sliding windows | Enabled, strict, step 1 |
-| Screening | Prune agents with fewer than 2 samples |
+| Screening | Prune agents with fewer than 2 observations |
 | Maps | None |
 
 ## Dataset compatibility

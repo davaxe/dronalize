@@ -86,9 +86,16 @@ Persisted scene records always include map arrays.
 - when map data is available, these arrays contain node and edge data
 - when map data is unavailable or disabled, readers expose empty map arrays
 
+Semantic labels and encoded arrays use different names:
+
+- `agent_category` is the semantic DataFrame column before record encoding
+- `agent_types` is the encoded per-agent integer array in `SceneRecord`
+- `EdgeType` and map node types are semantic map labels during map construction
+- `map_edge_types` and `map_node_types` are encoded arrays in `SceneRecord`
+
 ## Readers and adapters
 
 All backends feed the same reader-side mental model:
 
 - `PickleReader` and `MDSReader` yield framework-neutral `SceneRecord` objects
-- `TorchSceneDataset`, `HeteroSceneDataset`, and `SplitHeteroSceneDataset` build on top of readers.
+- `TorchSceneDataset` and `HeteroSceneDataset` build on top of readers.

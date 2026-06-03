@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "dronalize"
-version = "2.0.0.dev3"
+version = "0.1.0.dev1"
 description = "Trajectory data processing toolkit for autonomous driving datasets"
 authors = [
     { name = "Theodor Westny", email = "theodor.westny@liu.se" },
@@ -82,6 +82,7 @@ build = [
 docs = [
     "mkdocstrings[python]>=1.0.3",
     "zensical>=0.0.30",
+    "mike @ git+https://github.com/squidfunk/mike.git",
 ]
 
 dev = [

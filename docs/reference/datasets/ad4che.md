@@ -10,7 +10,7 @@ AD4CHE is an aerial congestion dataset for highway and expressway traffic in Chi
   <div class="summary-item"><span>Primary agents</span><strong>Vehicles</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>Limited</strong></div>
-  <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
+  <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
 !!! info "Extra dependencies"
@@ -32,7 +32,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Source bounds | 1136-9821 frames (observed) |
 | Resampling | 1:3 (linear) |
 | Sliding windows | Enabled, strict, step 25 |
-| Screening | Drop short tracks with fewer than 4 samples |
+| Screening | Drop short tracks with fewer than 4 observations |
 | Lane-change sampling | Require 5 lane changes; keep 1 in 3 negative scenes |
 | Maps | Full map |
 

@@ -30,7 +30,7 @@ That separation is the main design choice in the project. Dataset code is respon
 
 The goal is not just code reuse. It is to keep the responsibilities of the system clear.
 
-A dataset integration should be relatively narrow: it should know how to discover sources, load them, and expose any dataset-native metadata such as map references or predefined partitions. The shared runtime should own the common execution flow: planning, scene construction, split assignment, schema conversion, and writing output.
+A dataset integration should be relatively narrow: it should know how to discover sources, load them, and expose any dataset-native metadata such as map references or native splits. The shared runtime should own the common execution flow: planning, scene construction, output split assignment, schema conversion, and writing output.
 
 This makes new dataset integrations easier to add without duplicating the rest of the runtime. It also makes the processing model easier to reason about, because the same overall flow applies regardless of which dataset is being converted.
 
@@ -39,6 +39,14 @@ This makes new dataset integrations easier to add without duplicating the rest o
 A few public types define that flow. [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor) describes one dataset integration. [`ProjectConfig`](../reference/api/config/index.md#dronalize.config.ProjectConfig) represents optional user configuration. [`ExecutionRequest`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest) describes the requested run, and [`ExecutionPlan`](../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionPlan) is the resolved, execution-ready result.
 
 Together, these types separate what the user asked for from what the runtime is actually going to execute.
+
+## Scene lifecycle
+
+The runtime uses three scene forms:
+
+1. `SceneCandidate` is a candidate window before final acceptance.
+2. `Scene` is the internal DataFrame-backed runtime object.
+3. `SceneRecord` is the dense persisted and reader-facing representation.
 
 ## Output model
 

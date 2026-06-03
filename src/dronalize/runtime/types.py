@@ -14,6 +14,7 @@ from dronalize.config.models import RuntimeOverride, effective_scene_window
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
+from dronalize.datasets.registry import dataset_id_for_name, dataset_names_by_id
 from dronalize.io.base import (
     RecordTransform,
     SceneTransform,
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
         RuntimeConfig,
     )
     from dronalize.datasets.registry import DatasetDescriptor
-    from dronalize.processing.loading.models import DatasetOptionsModel
+    from dronalize.processing.loading.models import LoaderOptionsModel
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +56,7 @@ class ExecutionResult:
     """Number of raw DatasetSource units the executor started processing."""
     candidate_scenes: int
     """Number of scene candidates materialized before screening."""
-    selected_scenes: int
+    written_scenes: int
     """Number of scenes accepted for output after screening and limits."""
     split_counts: dict[str, int]
     """Accepted scene count per output split."""
@@ -108,7 +109,7 @@ class ExecutionPlan:
     """
 
     descriptor: DatasetDescriptor
-    """Resolved dataset specification."""
+    """Resolved dataset descriptor."""
     data_root: Path
     """Input dataset root."""
     output_dir: Path
@@ -132,11 +133,11 @@ class ExecutionPlan:
     effective_default_observation_length: int | None
     """Default reader/adaptor split point after resampling, if configured."""
     effective_sample_time: float
-    """Sample interval in seconds after resampling is applied."""
-    output_sample: OutputSample[object] | None = None
-    """Optional custom persisted-sample configuration for writer backends."""
+    """Effective `sample_time` interval in seconds after resampling is applied."""
+    output_transform: OutputTransform[object] | None = None
+    """Optional custom persisted-output configuration for writer backends."""
     limit: int | None = None
-    """Optional maximum number of selected scenes to write."""
+    """Optional maximum number of scenes to write."""
     seed: int | None = None
     """Optional seed used by deterministic runtime choices."""
 
@@ -168,6 +169,11 @@ class ExecutionPlan:
         export_config: OutputConfig = self.resolved_config.output
         return DatasetManifest(
             dataset=self.dataset,
+            dataset_names=(
+                dataset_names_by_id()
+                if dataset_id_for_name(self.dataset) is not None
+                else (self.dataset,)
+            ),
             storage_backend=storage_backend_name(self.storage_backend),
             dronalize_version=package_version(),
             precision=export_config.precision,
@@ -203,25 +209,25 @@ class ExecutionPlan:
             write_manifest(root, manifest)
 
 
-SampleT = TypeVar("SampleT")
+PayloadT = TypeVar("PayloadT")
 
 
 @dataclass(frozen=True, slots=True)
-class OutputSample(Generic[SampleT]):
-    """Python API configuration for custom persisted output samples.
+class OutputTransform(Generic[PayloadT]):
+    """Python API configuration for custom persisted output payloads.
 
     `record_transform` is the preferred hook because it receives the canonical
     `SceneRecord` after Dronalize has applied normal output semantics.
-    `scene_transform` is an expert escape hatch for deriving samples directly
+    `scene_transform` is an expert escape hatch for deriving payloads directly
     from runtime `Scene` objects.
     """
 
-    record_transform: RecordTransform[SampleT] | None = None
-    """Optional transform from canonical `SceneRecord` to persisted sample."""
-    scene_transform: SceneTransform[SampleT] | None = None
-    """Optional transform from runtime `Scene` to persisted sample."""
+    record_transform: RecordTransform[PayloadT] | None = None
+    """Optional transform from canonical `SceneRecord` to persisted payload."""
+    scene_transform: SceneTransform[PayloadT] | None = None
+    """Optional transform from runtime `Scene` to persisted payload."""
     mds_columns: dict[str, str] | None = None
-    """MDS column schema required when custom samples are written to MDS."""
+    """MDS column schema required when custom rows are written to MDS."""
 
     def __post_init__(self) -> None:
         """Validate that only one transform mode is configured."""
@@ -234,7 +240,7 @@ def build_loader_plan(
     *, descriptor: DatasetDescriptor, resolved_config: DatasetConfig, include_map: bool | None
 ) -> LoaderPlan:
     """Compile the loader-facing request for one resolved dataset config."""
-    loader_options: DatasetOptionsModel = descriptor.parse_loader_options(
+    loader_options: LoaderOptionsModel = descriptor.parse_loader_options(
         resolved_config.loader_options
     )
     map_config = (
@@ -282,15 +288,15 @@ class ExecutionRequest(BaseModel):
     include_map: bool | None = None
     """Override for map output. `None` uses the resolved dataset config."""
     limit: int | None = None
-    """Optional maximum number of selected scenes to write."""
+    """Optional maximum number of scenes to write."""
     seed: int | None = None
     """Optional seed used by deterministic runtime choices."""
     input_dir_exists: bool = True
     """Whether request resolution should require `input_dir` to exist."""
-    output_sample: OutputSample[object] | None = None
-    """Customized output sample configuration."""
+    output_transform: OutputTransform[object] | None = None
+    """Customized output transform configuration."""
 
 
 def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int | None, float]:
-    """Return the effective scene window and sample time for one resolved config."""
+    """Return the effective scene window and `sample_time` for one resolved config."""
     return effective_scene_window(config.scenes)

@@ -40,7 +40,7 @@ class Progress:
     This is incremented for every scene that is generated and screened,
     regardless of whether it is selected or not.
     """
-    selected_scenes: int
+    written_scenes: int
     """Actual number of scenes that have been selected for the dataset."""
     total_sources: int | None
     """Total sources to process if known, otherwise None."""
@@ -78,7 +78,7 @@ class WorkerRegistry:
 class ProgressState:
     active_workers: Synchronized[int]
     candidate_scene_counter: Synchronized[int]
-    selected_scene_counter: Synchronized[int]
+    written_scene_counter: Synchronized[int]
     source_counter: Synchronized[int]
     unsplit_counter: Synchronized[int]
     train_counter: Synchronized[int]
@@ -93,7 +93,7 @@ class ProgressState:
         return cls(
             active_workers=ctx.Value("i", 0),
             candidate_scene_counter=ctx.Value("i", 0),
-            selected_scene_counter=ctx.Value("i", 0),
+            written_scene_counter=ctx.Value("i", 0),
             source_counter=ctx.Value("i", 0),
             unsplit_counter=ctx.Value("i", 0),
             train_counter=ctx.Value("i", 0),
@@ -107,7 +107,7 @@ class ProgressState:
         counters = (
             self.active_workers,
             self.candidate_scene_counter,
-            self.selected_scene_counter,
+            self.written_scene_counter,
             self.source_counter,
             self.unsplit_counter,
             self.train_counter,
@@ -128,20 +128,20 @@ class ProgressState:
         self.update_event.set()
         return value
 
-    def claim_selected_scene(self, limit: int | None = None) -> int | None:
-        with self.selected_scene_counter.get_lock():
-            if limit is not None and self.selected_scene_counter.value >= limit:
+    def claim_written_scene(self, limit: int | None = None) -> int | None:
+        with self.written_scene_counter.get_lock():
+            if limit is not None and self.written_scene_counter.value >= limit:
                 return None
-            scene_number = self.selected_scene_counter.value
-            self.selected_scene_counter.value += 1
+            scene_number = self.written_scene_counter.value
+            self.written_scene_counter.value += 1
         self.update_event.set()
         return scene_number
 
-    def selected_scene_limit_reached(self, limit: int | None = None) -> bool:
+    def written_scene_limit_reached(self, limit: int | None = None) -> bool:
         if limit is None:
             return False
-        with self.selected_scene_counter.get_lock():
-            return self.selected_scene_counter.value >= limit
+        with self.written_scene_counter.get_lock():
+            return self.written_scene_counter.value >= limit
 
     def increment_source(self) -> int:
         with self.source_counter.get_lock():

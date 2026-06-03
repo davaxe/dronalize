@@ -54,7 +54,7 @@ uv pip install dronalize
 
     ---
 
-    Understand how dataset specs, configuration layers, screening, splits, maps, and outputs fit together.
+    Understand how dataset descriptors, configuration layers, screening, splits, maps, and outputs fit together.
 
 
 -   [:material-database:{ .lg .middle } __Data formats__](formats/index.md)

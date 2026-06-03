@@ -4,4 +4,4 @@
 
 ## ::: dronalize.runtime.ExecutionResult
 
-## ::: dronalize.runtime.OutputSample
+## ::: dronalize.runtime.OutputTransform

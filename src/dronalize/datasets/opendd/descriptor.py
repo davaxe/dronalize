@@ -7,7 +7,7 @@ from dronalize.datasets.registry import (
 )
 from dronalize.datasets.shared.presets import (
     linear_resample,
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -23,7 +23,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
             window_step=75,
             resample=linear_resample(up=1, down=3),
         ),
-        screening=minimum_samples_screening(6, required_frame=59),
+        screening=minimum_observations_screening(6, required_frame=59),
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=OpenDDLoader.native_trajectory_schema(),

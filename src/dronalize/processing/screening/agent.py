@@ -94,15 +94,15 @@ class AgentRequireWindow(AgentCheckRuleBase):
         return covered_frames.cast(pl.Float64) >= required_coverage
 
 
-class MinSamples(AgentCheckRuleBase):
-    """Require a minimum number of samples per agent."""
+class MinObservations(AgentCheckRuleBase):
+    """Require a minimum number of observations per agent."""
 
-    rule: Literal["min_samples"] = Field("min_samples", repr=False, init=False)
+    rule: Literal["min_observations"] = Field("min_observations", repr=False, init=False)
     minimum: int = Field(ge=1)
 
     @override
     def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
-        """Return the per-agent pass expression for the minimum sample count."""
+        """Return the per-agent pass expression for the minimum observation count."""
         return ctx.over_agent_window(pl.len()) >= self.minimum
 
 
@@ -236,7 +236,7 @@ AgentCheckRule = Annotated[
     | AgentMaxMissingFrames
     | AgentRequireFrames
     | AgentRequireWindow
-    | MinSamples
+    | MinObservations
     | MaxGap
     | MinConsecutiveFrames
     | StartsByFrame
@@ -260,7 +260,7 @@ __all__ = [
     "MaxGap",
     "MinConsecutiveFrames",
     "MinDistance",
-    "MinSamples",
+    "MinObservations",
     "MinSpan",
     "StartsByFrame",
 ]

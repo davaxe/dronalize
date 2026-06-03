@@ -114,8 +114,8 @@ frames = [19]
 tolerance = { absolute = 1, relative = 0.05 }
 selector = { mode = "include", categories = ["CAR"] }
 
-[datasets.a43.screening.agent.sample_floor]
-rule = "min_samples"
+[datasets.a43.screening.agent.observation_floor]
+rule = "min_observations"
 minimum = 8
 
 

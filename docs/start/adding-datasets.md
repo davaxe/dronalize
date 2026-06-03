@@ -48,7 +48,7 @@ It does not make the dataset visible to a later, separate `dronalize ...` shell 
 ## CLI usage
 
 For CLI workflows, put the dataset registration in an importable Python module and expose a
-`register_dronalize_datasets()` hook. The hook can register specs itself:
+`register_dronalize_datasets()` hook. The hook can register descriptors itself:
 
 <!-- no-validate -->
 ```python
@@ -61,7 +61,7 @@ def register_dronalize_datasets():
 ```
 
 The hook may also return one [`DatasetDescriptor`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetDescriptor) or an iterable of
-specs instead:
+descriptors instead:
 
 <!-- no-validate -->
 ```python
@@ -101,7 +101,7 @@ scenes.
 
 Optional dataset capabilities are explicit. Set
 [`DatasetFeatureSupport`](../reference/api/datasets/descriptor.md#dronalize.datasets.DatasetFeatureSupport)
-on the spec when the loader can provide maps or lane-change sampling. Leave a flag disabled until
+on the descriptor when the loader can provide maps or lane-change sampling. Leave a flag disabled until
 the loader really supports it; request planning fails early when a user enables an unsupported
 feature.
 

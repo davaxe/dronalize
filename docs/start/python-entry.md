@@ -10,13 +10,13 @@ with `dronalize.datasets`, `dronalize.config`, and `dronalize.runtime`.
 ```python
 from dronalize.datasets import get_dataset
 
-spec = get_dataset("a43")
-print(spec.name)
-print(spec.feature_support.map)
-print(spec.feature_support.lane_change_sampling)
-print(spec.loader_options_model.model_fields)
-print(spec.native_schema.name)
-print(spec.supported_native_splits)
+descriptor = get_dataset("a43")
+print(descriptor.name)
+print(descriptor.feature_support.map)
+print(descriptor.feature_support.lane_change_sampling)
+print(descriptor.loader_options_model.model_fields)
+print(descriptor.native_schema.name)
+print(descriptor.supported_native_splits)
 ```
 
 `get_dataset()` returns a `DatasetDescriptor`, which is the same descriptor the CLI uses for `inspect` and
@@ -31,9 +31,9 @@ from pathlib import Path
 from dronalize.config import parse_config
 from dronalize.datasets import get_dataset
 
-spec = get_dataset("a43")
+descriptor = get_dataset("a43")
 project = parse_config(Path("dronalize.toml"))
-resolved = project.resolve_dataset_config("a43", spec.default_config)
+resolved = project.resolve_dataset_config("a43", descriptor.default_config)
 
 print(resolved.scenes.horizon_frames, resolved.scenes.default_observation_length)
 print(resolved.output.precision)
@@ -63,7 +63,7 @@ plan = resolve_request(request)
 print(plan.effective_sample_time)
 
 result = execute_request(request)
-print(result.selected_scenes)
+print(result.written_scenes)
 ```
 
 Use `resolve_request()` when you want a dry planning step. Use `execute_request()` when you want to

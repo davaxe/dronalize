@@ -71,7 +71,7 @@ def build_writer_provider(plan: ExecutionPlan) -> WriterProvider:
 def _build_mds_writer_provider(plan: ExecutionPlan) -> WriterProvider:
     from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
 
-    sample = plan.output_sample
+    output_transform = plan.output_transform
     splits = _output_splits(plan)
     return WorkerWriterProvider(
         create_worker=functools.partial(
@@ -82,15 +82,17 @@ def _build_mds_writer_provider(plan: ExecutionPlan) -> WriterProvider:
             parallel=plan.parallel,
             record_transform=(
                 None
-                if sample is None
-                else cast("RecordTransform[dict[str, Any]] | None", sample.record_transform)
+                if output_transform is None
+                else cast(
+                    "RecordTransform[dict[str, Any]] | None", output_transform.record_transform
+                )
             ),
             scene_transform=(
                 None
-                if sample is None
-                else cast("SceneTransform[dict[str, Any]] | None", sample.scene_transform)
+                if output_transform is None
+                else cast("SceneTransform[dict[str, Any]] | None", output_transform.scene_transform)
             ),
-            sample_columns=None if sample is None else sample.mds_columns,
+            mds_columns=None if output_transform is None else output_transform.mds_columns,
         ),
         finalize=functools.partial(
             MDSDatasetWriter.finish_dataset,
@@ -110,7 +112,7 @@ def _create_mds_writer(
     parallel: bool,
     record_transform: RecordTransform[dict[str, Any]] | None,
     scene_transform: SceneTransform[dict[str, Any]] | None,
-    sample_columns: dict[str, str] | None,
+    mds_columns: dict[str, str] | None,
 ) -> DatasetWriter:
     from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
 
@@ -122,7 +124,7 @@ def _create_mds_writer(
         parallel_group=worker_id,
         record_transform=record_transform,
         scene_transform=scene_transform,
-        sample_columns=sample_columns,
+        mds_columns=mds_columns,
     )
 
 
@@ -139,15 +141,17 @@ def _create_null_writer(worker_id: int) -> DatasetWriter:
 
 
 def _build_pickle_writer_provider(plan: ExecutionPlan) -> WriterProvider:
-    sample = plan.output_sample
+    output_transform = plan.output_transform
     return WorkerWriterProvider(
         create_worker=functools.partial(
             _create_pickle_writer,
             output_dir=plan.output_dir,
             config=plan.output,
             splits=_output_splits(plan),
-            record_transform=None if sample is None else sample.record_transform,
-            scene_transform=None if sample is None else sample.scene_transform,
+            record_transform=None
+            if output_transform is None
+            else output_transform.record_transform,
+            scene_transform=None if output_transform is None else output_transform.scene_transform,
         )
     )
 
