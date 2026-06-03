@@ -18,7 +18,7 @@ class MDSSample(TypedDict):
     """Serialized MDS payload for one scene sample."""
 
     scene_number: int
-    dataset: str
+    dataset_id: int
     default_observation_length: int
     position_offset: npt.NDArray[np.float64]
     agent_types: npt.NDArray[np.int32]
@@ -41,7 +41,7 @@ def encode_mds_sample(record: SceneRecord) -> MDSSample:
     )
     return {
         "scene_number": int(record.scene_number),
-        "dataset": record.dataset or "",
+        "dataset_id": -1 if record.dataset_id is None else int(record.dataset_id),
         "default_observation_length": (
             -1
             if record.default_observation_length is None
@@ -69,7 +69,7 @@ def decode_mds_sample(sample: Mapping[str, Any]) -> SceneRecord:
     )
     return make_scene_record(
         scene_number=int(sample["scene_number"]),
-        dataset=str(sample["dataset"]) if sample.get("dataset") else None,
+        dataset_id=(None if int(sample.get("dataset_id", -1)) < 0 else int(sample["dataset_id"])),
         default_observation_length=(
             None
             if int(sample.get("default_observation_length", -1)) < 0
@@ -91,7 +91,7 @@ def mds_columns(dtype: str) -> dict[str, str]:
     """Return the MDS column schema for one serialized scene sample."""
     return {
         "scene_number": "int",
-        "dataset": "str",
+        "dataset_id": "int",
         "default_observation_length": "int",
         "position_offset": "ndarray:float64:2",
         "agent_types": "ndarray:int32",

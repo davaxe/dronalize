@@ -116,9 +116,9 @@ def _convert_full_to_hetero(sample: TorchSceneRecord) -> HeteroData:
     data = HeteroData()
 
     data["agent"].features = sample.features
-    data["agent"].mask = sample.agent_time_mask
+    data["agent"].agent_time_mask = sample.agent_time_mask
     data["agent"].agent_type = sample.agent_types
-    data["agent"].passed_mask = sample.screened_agent_mask
+    data["agent"].screened_agent_mask = sample.screened_agent_mask
     data["agent"].num_nodes = sample.features.size(0)
 
     _attach_map_store(
@@ -131,7 +131,7 @@ def _convert_full_to_hetero(sample: TorchSceneRecord) -> HeteroData:
     _attach_common_metadata(
         data,
         sample.scene_number,
-        sample.dataset,
+        sample.dataset_id,
         sample.position_offset,
         default_observation_length=sample.default_observation_length,
     )
@@ -155,13 +155,13 @@ def _attach_map_store(
 def _attach_common_metadata(
     data: HeteroData,
     scene_number: int,
-    dataset: str | None,
+    dataset_id: int | None,
     position_offset: torch.Tensor,
     *,
     default_observation_length: int | None,
 ) -> None:
     data.scene_number = int(scene_number)
-    data.dataset = dataset
+    data.dataset_id = dataset_id
     data.position_offset = position_offset
     data.default_observation_length = default_observation_length
 

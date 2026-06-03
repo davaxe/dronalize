@@ -317,6 +317,20 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetDescriptor] = {
     ),
 }
 
+_BUILTIN_DATASET_IDS: dict[str, int] = {
+    name: dataset_id for dataset_id, name in enumerate(_BUILTIN_DATASETS.keys())
+}
+
+
+def dataset_id_for_name(name: str) -> int | None:
+    """Return the stable built-in dataset id for a dataset name, if known."""
+    return _BUILTIN_DATASET_IDS.get(name)
+
+
+def dataset_names_by_id() -> tuple[str, ...]:
+    """Return built-in dataset names ordered by their stable dataset ids."""
+    return tuple(_BUILTIN_DATASET_IDS.keys())
+
 
 def register_dataset(descriptor: DatasetDescriptor) -> None:
     """Register one dataset specification in the in-memory registry.

@@ -113,9 +113,12 @@ reader = PickleReader(Path("output"), split="train")
 record = reader[0]
 
 print(record.scene_number)
-print(record.dataset)
+print(record.dataset_id)
 print(record.features.shape, record.mask.shape)
 ```
+
+Use `read_manifest(Path("output")).dataset_names[record.dataset_id]` to map a
+record dataset id back to the dataset name.
 
 Use `split=None` (default) for unsplit exports.
 

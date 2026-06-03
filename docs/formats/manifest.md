@@ -33,6 +33,7 @@ Current manifests use `format_version = 2`.
 | Field | Type | Description |
 | --- | --- | --- |
 | `dataset` | `str` | Name of the dataset. |
+| `dataset_names` | `list[str]` | Dataset names indexed by the integer `dataset_id` stored in scene records. |
 | `storage_backend` | `str` | Storage backend used to write scene records. |
 | `dronalize_version` | `str` | Package version that produced the export. |
 | `format_version` | `int` | Manifest format version used for compatibility checks. |
@@ -63,6 +64,7 @@ print(manifest.trajectory_schema_fields)
 print(manifest.storage_backend)
 print(manifest.feature_columns)
 print(manifest.horizon_frames, manifest.default_observation_length)
+print(manifest.dataset_names)
 ```
 
 See [`read_manifest()`](../reference/api/io/index.md#dronalize.io.read_manifest) for the full reader API.

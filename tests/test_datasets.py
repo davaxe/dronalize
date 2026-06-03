@@ -8,6 +8,11 @@ import pytest
 from dronalize.config import RuntimeOverride
 from dronalize.config.models import RequireFramesSpec
 from dronalize.datasets import DatasetDescriptor, get_dataset, list_datasets
+from dronalize.datasets.registry import (  # pyright: ignore[reportPrivateUsage]
+    _builtin_datasets,
+    dataset_id_for_name,
+    dataset_names_by_id,
+)
 from dronalize.io import StorageBackend
 from dronalize.runtime import ExecutionRequest, resolve_request
 from tests.support import demo_descriptor
@@ -22,6 +27,15 @@ def test_builtin_datasets_resolve(name: str) -> None:
     descriptor = get_dataset(name)
     assert isinstance(descriptor, DatasetDescriptor)
     assert descriptor.name == name
+
+
+def test_builtin_dataset_ids_are_unique() -> None:
+    names = dataset_names_by_id()
+
+    assert len(names) == len(set(names))
+    assert set(names) == set(_builtin_datasets())
+    for expected_id, name in enumerate(names):
+        assert dataset_id_for_name(name) == expected_id
 
 
 @pytest.mark.parametrize("name", list_datasets())

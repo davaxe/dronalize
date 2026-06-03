@@ -14,6 +14,7 @@ from dronalize.config.models import RuntimeOverride, effective_scene_window
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
+from dronalize.datasets.registry import dataset_id_for_name, dataset_names_by_id
 from dronalize.io.base import (
     RecordTransform,
     SceneTransform,
@@ -168,6 +169,11 @@ class ExecutionPlan:
         export_config: OutputConfig = self.resolved_config.output
         return DatasetManifest(
             dataset=self.dataset,
+            dataset_names=(
+                dataset_names_by_id()
+                if dataset_id_for_name(self.dataset) is not None
+                else (self.dataset,)
+            ),
             storage_backend=storage_backend_name(self.storage_backend),
             dronalize_version=package_version(),
             precision=export_config.precision,

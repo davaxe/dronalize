@@ -31,7 +31,7 @@ NDArrayAny = npt.NDArray[Any]
 @dataclass(slots=True)
 class CustomPickleSample:
     scene_number: int
-    dataset: str | None
+    dataset: object
     values: npt.NDArray[Any]
     source: str
 
@@ -48,9 +48,9 @@ def test_split_helpers_roundtrip(scene: Scene) -> None:
     np.testing.assert_array_equal(record.mask, rejoined.mask)
     np.testing.assert_allclose(split.history_features, rebuilt.history_features)
     np.testing.assert_allclose(split.future_features, rebuilt.future_features)
-    assert rebuilt.dataset == "demo"
-    assert rejoined.dataset == "demo"
-    assert record.dataset == "demo"
+    assert rebuilt.dataset_id == 0
+    assert rejoined.dataset_id == 0
+    assert record.dataset_id == 0
 
 
 def test_split_scene_record_rejects_bad_length(scene: Scene) -> None:
@@ -88,7 +88,7 @@ def test_pickle_writer_accepts_record_transform(tmp_path: Path, scene: Scene) ->
     def transform(record: SceneRecord) -> CustomPickleSample:
         return CustomPickleSample(
             scene_number=record.scene_number,
-            dataset=record.dataset,
+            dataset=record.dataset_id,
             values=record.features[:, :1, 0],
             source="record",
         )
@@ -103,7 +103,7 @@ def test_pickle_writer_accepts_record_transform(tmp_path: Path, scene: Scene) ->
     sample = reader[0]
 
     assert sample.scene_number == scene.scene_number
-    assert sample.dataset == "demo"
+    assert sample.dataset == 0
     assert sample.source == "record"
     assert sample.values.shape == (2, 1)
 
@@ -273,6 +273,7 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     loaded = read_manifest(tmp_path)
 
     assert loaded == manifest
+    assert loaded.dataset_names == ("test_dataset",)
 
 
 def test_manifest_rejects_bad_default_obs_length() -> None:
@@ -340,7 +341,7 @@ def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     sample = TorchSceneDataset(reader)[0]
 
     assert sample.scene_number == expected.scene_number
-    assert sample.dataset == expected.dataset
+    assert sample.dataset_id == expected.dataset_id
     _assert_tensor_allclose(sample.position_offset, expected.position_offset)
     _assert_tensor_array_equal(sample.agent_types, expected.agent_types)
     _assert_tensor_array_equal(sample.screened_agent_mask, expected.screened_agent_mask)
@@ -361,7 +362,7 @@ def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> Non
     split = sample.split(2)
 
     assert split.scene_number == expected.scene_number
-    assert split.dataset == expected.dataset
+    assert split.dataset_id == expected.dataset_id
     _assert_tensor_allclose(split.position_offset, expected.position_offset)
     _assert_tensor_allclose(split.history_features, expected.features[:, :2])
     _assert_tensor_array_equal(split.history_mask, expected.mask[:, :2])
@@ -378,7 +379,7 @@ def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     sample = HeteroSceneDataset(reader).get(0)
 
     assert sample.scene_number == expected.scene_number
-    assert sample.dataset == expected.dataset
+    assert sample.dataset_id == expected.dataset_id
     _assert_tensor_allclose(sample.position_offset, expected.position_offset)
     _assert_tensor_allclose(sample["agent"].features, expected.features)
     _assert_tensor_array_equal(sample["agent"].mask, expected.mask)

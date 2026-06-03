@@ -34,8 +34,8 @@ class TorchSceneRecord:
 
     scene_number: int
     """Scene identifier within the exported dataset."""
-    dataset: str | None
-    """Dataset label associated with this scene, if known."""
+    dataset_id: int | None
+    """Dataset id associated with this scene, if known."""
     default_observation_length: int | None
     """Default split point associated with this scene, if known."""
     position_offset: torch.Tensor
@@ -69,7 +69,7 @@ class TorchSceneRecord:
 
         return TorchSplitSceneRecord(
             scene_number=self.scene_number,
-            dataset=self.dataset,
+            dataset_id=self.dataset_id,
             default_observation_length=self.default_observation_length,
             position_offset=self.position_offset,
             agent_types=self.agent_types,
@@ -90,7 +90,7 @@ class TorchSplitSceneRecord:
     """Torch-backed equivalent of a split scene record."""
 
     scene_number: int
-    dataset: str | None
+    dataset_id: int | None
     default_observation_length: int | None
     position_offset: torch.Tensor
     agent_types: torch.Tensor
@@ -153,7 +153,7 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
     # writable, stable buffers without emitting warnings.
     return TorchSceneRecord(
         scene_number=record.scene_number,
-        dataset=record.dataset,
+        dataset_id=record.dataset_id,
         default_observation_length=record.default_observation_length,
         position_offset=torch.asarray(record.position_offset, copy=copy),
         agent_types=torch.asarray(record.agent_types, copy=copy),

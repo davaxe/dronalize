@@ -79,7 +79,7 @@ Every sample written to a shard contains the following fields.
 | Field | dtype | Shape | Description |
 | --- | --- | --- | --- |
 | `scene_number` | `int` | scalar | Global scene index assigned during processing. |
-| `dataset` | `str` | scalar | Dataset label associated with the sample. |
+| `dataset_id` | `int` | scalar | Dataset id associated with the sample, or `-1` when unset. Map ids back to names with `manifest.dataset_names`. |
 | `default_observation_length` | `int` | scalar | Default split point for input/output windows during reading, or `-1` when unset. |
 | `position_offset` | `float64` | `[2]` | The `(x, y)` offset subtracted from all positions before writing when `recenter_positions = true`. Zero otherwise. |
 | `agent_types` | `int32` | `[A]` | Integer agent category for each agent. |

@@ -11,6 +11,7 @@ from typing_extensions import TypedDict
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.typing import FloatScalarT
+from dronalize.datasets.registry import dataset_id_for_name
 from dronalize.io.records import (
     SceneRecord,
     SplitSceneRecord,
@@ -47,6 +48,7 @@ def encode_scene_record(
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
     default_observation_length: int | None = None,
+    dataset_id: int | None = None,
 ) -> SceneRecord: ...
 
 
@@ -59,6 +61,7 @@ def encode_scene_record(
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
     default_observation_length: int | None = None,
+    dataset_id: int | None = None,
 ) -> SceneRecord: ...
 
 
@@ -70,6 +73,7 @@ def encode_scene_record(
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
     default_observation_length: int | None = None,
+    dataset_id: int | None = None,
 ) -> SceneRecord:
     """Encode one scene into the canonical full-horizon `SceneRecord`."""
     if trajectory_schema is not None:
@@ -138,9 +142,17 @@ def encode_scene_record(
         map_edge_indices=map_record["map_edge_indices"],
         map_node_types=map_record["map_node_types"],
         map_edge_types=map_record["map_edge_types"],
-        dataset=scene.dataset,
+        dataset_id=_resolve_dataset_id(scene.dataset, explicit_dataset_id=dataset_id),
         default_observation_length=default_observation_length,
     )
+
+
+def _resolve_dataset_id(dataset: str | None, *, explicit_dataset_id: int | None) -> int | None:
+    if explicit_dataset_id is not None:
+        return explicit_dataset_id
+    if dataset is None:
+        return None
+    return dataset_id_for_name(dataset) or 0
 
 
 @overload
