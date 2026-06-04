@@ -187,7 +187,7 @@ def _expected_dataset_id(dataset: str | None) -> int | None:
 @dataclass(frozen=True, slots=True)
 class PlanSceneAssertionResult:
     checked_scenes: int
-    selected_scenes: int
+    written_scenes: int
     progress: Progress
 
 
@@ -286,7 +286,7 @@ def assert_plan_scene_outputs(
         1 for _ in (plan.output_dir / ".integration-scene-assertions").glob("*.json")
     )
     return PlanSceneAssertionResult(
-        checked_scenes=checked_scenes, selected_scenes=progress.selected_scenes, progress=progress
+        checked_scenes=checked_scenes, written_scenes=progress.written_scenes, progress=progress
     )
 
 

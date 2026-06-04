@@ -72,14 +72,14 @@ Multiple shard files are created automatically as a split exceeds `size_limit`.
     This parallel approach is described in more detail in the [parallel dataset conversion guide](https://docs.mosaicml.com/projects/streaming/en/stable/preparing_datasets/parallel_dataset_conversion.html).
 
 
-## Sample fields
+## MDS row fields
 
-Every sample written to a shard contains the following fields.
+Every MDS row written to a shard contains the following fields.
 
 | Field | dtype | Shape | Description |
 | --- | --- | --- | --- |
 | `scene_number` | `int` | scalar | Global scene index assigned during processing. |
-| `dataset_id` | `int` | scalar | Dataset id associated with the sample, or `-1` when unset. Map ids back to names with `manifest.dataset_names`. |
+| `dataset_id` | `int` | scalar | Dataset id associated with the row, or `-1` when unset. Map ids back to names with `manifest.dataset_names`. |
 | `default_observation_length` | `int` | scalar | Default split point for input/output windows during reading, or `-1` when unset. |
 | `position_offset` | `float64` | `[2]` | The `(x, y)` offset subtracted from all positions before writing when `recenter_positions = true`. Zero otherwise. |
 | `agent_types` | `int32` | `[A]` | Integer agent category for each agent. |
@@ -93,17 +93,17 @@ Every sample written to a shard contains the following fields.
 
 **Dimension key:**
 
-- `A` — number of agents in the scene (varies per sample)
+- `A` — number of agents in the scene (varies per row)
 - `T` — total full-horizon timesteps (fixed for a given dataset and config)
 - `F` — number of feature columns determined by the configured schema
-- `N` — number of map nodes (varies per sample)
-- `E` — number of map edges (varies per sample)
+- `N` — number of map nodes (varies per row)
+- `E` — number of map edges (varies per row)
 
 The `features` and `map_node_positions` dtypes follow the `precision` setting in the `[output]`
 config block. `position_offset` is always stored as `float64`.
 
 !!! note "Map fields when maps are disabled"
-    All four map fields are always present in every sample regardless of whether map data is
+    All four map fields are always present in every row regardless of whether map data is
     enabled. For scenes without maps, encoded placeholders are normalized back to empty arrays by
     the reader API.
     
@@ -114,13 +114,13 @@ config block. `position_offset` is always stored as `float64`.
     
     The reason for this design is that the MDS format does not currently support empty arrays.
 
-## Custom samples
+## Custom MDS rows
 
-Python integrations can customize the sample dictionaries written to MDS by
-passing `output_sample` to an
+Python integrations can customize the row dictionaries written to MDS by
+passing `output_transform` to an
 [`ExecutionRequest`](../../reference/api/runtime/planning-and-runs.md#dronalize.runtime.ExecutionRequest).
 
-MDS requires the column schema before any samples are written, so custom
+MDS requires the column schema before any rows are written, so custom
 transforms must provide both:
 
 - `record_transform` or `scene_transform`
@@ -135,10 +135,10 @@ recentering, map extraction, and default observation length metadata.
 import numpy as np
 
 from dronalize.io.records import SceneRecord
-from dronalize.runtime import ExecutionRequest, OutputSample, execute_request
+from dronalize.runtime import ExecutionRequest, OutputTransform, execute_request
 
 
-def to_training_sample(record: SceneRecord) -> dict[str, object]:
+def to_training_row(record: SceneRecord) -> dict[str, object]:
     observation_length = record.default_observation_length or 10
     return {
         "scene_number": int(record.scene_number),
@@ -162,12 +162,12 @@ request = ExecutionRequest(
     input_dir=input_dir,
     output_dir=output_dir,
     storage_backend="mds",
-    output_sample=OutputSample(record_transform=to_training_sample, mds_columns=columns),
+    output_transform=OutputTransform(record_transform=to_training_row, mds_columns=columns),
 )
 execute_request(request)
 ```
 
-For advanced cases, `scene_transform` can derive the MDS sample directly from
+For advanced cases, `scene_transform` can derive the MDS row directly from
 the runtime `Scene`. This bypasses `SceneRecord` encoding, so the transform is
 responsible for any schema conversion, dtype policy, recentering, and map
 resolution it needs. `record_transform` and `scene_transform` are mutually
@@ -183,19 +183,19 @@ from dronalize.io.readers import MDSReader
 
 
 @dataclass(slots=True)
-class TrainingSample:
+class TrainingRecord:
     x: np.ndarray
     y: np.ndarray
     x_mask: np.ndarray
     y_mask: np.ndarray
 
 
-def from_raw(sample: dict[str, object]) -> TrainingSample:
-    return TrainingSample(
-        x=np.asarray(sample["x"]),
-        y=np.asarray(sample["y"]),
-        x_mask=np.asarray(sample["x_mask"], dtype=bool),
-        y_mask=np.asarray(sample["y_mask"], dtype=bool),
+def from_raw(row: dict[str, object]) -> TrainingRecord:
+    return TrainingRecord(
+        x=np.asarray(row["x"]),
+        y=np.asarray(row["y"]),
+        x_mask=np.asarray(row["x_mask"], dtype=bool),
+        y_mask=np.asarray(row["y_mask"], dtype=bool),
     )
 
 

@@ -29,7 +29,7 @@ from dronalize.io.backends.null import NullWriter
 from dronalize.io.backends.registry import register_writer_backend
 from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.readers import PickleReader
-from dronalize.runtime import ExecutionRequest, OutputSample, execute_request, resolve_request
+from dronalize.runtime import ExecutionRequest, OutputTransform, execute_request, resolve_request
 from tests.support import DemoOptions, demo_descriptor
 
 if TYPE_CHECKING:
@@ -258,18 +258,20 @@ def test_execute_request_applies_record_transform(
             "feature_shape": record.features.shape,
         }
 
-    output_sample = OutputSample(record_transform=transform)
-    request = _request(tmp_path, storage_backend=StorageBackend.PICKLE, output_sample=output_sample)
+    output_transform = OutputTransform(record_transform=transform)
+    request = _request(
+        tmp_path, storage_backend=StorageBackend.PICKLE, output_transform=output_transform
+    )
 
     result = execute_request(request)
-    sample = cast("dict[str, object]", PickleReader(result.output_dir, sample_type=dict)[0])
+    record = cast("dict[str, object]", PickleReader(result.output_dir, record_type=dict)[0])
 
-    assert sample == {"scene_number": 0, "dataset_id": 0, "feature_shape": (1, 3, 7)}
+    assert record == {"scene_number": 0, "dataset_id": 0, "feature_shape": (1, 3, 7)}
 
 
 def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip(
-        "streaming", reason="Requires streaming package for custom MDS output sample format"
+        "streaming", reason="Requires streaming package for custom MDS output record format"
     )
     from dronalize.io.readers import MDSReader  # noqa: PLC0415
 
@@ -282,15 +284,17 @@ def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.M
             "feature_shape": record.features.shape,
         }
 
-    output_sample = OutputSample(
+    output_transform = OutputTransform(
         record_transform=transform,
         mds_columns={"scene_number": "int", "dataset_id": "int", "feature_shape": "json"},
     )
-    request = _request(tmp_path, storage_backend=StorageBackend.MDS, output_sample=output_sample)
+    request = _request(
+        tmp_path, storage_backend=StorageBackend.MDS, output_transform=output_transform
+    )
     result = execute_request(request)
     reader = MDSReader(path=result.output_dir, convert_raw=dict)
-    sample = reader[0]
-    assert sample == {"scene_number": 0, "dataset_id": 0, "feature_shape": [1, 3, 7]}
+    record = reader[0]
+    assert record == {"scene_number": 0, "dataset_id": 0, "feature_shape": [1, 3, 7]}
 
 
 def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -314,7 +318,7 @@ def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert result.dataset == "demo"
     assert result.processed_sources == 1
     assert result.candidate_scenes == 1
-    assert result.selected_scenes == 1
+    assert result.written_scenes == 1
     assert result.split_counts["unsplit"] == 1
 
     manifest = read_manifest(output_dir)

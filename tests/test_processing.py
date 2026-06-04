@@ -75,7 +75,7 @@ def test_tolerance_marks_failed_agents() -> None:
 def test_require_keeps_scene_with_enough_agents() -> None:
     df = pl.DataFrame({"scene": [1, 1, 1, 1, 1], "id": [1, 1, 2, 2, 3], "frame": [0, 1, 0, 1, 0]})
     rules = ScreeningRuleSet.define(
-        agent_rules=[agent.MinSamples(minimum=2, require=PassingRequirement(absolute=2))]
+        agent_rules=[agent.MinObservations(minimum=2, require=PassingRequirement(absolute=2))]
     )
 
     result = screen_scene(
@@ -112,7 +112,7 @@ def test_require_frames_marks_agents_using_scene_relative_frames() -> None:
 def test_require_frames_uses_pre_cleanup_scene_start() -> None:
     df = pl.DataFrame({"scene": [1, 1, 1, 1], "id": [1, 2, 2, 2], "frame": [0, 1, 2, 3]})
     rules = ScreeningRuleSet.define(
-        cleanup_rules=[agent.MinSamples(minimum=2)],
+        cleanup_rules=[agent.MinObservations(minimum=2)],
         agent_rules=[
             agent.AgentRequireFrames.define(frames={3}, require=PassingRequirement(absolute=1))
         ],
@@ -129,7 +129,7 @@ def test_require_frames_uses_pre_cleanup_scene_start() -> None:
 def test_require_relative_filters_scene() -> None:
     df = pl.DataFrame({"scene": [1, 1, 1, 1, 1], "id": [1, 1, 2, 2, 3], "frame": [0, 1, 0, 1, 0]})
     rules = ScreeningRuleSet.define(
-        agent_rules=[agent.MinSamples(minimum=2, require=PassingRequirement(relative=0.75))]
+        agent_rules=[agent.MinObservations(minimum=2, require=PassingRequirement(relative=0.75))]
     )
 
     result = screen_scene(df, rules, scene_group_by="scene", columns=TrajectoryColumns())
@@ -143,7 +143,7 @@ def test_require_and_tolerance_both_apply() -> None:
         "id": [1, 1, 2, 2, 3, 3, 4, 5],
         "frame": [0, 1, 0, 1, 0, 1, 0, 0],
     })
-    rule = agent.MinSamples(
+    rule = agent.MinObservations(
         minimum=2, require=PassingRequirement(absolute=3), tolerance=Tolerance(relative=0.25)
     )
 
@@ -166,7 +166,7 @@ def test_require_fails_without_matches() -> None:
     })
     rules = ScreeningRuleSet.define(
         agent_rules=[
-            agent.MinSamples(
+            agent.MinObservations(
                 minimum=2,
                 selector=AgentCategorySelector.include(AgentCategory.PEDESTRIAN),
                 require=PassingRequirement(absolute=1),
@@ -184,7 +184,7 @@ def test_require_fails_without_matches() -> None:
 def test_prune_by_rejects_agent_require() -> None:
     with pytest.raises(ValueError, match="require"):
         _ = cleanup.PruneByRule(
-            agent_rule=agent.MinSamples(minimum=2, require=PassingRequirement(absolute=1))
+            agent_rule=agent.MinObservations(minimum=2, require=PassingRequirement(absolute=1))
         )
 
 

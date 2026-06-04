@@ -92,37 +92,39 @@ def build_execution_plan(
         effective_horizon_frames=effective_horizon_frames,
         effective_default_observation_length=effective_default_observation_length,
         effective_sample_time=effective_sample_time,
-        output_sample=request.output_sample,
+        output_transform=request.output_transform,
         limit=request.limit,
         seed=request.seed,
         resolved_config=resolved_config,
     )
 
 
-def _validate_read_support(spec: DatasetDescriptor, config: ReadConfig | None) -> bool:
+def _validate_read_support(descriptor: DatasetDescriptor, config: ReadConfig | None) -> bool:
     if config is None:
         return True
     match config.root:
         case ReadNative(splits=splits) if splits is not None:
-            supported = spec.supported_native_splits
+            supported = descriptor.supported_native_splits
             if not supported:
                 return False
             return set(splits).issubset(supported)
         case ReadNative(splits=None):
-            return bool(spec.supported_native_splits)
+            return bool(descriptor.supported_native_splits)
         case _:
             return True
 
 
-def _validate_assignment_support(spec: DatasetDescriptor, config: AssignConfig | None) -> bool:
+def _validate_assignment_support(
+    descriptor: DatasetDescriptor, config: AssignConfig | None
+) -> bool:
     if config is None:
         return True
-    support = spec.split_support
+    support = descriptor.split_support
     match config.root:
         case NoAssign():
             return True
         case PreserveNativeAssign():
-            return bool(spec.supported_native_splits)
+            return bool(descriptor.supported_native_splits)
         case TimeBlockAssign() | ShuffledTimeBlockAssign():
             return support.time_block
         case SceneAssign():
@@ -131,17 +133,17 @@ def _validate_assignment_support(spec: DatasetDescriptor, config: AssignConfig |
             return support.source
 
 
-def _validate_feature_support(spec: DatasetDescriptor, config: DatasetConfig) -> bool:
+def _validate_feature_support(descriptor: DatasetDescriptor, config: DatasetConfig) -> bool:
     if config.scenes.lane_change is None:
         return True
     if config.scenes.window is None:
         msg = "Lane-change sampling requires window sampling to be enabled."
         raise dronalize_exceptions.ConfigurationError(msg)
-    return spec.feature_support.lane_change_sampling
+    return descriptor.feature_support.lane_change_sampling
 
 
-def _validate_temporal_support(spec: DatasetDescriptor, config: DatasetConfig) -> None:
-    support = spec.temporal_support
+def _validate_temporal_support(descriptor: DatasetDescriptor, config: DatasetConfig) -> None:
+    support = descriptor.temporal_support
     window = config.scenes.window
     if support is None or window is None:
         return
@@ -149,7 +151,7 @@ def _validate_temporal_support(spec: DatasetDescriptor, config: DatasetConfig) -
     windowing = support.windowing
     if window.policy not in windowing.supported_policies:
         msg = (
-            f"Dataset {spec.name} does not support window policy '{window.policy}'. "
+            f"Dataset {descriptor.name} does not support window policy '{window.policy}'. "
             f"Supported policies: {', '.join(windowing.supported_policies)}."
         )
         raise dronalize_exceptions.ConfigurationError(msg)
@@ -166,7 +168,7 @@ def _validate_temporal_support(spec: DatasetDescriptor, config: DatasetConfig) -
         return
 
     msg = (
-        f"Dataset {spec.name} supports windows up to {max_frames} source frames, "
+        f"Dataset {descriptor.name} supports windows up to {max_frames} source frames, "
         f"but the resolved scene window requests {requested_frames} frames."
     )
     if windowing.validation == "warn":

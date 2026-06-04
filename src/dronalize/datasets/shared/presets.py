@@ -1,4 +1,4 @@
-"""Small helpers for explicit dataset spec definitions."""
+"""Small helpers for explicit dataset descriptor definitions."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal
 from dronalize.config.models import (
     ExcludeCategoriesSpec,
     LaneChangeConfig,
-    MinSamplesSpec,
+    MinObservationsSpec,
     PassingRequirement,
     PruneByRuleSpec,
     RequireFramesSpec,
@@ -45,18 +45,18 @@ def exclude_category_screening(*category: AgentCategory) -> ScreeningConfig:
     return ScreeningConfig(cleanup={"category": ExcludeCategoriesSpec(categories=category)})
 
 
-def minimum_samples_screening(
+def minimum_observations_screening(
     minimum: int, *, required_frame: int | None = None
 ) -> ScreeningConfig:
-    """Return the standard screening used by built-in dataset specs.
+    """Return the standard screening used by built-in dataset descriptors.
 
     Parameters
     ----------
     minimum : int
-        Minimum number of samples required for each agent to be retained in the
+        Minimum number of observations required for each agent to be retained in the
         scene. This will cleanup all agents that do not meet this requirement.
     required_frame : int | None, optional
-        If not None, also require that each retained agent has a valid sample at
+        If not None, also require that each retained agent has a valid observation at
         the given frame index (relative to the start of the scene) in order for
         the scene to be retained. This rule requires only that at least one
         agent meets the requirement.
@@ -68,7 +68,9 @@ def minimum_samples_screening(
 
     """
     screening = ScreeningConfig(
-        cleanup={"min_samples": PruneByRuleSpec(agent_rule=MinSamplesSpec(minimum=minimum))}
+        cleanup={
+            "min_observations": PruneByRuleSpec(agent_rule=MinObservationsSpec(minimum=minimum))
+        }
     )
     if required_frame is None:
         return screening
@@ -163,7 +165,7 @@ def scenes_config(
     resample: ResampleConfig | None = None,
     lane_change: LaneChangeConfig | None = None,
 ) -> ScenesConfig:
-    """Build an explicit `ScenesConfig` while keeping specs concise."""
+    """Build an explicit `ScenesConfig` while keeping descriptor defaults concise."""
     return ScenesConfig(
         horizon_frames=horizon_frames,
         default_observation_length=default_observation_length,

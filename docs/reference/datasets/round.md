@@ -10,7 +10,7 @@ rounD is a naturalistic drone dataset for roundabout traffic in Germany. It is w
   <div class="summary-item"><span>Primary agents</span><strong>Mixed</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Drone</strong></div>
   <div class="summary-item"><span>Map context</span><strong>HD</strong></div>
-  <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
+  <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
 ## Default processing profile
@@ -25,7 +25,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Source bounds | 11024-31240 frames (observed) |
 | Resampling | 2:5 (linear) |
 | Sliding windows | Enabled, strict, step 25 |
-| Screening | Prune agents with fewer than 2 samples |
+| Screening | Prune agents with fewer than 2 observations |
 | Maps | Full map |
 
 ## Dataset compatibility

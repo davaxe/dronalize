@@ -48,8 +48,8 @@ Current manifests use `format_version = 2`.
 | `precision` | `str` | Floating-point precision used for persisted features (`"float32"` or `"float64"`). |
 | `recenter_positions` | `bool` | Whether per-scene position recentering was applied. |
 | `has_map` | `bool` | Whether the run requested map output and records may contain map topology arrays. |
-| `sample_time` | `float` | Effective sample interval (seconds) after any resampling. |
-| `original_sample_time` | `float` | Source sample interval (seconds) before resampling. |
+| `sample_time` | `float` | Effective `sample_time` interval (seconds) after any resampling. |
+| `original_sample_time` | `float` | Source `sample_time` interval (seconds) before resampling. |
 
 ## Read it programmatically
 

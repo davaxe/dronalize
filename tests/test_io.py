@@ -11,7 +11,7 @@ import pytest
 from dronalize.io import DatasetManifest, read_manifest
 from dronalize.io.backends.pickle import PickleWriter
 from dronalize.io.encoding import encode_scene_record, encode_split_scene_record
-from dronalize.io.encoding.mds import decode_mds_sample, encode_mds_sample
+from dronalize.io.encoding.mds import decode_mds_row, encode_mds_row
 from dronalize.io.manifest import write_manifest
 from dronalize.io.readers import PickleReader
 from dronalize.io.records import join_split_scene_record, split_scene_record
@@ -29,7 +29,7 @@ NDArrayAny = npt.NDArray[Any]
 
 
 @dataclass(slots=True)
-class CustomPickleSample:
+class CustomPickleRecord:
     scene_number: int
     dataset: object
     values: npt.NDArray[Any]
@@ -85,8 +85,8 @@ def test_pickle_writer_accepts_record_transform(tmp_path: Path, scene: Scene) ->
     scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
 
-    def transform(record: SceneRecord) -> CustomPickleSample:
-        return CustomPickleSample(
+    def transform(record: SceneRecord) -> CustomPickleRecord:
+        return CustomPickleRecord(
             scene_number=record.scene_number,
             dataset=record.dataset_id,
             values=record.features[:, :1, 0],
@@ -99,21 +99,21 @@ def test_pickle_writer_accepts_record_transform(tmp_path: Path, scene: Scene) ->
     writer.write(scene)
     writer.finish_local()
 
-    reader = PickleReader(output_dir, sample_type=CustomPickleSample)
-    sample = reader[0]
+    reader = PickleReader(output_dir, record_type=CustomPickleRecord)
+    record = reader[0]
 
-    assert sample.scene_number == scene.scene_number
-    assert sample.dataset == 0
-    assert sample.source == "record"
-    assert sample.values.shape == (2, 1)
+    assert record.scene_number == scene.scene_number
+    assert record.dataset == 0
+    assert record.source == "record"
+    assert record.values.shape == (2, 1)
 
 
 def test_pickle_writer_accepts_scene_transform(tmp_path: Path, scene: Scene) -> None:
     scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
 
-    def transform(scene: Scene) -> CustomPickleSample:
-        return CustomPickleSample(
+    def transform(scene: Scene) -> CustomPickleRecord:
+        return CustomPickleRecord(
             scene_number=scene.scene_number,
             dataset=scene.dataset,
             values=np.array([scene.horizon_frames], dtype=np.int32),
@@ -126,12 +126,12 @@ def test_pickle_writer_accepts_scene_transform(tmp_path: Path, scene: Scene) -> 
     writer.write(scene)
     writer.finish_local()
 
-    sample = PickleReader(output_dir, sample_type=CustomPickleSample)[0]
+    record = PickleReader(output_dir, record_type=CustomPickleRecord)[0]
 
-    assert sample.scene_number == scene.scene_number
-    assert sample.dataset == "demo"
-    assert sample.source == "scene"
-    np.testing.assert_array_equal(sample.values, np.array([scene.horizon_frames], dtype=np.int32))
+    assert record.scene_number == scene.scene_number
+    assert record.dataset == "demo"
+    assert record.source == "scene"
+    np.testing.assert_array_equal(record.values, np.array([scene.horizon_frames], dtype=np.int32))
 
 
 def test_pickle_writer_rejects_multiple_transforms(tmp_path: Path) -> None:
@@ -198,13 +198,13 @@ def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene)
         splits=None,
         parallel=False,
         record_transform=transform,
-        sample_columns=columns,
+        mds_columns=columns,
     )
     writer.write(scene)
     writer.finish_local()
     writer.finish_final()
 
-    raw = MDSReader(path=output_dir, convert_raw=lambda sample: sample)[0]
+    raw = MDSReader(path=output_dir, convert_raw=lambda record: record)[0]
     expected = encode_scene_record(scene, dtype=np.float32)
 
     assert int(raw["scene_number"]) == scene.scene_number
@@ -219,7 +219,7 @@ def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> Non
 
     from dronalize.io.backends.mds import MDSDatasetWriter
 
-    with pytest.raises(ValueError, match="sample_columns"):
+    with pytest.raises(ValueError, match="mds_columns"):
         _ = MDSDatasetWriter(
             output_dir=tmp_path,
             config=output_plan(),
@@ -232,8 +232,8 @@ def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> Non
 def test_mds_encoder_decoder_roundtrip(scene: Scene) -> None:
     scene = replace(scene, dataset="demo")
     expected = encode_scene_record(scene, dtype=np.float32, default_observation_length=2)
-    sample = encode_mds_sample(expected)
-    decoded = decode_mds_sample(sample)
+    record = encode_mds_row(expected)
+    decoded = decode_mds_row(record)
 
     assert_scene_record_equal(decoded, expected)
 
@@ -338,19 +338,19 @@ def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     from dronalize.io.adapters.torch import TorchSceneDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
-    sample = TorchSceneDataset(reader)[0]
+    record = TorchSceneDataset(reader)[0]
 
-    assert sample.scene_number == expected.scene_number
-    assert sample.dataset_id == expected.dataset_id
-    _assert_tensor_allclose(sample.position_offset, expected.position_offset)
-    _assert_tensor_array_equal(sample.agent_types, expected.agent_types)
-    _assert_tensor_array_equal(sample.screened_agent_mask, expected.screened_agent_mask)
-    _assert_tensor_allclose(sample.features, expected.features)
-    _assert_tensor_array_equal(sample.agent_time_mask, expected.mask)
-    _assert_tensor_allclose(sample.map_node_positions, expected.map_node_positions)
-    _assert_tensor_array_equal(sample.map_edge_indices, expected.map_edge_indices)
-    _assert_tensor_array_equal(sample.map_node_types, expected.map_node_types)
-    _assert_tensor_array_equal(sample.map_edge_types, expected.map_edge_types)
+    assert record.scene_number == expected.scene_number
+    assert record.dataset_id == expected.dataset_id
+    _assert_tensor_allclose(record.position_offset, expected.position_offset)
+    _assert_tensor_array_equal(record.agent_types, expected.agent_types)
+    _assert_tensor_array_equal(record.screened_agent_mask, expected.screened_agent_mask)
+    _assert_tensor_allclose(record.features, expected.features)
+    _assert_tensor_array_equal(record.agent_time_mask, expected.mask)
+    _assert_tensor_allclose(record.map_node_positions, expected.map_node_positions)
+    _assert_tensor_array_equal(record.map_edge_indices, expected.map_edge_indices)
+    _assert_tensor_array_equal(record.map_node_types, expected.map_node_types)
+    _assert_tensor_array_equal(record.map_edge_types, expected.map_edge_types)
 
 
 def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> None:
@@ -358,8 +358,8 @@ def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> Non
     from dronalize.io.adapters.torch import TorchSceneDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
-    sample = TorchSceneDataset(reader)[0]
-    split = sample.split(2)
+    record = TorchSceneDataset(reader)[0]
+    split = record.split(2)
 
     assert split.scene_number == expected.scene_number
     assert split.dataset_id == expected.dataset_id
@@ -376,21 +376,21 @@ def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     from dronalize.io.adapters.pyg import HeteroSceneDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
-    sample = HeteroSceneDataset(reader).get(0)
+    record = HeteroSceneDataset(reader).get(0)
 
-    assert sample.scene_number == expected.scene_number
-    assert sample.dataset_id == expected.dataset_id
-    _assert_tensor_allclose(sample.position_offset, expected.position_offset)
-    _assert_tensor_allclose(sample["agent"].features, expected.features)
-    _assert_tensor_array_equal(sample["agent"].mask, expected.mask)
-    _assert_tensor_array_equal(sample["agent"].agent_type, expected.agent_types)
-    _assert_tensor_array_equal(sample["agent"].passed_mask, expected.screened_agent_mask)
-    _assert_tensor_allclose(sample["map"].x, expected.map_node_positions)
-    _assert_tensor_array_equal(sample["map"].node_type, expected.map_node_types)
+    assert record.scene_number == expected.scene_number
+    assert record.dataset_id == expected.dataset_id
+    _assert_tensor_allclose(record.position_offset, expected.position_offset)
+    _assert_tensor_allclose(record["agent"].features, expected.features)
+    _assert_tensor_array_equal(record["agent"].agent_time_mask, expected.mask)
+    _assert_tensor_array_equal(record["agent"].agent_type, expected.agent_types)
+    _assert_tensor_array_equal(record["agent"].screened_agent_mask, expected.screened_agent_mask)
+    _assert_tensor_allclose(record["map"].x, expected.map_node_positions)
+    _assert_tensor_array_equal(record["map"].node_type, expected.map_node_types)
     _assert_tensor_array_equal(
-        sample["map", "connects", "map"].edge_index, expected.map_edge_indices
+        record["map", "connects", "map"].edge_index, expected.map_edge_indices
     )
-    _assert_tensor_array_equal(sample["map", "connects", "map"].edge_type, expected.map_edge_types)
+    _assert_tensor_array_equal(record["map", "connects", "map"].edge_type, expected.map_edge_types)
 
 
 def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:
@@ -398,12 +398,12 @@ def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:
     from dronalize.io.adapters.pyg import HeteroSceneDataset, collate_hetero_with_time_padding
 
     reader, _ = _build_pickle_reader(tmp_path, scene)
-    sample = HeteroSceneDataset(reader).get(0)
+    record = HeteroSceneDataset(reader).get(0)
 
-    shorter = sample.clone()
+    shorter = record.clone()
     shorter["agent"].features = shorter["agent"].features[:, :1, :]
-    shorter["agent"].mask = shorter["agent"].mask[:, :1]
+    shorter["agent"].agent_time_mask = shorter["agent"].agent_time_mask[:, :1]
 
-    batch = collate_hetero_with_time_padding([shorter, sample])
+    batch = collate_hetero_with_time_padding([shorter, record])
 
-    assert int(batch["agent"].features.size(1)) == int(sample["agent"].features.size(1))
+    assert int(batch["agent"].features.size(1)) == int(record["agent"].features.size(1))

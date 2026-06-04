@@ -10,7 +10,7 @@ from dronalize.datasets.registry import (
 from dronalize.datasets.shared.presets import (
     combine_screenings,
     exclude_category_screening,
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -32,7 +32,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
             horizon_frames=70, default_observation_length=20, sample_time=0.1, window_step=20
         ),
         screening=combine_screenings(
-            minimum_samples_screening(2, required_frame=19),
+            minimum_observations_screening(2, required_frame=19),
             exclude_category_screening(AgentCategory.UNKNOWN),
         ),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),

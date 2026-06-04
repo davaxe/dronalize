@@ -57,9 +57,9 @@ class DatasetManifest:
     has_map: bool
     """Whether records may contain map topology arrays."""
     sample_time: float
-    """Output sample interval in seconds after resampling."""
+    """Output `sample_time` interval in seconds after resampling."""
     original_sample_time: float
-    """Dataset sample interval in seconds before resampling."""
+    """Dataset `sample_time` interval in seconds before resampling."""
     format_version: int = FORMAT_VERSION
     """Manifest schema version used for compatibility checks."""
     dataset_names: tuple[str, ...] = ()

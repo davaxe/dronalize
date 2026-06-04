@@ -6,7 +6,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -17,7 +17,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     loader_factory=WaymoLoader.from_loader_request,
     default_config=DatasetConfig(
         scenes=scenes_config(horizon_frames=91, default_observation_length=11, sample_time=0.1),
-        screening=minimum_samples_screening(2, required_frame=10),
+        screening=minimum_observations_screening(2, required_frame=10),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
     native_schema=WaymoLoader.native_trajectory_schema(),

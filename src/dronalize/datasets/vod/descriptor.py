@@ -6,7 +6,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
-    minimum_samples_screening,
+    minimum_observations_screening,
     scenes_config,
     temporal_support,
 )
@@ -29,7 +29,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
         scenes=scenes_config(
             horizon_frames=35, default_observation_length=5, sample_time=0.1, window_step=5
         ),
-        screening=minimum_samples_screening(2, required_frame=4),
+        screening=minimum_observations_screening(2, required_frame=4),
         map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     ),
     loader_options_model=VodLoaderOptions,

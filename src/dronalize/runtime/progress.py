@@ -51,21 +51,21 @@ class _ExecutorDisplay(RichCast):
         self.task_id: rp.TaskID = self.progress.add_task("run", total=0)
         self.workers: int = 0
         self.candidate_scenes: int = 0
-        self.selected_scenes: int = 0
+        self.written_scenes: int = 0
         self.split_counts: SplitCounts = SplitCounts(unsplit=0, train=0, val=0, test=0)
         self.screening_enabled: bool = False
 
     def update(self, progress_state: Progress) -> None:
         if progress_state.scene_limit is not None:
             total = progress_state.scene_limit
-            completed = progress_state.selected_scenes
+            completed = progress_state.written_scenes
         else:
             total = progress_state.total_sources
             completed = progress_state.processed_sources
 
         self.workers = progress_state.active_workers if progress_state.running else 0
         self.candidate_scenes = progress_state.candidate_scenes
-        self.selected_scenes = progress_state.selected_scenes
+        self.written_scenes = progress_state.written_scenes
         self.split_counts = progress_state.split_counts
         self.screening_enabled = progress_state.screening_enabled
 
@@ -83,7 +83,7 @@ class _ExecutorDisplay(RichCast):
         layout_elements: list[RenderableType] = [self.progress, ""]
         stats_markup = (
             f"[bold cyan]Workers:[/bold cyan] {self.workers}"
-            f"    [bold magenta]Scenes:[/bold magenta] {self.selected_scenes}"
+            f"    [bold magenta]Scenes:[/bold magenta] {self.written_scenes}"
         )
         stats_text = Text.from_markup(stats_markup)
         stats_text.justify = "center"
@@ -91,13 +91,13 @@ class _ExecutorDisplay(RichCast):
 
         if self.screening_enabled:
             screening_percent = (
-                (self.selected_scenes / self.candidate_scenes) * 100
+                (self.written_scenes / self.candidate_scenes) * 100
                 if self.candidate_scenes > 0
                 else 0
             )
             screening_markup = (
                 "[bold yellow]Screening:[/bold yellow] "
-                f"{self.selected_scenes} / {self.candidate_scenes} ({screening_percent:.1f}%)"
+                f"{self.written_scenes} / {self.candidate_scenes} ({screening_percent:.1f}%)"
             )
             screening_text = Text.from_markup(screening_markup)
             screening_text.justify = "center"

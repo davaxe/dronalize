@@ -23,6 +23,7 @@ nav = [
 
   { Concepts = [
     "concepts/index.md",
+    { Terminology = "concepts/terminology.md" },
     { "Configuration model" = "concepts/configuration-model.md" },
     { "Split strategies" = "concepts/split-strategies.md" },
     { "Screening scenes" = "concepts/screening.md" },

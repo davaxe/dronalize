@@ -44,7 +44,7 @@ def test_builtin_screening_requires_observation_end(name: str) -> None:
     screening = descriptor.default_config.screening
 
     assert screening is not None
-    assert "min_samples" in screening.cleanup
+    assert "min_observations" in screening.cleanup
     assert "require_frames" in screening.agent
     rule = screening.agent["require_frames"]
     assert isinstance(rule, RequireFramesSpec)
@@ -59,10 +59,6 @@ def test_builtin_screening_requires_observation_end(name: str) -> None:
 def test_builtin_datasets_have_temporal_support(name: str) -> None:
     descriptor = get_dataset(name)
     temporal = descriptor.temporal_support
-
-    if descriptor.name == "a43":
-        assert temporal is None
-        return
 
     assert temporal is not None
     assert temporal.source_frame_bounds.min_frames is not None

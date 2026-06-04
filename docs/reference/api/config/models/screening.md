@@ -19,7 +19,7 @@
 
 ## ::: dronalize.config.models.RequireWindowSpec
 
-## ::: dronalize.config.models.MinSamplesSpec
+## ::: dronalize.config.models.MinObservationsSpec
 
 ## ::: dronalize.config.models.MaxMissingFramesSpec
 

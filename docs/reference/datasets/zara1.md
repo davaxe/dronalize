@@ -10,7 +10,7 @@ Zara1 is a pedestrian-only scene from the ETH/UCY benchmark family. It is common
   <div class="summary-item"><span>Primary agents</span><strong>Pedestrians</strong></div>
   <div class="summary-item"><span>Capture platform</span><strong>Camera</strong></div>
   <div class="summary-item"><span>Map context</span><strong>None</strong></div>
-  <div class="summary-item"><span># Samples</span><strong>Processed samples planned</strong></div>
+  <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
 ## Default processing profile
@@ -25,7 +25,7 @@ These are the default Dronalize settings used when processing this dataset.
 | Source bounds | 89-1440 frames (observed) |
 | Resampling | 4:1 (linear) |
 | Sliding windows | Enabled, strict, step 1 |
-| Screening | Keep agents with at least 2 samples |
+| Screening | Keep agents with at least 2 observations |
 | Maps | None |
 
 ## Dataset compatibility

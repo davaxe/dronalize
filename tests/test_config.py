@@ -12,7 +12,7 @@ from dronalize.config.models import (
     DatasetConfig,
     ExcludeCategoriesSpec,
     MapEdgeTypeRules,
-    MinSamplesSpec,
+    MinObservationsSpec,
     RequireSceneFramesSpec,
     RequireSceneWindowSpec,
     SceneExtentExtraction,
@@ -297,8 +297,8 @@ def test_screening_extend_is_default(tmp_path: Path) -> None:
         _write(
             tmp_path,
             """
-            [datasets.demo.screening.agent.sample_floor]
-            rule = "min_samples"
+            [datasets.demo.screening.agent.observation_floor]
+            rule = "min_observations"
             minimum = 8
             """,
         )
@@ -309,9 +309,9 @@ def test_screening_extend_is_default(tmp_path: Path) -> None:
     assert resolved.screening is not None
     assert resolved.screening.cleanup == {}
     assert resolved.screening.scene == {}
-    assert set(resolved.screening.agent) == {"sample_floor"}
-    assert isinstance(resolved.screening.agent["sample_floor"], MinSamplesSpec)
-    assert resolved.screening.agent["sample_floor"].minimum == 8
+    assert set(resolved.screening.agent) == {"observation_floor"}
+    assert isinstance(resolved.screening.agent["observation_floor"], MinObservationsSpec)
+    assert resolved.screening.agent["observation_floor"].minimum == 8
 
 
 def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
@@ -327,8 +327,8 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
             start_frame = 0
             end_frame = 3
 
-            [datasets.demo.screening.agent.sample_floor]
-            rule = "min_samples"
+            [datasets.demo.screening.agent.observation_floor]
+            rule = "min_observations"
             minimum = 8
             """,
         )
@@ -340,7 +340,7 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
             screening={
                 "cleanup": {"trim_static": {"rule": "exclude", "categories": ["STATIC_OBJECT"]}},
                 "scene": {"min_context": {"rule": "agent_range", "minimum": 2}},
-                "agent": {"sample_floor": {"rule": "min_samples", "minimum": 4}},
+                "agent": {"observation_floor": {"rule": "min_observations", "minimum": 4}},
             }
         ),
     )
@@ -348,12 +348,12 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
     assert resolved.screening is not None
     assert set(resolved.screening.cleanup) == {"trim_static"}
     assert set(resolved.screening.scene) == {"min_context", "context_window"}
-    assert set(resolved.screening.agent) == {"sample_floor"}
+    assert set(resolved.screening.agent) == {"observation_floor"}
     assert isinstance(resolved.screening.cleanup["trim_static"], ExcludeCategoriesSpec)
     assert isinstance(resolved.screening.scene["min_context"], AgentRangeSpec)
     assert isinstance(resolved.screening.scene["context_window"], RequireSceneWindowSpec)
-    assert isinstance(resolved.screening.agent["sample_floor"], MinSamplesSpec)
-    assert resolved.screening.agent["sample_floor"].minimum == 8
+    assert isinstance(resolved.screening.agent["observation_floor"], MinObservationsSpec)
+    assert resolved.screening.agent["observation_floor"].minimum == 8
 
 
 def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
@@ -378,7 +378,7 @@ def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
             screening={
                 "cleanup": {"trim_static": {"rule": "exclude", "categories": ["STATIC_OBJECT"]}},
                 "scene": {"min_context": {"rule": "agent_range", "minimum": 2}},
-                "agent": {"sample_floor": {"rule": "min_samples", "minimum": 4}},
+                "agent": {"observation_floor": {"rule": "min_observations", "minimum": 4}},
             }
         ),
     )
@@ -415,8 +415,8 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
                     "keep_scene": {"rule": "scene_frames", "frames": [0]},
                 },
                 "agent": {
-                    "shared": {"rule": "min_samples", "minimum": 4},
-                    "keep_agent": {"rule": "min_samples", "minimum": 2},
+                    "shared": {"rule": "min_observations", "minimum": 4},
+                    "keep_agent": {"rule": "min_observations", "minimum": 2},
                 },
             }
         ),
@@ -428,7 +428,7 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
     assert set(resolved.screening.agent) == {"keep_agent"}
     assert isinstance(resolved.screening.cleanup["keep_cleanup"], ExcludeCategoriesSpec)
     assert isinstance(resolved.screening.scene["keep_scene"], RequireSceneFramesSpec)
-    assert isinstance(resolved.screening.agent["keep_agent"], MinSamplesSpec)
+    assert isinstance(resolved.screening.agent["keep_agent"], MinObservationsSpec)
 
 
 def test_screening_remove_applies_after_replace(tmp_path: Path) -> None:
@@ -441,11 +441,11 @@ def test_screening_remove_applies_after_replace(tmp_path: Path) -> None:
             remove = ["drop_me"]
 
             [datasets.demo.screening.agent.drop_me]
-            rule = "min_samples"
+            rule = "min_observations"
             minimum = 8
 
             [datasets.demo.screening.agent.keep_me]
-            rule = "min_samples"
+            rule = "min_observations"
             minimum = 3
             """,
         )
@@ -457,7 +457,7 @@ def test_screening_remove_applies_after_replace(tmp_path: Path) -> None:
     assert resolved.screening.cleanup == {}
     assert resolved.screening.scene == {}
     assert set(resolved.screening.agent) == {"keep_me"}
-    assert isinstance(resolved.screening.agent["keep_me"], MinSamplesSpec)
+    assert isinstance(resolved.screening.agent["keep_me"], MinObservationsSpec)
 
 
 def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
@@ -466,7 +466,7 @@ def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
             tmp_path,
             """
             [profiles.base.screening.agent.min_obs]
-            rule = "min_samples"
+            rule = "min_observations"
             minimum = 4
 
             [profiles.base.screening.scene.min_context]
@@ -477,7 +477,7 @@ def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
             mode = "extend"
 
             [profiles.strict.screening.agent.min_obs]
-            rule = "min_samples"
+            rule = "min_observations"
             minimum = 8
 
             [profiles.strict.screening.agent.anchor_present]
@@ -627,7 +627,7 @@ def test_cleanup_specs_compile_nested_agent_rules() -> None:
             "keep_only_cars": {"rule": "include", "categories": ["car"]},
             "prune_sparse": {
                 "rule": "prune_by",
-                "agent_rule": {"rule": "min_samples", "minimum": 3},
+                "agent_rule": {"rule": "min_observations", "minimum": 3},
             },
         }
     })
@@ -637,7 +637,7 @@ def test_cleanup_specs_compile_nested_agent_rules() -> None:
     assert len(compiled.cleanup_rules) == 2
     assert isinstance(compiled.cleanup_rules[0], cleanup.IncludeCategories)
     assert isinstance(compiled.cleanup_rules[1], cleanup.PruneByRule)
-    assert isinstance(compiled.cleanup_rules[1].agent_rule, agent.MinSamples)
+    assert isinstance(compiled.cleanup_rules[1].agent_rule, agent.MinObservations)
     assert compiled.cleanup_rules[0].rule_id == "keep_only_cars"
     assert compiled.cleanup_rules[1].rule_id == "prune_sparse"
 
@@ -648,7 +648,11 @@ def test_prune_by_config_rejects_nested_require() -> None:
             "cleanup": {
                 "prune_sparse": {
                     "rule": "prune_by",
-                    "agent_rule": {"rule": "min_samples", "minimum": 3, "require": {"absolute": 1}},
+                    "agent_rule": {
+                        "rule": "min_observations",
+                        "minimum": 3,
+                        "require": {"absolute": 1},
+                    },
                 }
             }
         })
@@ -657,7 +661,9 @@ def test_prune_by_config_rejects_nested_require() -> None:
 def test_require_must_define_threshold() -> None:
     with pytest.raises(ValueError, match="at least one"):
         ScreeningConfig.model_validate({
-            "agent": {"sample_floor": {"rule": "min_samples", "minimum": 3, "require": {}}}
+            "agent": {
+                "observation_floor": {"rule": "min_observations", "minimum": 3, "require": {}}
+            }
         })
 
 

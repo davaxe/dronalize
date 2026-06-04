@@ -16,20 +16,20 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-SampleT = TypeVar("SampleT", default=SceneRecord)
+RecordT = TypeVar("RecordT", default=SceneRecord)
 
 
-RecordTransform: TypeAlias = Callable[[SceneRecord], SampleT]
-"""Callable that converts a canonical `SceneRecord` into a persisted sample.
+RecordTransform: TypeAlias = Callable[[SceneRecord], RecordT]
+"""Callable that converts a canonical `SceneRecord` into a persisted payload.
 
-This is the preferred customization hook for user-defined persisted sample
+This is the preferred customization hook for user-defined persisted payload
 layouts because it preserves Dronalize's standard output semantics before
 materializing the custom payload.
 """
 
 
-SceneTransform: TypeAlias = Callable[[Scene], SampleT]
-"""Callable that converts a runtime `Scene` directly into a persisted sample.
+SceneTransform: TypeAlias = Callable[[Scene], RecordT]
+"""Callable that converts a runtime `Scene` directly into a persisted payload.
 
 This is an advanced escape hatch for users who intentionally want to bypass
 `SceneRecord` encoding. Callers using this hook own schema conversion,
@@ -60,23 +60,23 @@ StorageBackendId = StorageBackend | str
 """Storage backend identifier accepted by public runtime APIs."""
 
 
-class DatasetReader(ABC, Generic[SampleT]):
+class DatasetReader(ABC, Generic[RecordT]):
     """Abstract base class for scene readers."""
 
     @abstractmethod
     def __len__(self) -> int:
         """Return the number of scene records."""
 
-    def __iter__(self) -> Iterator[SampleT]:
+    def __iter__(self) -> Iterator[RecordT]:
         """Iterate over decoded scene records."""
         for i in range(len(self)):
             yield self[i]
 
     @abstractmethod
-    def __getitem__(self, at: int) -> SampleT:
+    def __getitem__(self, at: int) -> RecordT:
         """Return a single decoded scene record."""
 
-    def get(self, at: int) -> SampleT | None:
+    def get(self, at: int) -> RecordT | None:
         """Return a single decoded scene record.
 
         Parameters
@@ -86,7 +86,7 @@ class DatasetReader(ABC, Generic[SampleT]):
 
         Returns
         -------
-        SampleT or None
+        RecordT or None
             The decoded scene record at the specified index, or `None` if the
             index is out of bounds.
 
@@ -97,7 +97,7 @@ class DatasetReader(ABC, Generic[SampleT]):
             return None
 
 
-class IterableDatasetReader(ABC, Generic[SampleT]):
+class IterableDatasetReader(ABC, Generic[RecordT]):
     """Abstract base class for iterable scene readers.
 
     This is a specialization of `DatasetReader` for backends that support
@@ -106,7 +106,7 @@ class IterableDatasetReader(ABC, Generic[SampleT]):
     """
 
     @abstractmethod
-    def __iter__(self) -> Iterator[SampleT]:
+    def __iter__(self) -> Iterator[RecordT]:
         """Iterate over decoded scene records."""
 
     def __len__(self) -> int:
@@ -174,7 +174,7 @@ def validate_transform_choice(
     record_transform: RecordTransform[object] | None,
     scene_transform: SceneTransform[object] | None,
 ) -> None:
-    """Validate that at most one sample customization hook is configured."""
+    """Validate that at most one output customization hook is configured."""
     if record_transform is not None and scene_transform is not None:
         msg = "Use either `record_transform` or `scene_transform`, not both."
         raise ValueError(msg)

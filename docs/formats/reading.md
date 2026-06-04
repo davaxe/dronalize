@@ -96,16 +96,16 @@ mask conventions match your model:
 
 <!-- no-validate -->
 ```python
-def split_hetero(sample):
-    observation_length = sample.default_observation_length
+def split_hetero(record):
+    observation_length = record.default_observation_length
     if observation_length is None:
         msg = "This record does not define a default observation length."
         raise ValueError(msg)
-    sample["agent"].x = sample["agent"].features[:, :observation_length]
-    sample["agent"].x_mask = sample["agent"].mask[:, :observation_length]
-    sample["agent"].y = sample["agent"].features[:, observation_length:]
-    sample["agent"].y_mask = sample["agent"].mask[:, observation_length:]
-    return sample
+    record["agent"].x = record["agent"].features[:, :observation_length]
+    record["agent"].x_mask = record["agent"].agent_time_mask[:, :observation_length]
+    record["agent"].y = record["agent"].features[:, observation_length:]
+    record["agent"].y_mask = record["agent"].agent_time_mask[:, observation_length:]
+    return record
 ```
 
 ## Choosing a reader setup

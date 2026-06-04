@@ -12,7 +12,7 @@ from typing_extensions import NotRequired, TypedDict, override
 from dronalize.config.models import (
     DatasetConfig,
     LaneChangeConfig,
-    MinSamplesSpec,
+    MinObservationsSpec,
     OutputConfig,
     ResampleConfig,
     ScenesConfig,
@@ -25,11 +25,7 @@ from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
 from dronalize.datasets import DatasetDescriptor, DatasetFeatureSupport
 from dronalize.io.records import SceneRecord
 from dronalize.processing.loading.base import SceneLoader
-from dronalize.processing.loading.models import (
-    DatasetOptionsModel,
-    DatasetSource,
-    LoadedSourceFrame,
-)
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, LoaderOptionsModel
 from dronalize.runtime.types import OutputPlan
 
 if TYPE_CHECKING:
@@ -50,7 +46,7 @@ class AgentData(TypedDict):
     lane_id: NotRequired[Sequence[int]]
 
 
-class DemoOptions(DatasetOptionsModel):
+class DemoOptions(LoaderOptionsModel):
     batch_size: int = Field(default=2, gt=0)
     use_cache: bool = False
 
@@ -120,7 +116,7 @@ def inherited_optional_blocks_descriptor() -> DatasetConfig:
             resample=ResampleConfig(up=2, down=1, method="cubic"),
             lane_change=LaneChangeConfig(persist=3),
         ),
-        screening=ScreeningConfig(agent={"min_obs": MinSamplesSpec(minimum=2)}),
+        screening=ScreeningConfig(agent={"min_obs": MinObservationsSpec(minimum=2)}),
     )
 
 
@@ -190,10 +186,10 @@ def make_scene_df(*agent_data: AgentData) -> pl.DataFrame:
 
 
 def _get_frames(agent: AgentData) -> list[int]:
-    samples = len(agent["x"])
+    observations = len(agent["x"])
     if "frame" in agent:
         return list(agent["frame"])
-    return list(range(samples))
+    return list(range(observations))
 
 
 def assert_scene_record_equal(actual: SceneRecord, expected: SceneRecord) -> None:

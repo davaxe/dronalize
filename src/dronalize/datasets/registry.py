@@ -22,9 +22,9 @@ from dronalize.core.errors import (
     MissingOptionalDependencyError,
 )
 from dronalize.processing.loading.models import (
-    DatasetOptionsModel,
     DatasetRunResources,
-    NoDatasetOptions,
+    LoaderOptionsModel,
+    NoLoaderOptions,
 )
 
 if TYPE_CHECKING:
@@ -159,7 +159,7 @@ class DatasetDescriptor:
     CLI, config resolver, and Python runtime all resolve dataset names to this
     object before planning a run.
 
-    The spec owns dataset-level metadata rather than per-run state. It defines
+    The descriptor owns dataset-level metadata rather than per-run state. It defines
     how to build loaders, which trajectory fields the raw loader produces, what
     configuration should be used as the starting point, which split strategies
     are valid, and whether map resources can be requested.
@@ -181,7 +181,7 @@ class DatasetDescriptor:
         Dataset-provided partitions available to `read.strategy = "native"` and
         `assign.strategy = "preserve-native"`. Use `None` for datasets without
         native partitions.
-    loader_options_model : type[DatasetOptionsModel], optional
+    loader_options_model : type[LoaderOptionsModel], optional
         Typed model for dataset-owned options under `[datasets.<name>.loader_options]`.
     resources_factory : ResourcesFactory or None, optional
         Optional context-manager factory for shared per-run resources such as
@@ -201,13 +201,13 @@ class DatasetDescriptor:
     default_config: DatasetConfig
     native_schema: TrajectorySchema
     supported_native_splits: tuple[DatasetSplit, ...] | None = None
-    loader_options_model: type[DatasetOptionsModel] = NoDatasetOptions
+    loader_options_model: type[LoaderOptionsModel] = NoLoaderOptions
     resources_factory: ResourcesFactory | None = None
     feature_support: DatasetFeatureSupport = DatasetFeatureSupport()
     split_support: DatasetSplitSupport = DatasetSplitSupport()
     temporal_support: DatasetTemporalSupport | None = None
 
-    def parse_loader_options(self, payload: Mapping[str, object] | None) -> DatasetOptionsModel:
+    def parse_loader_options(self, payload: Mapping[str, object] | None) -> LoaderOptionsModel:
         """Parse and validate dataset-owned config from plain data."""
         try:
             return self.loader_options_model.parse(dict(payload or {}))
@@ -227,7 +227,7 @@ class DatasetDescriptor:
     def build_loader(
         self, *, root: Path, request: LoaderPlan, resources: DatasetRunResources | None = None
     ) -> SceneLoader[Any, Any]:
-        """Construct one loader instance for this dataset specification."""
+        """Construct one loader instance for this dataset descriptor."""
         return self.loader_factory(data_root=root, request=request, resources=resources)
 
 
@@ -263,9 +263,6 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetDescriptor] = {
     "apolloscape": _builtin("dronalize.datasets.apolloscape"),
     "argoverse1": _builtin("dronalize.datasets.argoverse1"),
     "argoverse2": _builtin("dronalize.datasets.argoverse2"),
-    "eth_ucy": _builtin(
-        "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="eth_ucy"
-    ),
     "eth": _builtin(
         "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="eth"
     ),
@@ -333,7 +330,7 @@ def dataset_names_by_id() -> tuple[str, ...]:
 
 
 def register_dataset(descriptor: DatasetDescriptor) -> None:
-    """Register one dataset specification in the in-memory registry.
+    """Register one dataset descriptor in the in-memory registry.
 
     This is the main extension point for adding new datasets to dronalize from
     an external module.
@@ -341,7 +338,7 @@ def register_dataset(descriptor: DatasetDescriptor) -> None:
     Parameters
     ----------
     descriptor : DatasetDescriptor
-        The dataset specification to register.
+        The dataset descriptor to register.
     """
     if descriptor.name in _REGISTRY and _REGISTRY[descriptor.name] != descriptor:
         msg = f"Dataset '{descriptor.name}' is already registered."
@@ -369,14 +366,16 @@ def get_dataset(name: str) -> DatasetDescriptor:
         logger.debug("Resolved dataset descriptor from in-memory registry", extra={"dataset": name})
         return _REGISTRY[name]
 
-    builtin_specs = _builtin_datasets()
-    if name not in builtin_specs:
+    builtins = _builtin_datasets()
+    if name not in builtins:
         raise DatasetNotFoundError(name, list_datasets())
 
-    spec = builtin_specs[name]
-    missing = _missing_optional_dependencies(spec)
+    builtin = builtins[name]
+    missing = _missing_optional_dependencies(builtin)
     if missing:
-        raise _missing_dependency_error(subject=f"Dataset '{name}'", spec=spec, missing=missing)
+        raise _missing_dependency_error(
+            subject=f"Dataset '{name}'", builtin=builtin, missing=missing
+        )
 
     logger.debug("Resolved dataset descriptor from built-in registry", extra={"dataset": name})
     return _load_builtin_descriptor(name)
@@ -393,8 +392,8 @@ def list_datasets() -> list[str]:
     """
     builtin_names = {
         name
-        for name, spec in _builtin_datasets().items()
-        if not _missing_optional_dependencies(spec)
+        for name, builtin in _builtin_datasets().items()
+        if not _missing_optional_dependencies(builtin)
     }
     return sorted(set(_REGISTRY) | builtin_names)
 
@@ -405,21 +404,21 @@ def _builtin_datasets() -> dict[str, _BuiltinDatasetDescriptor]:
 
 @functools.cache
 def _load_builtin_descriptor(name: str) -> DatasetDescriptor:
-    spec = _builtin_datasets().get(name)
-    if spec is None:
+    builtin = _builtin_datasets().get(name)
+    if builtin is None:
         raise DatasetNotFoundError(name, list_datasets())
 
-    module = importlib.import_module(spec.module)
+    module = importlib.import_module(builtin.module)
     try:
-        exported = getattr(module, spec.export_name)
+        exported = getattr(module, builtin.export_name)
     except AttributeError as exc:
         msg = (
-            f"Built-in dataset module '{spec.module}' does not export '{spec.export_name}' "
+            f"Built-in dataset module '{builtin.module}' does not export '{builtin.export_name}' "
             f"for dataset '{name}'."
         )
         raise DatasetRegistryError(msg) from exc
 
-    descriptor = exported if spec.export_key is None else exported[spec.export_key]
+    descriptor = exported if builtin.export_key is None else exported[builtin.export_key]
     if not isinstance(descriptor, DatasetDescriptor):
         msg = f"Built-in dataset '{name}' did not resolve to a DatasetDescriptor."
         raise DatasetRegistryError(msg)
@@ -433,9 +432,9 @@ def _load_builtin_descriptor(name: str) -> DatasetDescriptor:
 
 
 @functools.lru_cache
-def _missing_optional_dependencies(spec: _BuiltinDatasetDescriptor) -> tuple[str, ...]:
+def _missing_optional_dependencies(builtin: _BuiltinDatasetDescriptor) -> tuple[str, ...]:
     return tuple(
-        module_name for module_name in spec.optional_dependencies if not _has_module(module_name)
+        module_name for module_name in builtin.optional_dependencies if not _has_module(module_name)
     )
 
 
@@ -448,9 +447,9 @@ def _has_module(module_name: str) -> bool:
 
 
 def _missing_dependency_error(
-    *, subject: str, spec: _BuiltinDatasetDescriptor, missing: tuple[str, ...]
+    *, subject: str, builtin: _BuiltinDatasetDescriptor, missing: tuple[str, ...]
 ) -> MissingOptionalDependencyError:
-    install_target = f"dronalize[{spec.extra}]" if spec.extra else None
+    install_target = f"dronalize[{builtin.extra}]" if builtin.extra else None
     install_hint = f"Install {install_target} to use it." if install_target else ""
     missing_str = ", ".join(missing)
     msg = (

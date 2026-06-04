@@ -32,12 +32,12 @@ if TYPE_CHECKING:
 
 
 class PickleWriter(DatasetWriter):
-    """Write one pickled sample per scene.
+    """Write one pickled record per scene.
 
     By default each file contains a full-horizon `SceneRecord`. Advanced callers
-    may provide `record_transform` to persist a custom pickleable sample derived
+    may provide `record_transform` to persist a custom pickleable payload derived
     from the encoded record, or `scene_transform` to bypass record encoding and
-    persist a sample derived directly from the runtime `Scene`.
+    persist a payload derived directly from the runtime `Scene`.
     """
 
     def __init__(
@@ -67,14 +67,14 @@ class PickleWriter(DatasetWriter):
 
     @override
     def write(self, scene: Scene) -> None:
-        """Encode one scene and persist the configured pickle sample."""
+        """Encode one scene and persist the configured pickle payload."""
         output_dir = self._dir_map[scene.split_assignment]
         file_path = output_dir / f"{scene.scene_number:06d}.pkl"
-        sample = self._make_sample(scene)
+        payload = self._make_payload(scene)
         with file_path.open("wb", buffering=1024 * 1024) as file:
-            pickle.dump(sample, file, protocol=pickle.HIGHEST_PROTOCOL)
+            pickle.dump(payload, file, protocol=pickle.HIGHEST_PROTOCOL)
 
-    def _make_sample(self, scene: Scene) -> object:
+    def _make_payload(self, scene: Scene) -> object:
         if self._scene_transform is not None:
             return self._scene_transform(scene)
 

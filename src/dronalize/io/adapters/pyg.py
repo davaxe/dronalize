@@ -36,9 +36,9 @@ HeteroDataTransform = Callable[[HeteroData], HeteroData]
 class HeteroSceneDataset(PyGDataset, Dataset[HeteroData], Generic[ReaderT]):
     """PyG dataset view over full-horizon Dronalize scene records.
 
-    Each sample is a `HeteroData` object with `agent` and `map` node stores and
+    Each record is a `HeteroData` object with `agent` and `map` node stores and
     a `("map", "connects", "map")` edge store. Agent trajectories are exposed
-    as `agent.features` with a matching `agent.mask`.
+    as `agent.features` with a matching `agent.agent_time_mask`.
     """
 
     def __init__(
@@ -50,7 +50,7 @@ class HeteroSceneDataset(PyGDataset, Dataset[HeteroData], Generic[ReaderT]):
 
     @override
     def __iter__(self) -> Iterator[HeteroData]:
-        """Iterate over the wrapped dataset, yielding samples converted to `HeteroData`."""
+        """Iterate over the wrapped dataset, yielding records converted to `HeteroData`."""
         for record in self.dataset:
             hetero = _convert_full_to_hetero(record)
             if self._transform is not None:
@@ -59,12 +59,12 @@ class HeteroSceneDataset(PyGDataset, Dataset[HeteroData], Generic[ReaderT]):
 
     @override
     def get(self, idx: int) -> HeteroData:
-        """Return one sample converted to `HeteroData`."""
+        """Return one record converted to `HeteroData`."""
         return _convert_full_to_hetero(self.dataset[idx])
 
     @override
     def len(self) -> int:
-        """Return the number of samples visible through the wrapped dataset."""
+        """Return the number of records visible through the wrapped dataset."""
         return len(self.dataset)
 
 
@@ -87,7 +87,7 @@ class IterableHeteroSceneDataset(IterableDataset[HeteroData], Generic[IterableRe
 
     @override
     def __iter__(self) -> Iterator[HeteroData]:
-        """Iterate over the wrapped dataset, yielding samples converted to `HeteroData`."""
+        """Iterate over the wrapped dataset, yielding records converted to `HeteroData`."""
         for record in self.dataset:
             hetero = _convert_full_to_hetero(record)
             if self._transform is not None:
@@ -95,45 +95,45 @@ class IterableHeteroSceneDataset(IterableDataset[HeteroData], Generic[IterableRe
             yield hetero
 
     def __len__(self) -> int:
-        """Return the number of samples visible through the wrapped dataset."""
+        """Return the number of records visible through the wrapped dataset."""
         return len(self.dataset)
 
 
-def collate_hetero_with_time_padding(samples: Sequence[HeteroData]) -> Batch:
+def collate_hetero_with_time_padding(records: Sequence[HeteroData]) -> Batch:
     """Batch hetero scenes by padding agent time axes within the current batch."""
-    if not samples:
-        msg = "`samples` must contain at least one HeteroData object."
+    if not records:
+        msg = "`records` must contain at least one HeteroData object."
         raise ValueError(msg)
 
-    max_horizon_frames = max(int(sample["agent"].features.size(1)) for sample in samples)
-    padded_samples: list[BaseData] = [
-        _pad_full_hetero_time_axes(sample, horizon_frames=max_horizon_frames) for sample in samples
+    max_horizon_frames = max(int(record["agent"].features.size(1)) for record in records)
+    padded_records: list[BaseData] = [
+        _pad_full_hetero_time_axes(record, horizon_frames=max_horizon_frames) for record in records
     ]
-    return Batch.from_data_list(padded_samples)
+    return Batch.from_data_list(padded_records)
 
 
-def _convert_full_to_hetero(sample: TorchSceneRecord) -> HeteroData:
+def _convert_full_to_hetero(record: TorchSceneRecord) -> HeteroData:
     data = HeteroData()
 
-    data["agent"].features = sample.features
-    data["agent"].agent_time_mask = sample.agent_time_mask
-    data["agent"].agent_type = sample.agent_types
-    data["agent"].screened_agent_mask = sample.screened_agent_mask
-    data["agent"].num_nodes = sample.features.size(0)
+    data["agent"].features = record.features
+    data["agent"].agent_time_mask = record.agent_time_mask
+    data["agent"].agent_type = record.agent_types
+    data["agent"].screened_agent_mask = record.screened_agent_mask
+    data["agent"].num_nodes = record.features.size(0)
 
     _attach_map_store(
         data,
-        sample.map_node_positions,
-        sample.map_node_types,
-        sample.map_edge_indices,
-        sample.map_edge_types,
+        record.map_node_positions,
+        record.map_node_types,
+        record.map_edge_indices,
+        record.map_edge_types,
     )
     _attach_common_metadata(
         data,
-        sample.scene_number,
-        sample.dataset_id,
-        sample.position_offset,
-        default_observation_length=sample.default_observation_length,
+        record.scene_number,
+        record.dataset_id,
+        record.position_offset,
+        default_observation_length=record.default_observation_length,
     )
     return data
 
@@ -166,12 +166,14 @@ def _attach_common_metadata(
     data.default_observation_length = default_observation_length
 
 
-def _pad_full_hetero_time_axes(sample: HeteroData, *, horizon_frames: int) -> HeteroData:
-    padded = sample.clone()
+def _pad_full_hetero_time_axes(record: HeteroData, *, horizon_frames: int) -> HeteroData:
+    padded = record.clone()
     padded["agent"].features = _pad_along_dim(
-        sample["agent"].features, target=horizon_frames, dim=1
+        record["agent"].features, target=horizon_frames, dim=1
     )
-    padded["agent"].mask = _pad_along_dim(sample["agent"].mask, target=horizon_frames, dim=1)
+    padded["agent"].agent_time_mask = _pad_along_dim(
+        record["agent"].agent_time_mask, target=horizon_frames, dim=1
+    )
     return padded
 
 
