@@ -39,9 +39,59 @@ _RuleSpecT = TypeVar("_RuleSpecT", bound=BaseModel)
 AgentCheckSpecs = Annotated[tuple[AgentCheckRule, ...], BeforeValidator(tuple)]
 CleanupSpecs = Annotated[tuple[CleanupRule, ...], BeforeValidator(tuple)]
 SceneCheckSpecs = Annotated[tuple[SceneCheckRule, ...], BeforeValidator(tuple)]
-SCENE_SCREENING_PASS_COLUMN: Final[str] = "_scene_passes"  # noqa: S105
-AGENT_SCREENING_PASS_COLUMN: Final[str] = "_agent_passes"  # noqa: S105
 RELATIVE_FRAME_COLUMN: Final[str] = "_screening_relative_frame"
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupRuleSceneStats:
+    """Cleanup statistics for one rule within one candidate scene."""
+
+    rule_name: str
+    rows_before: int
+    rows_after: int
+    agents_before: int
+    agents_after: int
+
+    @property
+    def rows_removed(self) -> int:
+        """Number of rows removed by this cleanup rule."""
+        return self.rows_before - self.rows_after
+
+    @property
+    def agents_removed(self) -> int:
+        """Number of agents fully removed by this cleanup rule."""
+        return self.agents_before - self.agents_after
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupSceneStats:
+    """Cleanup statistics for one candidate scene across all cleanup rules."""
+
+    rows_before: int
+    rows_after: int
+    agents_before: int
+    agents_after: int
+    by_rule: tuple[CleanupRuleSceneStats, ...] = ()
+
+    @property
+    def rows_removed(self) -> int:
+        """Number of rows removed across all cleanup rules."""
+        return self.rows_before - self.rows_after
+
+    @property
+    def agents_removed(self) -> int:
+        """Number of agents fully removed across all cleanup rules."""
+        return self.agents_before - self.agents_after
+
+
+@dataclass(frozen=True, slots=True)
+class ScreeningResult:
+    """Structured result from screening one candidate scene."""
+
+    frame: pl.DataFrame
+    passes_scene: bool
+    cleanup: CleanupSceneStats | None = None
+    passed_agent_ids: frozenset[int] | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -134,60 +184,142 @@ class _AgentCheckRuleCompiler(_RuleCompiler[AgentCheckRule]):
         return TypeAdapter(AgentCheckRule)
 
 
-@dataclass(slots=True, frozen=True)
-class _RuleColumns:
-    """Diagnostic column names emitted for a single screening rule."""
-
-    agent_pass: str
-    scene_pass: str
-
-    @classmethod
-    def from_rule(cls, rule: Rule) -> _RuleColumns:
-        """Return stable rule column name for a given rule."""
-        prefix = f"_screening_rule_{rule_name(rule)}"
-        if isinstance(rule, AgentCheckRuleBase):
-            prefix = "_agent" + prefix
-        return cls(agent_pass=f"{prefix}_agent_passes", scene_pass=f"{prefix}_scene_passes")
-
-
-def screen_scene(
-    data: DataFrameT,
-    scene_screening: ScreeningRuleSet | None,
-    columns: TrajectoryColumns,
-    scene_group_by: str | Sequence[str] | None = None,
-    *,
-    mark_passed_agents: bool = False,
-    retain_scene_passes: bool = False,
-) -> DataFrameT:
-    """Apply cleanup and screening rules to trajectory scenes."""
+def screen_data(
+    data: pl.DataFrame, scene_screening: ScreeningRuleSet | None, columns: TrajectoryColumns
+) -> ScreeningResult:
+    """Apply screening to one candidate scene and return structured metadata."""
     if scene_screening is None:
-        return data
+        return ScreeningResult(frame=data, passes_scene=True)
 
-    ctx = _build_context(columns=columns, scene_group_by=scene_group_by)
+    frame, ctx, relative_frame_column = _prepare_screening_frame(data, columns)
+    frame, cleanup_stats = _apply_cleanup_result(frame, scene_screening.cleanup_rules, ctx)
+    scene_passes = _evaluate_scene_rules(frame, scene_screening.scene_rules, ctx)
+    agent_passes, passed_agent_ids = _evaluate_agent_rules(frame, scene_screening.agent_rules, ctx)
+    passes_scene = bool(frame.height > 0 and all((*scene_passes, *agent_passes)))
+    frame = frame.drop(relative_frame_column, strict=False)
+    return ScreeningResult(
+        frame=frame,
+        passes_scene=passes_scene,
+        cleanup=cleanup_stats,
+        passed_agent_ids=passed_agent_ids,
+    )
+
+
+def _prepare_screening_frame(
+    data: pl.DataFrame, columns: TrajectoryColumns
+) -> tuple[pl.DataFrame, ScreeningContext, str]:
+    ctx = _build_context(columns=columns, scene_group_by=None)
     relative_frame_column = _temporary_column_name(data, RELATIVE_FRAME_COLUMN)
-    data = data.with_columns(ctx.relative_frame().alias(relative_frame_column))
-    ctx = replace(ctx, relative_frame_column=relative_frame_column)
-    df = _apply_cleanup(data, scene_screening.cleanup_rules, ctx)
-    df, scene_columns = _apply_scene_rules(df, scene_screening.scene_rules, ctx)
-    df, agent_columns = _apply_agent_rules(
-        df, scene_screening.agent_rules, ctx, include_passed_agent_ids=mark_passed_agents
-    )
-    df = df.with_columns(
-        _and_all([pl.col(name) for name in [*scene_columns, *agent_columns]]).alias(
-            SCENE_SCREENING_PASS_COLUMN
+    frame = data.with_columns(ctx.relative_frame().alias(relative_frame_column))
+    return frame, replace(ctx, relative_frame_column=relative_frame_column), relative_frame_column
+
+
+def _apply_cleanup_result(
+    data: pl.DataFrame, rules: tuple[CleanupRuleBase, ...], ctx: ScreeningContext
+) -> tuple[pl.DataFrame, CleanupSceneStats | None]:
+    if not rules:
+        return data, None
+
+    frame = data
+    by_rule: list[CleanupRuleSceneStats] = []
+    rows_before_all = frame.height
+    agents_before_all = _agent_count(frame, ctx)
+
+    for rule in rules:
+        rows_before = frame.height
+        agents_before = _agent_count(frame, ctx)
+        frame = _filter_cleanup_rule(frame, rule, ctx)
+        by_rule.append(
+            CleanupRuleSceneStats(
+                rule_name=rule_name(rule),
+                rows_before=rows_before,
+                rows_after=frame.height,
+                agents_before=agents_before,
+                agents_after=_agent_count(frame, ctx),
+            )
         )
+
+    return frame, CleanupSceneStats(
+        rows_before=rows_before_all,
+        rows_after=frame.height,
+        agents_before=agents_before_all,
+        agents_after=_agent_count(frame, ctx),
+        by_rule=tuple(by_rule),
     )
-    return _finalize_screened(
-        df,
-        diagnostic_columns=[
-            *scene_columns,
-            *agent_columns,
-            SCENE_SCREENING_PASS_COLUMN,
-            relative_frame_column,
-        ],
-        include_passed_agent_ids=mark_passed_agents,
-        retain_scene_passes=retain_scene_passes,
+
+
+def _filter_cleanup_rule(
+    frame: pl.DataFrame, rule: CleanupRuleBase, ctx: ScreeningContext
+) -> pl.DataFrame:
+    if frame.is_empty():
+        return frame
+    mask = (
+        frame
+        .lazy()
+        .select(rule.predicate_expr(ctx).fill_null(value=False).alias("_cleanup_keep"))
+        .collect()
+        .get_column("_cleanup_keep")
     )
+    return frame.filter(mask)
+
+
+def _evaluate_scene_rules(
+    frame: pl.DataFrame, rules: tuple[SceneCheckRuleBase, ...], ctx: ScreeningContext
+) -> tuple[bool, ...]:
+    if frame.is_empty():
+        return tuple(False for _ in rules)
+    return tuple(_first_bool(frame, rule.predicate_expr(ctx)) for rule in rules)
+
+
+def _evaluate_agent_rules(
+    frame: pl.DataFrame, rules: tuple[AgentCheckRuleBase, ...], ctx: ScreeningContext
+) -> tuple[tuple[bool, ...], frozenset[int] | None]:
+    if frame.is_empty():
+        return tuple(False for _ in rules), frozenset()
+    if not rules:
+        return (), _agent_ids(frame, ctx)
+
+    agent_pass_exprs: list[pl.Expr] = []
+    scene_passes: list[bool] = []
+    for rule in rules:
+        agent_pass, scene_pass = _agent_rule_exprs(rule, ctx)
+        agent_pass_exprs.append(agent_pass)
+        scene_passes.append(_first_bool(frame, scene_pass))
+
+    agent_rule_valid_column = "_dronalize_agent_rule_valid"
+    passed_agent_column = "_dronalize_passed_agent"
+    passed_frame = (
+        frame
+        .lazy()
+        .with_columns(_and_all(agent_pass_exprs).alias(agent_rule_valid_column))
+        .with_columns(
+            ctx.over_agent_window(pl.col(agent_rule_valid_column).any()).alias(passed_agent_column)
+        )
+        .select(pl.col(ctx.columns.agent_id), pl.col(passed_agent_column))
+        .collect()
+        .filter(pl.col(passed_agent_column))
+    )
+    passed_agent_ids = frozenset(
+        int(agent_id) for agent_id in passed_frame.get_column(ctx.columns.agent_id).unique()
+    )
+    return tuple(scene_passes), passed_agent_ids
+
+
+def _first_bool(frame: pl.DataFrame, expr: pl.Expr) -> bool:
+    result = frame.lazy().select(expr.fill_null(value=False).alias("_result")).collect()
+    if result.is_empty():
+        return False
+    return bool(result.get_column("_result").first())
+
+
+def _agent_count(frame: pl.DataFrame, ctx: ScreeningContext) -> int:
+    if frame.is_empty():
+        return 0
+    return int(frame.get_column(ctx.columns.agent_id).n_unique())
+
+
+def _agent_ids(frame: pl.DataFrame, ctx: ScreeningContext) -> frozenset[int]:
+    return frozenset(int(agent_id) for agent_id in frame.get_column(ctx.columns.agent_id).unique())
 
 
 def _build_context(
@@ -218,52 +350,7 @@ def _temporary_column_name(data: DataFrameT, base_name: str) -> str:
     return f"{base_name}_{index}"
 
 
-def _apply_cleanup(
-    data: DataFrameT, rules: tuple[CleanupRuleBase, ...], ctx: ScreeningContext
-) -> DataFrameT:
-    return data.filter(_and_all([rule.predicate_expr(ctx) for rule in rules]))
-
-
-def _apply_scene_rules(
-    data: DataFrameT, rules: tuple[SceneCheckRuleBase, ...], ctx: ScreeningContext
-) -> tuple[DataFrameT, list[str]]:
-    df = data
-    scene_passes: list[str] = []
-    for rule in rules:
-        cols = _RuleColumns.from_rule(rule)
-        df = df.with_columns(rule.predicate_expr(ctx).alias(cols.scene_pass))
-        scene_passes.append(cols.scene_pass)
-
-    return df, scene_passes
-
-
-def _apply_agent_rules(
-    data: DataFrameT,
-    rules: tuple[AgentCheckRuleBase, ...],
-    ctx: ScreeningContext,
-    *,
-    include_passed_agent_ids: bool,
-) -> tuple[DataFrameT, list[str]]:
-    df = data
-    scene_passes: list[str] = []
-    agent_passes: list[str] = []
-
-    for rule in rules:
-        df, cols = _apply_agent_rule(df, rule, ctx)
-        scene_passes.append(cols.scene_pass)
-        agent_passes.append(cols.agent_pass)
-
-    if include_passed_agent_ids:
-        df = df.with_columns(_agent_pass_expr(agent_passes, ctx).alias(AGENT_SCREENING_PASS_COLUMN))
-
-    df = df.drop(agent_passes)
-    return df, scene_passes
-
-
-def _apply_agent_rule(
-    data: DataFrameT, rule: AgentCheckRuleBase, ctx: ScreeningContext
-) -> tuple[DataFrameT, _RuleColumns]:
-    cols = _RuleColumns.from_rule(rule)
+def _agent_rule_exprs(rule: AgentCheckRuleBase, ctx: ScreeningContext) -> tuple[pl.Expr, pl.Expr]:
     scope = ctx.selector_mask(rule.selector)
     scoped_agent_count = ctx.retained_agent_count(rule.selector)
 
@@ -296,34 +383,7 @@ def _apply_agent_rule(
             rule.require, passing_agents=passing_agents, passing_fraction=passing_fraction
         ),
     )
-    df = data.with_columns(agent_pass.alias(cols.agent_pass), scene_pass.alias(cols.scene_pass))
-    return df, cols
-
-
-def _finalize_screened(
-    data: DataFrameT,
-    diagnostic_columns: list[str],
-    *,
-    include_passed_agent_ids: bool,
-    retain_scene_passes: bool,
-) -> DataFrameT:
-    excluded = list(diagnostic_columns)
-    if not include_passed_agent_ids:
-        excluded.append(AGENT_SCREENING_PASS_COLUMN)
-    if retain_scene_passes:
-        excluded.remove(SCENE_SCREENING_PASS_COLUMN)
-        return data if not excluded else data.select(pl.all().exclude(excluded))
-
-    screened = data.filter(pl.col(SCENE_SCREENING_PASS_COLUMN))
-    return screened if not excluded else screened.select(pl.all().exclude(excluded))
-
-
-def _agent_pass_expr(agent_pass_columns: list[str], ctx: ScreeningContext) -> pl.Expr:
-    if not agent_pass_columns:
-        return pl.lit(value=True)
-
-    all_rules_passed = _and_all([pl.col(name) for name in agent_pass_columns])
-    return ctx.over_agent_window(all_rules_passed.any())
+    return agent_pass, scene_pass
 
 
 def _and_all(exprs: list[pl.Expr]) -> pl.Expr:

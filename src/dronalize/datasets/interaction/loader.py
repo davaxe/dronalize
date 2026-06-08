@@ -13,7 +13,6 @@ from dronalize.core.functional import yaw_from_velocity_expr
 from dronalize.core.scene.schema import POSITIONS_VELOCITY_YAW
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
-from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -115,13 +114,6 @@ class InteractionLoader(SceneLoader[Path]):
         if not data_dir.is_dir():
             return 0
         return sum(1 for _ in data_dir.rglob("*.csv"))
-
-    @override
-    def map_resolver(self) -> MapResolver:
-        shared_maps = self.resources.shared_maps
-        if not shared_maps or self.map_config is None:
-            return no_map()
-        return shared_map(shared_maps)
 
 
 _SCHEMA = pl.Schema({

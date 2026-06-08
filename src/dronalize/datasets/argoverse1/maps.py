@@ -172,26 +172,6 @@ class LaneSegment:
             return EdgeType.CURB
         return EdgeType.NONE
 
-    def get_border_edge_types(self) -> tuple[EdgeType, EdgeType]:
-        """Determine the border edge types based on the lane segment's neighbors.
-
-        Returns
-        -------
-        left_edge_type : EdgeType
-            Edge type for the left border.
-        right_edge_type : EdgeType
-            Edge type for the right border.
-
-        """
-        ln, rn = (self.l_neighbor_id is not None, self.r_neighbor_id is not None)
-        left_edge_type = EdgeType.VIRTUAL if ln else EdgeType.CURB
-        right_edge_type = EdgeType.VIRTUAL if rn else EdgeType.CURB
-
-        if self.is_intersection:
-            left_edge_type, right_edge_type = EdgeType.VIRTUAL, EdgeType.VIRTUAL
-
-        return left_edge_type, right_edge_type
-
     @classmethod
     def _default(cls) -> LaneSegment:
         """Create a default `LaneSegment` instance."""
@@ -431,13 +411,6 @@ def lane_segment_successors(
 ) -> Iterable[LaneSegment]:
     """Get successors of a lane segment."""
     return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.successors)
-
-
-def lane_segment_predecessors(
-    lane_segment: LaneSegment, lane_segments: dict[int, LaneSegment]
-) -> Iterable[LaneSegment]:
-    """Get predecessors of a lane segment."""
-    return (lane_segments[lane_segment_id] for lane_segment_id in lane_segment.predecessors)
 
 
 def lane_segment_is_regulatory(lane_segment: LaneSegment) -> bool:

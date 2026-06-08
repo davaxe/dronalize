@@ -11,6 +11,7 @@ from typing_extensions import NotRequired, TypedDict, override
 
 from dronalize.config.models import (
     DatasetConfig,
+    ExcludeCategoriesSpec,
     LaneChangeConfig,
     MinObservationsSpec,
     OutputConfig,
@@ -87,10 +88,54 @@ class DemoLoader(SceneLoader[Path, DemoOptions]):
         return 1
 
 
+class CleanupDemoLoader(SceneLoader[Path, DemoOptions]):
+    @classmethod
+    @override
+    def native_trajectory_schema(cls) -> TrajectorySchema:
+        return CANONICAL
+
+    @override
+    def iter_sources(self) -> Iterable[DatasetSource[Path]]:
+        yield DatasetSource(
+            identifier="cleanup-source-1", payload=self.root / "cleanup-source.parquet"
+        )
+
+    @override
+    def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
+        _ = source
+        frame = pl.DataFrame(
+            {
+                "frame": [0, 1, 2, 0, 1, 2],
+                "id": [1, 1, 1, 2, 2, 2],
+                "x": [0.0, 1.0, 2.0, 10.0, 11.0, 12.0],
+                "y": [0.0, 0.0, 0.0, 10.0, 10.0, 10.0],
+                "vx": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+                "vy": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                "ax": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                "ay": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                "yaw": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                "agent_category": [
+                    AgentCategory.CAR.value,
+                    AgentCategory.CAR.value,
+                    AgentCategory.CAR.value,
+                    AgentCategory.UNIMPORTANT.value,
+                    AgentCategory.UNIMPORTANT.value,
+                    AgentCategory.UNIMPORTANT.value,
+                ],
+            },
+            schema_overrides={"frame": pl.Int32(), "id": pl.Int32(), "agent_category": pl.Int32()},
+        )
+        yield LoadedSourceFrame(frame.lazy())
+
+    @override
+    def count_sources(self) -> int | None:
+        return 1
+
+
 def demo_descriptor() -> DatasetDescriptor:
     return DatasetDescriptor(
         name="demo",
-        loader_factory=DemoLoader.from_loader_request,
+        loader_cls=DemoLoader,
         default_config=DatasetConfig(
             scenes=ScenesConfig(
                 horizon_frames=3,
@@ -103,6 +148,32 @@ def demo_descriptor() -> DatasetDescriptor:
         native_schema=CANONICAL,
         loader_options_model=DemoOptions,
         feature_support=DatasetFeatureSupport(map=True),
+    )
+
+
+def cleanup_demo_descriptor() -> DatasetDescriptor:
+    return DatasetDescriptor(
+        name="cleanup-demo",
+        loader_cls=CleanupDemoLoader,
+        default_config=DatasetConfig(
+            scenes=ScenesConfig(
+                horizon_frames=3,
+                default_observation_length=2,
+                sample_time=1.0,
+                window=WindowConfig(step=1),
+            ),
+            screening=ScreeningConfig(
+                cleanup={
+                    "trim_unimportant": ExcludeCategoriesSpec(
+                        categories=(AgentCategory.UNIMPORTANT,)
+                    )
+                }
+            ),
+            loader_options={"batch_size": 2, "use_cache": False},
+        ),
+        native_schema=CANONICAL,
+        loader_options_model=DemoOptions,
+        feature_support=DatasetFeatureSupport(map=False),
     )
 
 

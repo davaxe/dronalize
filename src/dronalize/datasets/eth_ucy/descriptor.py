@@ -33,7 +33,7 @@ def _descriptor(name: str) -> DatasetDescriptor:
     min_frames, max_frames = bounds[name]
     return DatasetDescriptor(
         name=name,
-        loader_factory=EthUcyLoader.from_loader_request,
+        loader_cls=EthUcyLoader,
         default_config=_DEFAULT_CONFIG,
         native_schema=EthUcyLoader.native_trajectory_schema(),
         supported_native_splits=_NATIVE_SPLITS,

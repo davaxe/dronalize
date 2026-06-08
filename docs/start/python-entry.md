@@ -37,8 +37,8 @@ resolved = project.resolve_dataset_config("a43", descriptor.default_config)
 
 print(resolved.scenes.horizon_frames, resolved.scenes.default_observation_length)
 print(resolved.output.precision)
-print(resolved.read.root.strategy)
-print(resolved.assign.root.strategy)
+print(resolved.read.strategy)
+print(resolved.assign.strategy)
 ```
 
 Use `resolve_dataset_config()` when you want the final dataset config with built-in defaults

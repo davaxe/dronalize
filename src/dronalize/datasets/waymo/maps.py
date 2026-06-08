@@ -2,16 +2,41 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
+from dronalize.datasets.shared import utils
 from dronalize.datasets.waymo.protos import lean_map_pb2
+from dronalize.processing.loading import MapProvider
 from dronalize.processing.maps import FeatureMapBuilder, PathFeature, PointFeature
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
+
+    from dronalize.core.maps import MapGraph
+    from dronalize.core.scene.model import Scene
+    from dronalize.datasets import MapConfig
+    from dronalize.processing.loading.models import MapReference
+
+
+@dataclass(frozen=True, slots=True)
+class WaymoEmbeddedMapProvider(MapProvider):
+    config: MapConfig
+
+    @override
+    def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
+        if reference.map_payload is None:
+            return None
+
+        map_data = lean_map_pb2.LeanMapContainer.FromString(reference.map_payload)
+        map_graph = WaymoMapBuilder.from_proto(map_data.map_features).build(
+            min_distance=self.config.min_distance,
+            interpolation_distance=self.config.interpolation_distance,
+        )
+        return utils.extract_configured_map(map_graph, scene, self.config)
 
 
 class WaymoMapBuilder(FeatureMapBuilder):
@@ -34,10 +59,6 @@ class WaymoMapBuilder(FeatureMapBuilder):
         waymo_map._process_map_features(map_features)
         waymo_map._no_map_features = len(map_features) == 0
         return waymo_map
-
-    def empty_map(self) -> bool:
-        """Check if the map is empty."""
-        return self._no_map_features
 
     @override
     def iter_features(self) -> Iterable[PathFeature | PointFeature]:

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.core.maps import MapGraph
 from dronalize.datasets.shared import utils
-from dronalize.processing.loading.models import DatasetRunResources
+from dronalize.processing.loading.models import DatasetRunResources, MapProvider, SharedMapProvider
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -45,7 +45,11 @@ def open_named_shared_map_resources(
         mappings[key] = handle.name
 
     try:
-        yield DatasetRunResources(shared_maps=mappings)
+        yield DatasetRunResources(
+            map_provider=SharedMapProvider(
+                shared_names=mappings, extractor=utils.extract_fn(map_config.extraction)
+            )
+        )
     finally:
         for handle in handles:
             handle.close()
@@ -63,7 +67,11 @@ def open_single_shared_map_resource(
 
     handle = utils.apply_map_config(build_map(map_path, map_config), map_config).to_shared()
     try:
-        yield DatasetRunResources(shared_maps=handle.name)
+        yield DatasetRunResources(
+            map_provider=SharedMapProvider(
+                shared_names=handle.name, extractor=utils.extract_fn(map_config.extraction)
+            )
+        )
     finally:
         handle.close()
         handle.unlink()
@@ -101,5 +109,25 @@ def single_shared_map_resource_factory(
             map_config=map_config, map_path=map_path(root), build_map=build_map
         ) as resources:
             yield resources
+
+    return _factory
+
+
+MapProviderFactory = Callable[[Path, MapConfig], MapProvider]
+
+
+def map_provider_resources_factory(*, create: MapProviderFactory) -> ResourcesFactory:
+    """Return a resources factory that installs a per-run MapProvider."""
+
+    @contextmanager
+    def _factory(
+        root: Path, scenes: ScenesConfig, map_config: MapConfig | None
+    ) -> Generator[DatasetRunResources]:
+        _ = scenes
+
+        if map_config is None:
+            yield DatasetRunResources()
+            return
+        yield DatasetRunResources(map_provider=create(root, map_config))
 
     return _factory

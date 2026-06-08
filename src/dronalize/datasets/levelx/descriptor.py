@@ -1,10 +1,10 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.levelx.loader import ExiDLoader, HighDLoader, StandardLevelXLoader
+from dronalize.datasets.levelx.maps import HighDMapProvider
 from dronalize.datasets.registry import (
     DatasetDescriptor,
     DatasetFeatureSupport,
     DatasetSplitSupport,
-    LoaderFactory,
 )
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 from dronalize.datasets.shared.presets import (
@@ -14,7 +14,10 @@ from dronalize.datasets.shared.presets import (
     scenes_config,
     temporal_support,
 )
-from dronalize.datasets.shared.resources import named_shared_map_resources_factory
+from dronalize.datasets.shared.resources import (
+    map_provider_resources_factory,
+    named_shared_map_resources_factory,
+)
 
 _open_levelx_osm_resources = named_shared_map_resources_factory(
     named_paths=lambda root: (
@@ -24,6 +27,11 @@ _open_levelx_osm_resources = named_shared_map_resources_factory(
     build_map=lambda path, config: OSMMapBuilder(path).build(
         config.min_distance, config.interpolation_distance
     ),
+)
+
+
+_open_highd_resources = map_provider_resources_factory(
+    create=lambda _root, map_config: HighDMapProvider(map_config)
 )
 
 
@@ -61,7 +69,7 @@ def _highd_config() -> DatasetConfig:
 
 def _levelx_spec(
     name: str,
-    loader_factory: LoaderFactory,
+    loader_cls: type[StandardLevelXLoader],
     default_config: DatasetConfig,
     *,
     lane_change_sampling_support: bool = False,
@@ -70,7 +78,7 @@ def _levelx_spec(
 ) -> DatasetDescriptor:
     return DatasetDescriptor(
         name=name,
-        loader_factory=loader_factory,
+        loader_cls=loader_cls,
         default_config=default_config,
         native_schema=StandardLevelXLoader.native_trajectory_schema(),
         resources_factory=_open_levelx_osm_resources,
@@ -90,7 +98,7 @@ def _levelx_spec(
 DATASET_DESCRIPTORS = {
     "highd": DatasetDescriptor(
         name="highd",
-        loader_factory=HighDLoader.from_loader_request,
+        loader_cls=HighDLoader,
         default_config=_highd_config(),
         native_schema=HighDLoader.native_trajectory_schema(),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
@@ -98,34 +106,23 @@ DATASET_DESCRIPTORS = {
         temporal_support=temporal_support(
             source_unit="recording", min_frames=9729, max_frames=31274, enabled_by_default=True
         ),
+        resources_factory=_open_highd_resources,
     ),
     "ind": _levelx_spec(
-        "ind",
-        StandardLevelXLoader.from_loader_request,
-        _levelx_config(),
-        min_frames=16192,
-        max_frames=33207,
+        "ind", StandardLevelXLoader, _levelx_config(), min_frames=16192, max_frames=33207
     ),
     "exid": _levelx_spec(
         "exid",
-        ExiDLoader.from_loader_request,
+        ExiDLoader,
         _levelx_config(lane_change=True),
         lane_change_sampling_support=True,
         min_frames=1332,
         max_frames=43534,
     ),
     "round": _levelx_spec(
-        "round",
-        StandardLevelXLoader.from_loader_request,
-        _levelx_config(),
-        min_frames=11024,
-        max_frames=31240,
+        "round", StandardLevelXLoader, _levelx_config(), min_frames=11024, max_frames=31240
     ),
     "unid": _levelx_spec(
-        "unid",
-        StandardLevelXLoader.from_loader_request,
-        _levelx_config(),
-        min_frames=8095,
-        max_frames=28658,
+        "unid", StandardLevelXLoader, _levelx_config(), min_frames=8095, max_frames=28658
     ),
 }

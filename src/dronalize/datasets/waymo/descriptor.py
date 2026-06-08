@@ -10,11 +10,17 @@ from dronalize.datasets.shared.presets import (
     scenes_config,
     temporal_support,
 )
+from dronalize.datasets.shared.resources import map_provider_resources_factory
 from dronalize.datasets.waymo.loader import WaymoLoader
+from dronalize.datasets.waymo.maps import WaymoEmbeddedMapProvider
+
+_open_waymo_resources = map_provider_resources_factory(
+    create=lambda _root, map_config: WaymoEmbeddedMapProvider(map_config)
+)
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="waymo",
-    loader_factory=WaymoLoader.from_loader_request,
+    loader_cls=WaymoLoader,
     default_config=DatasetConfig(
         scenes=scenes_config(horizon_frames=91, default_observation_length=11, sample_time=0.1),
         screening=minimum_observations_screening(2, required_frame=10),
@@ -31,4 +37,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
         enabled_by_default=False,
         confidence="documented",
     ),
+    resources_factory=_open_waymo_resources,
 )

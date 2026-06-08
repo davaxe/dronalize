@@ -13,13 +13,14 @@ from dronalize.core.functional import ResampleMethod, ResampleSpec
 from dronalize.core.functional.basic import normalize_group_by
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.pipeline.pipeline import Pipeline
-from dronalize.processing.screening.screen import ScreeningRuleSet
+from dronalize.processing.screening.screen import ScreeningRuleSet, screen_data
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterator, Sequence
 
     from dronalize.config.models import ScenesConfig
     from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
+    from dronalize.processing.pipeline.items import TrajectoryPipelineItem
 
 
 _SPLIT_PARTITION_COLUMN = "_split_partition"
@@ -34,30 +35,62 @@ _RAW_SPLIT_PARTITION_COLUMN = "_split_partition_raw"
 _RAW_SPLIT_SEGMENT_COLUMN = "_split_segment"
 
 
-def build_trajectory_pipeline(
+@dataclass(frozen=True, slots=True)
+class TrajectoryPipelineStages:
+    """Runtime-oriented trajectory pipeline split around structured screening."""
+
+    pre_screening: Pipeline
+    screening: ScreeningRuleSet | None
+    post_screening: Pipeline
+    columns: TrajectoryColumns
+
+    def screen(self, item: TrajectoryPipelineItem) -> TrajectoryPipelineItem:
+        """Return an item with structured screening metadata attached."""
+        return item.with_screening(
+            screen_data(item.frame, scene_screening=self.screening, columns=self.columns)
+        )
+
+    def postprocess(self, item: TrajectoryPipelineItem) -> Iterator[TrajectoryPipelineItem]:
+        """Yield post-screening item variants ready for output routing."""
+        for frame in self.post_screening.execute(item.frame, collect=True, filter_empty=True):
+            yield item.with_frame(frame)
+
+
+def build_trajectory_pipeline_stages(
     plan: TrajectoryPipelinePlan,
     *,
     columns: TrajectoryColumns | None = None,
     window_by: str | Sequence[str] | None = None,
     lane_id_column: str = "lane_id",
-) -> Pipeline:
-    """Build the trajectory-processing pipeline for one execution plan."""
+) -> TrajectoryPipelineStages:
+    """Build trajectory stages with screening as an explicit runtime boundary."""
     state = _compile_state(
         plan,
         columns=TrajectoryColumns() if columns is None else columns,
         window_by=window_by,
         lane_id_column=lane_id_column,
     )
-
-    return (
+    screening_spec = (
+        ScreeningRuleSet.from_config(state.plan.screening)
+        if state.plan.screening is not None
+        else None
+    )
+    pre_screening = (
         Pipeline()
         >> _build_split_stage(state)
         >> _build_lane_change_pre_window_stage(state)
         >> _build_window_stage(state)
         >> _build_scene_id_stage(state)
-        >> _build_screening_stage(state)
-        >> _build_lane_change_post_screening_stage(state)
-        >> _build_output_stage(state)
+        >> _build_candidate_fanout_stage(state)
+    )
+    post_screening = (
+        Pipeline() >> _build_lane_change_post_screening_stage(state) >> _build_output_stage(state)
+    )
+    return TrajectoryPipelineStages(
+        pre_screening=pre_screening,
+        screening=screening_spec,
+        post_screening=post_screening,
+        columns=state.columns,
     )
 
 
@@ -222,23 +255,12 @@ def _build_scene_id_stage(state: _TrajectoryPipelineState) -> Pipeline:
     return Pipeline().then(_with_scene_id, name="attach_scene_id")
 
 
-def _build_screening_stage(state: _TrajectoryPipelineState) -> Pipeline:
-    screening_spec = (
-        ScreeningRuleSet.from_config(state.plan.screening)
-        if state.plan.screening is not None
-        else None
-    )
-    if screening_spec is None:
+def _build_candidate_fanout_stage(state: _TrajectoryPipelineState) -> Pipeline:
+    if state.scene_id_column is None:
         return Pipeline()
-
-    return Pipeline().then(
-        tr.screen_scene(
-            screening_spec,
-            columns=state.columns,
-            group_by=state.scene_id_column,
-            mark_passed_agents=True,
-            retain_scene_passes=True,
-        )
+    return Pipeline().then_flat_map(
+        tr.group_by_yield(state.scene_id_column, drop_group_cols=False),
+        name="candidate_scene_fanout",
     )
 
 

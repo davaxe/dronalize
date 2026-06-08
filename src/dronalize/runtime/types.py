@@ -19,7 +19,6 @@ from dronalize.io.base import (
     RecordTransform,
     SceneTransform,
     StorageBackend,
-    storage_backend_name,
     validate_transform_choice,
 )
 from dronalize.io.manifest import DatasetManifest, package_version, write_manifest
@@ -35,33 +34,59 @@ if TYPE_CHECKING:
     )
     from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.processing.loading.models import LoaderOptionsModel
+    from dronalize.runtime.state import ExecutionStats
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupRemovalSummary:
+    """Aggregate cleanup-removal statistics over candidate scenes with cleanup stats.
+
+    Cleanup is recorded before screening rejection is applied, so ``scene_count``
+    does not necessarily match the number of written scenes.
+    """
+
+    scene_count: int
+    total_rows_removed: int
+    average_rows_removed_per_scene: float
+    min_rows_removed_per_scene: int
+    max_rows_removed_per_scene: int
+    total_agents_removed: int
+    average_agents_removed_per_scene: float
+    min_agents_removed_per_scene: int
+    max_agents_removed_per_scene: int
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupSummary:
+    """Final cleanup statistics, optionally broken down by cleanup rule."""
+
+    overall: CleanupRemovalSummary
+    by_rule: dict[str, CleanupRemovalSummary]
 
 
 @dataclass(frozen=True, slots=True)
 class ExecutionResult:
-    """Final result of a processing run.
+    """Final result of one dataset execution.
 
-    `processed_sources` counts how many DatasetSource units the executor started
-    processing, even when a scene limit stops the run before a DatasetSource is fully
-    exhausted.
+    ``stats`` is the canonical source, scene, split, screening, and cleanup
+    progress-counter payload. ``cleanup_summary`` contains the heavier final
+    diagnostic cleanup summary.
     """
 
     dataset: str
-    """Dataset key used for the run."""
+    """Dataset that was executed."""
     output_dir: Path
-    """Root directory where processed output was written."""
+    """Directory where output was written."""
     storage_backend: StorageBackend | str
-    """Storage backend used for the exported records."""
-    processed_sources: int
-    """Number of raw DatasetSource units the executor started processing."""
-    candidate_scenes: int
-    """Number of scene candidates materialized before screening."""
-    written_scenes: int
-    """Number of scenes accepted for output after screening and limits."""
-    split_counts: dict[str, int]
-    """Accepted scene count per output split."""
+    """Storage backend used for writing output."""
+    stats: ExecutionStats
+    """Final source, scene, split, screening, and cleanup counters."""
+    scene_limit: int | None
+    """Output scene limit used for this run, if any."""
+    cleanup_summary: CleanupSummary | None
+    """Final cleanup summary over candidate scenes with cleanup statistics."""
     elapsed_time_seconds: float
-    """Total execution time in seconds."""
+    """Wall-clock execution time in seconds."""
 
 
 @dataclass(frozen=True)
@@ -114,7 +139,7 @@ class ExecutionPlan:
     """Input dataset root."""
     output_dir: Path
     """Output dataset root."""
-    storage_backend: StorageBackend | str
+    storage_backend: StorageBackend
     """Storage backend selected for writing output records."""
     resolved_config: DatasetConfig
     """Dataset config after defaults, config files, and overrides are merged."""
@@ -174,7 +199,7 @@ class ExecutionPlan:
                 if dataset_id_for_name(self.dataset) is not None
                 else (self.dataset,)
             ),
-            storage_backend=storage_backend_name(self.storage_backend),
+            storage_backend=self.storage_backend.value,
             dronalize_version=package_version(),
             precision=export_config.precision,
             feature_columns=self.output.trajectory_schema.feature_columns(),

@@ -8,8 +8,8 @@ import pytest
 from dronalize.config import RuntimeOverride
 from dronalize.config.models import RequireFramesSpec
 from dronalize.datasets import DatasetDescriptor, get_dataset, list_datasets
-from dronalize.datasets.registry import (  # pyright: ignore[reportPrivateUsage]
-    _builtin_datasets,
+from dronalize.datasets.registry import (
+    _builtin_datasets,  # pyright: ignore[reportPrivateUsage]
     dataset_id_for_name,
     dataset_names_by_id,
 )

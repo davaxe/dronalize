@@ -32,7 +32,7 @@ _open_interaction_resources = named_shared_map_resources_factory(
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="interaction",
-    loader_factory=InteractionLoader.from_loader_request,
+    loader_cls=InteractionLoader,
     default_config=DatasetConfig(
         scenes=scenes_config(horizon_frames=40, default_observation_length=10, sample_time=0.1),
         screening=minimum_observations_screening(2, required_frame=9),

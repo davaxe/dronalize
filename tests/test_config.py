@@ -23,7 +23,8 @@ from dronalize.core import AgentCategory
 from dronalize.core.categories import DatasetSplit, EdgeType
 from dronalize.core.errors import ConfigurationError
 from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.screening import ScreeningRuleSet, agent, cleanup, scene, screen_scene
+from dronalize.processing.screening import ScreeningRuleSet, agent, cleanup, scene
+from dronalize.processing.screening.screen import screen_data
 from tests.support import inherited_optional_blocks_descriptor
 
 if TYPE_CHECKING:
@@ -667,7 +668,7 @@ def test_require_must_define_threshold() -> None:
         })
 
 
-def test_compiled_rules_work_with_screen_scene() -> None:
+def test_compiled_rules_work_with_screen_data() -> None:
     config = ScreeningConfig.model_validate({
         "cleanup": {"drop_unimportant": {"rule": "exclude", "categories": ["unimportant"]}},
         "scene": {"enough_agents": {"rule": "agent_range", "minimum": 1}},
@@ -682,7 +683,8 @@ def test_compiled_rules_work_with_screen_scene() -> None:
         "agent_category": [AgentCategory.CAR] * 7,
     })
 
-    screened = screen_scene(frame, compiled, scene_group_by="scene", columns=TrajectoryColumns())
+    screened = screen_data(frame, compiled, columns=TrajectoryColumns())
 
-    assert len(screened) == len(frame)
-    assert screened.columns == frame.columns
+    assert screened.passes_scene
+    assert len(screened.frame) == len(frame)
+    assert screened.frame.columns == frame.columns

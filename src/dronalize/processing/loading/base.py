@@ -14,16 +14,14 @@ from dronalize.processing.loading.models import (
     LoaderOptionsModel,
     NoLoaderOptions,
 )
-from dronalize.processing.maps import MapResolver, no_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.config.models import MapConfig, ScenesConfig, ScreeningConfig
     from dronalize.core.categories import DatasetSplit
-    from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, MapReference
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
     from dronalize.processing.models import LoaderPlan, ReadSelection
 
 
@@ -238,61 +236,6 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
             f"or `iter_sources_for()` with native split support"
         )
         raise NotImplementedError(msg)
-
-    def map_resolver(self) -> MapResolver:
-        """Return the loader-level map resolver used for scene-to-map lookup.
-
-        Returns
-        -------
-        MapResolver
-            A callable object that resolves a `Scene` to a `MapGraph`, or to
-            `None` if no map can be resolved.
-
-        Notes
-        -----
-        Concrete loaders may override this to provide dataset-specific map
-        lookup logic, caching, or binding rules.
-
-        The default implementation returns a resolver that never supplies a map.
-        This is appropriate for datasets without map support or loaders that do
-        not participate in map enrichment.
-        """
-        _ = self
-        return no_map()
-
-    def resolve_map(
-        self, scene: Scene, map_reference: MapReference | None = None
-    ) -> MapGraph | None:
-        """Resolve the map graph associated with a scene.
-
-        Parameters
-        ----------
-        scene : Scene
-            The scene for which a map should be resolved.
-        map_reference : MapReference, optional
-            Optional explicit map reference information that may be used by custom
-            implementations to refine map lookup.
-
-        Returns
-        -------
-        MapGraph or None
-            The resolved map graph for the scene, or `None` if map resolution is
-            disabled or unsuccessful.
-
-        Notes
-        -----
-        This method first checks whether map support is enabled in the request.
-        If no map configuration is present, it returns `None` immediately.
-
-        By default, resolution is delegated to the callable returned by
-        `map_resolver()`. Subclasses may override either this method or
-        `map_resolver()` depending on whether they need per-call logic or only a
-        custom resolver object.
-        """
-        _ = map_reference
-        if self.map_config is None:
-            return None
-        return self.map_resolver()(scene)
 
     def count_sources_for(self, split: DatasetSplit) -> int | None:
         """Return the DatasetSource count for a selection when cheaply knowable.

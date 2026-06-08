@@ -18,8 +18,7 @@ from dronalize.config.models import (
     TimeBlockAssign,
 )
 from dronalize.config.parse import ProjectConfig, parse_config
-from dronalize.io.backends.registry import is_writer_backend_registered, registered_writer_backends
-from dronalize.io.base import StorageBackend, storage_backend_name
+from dronalize.io.base import StorageBackend
 from dronalize.processing.models import SplitAssignmentPlan
 from dronalize.runtime.types import (
     ExecutionPlan,
@@ -71,7 +70,7 @@ def build_execution_plan(
         "Built execution plan",
         extra={
             "dataset": descriptor.name,
-            "storage_backend": storage_backend_name(storage_backend),
+            "storage_backend": storage_backend,
             "parallel": resolved_config.runtime.jobs > 1,
             "include_map": loader_request.map is not None,
         },
@@ -80,7 +79,7 @@ def build_execution_plan(
         descriptor=descriptor,
         data_root=request.input_dir,
         output_dir=request.output_dir,
-        storage_backend=storage_backend,
+        storage_backend=StorageBackend(storage_backend),
         runtime=resolved_config.runtime,
         output=OutputPlan(
             config=resolved_config.output,
@@ -102,7 +101,7 @@ def build_execution_plan(
 def _validate_read_support(descriptor: DatasetDescriptor, config: ReadConfig | None) -> bool:
     if config is None:
         return True
-    match config.root:
+    match config:
         case ReadNative(splits=splits) if splits is not None:
             supported = descriptor.supported_native_splits
             if not supported:
@@ -120,7 +119,7 @@ def _validate_assignment_support(
     if config is None:
         return True
     support = descriptor.split_support
-    match config.root:
+    match config:
         case NoAssign():
             return True
         case PreserveNativeAssign():
@@ -192,16 +191,14 @@ def _validate_output_path(request: ExecutionRequest) -> None:
         raise NotADirectoryError(msg)
 
 
-def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBackend | str:
+def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBackend:
     try:
-        resolved: StorageBackend | str = StorageBackend(storage_backend)
-    except ValueError:
-        resolved = str(storage_backend)
-    if is_writer_backend_registered(resolved):
-        return resolved
-    raise dronalize_exceptions.UnsupportedStorageBackendError(
-        storage_backend_name(resolved), registered_writer_backends()
-    )
+        resolved: StorageBackend = StorageBackend(storage_backend)
+    except ValueError as exc:
+        raise dronalize_exceptions.UnsupportedStorageBackendError(
+            storage_backend, tuple(sb.value for sb in StorageBackend)
+        ) from exc
+    return resolved
 
 
 def _resolve_dataset_config(

@@ -26,7 +26,6 @@ _YAW_FIELDS: Final[TrajectoryField] = TrajectoryField.YAW
 _KINEMATIC_FIELDS: Final[TrajectoryField] = _VELOCITY_FIELDS | _ACCELERATION_FIELDS
 
 _DERIVATIVE_RENAME: Final[dict[int, list[str]]] = {1: ["vx", "vy"], 2: ["ax", "ay"]}
-_TMP_YAW_VELOCITY: Final[tuple[str, str]] = ("__scene_tmp_vx", "__scene_tmp_vy")
 
 
 @dataclass(slots=True, frozen=True)

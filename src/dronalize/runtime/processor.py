@@ -2,33 +2,35 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass, field, replace
+from typing import TYPE_CHECKING, Any, cast
 
 from dronalize.core.categories import DatasetSplit
 from dronalize.core.errors import SplitAssignmentError
 from dronalize.core.scene import Scene
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
-from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, MapReference
-from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
-from dronalize.processing.pipeline.trajectory import build_trajectory_pipeline
-from dronalize.processing.screening.screen import (
-    AGENT_SCREENING_PASS_COLUMN,
-    SCENE_SCREENING_PASS_COLUMN,
+from dronalize.processing.loading.models import (
+    BoundMapResolver,
+    DatasetSource,
+    LoadedSourceFrame,
+    MapReference,
 )
+from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
+from dronalize.processing.pipeline.items import TrajectoryPipelineItem
+from dronalize.processing.pipeline.trajectory import build_trajectory_pipeline_stages
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     import polars as pl
 
-    from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import MapKey, TrajectorySchema
+    from dronalize.core.scene import TrajectorySchema
+    from dronalize.core.scene.model import MapResolver
     from dronalize.processing.loading.base import SceneLoader
     from dronalize.processing.loading.models import LoaderOptionsModel
-    from dronalize.processing.maps import MapResolver
-    from dronalize.processing.pipeline.pipeline import Pipeline
+    from dronalize.processing.pipeline.trajectory import TrajectoryPipelineStages
+    from dronalize.processing.screening.screen import CleanupSceneStats
     from dronalize.runtime.types import ExecutionPlan
 
 
@@ -48,21 +50,10 @@ class SceneCandidate:
     stable_identifier: SceneIdentifier
     frame: pl.DataFrame
     passes_screening: bool
+    cleanup_stats: CleanupSceneStats | None = None
     map_reference: MapReference = field(default_factory=MapReference)
     passed_agent_ids: frozenset[int] | None = None
     split_assignment: DatasetSplit | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class DeferredMapResolver:
-    """Picklable scene map resolver for deferred map materialization."""
-
-    loader: SceneLoader[Any, LoaderOptionsModel]
-    map_reference: MapReference | None = None
-
-    def __call__(self, scene: Scene) -> MapGraph | None:
-        """Resolve the map for the given scene."""
-        return self.loader.resolve_map(scene, self.map_reference)
 
 
 class SplitAssigner:
@@ -137,7 +128,7 @@ class RuntimeProcessor:
     horizon_frames: int
     sample_time: float
     split_assigner: SplitAssigner
-    _pipeline: Pipeline | None = field(default=None, init=False, repr=False)
+    _pipeline_stages: TrajectoryPipelineStages | None = field(default=None, init=False, repr=False)
 
     @classmethod
     def from_plan(
@@ -165,41 +156,46 @@ class RuntimeProcessor:
     def screening_enabled(self) -> bool:
         """Return whether screening is enabled for this processor."""
         config = self.loader.screening_config
-        return config is not None and bool(config.agent or config.scene)
+        return config is not None and bool(config.cleanup or config.agent or config.scene)
 
     def iter_candidates(self, source: DatasetSource[Any]) -> Iterable[SceneCandidate]:
         """Iterate scene candidates for one DatasetSource."""
+        for item in self._iter_pipeline_items(source):
+            yield self._candidate_from_item(item)
+
+    def _iter_pipeline_items(self, source: DatasetSource[Any]) -> Iterable[TrajectoryPipelineItem]:
+        """Iterate processed candidate scene items for one DatasetSource."""
         source_local_scene_index = 0
 
         for data in self.loader.load_source(source):
             effective_source = self._effective_source(source, data)
+            stages = self._pipeline_stages_for_loader()
 
-            for processed_frame in self._pipeline_for_loader().execute(
+            for candidate_frame in stages.pre_screening.execute(
                 data.frame, collect=True, filter_empty=True
             ):
-                passes_screening, frame = self._extract_scene_pass(processed_frame)
-                passed_agent_ids, frame = self._extract_agent_pass(frame)
-
                 stable_identifier = SceneIdentifier(
                     source_identifier=effective_source.identifier,
                     source_local_scene_index=source_local_scene_index,
                 )
-
-                split_assignment = None
-                if passes_screening:
-                    split_assignment = self.split_assigner.assign(
-                        source=effective_source, stable_identifier=stable_identifier, frame=frame
-                    )
-
-                yield SceneCandidate(
+                item = TrajectoryPipelineItem(
                     source=effective_source,
                     stable_identifier=stable_identifier,
-                    frame=frame,
-                    passes_screening=passes_screening,
+                    frame=candidate_frame,
                     map_reference=data.map_reference,
-                    passed_agent_ids=passed_agent_ids,
-                    split_assignment=split_assignment,
                 )
+                screened_item = stages.screen(item)
+
+                if screened_item.screening is None or not screened_item.screening.passes_scene:
+                    yield screened_item
+                else:
+                    for postprocessed_item in stages.postprocess(screened_item):
+                        split_assignment = self.split_assigner.assign(
+                            source=effective_source,
+                            stable_identifier=stable_identifier,
+                            frame=postprocessed_item.frame,
+                        )
+                        yield postprocessed_item.with_split_assignment(split_assignment)
 
                 source_local_scene_index += 1
 
@@ -225,9 +221,9 @@ class RuntimeProcessor:
 
         return scene.as_schema(self.target_schema)
 
-    def _pipeline_for_loader(self) -> Pipeline:
-        if self._pipeline is not None:
-            return self._pipeline
+    def _pipeline_stages_for_loader(self) -> TrajectoryPipelineStages:
+        if self._pipeline_stages is not None:
+            return self._pipeline_stages
 
         plan = TrajectoryPipelinePlan(
             scenes=self.loader.scenes_config,
@@ -236,15 +232,26 @@ class RuntimeProcessor:
         )
         columns = TrajectoryColumns.from_schema(self.loader.native_trajectory_schema())
 
-        self._pipeline = build_trajectory_pipeline(plan, columns=columns)
-        return self._pipeline
+        self._pipeline_stages = build_trajectory_pipeline_stages(plan, columns=columns)
+        return self._pipeline_stages
 
-    def _resolve_scene_map(self, candidate: SceneCandidate) -> tuple[MapKey, MapResolver | None]:
+    def _resolve_scene_map(
+        self, candidate: SceneCandidate
+    ) -> tuple[str | None, MapResolver | None]:
         if self.loader.map_config is None:
             return None, None
 
         map_key = candidate.map_reference.map_key or candidate.source.map_key
-        return map_key, DeferredMapResolver(self.loader, candidate.map_reference)
+        reference = candidate.map_reference
+
+        if reference.map_key != map_key:
+            reference = replace(reference, map_key=map_key)
+
+        provider = self.loader.resources.map_provider
+        if provider is None:
+            return map_key, None
+
+        return map_key, BoundMapResolver(provider=provider, reference=reference)
 
     @staticmethod
     def _effective_source(
@@ -256,21 +263,16 @@ class RuntimeProcessor:
         return source.with_source_split(data.source_split)
 
     @staticmethod
-    def _extract_scene_pass(frame: pl.DataFrame) -> tuple[bool, pl.DataFrame]:
-        if SCENE_SCREENING_PASS_COLUMN not in frame.columns:
-            return True, frame
-
-        passes = bool(frame.get_column(SCENE_SCREENING_PASS_COLUMN).first())
-        return passes, frame.drop(SCENE_SCREENING_PASS_COLUMN)
-
-    @staticmethod
-    def _extract_agent_pass(frame: pl.DataFrame) -> tuple[frozenset[int] | None, pl.DataFrame]:
-        if AGENT_SCREENING_PASS_COLUMN not in frame.columns:
-            return None, frame
-
-        passed_ids = (
-            frame.filter(frame[AGENT_SCREENING_PASS_COLUMN]).get_column("id").unique().to_list()
+    def _candidate_from_item(item: TrajectoryPipelineItem) -> SceneCandidate:
+        screening = item.screening
+        passes_screening = True if screening is None else screening.passes_scene
+        return SceneCandidate(
+            source=item.source,
+            stable_identifier=cast("SceneIdentifier", item.stable_identifier),
+            frame=item.frame,
+            passes_screening=passes_screening,
+            cleanup_stats=None if screening is None else screening.cleanup,
+            map_reference=item.map_reference,
+            passed_agent_ids=None if screening is None else screening.passed_agent_ids,
+            split_assignment=item.split_assignment,
         )
-        passed_agent_ids = frozenset(int(agent_id) for agent_id in passed_ids)
-
-        return passed_agent_ids, frame.drop(AGENT_SCREENING_PASS_COLUMN)

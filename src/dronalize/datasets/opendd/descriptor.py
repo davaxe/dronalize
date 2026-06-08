@@ -1,5 +1,6 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.opendd.loader import OpenDDLoader
+from dronalize.datasets.opendd.maps import OpenDDMapProvider
 from dronalize.datasets.registry import (
     DatasetDescriptor,
     DatasetFeatureSupport,
@@ -11,10 +12,15 @@ from dronalize.datasets.shared.presets import (
     scenes_config,
     temporal_support,
 )
+from dronalize.datasets.shared.resources import map_provider_resources_factory
+
+_opendd_resources = map_provider_resources_factory(
+    create=lambda _root, map_config: OpenDDMapProvider(map_config)
+)
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="opendd",
-    loader_factory=OpenDDLoader.from_loader_request,
+    loader_cls=OpenDDLoader,
     default_config=DatasetConfig(
         scenes=scenes_config(
             horizon_frames=210,
@@ -32,4 +38,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     temporal_support=temporal_support(
         source_unit="recording", min_frames=456, max_frames=16916, enabled_by_default=True
     ),
+    resources_factory=_opendd_resources,
 )

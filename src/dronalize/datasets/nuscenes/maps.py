@@ -103,25 +103,9 @@ class NuScenesMap:
         return _many_from_dict(Lane, self.json_data["lane"])
 
     @cached_property
-    def road_blocks(self) -> dict[str, RoadBlock]:
-        """A dictionary of `RoadBlock` objects keyed by their str."""
-        return _many_from_dict(RoadBlock, self.json_data["road_block"])
-
-    @cached_property
     def carpark_areas(self) -> dict[str, CarparkArea]:
         """A dictionary of `Carpark` objects keyed by their str."""
         return _many_from_dict(CarparkArea, self.json_data.get("carpark_area", []))
-
-    @cached_property
-    def arcline_path_3(self) -> dict[str, ArclinePathV1]:
-        """A dictionary of `ArclinePathV1` objects keyed by their str."""
-        # This is dict[str, Any], where the key i the token and the value is the
-        # arcline definition
-        data: dict[str, Any] = self.json_data["arcline_path_3"]
-        data_iter = (
-            {"token": k, "knots": v[0], "ctrl": v[1], "order": v[2]} for k, v in data.items()
-        )
-        return _many_from_dict(ArclinePathV1, data_iter)
 
 
 class StopLineType(IntEnum):
@@ -200,23 +184,6 @@ class Node:
     def from_dict(cls, data: dict[str, Any]) -> Node:
         """Create a `Node` instance from a dictionary."""
         return Node(id=str(data["token"]), x=data["x"], y=data["y"])
-
-
-@dataclass
-class ArclinePathV1:
-    """A version 1 arcline path in the NuScenes map, representing a curved path."""
-
-    id: str
-    knots: list[float]
-    ctrl: list[list[float]]
-    order: int
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> ArclinePathV1:
-        """Create a `ArclinePathV1` instance from a dictionary."""
-        return ArclinePathV1(
-            id=str(data["token"]), knots=data["knots"], ctrl=data["ctrl"], order=data["order"]
-        )
 
 
 @dataclass
@@ -454,28 +421,6 @@ class CarparkArea:
             polygon=str(data["polygon_token"]),
             orientation=data.get("orientation", 0.0),
             road_block=str(data.get("road_block_token", "")) or None,
-        )
-
-
-@dataclass
-class RoadBlock:
-    """A road block in NuScenes, represented by a polygon."""
-
-    id: str
-    polygon: str
-    from_line_edge: str
-    to_line_edge: str
-    road_segment: str
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
-        """Create a `RoadBlock` instance from a dictionary."""
-        return cls(
-            id=str(data["token"]),
-            polygon=str(data["polygon_token"]),
-            from_line_edge=str(data["from_line_edge_token"]),
-            to_line_edge=str(data["to_line_edge_token"]),
-            road_segment=str(data["road_segment_token"]),
         )
 
 

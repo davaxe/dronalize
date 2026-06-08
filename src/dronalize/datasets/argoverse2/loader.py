@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import functools
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,8 +11,6 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
-from dronalize.datasets.argoverse2.maps import Argoverse2MapBuilder
-from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import (
     DatasetSource,
@@ -25,9 +22,7 @@ from dronalize.processing.loading.models import (
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.maps import MapResolver
+    from dronalize.core.scene import TrajectorySchema
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -99,32 +94,6 @@ class Argoverse2Loader(SceneLoader[list[Path], Argoverse2LoaderOptions]):
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_YAW
-
-    @override
-    def map_resolver(self) -> MapResolver:
-        def _resolver(scene: Scene) -> MapGraph | None:
-            if scene.map_key is None or self.map_config is None:
-                return None
-            return utils.extract_configured_map(
-                self._get_map(
-                    scene.map_key,
-                    self.map_config.min_distance,
-                    self.map_config.interpolation_distance,
-                ),
-                scene,
-                self.map_config,
-            )
-
-        return _resolver
-
-    @staticmethod
-    @functools.lru_cache(maxsize=10)
-    def _get_map(
-        key: str, min_distance: float | None, interpolation_distance: float | None
-    ) -> MapGraph:
-        return Argoverse2MapBuilder.from_json_file(Path(key)).build(
-            min_distance, interpolation_distance
-        )
 
     @staticmethod
     def _map_object_type_expr(col: str) -> pl.Expr:

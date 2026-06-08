@@ -1,3 +1,4 @@
+# ruff: noqa: RUF067
 """Top-level package namespace for the `dronalize` library.
 
 This module is intentionally small. It does not provide convenience aliases
@@ -25,8 +26,11 @@ from dronalize.core import AgentCategory, DatasetSplit
 
 """
 
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 
 __all__: list[str] = []
 
-__version__: str = version("dronalize")
+try:
+    __version__ = version("dronalize")
+except PackageNotFoundError:
+    __version__ = "0+unknown"

@@ -10,19 +10,14 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_VELOCITY_ACCELERATION
-from dronalize.datasets.ad4che.maps import AD4CHEMapBuilder
 from dronalize.datasets.levelx.loader import LevelXDataLoader, LevelXSourceData
-from dronalize.datasets.shared import utils
 from dronalize.processing.loading.models import DatasetSource
-from dronalize.processing.maps import no_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import Scene, TrajectorySchema
+    from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.loading.models import DatasetRunResources
-    from dronalize.processing.maps import MapResolver
     from dronalize.processing.models import LoaderPlan
 
 
@@ -38,9 +33,6 @@ class AD4CHELoader(LevelXDataLoader):
         super().__init__(
             data_root=Path(data_root) / "AD4CHE_Data_V1.0", request=request, resources=resources
         )
-        # Cache for configured maps to avoid redundant processing across scenes
-        # that reference the same map.
-        self._configured_map_cache: dict[str, MapGraph] = {}
 
     @override
     def iter_sources(self) -> Iterable[DatasetSource[LevelXSourceData]]:
@@ -103,35 +95,6 @@ class AD4CHELoader(LevelXDataLoader):
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_ACCELERATION
-
-    @override
-    def map_resolver(self) -> MapResolver:
-        if self.map_config is None:
-            return no_map()
-
-        def _resolver(scene: Scene) -> MapGraph | None:
-            if scene.map_key is None or self.map_config is None:
-                return None
-            map_graph = self._configured_map(scene.map_key)
-            return utils.extract_based_on_scene(map_graph, scene, self.map_config.extraction)
-
-        return _resolver
-
-    def _configured_map(self, map_key: str) -> MapGraph:
-        if self.map_config is None:
-            msg = "Cannot build an AD4CHE map without a map config."
-            raise RuntimeError(msg)
-
-        cached = self._configured_map_cache.get(map_key)
-        if cached is not None:
-            return cached
-
-        map_graph = AD4CHEMapBuilder(self.root / map_key).build(
-            self.map_config.min_distance, self.map_config.interpolation_distance
-        )
-        configured = utils.apply_map_config(map_graph, self.map_config)
-        self._configured_map_cache[map_key] = configured
-        return configured
 
     def _recordings(self) -> Iterable[tuple[int, Path]]:
         """Yield discovered recording identifiers with their directories."""

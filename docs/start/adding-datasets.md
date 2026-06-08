@@ -116,7 +116,7 @@ from my_project.options import MyLoaderOptions
 
 MY_DATASET_DESCRIPTOR = DatasetDescriptor(
     name="my-dataset",
-    loader_factory=MyLoader.from_loader_request,
+    loader_cls=MyLoader,
     default_config=MY_DEFAULT_CONFIG,
     native_schema=MY_NATIVE_SCHEMA,
     loader_options_model=MyLoaderOptions,

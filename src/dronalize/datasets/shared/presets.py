@@ -137,24 +137,6 @@ def linear_resample(up: int, down: int = 1) -> ResampleConfig:
     return resample_config(method="linear", up=up, down=down)
 
 
-def spline_resample(
-    up: int,
-    down: int = 1,
-    *,
-    emit_velocity: bool = True,
-    emit_acceleration: bool = True,
-    method: Literal["cubic", "pchip"] = "pchip",
-) -> ResampleConfig:
-    """Return the default cubic resampling config used by most trajectory datasets."""
-    return resample_config(
-        method=method,
-        up=up,
-        down=down,
-        emit_velocity=emit_velocity,
-        emit_acceleration=emit_acceleration,
-    )
-
-
 def scenes_config(
     *,
     horizon_frames: int,

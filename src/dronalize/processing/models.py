@@ -18,10 +18,8 @@ from dronalize.core.categories import DatasetSplit
 if TYPE_CHECKING:
     from dronalize.config.models import (
         AssignConfig,
-        AssignUnion,
         MapConfig,
         ReadConfig,
-        ReadUnion,
         ScenesConfig,
         ScreeningConfig,
     )
@@ -39,7 +37,7 @@ def _ordered_splits(
 class ReadSelection:
     """Read scope for dataset DatasetSource enumeration."""
 
-    config: ReadUnion
+    config: ReadConfig
     native_splits: tuple[DatasetSplit, ...] | None = None
 
     @classmethod
@@ -47,14 +45,13 @@ class ReadSelection:
         cls, read: ReadConfig, *, supported_native_splits: tuple[DatasetSplit, ...] | None = None
     ) -> ReadSelection:
         """Build a read scope from the public read configuration."""
-        read_root = read.root
-        match read_root:
+        match read:
             case ReadAll():
-                return cls(config=read_root, native_splits=supported_native_splits)
+                return cls(config=read, native_splits=supported_native_splits)
             case ReadNative(splits=splits) if splits is not None:
-                return cls(config=read_root, native_splits=_ordered_splits(splits))
+                return cls(config=read, native_splits=_ordered_splits(splits))
             case ReadNative():
-                return cls(config=read_root, native_splits=supported_native_splits)
+                return cls(config=read, native_splits=supported_native_splits)
 
     @property
     def strategy(self) -> str:
@@ -66,13 +63,13 @@ class ReadSelection:
 class SplitAssignmentPlan:
     """Output split assignment plan derived from the resolved config."""
 
-    config: AssignUnion
+    config: AssignConfig
     seed: int | None = None
 
     @classmethod
     def from_config(cls, assign: AssignConfig, *, seed: int | None = None) -> SplitAssignmentPlan:
         """Build an output-assignment plan from the public config wrapper."""
-        return cls(config=assign.root, seed=seed)
+        return cls(config=assign, seed=seed)
 
     def active(self) -> tuple[tuple[DatasetSplit, float], ...]:
         """Return active output splits and their weights."""
