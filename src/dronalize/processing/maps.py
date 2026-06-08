@@ -4,19 +4,34 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from math import ceil
-from typing import TYPE_CHECKING, Protocol, TypeAlias
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
 import numpy as np
-from typing_extensions import override
+import numpy.typing as npt
+from typing_extensions import Self, override
 
+from dronalize.config.models import (
+    BoundingBoxExtraction,
+    CircularExtraction,
+    FullMapExtraction,
+    MapConfig,
+    MapEdgeTypeRules,
+    MapExtraction,
+    SceneExtentExtraction,
+    TrajectoryBufferExtraction,
+)
 from dronalize.core.categories import EdgeType
 from dronalize.core.maps import MapGraph
+from dronalize.core.scene import Scene
 
 if TYPE_CHECKING:
+    import multiprocessing.shared_memory as shm
     from collections.abc import Iterable, Mapping
+    from types import TracebackType
 
 
 Point: TypeAlias = tuple[float, float]
@@ -43,6 +58,242 @@ class PathFeature:
 
 
 MapFeature: TypeAlias = PointFeature | PathFeature
+MapExtractor: TypeAlias = Callable[[Scene, MapGraph], MapGraph]
+
+
+@dataclass(slots=True, frozen=True)
+class MapReference:
+    """Lightweight scene map reference carried alongside loaded trajectory data."""
+
+    map_key: str | None = None
+    """Stable map identifier for the scene, if one is known at ingest time."""
+    map_payload: bytes | None = None
+    """Serialized map payload already available from trajectory ingestion."""
+
+
+class MapProvider(Protocol):
+    """Resolve map graphs for materialized scenes."""
+
+    def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
+        """Resolve the map for *scene* using loader-supplied map reference data."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class BoundMapResolver:
+    """Scene-compatible resolver bound to one provider/reference pair."""
+
+    provider: MapProvider
+    reference: MapReference
+
+    def __call__(self, scene: Scene) -> MapGraph | None:
+        """Resolve the map for *scene* using the bound provider and reference."""
+        return self.provider.resolve(scene, self.reference)
+
+
+def bind_map_provider(provider: MapProvider, reference: MapReference) -> BoundMapResolver:
+    """Bind a map provider/reference pair into a `Scene` map resolver."""
+    return BoundMapResolver(provider=provider, reference=reference)
+
+
+def resolve_map_key(scene: Scene, reference: MapReference) -> str | None:
+    """Return the effective map key for a scene/reference pair."""
+    return reference.map_key or scene.map_key
+
+
+@dataclass(frozen=True, slots=True)
+class SharedMapProvider(MapProvider):
+    """Map provider backed by shared-memory map graph names."""
+
+    shared_names: dict[str | None, str] | str
+    extractor: MapExtractor | None = None
+
+    @override
+    def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
+        key = resolve_map_key(scene, reference)
+        name = (
+            self.shared_names.get(key) if isinstance(self.shared_names, dict) else self.shared_names
+        )
+        if name is None:
+            return None
+
+        with MapGraph.from_shared(name) as map_graph:
+            if self.extractor is None:
+                return map_graph.copy()
+
+            extracted = self.extractor(scene, map_graph)
+            return extracted.copy() if extracted is map_graph else extracted
+
+
+@dataclass(slots=True)
+class SharedMapStore:
+    """Own shared-memory handles for a set of configured map graphs."""
+
+    shared_names: dict[str | None, str] | str
+    handles: tuple[shm.SharedMemory, ...]
+
+    def provider(self, extractor: MapExtractor | None = None) -> SharedMapProvider:
+        """Return a provider backed by this store."""
+        return SharedMapProvider(shared_names=self.shared_names, extractor=extractor)
+
+    def close(self) -> None:
+        """Close and unlink all owned shared-memory handles."""
+        for handle in self.handles:
+            handle.close()
+            handle.unlink()
+
+    def __enter__(self) -> Self:
+        """Return this store as a context manager."""
+        return self
+
+    def __exit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        _exc_val: BaseException | None,
+        _exc_t: TracebackType | None,
+    ) -> None:
+        """Release shared-memory resources."""
+        self.close()
+
+
+def open_shared_map_store(maps: dict[str | None, MapGraph] | MapGraph) -> SharedMapStore:
+    """Serialize one or more map graphs to shared memory."""
+    if isinstance(maps, MapGraph):
+        handle = maps.to_shared()
+        return SharedMapStore(shared_names=handle.name, handles=(handle,))
+
+    handles: list[shm.SharedMemory] = []
+    names: dict[str | None, str] = {}
+    for key, graph in maps.items():
+        handle = graph.to_shared()
+        handles.append(handle)
+        names[key] = handle.name
+    return SharedMapStore(shared_names=names, handles=tuple(handles))
+
+
+def extract_fn(extraction: MapExtraction) -> MapExtractor:
+    """Create a scene-aware map extraction function from config."""
+    if isinstance(extraction, FullMapExtraction):
+        return lambda _scene, graph: graph
+
+    def _extract(scene: Scene, graph: MapGraph) -> MapGraph:
+        return extract_based_on_scene(graph, scene, extraction)
+
+    return _extract
+
+
+def extract_based_on_scene(
+    map_graph: MapGraph, scene: Scene, extraction: MapExtraction
+) -> MapGraph:
+    """Extract a subgraph based on the scene and extraction configuration."""
+    center_x = scene.frame.select("x").mean().item()
+    center_y = scene.frame.select("y").mean().item()
+    return extract(
+        map_graph, center=(center_x, center_y), extraction=extraction, relevant_positions=scene
+    )
+
+
+def apply_map_config(map_graph: MapGraph, config: MapConfig) -> MapGraph:
+    """Apply config-wide map transforms that do not depend on a scene."""
+    return apply_edge_type_config(map_graph, config.edge_types)
+
+
+def extract_configured_map(map_graph: MapGraph, scene: Scene, config: MapConfig) -> MapGraph:
+    """Apply map config and then extract the scene-local subgraph."""
+    return extract_based_on_scene(apply_map_config(map_graph, config), scene, config.extraction)
+
+
+def extract(
+    graph: MapGraph,
+    center: tuple[float, float] | npt.NDArray[np.floating[Any]] | None,
+    extraction: MapExtraction,
+    *,
+    relevant_positions: npt.NDArray[np.floating[Any]] | Scene | None = None,
+) -> MapGraph:
+    """Extract a subgraph from a graph according to a map extraction config."""
+    if isinstance(relevant_positions, Scene):
+        relevant_positions = relevant_positions.frame.select("x", "y").to_numpy()
+
+    match extraction:
+        case BoundingBoxExtraction(width=width, height=height):
+            return graph.extract_bounding_box(center, width, height)
+        case CircularExtraction(radius=radius):
+            return graph.extract_radius(center, radius)
+        case TrajectoryBufferExtraction(radius=radius):
+            if relevant_positions is None:
+                msg = "relevant_positions must be provided for TrajectoryBufferExtraction"
+                raise ValueError(msg)
+            return graph.extract_trajectory_buffer(relevant_positions, radius)
+        case SceneExtentExtraction(padding=padding, shape=shape):
+            if relevant_positions is None:
+                msg = "relevant_positions must be provided for SceneExtentExtraction"
+                raise ValueError(msg)
+            return graph.extract_extent_for_positions(
+                relevant_positions, padding, use_bbox=shape == "bounding_box"
+            )
+        case FullMapExtraction():
+            return graph
+
+
+def apply_edge_type_config(map_graph: MapGraph, edge_types: MapEdgeTypeRules | None) -> MapGraph:
+    """Apply edge-type remapping and filtering to a graph."""
+    if edge_types is None or map_graph.num_edges == 0:
+        return map_graph
+
+    include, exclude, remap = _normalize_edge_type_rules(edge_types)
+    remapped_edge_types = np.array(map_graph.edge_types, copy=True)
+    changed = False
+    for source, target in remap.items():
+        source_value = int(source)
+        target_value = int(target)
+        matches = remapped_edge_types == source_value
+        if matches.any():
+            remapped_edge_types[matches] = target_value
+            changed = True
+
+    edge_mask = np.ones(map_graph.num_edges, dtype=bool)
+    if include is not None:
+        include_values = np.array([int(edge_type) for edge_type in include], dtype=np.int32)
+        edge_mask &= np.isin(remapped_edge_types, include_values)
+    if exclude:
+        exclude_values = np.array([int(edge_type) for edge_type in exclude], dtype=np.int32)
+        edge_mask &= ~np.isin(remapped_edge_types, exclude_values)
+
+    if not edge_mask.all():
+        filtered_graph = map_graph.filter_edges(edge_mask)
+        filtered_edge_types = remapped_edge_types[edge_mask]
+        return MapGraph(
+            node_positions=filtered_graph.node_positions,
+            edge_indices=filtered_graph.edge_indices,
+            node_types=filtered_graph.node_types,
+            edge_types=filtered_edge_types,
+        )
+
+    if not changed:
+        return map_graph
+
+    return MapGraph(
+        node_positions=map_graph.node_positions,
+        edge_indices=map_graph.edge_indices,
+        node_types=map_graph.node_types,
+        edge_types=remapped_edge_types,
+    )
+
+
+def _normalize_edge_type_rules(
+    edge_types: MapEdgeTypeRules,
+) -> tuple[frozenset[EdgeType] | None, frozenset[EdgeType], dict[EdgeType, EdgeType]]:
+    include = (
+        None
+        if edge_types.include is None
+        else frozenset(EdgeType.from_value(edge_type) for edge_type in edge_types.include)
+    )
+    exclude = frozenset(EdgeType.from_value(edge_type) for edge_type in edge_types.exclude)
+    remap = {
+        EdgeType.from_value(source): EdgeType.from_value(target)
+        for source, target in edge_types.remap.items()
+    }
+    return include, exclude, remap
 
 
 @dataclass(frozen=True, slots=True)

@@ -9,9 +9,14 @@ import polars as pl
 from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
-from dronalize.datasets.shared import utils
-from dronalize.processing.loading.models import MapProvider
-from dronalize.processing.maps import FeatureMapBuilder, PathFeature
+from dronalize.processing.maps import (
+    FeatureMapBuilder,
+    MapProvider,
+    MapReference,
+    PathFeature,
+    extract_configured_map,
+    resolve_map_key,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -19,7 +24,6 @@ if TYPE_CHECKING:
     from dronalize.config.models import MapConfig
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene import Scene
-    from dronalize.processing.loading.models import MapReference
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,7 +32,7 @@ class A43MapProvider(MapProvider):
 
     @override
     def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
-        key = reference.map_key or scene.map_key
+        key = resolve_map_key(scene, reference)
         if key is None:
             return None
 
@@ -39,7 +43,7 @@ class A43MapProvider(MapProvider):
             min_distance=self.config.min_distance,
             interpolation_distance=self.config.interpolation_distance,
         )
-        return utils.extract_configured_map(map_graph, scene, self.config)
+        return extract_configured_map(map_graph, scene, self.config)
 
 
 class A43MapBuilder(FeatureMapBuilder):

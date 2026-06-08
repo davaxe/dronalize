@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 
 from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.core.maps import MapGraph
-from dronalize.datasets.shared import utils
-from dronalize.processing.loading.models import DatasetRunResources, MapProvider, SharedMapProvider
+from dronalize.processing.loading.models import DatasetRunResources
+from dronalize.processing.maps import MapProvider, SharedMapProvider, apply_map_config, extract_fn
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -40,14 +40,14 @@ def open_named_shared_map_resources(
     handles: list[SharedMemory] = []
     mappings: dict[str | None, str] = {}
     for key, path in named_paths:
-        handle = utils.apply_map_config(build_map(path, map_config), map_config).to_shared()
+        handle = apply_map_config(build_map(path, map_config), map_config).to_shared()
         handles.append(handle)
         mappings[key] = handle.name
 
     try:
         yield DatasetRunResources(
             map_provider=SharedMapProvider(
-                shared_names=mappings, extractor=utils.extract_fn(map_config.extraction)
+                shared_names=mappings, extractor=extract_fn(map_config.extraction)
             )
         )
     finally:
@@ -65,11 +65,11 @@ def open_single_shared_map_resource(
         yield DatasetRunResources()
         return
 
-    handle = utils.apply_map_config(build_map(map_path, map_config), map_config).to_shared()
+    handle = apply_map_config(build_map(map_path, map_config), map_config).to_shared()
     try:
         yield DatasetRunResources(
             map_provider=SharedMapProvider(
-                shared_names=handle.name, extractor=utils.extract_fn(map_config.extraction)
+                shared_names=handle.name, extractor=extract_fn(map_config.extraction)
             )
         )
     finally:
