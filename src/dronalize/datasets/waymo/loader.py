@@ -12,7 +12,8 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
 from dronalize.datasets.waymo.protos import lean_scenario_pb2
 from dronalize.processing.loading.base import SceneLoader
-from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, MapReference
+from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
+from dronalize.processing.maps import MapReference
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

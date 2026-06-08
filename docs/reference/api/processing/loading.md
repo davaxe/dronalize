@@ -15,5 +15,3 @@
 ## ::: dronalize.processing.loading.DatasetSource
 
 ## ::: dronalize.processing.loading.LoadedSourceFrame
-
-## ::: dronalize.processing.loading.MapReference

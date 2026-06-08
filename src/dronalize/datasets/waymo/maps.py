@@ -8,10 +8,15 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
-from dronalize.datasets.shared import utils
 from dronalize.datasets.waymo.protos import lean_map_pb2
-from dronalize.processing.loading import MapProvider
-from dronalize.processing.maps import FeatureMapBuilder, PathFeature, PointFeature
+from dronalize.processing.maps import (
+    FeatureMapBuilder,
+    MapProvider,
+    MapReference,
+    PathFeature,
+    PointFeature,
+    extract_configured_map,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
@@ -19,7 +24,6 @@ if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
     from dronalize.core.scene.model import Scene
     from dronalize.datasets import MapConfig
-    from dronalize.processing.loading.models import MapReference
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +40,7 @@ class WaymoEmbeddedMapProvider(MapProvider):
             min_distance=self.config.min_distance,
             interpolation_distance=self.config.interpolation_distance,
         )
-        return utils.extract_configured_map(map_graph, scene, self.config)
+        return extract_configured_map(map_graph, scene, self.config)
 
 
 class WaymoMapBuilder(FeatureMapBuilder):

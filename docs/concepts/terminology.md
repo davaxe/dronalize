@@ -49,7 +49,7 @@ This page defines the terms used across `dronalize` docs, configuration, and pub
 | --- | --- |
 | Backend | The storage implementation used to write scene records, such as `pickle`, `mds`, or `null`. |
 | Manifest | The `manifest.json` file that records dataset names, trajectory schema, feature fields, timing, horizon, precision, backend, and map presence for an export. |
-| Map reference | A lightweight `MapReference` carried by loader output to identify or provide map data for a scene. |
+| Map reference | A lightweight `processing.maps.MapReference` carried by loader output to identify or provide map data for a scene. |
 
 ## Schemas and encoded labels
 
