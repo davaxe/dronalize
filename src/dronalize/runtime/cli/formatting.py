@@ -22,17 +22,14 @@ from dronalize.config.models import (
 )
 from dronalize.core.categories import DatasetSplit, EdgeType
 from dronalize.core.scene import get_trajectory_schema
-from dronalize.io.base import storage_backend_name
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from dronalize.config.models import (
         AssignConfig,
-        AssignUnion,
         MapConfig,
         ReadConfig,
-        ReadUnion,
         ScenesConfig,
         ScreeningConfig,
         SplitWeights,
@@ -66,7 +63,7 @@ def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
         ("Dataset", plan.dataset),
         ("Input", str(plan.data_root)),
         ("Output", str(plan.output_dir)),
-        ("Backend", storage_backend_name(plan.storage_backend)),
+        ("Backend", plan.storage_backend.value),
         ("Workers", str(plan.runtime.jobs)),
         ("Limit", "none" if plan.limit is None else str(plan.limit)),
         ("Schema", get_trajectory_schema(output_config.trajectory_schema).name),
@@ -421,11 +418,11 @@ def _read_request_rows(read: ReadSelection) -> tuple[Row, ...]:
 
 
 def _read_config_rows(read_config: ReadConfig) -> tuple[Row, ...]:
-    return _read_rows(read_config.root)
+    return _read_rows(read_config)
 
 
 def _read_rows(
-    read_config: ReadUnion, *, native_splits: Sequence[DatasetSplit] | None = None
+    read_config: ReadConfig, *, native_splits: Sequence[DatasetSplit] | None = None
 ) -> tuple[Row, ...]:
     rows: list[Row] = [("Strategy", read_config.strategy)]
     match read_config:
@@ -446,11 +443,11 @@ def _assignment_request_rows(
 
 
 def _assign_config_rows(assign_config: AssignConfig) -> tuple[Row, ...]:
-    return _assignment_rows(assign_config.root)
+    return _assignment_rows(assign_config)
 
 
 def _assignment_rows(
-    assign_config: AssignUnion, *, native_splits: Sequence[DatasetSplit] | None = None
+    assign_config: AssignConfig, *, native_splits: Sequence[DatasetSplit] | None = None
 ) -> tuple[Row, ...]:
     rows: list[Row] = [("Strategy", assign_config.strategy)]
     if isinstance(assign_config, NoAssign):

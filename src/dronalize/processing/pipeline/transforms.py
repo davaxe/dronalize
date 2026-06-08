@@ -8,55 +8,12 @@ import polars as pl
 
 from dronalize.core import functional as f
 from dronalize.core.functional import ResampleSpec
-from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.screening.screen import screen_scene as _screen_scene
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from dronalize.core.functional.window import WindowPolicy
     from dronalize.processing.pipeline.pipeline import FlatMapTransform, Transform
-    from dronalize.processing.screening import ScreeningRuleSet
-
-
-def screen_scene(
-    scene_screening: ScreeningRuleSet | None = None,
-    columns: TrajectoryColumns | None = None,
-    *,
-    group_by: str | Sequence[str] | None = None,
-    mark_passed_agents: bool = False,
-    retain_scene_passes: bool = False,
-) -> Transform:
-    """Create a screening transform.
-
-    Wraps [`dronalize.processing.screening.screen_scene`][].
-
-    Parameters
-    ----------
-    scene_screening : ScreeningRuleSet, optional
-        Screening specification containing cleanup and check rules.
-    columns : TrajectoryColumns, optional
-        Column mapping for the input frame.
-    group_by : str or Sequence[str], optional
-        Column(s) that define independent scenes inside the frame.
-    mark_passed_agents : bool, optional
-        Whether to retain an internal per-agent passed marker for runtime transport.
-
-    """
-
-    def _screen(df: pl.LazyFrame) -> pl.LazyFrame:
-        return _screen_scene(
-            df,
-            scene_screening=scene_screening,
-            columns=columns or TrajectoryColumns(),
-            scene_group_by=group_by,
-            mark_passed_agents=mark_passed_agents,
-            retain_scene_passes=retain_scene_passes,
-        )
-
-    _screen.__name__ = "screen"
-    _screen.__qualname__ = "transforms.screen"
-    return _screen
 
 
 def resample(

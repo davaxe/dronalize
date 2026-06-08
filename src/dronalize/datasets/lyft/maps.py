@@ -439,37 +439,6 @@ class LaneBoundary:
 
         return edge_type
 
-    def get_edge_types(self) -> list[EdgeType] | EdgeType:
-        """Get edge types for the lane boundary.
-
-        Returns a list if the lane boundary changes with distance,
-        otherwise returns a single edge type for the entire boundary.
-        """
-        if not self.lane_types:
-            return EdgeType.NONE
-
-        if not self.type_change_distances:
-            return self.lane_types[0].to_edge_type()
-
-        edge_types: list[EdgeType] = []
-        acc_distance: float = 0.0
-        change_count: int = 0
-        edge_type: EdgeType = self.lane_types[0].to_edge_type()
-        for i in range(len(self.points) - 1):
-            edge_types.append(edge_type)
-            dist = _point_distance(self.points[i], self.points[i + 1])
-            acc_distance += dist
-
-            if (
-                change_count < len(self.type_change_distances)
-                and acc_distance >= self.type_change_distances[change_count]
-            ):
-                change_count += 1
-                edge_type = self.lane_types[change_count].to_edge_type()
-                acc_distance = 0.0
-
-        return edge_types
-
 
 @dataclass
 class Lane:

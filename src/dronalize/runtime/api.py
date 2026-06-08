@@ -7,8 +7,7 @@ import time
 from typing import TYPE_CHECKING
 
 from dronalize.datasets.registry import get_dataset
-from dronalize.io.backends.registry import build_writer_provider
-from dronalize.io.base import storage_backend_name
+from dronalize.io.backends.provider import build_writer_provider
 from dronalize.runtime.executor import open_execution_session
 from dronalize.runtime.progress import execute_with_rich_progress
 from dronalize.runtime.resolve import build_execution_plan
@@ -90,12 +89,10 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
     """
     logger.info(
         "Executing plan",
-        extra={
-            "dataset": plan.dataset,
-            "storage_backend": storage_backend_name(plan.storage_backend),
-        },
+        extra={"dataset": plan.dataset, "storage_backend": plan.storage_backend.value},
     )
-    start_time = time.time()
+
+    start_time = time.perf_counter()
     with open_execution_session(plan) as run:
         writer_provider = build_writer_provider(plan)
         progress = execute_with_rich_progress(
@@ -109,17 +106,18 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
             "Finished plan",
             extra={
                 "dataset": plan.dataset,
-                "processed_sources": progress.processed_sources,
-                "written_scenes": progress.written_scenes,
+                "processed_sources": progress.stats.processed_sources,
+                "candidate_scenes": progress.stats.candidate_scenes,
+                "written_scenes": progress.stats.written_scenes,
             },
         )
+
         return ExecutionResult(
             dataset=plan.dataset,
             output_dir=plan.output_dir,
             storage_backend=plan.storage_backend,
-            processed_sources=progress.processed_sources,
-            candidate_scenes=progress.candidate_scenes,
-            written_scenes=progress.written_scenes,
-            split_counts={k: v for k, v in progress.split_counts.items() if isinstance(v, int)},
-            elapsed_time_seconds=time.time() - start_time,
+            stats=progress.stats,
+            scene_limit=progress.scene_limit,
+            cleanup_summary=run.executor.cleanup_summary(),
+            elapsed_time_seconds=time.perf_counter() - start_time,
         )

@@ -22,14 +22,6 @@ if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
 
 
-MapKey = str | None
-"""Stable identifier for the map associated with a scene.
-
-Loaders typically populate this with a dataset-native lane graph or HD map
-identifier. `None` indicates that the scene either has no map or that the map
-should be resolved without a per-scene key.
-"""
-
 MapResolver = Callable[["Scene"], MapGraph | None]
 """Callable signature used to materialize a scene's map graph lazily.
 
@@ -53,7 +45,7 @@ class Scene:
     """Schema describing which fields this scene currently provides."""
     sample_time: float | None = None
     """Time interval between frames in seconds."""
-    map_key: MapKey = None
+    map_key: str | None = None
     """Stable map identifier for the scene, if one exists."""
     map_resolver: MapResolver | None = field(default=None, compare=False, repr=False)
     """Resolver attached by the loader to materialize the scene map on demand."""
@@ -73,7 +65,7 @@ class Scene:
         horizon_frames: int,
         schema: TrajectorySchema,
         sample_time: float | None = None,
-        map_key: MapKey = None,
+        map_key: str | None = None,
         map_resolver: MapResolver | None = None,
         split_assignment: DatasetSplit | None = None,
         dataset: str | None = None,
@@ -158,7 +150,7 @@ class Scene:
 
     def has_map(self) -> bool:
         """Return whether this scene has a lazy map resolver attached."""
-        return self.map_resolver is not None
+        return self.map_key is not None or self.map_resolver is not None
 
     def as_schema(self, schema: TrajectorySchema = CANONICAL) -> Scene:
         """Return a copy converted to the requested trajectory schema."""

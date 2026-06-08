@@ -1,5 +1,6 @@
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.a43.loader import A43Loader
+from dronalize.datasets.a43.maps import A43MapProvider
 from dronalize.datasets.registry import (
     DatasetDescriptor,
     DatasetFeatureSupport,
@@ -10,10 +11,15 @@ from dronalize.datasets.shared.presets import (
     scenes_config,
     temporal_support,
 )
+from dronalize.datasets.shared.resources import map_provider_resources_factory
+
+_open_a43_resources = map_provider_resources_factory(
+    create=lambda _root, map_config: A43MapProvider(map_config)
+)
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="a43",
-    loader_factory=A43Loader.from_loader_request,
+    loader_cls=A43Loader,
     default_config=DatasetConfig(
         scenes=scenes_config(
             horizon_frames=70, default_observation_length=20, sample_time=0.1, window_step=25
@@ -27,4 +33,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     temporal_support=temporal_support(
         source_unit="recording", min_frames=52123, max_frames=52123, enabled_by_default=True
     ),
+    resources_factory=_open_a43_resources,
 )

@@ -20,17 +20,17 @@ from dronalize.datasets import (
     FrameBounds,
     list_datasets,
 )
-from dronalize.datasets.registry import (  # pyright: ignore[reportPrivateUsage]
-    _REGISTRY,
+from dronalize.datasets.registry import (
+    _REGISTRY,  # pyright: ignore[reportPrivateUsage]
     dataset_names_by_id,
 )
 from dronalize.io import StorageBackend, read_manifest
 from dronalize.io.backends.null import NullWriter
-from dronalize.io.backends.registry import register_writer_backend
 from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.readers import PickleReader
 from dronalize.runtime import ExecutionRequest, OutputTransform, execute_request, resolve_request
-from tests.support import DemoOptions, demo_descriptor
+from dronalize.runtime.executor import open_execution_session
+from tests.support import DemoOptions, cleanup_demo_descriptor, demo_descriptor
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -75,6 +75,10 @@ def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_descriptor(monkeypatch, demo_descriptor())
 
 
+def _create_null_writer(_worker_id: int) -> NullWriter:
+    return NullWriter()
+
+
 def test_resolve_request_builds_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_get_demo_descriptor(monkeypatch)
 
@@ -96,19 +100,6 @@ def test_resolve_request_rejects_unknown_backend(
 
     with pytest.raises(UnsupportedStorageBackendError, match="Unsupported storage backend"):
         _ = resolve_request(_request(tmp_path, storage_backend="bad-backend"))
-
-
-def test_resolve_request_accepts_registered_backend(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _patch_get_demo_descriptor(monkeypatch)
-    register_writer_backend(
-        "test-null", lambda _plan: WorkerWriterProvider(lambda _i: NullWriter())
-    )
-
-    plan = resolve_request(_request(tmp_path, storage_backend="test-null"))
-
-    assert plan.storage_backend == "test-null"
 
 
 def test_resolve_request_rejects_lane_change(
@@ -212,7 +203,7 @@ def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mon
 
     assert result.dataset == "demo"
     assert result.storage_backend == StorageBackend.NULL
-    assert result.processed_sources == 1
+    assert result.stats.processed_sources == 1
 
     manifest = read_manifest(result.output_dir)
     assert manifest.storage_backend == "null"
@@ -316,15 +307,83 @@ def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     result = execute_request(request)
 
     assert result.dataset == "demo"
-    assert result.processed_sources == 1
-    assert result.candidate_scenes == 1
-    assert result.written_scenes == 1
-    assert result.split_counts["unsplit"] == 1
+    assert result.stats.processed_sources == 1
+    assert result.stats.candidate_scenes == 1
+    assert result.stats.written_scenes == 1
+    assert result.stats.split_counts["unsplit"] == 1
 
     manifest = read_manifest(output_dir)
     assert manifest.horizon_frames == 3
     assert manifest.default_observation_length == 2
     assert manifest.dataset_names == ("demo",)
+
+
+def test_execute_request_reports_cleanup_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_descriptor(monkeypatch, cleanup_demo_descriptor())
+
+    request = _request(tmp_path, dataset="cleanup-demo")
+    result = execute_request(request)
+
+    assert result.cleanup_summary is not None
+    assert result.cleanup_summary.overall.scene_count == 1
+    assert result.cleanup_summary.overall.total_rows_removed == 3
+    assert result.cleanup_summary.overall.total_agents_removed == 1
+    assert result.cleanup_summary.overall.average_rows_removed_per_scene == pytest.approx(3.0)
+    assert result.cleanup_summary.overall.min_rows_removed_per_scene == 3
+    assert result.cleanup_summary.overall.max_rows_removed_per_scene == 3
+    assert "trim_unimportant" in result.cleanup_summary.by_rule
+    rule_summary = result.cleanup_summary.by_rule["trim_unimportant"]
+    assert rule_summary.total_rows_removed == 3
+    assert rule_summary.total_agents_removed == 1
+
+
+def test_parallel_execution_reports_cleanup_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_descriptor(monkeypatch, cleanup_demo_descriptor())
+
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    input_dir.mkdir()
+
+    request = ExecutionRequest(
+        dataset="cleanup-demo",
+        input_dir=input_dir,
+        output_dir=output_dir,
+        storage_backend=StorageBackend.NULL,
+        overrides=RuntimeOverride.from_inputs(jobs=2),
+    )
+
+    result = execute_request(request)
+
+    assert result.cleanup_summary is not None
+    assert result.cleanup_summary.overall.total_rows_removed == 3
+    assert result.cleanup_summary.overall.total_agents_removed == 1
+    assert result.cleanup_summary.by_rule["trim_unimportant"].scene_count == 1
+
+
+@pytest.mark.parametrize("jobs", [None, 2], ids=["sequential", "parallel"])
+def test_execution_progress_reports_cleanup_counters(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, jobs: int | None
+) -> None:
+    _patch_descriptor(monkeypatch, cleanup_demo_descriptor())
+
+    request_kwargs: dict[str, object] = {"dataset": "cleanup-demo"}
+    if jobs is not None:
+        request_kwargs["overrides"] = RuntimeOverride.from_inputs(jobs=jobs)
+
+    plan = resolve_request(_request(tmp_path, **request_kwargs))
+    writer_provider = WorkerWriterProvider(_create_null_writer)
+
+    with open_execution_session(plan) as run:
+        progress = run.executor.execute(writer_provider)
+
+    assert progress.cleanup.rows_total == 6
+    assert progress.cleanup.rows_removed == 3
+    assert progress.cleanup.agents_total == 2
+    assert progress.cleanup.agents_removed == 1
 
 
 @pytest.mark.parametrize(

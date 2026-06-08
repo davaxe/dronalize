@@ -14,6 +14,6 @@ Custom backends can be added by registering another backend builder with
 `register_writer_backend`.
 """
 
-from dronalize.io.backends.registry import build_writer_provider, register_writer_backend
+from dronalize.io.backends.provider import build_writer_provider
 
-__all__ = ["build_writer_provider", "register_writer_backend"]
+__all__ = ["build_writer_provider"]

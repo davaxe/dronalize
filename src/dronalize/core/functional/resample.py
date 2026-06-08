@@ -36,10 +36,6 @@ class ResampleMethod(str, Enum):
     CUBIC = "cubic"
     PCHIP = "pchip"
 
-    def supports_derivatives(self) -> bool:
-        """Return whether the method can emit derivative columns."""
-        return self is not ResampleMethod.LINEAR
-
 
 def _velocity_column_name(coordinate: str) -> str:
     return f"v{coordinate}" if len(coordinate) == 1 else f"velocity_{coordinate}"

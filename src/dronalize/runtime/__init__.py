@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from dronalize.runtime.api import execute_plan, execute_request, resolve_request
 from dronalize.runtime.types import (
+    CleanupRemovalSummary,
+    CleanupSummary,
     ExecutionPlan,
     ExecutionRequest,
     ExecutionResult,
@@ -19,6 +21,8 @@ from dronalize.runtime.types import (
 )
 
 __all__ = [
+    "CleanupRemovalSummary",
+    "CleanupSummary",
     "ExecutionPlan",
     "ExecutionRequest",
     "ExecutionResult",

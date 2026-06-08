@@ -56,10 +56,6 @@ class StorageBackend(str, Enum):
     """Null storage backend that discards all data. Useful for testing."""
 
 
-StorageBackendId = StorageBackend | str
-"""Storage backend identifier accepted by public runtime APIs."""
-
-
 class DatasetReader(ABC, Generic[RecordT]):
     """Abstract base class for scene readers."""
 
@@ -178,8 +174,3 @@ def validate_transform_choice(
     if record_transform is not None and scene_transform is not None:
         msg = "Use either `record_transform` or `scene_transform`, not both."
         raise ValueError(msg)
-
-
-def storage_backend_name(backend: StorageBackendId) -> str:
-    """Return the stable string key for a storage backend identifier."""
-    return backend.value if isinstance(backend, StorageBackend) else str(backend)

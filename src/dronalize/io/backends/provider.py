@@ -15,17 +15,9 @@ from __future__ import annotations
 
 import functools
 import logging
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
-from dronalize.core.errors import UnsupportedStorageBackendError
-from dronalize.io.base import (
-    StorageBackend,
-    StorageBackendId,
-    WorkerWriterProvider,
-    WriterProvider,
-    storage_backend_name,
-)
+from dronalize.io.base import StorageBackend, WorkerWriterProvider, WriterProvider
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,38 +26,18 @@ if TYPE_CHECKING:
     from dronalize.io.base import DatasetWriter, RecordTransform, SceneTransform
     from dronalize.runtime.types import ExecutionPlan, OutputPlan
 
-WriterProviderBuilder = Callable[["ExecutionPlan"], WriterProvider]
-_WRITER_BACKENDS: dict[str, WriterProviderBuilder] = {}
 logger = logging.getLogger(__name__)
-
-
-def registered_writer_backends() -> tuple[str, ...]:
-    """Return registered writer backend names in deterministic order."""
-    return tuple(sorted(_WRITER_BACKENDS))
-
-
-def is_writer_backend_registered(backend: StorageBackendId) -> bool:
-    """Return whether a writer backend has been registered."""
-    return storage_backend_name(backend) in _WRITER_BACKENDS
-
-
-def register_writer_backend(backend: StorageBackendId, builder: WriterProviderBuilder) -> None:
-    """Register a writer backend provider builder."""
-    backend_name = storage_backend_name(backend)
-    _WRITER_BACKENDS[backend_name] = builder
-    logger.debug("Registered writer backend", extra={"storage_backend": backend_name})
 
 
 def build_writer_provider(plan: ExecutionPlan) -> WriterProvider:
     """Build the writer provider for one resolved processing plan."""
-    backend_name = storage_backend_name(plan.storage_backend)
-    builder = _WRITER_BACKENDS.get(backend_name)
-    if builder is None:
-        raise UnsupportedStorageBackendError(backend_name, registered_writer_backends())
-    logger.debug(
-        "Building writer provider", extra={"dataset": plan.dataset, "storage_backend": backend_name}
-    )
-    return builder(plan)
+    match plan.storage_backend:
+        case StorageBackend.MDS:
+            return _build_mds_writer_provider(plan)
+        case StorageBackend.PICKLE:
+            return _build_pickle_writer_provider(plan)
+        case StorageBackend.NULL:
+            return _build_null_writer_provider(plan)
 
 
 def _build_mds_writer_provider(plan: ExecutionPlan) -> WriterProvider:
@@ -179,8 +151,3 @@ def _create_pickle_writer(
 
 def _output_splits(plan: ExecutionPlan) -> tuple[DatasetSplit, ...] | None:
     return plan.assignment.output_splits(input_native_splits=plan.loader.read.native_splits)
-
-
-register_writer_backend(StorageBackend.MDS, _build_mds_writer_provider)
-register_writer_backend(StorageBackend.NULL, _build_null_writer_provider)
-register_writer_backend(StorageBackend.PICKLE, _build_pickle_writer_provider)

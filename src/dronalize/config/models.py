@@ -10,7 +10,7 @@ from pydantic import (
     AliasChoices,
     BeforeValidator,
     Field,
-    RootModel,
+    TypeAdapter,
     field_validator,
     model_validator,
 )
@@ -112,13 +112,7 @@ class ReadNative(ResolvedConfig):
     """Native dataset partitions to read from the DatasetSource dataset."""
 
 
-ReadUnion = Annotated[ReadAll | ReadNative, Field(discriminator="strategy")]
-
-
-class ReadConfig(RootModel[ReadUnion]):
-    """Read-selection configuration wrapper model."""
-
-    root: ReadUnion
+ReadConfig = Annotated[ReadAll | ReadNative, Field(discriminator="strategy")]
 
 
 class NoAssign(ResolvedConfig):
@@ -164,7 +158,7 @@ class ShuffledTimeBlockAssign(ResolvedConfig):
     ratio: SplitWeights = Field(default_factory=SplitWeights)
 
 
-AssignUnion = Annotated[
+AssignConfig = Annotated[
     NoAssign
     | PreserveNativeAssign
     | SceneAssign
@@ -173,12 +167,6 @@ AssignUnion = Annotated[
     | ShuffledTimeBlockAssign,
     Field(discriminator="strategy"),
 ]
-
-
-class AssignConfig(RootModel[AssignUnion]):
-    """Assignment configuration wrapper model."""
-
-    root: AssignUnion
 
 
 class RuntimeConfig(ResolvedConfig):
@@ -1008,9 +996,9 @@ class DatasetConfig(ResolvedConfig):
     """Output encoding, schema, and backend-specific writer settings."""
     map: MapConfig = Field(default_factory=MapConfig)
     """Map extraction and interpolation settings for generated scenes."""
-    read: ReadConfig = Field(default_factory=lambda: ReadConfig(ReadAll()))
+    read: ReadConfig = Field(default_factory=ReadAll)
     """Input selection configuration used to choose raw dataset sources."""
-    assign: AssignConfig = Field(default_factory=lambda: AssignConfig(NoAssign()))
+    assign: AssignConfig = Field(default_factory=NoAssign)
     """Output assignment configuration used to label generated scenes."""
     loader_options: dict[str, Any] | None = Field(default=None)
     """Dataset-specific loader options forwarded to the selected dataset plugin."""
@@ -1194,8 +1182,11 @@ class RuntimeOverride(ConfigPatch[PartialDatasetConfig]):
 
         read_data = {"strategy": read_strategy, "splits": read_split}
         read_data = {k: v for k, v in read_data.items() if v is not None}
-        read_config = ReadConfig.model_validate(read_data) if "strategy" in read_data else None
-
+        read_config = (
+            TypeAdapter[ReadConfig](ReadConfig).validate_python(read_data)
+            if "strategy" in read_data
+            else None
+        )
         assign_data = {
             "strategy": assign_strategy,
             "ratio": {"train": ratio[0], "val": ratio[1], "test": ratio[2]} if ratio else None,
@@ -1204,7 +1195,9 @@ class RuntimeOverride(ConfigPatch[PartialDatasetConfig]):
         }
         assign_data = {k: v for k, v in assign_data.items() if v is not None}
         assign_config = (
-            AssignConfig.model_validate(assign_data) if "strategy" in assign_data else None
+            TypeAdapter[AssignConfig](AssignConfig).validate_python(assign_data)
+            if "strategy" in assign_data
+            else None
         )
 
         return cls(

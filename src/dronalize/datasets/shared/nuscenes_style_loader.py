@@ -10,10 +10,8 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, LoaderOptionsModel
-from dronalize.processing.maps import no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -21,7 +19,6 @@ if TYPE_CHECKING:
 
     from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.loading.models import DatasetRunResources
-    from dronalize.processing.maps import MapResolver
     from dronalize.processing.models import LoaderPlan
 
 
@@ -107,13 +104,6 @@ class NuScenesStyleLoader(SceneLoader[str, NuScenesStyleLoaderOptions]):
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
-
-    @override
-    def map_resolver(self) -> MapResolver:
-        if not self.resources.shared_maps or self.map_config is None:
-            return no_map()
-        extraction = self.map_config.extraction
-        return shared_map(self.resources.shared_maps, utils.extract_fn(extraction))
 
     def _ensure_dataset_loaded(self) -> None:
         if self._scene_cache:

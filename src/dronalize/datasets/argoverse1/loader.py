@@ -11,7 +11,6 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import (
     DatasetSource,
@@ -19,7 +18,6 @@ from dronalize.processing.loading.models import (
     LoaderOptionsModel,
     MapReference,
 )
-from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -110,13 +108,6 @@ class Argoverse1Loader(SceneLoader[list[Path], Argoverse1LoaderOptions]):
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
-
-    @override
-    def map_resolver(self) -> MapResolver:
-        shared_maps = self.resources.shared_maps
-        if not isinstance(shared_maps, dict) or self.map_config is None:
-            return no_map()
-        return shared_map(shared_maps, utils.extract_fn(self.map_config.extraction))
 
     def _sources_from_dir(self, data_dir: Path) -> Iterable[DatasetSource[list[Path]]]:
         if not data_dir.is_dir():
