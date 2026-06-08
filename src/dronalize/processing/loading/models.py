@@ -2,37 +2,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field, replace
-from typing import TYPE_CHECKING, ClassVar, Generic, Protocol, TypeAlias
+from typing import TYPE_CHECKING, ClassVar, Generic
 
 from pydantic import BaseModel, ConfigDict
-from typing_extensions import Self, override
+from typing_extensions import Self
 
-from dronalize.core.maps import MapGraph
-from dronalize.core.scene import Scene
 from dronalize.core.typing import SourceId, SourceT
+from dronalize.processing.maps import MapProvider, MapReference
 
 if TYPE_CHECKING:
     import polars as pl
 
     from dronalize.core.categories import DatasetSplit
-
-
-@dataclass(slots=True, frozen=True)
-class MapReference:
-    """Loader-side map reference carried alongside ingested or processed data.
-
-    The reference intentionally stays lightweight. Datasets can provide a stable
-    map key and, when map data is already read together with trajectories, a
-    serialized map payload for their loader-specific `resolve_map()`
-    implementation.
-    """
-
-    map_key: str | None = None
-    """Stable map identifier for the scene, if one is known at ingest time."""
-    map_payload: bytes | None = None
-    """Serialized map payload already available from trajectory ingestion."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -82,51 +64,3 @@ class LoaderOptionsModel(BaseModel):
 
 class NoLoaderOptions(LoaderOptionsModel):
     """Empty loader-options model for datasets without dataset-owned settings."""
-
-
-MapExtractor: TypeAlias = Callable[[Scene, MapGraph], MapGraph]
-
-
-class MapProvider(Protocol):
-    """Resolve map graphs for materialized scenes."""
-
-    def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
-        """Resolve the map for *scene* using loader-supplied map reference data."""
-        ...
-
-
-@dataclass(frozen=True, slots=True)
-class BoundMapResolver:
-    """Scene-compatible resolver bound to one provider/reference pair."""
-
-    provider: MapProvider
-    reference: MapReference
-
-    def __call__(self, scene: Scene) -> MapGraph | None:
-        """Resolve the map for *scene* using the bound provider and reference."""
-        return self.provider.resolve(scene, self.reference)
-
-
-@dataclass(frozen=True, slots=True)
-class SharedMapProvider(MapProvider):
-    """Map provider backed by shared-memory map graph names."""
-
-    shared_names: dict[str | None, str] | str
-    extractor: MapExtractor | None = None
-
-    @override
-    def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
-        key = reference.map_key or scene.map_key
-
-        name = (
-            self.shared_names.get(key) if isinstance(self.shared_names, dict) else self.shared_names
-        )
-        if name is None:
-            return None
-
-        with MapGraph.from_shared(name) as map_graph:
-            if self.extractor is None:
-                return map_graph.copy()
-
-            extracted = self.extractor(scene, map_graph)
-            return extracted.copy() if extracted is map_graph else extracted

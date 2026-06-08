@@ -5,8 +5,14 @@
 
 ## ::: dronalize.processing.maps.MapBuilder
 
-## ::: dronalize.processing.maps.no_map
+## ::: dronalize.processing.maps.MapReference
 
-## ::: dronalize.processing.maps.shared_map
+## ::: dronalize.processing.maps.MapProvider
 
-## ::: dronalize.processing.maps.MapResolver
+## ::: dronalize.processing.maps.SharedMapProvider
+
+## ::: dronalize.processing.maps.FeatureMapBuilder
+
+## ::: dronalize.processing.maps.PathFeature
+
+## ::: dronalize.processing.maps.PointFeature
