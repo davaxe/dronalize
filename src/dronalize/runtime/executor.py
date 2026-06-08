@@ -7,7 +7,6 @@ import logging
 import multiprocessing as mp
 import threading
 from abc import ABC, abstractmethod
-from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from multiprocessing.synchronize import Event
@@ -16,22 +15,28 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from typing_extensions import override
 
-from dronalize.core.scene import Scene
+from dronalize.runtime.accounting import (
+    CleanupSummaryAccumulator,
+    LocalRunAccounting,
+    SharedRunAccounting,
+    iter_scenes_from_source,
+)
 from dronalize.runtime.processor import RuntimeProcessor
-from dronalize.runtime.state import Progress, SharedResources, SplitCounts, WorkerRuntime
+from dronalize.runtime.state import Progress, SharedResources
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable, Iterator
     from multiprocessing.context import BaseContext
     from multiprocessing.pool import Pool
 
+    from dronalize.core.scene import Scene
     from dronalize.core.typing import P
     from dronalize.io.base import DatasetWriter, WriterProvider
     from dronalize.processing.loading.models import DatasetSource
-    from dronalize.runtime.types import ExecutionPlan
+    from dronalize.runtime.types import CleanupSummary, ExecutionPlan
 
 AnyEvent = Event | threading.Event
-ReturnT = TypeVar("ReturnT", int, list[Scene])
+ReturnT = TypeVar("ReturnT")
 _ctx: WorkerRuntime
 
 logger = logging.getLogger(__name__)
@@ -74,11 +79,25 @@ class Executor(Protocol):
         """
         ...
 
+    def cleanup_summary(self) -> CleanupSummary | None:
+        """Return aggregated cleanup statistics collected during execution."""
+        ...
+
 
 @dataclass(slots=True)
 class ExecutionSession:
     plan: ExecutionPlan
     executor: Executor
+
+
+@dataclass(slots=True)
+class WorkerRuntime:
+    """Runtime objects available inside one worker process."""
+
+    shared: SharedResources
+    worker_id: int
+    processor: RuntimeProcessor | None = None
+    writer: DatasetWriter | None = None
 
 
 @contextmanager
@@ -110,7 +129,7 @@ class SequentialExecutor(Executor, ProgressSource):
     Parameters
     ----------
     processor: RuntimeProcessor
-        The runtime processor to execute, containing logic and cofigurations.
+        The runtime processor to execute, containing logic and configurations.
     limit: int | None, optional
         An optional limit on the total number of scenes to select. If None, no
         limit will be applied. Default is None.
@@ -118,15 +137,13 @@ class SequentialExecutor(Executor, ProgressSource):
 
     def __init__(self, processor: RuntimeProcessor, *, limit: int | None = None) -> None:
         self._processor: RuntimeProcessor = processor
-        self._limit: int | None = limit
-        self._candidate_scene_counter: int = 0
-        self._written_scene_counter: int = 0
-        self._source_counter: int = 0
-        self._split_counts: SplitCounts = {"unsplit": 0, "train": 0, "val": 0, "test": 0}
         self._screening_enabled: bool = processor.screening_enabled()
         self._total_sources: int | None = processor.total_sources()
         self._update_event: threading.Event = threading.Event()
         self._running: bool = False
+        self._accounting: LocalRunAccounting = LocalRunAccounting(
+            limit=limit, update_event=self._update_event
+        )
 
     @property
     @override
@@ -137,78 +154,48 @@ class SequentialExecutor(Executor, ProgressSource):
     def execute(self, writer_provider: WriterProvider) -> Progress:
         writer = writer_provider.open_worker(0)
         try:
-            for scene in self._generate_and_track():
+            for scene in self._iter_scenes():
                 writer.write(scene)
         finally:
             try:
                 writer.finish_local()
             finally:
                 writer_provider.finish_final()
+
         return self.snapshot()
 
     @override
     def snapshot(self) -> Progress:
-        return Progress(
+        return self._accounting.snapshot(
             running=self._running,
-            processed_sources=self._source_counter,
-            candidate_scenes=self._candidate_scene_counter,
-            written_scenes=self._written_scene_counter,
             total_sources=self._total_sources,
-            scene_limit=self._limit,
             active_workers=1 if self._running else 0,
-            split_counts=self._split_counts,
             screening_enabled=self._screening_enabled,
         )
+
+    @override
+    def cleanup_summary(self) -> CleanupSummary | None:
+        return self._accounting.cleanup_summary()
 
     @override
     def changed(self) -> threading.Event:
         return self._update_event
 
-    def _generate_and_track(self) -> Iterable[Scene]:
+    def _iter_scenes(self) -> Iterator[Scene]:
         self._running = True
         self._update_event.set()
 
         try:
-            yield from self._inner_iter_sources()
+            for source in self._processor.iter_sources():
+                if self._accounting.limit_reached():
+                    break
+
+                self._accounting.start_source()
+
+                yield from iter_scenes_from_source(self._processor, source, self._accounting)
         finally:
             self._running = False
             self._update_event.set()
-
-    def _inner_iter_sources(self) -> Iterable[Scene]:
-        for source in self._processor.iter_sources():
-            if self._written_scene_limit_reached():
-                break
-            self._source_counter += 1
-            self._update_event.set()
-            for candidate in self._processor.iter_candidates(source):
-                self._record_candidate_scene()
-                if not candidate.passes_screening:
-                    continue
-                scene_number = self._claim_written_scene()
-                if scene_number is None:
-                    return
-                scene = self._processor.materialize(candidate, scene_number)
-                split_key = (
-                    "unsplit" if scene.split_assignment is None else scene.split_assignment.value
-                )
-                self._split_counts[split_key] += 1
-                self._update_event.set()
-                yield scene
-
-    def _record_candidate_scene(self) -> None:
-        self._candidate_scene_counter += 1
-        self._update_event.set()
-
-    def _claim_written_scene(self) -> int | None:
-        if self._written_scene_limit_reached():
-            return None
-        scene_number = self._written_scene_counter
-        self._written_scene_counter += 1
-        self._update_event.set()
-        return scene_number
-
-    def _written_scene_limit_reached(self) -> bool:
-        return self._limit is not None and self._written_scene_counter >= self._limit
 
 
 class ParallelExecutor(Executor, ProgressSource):
@@ -250,6 +237,7 @@ class ParallelExecutor(Executor, ProgressSource):
         self._num_sources: int | None = total_sources
         self._screening_enabled: bool = processor.screening_enabled()
         self._running: bool = False
+        self._cleanup_accumulator: CleanupSummaryAccumulator = CleanupSummaryAccumulator()
         self._mp_context: BaseContext = mp_context or mp.get_context("spawn")
         self._shared: SharedResources = SharedResources.create(
             scene_limit=limit, mp_context=self._mp_context
@@ -262,87 +250,55 @@ class ParallelExecutor(Executor, ProgressSource):
 
     @override
     def execute(self, writer_provider: WriterProvider) -> Progress:
-        _ = deque(
-            self._execute_parallel(
-                self._process_fn_write,
-                self._processor.iter_sources(),
-                _init_write_worker,
-                self._shared,
-                self._processor,
-                writer_provider,
-            ),
-            maxlen=0,
-        )
+        for cleanup_summary in self._execute_parallel(
+            self._process_fn_write,
+            self._processor.iter_sources(),
+            _init_write_worker,
+            self._shared,
+            self._processor,
+            writer_provider,
+        ):
+            self._cleanup_accumulator.merge(cleanup_summary)
         writer_provider.finish_final()
         return self.snapshot()
 
     @override
     def snapshot(self) -> Progress:
-        with self._shared.progress.snapshot_lock:
-            return Progress(
-                running=self._running,
-                processed_sources=self._shared.progress.source_counter.value,
-                candidate_scenes=self._shared.progress.candidate_scene_counter.value,
-                written_scenes=self._shared.progress.written_scene_counter.value,
-                active_workers=self._shared.progress.active_workers.value,
-                total_sources=self._num_sources,
-                scene_limit=self._limit,
-                split_counts=self._shared.progress.split_counts(),
-                screening_enabled=self._screening_enabled,
-            )
+        return self._shared.progress.snapshot(
+            running=self._running,
+            total_sources=self._num_sources,
+            scene_limit=self._limit,
+            screening_enabled=self._screening_enabled,
+        )
 
     @override
     def changed(self) -> Event:
         return self._shared.progress.update_event
 
+    @override
+    def cleanup_summary(self) -> CleanupSummary | None:
+        return self._cleanup_accumulator.freeze()
+
     @staticmethod
-    def _process_fn_write(source: DatasetSource[Any]) -> int:
+    def _process_fn_write(source: DatasetSource[Any]) -> CleanupSummary | None:
         if _ctx.writer is None:
             msg = "DatasetWriter was not initialized for this worker process."
             raise ValueError(msg)
         if _ctx.processor is None:
             msg = "Runtime processor was not initialized for this worker process."
             raise ValueError(msg)
-        if _ctx.shared.progress.written_scene_limit_reached(_ctx.shared.scene_limit):
-            return 0
-        written_scenes = 0
-        for scene in ParallelExecutor._generate_scenes(_ctx.processor, source):
-            _ctx.shared.progress.record_split(scene.split_assignment)
-            _ctx.writer.write(scene)
-            written_scenes += 1
-        _ = _ctx.shared.progress.increment_source()
-        return written_scenes
 
-    @staticmethod
-    def _process_fn_yield(source: DatasetSource[Any]) -> list[Scene]:
-        if _ctx.processor is None:
-            msg = "Runtime processor was not initialized for this worker process."
-            raise ValueError(msg)
-        if _ctx.shared.progress.written_scene_limit_reached(_ctx.shared.scene_limit):
-            return []
-        _ = _ctx.shared.progress.increment_source()
-        scenes = list(ParallelExecutor._generate_scenes(_ctx.processor, source))
-        for scene in scenes:
-            _ctx.shared.progress.record_split(scene.split_assignment)
-        return scenes
-
-    @staticmethod
-    def _generate_scenes(
-        processor: RuntimeProcessor, source: DatasetSource[Any]
-    ) -> Iterator[Scene]:
-        if _ctx.shared.progress.written_scene_limit_reached(_ctx.shared.scene_limit):
-            return
-        claim_written_scene = functools.partial(
-            _ctx.shared.progress.claim_written_scene, _ctx.shared.scene_limit
+        accounting = SharedRunAccounting(
+            progress=_ctx.shared.progress, limit=_ctx.shared.scene_limit
         )
-        for candidate in processor.iter_candidates(source):
-            _ = _ctx.shared.progress.record_candidate_scene()
-            if not candidate.passes_screening:
-                continue
-            scene_number = claim_written_scene()
-            if scene_number is None:
-                return
-            yield processor.materialize(candidate, scene_number)
+        if accounting.limit_reached():
+            return None
+
+        accounting.start_source()
+        for scene in iter_scenes_from_source(_ctx.processor, source, accounting):
+            _ctx.writer.write(scene)
+
+        return accounting.cleanup_summary()
 
     def _execute_parallel(
         self,
@@ -395,7 +351,7 @@ def _init_worker(
     if with_finalize:
 
         def cleanup() -> None:
-            _ = _ctx.shared.progress.worker_stopped()
+            _ctx.shared.progress.worker_stopped()
 
         _ = Finalize(obj=None, callback=cleanup, exitpriority=10)
 
@@ -410,7 +366,7 @@ def _init_write_worker(
         writer = writer_provider.open_worker(_ctx.worker_id)
         _ctx.writer = writer
     except Exception:
-        _ = _ctx.shared.progress.worker_stopped()
+        _ctx.shared.progress.worker_stopped()
         raise
 
     def cleanup() -> None:
@@ -420,6 +376,6 @@ def _init_write_worker(
         try:
             current_writer.finish_local()
         finally:
-            _ = _ctx.shared.progress.worker_stopped()
+            _ctx.shared.progress.worker_stopped()
 
     _ = Finalize(obj=None, callback=cleanup, exitpriority=10)

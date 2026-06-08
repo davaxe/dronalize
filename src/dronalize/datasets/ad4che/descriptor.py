@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from dronalize.config.models import DatasetConfig, FullMapExtraction, MapConfig
 from dronalize.datasets.ad4che.loader import AD4CHELoader
+from dronalize.datasets.ad4che.maps import AD4CHEMapProvider
 from dronalize.datasets.registry import (
     DatasetDescriptor,
     DatasetFeatureSupport,
@@ -12,10 +15,17 @@ from dronalize.datasets.shared.presets import (
     scenes_config,
     temporal_support,
 )
+from dronalize.datasets.shared.resources import map_provider_resources_factory
+
+_open_ad4che_resources = map_provider_resources_factory(
+    create=lambda root, map_config: AD4CHEMapProvider(
+        root=Path(root) / "AD4CHE_Data_V1.0", config=map_config
+    )
+)
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="ad4che",
-    loader_factory=AD4CHELoader.from_loader_request,
+    loader_cls=AD4CHELoader,
     default_config=DatasetConfig(
         scenes=scenes_config(
             horizon_frames=211,
@@ -34,4 +44,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     temporal_support=temporal_support(
         source_unit="recording", min_frames=1136, max_frames=9821, enabled_by_default=True
     ),
+    resources_factory=_open_ad4che_resources,
 )

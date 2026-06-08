@@ -76,12 +76,6 @@ class ConfigPatch(BaseModel, Generic[ResolvedConfigT]):
         merged = deep_merge(base, patch)
         return self.full_config_type.model_validate(merged)
 
-    @classmethod
-    def from_full_config(cls, full_config: ResolvedConfigT) -> ConfigPatch[ResolvedConfigT]:
-        """Create a ConfigPatch instance from a ResolvedConfig instance."""
-        data = full_config.model_dump()
-        return cls.model_validate(data)
-
 
 def deep_merge(
     base: MutableMapping[str, object], patch: Mapping[str, object]

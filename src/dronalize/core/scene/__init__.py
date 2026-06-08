@@ -29,7 +29,7 @@ works with scenes or persisted feature layouts.
   contracts
 """
 
-from dronalize.core.scene.model import MapKey, MapResolver, Scene
+from dronalize.core.scene.model import MapResolver, Scene
 from dronalize.core.scene.schema import (
     CANONICAL,
     POSITIONS_ONLY,
@@ -53,7 +53,6 @@ __all__ = [
     "POSITIONS_VELOCITY_YAW",
     "POSITIONS_YAW",
     "TRAJECTORY_SCHEMAS",
-    "MapKey",
     "MapResolver",
     "Scene",
     "TrajectoryField",

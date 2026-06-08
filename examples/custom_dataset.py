@@ -64,7 +64,7 @@ class MiniCsvLoader(SceneLoader[str]):
 
 MINI_CSV_SPEC = DatasetDescriptor(
     name="mini-csv",
-    loader_factory=MiniCsvLoader.from_loader_request,
+    loader_cls=MiniCsvLoader,
     default_config=DatasetConfig(
         scenes=ScenesConfig(
             horizon_frames=3,

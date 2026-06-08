@@ -29,7 +29,7 @@ _open_argoverse1_resources = named_shared_map_resources_factory(
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="argoverse1",
-    loader_factory=Argoverse1Loader.from_loader_request,
+    loader_cls=Argoverse1Loader,
     default_config=DatasetConfig(
         scenes=scenes_config(horizon_frames=50, default_observation_length=20, sample_time=0.1),
         screening=minimum_observations_screening(2, required_frame=19),

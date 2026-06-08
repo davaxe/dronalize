@@ -11,17 +11,13 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import CANONICAL, POSITIONS_VELOCITY_ACCELERATION
-from dronalize.datasets.levelx.maps import HighDMapBuilder
-from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
-from dronalize.processing.maps import MapResolver, no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import Scene, TrajectorySchema
+    from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.loading.models import DatasetRunResources
     from dronalize.processing.models import LoaderPlan
 
@@ -138,13 +134,6 @@ class LevelXDataLoader(SceneLoader[LevelXSourceData]):
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return CANONICAL
 
-    @override
-    def map_resolver(self) -> MapResolver:
-        shared_maps = self.resources.shared_maps
-        if not shared_maps or self.map_config is None:
-            return no_map()
-        return shared_map(shared_maps, utils.extract_fn(self.map_config.extraction))
-
     def _recording_ids(self) -> list[int]:
         """Return sorted recording identifiers discovered from metadata files."""
         recording_ids: list[int] = []
@@ -249,23 +238,6 @@ class HighDLoader(LevelXDataLoader):
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_ACCELERATION
-
-    @override
-    def map_resolver(self) -> MapResolver:
-        def _resolver(scene: Scene) -> MapGraph | None:
-            if scene.map_key is None or self.map_config is None:
-                return None
-
-            min_x = scene.frame.select(pl.col("x")).min().item()
-            max_x = scene.frame.select(pl.col("x")).max().item()
-            dist = max_x - min_x
-            builder = HighDMapBuilder(Path(scene.map_key), min_x - dist * 0.1, max_x + dist * 0.1)
-            map_graph = builder.build(
-                self.map_config.min_distance, self.map_config.interpolation_distance
-            )
-            return utils.extract_configured_map(map_graph, scene, self.map_config)
-
-        return _resolver
 
 
 _META_SCHEMA: pl.Schema = pl.Schema({"trackId": pl.Int32, "class": pl.Utf8})

@@ -10,7 +10,7 @@ from dronalize.datasets.shared.presets import (
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="apolloscape",
-    loader_factory=ApolloScapeLoader.from_loader_request,
+    loader_cls=ApolloScapeLoader,
     default_config=DatasetConfig(
         scenes=scenes_config(
             horizon_frames=10,

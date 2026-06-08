@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,10 +11,42 @@ from typing import TYPE_CHECKING, Any, Protocol
 from typing_extensions import Self, override
 
 from dronalize.core.categories import EdgeType
+from dronalize.datasets.shared import utils
+from dronalize.processing.loading.models import MapProvider
 from dronalize.processing.maps import FeatureMapBuilder, PathFeature, Point
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.config.models import MapConfig
+    from dronalize.core.maps import MapGraph
+    from dronalize.core.scene import Scene
+    from dronalize.processing.loading.models import MapReference
+
+
+@dataclass(frozen=True, slots=True)
+class OpenDDMapProvider(MapProvider):
+    config: MapConfig
+
+    @override
+    def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
+        key = reference.map_key or scene.map_key
+        if key is None:
+            return None
+
+        map_graph = _load_opendd_map(
+            str(key), self.config.min_distance, self.config.interpolation_distance
+        )
+        return utils.extract_configured_map(map_graph, scene, self.config)
+
+
+@functools.lru_cache(maxsize=8)
+def _load_opendd_map(
+    key: str, min_distance: float | None, interpolation_distance: float | None
+) -> MapGraph:
+    return OpenDDMapBuilder(Path(key)).build(
+        min_distance=min_distance, interpolation_distance=interpolation_distance
+    )
 
 
 class OpenDDMapBuilder(FeatureMapBuilder):

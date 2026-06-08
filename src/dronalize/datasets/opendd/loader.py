@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import functools
 import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -12,17 +11,13 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.datasets.opendd.maps import OpenDDMapBuilder
-from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import Scene, TrajectorySchema
-    from dronalize.processing.maps import MapResolver
+    from dronalize.core.scene import TrajectorySchema
 
 
 def _table_query(table_name: str) -> str:
@@ -54,7 +49,7 @@ class OpenDDLoader(SceneLoader[tuple[Path, str]]):
                 yield DatasetSource(
                     identifier=identifier,
                     payload=(db_path, table_name),
-                    map_key=str(db_path.parent),
+                    map_key=str(_map_sqlite_path(db_path.parent)),
                 )
 
     @override
@@ -98,34 +93,6 @@ class OpenDDLoader(SceneLoader[tuple[Path, str]]):
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
 
-    @override
-    def map_resolver(self) -> MapResolver:
-        def _resolver(scene: Scene) -> MapGraph | None:
-            if scene.map_key is None or self.map_config is None:
-                return None
-            return utils.extract_configured_map(
-                self._get_map(
-                    scene.map_key,
-                    self.map_config.min_distance,
-                    self.map_config.interpolation_distance,
-                ),
-                scene,
-                self.map_config,
-            )
-
-        return _resolver
-
-    @staticmethod
-    @functools.lru_cache(maxsize=10)
-    def _get_map(
-        key: str, min_distance: float | None, interpolation_distance: float | None
-    ) -> MapGraph:
-        database = Path(key).name
-        map_path = Path(key) / f"map_{database}" / f"map_{database}.sqlite"
-        return OpenDDMapBuilder.from_sqlite_file(map_path).build(
-            min_distance, interpolation_distance
-        )
-
 
 def _list_table_names(db_path: Path) -> list[str]:
     with sqlite3.connect(db_path) as connection:
@@ -139,3 +106,7 @@ def _count_tables(db_path: Path) -> int:
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table';"
         ).fetchone()
     return row[0] if row is not None else 0
+
+
+def _map_sqlite_path(recording_dir: Path) -> Path:
+    return recording_dir / f"map_{recording_dir.name}" / f"map_{recording_dir.name}.sqlite"

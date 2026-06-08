@@ -28,7 +28,7 @@ _open_nuscenes_resources = named_shared_map_resources_factory(
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="nuscenes",
-    loader_factory=NuScenesLoader.from_loader_request,
+    loader_cls=NuScenesLoader,
     default_config=DatasetConfig(
         scenes=scenes_config(
             horizon_frames=16,

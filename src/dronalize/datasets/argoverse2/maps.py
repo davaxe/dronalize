@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import json
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
@@ -10,10 +11,41 @@ from typing import TYPE_CHECKING, Any, Literal
 from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
+from dronalize.datasets.shared import utils
+from dronalize.processing.loading.models import MapProvider
 from dronalize.processing.maps import FeatureMapBuilder, PathFeature, Point
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from dronalize.config.models import MapConfig
+    from dronalize.core.maps import MapGraph
+    from dronalize.core.scene import Scene
+    from dronalize.processing.loading.models import MapReference
+
+
+@dataclass(frozen=True, slots=True)
+class Argoverse2MapProvider(MapProvider):
+    config: MapConfig
+
+    @override
+    def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
+        key = reference.map_key or scene.map_key
+        if key is None:
+            return None
+        map_graph = _load_argoverse2_map(
+            str(key), self.config.min_distance, self.config.interpolation_distance
+        )
+        return utils.extract_configured_map(map_graph, scene, self.config)
+
+
+@functools.lru_cache(maxsize=10)
+def _load_argoverse2_map(
+    key: str, min_distance: float | None, interpolation_distance: float | None
+) -> MapGraph:
+    return Argoverse2MapBuilder.from_json_file(Path(key)).build(
+        min_distance=min_distance, interpolation_distance=interpolation_distance
+    )
 
 
 class Argoverse2Map:
@@ -44,12 +76,6 @@ class Argoverse2Map:
             crossing["id"]: PedestrianCrossing.from_dict(crossing)
             for crossing in crossings_data.values()
         }
-
-    @cached_property
-    def drivable_areas(self) -> dict[int, DrivableArea]:
-        """Get the drivable areas from the JSON data."""
-        areas_data: dict[str, dict[str, Any]] = self.json_data.get("drivable_areas", [])
-        return {area["id"]: DrivableArea.from_dict(area) for area in areas_data.values()}
 
 
 class LaneType(IntEnum):
@@ -169,21 +195,6 @@ class PedestrianCrossing:
             id=data["id"],
             first_edge=[(node["x"], node["y"]) for node in data["edge1"]],
             second_edge=[(node["x"], node["y"]) for node in data["edge2"]],
-        )
-
-
-@dataclass
-class DrivableArea:
-    """Represents a drivable area in the Argoverse2 map."""
-
-    id: int
-    boundary: list[Point] = field(default_factory=list)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> DrivableArea:
-        """Create a `DrivableArea` instance from a dictionary."""
-        return cls(
-            id=data["id"], boundary=[(node["x"], node["y"]) for node in data["area_boundary"]]
         )
 
 

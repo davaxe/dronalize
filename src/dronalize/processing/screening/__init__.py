@@ -36,7 +36,7 @@ type into one package namespace.
 from dronalize.config.models import PassingRequirement, Tolerance
 from dronalize.processing.screening import agent, cleanup, scene
 from dronalize.processing.screening.base import AgentCategorySelector
-from dronalize.processing.screening.screen import ScreeningRuleSet, screen_scene
+from dronalize.processing.screening.screen import ScreeningRuleSet
 
 __all__ = [
     "AgentCategorySelector",
@@ -46,5 +46,4 @@ __all__ = [
     "agent",
     "cleanup",
     "scene",
-    "screen_scene",
 ]

@@ -1,12 +1,11 @@
 # ruff: noqa: D102
-"""Shared multiprocessing state used by the internal parallel runner."""
+"""Runtime progress models and multiprocessing execution state."""
 
 from __future__ import annotations
 
 import multiprocessing as mp
-from contextlib import ExitStack
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import TypedDict
 
@@ -15,10 +14,7 @@ from dronalize.core.categories import DatasetSplit
 if TYPE_CHECKING:
     from multiprocessing.context import BaseContext
     from multiprocessing.sharedctypes import Synchronized
-    from multiprocessing.synchronize import Event, Lock
-
-    from dronalize.io.base import DatasetWriter
-    from dronalize.runtime.processor import RuntimeProcessor
+    from multiprocessing.synchronize import Event
 
 
 class SplitCounts(TypedDict, total=True):
@@ -28,34 +24,88 @@ class SplitCounts(TypedDict, total=True):
     test: int
 
 
+SplitKey = Literal["unsplit", "train", "val", "test"]
+
+
+def empty_split_counts() -> SplitCounts:
+    """Return zero-initialized split counts."""
+    return {"unsplit": 0, "train": 0, "val": 0, "test": 0}
+
+
+def split_key(split: DatasetSplit | None) -> SplitKey:
+    """Return the split-count key for a split assignment."""
+    if split is None:
+        return "unsplit"
+    return split.value  # type: ignore[return-value]
+
+
+@dataclass(frozen=True, slots=True)
+class ScreeningProgress:
+    """Screening counters for candidate scenes."""
+
+    enabled: bool = False
+    passed: int = 0
+    rejected: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class CleanupProgress:
+    """Lightweight cleanup counters for live progress reporting."""
+
+    rows_total: int = 0
+    rows_removed: int = 0
+    agents_total: int = 0
+    agents_removed: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionStats:
+    """Counters shared by live progress snapshots and final execution results."""
+
+    processed_sources: int = 0
+    candidate_scenes: int = 0
+    written_scenes: int = 0
+    split_counts: SplitCounts = field(default_factory=empty_split_counts)
+    cleanup: CleanupProgress = field(default_factory=CleanupProgress)
+    screening: ScreeningProgress = field(default_factory=ScreeningProgress)
+
+
 @dataclass(frozen=True, slots=True)
 class Progress:
-    running: bool
-    """Whether the execution is currently running."""
-    processed_sources: int
-    """The number of sources that have been processed."""
-    candidate_scenes: int
-    """The number of candidate scenes that have been generated and screened.
+    """Immutable live progress snapshot.
 
-    This is incremented for every scene that is generated and screened,
-    regardless of whether it is selected or not.
+    ``stats`` is the canonical counter payload. Convenience properties expose the
+    same values directly for concise display and API code.
     """
-    written_scenes: int
-    """Actual number of scenes that have been selected for the dataset."""
-    total_sources: int | None
-    """Total sources to process if known, otherwise None."""
-    scene_limit: int | None
-    """The total scene limit if one is set, otherwise None."""
-    active_workers: int
-    """Current number of active worker processes."""
-    split_counts: SplitCounts
-    """Split partition counts, with keys "unsplit", "train", "val", and "test"."""
-    screening_enabled: bool
-    """Whether the processor has screening enabled."""
+
+    running: bool = False
+    total_sources: int | None = None
+    scene_limit: int | None = None
+    active_workers: int = 0
+    stats: ExecutionStats = field(default_factory=ExecutionStats)
+
+    @classmethod
+    def empty(cls) -> Progress:
+        """Return an empty progress snapshot."""
+        return cls()
+
+    @property
+    def split_counts(self) -> SplitCounts:
+        return self.stats.split_counts
+
+    @property
+    def cleanup(self) -> CleanupProgress:
+        return self.stats.cleanup
+
+    @property
+    def screening(self) -> ScreeningProgress:
+        return self.stats.screening
 
 
 @dataclass(slots=True)
 class WorkerRegistry:
+    """Multiprocessing-safe worker id allocator."""
+
     next_worker_id: Synchronized[int]
 
     @classmethod
@@ -64,27 +114,35 @@ class WorkerRegistry:
         return cls(next_worker_id=ctx.Value("i", 0))
 
     def reset(self) -> None:
-        with self.next_worker_id.get_lock():
-            self.next_worker_id.value = 0
+        _set_counter(self.next_worker_id, 0)
 
     def next_worker(self) -> int:
-        with self.next_worker_id.get_lock():
-            worker_id = self.next_worker_id.value
-            self.next_worker_id.value += 1
-            return worker_id
+        _add_counter(self.next_worker_id, 1)
+        return self.next_worker_id.value
 
 
 @dataclass(slots=True)
 class ProgressState:
+    """Multiprocessing-safe mutable progress state.
+
+    This class owns shared progress mutation. Executors should expose immutable
+    ``Progress`` snapshots instead of reading counters directly.
+    """
+
     active_workers: Synchronized[int]
-    candidate_scene_counter: Synchronized[int]
-    written_scene_counter: Synchronized[int]
     source_counter: Synchronized[int]
+    candidate_scene_counter: Synchronized[int]
+    screening_passed_counter: Synchronized[int]
+    screening_rejected_counter: Synchronized[int]
+    written_scene_counter: Synchronized[int]
+    cleanup_rows_total_counter: Synchronized[int]
+    cleanup_rows_removed_counter: Synchronized[int]
+    cleanup_agents_total_counter: Synchronized[int]
+    cleanup_agents_removed_counter: Synchronized[int]
     unsplit_counter: Synchronized[int]
     train_counter: Synchronized[int]
     val_counter: Synchronized[int]
     test_counter: Synchronized[int]
-    snapshot_lock: Lock
     update_event: Event
 
     @classmethod
@@ -92,43 +150,86 @@ class ProgressState:
         ctx = mp_context or mp.get_context()
         return cls(
             active_workers=ctx.Value("i", 0),
-            candidate_scene_counter=ctx.Value("i", 0),
-            written_scene_counter=ctx.Value("i", 0),
             source_counter=ctx.Value("i", 0),
+            candidate_scene_counter=ctx.Value("i", 0),
+            screening_passed_counter=ctx.Value("i", 0),
+            screening_rejected_counter=ctx.Value("i", 0),
+            written_scene_counter=ctx.Value("i", 0),
+            cleanup_rows_total_counter=ctx.Value("i", 0),
+            cleanup_rows_removed_counter=ctx.Value("i", 0),
+            cleanup_agents_total_counter=ctx.Value("i", 0),
+            cleanup_agents_removed_counter=ctx.Value("i", 0),
             unsplit_counter=ctx.Value("i", 0),
             train_counter=ctx.Value("i", 0),
             val_counter=ctx.Value("i", 0),
             test_counter=ctx.Value("i", 0),
-            snapshot_lock=ctx.Lock(),
             update_event=ctx.Event(),
         )
 
     def reset(self) -> None:
-        counters = (
-            self.active_workers,
-            self.candidate_scene_counter,
-            self.written_scene_counter,
-            self.source_counter,
-            self.unsplit_counter,
-            self.train_counter,
-            self.val_counter,
-            self.test_counter,
-        )
-        with ExitStack() as stack:
-            for counter in counters:
-                _ = stack.enter_context(counter.get_lock())
-            for counter in counters:
-                counter.value = 0
-            _ = self.update_event.clear()
+        """Reset all progress counters and clear the update event."""
+        for counter in self._counters():
+            _set_counter(counter, 0)
+        self.update_event.clear()
 
-    def record_candidate_scene(self) -> int:
-        with self.candidate_scene_counter.get_lock():
-            self.candidate_scene_counter.value += 1
-            value = self.candidate_scene_counter.value
-        self.update_event.set()
-        return value
+    def snapshot(
+        self,
+        *,
+        running: bool,
+        total_sources: int | None,
+        scene_limit: int | None,
+        screening_enabled: bool,
+    ) -> Progress:
+        """Return an immutable point-in-time progress snapshot."""
+        return Progress(
+            running=running,
+            total_sources=total_sources,
+            scene_limit=scene_limit,
+            active_workers=self.active_workers.value,
+            stats=self.execution_stats(screening_enabled=screening_enabled),
+        )
+
+    def execution_stats(self, *, screening_enabled: bool) -> ExecutionStats:
+        """Return an immutable snapshot of shared execution counters."""
+        return ExecutionStats(
+            processed_sources=self.source_counter.value,
+            candidate_scenes=self.candidate_scene_counter.value,
+            written_scenes=self.written_scene_counter.value,
+            split_counts=self.split_counts(),
+            cleanup=self.cleanup_progress(),
+            screening=ScreeningProgress(
+                enabled=screening_enabled,
+                passed=self.screening_passed_counter.value,
+                rejected=self.screening_rejected_counter.value,
+            ),
+        )
+
+    def cleanup_progress(self) -> CleanupProgress:
+        """Return cleanup counters as a lightweight progress object."""
+        return CleanupProgress(
+            rows_total=self.cleanup_rows_total_counter.value,
+            rows_removed=self.cleanup_rows_removed_counter.value,
+            agents_total=self.cleanup_agents_total_counter.value,
+            agents_removed=self.cleanup_agents_removed_counter.value,
+        )
+
+    def increment_source(self) -> None:
+        """Record that one source has started processing."""
+        self._increment_and_notify(self.source_counter)
+
+    def record_candidate_scene(self) -> None:
+        """Record one generated candidate scene."""
+        self._increment_and_notify(self.candidate_scene_counter)
+
+    def record_screening_result(self, *, passed: bool) -> None:
+        """Record one screening decision."""
+        if passed:
+            self._increment_and_notify(self.screening_passed_counter)
+        else:
+            self._increment_and_notify(self.screening_rejected_counter)
 
     def claim_written_scene(self, limit: int | None = None) -> int | None:
+        """Claim the next output scene number, respecting the optional limit."""
         with self.written_scene_counter.get_lock():
             if limit is not None and self.written_scene_counter.value >= limit:
                 return None
@@ -138,52 +239,85 @@ class ProgressState:
         return scene_number
 
     def written_scene_limit_reached(self, limit: int | None = None) -> bool:
+        """Return whether the written-scene counter has reached ``limit``."""
         if limit is None:
             return False
         with self.written_scene_counter.get_lock():
             return self.written_scene_counter.value >= limit
 
-    def increment_source(self) -> int:
-        with self.source_counter.get_lock():
-            self.source_counter.value += 1
-            value = self.source_counter.value
+    def record_cleanup(
+        self, *, rows_total: int, rows_removed: int, agents_total: int, agents_removed: int
+    ) -> None:
+        """Record cleanup row/agent totals for one candidate scene."""
+        for counter, amount in (
+            (self.cleanup_rows_total_counter, rows_total),
+            (self.cleanup_rows_removed_counter, rows_removed),
+            (self.cleanup_agents_total_counter, agents_total),
+            (self.cleanup_agents_removed_counter, agents_removed),
+        ):
+            _add_counter(counter, amount)
         self.update_event.set()
-        return value
 
     def record_split(self, split: DatasetSplit | None) -> None:
-        counter = {
-            None: self.unsplit_counter,
-            DatasetSplit.TRAIN: self.train_counter,
-            DatasetSplit.VAL: self.val_counter,
-            DatasetSplit.TEST: self.test_counter,
-        }[split]
-        with counter.get_lock():
-            counter.value += 1
-        self.update_event.set()
+        """Record the output split assignment for one written scene."""
+        self._increment_and_notify(self._split_counter(split))
 
     def split_counts(self) -> SplitCounts:
+        """Return current output split counts."""
         return {
             "unsplit": self.unsplit_counter.value,
-            DatasetSplit.TRAIN.value: self.train_counter.value,
-            DatasetSplit.VAL.value: self.val_counter.value,
-            DatasetSplit.TEST.value: self.test_counter.value,
+            "train": self.train_counter.value,
+            "val": self.val_counter.value,
+            "test": self.test_counter.value,
         }
 
     def worker_started(self) -> None:
-        with self.active_workers.get_lock():
-            self.active_workers.value += 1
+        """Record one active worker process."""
+        self._increment_and_notify(self.active_workers)
+
+    def worker_stopped(self) -> None:
+        """Record one worker process stopping."""
+        _add_counter(self.active_workers, -1)
         self.update_event.set()
 
-    def worker_stopped(self) -> int:
-        with self.active_workers.get_lock():
-            self.active_workers.value -= 1
-            value = self.active_workers.value
+    def _counters(self) -> tuple[Synchronized[int], ...]:
+        return (
+            self.active_workers,
+            self.source_counter,
+            self.candidate_scene_counter,
+            self.screening_passed_counter,
+            self.screening_rejected_counter,
+            self.written_scene_counter,
+            self.cleanup_rows_total_counter,
+            self.cleanup_rows_removed_counter,
+            self.cleanup_agents_total_counter,
+            self.cleanup_agents_removed_counter,
+            self.unsplit_counter,
+            self.train_counter,
+            self.val_counter,
+            self.test_counter,
+        )
+
+    def _split_counter(self, split: DatasetSplit | None) -> Synchronized[int]:
+        match split:
+            case None:
+                return self.unsplit_counter
+            case DatasetSplit.TRAIN:
+                return self.train_counter
+            case DatasetSplit.VAL:
+                return self.val_counter
+            case DatasetSplit.TEST:
+                return self.test_counter
+
+    def _increment_and_notify(self, counter: Synchronized[int]) -> None:
+        _add_counter(counter, 1)
         self.update_event.set()
-        return value
 
 
 @dataclass(slots=True)
 class SharedResources:
+    """Shared state passed to runtime worker processes."""
+
     registry: WorkerRegistry
     progress: ProgressState
     scene_limit: int | None = None
@@ -203,9 +337,11 @@ class SharedResources:
         self.progress.reset()
 
 
-@dataclass(slots=True)
-class WorkerRuntime:
-    shared: SharedResources
-    worker_id: int
-    processor: RuntimeProcessor | None = None
-    writer: DatasetWriter | None = None
+def _set_counter(counter: Synchronized[int], value: int) -> None:
+    with counter.get_lock():
+        counter.value = value
+
+
+def _add_counter(counter: Synchronized[int], amount: int) -> None:
+    with counter.get_lock():
+        counter.value += amount

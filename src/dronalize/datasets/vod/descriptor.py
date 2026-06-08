@@ -24,7 +24,7 @@ _open_vod_resources = single_shared_map_resource_factory(
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="vod",
-    loader_factory=VodLoader.from_loader_request,
+    loader_cls=VodLoader,
     default_config=DatasetConfig(
         scenes=scenes_config(
             horizon_frames=35, default_observation_length=5, sample_time=0.1, window_step=5

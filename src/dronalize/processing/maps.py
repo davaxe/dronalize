@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from math import ceil
@@ -18,9 +17,6 @@ from dronalize.core.maps import MapGraph
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
-
-    from dronalize.core.scene import MapKey
-    from dronalize.core.scene.model import Scene
 
 
 Point: TypeAlias = tuple[float, float]
@@ -361,65 +357,3 @@ def build_map(
     )
     compiler = MapGraphCompiler(options)
     return compiler.compile(source.iter_features())
-
-
-MapResolver = Callable[["Scene"], MapGraph | None]
-"""Callable signature for lazily resolving a map graph for a scene.
-
-Processing loaders attach resolvers to scenes so map materialization can be
-deferred until a downstream consumer actually needs the graph.
-"""
-
-
-def no_map() -> MapResolver:
-    """Create a resolver for datasets that do not expose map data.
-
-    Returns
-    -------
-    MapResolver
-        Resolver that always returns `None`.
-
-    """
-
-    def _resolve(_scene: Scene) -> None:
-        return None
-
-    _resolve.__name__ = "no_map"
-    return _resolve
-
-
-def shared_map(
-    shared_name: dict[MapKey, str] | str, f: Callable[[Scene, MapGraph], MapGraph] | None = None
-) -> MapResolver:
-    """Create a resolver that materializes a scene map from shared memory.
-
-    Parameters
-    ----------
-    shared_name : dict[MapKey, str] | str
-        Shared-memory name or lookup table keyed by `scene.map_key`.
-    f : Callable[[Scene, MapGraph], MapGraph] | None
-        A function to apply to the map graph before returning it.
-        If `None`, the map graph is returned as-is.
-
-    Returns
-    -------
-    MapResolver
-        Resolver that opens the shared-memory map, optionally applies `f`,
-        and returns a detached copy.
-
-    """
-
-    def _resolve(scene: Scene) -> MapGraph | None:
-        name = shared_name.get(scene.map_key) if isinstance(shared_name, dict) else shared_name
-        if name is None:
-            return None
-
-        with MapGraph.from_shared(name) as map_graph:
-            if f is None:
-                return map_graph.copy()
-
-            extracted = f(scene, map_graph)
-            return extracted.copy() if extracted is map_graph else extracted
-
-    _resolve.__name__ = "shared_map"
-    return _resolve

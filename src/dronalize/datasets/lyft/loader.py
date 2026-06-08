@@ -15,10 +15,8 @@ from zarr.creation import open_array  # pyright: ignore[reportUnknownVariableTyp
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.errors import SplitNotSupportedError
 from dronalize.core.scene import POSITIONS_ONLY
-from dronalize.datasets.shared import utils
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, LoaderOptionsModel
-from dronalize.processing.maps import no_map, shared_map
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -28,7 +26,6 @@ if TYPE_CHECKING:
 
     from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.loading.models import DatasetRunResources
-    from dronalize.processing.maps import MapResolver
     from dronalize.processing.models import LoaderPlan
 
 
@@ -139,13 +136,6 @@ class LyftLoader(SceneLoader[_Source, LyftLoaderOptions]):
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_ONLY
-
-    @override
-    def map_resolver(self) -> MapResolver:
-        shared_maps = self.resources.shared_maps
-        if not shared_maps or self.map_config is None:
-            return no_map()
-        return shared_map(shared_maps, utils.extract_fn(self.map_config.extraction))
 
 
 @dataclass

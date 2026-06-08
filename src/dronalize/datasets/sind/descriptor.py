@@ -28,7 +28,7 @@ _open_sind_resources = named_shared_map_resources_factory(
 
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="sind",
-    loader_factory=SindLoader.from_loader_request,
+    loader_cls=SindLoader,
     default_config=DatasetConfig(
         scenes=scenes_config(
             horizon_frames=70, default_observation_length=20, sample_time=0.1, window_step=25

@@ -10,7 +10,7 @@ from collections.abc import Callable, Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import ValidationError
 
@@ -137,19 +137,6 @@ class DatasetTemporalSupport:
     """Supported generic windowing behavior for this dataset."""
 
 
-class LoaderFactory(Protocol):
-    """Protocol for functions that create dataset loaders with flexible arguments."""
-
-    def __call__(
-        self,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
-    ) -> SceneLoader[Any, Any]:
-        """Create a scene loader for the dataset with the given configuration."""
-        ...
-
-
 @dataclass(frozen=True, slots=True)
 class DatasetDescriptor:
     """Descriptor for one dataset integration.
@@ -169,9 +156,8 @@ class DatasetDescriptor:
     name : str
         Unique registry key used in config files, CLI commands, and
         `ExecutionRequest.dataset`.
-    loader_factory : LoaderFactory
-        Callable that constructs a dataset loader from a root path, compiled
-        loader request, and optional shared resources.
+    loader_cls : type[SceneLoader[Any, Any]]
+        Loader class implementing the dataset integration.
     default_config : DatasetConfig
         Dataset-specific baseline configuration. User profiles, dataset entries,
         and runtime overrides are applied on top of this value.
@@ -197,7 +183,7 @@ class DatasetDescriptor:
     """
 
     name: str
-    loader_factory: LoaderFactory
+    loader_cls: type[SceneLoader[Any, Any]]
     default_config: DatasetConfig
     native_schema: TrajectorySchema
     supported_native_splits: tuple[DatasetSplit, ...] | None = None
@@ -228,7 +214,9 @@ class DatasetDescriptor:
         self, *, root: Path, request: LoaderPlan, resources: DatasetRunResources | None = None
     ) -> SceneLoader[Any, Any]:
         """Construct one loader instance for this dataset descriptor."""
-        return self.loader_factory(data_root=root, request=request, resources=resources)
+        return self.loader_cls.from_loader_request(
+            data_root=root, request=request, resources=resources
+        )
 
 
 @dataclass(frozen=True, slots=True)

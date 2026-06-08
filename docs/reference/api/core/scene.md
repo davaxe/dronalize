@@ -9,8 +9,6 @@
 
 ## ::: dronalize.core.scene.TrajectoryField
 
-## ::: dronalize.core.scene.MapKey
-
 ## ::: dronalize.core.scene.MapResolver
 
 ## ::: dronalize.core.scene.get_trajectory_schema

@@ -286,7 +286,9 @@ def assert_plan_scene_outputs(
         1 for _ in (plan.output_dir / ".integration-scene-assertions").glob("*.json")
     )
     return PlanSceneAssertionResult(
-        checked_scenes=checked_scenes, written_scenes=progress.written_scenes, progress=progress
+        checked_scenes=checked_scenes,
+        written_scenes=progress.stats.written_scenes,
+        progress=progress,
     )
 
 
@@ -296,6 +298,13 @@ def save_scene_artifacts(
     """Save scene artifacts like trajectories and maps for debugging."""
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        import dronalize_viz as dviz  # noqa: PLC0415
+
+        dviz.trajectory_figure(scene).save(out_dir / "trajectory.html")
+
+    except ImportError:
+        ...
     frame = scene.frame.select("frame", "id", "x", "y")
     summary_frame = frame.select(
         pl.col("x").min().alias("x_min"),

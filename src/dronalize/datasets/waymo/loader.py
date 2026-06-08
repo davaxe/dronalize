@@ -10,9 +10,7 @@ from typing_extensions import override
 
 from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_VELOCITY_YAW
-from dronalize.datasets.shared import utils
-from dronalize.datasets.waymo.maps import WaymoMapBuilder
-from dronalize.datasets.waymo.protos import lean_map_pb2, lean_scenario_pb2
+from dronalize.datasets.waymo.protos import lean_scenario_pb2
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, MapReference
 
@@ -20,8 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
-    from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import Scene, TrajectorySchema
+    from dronalize.core.scene import TrajectorySchema
 
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -70,22 +67,6 @@ class WaymoLoader(SceneLoader):
     @override
     def native_trajectory_schema(cls) -> TrajectorySchema:
         return POSITIONS_VELOCITY_YAW
-
-    @override
-    def resolve_map(
-        self, scene: Scene, map_reference: MapReference | None = None
-    ) -> MapGraph | None:
-        if map_reference is None or self.map_config is None:
-            return None
-        if map_reference.map_payload is None:
-            return None
-        map_data = lean_map_pb2.LeanMapContainer.FromString(map_reference.map_payload)
-        map_config = self.map_config
-        map_graph = WaymoMapBuilder.from_proto(map_data.map_features).build(
-            min_distance=map_config.min_distance,
-            interpolation_distance=map_config.interpolation_distance,
-        )
-        return utils.extract_configured_map(map_graph, scene, map_config)
 
     @staticmethod
     def _count_sources(data_dir: Path) -> int:

@@ -40,24 +40,6 @@ SplitAssigner = Assigner[DatasetSplit | None]
 """A group assigner for dataset splits (train/val/test)."""
 
 
-class ConstantAssigner(Assigner[T_co]):
-    """A simple assigner that always assigns the same constant group.
-
-    Parameters
-    ----------
-    group : T_co
-        The constant group to assign for any input values.
-    """
-
-    def __init__(self, group: T_co) -> None:
-        self._group: T_co = group
-
-    @override
-    def assign(self, *values: int | str) -> T_co:
-        """Assign the constant group, ignoring the input values."""
-        return self._group
-
-
 class StatelessWeightedAssigner(Assigner[T_co]):
     """Stateless group assigner based on hashing.
 

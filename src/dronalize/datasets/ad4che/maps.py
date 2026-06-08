@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Final
 
 import cv2
@@ -10,13 +11,50 @@ import numpy.typing as npt
 from typing_extensions import override
 
 from dronalize.core.categories import EdgeType
+from dronalize.datasets.shared import utils
+from dronalize.processing.loading.models import MapProvider
 from dronalize.processing.maps import FeatureMapBuilder, PathFeature
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+    from dronalize.config.models import MapConfig
+    from dronalize.core.maps import MapGraph
+    from dronalize.core.scene import Scene
+    from dronalize.processing.loading.models import MapReference
+
+
 PIXEL_TO_METER: Final[float] = 0.038
+
+
+@dataclass(slots=True)
+class AD4CHEMapProvider(MapProvider):
+    root: Path
+    config: MapConfig
+    _configured_map_cache: dict[str, MapGraph] = field(default_factory=dict, init=False)
+
+    @override
+    def resolve(self, scene: Scene, reference: MapReference) -> MapGraph | None:
+        key = reference.map_key or scene.map_key
+        if key is None:
+            return None
+
+        map_graph = self._configured_map(str(key))
+        return utils.extract_based_on_scene(map_graph, scene, self.config.extraction)
+
+    def _configured_map(self, map_key: str) -> MapGraph:
+        cached = self._configured_map_cache.get(map_key)
+        if cached is not None:
+            return cached
+
+        map_graph = AD4CHEMapBuilder(self.root / map_key).build(
+            min_distance=self.config.min_distance,
+            interpolation_distance=self.config.interpolation_distance,
+        )
+        configured = utils.apply_map_config(map_graph, self.config)
+        self._configured_map_cache[map_key] = configured
+        return configured
 
 
 class AD4CHEMapBuilder(FeatureMapBuilder):

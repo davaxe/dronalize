@@ -60,7 +60,7 @@ def ngsim_resources(
 DATASET_DESCRIPTORS = {
     "i80": DatasetDescriptor(
         name="i80",
-        loader_factory=NGSimLoader.from_loader_request,
+        loader_cls=NGSimLoader,
         default_config=_DEFAULT_CONFIG,
         native_schema=NGSimLoader.native_trajectory_schema(),
         resources_factory=ngsim_resources(
@@ -74,7 +74,7 @@ DATASET_DESCRIPTORS = {
     ),
     "us101": DatasetDescriptor(
         name="us101",
-        loader_factory=NGSimLoader.from_loader_request,
+        loader_cls=NGSimLoader,
         default_config=_DEFAULT_CONFIG,
         native_schema=NGSimLoader.native_trajectory_schema(),
         resources_factory=ngsim_resources(
