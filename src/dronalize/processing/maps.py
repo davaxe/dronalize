@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeAlias
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Self, override
+from typing_extensions import override
 
 from dronalize.config.models import (
     BoundingBoxExtraction,
@@ -29,9 +29,7 @@ from dronalize.core.maps import MapGraph
 from dronalize.core.scene import Scene
 
 if TYPE_CHECKING:
-    import multiprocessing.shared_memory as shm
     from collections.abc import Iterable, Mapping
-    from types import TracebackType
 
 
 Point: TypeAlias = tuple[float, float]
@@ -123,52 +121,6 @@ class SharedMapProvider(MapProvider):
 
             extracted = self.extractor(scene, map_graph)
             return extracted.copy() if extracted is map_graph else extracted
-
-
-@dataclass(slots=True)
-class SharedMapStore:
-    """Own shared-memory handles for a set of configured map graphs."""
-
-    shared_names: dict[str | None, str] | str
-    handles: tuple[shm.SharedMemory, ...]
-
-    def provider(self, extractor: MapExtractor | None = None) -> SharedMapProvider:
-        """Return a provider backed by this store."""
-        return SharedMapProvider(shared_names=self.shared_names, extractor=extractor)
-
-    def close(self) -> None:
-        """Close and unlink all owned shared-memory handles."""
-        for handle in self.handles:
-            handle.close()
-            handle.unlink()
-
-    def __enter__(self) -> Self:
-        """Return this store as a context manager."""
-        return self
-
-    def __exit__(
-        self,
-        _exc_type: type[BaseException] | None,
-        _exc_val: BaseException | None,
-        _exc_t: TracebackType | None,
-    ) -> None:
-        """Release shared-memory resources."""
-        self.close()
-
-
-def open_shared_map_store(maps: dict[str | None, MapGraph] | MapGraph) -> SharedMapStore:
-    """Serialize one or more map graphs to shared memory."""
-    if isinstance(maps, MapGraph):
-        handle = maps.to_shared()
-        return SharedMapStore(shared_names=handle.name, handles=(handle,))
-
-    handles: list[shm.SharedMemory] = []
-    names: dict[str | None, str] = {}
-    for key, graph in maps.items():
-        handle = graph.to_shared()
-        handles.append(handle)
-        names[key] = handle.name
-    return SharedMapStore(shared_names=names, handles=tuple(handles))
 
 
 def extract_fn(extraction: MapExtraction) -> MapExtractor:
@@ -592,19 +544,3 @@ class FeatureMapBuilder(MapBuilder, MapGeometrySource, ABC):
         )
         compiler = MapGraphCompiler(options)
         return compiler.compile(self.iter_features())
-
-
-def build_map(
-    source: MapGeometrySource,
-    *,
-    min_distance: float | None = None,
-    interpolation_distance: float | None = None,
-) -> MapGraph:
-    """Compile a geometry source directly into a `MapGraph`."""
-    options = MapBuildOptions.from_distances(
-        min_distance=min_distance,
-        interpolation_distance=interpolation_distance,
-        edge_remap=source.edge_remap(),
-    )
-    compiler = MapGraphCompiler(options)
-    return compiler.compile(source.iter_features())
