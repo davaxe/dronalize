@@ -13,13 +13,12 @@ from dronalize.core.categories import AgentCategory, DatasetSplit
 from dronalize.core.scene import POSITIONS_ONLY
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, LoaderOptionsModel
-from dronalize.processing.maps import MapReference
+from dronalize.processing.maps import MapProvider, MapReference
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.models import DatasetRunResources
     from dronalize.processing.models import LoaderPlan
 
 
@@ -36,12 +35,9 @@ class Argoverse1Loader(SceneLoader[list[Path], Argoverse1LoaderOptions]):
     """Loader for Argoverse 1 forecasting trajectories."""
 
     def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
+        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> None:
-        super().__init__(data_root=data_root, request=request, resources=resources)
+        super().__init__(data_root=data_root, request=request, map_provider=map_provider)
         self._train_dir: Path = self.root / "forecasting_train_v1.1" / "train" / "data"
         self._val_dir: Path = self.root / "forecasting_val_v1.1" / "val" / "data"
         self._test_dir: Path = self.root / "forecasting_test_v1.1" / "test_obs" / "data"

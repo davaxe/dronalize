@@ -37,5 +37,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
         enabled_by_default=False,
         confidence="documented",
     ),
-    resources_factory=_open_waymo_resources,
+    map_provider_factory=_open_waymo_resources,
 )

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.models import DatasetRunResources
+    from dronalize.processing.maps import MapProvider
     from dronalize.processing.models import LoaderPlan
 
 
@@ -25,13 +25,12 @@ class AD4CHELoader(LevelXDataLoader):
     """Loader for the AD4CHE dataset."""
 
     def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
+        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> None:
         super().__init__(
-            data_root=Path(data_root) / "AD4CHE_Data_V1.0", request=request, resources=resources
+            data_root=Path(data_root) / "AD4CHE_Data_V1.0",
+            request=request,
+            map_provider=map_provider,
         )
 
     @override

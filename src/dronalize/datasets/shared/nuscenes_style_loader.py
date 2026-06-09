@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.models import DatasetRunResources
+    from dronalize.processing.maps import MapProvider
     from dronalize.processing.models import LoaderPlan
 
 
@@ -39,12 +39,9 @@ class NuScenesStyleLoader(SceneLoader[str, NuScenesStyleLoaderOptions]):
     bad_first_step_threshold_meters: ClassVar[float | None] = None
 
     def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
+        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> None:
-        super().__init__(data_root=data_root, request=request, resources=resources)
+        super().__init__(data_root=data_root, request=request, map_provider=map_provider)
         self._schemas: dict[str, pl.Schema | None] = _SCHEMAS
         self._sources: dict[DatasetSplit, list[DatasetSource[str]]] | None = None
         self._scene_cache: dict[str, pl.DataFrame] = {}

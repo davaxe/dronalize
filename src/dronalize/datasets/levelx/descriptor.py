@@ -81,7 +81,7 @@ def _levelx_spec(
         loader_cls=loader_cls,
         default_config=default_config,
         native_schema=StandardLevelXLoader.native_trajectory_schema(),
-        resources_factory=_open_levelx_osm_resources,
+        map_provider_factory=_open_levelx_osm_resources,
         feature_support=DatasetFeatureSupport(
             map=True, lane_change_sampling=lane_change_sampling_support
         ),
@@ -106,7 +106,7 @@ DATASET_DESCRIPTORS = {
         temporal_support=temporal_support(
             source_unit="recording", min_frames=9729, max_frames=31274, enabled_by_default=True
         ),
-        resources_factory=_open_highd_resources,
+        map_provider_factory=_open_highd_resources,
     ),
     "ind": _levelx_spec(
         "ind", StandardLevelXLoader, _levelx_config(), min_frames=16192, max_frames=33207

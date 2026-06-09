@@ -33,5 +33,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     temporal_support=temporal_support(
         source_unit="recording", min_frames=52123, max_frames=52123, enabled_by_default=True
     ),
-    resources_factory=_open_a43_resources,
+    map_provider_factory=_open_a43_resources,
 )

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from zarr import Array
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.models import DatasetRunResources
+    from dronalize.processing.maps import MapProvider
     from dronalize.processing.models import LoaderPlan
 
 
@@ -59,12 +59,9 @@ class LyftLoader(SceneLoader[_Source, LyftLoaderOptions]):
     """Loader for Lyft Level 5 scenes stored in Zarr format."""
 
     def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
+        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> None:
-        super().__init__(data_root=data_root, request=request, resources=resources)
+        super().__init__(data_root=data_root, request=request, map_provider=map_provider)
         self._data: dict[DatasetSplit, _ArrayData] = {}
 
     def _get_arrays(self, split: DatasetSplit) -> _ArrayData:

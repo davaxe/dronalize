@@ -9,11 +9,7 @@ from typing import TYPE_CHECKING, Generic, cast
 from typing_extensions import Self, TypeVar
 
 from dronalize.core.typing import SourceT
-from dronalize.processing.loading.models import (
-    DatasetRunResources,
-    LoaderOptionsModel,
-    NoLoaderOptions,
-)
+from dronalize.processing.loading.models import LoaderOptionsModel, NoLoaderOptions
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -22,6 +18,7 @@ if TYPE_CHECKING:
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import TrajectorySchema
     from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame
+    from dronalize.processing.maps import MapProvider
     from dronalize.processing.models import LoaderPlan, ReadSelection
 
 
@@ -39,10 +36,8 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
     request : LoaderPlan
         The full loader request, which may be used to configure loading behavior
         and is retained for potential use by subclasses.
-    resources : DatasetRunResources, optional
-        Optional shared resources for loading, which may be used by loaders that
-        need to share expensive resources like maps across multiple sources or
-        splits.
+    map_provider : MapProvider or None, optional
+        Optional map provider prepared for the run and shared across sources.
 
     Notes
     -----
@@ -54,11 +49,7 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
     """
 
     def __init__(
-        self,
-        *,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
+        self, *, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> None:
         self.root: Path = Path(data_root)
         self.request: LoaderPlan = request
@@ -66,9 +57,7 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         self.screening_config: ScreeningConfig | None = request.screening
         self.read_config: ReadSelection = request.read
         self.map_config: MapConfig | None = request.map
-        self.resources: DatasetRunResources = (
-            DatasetRunResources() if resources is None else resources
-        )
+        self.map_provider: MapProvider | None = map_provider
         self.loader_options: _LoaderOptionsT = cast("_LoaderOptionsT", request.loader_options)
 
     def __init_subclass__(cls) -> None:
@@ -85,10 +74,7 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
 
     @classmethod
     def from_loader_request(
-        cls,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
+        cls, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> Self:
         """Construct a concrete loader instance from the unified request interface.
 
@@ -99,8 +85,9 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         request : LoaderPlan
             Full loader request containing all generic and dataset-specific
             options.
-        resources : DatasetRunResources, optional
-            Optional shared resource container.
+        map_provider : MapProvider or None, optional
+            Optional map provider prepared for the run and injected into the
+            loader instance.
 
         Returns
         -------
@@ -117,7 +104,7 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         behavior, precomputation, validation, or dependency injection beyond the
         default initializer.
         """
-        return cls(data_root=data_root, request=request, resources=resources)
+        return cls(data_root=data_root, request=request, map_provider=map_provider)
 
     @classmethod
     @abstractmethod

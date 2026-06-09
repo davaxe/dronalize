@@ -251,7 +251,7 @@ class RuntimeProcessor:
         if reference.map_key != map_key:
             reference = replace(reference, map_key=map_key)
 
-        provider = self.loader.resources.map_provider
+        provider = self.loader.map_provider
         if provider is None:
             return map_key, None
 

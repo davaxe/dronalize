@@ -39,7 +39,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     native_schema=Argoverse1Loader.native_trajectory_schema(),
     supported_native_splits=_NATIVE_SPLITS,
     loader_options_model=Argoverse1LoaderOptions,
-    resources_factory=_open_argoverse1_resources,
+    map_provider_factory=_open_argoverse1_resources,
     split_support=DatasetSplitSupport(scene=True),
     feature_support=DatasetFeatureSupport(map=True),
     temporal_support=temporal_support(
