@@ -6,19 +6,15 @@ import multiprocessing as mp
 from typing import TYPE_CHECKING, Annotated, Any, Literal, TypeVar
 
 import numpy as np
-from pydantic import (
-    AliasChoices,
-    BeforeValidator,
-    Field,
-    TypeAdapter,
-    field_validator,
-    model_validator,
-)
+from pydantic import BeforeValidator, Field, TypeAdapter, field_validator, model_validator
 from typing_extensions import override
 
 from dronalize.config.base import (
+    Clear,
     ConfigBase,
     ConfigPatch,
+    DictPatch,
+    MappingPatch,
     ResampleMethod,
     ResolvedConfig,
     apply_optional,
@@ -131,14 +127,14 @@ class SceneAssign(ResolvedConfig):
     """Scene-based output split assignment."""
 
     strategy: Literal["scene"] = Field("scene", repr=False, init=False)
-    ratio: SplitWeights = Field(default_factory=SplitWeights)
+    ratio: SplitWeights
 
 
 class SourceAssign(ResolvedConfig):
     """DatasetSource-based output split assignment."""
 
     strategy: Literal["source"] = Field("source", repr=False, init=False)
-    ratio: SplitWeights = Field(default_factory=SplitWeights)
+    ratio: SplitWeights
 
 
 class TimeBlockAssign(ResolvedConfig):
@@ -146,7 +142,7 @@ class TimeBlockAssign(ResolvedConfig):
 
     gap: int = Field(ge=0, default=0)
     strategy: Literal["time"] = Field("time", repr=False, init=False)
-    ratio: SplitWeights = Field(default_factory=SplitWeights)
+    ratio: SplitWeights
 
 
 class ShuffledTimeBlockAssign(ResolvedConfig):
@@ -155,7 +151,7 @@ class ShuffledTimeBlockAssign(ResolvedConfig):
     segments: int = Field(ge=1)
     gap: int = Field(ge=0, default=0)
     strategy: Literal["shuffled-time"] = Field("shuffled-time", repr=False, init=False)
-    ratio: SplitWeights = Field(default_factory=SplitWeights)
+    ratio: SplitWeights
 
 
 AssignConfig = Annotated[
@@ -187,8 +183,8 @@ class RuntimeConfig(ResolvedConfig):
     """Optional per-worker batch size for scene dispatch."""
 
 
-class PartialRuntimeConfig(ConfigPatch[RuntimeConfig]):
-    """Patch model for partially overriding :class:`RuntimeConfig`."""
+class RuntimePatch(ConfigPatch[RuntimeConfig]):
+    """Patch model for overriding :class:`RuntimeConfig`."""
 
     jobs: int | Literal["auto"] | None = None
     """Replacement worker count or `"auto"` to use the current CPU count."""
@@ -197,11 +193,9 @@ class PartialRuntimeConfig(ConfigPatch[RuntimeConfig]):
     full_config_type: type[RuntimeConfig] = Field(default=RuntimeConfig, init=False, repr=False)
 
     @override
-    def merge_into(
-        self, target: RuntimeConfig | None, *, exclude_none: bool = True
-    ) -> RuntimeConfig:
+    def merge_into(self, target: RuntimeConfig | None) -> RuntimeConfig:
         partial = self.model_copy(update={"jobs": mp.cpu_count()}) if self.jobs == "auto" else self
-        return ConfigPatch[RuntimeConfig].merge_into(partial, target, exclude_none=exclude_none)
+        return ConfigPatch[RuntimeConfig].merge_into(partial, target)
 
 
 class MDSOutputConfig(ResolvedConfig):
@@ -217,8 +211,8 @@ class MDSOutputConfig(ResolvedConfig):
     """Whether an existing output location may be reused instead of raising an error."""
 
 
-class PartialMDSOutputConfig(ConfigPatch[MDSOutputConfig]):
-    """Patch model for partially overriding Mosaic Streaming writer settings."""
+class MDSOutputPatch(ConfigPatch[MDSOutputConfig]):
+    """Patch model for overriding Mosaic Streaming writer settings."""
 
     compression: str | None = None
     """Replacement compression algorithm for Mosaic shards."""
@@ -234,11 +228,7 @@ class PartialMDSOutputConfig(ConfigPatch[MDSOutputConfig]):
 class OutputConfig(ResolvedConfig):
     """Resolved output configuration shared by storage backends."""
 
-    trajectory_schema: TrajectorySchemaLike = Field(
-        default=CANONICAL,
-        validation_alias=AliasChoices("schema", "trajectory_schema"),
-        serialization_alias="schema",
-    )
+    trajectory_schema: TrajectorySchemaLike = Field(default=CANONICAL)
     """Trajectory schema used when encoding scene records."""
     precision: OutputPrecision = "float32"
     """Floating-point precision used for serialized numeric arrays."""
@@ -248,21 +238,17 @@ class OutputConfig(ResolvedConfig):
     """Backend-specific tuning for Mosaic Streaming outputs."""
 
 
-class PartialOutputConfig(ConfigPatch[OutputConfig]):
-    """Patch model for partially overriding shared output settings."""
+class OutputPatch(ConfigPatch[OutputConfig]):
+    """Patch model for overriding shared output settings."""
 
-    trajectory_schema: TrajectorySchemaLike | None = Field(
-        default=None,
-        validation_alias=AliasChoices("schema", "trajectory_schema"),
-        serialization_alias="schema",
-    )
+    trajectory_schema: TrajectorySchemaLike | None = Field(default=None)
     """Replacement trajectory schema used when encoding scene records."""
     precision: OutputPrecision | None = None
     """Replacement floating-point precision for serialized numeric arrays."""
     recenter_positions: bool | None = None
     """Replacement policy for recentering scene positions before writing."""
-    mds: PartialMDSOutputConfig | None = None
-    """Partial backend-specific overrides for Mosaic Streaming outputs."""
+    mds: MDSOutputPatch | None = None
+    """Backend-specific patch overrides for Mosaic Streaming outputs."""
     full_config_type: type[OutputConfig] = Field(default=OutputConfig, init=False, repr=False)
 
 
@@ -379,8 +365,8 @@ class MapConfig(ResolvedConfig):
         return self
 
 
-class PartialMapEdgeTypeRules(ConfigPatch[MapEdgeTypeRules]):
-    """Patch model for partially overriding :class:`MapEdgeTypeRules`."""
+class MapEdgeTypeRulesPatch(ConfigPatch[MapEdgeTypeRules]):
+    """Patch model for overriding :class:`MapEdgeTypeRules`."""
 
     include: frozenset[EdgeTypeLike] | None = Field(default=None)
     """Replacement allow-list of edge types to keep."""
@@ -391,8 +377,8 @@ class PartialMapEdgeTypeRules(ConfigPatch[MapEdgeTypeRules]):
     full_config_type: type[MapEdgeTypeRules] = Field(MapEdgeTypeRules, repr=False, init=False)
 
 
-class PartialMapConfig(ConfigPatch[MapConfig]):
-    """Patch model for partially overriding :class:`MapConfig`."""
+class MapPatch(ConfigPatch[MapConfig]):
+    """Patch model for overriding :class:`MapConfig`."""
 
     min_distance: float | None = Field(gt=0, default=None)
     """Replacement minimum spacing for simplified map points."""
@@ -400,15 +386,12 @@ class PartialMapConfig(ConfigPatch[MapConfig]):
     """Replacement interpolation spacing for map geometry."""
     extraction: MapExtraction | None = Field(default=None)
     """Replacement map extraction strategy."""
-    edge_types: PartialMapEdgeTypeRules | Literal[False] | None = Field(default=None)
+    edge_types: MapEdgeTypeRulesPatch | Clear | None = Field(default=None)
     """Replacement edge-type rules, or `false` to clear inherited rules."""
     full_config_type: type[MapConfig] = Field(MapConfig, repr=False, init=False)
 
     @override
-    def merge_into(self, target: MapConfig | None, *, exclude_none: bool = True) -> MapConfig:
-        if exclude_none is False:
-            return super().merge_into(target, exclude_none=exclude_none)
-
+    def merge_into(self, target: MapConfig | None) -> MapConfig:
         base = MapConfig() if target is None else target
         return MapConfig(
             min_distance=self.min_distance if self.min_distance is not None else base.min_distance,
@@ -448,8 +431,8 @@ class ResampleConfig(ResolvedConfig):
         return self
 
 
-class PartialResampleConfig(ConfigPatch[ResampleConfig]):
-    """Patch model for partially overriding temporal resampling settings."""
+class ResamplePatch(ConfigPatch[ResampleConfig]):
+    """Patch model for overriding temporal resampling settings."""
 
     up: int | None = None
     """Replacement upsampling factor."""
@@ -477,8 +460,8 @@ class WindowConfig(ResolvedConfig):
     """Completeness policy for sources that do not fully cover a window."""
 
 
-class PartialWindowConfig(ConfigPatch[WindowConfig]):
-    """Patch model for partially overriding sliding-window extraction settings."""
+class WindowPatch(ConfigPatch[WindowConfig]):
+    """Patch model for overriding sliding-window extraction settings."""
 
     step: int | None = None
     """Replacement stride between consecutive sampled windows in frames."""
@@ -502,8 +485,8 @@ class LaneChangeConfig(ResolvedConfig):
     """Keep one negative scene window out of every N candidates."""
 
 
-class PartialLaneChangeConfig(ConfigPatch[LaneChangeConfig]):
-    """Patch model for partially overriding lane-change-aware sampling settings."""
+class LaneChangePatch(ConfigPatch[LaneChangeConfig]):
+    """Patch model for overriding lane-change-aware sampling settings."""
 
     persist: int | None = None
     """Replacement persistence threshold for lane-change detection."""
@@ -559,8 +542,8 @@ class ScenesConfig(ResolvedConfig):
         return self
 
 
-class PartialScenesConfig(ConfigPatch[ScenesConfig]):
-    """Patch model for partially overriding scene construction settings."""
+class ScenesPatch(ConfigPatch[ScenesConfig]):
+    """Patch model for overriding scene construction settings."""
 
     horizon_frames: int | None = None
     """Replacement number of frames per scene horizon."""
@@ -568,16 +551,16 @@ class PartialScenesConfig(ConfigPatch[ScenesConfig]):
     """Replacement default reader/adaptor split point."""
     sample_time: float | None = None
     """Replacement frame interval in seconds."""
-    window: PartialWindowConfig | Literal[False] | None = None
-    """Partial override for sliding-window sampling settings."""
-    resample: PartialResampleConfig | Literal[False] | None = None
-    """Partial override for temporal resampling settings."""
-    lane_change: PartialLaneChangeConfig | Literal[False] | None = None
-    """Partial override for lane-change-aware sampling settings."""
+    window: WindowPatch | Clear | None = None
+    """Patch override for sliding-window sampling settings."""
+    resample: ResamplePatch | Clear | None = None
+    """Patch override for temporal resampling settings."""
+    lane_change: LaneChangePatch | Clear | None = None
+    """Patch override for lane-change-aware sampling settings."""
     full_config_type: type[ScenesConfig] = Field(default=ScenesConfig, init=False, repr=False)
 
     @override
-    def merge_into(self, target: ScenesConfig | None, *, exclude_none: bool = True) -> ScenesConfig:
+    def merge_into(self, target: ScenesConfig | None) -> ScenesConfig:
         """Apply this partial scenes config to an existing full scenes config."""
         return ScenesConfig(
             horizon_frames=_resolve_required(
@@ -617,12 +600,12 @@ ConfigT = TypeVar("ConfigT", bound=ConfigBase)
 
 
 def _apply_optional_block(
-    patch: ConfigPatch[ConfigT] | Literal[False] | None, target: ConfigT | None
+    patch: ConfigPatch[ConfigT] | Clear | None, target: ConfigT | None
 ) -> ConfigT | None:
     """Apply a patch to an optional nested config block."""
     if patch is None:
         return target
-    if patch is False:
+    if isinstance(patch, Clear):
         return None
     return patch.merge_into(target)
 
@@ -938,97 +921,65 @@ class ScreeningConfig(ResolvedConfig):
     """Declarative screening configuration composed from named rule maps."""
 
     cleanup: dict[str, CleanupSpec] = Field(default_factory=dict)
-    """Named cleanup actions applied before screening checks are evaluated."""
-    scene: dict[str, SceneCheckSpec] = Field(default_factory=dict)
-    """Named scene-level screening rules."""
-    agent: dict[str, AgentCheckSpec] = Field(default_factory=dict)
-    """Named agent-level screening rules."""
+    scenes: dict[str, SceneCheckSpec] = Field(default_factory=dict)
+    agents: dict[str, AgentCheckSpec] = Field(default_factory=dict)
 
 
-class PartialScreeningConfig(ConfigPatch[ScreeningConfig]):
-    """Patch model for replacing or extending named screening rule sets."""
+class ScreeningPatch(ConfigPatch[ScreeningConfig]):
+    """Patch model for named screening rule sets.
 
-    mode: Literal["replace", "extend"] | None = None
-    """How this partial screening config should combine with an existing target."""
-    remove: tuple[str, ...] | None = None
-    """Named cleanup, scene, or agent rules to remove after merging."""
-    cleanup: dict[str, CleanupSpec] | None = None
-    """Cleanup rule overrides keyed by rule name."""
-    scene: dict[str, SceneCheckSpec] | None = None
-    """Scene-level rule overrides keyed by rule name."""
-    agent: dict[str, AgentCheckSpec] | None = None
-    """Agent-level rule overrides keyed by rule name."""
+    Each rule section has independent replace/extend/remove semantics.
+    This avoids deleting rules from unrelated sections that happen to share the
+    same name.
+    """
+
+    cleanup: MappingPatch[CleanupSpec] | None = None
+    scenes: MappingPatch[SceneCheckSpec] | None = None
+    agents: MappingPatch[AgentCheckSpec] | None = None
     full_config_type: type[ScreeningConfig] = Field(ScreeningConfig, repr=False, init=False)
 
     @override
-    def merge_into(
-        self, target: ScreeningConfig | None, *, exclude_none: bool = True
-    ) -> ScreeningConfig:
-        mode = self.mode or "extend"
-        cleanup = target.cleanup if target is not None else {}
-        scene = target.scene if target is not None else {}
-        agent = target.agent if target is not None else {}
-        if mode == "replace":
-            cleanup = self.cleanup if self.cleanup is not None else {}
-            scene = self.scene if self.scene is not None else {}
-            agent = self.agent if self.agent is not None else {}
-        elif mode == "extend":
-            cleanup = {**cleanup, **(self.cleanup or {})}
-            scene = {**scene, **(self.scene or {})}
-            agent = {**agent, **(self.agent or {})}
-        if self.remove:
-            cleanup = {k: v for k, v in cleanup.items() if k not in self.remove}
-            scene = {k: v for k, v in scene.items() if k not in self.remove}
-            agent = {k: v for k, v in agent.items() if k not in self.remove}
-        return ScreeningConfig(cleanup=cleanup, scene=scene, agent=agent)
+    def merge_into(self, target: ScreeningConfig | None) -> ScreeningConfig:
+        base = target or ScreeningConfig()
+        return ScreeningConfig(
+            cleanup=(
+                self.cleanup.merge_into(base.cleanup) if self.cleanup is not None else base.cleanup
+            ),
+            scenes=self.scenes.merge_into(base.scenes) if self.scenes is not None else base.scenes,
+            agents=self.agents.merge_into(base.agents) if self.agents is not None else base.agents,
+        )
 
 
 class DatasetConfig(ResolvedConfig):
     """Full dataset/profile-style configuration schema."""
 
     scenes: ScenesConfig
-    """Scene construction and temporal sampling settings."""
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
-    """Runtime execution settings such as worker count and chunk size."""
     screening: ScreeningConfig | None = Field(default=None)
-    """Optional screening rules applied before scenes are emitted."""
     output: OutputConfig = Field(default_factory=OutputConfig)
-    """Output encoding, schema, and backend-specific writer settings."""
     map: MapConfig = Field(default_factory=MapConfig)
-    """Map extraction and interpolation settings for generated scenes."""
     read: ReadConfig = Field(default_factory=ReadAll)
-    """Input selection configuration used to choose raw dataset sources."""
     assign: AssignConfig = Field(default_factory=NoAssign)
-    """Output assignment configuration used to label generated scenes."""
     loader_options: dict[str, Any] | None = Field(default=None)
-    """Dataset-specific loader options forwarded to the selected dataset plugin."""
 
 
-class PartialDatasetConfigBase(ConfigBase):
+class DatasetConfigPatchBase(ConfigBase):
     """Common optional fields shared by partial dataset-style configs.
 
     This base is reused by authored dataset entries and profile fragments.
     """
 
-    scenes: PartialScenesConfig | None = Field(default=None)
-    """Partial scene construction overrides to merge into the target config."""
-    runtime: PartialRuntimeConfig | None = Field(default=None)
-    """Partial runtime execution overrides to merge into the target config."""
-    screening: PartialScreeningConfig | Literal[False] | None = Field(default=None)
-    """Partial screening rule overrides to merge into the target config."""
-    output: PartialOutputConfig | None = Field(default=None)
-    """Partial output writer overrides to merge into the target config."""
-    map: PartialMapConfig | None = Field(default=None)
-    """Partial map extraction overrides to merge into the target config."""
+    scenes: ScenesPatch | None = Field(default=None)
+    runtime: RuntimePatch | None = Field(default=None)
+    screening: ScreeningPatch | Clear | None = Field(default=None)
+    output: OutputPatch | None = Field(default=None)
+    map: MapPatch | None = Field(default=None)
     read: ReadConfig | None = Field(default=None)
-    """Replacement input selection strategy for the target dataset config."""
     assign: AssignConfig | None = Field(default=None)
-    """Replacement output assignment strategy for the target dataset config."""
-    loader_options: dict[str, Any] | None = Field(default=None)
-    """Dataset-specific loader option overrides for the target config."""
+    loader_options: DictPatch | Clear | None = Field(default=None)
 
 
-class PartialDatasetConfig(PartialDatasetConfigBase, ConfigPatch[DatasetConfig]):
+class DatasetConfigPatch(DatasetConfigPatchBase, ConfigPatch[DatasetConfig]):
     """Patch model for applying partial values to a full dataset config.
 
     The merge strategy preserves existing nested defaults unless a matching
@@ -1038,20 +989,16 @@ class PartialDatasetConfig(PartialDatasetConfigBase, ConfigPatch[DatasetConfig])
     full_config_type: type[DatasetConfig] = DatasetConfig
 
     @override
-    def merge_into(
-        self, target: DatasetConfig | None, *, exclude_none: bool = True
-    ) -> DatasetConfig:
+    def merge_into(self, target: DatasetConfig | None) -> DatasetConfig:
         if target is None:
-            msg = "Defaults must be provided to apply a PartialDatasetConfig."
+            msg = "Defaults must be provided to apply a DatasetConfigPatch."
             raise ValueError(msg)
 
         return DatasetConfig(
             scenes=self.scenes.merge_into(target.scenes) if self.scenes else target.scenes,
             runtime=self.runtime.merge_into(target.runtime) if self.runtime else target.runtime,
             screening=apply_optional(self.screening, target.screening),
-            loader_options=(
-                self.loader_options if self.loader_options is not None else target.loader_options
-            ),
+            loader_options=_apply_loader_options_patch(self.loader_options, target.loader_options),
             output=self.output.merge_into(target.output) if self.output else target.output,
             map=self.map.merge_into(target.map) if self.map else target.map,
             read=self.read if self.read is not None else target.read,
@@ -1059,7 +1006,17 @@ class PartialDatasetConfig(PartialDatasetConfigBase, ConfigPatch[DatasetConfig])
         )
 
 
-class RuntimeOverride(ConfigPatch[PartialDatasetConfig]):
+def _apply_loader_options_patch(
+    patch: DictPatch | Clear | None, target: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    if patch is None:
+        return target
+    if isinstance(patch, Clear):
+        return None
+    return patch.merge_into(target or {})
+
+
+class RuntimeOverride(ConfigBase):
     """User-supplied overrides layered on top of a dataset's base config.
 
     `RuntimeOverride` is the bridge between unstructured runtime inputs such as
@@ -1068,13 +1025,20 @@ class RuntimeOverride(ConfigPatch[PartialDatasetConfig]):
     existing dataset config at run time.
     """
 
-    runtime: PartialRuntimeConfig | None = None
+    runtime: RuntimePatch | None = None
     read: ReadConfig | None = None
     assign: AssignConfig | None = None
-    output: PartialOutputConfig | None = None
-    full_config_type: type[PartialDatasetConfig] = Field(
-        default=PartialDatasetConfig, init=False, repr=False
-    )
+    output: OutputPatch | None = None
+
+    def to_dataset_patch(self) -> DatasetConfigPatch:
+        """Convert CLI/programmatic runtime inputs into a dataset patch."""
+        return DatasetConfigPatch(
+            runtime=self.runtime, read=self.read, assign=self.assign, output=self.output
+        )
+
+    def merge_into(self, target: DatasetConfig) -> DatasetConfig:
+        """Apply this runtime override directly to a resolved dataset config."""
+        return self.to_dataset_patch().merge_into(target)
 
     @staticmethod
     def _validate_read_inputs(
@@ -1133,9 +1097,9 @@ class RuntimeOverride(ConfigPatch[PartialDatasetConfig]):
 
         Inputs are based on raw CLI arguments that are not validated.
 
-        !!! note "`PartialDatasetConfig` conversion"
+        !!! note "`DatasetConfigPatch` conversion"
             The `merge_into` method can be used to convert this `RuntimeOverride`
-            into a `PartialDatasetConfig` that can be merged with the dataset's
+            into a `DatasetConfigPatch` that can be merged with the dataset's
             default config. This allows for applying overrides without needing
             to specify the full config structure.
 
@@ -1201,10 +1165,10 @@ class RuntimeOverride(ConfigPatch[PartialDatasetConfig]):
         )
 
         return cls(
-            runtime=PartialRuntimeConfig(jobs=jobs) if jobs is not None else None,
+            runtime=RuntimePatch(jobs=jobs) if jobs is not None else None,
             read=read_config,
             assign=assign_config,
-            output=PartialOutputConfig(trajectory_schema=trajectory_schema)
+            output=OutputPatch(trajectory_schema=trajectory_schema)
             if trajectory_schema is not None
             else None,
         )

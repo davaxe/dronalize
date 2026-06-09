@@ -3,12 +3,13 @@
 # This file doubles as a parser-validated example config for docs and tests.
 # Keep it aligned with the current public configuration model.
 #
-# Design goals:
-# - keep reusable profiles and per-dataset entries
-# - move filtering out of the scene-loading branch
-# - give dataset-specific loader extras a first-class home
-# - rename sections toward user-facing concepts instead of implementation terms
-# - group related settings by how users think about a preprocessing run
+# Breaking changes reflected here:
+# - Partial config sections are now patch sections.
+# - Clearing uses `{ op = "clear" }`, not `false`.
+# - Screening merge/remove is now section-local.
+# - Screening rule maps use `values = { ... }` or `[...values.<name>]`.
+# - Loader options, if used, should be expressed as a DictPatch.
+# - Weighted assignment strategies require explicit `ratio`.
 
 
 # --------------------------------------------------------------------------------------
@@ -19,9 +20,15 @@
 jobs = 4
 
 [profiles.high_precision.output]
-schema = "positions_velocity_yaw"
+trajectory_schema = "positions_velocity_yaw"
 precision = "float64"
 recenter_positions = true
+
+
+# Basic screening profile --------------------------------------------------------------
+
+[profiles.basic_screening.screening.cleanup]
+mode = "extend"
 
 [profiles.basic_screening.screening.cleanup.remove_animals]
 rule = "exclude"
@@ -31,14 +38,30 @@ categories = ["ANIMAL"]
 rule = "exclude"
 categories = ["UNIMPORTANT"]
 
-[profiles.strict_screening.screening]
 
-[profiles.strict_screening.screening.agent]
-no_gap = {rule = "max_gap", maximum = 0}
-stationary = { rule = "min_distance", minimum = 4, tolerance = { absolute = 100} }
+# Strict screening profile -------------------------------------------------------------
 
-[profiles.strict_screening.screening.scene]
-min_agents = { rule = "agent_range", minimum = 12 }
+[profiles.strict_screening.screening.agents]
+mode = "extend"
+
+[profiles.strict_screening.screening.agents.no_gap]
+rule = "max_gap"
+maximum = 0
+
+[profiles.strict_screening.screening.agents.stationary]
+rule = "min_distance"
+minimum = 4
+
+[profiles.strict_screening.screening.agents.stationary.tolerance]
+absolute = 100
+
+[profiles.strict_screening.screening.scenes]
+mode = "extend"
+
+[profiles.strict_screening.screening.scenes.min_agents]
+rule = "agent_range"
+minimum = 12
+
 
 # --------------------------------------------------------------------------------------
 # Dataset: waymo
@@ -47,15 +70,16 @@ min_agents = { rule = "agent_range", minimum = 12 }
 [datasets.waymo]
 uses = ["strict_screening"]
 
-[datasets.waymo.screening]
-mode = "extend"
+# No dataset-local screening patch is needed here.
+# The strict_screening profile already extends the agent and scene rule maps.
+
 
 # --------------------------------------------------------------------------------------
 # Dataset: a43
 # --------------------------------------------------------------------------------------
 
 [datasets.a43]
-uses = ["basic_screening"]
+uses = ["basic_screening", "high_precision"]
 
 
 # Runtime ------------------------------------------------------------------------------
@@ -88,15 +112,19 @@ emit_velocity = true
 emit_acceleration = true
 
 
-# Screening -------------------------------------------------------------------------------
+# Screening ----------------------------------------------------------------------------
 #
 # Screening is separated from scene sampling so it reads as an independent policy layer.
 # The three namespaces below stay because they are genuinely distinct:
 # - cleanup: row/agent removal before validation
 # - scene: whole-scene acceptance rules
 # - agent: per-agent validity rules
+#
+# Breaking change:
+# `remove` is no longer global under `[screening]`.
+# It is now local to each rule namespace.
 
-[datasets.a43.screening]
+[datasets.a43.screening.cleanup]
 mode = "extend"
 remove = ["remove_unimportant"]  # from the basic_screening profile
 
@@ -104,28 +132,46 @@ remove = ["remove_unimportant"]  # from the basic_screening profile
 rule = "exclude"
 categories = ["STATIC_OBJECT", "UNIMPORTANT"]
 
-[datasets.a43.screening.scene.min_context]
+[datasets.a43.screening.scenes]
+mode = "extend"
+
+[datasets.a43.screening.scenes.min_context]
 rule = "agent_range"
 minimum = 2
 
-[datasets.a43.screening.agent.anchor_present]
+[datasets.a43.screening.agents]
+mode = "extend"
+
+[datasets.a43.screening.agents.anchor_present]
 rule = "frames"
 frames = [19]
-tolerance = { absolute = 1, relative = 0.05 }
-selector = { mode = "include", categories = ["CAR"] }
 
-[datasets.a43.screening.agent.observation_floor]
+[datasets.a43.screening.agents.anchor_present.tolerance]
+absolute = 1
+relative = 0.05
+
+[datasets.a43.screening.agents.anchor_present.selector]
+mode = "include"
+categories = ["CAR"]
+
+[datasets.a43.screening.agents.observation_floor]
 rule = "min_observations"
 minimum = 8
 
 
 # Split --------------------------------------------------------------------------------
+#
+# Weighted assignment strategies now require an explicit ratio.
 
 [datasets.a43.assign]
 strategy = "shuffled-time"
-ratio = { train = 0.7, val = 0.2, test = 0.1 }
 segments = 8
 gap = 2
+
+[datasets.a43.assign.ratio]
+train = 0.7
+val = 0.2
+test = 0.1
 
 
 # Map ----------------------------------------------------------------------------------
@@ -137,6 +183,7 @@ interpolation_distance = 2.5
 [datasets.a43.map.extraction]
 mode = "circle"
 radius = 60.0
+
 
 # Output -------------------------------------------------------------------------------
 

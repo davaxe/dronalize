@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from pydantic import Field
 
 from dronalize.config.base import ConfigBase
-from dronalize.config.models import DatasetConfig, PartialDatasetConfig, PartialDatasetConfigBase
+from dronalize.config.models import DatasetConfig, DatasetConfigPatch, DatasetConfigPatchBase
 from dronalize.core.errors import ConfigurationError
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ def parse_config(path: Path) -> ProjectConfig:
     """Parse configuration from a TOML file.
 
     !!! note "Completeness of the returned config"
-        By design, this loader returns a validated but potentially incomplete configuration for
+        By design, this loader returns a validated but patch-style project configuration for
         specific datasets.
 
         See the
@@ -50,14 +50,14 @@ def parse_config(path: Path) -> ProjectConfig:
     return ProjectConfig.model_validate(data)
 
 
-class DatasetConfigEntry(PartialDatasetConfigBase):
+class DatasetConfigEntry(DatasetConfigPatchBase):
     """Dataset-local authored config."""
 
     uses: tuple[str, ...] | None = None
 
-    def to_partial_dataset_config(self) -> PartialDatasetConfig:
+    def to_dataset_config_patch(self) -> DatasetConfigPatch:
         """Return config without the uses field."""
-        return PartialDatasetConfig(
+        return DatasetConfigPatch(
             scenes=self.scenes,
             runtime=self.runtime,
             screening=self.screening,
@@ -83,7 +83,7 @@ class ProjectConfig(ConfigBase):
     """
 
     defaults: DatasetConfigEntry | None = Field(default=None)
-    profiles: dict[str, PartialDatasetConfig] = Field(default_factory=dict)
+    profiles: dict[str, DatasetConfigPatch] = Field(default_factory=dict)
     datasets: dict[str, DatasetConfigEntry] = Field(default_factory=dict)
 
     def resolve_dataset_config(self, dataset: str, dataset_config: DatasetConfig) -> DatasetConfig:
@@ -118,4 +118,4 @@ class ProjectConfig(ConfigBase):
                 raise ConfigurationError(msg)
             target = profile.merge_into(target)
 
-        return entry.to_partial_dataset_config().merge_into(target)
+        return entry.to_dataset_config_patch().merge_into(target)
