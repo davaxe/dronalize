@@ -102,11 +102,11 @@ class WorkerRuntime:
 
 @contextmanager
 def open_execution_session(plan: ExecutionPlan) -> Generator[ExecutionSession]:
-    """Open one plan with initialized resources, processor, and executor."""
-    with plan.descriptor.open_resources(plan.data_root, plan.loader) as resources:
+    """Open one plan with its map provider, processor, and executor."""
+    with plan.descriptor.open_resources(plan.data_root, plan.loader) as map_provider:
         logger.debug("Opening execution session", extra={"dataset": plan.dataset})
         loader = plan.descriptor.build_loader(
-            root=plan.data_root, request=plan.loader, resources=resources
+            root=plan.data_root, request=plan.loader, map_provider=map_provider
         )
         processor = RuntimeProcessor.from_plan(plan, loader)
         executor = _build_executor(plan, processor)

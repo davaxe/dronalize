@@ -6,48 +6,35 @@ import functools
 import importlib
 import importlib.util
 import logging
-from collections.abc import Callable, Generator, Mapping
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import ValidationError
 
-from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.core.errors import (
     DatasetNotFoundError,
     DatasetRegistryError,
     LoaderConfigError,
     MissingOptionalDependencyError,
 )
-from dronalize.processing.loading.models import (
-    DatasetRunResources,
-    LoaderOptionsModel,
-    NoLoaderOptions,
-)
+from dronalize.processing.loading.models import LoaderOptionsModel, NoLoaderOptions
 
 if TYPE_CHECKING:
+    from collections.abc import Generator, Mapping
+    from pathlib import Path
+
     from dronalize.config.models import DatasetConfig
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import TrajectorySchema
+    from dronalize.datasets.shared.resources import MapProviderFactory
     from dronalize.processing.loading.base import SceneLoader
+    from dronalize.processing.maps import MapProvider
     from dronalize.processing.models import LoaderPlan
 
 
 _REGISTRY: dict[str, DatasetDescriptor] = {}
 logger = logging.getLogger(__name__)
-
-ResourcesFactory = Callable[
-    [Path, ScenesConfig, MapConfig | None], AbstractContextManager[DatasetRunResources]
-]
-"""Factory signature for dataset-scoped shared resources.
-
-A resources factory receives the dataset root plus the resolved scene and map
-configuration for a run, then returns a context manager that owns shared state
-such as cached metadata tables, shared-memory map stores, or handles reused
-across loader instances.
-"""
 
 SourceTemporalUnit = Literal["recording", "scenario", "case", "scene", "batch", "unknown"]
 """Logical sequence unit represented by one source before scene windowing."""
@@ -149,7 +136,7 @@ class DatasetDescriptor:
     The descriptor owns dataset-level metadata rather than per-run state. It defines
     how to build loaders, which trajectory fields the raw loader produces, what
     configuration should be used as the starting point, which split strategies
-    are valid, and whether map resources can be requested.
+    are valid, and how run-scoped map providers are initialized.
 
     Parameters
     ----------
@@ -169,9 +156,9 @@ class DatasetDescriptor:
         native partitions.
     loader_options_model : type[LoaderOptionsModel], optional
         Typed model for dataset-owned options under `[datasets.<name>.loader_options]`.
-    resources_factory : ResourcesFactory or None, optional
-        Optional context-manager factory for shared per-run resources such as
-        maps or cached metadata.
+    map_provider_factory : MapProviderFactory or None, optional
+        Optional context-manager factory that prepares a run-scoped map
+        provider.
     feature_support : DatasetFeatureSupport, optional
         Optional dataset features supported by this integration.
     split_support : DatasetSplitSupport, optional
@@ -188,7 +175,7 @@ class DatasetDescriptor:
     native_schema: TrajectorySchema
     supported_native_splits: tuple[DatasetSplit, ...] | None = None
     loader_options_model: type[LoaderOptionsModel] = NoLoaderOptions
-    resources_factory: ResourcesFactory | None = None
+    map_provider_factory: MapProviderFactory | None = None
     feature_support: DatasetFeatureSupport = DatasetFeatureSupport()
     split_support: DatasetSplitSupport = DatasetSplitSupport()
     temporal_support: DatasetTemporalSupport | None = None
@@ -202,20 +189,20 @@ class DatasetDescriptor:
             raise LoaderConfigError(msg) from exc
 
     @contextmanager
-    def open_resources(self, root: Path, request: LoaderPlan) -> Generator[DatasetRunResources]:
-        """Open per-run shared dataset resources."""
-        if self.resources_factory is None:
-            yield DatasetRunResources()
+    def open_resources(self, root: Path, request: LoaderPlan) -> Generator[MapProvider | None]:
+        """Open the run-scoped map provider for this dataset, if any."""
+        if self.map_provider_factory is None:
+            yield None
             return
-        with self.resources_factory(root, request.scenes, request.map) as resources:
-            yield resources
+        with self.map_provider_factory(root, request.scenes, request.map) as map_provider:
+            yield map_provider
 
     def build_loader(
-        self, *, root: Path, request: LoaderPlan, resources: DatasetRunResources | None = None
+        self, *, root: Path, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> SceneLoader[Any, Any]:
         """Construct one loader instance for this dataset descriptor."""
         return self.loader_cls.from_loader_request(
-            data_root=root, request=request, resources=resources
+            data_root=root, request=request, map_provider=map_provider
         )
 
 

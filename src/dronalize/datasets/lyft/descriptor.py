@@ -41,7 +41,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     native_schema=LyftLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     loader_options_model=LyftLoaderOptions,
-    resources_factory=_open_lyft_resources,
+    map_provider_factory=_open_lyft_resources,
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
     temporal_support=temporal_support(

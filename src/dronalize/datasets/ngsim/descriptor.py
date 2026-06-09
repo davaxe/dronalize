@@ -14,7 +14,10 @@ from dronalize.datasets.shared.presets import (
     scenes_config,
     temporal_support,
 )
-from dronalize.datasets.shared.resources import ResourcesFactory, single_shared_map_resource_factory
+from dronalize.datasets.shared.resources import (
+    MapProviderFactory,
+    single_shared_map_resource_factory,
+)
 
 _SELECT_EXPR = (
     pl.col("Vehicle_ID").alias("id"),
@@ -42,8 +45,8 @@ def ngsim_resources(
     smoothing: float | None = 3.0,
     *,
     include_outer_borders: bool = True,
-) -> ResourcesFactory:
-    """Create a resources factory for the NGSIM dataset."""
+) -> MapProviderFactory:
+    """Create a map-provider factory for the NGSIM dataset."""
     return single_shared_map_resource_factory(
         map_path=lambda root: root,
         build_map=lambda path, config: HighwayLaneMapBuilder.from_csv(
@@ -63,7 +66,7 @@ DATASET_DESCRIPTORS = {
         loader_cls=NGSimLoader,
         default_config=_DEFAULT_CONFIG,
         native_schema=NGSimLoader.native_trajectory_schema(),
-        resources_factory=ngsim_resources(
+        map_provider_factory=ngsim_resources(
             LaneDescription(ids=list(range(1, 8)), direction=[True] * 7)
         ),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
@@ -77,7 +80,7 @@ DATASET_DESCRIPTORS = {
         loader_cls=NGSimLoader,
         default_config=_DEFAULT_CONFIG,
         native_schema=NGSimLoader.native_trajectory_schema(),
-        resources_factory=ngsim_resources(
+        map_provider_factory=ngsim_resources(
             LaneDescription(ids=list(range(1, 9)), direction=[True] * 8)
         ),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),

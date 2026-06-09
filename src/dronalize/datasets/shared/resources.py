@@ -1,4 +1,4 @@
-"""Shared helpers for dataset resource factories."""
+"""Shared helpers for dataset map-provider factories."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 from dronalize.config.models import MapConfig, ScenesConfig
 from dronalize.core.maps import MapGraph
-from dronalize.processing.loading.models import DatasetRunResources
 from dronalize.processing.maps import MapProvider, SharedMapProvider, apply_map_config, extract_fn
 
 if TYPE_CHECKING:
@@ -20,8 +19,8 @@ if TYPE_CHECKING:
 MapBuilder = Callable[[Path, MapConfig], MapGraph]
 NamedPathsFactory = Callable[[Path], Iterable[tuple[str | None, Path]]]
 SinglePathFactory = Callable[[Path], Path]
-ResourcesFactory = Callable[
-    [Path, ScenesConfig, MapConfig | None], AbstractContextManager[DatasetRunResources]
+MapProviderFactory = Callable[
+    [Path, ScenesConfig, MapConfig | None], AbstractContextManager[MapProvider | None]
 ]
 
 
@@ -31,10 +30,10 @@ def open_named_shared_map_resources(
     map_config: MapConfig | None,
     named_paths: Iterable[tuple[str | None, Path]],
     build_map: MapBuilder,
-) -> Generator[DatasetRunResources]:
+) -> Generator[MapProvider | None]:
     """Open shared-memory map resources keyed by explicit names."""
     if map_config is None:
-        yield DatasetRunResources()
+        yield None
         return
 
     handles: list[SharedMemory] = []
@@ -45,11 +44,8 @@ def open_named_shared_map_resources(
         mappings[key] = handle.name
 
     try:
-        yield DatasetRunResources(
-            map_provider=SharedMapProvider(
-                shared_names=mappings, extractor=extract_fn(map_config.extraction)
-            )
-        )
+        yield SharedMapProvider(shared_names=mappings, extractor=extract_fn(map_config.extraction))
+
     finally:
         for handle in handles:
             handle.close()
@@ -59,18 +55,16 @@ def open_named_shared_map_resources(
 @contextmanager
 def open_single_shared_map_resource(
     *, map_config: MapConfig | None, map_path: Path, build_map: MapBuilder
-) -> Generator[DatasetRunResources]:
+) -> Generator[MapProvider | None]:
     """Open a single shared-memory map resource."""
     if map_config is None:
-        yield DatasetRunResources()
+        yield None
         return
 
     handle = apply_map_config(build_map(map_path, map_config), map_config).to_shared()
     try:
-        yield DatasetRunResources(
-            map_provider=SharedMapProvider(
-                shared_names=handle.name, extractor=extract_fn(map_config.extraction)
-            )
+        yield SharedMapProvider(
+            shared_names=handle.name, extractor=extract_fn(map_config.extraction)
         )
     finally:
         handle.close()
@@ -79,55 +73,54 @@ def open_single_shared_map_resource(
 
 def named_shared_map_resources_factory(
     *, named_paths: NamedPathsFactory, build_map: MapBuilder
-) -> ResourcesFactory:
-    """Return a registry resource factory for named shared maps."""
+) -> MapProviderFactory:
+    """Return a registry map-provider factory for named shared maps."""
 
     @contextmanager
     def _factory(
         root: Path, scenes: ScenesConfig, map_config: MapConfig | None
-    ) -> Generator[DatasetRunResources]:
+    ) -> Generator[MapProvider | None]:
         _ = scenes
         with open_named_shared_map_resources(
             map_config=map_config, named_paths=named_paths(root), build_map=build_map
-        ) as resources:
-            yield resources
+        ) as map_provider:
+            yield map_provider
 
     return _factory
 
 
 def single_shared_map_resource_factory(
     *, map_path: SinglePathFactory, build_map: MapBuilder
-) -> ResourcesFactory:
-    """Return a registry resource factory for one shared map."""
+) -> MapProviderFactory:
+    """Return a registry map-provider factory for one shared map."""
 
     @contextmanager
     def _factory(
         root: Path, scenes: ScenesConfig, map_config: MapConfig | None
-    ) -> Generator[DatasetRunResources]:
+    ) -> Generator[MapProvider | None]:
         _ = scenes
         with open_single_shared_map_resource(
             map_config=map_config, map_path=map_path(root), build_map=build_map
-        ) as resources:
-            yield resources
+        ) as map_provider:
+            yield map_provider
 
     return _factory
 
 
-MapProviderFactory = Callable[[Path, MapConfig], MapProvider]
-
-
-def map_provider_resources_factory(*, create: MapProviderFactory) -> ResourcesFactory:
-    """Return a resources factory that installs a per-run MapProvider."""
+def map_provider_resources_factory(
+    *, create: Callable[[Path, MapConfig], MapProvider]
+) -> MapProviderFactory:
+    """Return a map-provider factory that installs a per-run `MapProvider`."""
 
     @contextmanager
     def _factory(
         root: Path, scenes: ScenesConfig, map_config: MapConfig | None
-    ) -> Generator[DatasetRunResources]:
+    ) -> Generator[MapProvider | None]:
         _ = scenes
 
         if map_config is None:
-            yield DatasetRunResources()
+            yield None
             return
-        yield DatasetRunResources(map_provider=create(root, map_config))
+        yield create(root, map_config)
 
     return _factory

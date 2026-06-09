@@ -37,5 +37,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     temporal_support=temporal_support(
         source_unit="scenario", min_frames=50, max_frames=110, enabled_by_default=False
     ),
-    resources_factory=_open_argoverse2_resources,
+    map_provider_factory=_open_argoverse2_resources,
 )

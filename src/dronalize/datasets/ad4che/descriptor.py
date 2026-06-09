@@ -44,5 +44,5 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     temporal_support=temporal_support(
         source_unit="recording", min_frames=1136, max_frames=9821, enabled_by_default=True
     ),
-    resources_factory=_open_ad4che_resources,
+    map_provider_factory=_open_ad4che_resources,
 )

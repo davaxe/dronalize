@@ -2,7 +2,6 @@
 
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import (
-    DatasetRunResources,
     DatasetSource,
     LoadedSourceFrame,
     LoaderOptionsModel,
@@ -10,7 +9,6 @@ from dronalize.processing.loading.models import (
 )
 
 __all__ = [
-    "DatasetRunResources",
     "DatasetSource",
     "LoadedSourceFrame",
     "LoaderOptionsModel",

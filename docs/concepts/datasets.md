@@ -19,7 +19,7 @@ integration contract:
 - `supported_native_splits` when the dataset ships with fixed partitions
 - `feature_support` for explicit optional capabilities such as map data and lane-change sampling
 - `loader_options_model` for typed `[datasets.<name>.loader_options]` config
-- `resources_factory` for run-scoped shared resources such as maps
+- `map_provider_factory` for run-scoped map-provider initialization
 - `split_support` when scene-, source-, or time-based split modes are valid
 
 This is why configuration often starts small: the dataset already provides a meaningful default
