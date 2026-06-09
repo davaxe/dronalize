@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from dronalize.core.scene import TrajectorySchema
-    from dronalize.processing.loading.models import DatasetRunResources
+    from dronalize.processing.maps import MapProvider
     from dronalize.processing.models import LoaderPlan
 
 
@@ -147,12 +147,11 @@ class StandardLevelXLoader(LevelXDataLoader):
     """Loader for LevelX datasets that store recordings under a ``data`` directory."""
 
     def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
+        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> None:
-        super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
+        super().__init__(
+            data_root=Path(data_root) / "data", request=request, map_provider=map_provider
+        )
 
 
 class ExiDLoader(StandardLevelXLoader):
@@ -177,12 +176,11 @@ class HighDLoader(LevelXDataLoader):
     """Loader for the highD dataset."""
 
     def __init__(
-        self,
-        data_root: Path | str,
-        request: LoaderPlan,
-        resources: DatasetRunResources | None = None,
+        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
     ) -> None:
-        super().__init__(data_root=Path(data_root) / "data", request=request, resources=resources)
+        super().__init__(
+            data_root=Path(data_root) / "data", request=request, map_provider=map_provider
+        )
 
     @staticmethod
     @override

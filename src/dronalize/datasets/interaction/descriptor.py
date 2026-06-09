@@ -39,7 +39,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     ),
     native_schema=InteractionLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
-    resources_factory=_open_interaction_resources,
+    map_provider_factory=_open_interaction_resources,
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
     temporal_support=temporal_support(

@@ -4,4 +4,4 @@
 
 ## ::: dronalize.datasets.registry.DatasetSplitSupport
 
-## ::: dronalize.datasets.ResourcesFactory
+## ::: dronalize.datasets.shared.resources.MapProviderFactory

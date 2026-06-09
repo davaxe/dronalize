@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from typing_extensions import Self
 
 from dronalize.core.typing import SourceId, SourceT
-from dronalize.processing.maps import MapProvider, MapReference
+from dronalize.processing.maps import MapReference
 
 if TYPE_CHECKING:
     import polars as pl
@@ -24,13 +24,6 @@ class LoadedSourceFrame:
     frame: pl.LazyFrame
     map_reference: MapReference = field(default_factory=MapReference)
     source_split: DatasetSplit | None = None
-
-
-@dataclass(slots=True, frozen=True)
-class DatasetRunResources:
-    """Shared resources prepared once for a processing run."""
-
-    map_provider: MapProvider | None = None
 
 
 @dataclass(slots=True, frozen=True)

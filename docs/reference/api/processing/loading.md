@@ -10,8 +10,6 @@
 
 ## ::: dronalize.processing.loading.NoLoaderOptions
 
-## ::: dronalize.processing.loading.DatasetRunResources
-
 ## ::: dronalize.processing.loading.DatasetSource
 
 ## ::: dronalize.processing.loading.LoadedSourceFrame

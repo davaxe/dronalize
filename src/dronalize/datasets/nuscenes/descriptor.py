@@ -42,7 +42,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     ),
     loader_options_model=NuScenesLoaderOptions,
     native_schema=NuScenesLoader.native_trajectory_schema(),
-    resources_factory=_open_nuscenes_resources,
+    map_provider_factory=_open_nuscenes_resources,
     feature_support=DatasetFeatureSupport(map=True),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     split_support=DatasetSplitSupport(scene=True, source=True),

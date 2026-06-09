@@ -37,7 +37,7 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
         map=MapConfig(extraction=FullMapExtraction()),
     ),
     native_schema=SindLoader.native_trajectory_schema(),
-    resources_factory=_open_sind_resources,
+    map_provider_factory=_open_sind_resources,
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
     temporal_support=temporal_support(

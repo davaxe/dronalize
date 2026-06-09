@@ -9,9 +9,9 @@ The dataset API is intentionally small:
 - [`register_dataset`][dronalize.datasets.register_dataset] adds a custom dataset descriptor to
   the in-memory registry
 
-Use [`ResourcesFactory`][dronalize.datasets.ResourcesFactory] when authoring
-dataset integrations that need shared per-run state such as cached metadata or
-map stores.
+Use
+[`MapProviderFactory`][dronalize.datasets.shared.resources.MapProviderFactory]
+when authoring dataset integrations that need run-scoped map-provider setup.
 """
 
 from dronalize.config.models import MapConfig, ScenesConfig
@@ -21,22 +21,18 @@ from dronalize.datasets.registry import (
     DatasetTemporalSupport,
     DatasetWindowingSupport,
     FrameBounds,
-    ResourcesFactory,
     get_dataset,
     list_datasets,
     register_dataset,
 )
-from dronalize.processing.loading import DatasetRunResources
 
 __all__ = [
     "DatasetDescriptor",
     "DatasetFeatureSupport",
-    "DatasetRunResources",
     "DatasetTemporalSupport",
     "DatasetWindowingSupport",
     "FrameBounds",
     "MapConfig",
-    "ResourcesFactory",
     "ScenesConfig",
     "get_dataset",
     "list_datasets",
