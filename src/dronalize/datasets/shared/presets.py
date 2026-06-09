@@ -33,11 +33,11 @@ def combine_screenings(*screenings: ScreeningConfig) -> ScreeningConfig:
     for screening in screenings:
         if screening.cleanup:
             combined_cleanup.update(screening.cleanup)
-        if screening.agent:
-            combined_agent.update(screening.agent)
-        if screening.scene:
-            combined_scene.update(screening.scene)
-    return ScreeningConfig(cleanup=combined_cleanup, agent=combined_agent, scene=combined_scene)
+        if screening.agents:
+            combined_agent.update(screening.agents)
+        if screening.scenes:
+            combined_scene.update(screening.scenes)
+    return ScreeningConfig(cleanup=combined_cleanup, agents=combined_agent, scenes=combined_scene)
 
 
 def exclude_category_screening(*category: AgentCategory) -> ScreeningConfig:
@@ -92,7 +92,7 @@ def require_frames_screening(
         else None
     )
     return ScreeningConfig(
-        agent={"require_frames": RequireFramesSpec(frames=frames, require=require)}
+        agents={"require_frames": RequireFramesSpec(frames=frames, require=require)}
     )
 
 

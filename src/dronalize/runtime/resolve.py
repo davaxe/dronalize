@@ -204,8 +204,9 @@ def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBa
 def _resolve_dataset_config(
     *, descriptor: DatasetDescriptor, config_path: Path | None, cli_override: RuntimeOverride
 ) -> DatasetConfig:
-    project = parse_config(config_path) if config_path is not None else ProjectConfig()
+    project = parse_config(config_path) if config_path else ProjectConfig()
     defaults = descriptor.default_config
     config = project.resolve_dataset_config(descriptor.name, defaults)
+    config = cli_override.merge_into(config)
     logger.debug("Resolved dataset config", extra={"dataset": descriptor.name})
-    return cli_override.merge_into(None).merge_into(config)
+    return config
