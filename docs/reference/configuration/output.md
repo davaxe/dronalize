@@ -6,7 +6,7 @@ Output settings control what is persisted after preprocessing. In practice, this
 
 | Key | Type | Description | Default |
 |---|---|---|---|
-| `schema` | `str` or `table` | Output trajectory schema to persist. Use either a built-in trajectory schema name or a structured custom trajectory schema definition. | `"canonical"` |
+| `trajectory_schema` | `str` or `table` | Output trajectory schema to persist. Use either a built-in trajectory schema name or a structured custom trajectory schema definition. | `"canonical"` |
 | `precision` | `"float32"` or `"float64"` | Floating-point precision of persisted data. | `"float32"` |
 | `recenter_positions` | `bool` | Offset all agent positions by the scene mean before writing. The offset is stored in the output. | `true` |
 
@@ -30,7 +30,7 @@ This nested block only matters when writing MDS output and is used to tune shard
 
 ```toml
 [datasets.a43.output]
-schema = "positions_velocity_yaw"
+trajectory_schema = "positions_velocity_yaw"
 precision = "float64"
 recenter_positions = true
 
@@ -41,8 +41,8 @@ size_limit = 33554432
 exist_ok = true
 ```
 
-The canonical concept is the trajectory schema. The config key remains
-`output.schema` as the concise TOML alias for the output trajectory schema.
+The canonical concept is the trajectory schema, and the TOML key is
+`output.trajectory_schema`.
 
 To use a custom trajectory schema instead of a built-in one, define it with a
 table. Custom trajectory schemas must include the base fields
@@ -50,7 +50,7 @@ table. Custom trajectory schemas must include the base fields
 
 ```toml
 [datasets.a43.output]
-schema = { name = "custom", fields = ["frame", "id", "agent_category", "x", "y", "vx", "vy"] }
+trajectory_schema = { name = "custom", fields = ["frame", "id", "agent_category", "x", "y", "vx", "vy"] }
 precision = "float64"
 recenter_positions = true
 ```

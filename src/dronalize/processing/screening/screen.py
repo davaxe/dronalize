@@ -137,8 +137,8 @@ class ScreeningRuleSet:
         """Return a ScreeningRuleSet instance compiled from a ScreeningConfig."""
         return cls.define(
             cleanup_rules=_CleanupRuleCompiler.compile(config.cleanup),
-            scene_rules=_SceneCheckRuleCompiler.compile(config.scene),
-            agent_rules=_AgentCheckRuleCompiler.compile(config.agent),
+            scene_rules=_SceneCheckRuleCompiler.compile(config.scenes),
+            agent_rules=_AgentCheckRuleCompiler.compile(config.agents),
         )
 
 

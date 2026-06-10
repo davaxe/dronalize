@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Mapping, MutableMapping
-from typing import TYPE_CHECKING, ClassVar, Generic, Literal, TypeAlias, TypeVar, cast
+from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, TypeAlias, TypeVar, cast
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from typing_extensions import Any, override
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from typing_extensions import Any, TypeAliasType, override
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -203,3 +203,16 @@ class MappingPatch(ConfigBase, Generic[ValueT]):
 
 class DictPatch(MappingPatch[object]):
     """Patch operation for arbitrary string-keyed dictionaries."""
+
+
+def _clear_shorthand(value: object) -> object:
+    if value == "clear":
+        return {"op": "clear"}
+    return value
+
+
+T = TypeVar("T")
+
+Clearable = TypeAliasType(
+    "Clearable", Annotated[T | Clear | None, BeforeValidator(_clear_shorthand)], type_params=(T,)
+)

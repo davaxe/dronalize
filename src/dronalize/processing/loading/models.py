@@ -24,6 +24,7 @@ class LoadedSourceFrame:
     frame: pl.LazyFrame
     map_reference: MapReference = field(default_factory=MapReference)
     source_split: DatasetSplit | None = None
+    ego_agent_id: int | None = None
 
 
 @dataclass(slots=True, frozen=True)

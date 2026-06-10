@@ -12,12 +12,7 @@ from typing_extensions import TypedDict
 from dronalize.core.categories import AgentCategory
 from dronalize.core.typing import FloatScalarT
 from dronalize.datasets.registry import dataset_id_for_name
-from dronalize.io.records import (
-    SceneRecord,
-    SplitSceneRecord,
-    make_scene_record,
-    split_scene_record,
-)
+from dronalize.io.records import SceneRecord, SplitSceneRecord
 
 if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
@@ -131,7 +126,7 @@ def encode_scene_record(
         )
 
     map_record = encode_map_from_scene(scene, dtype=dtype, offset=offset)
-    return make_scene_record(
+    return SceneRecord(
         scene_number=scene.scene_number,
         position_offset=offset,
         agent_types=agent_types,
@@ -144,6 +139,7 @@ def encode_scene_record(
         map_edge_types=map_record["map_edge_types"],
         dataset_id=_resolve_dataset_id(scene.dataset, explicit_dataset_id=dataset_id),
         default_observation_length=default_observation_length,
+        ego_agent_id=scene.ego_agent_id,
     )
 
 
@@ -196,7 +192,7 @@ def encode_split_scene_record(
         trajectory_schema=trajectory_schema,
         category_mapping=category_mapping,
     )
-    return split_scene_record(record, observation_length=observation_length)
+    return record.split(observation_length)
 
 
 @overload

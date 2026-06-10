@@ -44,7 +44,7 @@ Use `[defaults]` for shared policy that should affect every dataset resolved fro
 jobs = 8
 
 [defaults.output]
-schema = "canonical"
+trajectory_schema = "canonical"
 precision = "float32"
 recenter_positions = true
 
@@ -101,7 +101,7 @@ You can combine multiple profiles:
 jobs = "auto"
 
 [profiles.high_precision.output]
-schema = "positions_velocity_yaw"
+trajectory_schema = "positions_velocity_yaw"
 precision = "float64"
 
 [datasets.a43]
@@ -115,7 +115,7 @@ uses = ["fast", "high_precision"]
 jobs = "auto"
 
 [defaults.output]
-schema = "canonical"
+trajectory_schema = "canonical"
 precision = "float32"
 recenter_positions = true
 

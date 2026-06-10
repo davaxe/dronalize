@@ -9,9 +9,9 @@ The scenes config describes how raw trajectory data becomes model-ready scenes. 
 | `horizon_frames` | `int` | Configured scene-window length before optional resampling. | `dataset default` |
 | `default_observation_length` | `int` or omitted | Optional default observation length for reader/adaptor convenience. | `dataset default` |
 | `sample_time` | `float` | Time between frames before resampling. | `dataset default` |
-| `window` | `table` or `false` | Sliding-window extraction settings. Use `false` to disable an inherited window block. | `inherited` |
-| `resample` | `table` or `false` | Temporal resampling and interpolation settings. Use `false` to disable an inherited resample block. | `inherited` |
-| `lane_change` | `table` or `false` | Lane-change sampling controls for highway-style datasets. Use `false` to disable an inherited lane-change block. | `inherited` |
+| `window` | `table` or `"clear"` | Sliding-window extraction settings. Use `"clear"` to disable an inherited window block. | `inherited` |
+| `resample` | `table` or `"clear"` | Temporal resampling and interpolation settings. Use `"clear"` to disable an inherited resample block. | `inherited` |
+| `lane_change` | `table` or `"clear"` | Lane-change sampling controls for highway-style datasets. Use `"clear"` to disable an inherited lane-change block. | `inherited` |
 
 The `scenes` block merges into the dataset's built-in scene config, so several effective defaults
 are dataset-specific rather than global.
@@ -140,11 +140,11 @@ down = 1
 method = "cubic"
 ```
 
-To disable an inherited optional block instead of overriding it, set the key to `false` on the
+To disable an inherited optional block instead of overriding it, set the key to `"clear"` on the
 parent `[...scenes]` table:
 
 ```toml
 [datasets.highd.scenes]
-resample = false
-lane_change = false
+resample = "clear"
+lane_change = "clear"
 ```

@@ -10,11 +10,10 @@ import pytest
 
 from dronalize.io import DatasetManifest, read_manifest
 from dronalize.io.backends.pickle import PickleWriter
-from dronalize.io.encoding import encode_scene_record, encode_split_scene_record
+from dronalize.io.encoding import encode_scene_record
 from dronalize.io.encoding.mds import decode_mds_row, encode_mds_row
 from dronalize.io.manifest import write_manifest
 from dronalize.io.readers import PickleReader
-from dronalize.io.records import join_split_scene_record, split_scene_record
 from tests.support import assert_scene_record_equal, output_plan
 
 if TYPE_CHECKING:
@@ -36,28 +35,11 @@ class CustomPickleRecord:
     source: str
 
 
-def test_split_helpers_roundtrip(scene: Scene) -> None:
-    scene = replace(scene, dataset="demo")
-    record = encode_scene_record(scene, dtype=np.float64)
-    split = encode_split_scene_record(scene, dtype=np.float64, observation_length=2)
-
-    rebuilt = split_scene_record(record, observation_length=2)
-    rejoined = join_split_scene_record(split)
-
-    np.testing.assert_allclose(record.features, rejoined.features)
-    np.testing.assert_array_equal(record.mask, rejoined.mask)
-    np.testing.assert_allclose(split.history_features, rebuilt.history_features)
-    np.testing.assert_allclose(split.future_features, rebuilt.future_features)
-    assert rebuilt.dataset_id == 0
-    assert rejoined.dataset_id == 0
-    assert record.dataset_id == 0
-
-
 def test_split_scene_record_rejects_bad_length(scene: Scene) -> None:
     record = encode_scene_record(scene, dtype=np.float64)
 
     with pytest.raises(ValueError, match="observation_length"):
-        _ = split_scene_record(record, observation_length=record.horizon_frames + 1)
+        _ = record.split(observation_length=record.horizon_frames + 1)
 
 
 def test_encode_scene_record_uses_passed_ids(scene: Scene) -> None:
@@ -164,6 +146,7 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
     reader = MDSReader(path=output_dir)
     assert len(reader) == 1
+    assert reader[0].ego_agent_id == 10
     assert_scene_record_equal(reader[0], expected)
 
 

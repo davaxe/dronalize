@@ -52,6 +52,7 @@ class SceneCandidate:
     map_reference: MapReference = field(default_factory=MapReference)
     passed_agent_ids: frozenset[int] | None = None
     split_assignment: DatasetSplit | None = None
+    ego_agent_id: int | None = None
 
 
 class SplitAssigner:
@@ -156,7 +157,7 @@ class RuntimeProcessor:
     def screening_enabled(self) -> bool:
         """Return whether screening is enabled for this processor."""
         config = self.loader.screening_config
-        return config is not None and bool(config.cleanup or config.agent or config.scene)
+        return config is not None and bool(config.cleanup or config.agents or config.scenes)
 
     def iter_candidates(self, source: DatasetSource[Any]) -> Iterable[SceneCandidate]:
         """Iterate scene candidates for one DatasetSource."""
@@ -182,6 +183,7 @@ class RuntimeProcessor:
                         cleanup_stats=screening.cleanup,
                         map_reference=data.map_reference,
                         passed_agent_ids=screening.passed_agent_ids,
+                        ego_agent_id=data.ego_agent_id,
                     )
                 else:
                     for output_frame in stages.iter_output_frames(screening.frame):
@@ -199,8 +201,8 @@ class RuntimeProcessor:
                             map_reference=data.map_reference,
                             passed_agent_ids=screening.passed_agent_ids,
                             split_assignment=split_assignment,
+                            ego_agent_id=data.ego_agent_id,
                         )
-
                 source_local_scene_index += 1
 
     def materialize(self, candidate: SceneCandidate, scene_number: int) -> Scene:

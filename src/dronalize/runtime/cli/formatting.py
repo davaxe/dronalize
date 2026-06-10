@@ -333,8 +333,8 @@ def _format_screening_rules(config: ScreeningConfig | None) -> str:
         f"{label}: {', '.join(rules)}"
         for label, rules in (
             ("cleanup", config.cleanup),
-            ("scene", config.scene),
-            ("agent", config.agent),
+            ("scene", config.scenes),
+            ("agent", config.agents),
         )
         if rules
     ]

@@ -32,7 +32,7 @@ Most useful config lives in nested blocks under one of those roots:
 jobs = 4
 
 [defaults.output]
-schema = "canonical"
+trajectory_schema = "canonical"
 precision = "float32"
 
 [profiles.fast.runtime]
@@ -47,7 +47,7 @@ default_observation_length = 20
 sample_time = 0.1
 
 [datasets.a43.output]
-schema = "positions_velocity_yaw"
+trajectory_schema = "positions_velocity_yaw"
 precision = "float64"
 ```
 
@@ -91,16 +91,16 @@ The reference pages describe the file format only, but the values are resolved i
 That matters because many fields do not start from a single hard-coded default. Instead, they begin from the dataset's built-in runtime config and are then overridden or merged by the configuration file.
 
 For optional inherited blocks such as `screening`, `scenes.window`, `scenes.resample`, and
-`scenes.lane_change`, you can explicitly disable the inherited block with `false` on the parent
+`scenes.lane_change`, you can explicitly disable the inherited block with `"clear"` on the parent
 table instead of inheriting it:
 
 ```toml
 [datasets.highd]
-screening = false
+screening = "clear"
 
 [datasets.highd.scenes]
-resample = false
-lane_change = false
+resample = "clear"
+lane_change = "clear"
 ```
 
 When you need to know what a specific dataset starts with, or whether it exposes dataset-specific behavior beyond the generic config tables here, check the [dataset reference](../datasets/index.md).
@@ -143,7 +143,7 @@ The page titles use TOML path notation:
 jobs = "auto"
 
 [defaults.output]
-schema = "canonical"
+trajectory_schema = "canonical"
 precision = "float32"
 recenter_positions = true
 

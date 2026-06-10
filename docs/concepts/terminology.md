@@ -55,7 +55,7 @@ This page defines the terms used across `dronalize` docs, configuration, and pub
 
 | Term | Definition |
 | --- | --- |
-| Trajectory schema | The canonical concept for trajectory fields and feature conversion. In TOML, `output.schema` is the concise config key for the output trajectory schema. |
+| Trajectory schema | The canonical concept for trajectory fields and feature conversion. In TOML, `output.trajectory_schema` is the config key for the output trajectory schema. |
 | `agent_category` | Semantic DataFrame column containing the agent category before encoding. |
 | `agent_types` | Encoded per-agent integer array in `SceneRecord`. |
 | `EdgeType` and map node types | Semantic map labels used while constructing map graphs. |

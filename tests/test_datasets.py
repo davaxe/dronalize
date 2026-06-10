@@ -45,8 +45,8 @@ def test_builtin_screening_requires_observation_end(name: str) -> None:
 
     assert screening is not None
     assert "min_observations" in screening.cleanup
-    assert "require_frames" in screening.agent
-    rule = screening.agent["require_frames"]
+    assert "require_frames" in screening.agents
+    rule = screening.agents["require_frames"]
     assert isinstance(rule, RequireFramesSpec)
     assert descriptor.default_config.scenes.default_observation_length is not None
     assert rule.frames == (descriptor.default_config.scenes.default_observation_length - 1,)
@@ -135,7 +135,5 @@ def test_datasets_mocked_registry_smoke(
         limit=2,
     )
     plan = resolve_request(request)
-
     result = assert_plan_scene_outputs(plan, dataset_name="demo")
-
     assert result.checked_scenes > 0

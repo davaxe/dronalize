@@ -131,7 +131,7 @@ def test_resolve_request_requires_window_for_lane_change(
     _ = config_path.write_text(
         """
 [datasets.demo.scenes]
-window = false
+window = { op = "clear" }
 
 [datasets.demo.scenes.lane_change]
 persist = 3
@@ -412,7 +412,6 @@ def test_cli_commands_smoke(tmp_path: Path, name: str) -> None:
         }
         args = args_by_command[name]
         result = runner.invoke(app, args)
-
         assert result.exit_code == 0, f"{name} failed: {result.output}"
 
 
