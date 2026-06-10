@@ -1,8 +1,6 @@
 # `[map]` section
 
-<div class="section-intro" markdown="1">
 Map settings control how map data is processed when a run includes maps. The most important choice here is usually the extraction mode.
-</div>
 
 | Key | Type | Description | Default |
 |---|---|---|---|

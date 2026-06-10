@@ -1,9 +1,7 @@
 # `[read]` section
 
-<div class="section-intro" markdown="1">
 Read settings control which raw dataset inputs are loaded before any scene
 assignment or output writing happens.
-</div>
 
 | Key | Type | Description | Default |
 |---|---|---|---|

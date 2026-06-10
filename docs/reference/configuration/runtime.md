@@ -1,8 +1,6 @@
 # `[runtime]` section
 
-<div class="section-intro" markdown="1">
 Runtime settings control how work is distributed while processing. In most cases, this section is only about how many workers to use and whether work should be batched.
-</div>
 
 | Key | Type | Description | Default |
 |---|---|---|---|

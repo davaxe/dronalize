@@ -12,38 +12,11 @@ nav = [
   { Home = "index.md" },
 
   { Start = [
-    "start/index.md",
     { Installation = "start/installation.md" },
     { "First run (CLI)" = "start/first-run-cli.md" },
     { "Python entry" = "start/python-entry.md" },
-    { "Adding datasets" = "start/adding-datasets.md" },
-    { Changelog = "start/changelog.md" },
-    { Citation = "start/citation.md" },
-  ] },
-
-  { Concepts = [
-    "concepts/index.md",
-    { Terminology = "concepts/terminology.md" },
-    { "Configuration model" = "concepts/configuration-model.md" },
-    { "Split strategies" = "concepts/split-strategies.md" },
-    { "Screening scenes" = "concepts/screening.md" },
-    { "Map processing" = "concepts/map-processing.md" },
-    { Datasets = "concepts/datasets.md" },
-    { "Lane-change sampling" = "concepts/lane-change-sampling.md" },
-    { "Architecture overview" = "concepts/architecture.md" },
-  ] },
-
-  { "Data formats" = [
-    "formats/index.md",
-    { "Scene schema" = "formats/schema.md" },
-    { Manifest = "formats/manifest.md" },
-    { "Reading datasets" = "formats/reading.md" },
-    { "Storage backends" = [
-      "formats/backends/index.md",
-      { "MDS backend" = "formats/backends/mds.md" },
-      { "Pickle backend" = "formats/backends/pickle.md" },
-      { "Null backend" = "formats/backends/null.md" },
-    ] },
+    { "Reading data" = "start/reading.md" },
+    {  "Scene schema" = "start/schema.md" }
   ] },
 
   { "Configuration reference" = [
@@ -91,8 +64,6 @@ nav = [
     { Overview = "reference/api/index.md" },
     { "Core types" = [
       "reference/api/core/index.md",
-      { "Scene models and schemas" = "reference/api/core/scene.md" },
-      { "Map graphs" = "reference/api/core/maps.md" },
     ] },
     { Configuration = [
       "reference/api/config/index.md",
@@ -110,7 +81,6 @@ nav = [
     { Processing = [
       "reference/api/processing/index.md",
       { Screening = "reference/api/processing/screening.md" },
-      { "Map processing" = "reference/api/processing/maps.md" },
       { "Loader extension API" = "reference/api/processing/loading.md" },
     ] },
     { "I/O" = [
@@ -122,6 +92,7 @@ nav = [
       "reference/api/visualization/index.md",
     ] },
   ] },
+  { Citation =  "citation.md" }
 ]
 
 [project.theme]

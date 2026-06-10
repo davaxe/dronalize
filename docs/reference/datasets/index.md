@@ -1,8 +1,6 @@
 # Dataset reference
 
-<div class="section-intro" markdown="1">
 This section gives a high-level reference for the datasets supported by `dronalize`. Each page summarizes what a dataset is, the kind of traffic it captures, the expected structure on disk, and where to find the original paper or dataset source.
-</div>
 
 ## At a glance
 

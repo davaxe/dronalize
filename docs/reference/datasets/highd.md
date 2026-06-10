@@ -1,8 +1,6 @@
 # highD
 
-<div class="section-intro" markdown="1">
 highD is a widely used naturalistic highway trajectory dataset collected from drones over German freeways. It became a foundational benchmark for lane-level traffic analysis, safety validation, and highway motion prediction.
-</div>
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Highway</strong></div>
@@ -15,7 +13,7 @@ highD is a widely used naturalistic highway trajectory dataset collected from dr
 
 ## Default processing profile
 
-These are the default Dronalize settings used when processing this dataset.
+Default processing settings for this dataset.
 
 | Setting | Default |
 | ------- | ------- |
@@ -31,7 +29,7 @@ These are the default Dronalize settings used when processing this dataset.
 
 ## Dataset compatibility
 
-Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+Expected raw data layout for this loader.
 
 | Field | Value |
 | ----- | ----- |
@@ -58,7 +56,7 @@ Dronalize targets the release or raw layout below. If you have an older or newer
 
 ## Split support
 
-Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom split strategies, and any recommended strategy.
+Use the CLI for current native split and assignment support.
 
 ```bash
 dronalize split-support highd

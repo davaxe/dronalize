@@ -43,42 +43,42 @@ uv pip install dronalize
 
 <div class="grid cards" markdown>
 
--   [:material-rocket-launch:{ .lg .middle } __Start here__](start/index.md)
+-   [:material-rocket-launch:{ .lg .middle } __Install__](start/installation/)
 
     ---
 
-    Install `dronalize`, run the CLI once, and choose whether your workflow starts from the terminal or Python.
+    Install `dronalize` and the optional extras needed for your datasets, readers, and training stack.
 
 
--   [:material-source-branch:{ .lg .middle } __Concepts__](concepts/index.md)
-
-    ---
-
-    Understand how dataset descriptors, configuration layers, screening, splits, maps, and outputs fit together.
-
-
--   [:material-database:{ .lg .middle } __Data formats__](formats/index.md)
+-   [:material-terminal:{ .lg .middle } __First CLI run__](start/first-run-cli/)
 
     ---
 
-    See how processed scenes are stored, what the manifest contains, and which backend or reader model fits your use case.
+    Inspect a dataset, preview resolved configuration, and run `process --plan` before writing outputs.
 
 
--   [:material-map-search:{ .lg .middle } __Dataset reference__](reference/datasets/index.md)
+-   [:material-language-python:{ .lg .middle } __Python usage__](start/python-entry/)
+
+    ---
+
+    Use the public Python API to inspect datasets, resolve config, plan runs, and execute processing.
+
+
+-   [:material-map-search:{ .lg .middle } __Dataset reference__](reference/datasets/)
 
     ---
 
     Browse supported datasets, expected on-disk structure, and source links before preparing raw data locally.
 
 
--   [:material-tune:{ .lg .middle } __Configuration reference__](reference/configuration/index.md)
+-   [:material-tune:{ .lg .middle } __Configuration reference__](reference/configuration/)
 
     ---
 
     Look up the TOML config surface, section layout, and field behavior when you need exact option details.
 
 
--   [:material-api:{ .lg .middle } __API reference__](reference/api/index.md)
+-   [:material-api:{ .lg .middle } __API reference__](reference/api/)
 
     ---
 

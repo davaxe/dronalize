@@ -1,8 +1,6 @@
 # Installation
 
-<div class="section-intro" markdown="1">
 The base `dronalize` package is intentionally small. Install it first, then add optional extras for the CLI, MDS storage, Torch/PyG adapters, or dataset-specific loaders when needed. The `viz` extra is currently reserved for future visualization support.
-</div>
 
 ## Requirements
 

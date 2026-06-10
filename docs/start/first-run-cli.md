@@ -1,10 +1,8 @@
 # First run (CLI)
 
-<div class="section-intro" markdown="1">
 The current CLI exposes five commands: `available`, `inspect`, `show-config`, `split-support`, and
 `process`. A good first run is: inspect the dataset, preview the resolved config, then run
 `process --plan` before writing anything.
-</div>
 
 ## Inspect the registry
 

@@ -1,8 +1,6 @@
 # `[output]` section
 
-<div class="section-intro" markdown="1">
 Output settings control what is persisted after preprocessing. In practice, this means choosing the trajectory schema, numeric precision, and any backend-specific output options.
-</div>
 
 | Key | Type | Description | Default |
 |---|---|---|---|

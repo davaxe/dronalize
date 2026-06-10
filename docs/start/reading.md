@@ -1,9 +1,7 @@
 # Reading data
 
-<div class="section-intro" markdown="1">
 `dronalize` readers expose one common in-memory record model across storage backends. This means
 you can switch between `pickle` and `mds` without changing your downstream scene-processing code.
-</div>
 
 ## Reader model
 

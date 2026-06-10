@@ -1,9 +1,7 @@
 # `[assign]` section
 
-<div class="section-intro" markdown="1">
 Assignment settings control how loaded scenes are routed into train, val, and
 test outputs.
-</div>
 
 | Key | Type | Description | Default |
 |---|---|---|---|
