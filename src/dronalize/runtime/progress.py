@@ -83,7 +83,7 @@ class _ExecutorDisplay(RichCast):
         screening = self.state.screening
         return (
             "[bold yellow]Screening:[/bold yellow] "
-            f"passed {screening.passed} / {candidates} "
+            f"{screening.passed} / {candidates} passed "
             f"({_percent(screening.passed, candidates):.1f}%)"
             f" • rejected: {screening.rejected}"
         )

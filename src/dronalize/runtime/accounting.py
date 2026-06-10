@@ -171,8 +171,8 @@ class CleanupAccounting:
 class RunAccounting(Protocol):
     """Bookkeeping backend used by the shared source-to-scene loop."""
 
-    def start_source(self) -> None:
-        """Record that processing started for one source."""
+    def finish_source(self) -> None:
+        """Record that processing finished for one source."""
         ...
 
     def record_candidate(self) -> None:
@@ -218,8 +218,8 @@ class LocalRunAccounting:
     split_counts: SplitCounts = field(default_factory=empty_split_counts)
     cleanup: CleanupAccounting = field(default_factory=CleanupAccounting)
 
-    def start_source(self) -> None:
-        """Record that one source has started processing."""
+    def finish_source(self) -> None:
+        """Record that one source finished processing."""
         self.source_count += 1
         self._changed()
 
@@ -314,9 +314,9 @@ class SharedRunAccounting:
     limit: int | None = None
     cleanup: CleanupAccounting = field(default_factory=CleanupAccounting)
 
-    def start_source(self) -> None:
-        """Record that one source has started processing."""
-        self.progress.increment_source()
+    def finish_source(self) -> None:
+        """Record that one source finished processing."""
+        self.progress.record_processed_source()
 
     def record_candidate(self) -> None:
         """Record one generated candidate scene."""
@@ -360,7 +360,8 @@ def iter_scenes_from_source(
     """Yield materialized scenes for one source while applying bookkeeping.
 
     Cleanup is recorded for candidates considered before the run stops. Scene
-    numbers are claimed only after screening passes.
+    numbers are claimed only after screening passes. A source is counted as
+    processed only after all of its candidates have been extracted.
     """
     for candidate in processor.iter_candidates(source):
         if accounting.limit_reached():
@@ -369,7 +370,6 @@ def iter_scenes_from_source(
         accounting.record_candidate()
         accounting.record_cleanup(candidate.cleanup_stats)
         accounting.record_screening_result(passed=candidate.passes_screening)
-
         if not candidate.passes_screening:
             continue
 
@@ -380,6 +380,7 @@ def iter_scenes_from_source(
         scene = processor.materialize(candidate, scene_number)
         accounting.record_written(scene.split_assignment)
         yield scene
+    accounting.finish_source()
 
 
 def _min_optional(current: int | None, value: int) -> int:
