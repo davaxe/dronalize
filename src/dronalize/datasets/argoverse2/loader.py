@@ -76,6 +76,7 @@ class Argoverse2Loader(SceneLoader[list[Path], Argoverse2LoaderOptions]):
             yield LoadedSourceFrame(
                 frame=group.lazy().drop("file_id"),
                 map_reference=MapReference(map_key=file_to_map.get(str(file_id))),
+                ego_agent_id=0,
             )
 
     @override

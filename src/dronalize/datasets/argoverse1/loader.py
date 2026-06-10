@@ -78,14 +78,21 @@ class Argoverse1Loader(SceneLoader[list[Path], Argoverse1LoaderOptions]):
                 .alias("frame"),
                 pl.col("file_id").cast(pl.Categorical).to_physical(),
             )
-            .drop("OBJECT_TYPE", "TRACK_ID", "TIMESTAMP")
+            .drop("TRACK_ID", "TIMESTAMP")
             .rename({"X": "x", "Y": "y", "CITY_NAME": "map"})
         )
 
         for _, group in batch_lf.collect().group_by(["file_id"]):
+            ego_vehicle_id = int(
+                group
+                .filter(pl.col("agent_category") == AgentCategory.CAR)
+                .select(pl.col("id").first())
+                .item()
+            )
             yield LoadedSourceFrame(
-                frame=group.drop("file_id").lazy(),
+                frame=group.drop("file_id", "OBJECT_TYPE").lazy(),
                 map_reference=MapReference(map_key=str(group["map"].first())),
+                ego_agent_id=ego_vehicle_id,
             )
 
     @override

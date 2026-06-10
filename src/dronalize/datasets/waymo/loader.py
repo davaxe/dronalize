@@ -62,6 +62,7 @@ class WaymoLoader(SceneLoader):
                     map_key=f"{source.identifier}:{scenario_index}",
                     map_payload=raw_data if self.map_config is not None else None,
                 ),
+                ego_agent_id=0,
             )
 
     @classmethod

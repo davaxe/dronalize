@@ -110,7 +110,6 @@ class LyftLoader(SceneLoader[_Source, LyftLoaderOptions]):
         start, end = source.payload.interval
         arrays = self._get_arrays(source.payload.split)
         scenes_np = cast("npt.NDArray[np.void]", arrays.scenes[start:end])
-
         frame_start = np.min(scenes_np[:]["frame_index_interval"])
         frame_end = np.max(scenes_np[:]["frame_index_interval"])
         frames_np = cast("npt.NDArray[np.void]", arrays.frames[frame_start:frame_end])
@@ -126,7 +125,9 @@ class LyftLoader(SceneLoader[_Source, LyftLoaderOptions]):
                     agents=agents_np,
                     frame_offset=frame_start,
                     agent_offset=agent_start,
-                ).lazy()
+                ).lazy(),
+                # Ego agent id is set to zero in _scene_to_polars
+                ego_agent_id=0,
             )
 
     @classmethod
