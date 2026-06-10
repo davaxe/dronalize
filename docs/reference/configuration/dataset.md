@@ -9,4 +9,4 @@ Example for a dataset that supports loader options:
 file_batch_size = 8
 ```
 
-Use `dronalize inspect <dataset>` to see whether a dataset exposes loader options and which option keys it supports by default. The [dataset reference](../datasets/index.md) also documents dataset-specific config when relevant.
+Use `dronalize inspect <dataset>` to see whether a dataset exposes loader options and which option keys it supports by default. The [dataset reference](../datasets/) also documents dataset-specific config when relevant.

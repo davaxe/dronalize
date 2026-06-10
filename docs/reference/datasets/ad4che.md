@@ -1,8 +1,6 @@
 # AD4CHE
 
-<div class="section-intro" markdown="1">
 AD4CHE is an aerial congestion dataset for highway and expressway traffic in China. It is aimed at interaction-heavy congestion scenarios, especially the kinds of cut-ins and traffic-jam behavior that matter for assisted-driving evaluation.
-</div>
 
 <div class="summary-grid">
   <div class="summary-item"><span>Domain</span><strong>Highway traffic</strong></div>
@@ -22,7 +20,7 @@ AD4CHE is an aerial congestion dataset for highway and expressway traffic in Chi
 
 ## Default processing profile
 
-These are the default Dronalize settings used when processing this dataset.
+Default processing settings for this dataset.
 
 | Setting | Default |
 | ------- | ------- |
@@ -38,7 +36,7 @@ These are the default Dronalize settings used when processing this dataset.
 
 ## Dataset compatibility
 
-Dronalize targets the release or raw layout below. If you have an older or newer download, expect breakage when split names, file names, schemas, or map assets differ.
+Expected raw data layout for this loader.
 
 | Field | Value |
 | ----- | ----- |
@@ -63,7 +61,7 @@ Dronalize targets the release or raw layout below. If you have an older or newer
 
 ## Split support
 
-Use the command below for the most up-to-date split support information for this dataset, including native splits, supported custom split strategies, and any recommended strategy.
+Use the CLI for current native split and assignment support.
 
 ```bash
 dronalize split-support ad4che

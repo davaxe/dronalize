@@ -1,9 +1,7 @@
 # Outputs and schemas
 
-<div class="section-intro" markdown="1">
 Output decisions in `dronalize` are easiest to understand as two separate choices: what each scene
 contains, and how those scenes are stored on disk.
-</div>
 
 For exact configuration keys, see the [output reference](../reference/configuration/output.md).
 
@@ -77,7 +75,9 @@ The backend decides what goes inside each split directory:
 - `mds` writes shard files plus `index.json`
 - `null` writes no scene files
 
-Manifest details are documented on the dedicated [Manifest](manifest.md) page.
+The manifest is written as JSON at the output root. It records the produced splits, storage backend,
+feature columns, trajectory schema fields, numeric precision, horizon, default observation length,
+and map availability for the run.
 
 ## Maps in persisted records
 

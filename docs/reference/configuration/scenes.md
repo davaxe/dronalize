@@ -1,8 +1,6 @@
 # `[scenes]` section
 
-<div class="section-intro" markdown="1">
 The scenes config describes how raw trajectory data becomes model-ready scenes. In practice, it controls scene-window length and optional temporal transforms such as windowing and resampling.
-</div>
 
 | Key | Type | Description | Default |
 |---|---|---|---|
@@ -17,7 +15,7 @@ The `scenes` block merges into the dataset's built-in scene config, so several e
 are dataset-specific rather than global.
 
 For dataset-specific defaults, known source-sequence bounds before windowing, and dataset-owned
-loader behavior, see the [dataset reference](../datasets/index.md) or run
+loader behavior, see the [dataset reference](../datasets/) or run
 `dronalize inspect <dataset>`.
 
 ## Most common setup

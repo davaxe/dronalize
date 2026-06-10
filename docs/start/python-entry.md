@@ -1,9 +1,7 @@
 # Python entry
 
-<div class="section-intro" markdown="1">
 The Python surface is organized around explicit package namespaces. In practice, most code starts
 with `dronalize.datasets`, `dronalize.config`, and `dronalize.runtime`.
-</div>
 
 ## Inspect a dataset programmatically
 
@@ -71,8 +69,12 @@ execute the request directly.
 
 ## Schema and record helpers
 
-The `dronalize.core.scene` package exports the built-in schema constants and lookup helpers such as
-`CANONICAL`, `POSITIONS_VELOCITY_YAW`, and `get_trajectory_schema`.
+The `dronalize.core` package exports the scene, map, schema, and category types commonly used by
+downstream code:
+
+```python
+from dronalize.core import CANONICAL, MapGraph, Scene, get_trajectory_schema
+```
 
 For persisted outputs:
 

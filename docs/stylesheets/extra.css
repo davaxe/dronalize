@@ -47,22 +47,10 @@
     color: white;
 }
 
-.section-intro {
-    margin: 0 0 1.3rem;
-    padding: clamp(1.2rem, 3vw, 2rem);
-}
-
-.md-typeset>.section-intro {
-    padding: 0.5rem 0.9rem 0.5rem 1rem;
-    border-left: 0.12rem solid var(--md-accent-fg-color);
-}
-
-.section-intro> :first-child,
 .command-block> :first-child {
     margin-top: 0;
 }
 
-.section-intro> :last-child,
 .command-block> :last-child {
     margin-bottom: 0;
 }

@@ -1,10 +1,8 @@
 # Configuration reference
 
-<div class="section-intro" markdown="1">
 This reference describes the TOML configuration surface used by `dronalize`. The file is validated before processing starts, with structured schema checks handling field types, nested table shapes, and section-specific requirements so you can catch configuration issues early.
 
-Dataset-specific defaults, capabilities, and dataset-owned configuration behavior are documented in the [dataset reference](../datasets/index.md).
-</div>
+Dataset-specific defaults, capabilities, and dataset-owned configuration behavior are documented in the [dataset reference](../datasets/).
 
 ## Expected file shape
 
@@ -65,14 +63,14 @@ roots are:
 
 | Block | Purpose |
 | --- | --- |
-| [`runtime`](./runtime.md) | Worker count and executor chunking. |
-| [`scenes`](./scenes.md) | Scene window length, sampling time, and related settings. |
-| [`screening`](./screening.md) | Scene + agent screening and cleanup. |
-| [`read`](./read.md) | Raw input selection, including dataset-native partition reads. |
-| [`assign`](./assign.md) | Output split assignment, ratios, and temporal assignment parameters. |
-| [`map`](./map.md) | Map extraction and interpolation settings. |
-| [`output`](./output.md) | Persisted trajectory schema, precision, offsets, storage backend tuning. |
-| [`loader_options`](./dataset.md) | Dataset-specific loader options that don't fit into the other categories. |
+| [`runtime`](runtime/) | Worker count and executor chunking. |
+| [`scenes`](scenes/) | Scene window length, sampling time, and related settings. |
+| [`screening`](screening/) | Scene + agent screening and cleanup. |
+| [`read`](read/) | Raw input selection, including dataset-native partition reads. |
+| [`assign`](assign/) | Output split assignment, ratios, and temporal assignment parameters. |
+| [`map`](map/) | Map extraction and interpolation settings. |
+| [`output`](output/) | Persisted trajectory schema, precision, offsets, storage backend tuning. |
+| [`loader_options`](dataset/) | Dataset-specific loader options that don't fit into the other categories. |
 
 !!! note "Section roots"
     In general, roots can be left unspecified (not present in the file), but if
@@ -103,7 +101,7 @@ resample = "clear"
 lane_change = "clear"
 ```
 
-When you need to know what a specific dataset starts with, or whether it exposes dataset-specific behavior beyond the generic config tables here, check the [dataset reference](../datasets/index.md).
+When you need to know what a specific dataset starts with, or whether it exposes dataset-specific behavior beyond the generic config tables here, check the [dataset reference](../datasets/).
 
 ## How to read the section tables
 

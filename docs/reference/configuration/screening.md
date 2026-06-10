@@ -1,8 +1,6 @@
 # `[screening]` section
 
-<div class="section-intro" markdown="1">
 The screening section defines the policy layer that decides which rows, agents, and scenes are kept after scene extraction. It is authored as three named rule namespaces: `cleanup`, `scenes`, and `agents`.
-</div>
 
 ## Shape
 

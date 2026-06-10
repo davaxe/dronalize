@@ -1,22 +1,15 @@
-"""Small root package for shared enums and sibling core subpackages.
+"""Core scene, map, and shared enum types.
 
 ## Import guide
 
 ```python
-from dronalize.core import AgentCategory, DatasetSplit
+from dronalize.core import AgentCategory, DatasetSplit, MapGraph, Scene
+from dronalize.core import CANONICAL, TrajectorySchema, get_trajectory_schema
 from dronalize.core import functional
-from dronalize.core.scene import Scene, TrajectorySchema
-from dronalize.core.maps import MapGraph, EdgeType
 ```
 
-The richer domain-model surfaces live in sibling packages:
-
-- [`dronalize.core.scene`][] for scenes, trajectory schemas, and schema lookup
-- [`dronalize.core.maps`][] for map graphs and map-edge types
-
-This root package intentionally only exposes the cross-cutting enum types that
-appear throughout the rest of the library; the richer helpers remain grouped in
-their dedicated subpackages.
+This package is the public import surface for the common domain objects used by
+readers, runtime planning, and downstream model code.
 
 """
 
@@ -27,5 +20,44 @@ from dronalize.core.categories import (
     DatasetSplit,
     EdgeType,
 )
+from dronalize.core.maps import MapGraph, SharedMapGraph
+from dronalize.core.scene import (
+    CANONICAL,
+    POSITIONS_ONLY,
+    POSITIONS_VELOCITY,
+    POSITIONS_VELOCITY_ACCELERATION,
+    POSITIONS_VELOCITY_YAW,
+    POSITIONS_YAW,
+    TRAJECTORY_SCHEMAS,
+    MapResolver,
+    Scene,
+    TrajectoryField,
+    TrajectorySchema,
+    available_trajectory_schema_names,
+    available_trajectory_schemas,
+    get_trajectory_schema,
+)
 
-__all__ = ["AgentCategory", "AgentCategoryInput", "AgentCategoryLike", "DatasetSplit", "EdgeType"]
+__all__ = [
+    "CANONICAL",
+    "POSITIONS_ONLY",
+    "POSITIONS_VELOCITY",
+    "POSITIONS_VELOCITY_ACCELERATION",
+    "POSITIONS_VELOCITY_YAW",
+    "POSITIONS_YAW",
+    "TRAJECTORY_SCHEMAS",
+    "AgentCategory",
+    "AgentCategoryInput",
+    "AgentCategoryLike",
+    "DatasetSplit",
+    "EdgeType",
+    "MapGraph",
+    "MapResolver",
+    "Scene",
+    "SharedMapGraph",
+    "TrajectoryField",
+    "TrajectorySchema",
+    "available_trajectory_schema_names",
+    "available_trajectory_schemas",
+    "get_trajectory_schema",
+]
