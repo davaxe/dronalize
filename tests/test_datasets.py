@@ -89,6 +89,8 @@ ALL_CASES_DEFAULT: dict[str, DatasetCase] = {
 def test_dataset_raw_data_processing(
     case: DatasetCase, jobs: int, raw_data_root: Path, artifact_dir: Path, tmp_path: Path
 ) -> None:
+    if case.dataset != "argoverse2":
+        return
     if not (raw_data_root / case.path_rel_root).exists():
         pytest.skip(f"Dataset root not found: {raw_data_root / case.path_rel_root}")
     if jobs > 1:

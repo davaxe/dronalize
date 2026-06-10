@@ -208,7 +208,6 @@ class RuntimeProcessor:
     def materialize(self, candidate: SceneCandidate, scene_number: int) -> Scene:
         """Materialize one scene from candidate."""
         map_key, map_resolver = self._resolve_scene_map(candidate)
-
         scene = Scene.create(
             frame=candidate.frame,
             scene_number=scene_number,
@@ -220,6 +219,7 @@ class RuntimeProcessor:
             passed_agent_ids=candidate.passed_agent_ids,
             split_assignment=candidate.split_assignment,
             dataset=self.dataset,
+            ego_agent_id=candidate.ego_agent_id,
         )
 
         if self.target_schema == self.source_schema:

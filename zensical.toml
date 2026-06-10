@@ -96,13 +96,6 @@ nav = [
     ] },
     { Configuration = [
       "reference/api/config/index.md",
-      { "Dataset models" = "reference/api/config/models/dataset.md" },
-      { "Scene models" = "reference/api/config/models/scene.md" },
-      { "Screening models" = "reference/api/config/models/screening.md" },
-      { "Map models" = "reference/api/config/models/map.md" },
-      { "Output models" = "reference/api/config/models/output.md" },
-      { "Split models" = "reference/api/config/models/split.md" },
-      { "Runtime models" = "reference/api/config/models/runtime.md" },
     ] },
     { Datasets = [
       "reference/api/datasets/index.md",
@@ -124,7 +117,6 @@ nav = [
       "reference/api/io/index.md",
       { Readers = "reference/api/io/readers.md" },
       { "Framework adapters" = "reference/api/io/adapters.md" },
-      { "Backend extension API" = "reference/api/io/backends.md" },
     ] },
     {  Visualization = [
       "reference/api/visualization/index.md",

@@ -94,7 +94,7 @@ class NuScenesStyleLoader(SceneLoader[str, NuScenesStyleLoaderOptions]):
             for regex in self.loader_options.drop_full_category_regex
         )
         yield LoadedSourceFrame(
-            scenes.filter(*filters).drop(["status", "full_category", "full_status"])
+            scenes.filter(*filters).drop(["status", "full_category", "full_status"]), ego_agent_id=0
         )
 
     @classmethod
