@@ -81,7 +81,7 @@ class DemoLoader(SceneLoader[Path, DemoOptions]):
             },
             schema_overrides={"frame": pl.Int32(), "id": pl.Int32(), "agent_category": pl.Int32()},
         )
-        yield LoadedSourceFrame(frame.lazy())
+        yield LoadedSourceFrame(frame.lazy(), ego_agent_id=1)
 
     @override
     def count_sources(self) -> int | None:
@@ -187,7 +187,7 @@ def inherited_optional_blocks_descriptor() -> DatasetConfig:
             resample=ResampleConfig(up=2, down=1, method="cubic"),
             lane_change=LaneChangeConfig(persist=3),
         ),
-        screening=ScreeningConfig(agent={"min_obs": MinObservationsSpec(minimum=2)}),
+        screening=ScreeningConfig(agents={"min_obs": MinObservationsSpec(minimum=2)}),
     )
 
 
@@ -230,6 +230,7 @@ def make_scene(*, passed_agent_ids: frozenset[int] | None = None) -> Scene:
         map_key="demo-map",
         map_resolver=lambda _scene, graph=graph: graph,
         passed_agent_ids=passed_agent_ids,
+        ego_agent_id=10,
     )
 
 

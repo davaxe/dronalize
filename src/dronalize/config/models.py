@@ -11,6 +11,7 @@ from typing_extensions import override
 
 from dronalize.config.base import (
     Clear,
+    Clearable,
     ConfigBase,
     ConfigPatch,
     DictPatch,
@@ -386,7 +387,7 @@ class MapPatch(ConfigPatch[MapConfig]):
     """Replacement interpolation spacing for map geometry."""
     extraction: MapExtraction | None = Field(default=None)
     """Replacement map extraction strategy."""
-    edge_types: MapEdgeTypeRulesPatch | Clear | None = Field(default=None)
+    edge_types: Clearable[MapEdgeTypeRulesPatch] = Field(default=None)
     """Replacement edge-type rules, or `false` to clear inherited rules."""
     full_config_type: type[MapConfig] = Field(MapConfig, repr=False, init=False)
 
@@ -551,11 +552,11 @@ class ScenesPatch(ConfigPatch[ScenesConfig]):
     """Replacement default reader/adaptor split point."""
     sample_time: float | None = None
     """Replacement frame interval in seconds."""
-    window: WindowPatch | Clear | None = None
+    window: Clearable[WindowPatch] = None
     """Patch override for sliding-window sampling settings."""
-    resample: ResamplePatch | Clear | None = None
+    resample: Clearable[ResamplePatch] = None
     """Patch override for temporal resampling settings."""
-    lane_change: LaneChangePatch | Clear | None = None
+    lane_change: Clearable[LaneChangePatch] = None
     """Patch override for lane-change-aware sampling settings."""
     full_config_type: type[ScenesConfig] = Field(default=ScenesConfig, init=False, repr=False)
 
@@ -600,7 +601,7 @@ ConfigT = TypeVar("ConfigT", bound=ConfigBase)
 
 
 def _apply_optional_block(
-    patch: ConfigPatch[ConfigT] | Clear | None, target: ConfigT | None
+    patch: Clearable[ConfigPatch[ConfigT]], target: ConfigT | None
 ) -> ConfigT | None:
     """Apply a patch to an optional nested config block."""
     if patch is None:
@@ -971,12 +972,12 @@ class DatasetConfigPatchBase(ConfigBase):
 
     scenes: ScenesPatch | None = Field(default=None)
     runtime: RuntimePatch | None = Field(default=None)
-    screening: ScreeningPatch | Clear | None = Field(default=None)
+    screening: Clearable[ScreeningPatch] = None
     output: OutputPatch | None = Field(default=None)
     map: MapPatch | None = Field(default=None)
     read: ReadConfig | None = Field(default=None)
     assign: AssignConfig | None = Field(default=None)
-    loader_options: DictPatch | Clear | None = Field(default=None)
+    loader_options: Clearable[DictPatch] = None
 
 
 class DatasetConfigPatch(DatasetConfigPatchBase, ConfigPatch[DatasetConfig]):
@@ -1007,7 +1008,7 @@ class DatasetConfigPatch(DatasetConfigPatchBase, ConfigPatch[DatasetConfig]):
 
 
 def _apply_loader_options_patch(
-    patch: DictPatch | Clear | None, target: dict[str, Any] | None
+    patch: Clearable[DictPatch], target: dict[str, Any] | None
 ) -> dict[str, Any] | None:
     if patch is None:
         return target

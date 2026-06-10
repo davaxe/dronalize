@@ -8,7 +8,7 @@ import numpy as np
 import numpy.typing as npt
 from typing_extensions import TypedDict
 
-from dronalize.io.records import SceneRecord, make_scene_record
+from dronalize.io.records import SceneRecord
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -20,6 +20,7 @@ class MDSRow(TypedDict):
     scene_number: int
     dataset_id: int
     default_observation_length: int
+    ego_agent_id: int
     position_offset: npt.NDArray[np.float64]
     agent_types: npt.NDArray[np.int32]
     screened_agent_mask: npt.NDArray[np.uint8]
@@ -47,6 +48,7 @@ def encode_mds_row(record: SceneRecord) -> MDSRow:
             if record.default_observation_length is None
             else int(record.default_observation_length)
         ),
+        "ego_agent_id": -1 if record.ego_agent_id is None else int(record.ego_agent_id),
         "position_offset": record.position_offset,
         "agent_types": record.agent_types,
         "screened_agent_mask": record.screened_agent_mask.astype(np.uint8, copy=False),
@@ -67,8 +69,9 @@ def decode_mds_row(row: Mapping[str, Any]) -> SceneRecord:
         np.asarray(row["map_node_types"]),
         np.asarray(row["map_edge_types"]),
     )
-    return make_scene_record(
+    return SceneRecord(
         scene_number=int(row["scene_number"]),
+        ego_agent_id=(None if int(row.get("ego_agent_id", -1)) < 0 else int(row["ego_agent_id"])),
         dataset_id=(None if int(row.get("dataset_id", -1)) < 0 else int(row["dataset_id"])),
         default_observation_length=(
             None
@@ -93,6 +96,7 @@ def mds_columns(dtype: str) -> dict[str, str]:
         "scene_number": "int",
         "dataset_id": "int",
         "default_observation_length": "int",
+        "ego_agent_id": "int",
         "position_offset": "ndarray:float64:2",
         "agent_types": "ndarray:int32",
         "screened_agent_mask": "ndarray:uint8",

@@ -5,9 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import numpy as np
-
 if TYPE_CHECKING:
+    import numpy as np
     import numpy.typing as npt
 
 
@@ -58,6 +57,8 @@ class SceneRecord:
     """Integer dataset identifier associated with this record, if known."""
     default_observation_length: int | None = None
     """Default split point for reader/adaptor convenience, if known."""
+    ego_agent_id: int | None = None
+    """Optional agent ID of the ego vehicle, if known or applicable."""
 
     @property
     def horizon_frames(self) -> int:
@@ -66,7 +67,29 @@ class SceneRecord:
 
     def split(self, observation_length: int) -> SplitSceneRecord:
         """Split the full horizon into observation and prediction tensors."""
-        return split_scene_record(self, observation_length=observation_length)
+        total_length = self.horizon_frames
+        if observation_length < 0 or observation_length > total_length:
+            msg = (
+                f"`observation_length` must be between 0 and {total_length}, "
+                f"but got {observation_length}."
+            )
+            raise ValueError(msg)
+
+        return SplitSceneRecord(
+            scene_number=self.scene_number,
+            position_offset=self.position_offset,
+            agent_types=self.agent_types,
+            screened_agent_mask=self.screened_agent_mask,
+            history_features=self.features[:, :observation_length],
+            history_mask=self.mask[:, :observation_length],
+            future_features=self.features[:, observation_length:],
+            future_mask=self.mask[:, observation_length:],
+            map_node_positions=self.map_node_positions,
+            map_edge_indices=self.map_edge_indices,
+            map_node_types=self.map_node_types,
+            map_edge_types=self.map_edge_types,
+            dataset_id=self.dataset_id,
+        )
 
 
 @dataclass(slots=True)
@@ -76,11 +99,6 @@ class SplitSceneRecord:
     This type is intended for online reader/adaptor use. It is not the canonical
     persisted representation.
     """
-
-    scene_number: int
-    """Scene identifier within the exported dataset."""
-    position_offset: npt.NDArray[np.float64]
-    """Global 2D translation offset applied to scene coordinates, shape `(2,)`."""
 
     # Agent data
     agent_types: npt.NDArray[np.int32]
@@ -106,10 +124,15 @@ class SplitSceneRecord:
     map_edge_types: npt.NDArray[np.int32]
     """Integer-encoded map edge types, shape `(E,)`."""
 
+    # Metadata
+    scene_number: int
+    """Scene identifier within the exported dataset."""
+    position_offset: npt.NDArray[np.float64]
+    """Global 2D translation offset applied to scene coordinates, shape `(2,)`."""
     dataset_id: int | None = None
     """Integer dataset identifier associated with this record, if known."""
-    default_observation_length: int | None = None
-    """Default split point associated with this record, if known."""
+    ego_agent_id: int | None = None
+    """Optional agent ID of the ego vehicle, if known or applicable."""
 
     @property
     def observation_length(self) -> int:
@@ -120,121 +143,3 @@ class SplitSceneRecord:
     def future_length(self) -> int:
         """Return the number of time steps in the future tensors."""
         return int(self.future_features.shape[1])
-
-    def join(self) -> SceneRecord:
-        """Collapse the split tensors back into the full-horizon representation."""
-        return join_split_scene_record(self)
-
-
-def make_scene_record(
-    *,
-    scene_number: int,
-    position_offset: npt.NDArray[np.float64],
-    agent_types: npt.NDArray[np.int32],
-    screened_agent_mask: npt.NDArray[np.bool_],
-    features: npt.NDArray[np.float32 | np.float64],
-    mask: npt.NDArray[np.bool_],
-    map_node_positions: npt.NDArray[np.float32 | np.float64],
-    map_edge_indices: npt.NDArray[np.int32],
-    map_node_types: npt.NDArray[np.int32],
-    map_edge_types: npt.NDArray[np.int32],
-    dataset_id: int | None = None,
-    default_observation_length: int | None = None,
-) -> SceneRecord:
-    """Construct one canonical full-horizon `SceneRecord`."""
-    return SceneRecord(
-        scene_number=scene_number,
-        position_offset=position_offset,
-        agent_types=agent_types,
-        screened_agent_mask=screened_agent_mask,
-        features=features,
-        mask=mask,
-        map_node_positions=map_node_positions,
-        map_edge_indices=map_edge_indices,
-        map_node_types=map_node_types,
-        map_edge_types=map_edge_types,
-        dataset_id=dataset_id,
-        default_observation_length=default_observation_length,
-    )
-
-
-def make_split_scene_record(
-    *,
-    scene_number: int,
-    position_offset: npt.NDArray[np.float64],
-    agent_types: npt.NDArray[np.int32],
-    screened_agent_mask: npt.NDArray[np.bool_],
-    history_features: npt.NDArray[np.float32 | np.float64],
-    history_mask: npt.NDArray[np.bool_],
-    future_features: npt.NDArray[np.float32 | np.float64],
-    future_mask: npt.NDArray[np.bool_],
-    map_node_positions: npt.NDArray[np.float32 | np.float64],
-    map_edge_indices: npt.NDArray[np.int32],
-    map_node_types: npt.NDArray[np.int32],
-    map_edge_types: npt.NDArray[np.int32],
-    dataset_id: int | None = None,
-    default_observation_length: int | None = None,
-) -> SplitSceneRecord:
-    """Construct one split convenience record."""
-    return SplitSceneRecord(
-        scene_number=scene_number,
-        position_offset=position_offset,
-        agent_types=agent_types,
-        screened_agent_mask=screened_agent_mask,
-        history_features=history_features,
-        history_mask=history_mask,
-        future_features=future_features,
-        future_mask=future_mask,
-        map_node_positions=map_node_positions,
-        map_edge_indices=map_edge_indices,
-        map_node_types=map_node_types,
-        map_edge_types=map_edge_types,
-        dataset_id=dataset_id,
-        default_observation_length=default_observation_length,
-    )
-
-
-def split_scene_record(record: SceneRecord, *, observation_length: int) -> SplitSceneRecord:
-    """Split one full-horizon scene record into observation and prediction tensors."""
-    total_length = record.horizon_frames
-    if observation_length < 0 or observation_length > total_length:
-        msg = (
-            f"`observation_length` must be between 0 and {total_length}, "
-            f"but got {observation_length}."
-        )
-        raise ValueError(msg)
-
-    return make_split_scene_record(
-        scene_number=record.scene_number,
-        position_offset=record.position_offset,
-        agent_types=record.agent_types,
-        screened_agent_mask=record.screened_agent_mask,
-        history_features=record.features[:, :observation_length],
-        history_mask=record.mask[:, :observation_length],
-        future_features=record.features[:, observation_length:],
-        future_mask=record.mask[:, observation_length:],
-        map_node_positions=record.map_node_positions,
-        map_edge_indices=record.map_edge_indices,
-        map_node_types=record.map_node_types,
-        map_edge_types=record.map_edge_types,
-        dataset_id=record.dataset_id,
-        default_observation_length=record.default_observation_length,
-    )
-
-
-def join_split_scene_record(record: SplitSceneRecord) -> SceneRecord:
-    """Collapse one split convenience record into the full-horizon representation."""
-    return make_scene_record(
-        scene_number=record.scene_number,
-        position_offset=record.position_offset,
-        agent_types=record.agent_types,
-        screened_agent_mask=record.screened_agent_mask,
-        features=np.concatenate((record.history_features, record.future_features), axis=1),
-        mask=np.concatenate((record.history_mask, record.future_mask), axis=1),
-        map_node_positions=record.map_node_positions,
-        map_edge_indices=record.map_edge_indices,
-        map_node_types=record.map_node_types,
-        map_edge_types=record.map_edge_types,
-        dataset_id=record.dataset_id,
-        default_observation_length=record.default_observation_length,
-    )

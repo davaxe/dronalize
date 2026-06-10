@@ -102,7 +102,7 @@ def test_resolve_applies_defaults_without_dataset(tmp_path: Path) -> None:
             jobs = 8
 
             [defaults.output]
-            schema = "canonical"
+            trajectory_schema = "canonical"
             precision = "float32"
             recenter_positions = true
 
@@ -275,12 +275,12 @@ def test_resolve_disables_inherited_optional_blocks(tmp_path: Path) -> None:
             tmp_path,
             """
             [datasets.demo]
-            screening = false
+            screening = { op = "clear" }
 
             [datasets.demo.scenes]
-            window = false
-            resample = false
-            lane_change = false
+            window = "clear"
+            resample = "clear"
+            lane_change = "clear"
             """,
         )
     )
@@ -298,7 +298,7 @@ def test_screening_extend_is_default(tmp_path: Path) -> None:
         _write(
             tmp_path,
             """
-            [datasets.demo.screening.agent.observation_floor]
+            [datasets.demo.screening.agents.observation_floor]
             rule = "min_observations"
             minimum = 8
             """,
@@ -309,10 +309,10 @@ def test_screening_extend_is_default(tmp_path: Path) -> None:
 
     assert resolved.screening is not None
     assert resolved.screening.cleanup == {}
-    assert resolved.screening.scene == {}
-    assert set(resolved.screening.agent) == {"observation_floor"}
-    assert isinstance(resolved.screening.agent["observation_floor"], MinObservationsSpec)
-    assert resolved.screening.agent["observation_floor"].minimum == 8
+    assert resolved.screening.scenes == {}
+    assert set(resolved.screening.agents) == {"observation_floor"}
+    assert isinstance(resolved.screening.agents["observation_floor"], MinObservationsSpec)
+    assert resolved.screening.agents["observation_floor"].minimum == 8
 
 
 def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
@@ -320,15 +320,18 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
         _write(
             tmp_path,
             """
-            [datasets.demo.screening]
+            [datasets.demo.screening.scenes]
             mode = "extend"
 
-            [datasets.demo.screening.scene.context_window]
+            [datasets.demo.screening.agents]
+            mode = "extend"
+
+            [datasets.demo.screening.scenes.context_window]
             rule = "scene_window"
             start_frame = 0
             end_frame = 3
 
-            [datasets.demo.screening.agent.observation_floor]
+            [datasets.demo.screening.agents.observation_floor]
             rule = "min_observations"
             minimum = 8
             """,
@@ -340,21 +343,21 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
         _dataset_config(
             screening={
                 "cleanup": {"trim_static": {"rule": "exclude", "categories": ["STATIC_OBJECT"]}},
-                "scene": {"min_context": {"rule": "agent_range", "minimum": 2}},
-                "agent": {"observation_floor": {"rule": "min_observations", "minimum": 4}},
+                "scenes": {"min_context": {"rule": "agent_range", "minimum": 2}},
+                "agents": {"observation_floor": {"rule": "min_observations", "minimum": 4}},
             }
         ),
     )
 
     assert resolved.screening is not None
     assert set(resolved.screening.cleanup) == {"trim_static"}
-    assert set(resolved.screening.scene) == {"min_context", "context_window"}
-    assert set(resolved.screening.agent) == {"observation_floor"}
+    assert set(resolved.screening.scenes) == {"min_context", "context_window"}
+    assert set(resolved.screening.agents) == {"observation_floor"}
     assert isinstance(resolved.screening.cleanup["trim_static"], ExcludeCategoriesSpec)
-    assert isinstance(resolved.screening.scene["min_context"], AgentRangeSpec)
-    assert isinstance(resolved.screening.scene["context_window"], RequireSceneWindowSpec)
-    assert isinstance(resolved.screening.agent["observation_floor"], MinObservationsSpec)
-    assert resolved.screening.agent["observation_floor"].minimum == 8
+    assert isinstance(resolved.screening.scenes["min_context"], AgentRangeSpec)
+    assert isinstance(resolved.screening.scenes["context_window"], RequireSceneWindowSpec)
+    assert isinstance(resolved.screening.agents["observation_floor"], MinObservationsSpec)
+    assert resolved.screening.agents["observation_floor"].minimum == 8
 
 
 def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
@@ -362,10 +365,16 @@ def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
         _write(
             tmp_path,
             """
-            [datasets.demo.screening]
+            [datasets.demo.screening.scenes]
             mode = "replace"
 
-            [datasets.demo.screening.scene.context_window]
+            [datasets.demo.screening.agents]
+            mode = "replace"
+
+            [datasets.demo.screening.cleanup]
+            mode = "replace"
+
+            [datasets.demo.screening.scenes.context_window]
             rule = "scene_window"
             start_frame = 0
             end_frame = 3
@@ -378,17 +387,17 @@ def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
         _dataset_config(
             screening={
                 "cleanup": {"trim_static": {"rule": "exclude", "categories": ["STATIC_OBJECT"]}},
-                "scene": {"min_context": {"rule": "agent_range", "minimum": 2}},
-                "agent": {"observation_floor": {"rule": "min_observations", "minimum": 4}},
+                "scenes": {"min_context": {"rule": "agent_range", "minimum": 2}},
+                "agents": {"observation_floor": {"rule": "min_observations", "minimum": 4}},
             }
         ),
     )
 
     assert resolved.screening is not None
     assert resolved.screening.cleanup == {}
-    assert set(resolved.screening.scene) == {"context_window"}
-    assert resolved.screening.agent == {}
-    assert isinstance(resolved.screening.scene["context_window"], RequireSceneWindowSpec)
+    assert set(resolved.screening.scenes) == {"context_window"}
+    assert resolved.screening.agents == {}
+    assert isinstance(resolved.screening.scenes["context_window"], RequireSceneWindowSpec)
 
 
 def test_screening_remove_drops_names(tmp_path: Path) -> None:
@@ -396,9 +405,19 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
         _write(
             tmp_path,
             """
-            [datasets.demo.screening]
+            [datasets.demo.screening.agents]
             mode = "extend"
             remove = ["shared"]
+
+            [datasets.demo.screening.scenes]
+            mode = "extend"
+            remove = ["shared"]
+
+            [datasets.demo.screening.cleanup]
+            mode = "extend"
+            remove = ["shared"]
+
+
             """,
         )
     )
@@ -411,11 +430,11 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
                     "shared": {"rule": "exclude", "categories": ["STATIC_OBJECT"]},
                     "keep_cleanup": {"rule": "exclude", "categories": ["ANIMAL"]},
                 },
-                "scene": {
+                "scenes": {
                     "shared": {"rule": "agent_range", "minimum": 2},
                     "keep_scene": {"rule": "scene_frames", "frames": [0]},
                 },
-                "agent": {
+                "agents": {
                     "shared": {"rule": "min_observations", "minimum": 4},
                     "keep_agent": {"rule": "min_observations", "minimum": 2},
                 },
@@ -425,40 +444,11 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
 
     assert resolved.screening is not None
     assert set(resolved.screening.cleanup) == {"keep_cleanup"}
-    assert set(resolved.screening.scene) == {"keep_scene"}
-    assert set(resolved.screening.agent) == {"keep_agent"}
+    assert set(resolved.screening.scenes) == {"keep_scene"}
+    assert set(resolved.screening.agents) == {"keep_agent"}
     assert isinstance(resolved.screening.cleanup["keep_cleanup"], ExcludeCategoriesSpec)
-    assert isinstance(resolved.screening.scene["keep_scene"], RequireSceneFramesSpec)
-    assert isinstance(resolved.screening.agent["keep_agent"], MinObservationsSpec)
-
-
-def test_screening_remove_applies_after_replace(tmp_path: Path) -> None:
-    cfg = parse_config(
-        _write(
-            tmp_path,
-            """
-            [datasets.demo.screening]
-            mode = "replace"
-            remove = ["drop_me"]
-
-            [datasets.demo.screening.agent.drop_me]
-            rule = "min_observations"
-            minimum = 8
-
-            [datasets.demo.screening.agent.keep_me]
-            rule = "min_observations"
-            minimum = 3
-            """,
-        )
-    )
-
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
-
-    assert resolved.screening is not None
-    assert resolved.screening.cleanup == {}
-    assert resolved.screening.scene == {}
-    assert set(resolved.screening.agent) == {"keep_me"}
-    assert isinstance(resolved.screening.agent["keep_me"], MinObservationsSpec)
+    assert isinstance(resolved.screening.scenes["keep_scene"], RequireSceneFramesSpec)
+    assert isinstance(resolved.screening.agents["keep_agent"], MinObservationsSpec)
 
 
 def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
@@ -466,44 +456,50 @@ def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
         _write(
             tmp_path,
             """
-            [profiles.base.screening.agent.min_obs]
+            [profiles.base.screening.agents.min_obs]
             rule = "min_observations"
             minimum = 4
 
-            [profiles.base.screening.scene.min_context]
+            [profiles.base.screening.scenes.min_context]
             rule = "agent_range"
             minimum = 2
 
-            [profiles.strict.screening]
+            [profiles.strict.screening.agents]
             mode = "extend"
 
-            [profiles.strict.screening.agent.min_obs]
+            [profiles.strict.screening.agents.min_obs]
             rule = "min_observations"
             minimum = 8
 
-            [profiles.strict.screening.agent.anchor_present]
+            [profiles.strict.screening.agents.anchor_present]
             rule = "frames"
             frames = [19]
 
-            [profiles.curated.screening]
+            [profiles.curated.screening.cleanup]
+            mode = "replace"
+
+            [profiles.curated.screening.agents]
+            mode = "replace"
+
+            [profiles.curated.screening.scenes]
             mode = "replace"
 
             [profiles.curated.screening.cleanup.trim_static]
             rule = "exclude"
             categories = ["STATIC_OBJECT", "UNIMPORTANT"]
 
-            [profiles.curated.screening.scene.category_mix]
+            [profiles.curated.screening.scenes.category_mix]
             rule = "category_range"
             ranges = { CAR = { minimum = 1 }, PEDESTRIAN = { minimum = 1 } }
 
             [datasets.demo]
             uses = ["base", "strict", "curated"]
 
-            [datasets.demo.screening]
+            [datasets.demo.screening.scenes]
             mode = "extend"
             remove = ["category_mix"]
 
-            [datasets.demo.screening.scene.final_context]
+            [datasets.demo.screening.scenes.final_context]
             rule = "agent_range"
             minimum = 3
             """,
@@ -514,11 +510,11 @@ def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
 
     assert resolved.screening is not None
     assert set(resolved.screening.cleanup) == {"trim_static"}
-    assert set(resolved.screening.scene) == {"final_context"}
+    assert set(resolved.screening.scenes) == {"final_context"}
     assert isinstance(resolved.screening.cleanup["trim_static"], ExcludeCategoriesSpec)
-    assert isinstance(resolved.screening.scene["final_context"], AgentRangeSpec)
-    assert resolved.screening.scene["final_context"].minimum == 3
-    assert resolved.screening.agent == {}
+    assert isinstance(resolved.screening.scenes["final_context"], AgentRangeSpec)
+    assert resolved.screening.scenes["final_context"].minimum == 3
+    assert resolved.screening.agents == {}
 
 
 def test_map_config_parses_scene_extent(tmp_path: Path) -> None:
@@ -585,7 +581,7 @@ def test_map_config_parses_trajectory_buffer(tmp_path: Path) -> None:
 
 def test_agent_specs_compile() -> None:
     config = ScreeningConfig.model_validate({
-        "agent": {
+        "agents": {
             "required_frames": {"rule": "frames", "frames": [0, 1, 2]},
             "coverage": {"rule": "window", "start_frame": 0, "end_frame": 2, "min_fraction": 0.5},
             "gap_budget": {
@@ -612,7 +608,7 @@ def test_agent_specs_compile() -> None:
 
 def test_scene_specs_compile() -> None:
     config = ScreeningConfig.model_validate({
-        "scene": {"agent_bounds": {"rule": "agent_range", "minimum": 1, "maximum": 5}}
+        "scenes": {"agent_bounds": {"rule": "agent_range", "minimum": 1, "maximum": 5}}
     })
 
     compiled = ScreeningRuleSet.from_config(config)
@@ -662,7 +658,7 @@ def test_prune_by_config_rejects_nested_require() -> None:
 def test_require_must_define_threshold() -> None:
     with pytest.raises(ValueError, match="at least one"):
         ScreeningConfig.model_validate({
-            "agent": {
+            "agents": {
                 "observation_floor": {"rule": "min_observations", "minimum": 3, "require": {}}
             }
         })
@@ -671,8 +667,8 @@ def test_require_must_define_threshold() -> None:
 def test_compiled_rules_work_with_screen_data() -> None:
     config = ScreeningConfig.model_validate({
         "cleanup": {"drop_unimportant": {"rule": "exclude", "categories": ["unimportant"]}},
-        "scene": {"enough_agents": {"rule": "agent_range", "minimum": 1}},
-        "agent": {"max_missing": {"rule": "max_missing_frames", "maximum": 1}},
+        "scenes": {"enough_agents": {"rule": "agent_range", "minimum": 1}},
+        "agents": {"max_missing": {"rule": "max_missing_frames", "maximum": 1}},
     })
     compiled = ScreeningRuleSet.from_config(config)
 

@@ -5,7 +5,7 @@
 #
 # Breaking changes reflected here:
 # - Partial config sections are now patch sections.
-# - Clearing uses `{ op = "clear" }`, not `false`.
+# - Clearing uses `{ op = "clear" }`, or "clear" shorthand.
 # - Screening merge/remove is now section-local.
 # - Screening rule maps use `values = { ... }` or `[...values.<name>]`.
 # - Loader options, if used, should be expressed as a DictPatch.

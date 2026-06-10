@@ -71,49 +71,6 @@ Multiple shard files are created automatically as a split exceeds `size_limit`.
     
     This parallel approach is described in more detail in the [parallel dataset conversion guide](https://docs.mosaicml.com/projects/streaming/en/stable/preparing_datasets/parallel_dataset_conversion.html).
 
-
-## MDS row fields
-
-Every MDS row written to a shard contains the following fields.
-
-| Field | dtype | Shape | Description |
-| --- | --- | --- | --- |
-| `scene_number` | `int` | scalar | Global scene index assigned during processing. |
-| `dataset_id` | `int` | scalar | Dataset id associated with the row, or `-1` when unset. Map ids back to names with `manifest.dataset_names`. |
-| `default_observation_length` | `int` | scalar | Default split point for input/output windows during reading, or `-1` when unset. |
-| `position_offset` | `float64` | `[2]` | The `(x, y)` offset subtracted from all positions before writing when `recenter_positions = true`. Zero otherwise. |
-| `agent_types` | `int32` | `[A]` | Integer agent category for each agent. |
-| `screened_agent_mask` | `uint8` | `[A]` | Per-agent screening pass mask (`1` means passed). |
-| `features` | `float32` or `float64` | `[A, T, F]` | Per-agent feature tensor in canonical column order. |
-| `mask` | `uint8` | `[A, T]` | Presence mask. `1` where the agent is observed at that timestep, `0` otherwise. |
-| `map_node_positions` | `float32` or `float64` | `[N, 2]` | Map lane node coordinates, offset-corrected when applicable. |
-| `map_edge_indices` | `int32` | `[2, E]` | Edge connectivity in COO format (source and target node indices). |
-| `map_node_types` | `int32` | `[N]` | Integer node type per map node. |
-| `map_edge_types` | `int32` | `[E]` | Integer edge type per map edge. |
-
-**Dimension key:**
-
-- `A` — number of agents in the scene (varies per row)
-- `T` — total full-horizon timesteps (fixed for a given dataset and config)
-- `F` — number of feature columns determined by the configured schema
-- `N` — number of map nodes (varies per row)
-- `E` — number of map edges (varies per row)
-
-The `features` and `map_node_positions` dtypes follow the `precision` setting in the `[output]`
-config block. `position_offset` is always stored as `float64`.
-
-!!! note "Map fields when maps are disabled"
-    All four map fields are always present in every row regardless of whether map data is
-    enabled. For scenes without maps, encoded placeholders are normalized back to empty arrays by
-    the reader API.
-    
-!!! warning "Map fields will not be empty arrays"
-    When maps are disabled, the map fields are still present but contain encoded placeholder values.
-    The reader API normalizes these back to empty arrays, but they will not be empty in the raw
-    MDS shards.
-    
-    The reason for this design is that the MDS format does not currently support empty arrays.
-
 ## Custom MDS rows
 
 Python integrations can customize the row dictionaries written to MDS by
@@ -214,7 +171,7 @@ A typical setup:
 
 ```toml
 [datasets.a43.output]
-schema = "positions_velocity_yaw"
+trajectory_schema = "positions_velocity_yaw"
 precision = "float32"
 recenter_positions = true
 

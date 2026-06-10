@@ -55,6 +55,8 @@ class Scene:
     """Split assignment for this scene (train/val/test)."""
     dataset: str | None = None
     """Dataset label associated with this scene, if known."""
+    ego_agent_id: int | None = None
+    """Optional ID of the ego vehicle in this scene, if applicable."""
 
     @classmethod
     def create(
@@ -71,6 +73,7 @@ class Scene:
         dataset: str | None = None,
         passed_agent_ids: frozenset[int] | None = None,
         cast_schema: bool = True,
+        ego_agent_id: int | None = None,
     ) -> Scene:
         """Create a scene with optional schema casting.
 
@@ -111,6 +114,8 @@ class Scene:
         cast_schema : bool, optional
             Whether to cast the input frame to match the expected physical
             schema or to assume it already matches. Default is `True`.
+        ego_agent_id : int or None, optional
+            Optional ID of the ego vehicle in this scene, if applicable.
 
         """
         if cast_schema:
@@ -127,6 +132,7 @@ class Scene:
             passed_agent_ids=passed_agent_ids,
             split_assignment=split_assignment,
             dataset=dataset,
+            ego_agent_id=ego_agent_id,
         )
 
     def __post_init__(self) -> None:
