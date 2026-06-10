@@ -213,8 +213,8 @@ class ProgressState:
             agents_removed=self.cleanup_agents_removed_counter.value,
         )
 
-    def increment_source(self) -> None:
-        """Record that one source has started processing."""
+    def record_processed_source(self) -> None:
+        """Record that one source has finished processing."""
         self._increment_and_notify(self.source_counter)
 
     def record_candidate_scene(self) -> None:

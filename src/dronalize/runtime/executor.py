@@ -189,9 +189,6 @@ class SequentialExecutor(Executor, ProgressSource):
             for source in self._processor.iter_sources():
                 if self._accounting.limit_reached():
                     break
-
-                self._accounting.start_source()
-
                 yield from iter_scenes_from_source(self._processor, source, self._accounting)
         finally:
             self._running = False
@@ -294,7 +291,6 @@ class ParallelExecutor(Executor, ProgressSource):
         if accounting.limit_reached():
             return None
 
-        accounting.start_source()
         for scene in iter_scenes_from_source(_ctx.processor, source, accounting):
             _ctx.writer.write(scene)
 

@@ -123,15 +123,36 @@ class SharedMapProvider(MapProvider):
             return extracted.copy() if extracted is map_graph else extracted
 
 
+@dataclass(frozen=True, slots=True)
+class SceneBasedMapExtractor:
+    """Scene-aware map extractor bound to one extraction config.
+
+    This is intentionally a top-level callable class so that it is pickleable
+    by multiprocessing when using the spawn start method.
+    """
+
+    extraction: MapExtraction
+
+    def __call__(self, scene: Scene, graph: MapGraph) -> MapGraph:
+        """Extract a scene-local subgraph from *graph*."""
+        return extract_based_on_scene(graph, scene, self.extraction)
+
+
+def full_map_extract(_scene: Scene, graph: MapGraph) -> MapGraph:
+    """Return the full map graph unchanged.
+
+    This is intentionally a top-level function so that it is pickleable by
+    multiprocessing when using the spawn start method.
+    """
+    return graph
+
+
 def extract_fn(extraction: MapExtraction) -> MapExtractor:
     """Create a scene-aware map extraction function from config."""
     if isinstance(extraction, FullMapExtraction):
-        return lambda _scene, graph: graph
+        return full_map_extract
 
-    def _extract(scene: Scene, graph: MapGraph) -> MapGraph:
-        return extract_based_on_scene(graph, scene, extraction)
-
-    return _extract
+    return SceneBasedMapExtractor(extraction)
 
 
 def extract_based_on_scene(
