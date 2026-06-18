@@ -3,44 +3,18 @@
 from __future__ import annotations
 
 import hashlib
-from typing import TYPE_CHECKING, Generic, Protocol
+from typing import TYPE_CHECKING, Generic
 
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import override
 
-from dronalize.core.categories import DatasetSplit
 from dronalize.core.typing import T_co
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-class Assigner(Protocol, Generic[T_co]):
-    """Common interface for group assigners."""
-
-    def assign(self, *values: int | str) -> T_co:
-        """Get assignment for the provided values.
-
-        Parameters
-        ----------
-        *values : int or str
-            A set of integer or string values that will be used to compute the
-            assignment (implementation dependent).
-
-        Returns
-        -------
-        T_co
-            The assigned group for the provided values.
-        """
-        ...
-
-
-SplitAssigner = Assigner[DatasetSplit | None]
-"""A group assigner for dataset splits (train/val/test)."""
-
-
-class StatelessWeightedAssigner(Assigner[T_co]):
+class StatelessWeightedAssigner(Generic[T_co]):
     """Stateless group assigner based on hashing.
 
     Given a set of groups and optional weights, this class provides a
@@ -84,7 +58,6 @@ class StatelessWeightedAssigner(Assigner[T_co]):
         self._cumulative_weights: npt.NDArray[np.float64] = np.cumsum(self._weights)
         self._cumulative_weights[-1] = 1.0
 
-    @override
     def assign(self, *values: int | str) -> T_co:
         """Assign a group based on the provided values.
 

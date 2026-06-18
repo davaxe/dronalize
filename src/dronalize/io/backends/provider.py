@@ -22,9 +22,10 @@ from dronalize.io.base import StorageBackend, WorkerWriterProvider, WriterProvid
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from dronalize.config.models import OutputConfig
     from dronalize.core.categories import DatasetSplit
     from dronalize.io.base import DatasetWriter, RecordTransform, SceneTransform
-    from dronalize.runtime.types import ExecutionPlan, OutputPlan
+    from dronalize.runtime.types import ExecutionPlan
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +50,8 @@ def _build_mds_writer_provider(plan: ExecutionPlan) -> WriterProvider:
         create_worker=functools.partial(
             _create_mds_writer,
             output_dir=plan.output_dir,
-            config=plan.output,
+            config=plan.output_config,
+            default_observation_length=plan.effective_default_observation_length,
             splits=splits,
             parallel=plan.parallel,
             record_transform=(
@@ -79,7 +81,8 @@ def _create_mds_writer(
     worker_id: int,
     *,
     output_dir: Path,
-    config: OutputPlan,
+    config: OutputConfig,
+    default_observation_length: int | None,
     splits: tuple[DatasetSplit, ...] | None,
     parallel: bool,
     record_transform: RecordTransform[dict[str, Any]] | None,
@@ -91,6 +94,7 @@ def _create_mds_writer(
     return MDSDatasetWriter(
         output_dir=output_dir,
         config=config,
+        default_observation_length=default_observation_length,
         splits=splits,
         parallel=parallel,
         parallel_group=worker_id,
@@ -118,7 +122,8 @@ def _build_pickle_writer_provider(plan: ExecutionPlan) -> WriterProvider:
         create_worker=functools.partial(
             _create_pickle_writer,
             output_dir=plan.output_dir,
-            config=plan.output,
+            config=plan.output_config,
+            default_observation_length=plan.effective_default_observation_length,
             splits=_output_splits(plan),
             record_transform=None
             if output_transform is None
@@ -132,7 +137,8 @@ def _create_pickle_writer(
     worker_id: int,
     *,
     output_dir: Path,
-    config: OutputPlan,
+    config: OutputConfig,
+    default_observation_length: int | None,
     splits: tuple[DatasetSplit, ...] | None,
     record_transform: RecordTransform[object] | None,
     scene_transform: SceneTransform[object] | None,
@@ -143,6 +149,7 @@ def _create_pickle_writer(
         output_dir=output_dir,
         identifier=worker_id,
         config=config,
+        default_observation_length=default_observation_length,
         splits=splits,
         record_transform=record_transform,
         scene_transform=scene_transform,

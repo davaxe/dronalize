@@ -103,25 +103,6 @@ class Progress:
 
 
 @dataclass(slots=True)
-class WorkerRegistry:
-    """Multiprocessing-safe worker id allocator."""
-
-    next_worker_id: Synchronized[int]
-
-    @classmethod
-    def create(cls, mp_context: BaseContext | None = None) -> WorkerRegistry:
-        ctx = mp_context or mp.get_context()
-        return cls(next_worker_id=ctx.Value("i", 0))
-
-    def reset(self) -> None:
-        _set_counter(self.next_worker_id, 0)
-
-    def next_worker(self) -> int:
-        _add_counter(self.next_worker_id, 1)
-        return self.next_worker_id.value
-
-
-@dataclass(slots=True)
 class ProgressState:
     """Multiprocessing-safe mutable progress state.
 
@@ -323,23 +304,29 @@ class ProgressState:
 class SharedResources:
     """Shared state passed to runtime worker processes."""
 
-    registry: WorkerRegistry
     progress: ProgressState
+    next_worker_id: Synchronized[int]
     scene_limit: int | None = None
 
     @classmethod
     def create(
         cls, *, scene_limit: int | None = None, mp_context: BaseContext | None = None
     ) -> SharedResources:
+        ctx = mp_context or mp.get_context()
         return cls(
-            registry=WorkerRegistry.create(mp_context),
-            progress=ProgressState.create(mp_context),
+            progress=ProgressState.create(ctx),
+            next_worker_id=ctx.Value("i", 0),
             scene_limit=scene_limit,
         )
 
     def reset(self) -> None:
-        self.registry.reset()
+        _set_counter(self.next_worker_id, 0)
         self.progress.reset()
+
+    def next_worker(self) -> int:
+        """Allocate the next worker identifier."""
+        _add_counter(self.next_worker_id, 1)
+        return self.next_worker_id.value
 
 
 def _set_counter(counter: Synchronized[int], value: int) -> None:

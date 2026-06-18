@@ -131,8 +131,7 @@ Force = Annotated[
 Overwrite = Annotated[
     bool,
     typer.Option(
-        "--overwrite/--no-overwrite",
-        help="Replace an existing non-empty output directory.",
+        "--overwrite/--no-overwrite", help="Replace an existing non-empty output directory."
     ),
 ]
 DatasetName = Annotated[

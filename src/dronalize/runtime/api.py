@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from dronalize.datasets.registry import get_dataset
 from dronalize.io.backends.provider import build_writer_provider
-from dronalize.runtime.executor import open_execution_session
+from dronalize.runtime.executor import open_executor
 from dronalize.runtime.progress import execute_with_rich_progress
 from dronalize.runtime.resolve import build_execution_plan
 from dronalize.runtime.types import ExecutionResult
@@ -95,12 +95,10 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
 
     _prepare_output_directory(plan)
     start_time = time.perf_counter()
-    with open_execution_session(plan) as run:
+    with open_executor(plan) as executor:
         writer_provider = build_writer_provider(plan)
         progress = execute_with_rich_progress(
-            run.executor.progress,
-            lambda: run.executor.execute(writer_provider),
-            enable=show_progress,
+            executor, lambda: executor.execute(writer_provider), enable=show_progress
         )
         logger.debug("Execution complete, writing manifests", extra={"dataset": plan.dataset})
         plan.write_manifests()
@@ -120,7 +118,7 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
             storage_backend=plan.storage_backend,
             stats=progress.stats,
             scene_limit=progress.scene_limit,
-            cleanup_summary=run.executor.cleanup_summary(),
+            cleanup_summary=executor.cleanup_summary(),
             elapsed_time_seconds=time.perf_counter() - start_time,
         )
 

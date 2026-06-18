@@ -5,13 +5,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import polars as pl
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
 
-from dronalize.config.models import CountRange  # noqa: TC001
-from dronalize.core.categories import AgentCategory, AgentCategoryInput
+from dronalize.core.categories import AgentCategory, AgentCategoryInput, AgentCategoryLike
 from dronalize.processing.screening.base import (
     AgentCategorySelector,
+    CountRange,
     FrameInput,
     FrameSet,
     RuleId,
@@ -56,6 +56,13 @@ class CategoryRange(SceneCheckRuleBase):
     ranges: dict[AgentCategory, CountRange]
     rule: Literal["category_range"] = Field("category_range", repr=False, init=False)
 
+    @field_validator("ranges", mode="before")
+    @classmethod
+    def _coerce_categories(
+        cls, ranges: dict[AgentCategoryLike, CountRange]
+    ) -> dict[AgentCategory, CountRange]:
+        return {AgentCategory.from_value(category): value for category, value in ranges.items()}
+
     @classmethod
     def define(cls, *ranges: tuple[AgentCategoryInput, CountRange]) -> CategoryRange:
         """Alternate constructor that accepts one or many category-range pairs."""
@@ -78,7 +85,7 @@ class SceneRequireFrames(SceneCheckRuleBase):
     """Require specific relative frames to exist in the scene window."""
 
     frames: FrameSet
-    rule: Literal["frames"] = Field("frames", repr=False, init=False)
+    rule: Literal["scene_frames"] = Field("scene_frames", repr=False, init=False)
 
     @classmethod
     def define(cls, frames: FrameInput, *, rule_id: RuleId | None = None) -> SceneRequireFrames:
@@ -99,7 +106,7 @@ class SceneRequireWindow(SceneCheckRuleBase):
     start_frame: int = Field(ge=0)
     end_frame: int = Field(ge=0)
     min_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
-    rule: Literal["window"] = Field("window", repr=False, init=False)
+    rule: Literal["scene_window"] = Field("scene_window", repr=False, init=False)
 
     @model_validator(mode="after")
     def _validate_window(self) -> SceneRequireWindow:
@@ -121,17 +128,17 @@ class SceneRequireWindow(SceneCheckRuleBase):
 class SceneMaxMissingFrames(SceneCheckRuleBase):
     """Require the cleaned scene window to stay within a missing-frame budget."""
 
-    max_missing_frames: int = Field(default=0, ge=0)
+    maximum: int = Field(ge=0)
+    selector: AgentCategorySelector
     rule: Literal["max_missing_frames"] = Field("max_missing_frames", repr=False, init=False)
 
     @override
     def predicate_expr(self, ctx: ScreeningContext) -> pl.Expr:
         """Return the scene-pass expression for the missing-frame budget."""
-        unique_frame_count = ctx.over_scene_window(pl.col(ctx.columns.frame).n_unique())
-        frame_span = ctx.over_scene_window(
-            pl.col(ctx.columns.frame).max() - pl.col(ctx.columns.frame).min() + 1
-        )
-        return (frame_span - unique_frame_count) <= self.max_missing_frames
+        frame = pl.col(ctx.columns.frame).filter(ctx.selector_mask(self.selector))
+        unique_frame_count = ctx.over_scene_window(frame.n_unique())
+        frame_span = ctx.over_scene_window(frame.max() - frame.min() + 1)
+        return (frame_span - unique_frame_count) <= self.maximum
 
 
 SceneCheckRule = Annotated[

@@ -165,10 +165,7 @@ def _validate_full_record(record: SceneRecord) -> None:
         msg = f"`features` must have shape (N, T, F), got {record.features.shape!r}."
         raise ValueError(msg)
     if record.mask.shape != record.features.shape[:2]:
-        msg = (
-            f"`mask` must have shape {record.features.shape[:2]!r}, "
-            f"got {record.mask.shape!r}."
-        )
+        msg = f"`mask` must have shape {record.features.shape[:2]!r}, got {record.mask.shape!r}."
         raise ValueError(msg)
     _validate_agent_arrays(
         num_agents=record.features.shape[0],

@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 import pytest
 
 from dronalize.config import RuntimeOverride
-from dronalize.config.models import RequireFramesSpec
 from dronalize.datasets import DatasetDescriptor, get_dataset, list_datasets
 from dronalize.datasets.registry import (
     _builtin_datasets,  # pyright: ignore[reportPrivateUsage]
@@ -14,6 +13,7 @@ from dronalize.datasets.registry import (
     dataset_names_by_id,
 )
 from dronalize.io import StorageBackend
+from dronalize.processing.screening.agent import AgentRequireFrames
 from dronalize.runtime import ExecutionRequest, resolve_request
 from tests.support import demo_descriptor
 from tests.support_integration import assert_plan_scene_outputs
@@ -47,9 +47,11 @@ def test_builtin_screening_requires_observation_end(name: str) -> None:
     assert "min_observations" in screening.cleanup
     assert "require_frames" in screening.agents
     rule = screening.agents["require_frames"]
-    assert isinstance(rule, RequireFramesSpec)
+    assert isinstance(rule, AgentRequireFrames)
     assert descriptor.default_config.scenes.default_observation_length is not None
-    assert rule.frames == (descriptor.default_config.scenes.default_observation_length - 1,)
+    assert rule.frames == frozenset({
+        descriptor.default_config.scenes.default_observation_length - 1
+    })
     assert rule.require is not None
     assert rule.require.absolute == 1
     assert rule.require.relative is None
@@ -89,8 +91,6 @@ ALL_CASES_DEFAULT: dict[str, DatasetCase] = {
 def test_dataset_raw_data_processing(
     case: DatasetCase, jobs: int, raw_data_root: Path, artifact_dir: Path, tmp_path: Path
 ) -> None:
-    if case.dataset != "argoverse2":
-        return
     if not (raw_data_root / case.path_rel_root).exists():
         pytest.skip(f"Dataset root not found: {raw_data_root / case.path_rel_root}")
     if jobs > 1:

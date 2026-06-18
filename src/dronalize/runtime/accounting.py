@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from dronalize.runtime.state import (
     CleanupProgress,
@@ -90,16 +90,20 @@ class CleanupRemovalAccumulator:
 
 
 @dataclass(slots=True)
-class CleanupSummaryAccumulator:
-    """Accumulate cleanup summary statistics, including per-rule summaries."""
+class CleanupAccumulator:
+    """Accumulate cleanup progress and final per-rule summaries."""
 
     overall: CleanupRemovalAccumulator = field(default_factory=CleanupRemovalAccumulator)
     by_rule: dict[str, CleanupRemovalAccumulator] = field(default_factory=dict)
+    rows_total: int = 0
+    rows_removed: int = 0
+    agents_total: int = 0
+    agents_removed: int = 0
 
-    def record(self, stats: CleanupSceneStats | None) -> None:
-        """Record cleanup statistics for one candidate scene."""
+    def record(self, stats: CleanupSceneStats | None) -> bool:
+        """Record one candidate and return whether counters changed."""
         if stats is None:
-            return
+            return False
 
         self.overall.record(rows_removed=stats.rows_removed, agents_removed=stats.agents_removed)
         for rule_stats in stats.by_rule:
@@ -107,6 +111,11 @@ class CleanupSummaryAccumulator:
             accumulator.record(
                 rows_removed=rule_stats.rows_removed, agents_removed=rule_stats.agents_removed
             )
+        self.rows_total += stats.rows_before
+        self.rows_removed += stats.rows_removed
+        self.agents_total += stats.agents_before
+        self.agents_removed += stats.agents_removed
+        return True
 
     def merge(self, summary: CleanupSummary | None) -> None:
         """Merge a frozen cleanup summary into this accumulator."""
@@ -131,29 +140,6 @@ class CleanupSummaryAccumulator:
         }
         return CleanupSummary(overall=overall, by_rule=by_rule)
 
-
-@dataclass(slots=True)
-class CleanupAccounting:
-    """Collect cleanup progress counters and detailed cleanup summaries."""
-
-    accumulator: CleanupSummaryAccumulator = field(default_factory=CleanupSummaryAccumulator)
-    rows_total: int = 0
-    rows_removed: int = 0
-    agents_total: int = 0
-    agents_removed: int = 0
-
-    def record(self, stats: CleanupSceneStats | None) -> bool:
-        """Record cleanup stats and return whether any counters changed."""
-        if stats is None:
-            return False
-
-        self.accumulator.record(stats)
-        self.rows_total += stats.rows_before
-        self.rows_removed += stats.rows_removed
-        self.agents_total += stats.agents_before
-        self.agents_removed += stats.agents_removed
-        return True
-
     def progress(self) -> CleanupProgress:
         """Return lightweight cleanup counters for live progress."""
         return CleanupProgress(
@@ -162,46 +148,6 @@ class CleanupAccounting:
             agents_total=self.agents_total,
             agents_removed=self.agents_removed,
         )
-
-    def freeze(self) -> CleanupSummary | None:
-        """Return the frozen cleanup summary."""
-        return self.accumulator.freeze()
-
-
-class RunAccounting(Protocol):
-    """Bookkeeping backend used by the shared source-to-scene loop."""
-
-    def finish_source(self) -> None:
-        """Record that processing finished for one source."""
-        ...
-
-    def record_candidate(self) -> None:
-        """Record one generated scene candidate."""
-        ...
-
-    def record_cleanup(self, stats: CleanupSceneStats | None) -> None:
-        """Record cleanup statistics associated with one candidate scene."""
-        ...
-
-    def record_screening_result(self, *, passed: bool) -> None:
-        """Record whether one candidate passed screening."""
-        ...
-
-    def claim_scene_number(self) -> int | None:
-        """Claim the next output scene number, respecting the scene limit."""
-        ...
-
-    def record_written(self, split: DatasetSplit | None) -> None:
-        """Record that one selected scene was written/materialized."""
-        ...
-
-    def limit_reached(self) -> bool:
-        """Return whether the output scene limit has already been reached."""
-        ...
-
-    def cleanup_summary(self) -> CleanupSummary | None:
-        """Return cleanup summary statistics collected by this backend."""
-        ...
 
 
 @dataclass(slots=True)
@@ -217,7 +163,7 @@ class LocalRunAccounting:
     screening_passed_count: int = 0
     screening_rejected_count: int = 0
     split_counts: SplitCounts = field(default_factory=empty_split_counts)
-    cleanup: CleanupAccounting = field(default_factory=CleanupAccounting)
+    cleanup: CleanupAccumulator = field(default_factory=CleanupAccumulator)
 
     def finish_source(self) -> None:
         """Record that one source finished processing."""
@@ -314,7 +260,7 @@ class SharedRunAccounting:
 
     progress: ProgressState
     limit: int | None = None
-    cleanup: CleanupAccounting = field(default_factory=CleanupAccounting)
+    cleanup: CleanupAccumulator = field(default_factory=CleanupAccumulator)
 
     def finish_source(self) -> None:
         """Record that one source finished processing."""
@@ -357,7 +303,9 @@ class SharedRunAccounting:
 
 
 def iter_scenes_from_source(
-    processor: RuntimeProcessor, source: DatasetSource[Any], accounting: RunAccounting
+    processor: RuntimeProcessor,
+    source: DatasetSource[Any],
+    accounting: LocalRunAccounting | SharedRunAccounting,
 ) -> Iterator[Scene]:
     """Yield materialized scenes for one source while applying bookkeeping.
 

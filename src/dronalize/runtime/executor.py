@@ -6,17 +6,13 @@ import functools
 import logging
 import multiprocessing as mp
 import threading
-from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from multiprocessing.synchronize import Event
 from multiprocessing.util import Finalize
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar
-
-from typing_extensions import override
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from dronalize.runtime.accounting import (
-    CleanupSummaryAccumulator,
+    CleanupAccumulator,
     LocalRunAccounting,
     SharedRunAccounting,
     iter_scenes_from_source,
@@ -28,6 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable, Iterator
     from multiprocessing.context import BaseContext
     from multiprocessing.pool import Pool
+    from multiprocessing.synchronize import Event
 
     from dronalize.core.scene import Scene
     from dronalize.core.typing import P
@@ -35,59 +32,10 @@ if TYPE_CHECKING:
     from dronalize.processing.loading.models import DatasetSource
     from dronalize.runtime.types import CleanupSummary, ExecutionPlan
 
-AnyEvent = Event | threading.Event
 ReturnT = TypeVar("ReturnT")
 _ctx: WorkerRuntime
 
 logger = logging.getLogger(__name__)
-
-
-class ProgressSource(ABC):
-    """Read-only progress interface for execution observers."""
-
-    @abstractmethod
-    def snapshot(self) -> Progress:
-        """Return a point-in-time progress snapshot."""
-        ...
-
-    @abstractmethod
-    def changed(self) -> AnyEvent:
-        """Return the event set whenever progress changes."""
-        ...
-
-    def wait_for_change(self) -> Progress:
-        """Wait for the next progress change and return progress."""
-        _ = self.changed().wait()
-        self.changed().clear()
-        return self.snapshot()
-
-
-class Executor(Protocol):
-    """Shared protocol for sequential and parallel execution of a plan."""
-
-    @property
-    def progress(self) -> ProgressSource:
-        """Return the progress interface for this executor."""
-        ...
-
-    def execute(self, writer_provider: WriterProvider) -> Progress:
-        """Execute the plan and return the final progress snapshot.
-
-        The writer provider owns creation of worker-local writers and any
-        dataset-wide finalization required after workers finish.
-
-        """
-        ...
-
-    def cleanup_summary(self) -> CleanupSummary | None:
-        """Return aggregated cleanup statistics collected during execution."""
-        ...
-
-
-@dataclass(slots=True)
-class ExecutionSession:
-    plan: ExecutionPlan
-    executor: Executor
 
 
 @dataclass(slots=True)
@@ -101,19 +49,20 @@ class WorkerRuntime:
 
 
 @contextmanager
-def open_execution_session(plan: ExecutionPlan) -> Generator[ExecutionSession]:
-    """Open one plan with its map provider, processor, and executor."""
+def open_executor(plan: ExecutionPlan) -> Generator[SequentialExecutor | ParallelExecutor]:
+    """Open the executor and dataset resources for one plan."""
     with plan.descriptor.open_resources(plan.data_root, plan.loader) as map_provider:
-        logger.debug("Opening execution session", extra={"dataset": plan.dataset})
+        logger.debug("Opening executor", extra={"dataset": plan.dataset})
         loader = plan.descriptor.build_loader(
             root=plan.data_root, request=plan.loader, map_provider=map_provider
         )
         processor = RuntimeProcessor.from_plan(plan, loader)
-        executor = _build_executor(plan, processor)
-        yield ExecutionSession(plan=plan, executor=executor)
+        yield _build_executor(plan, processor)
 
 
-def _build_executor(plan: ExecutionPlan, processor: RuntimeProcessor) -> Executor:
+def _build_executor(
+    plan: ExecutionPlan, processor: RuntimeProcessor
+) -> SequentialExecutor | ParallelExecutor:
     if plan.parallel:
         logger.debug("Using parallel executor", extra={"dataset": plan.dataset})
         return ParallelExecutor(
@@ -123,7 +72,7 @@ def _build_executor(plan: ExecutionPlan, processor: RuntimeProcessor) -> Executo
     return SequentialExecutor(processor, limit=plan.limit)
 
 
-class SequentialExecutor(Executor, ProgressSource):
+class SequentialExecutor:
     """Single-process executor for internal runtime execution.
 
     Parameters
@@ -145,13 +94,8 @@ class SequentialExecutor(Executor, ProgressSource):
             limit=limit, update_event=self._update_event
         )
 
-    @property
-    @override
-    def progress(self) -> ProgressSource:
-        return self
-
-    @override
     def execute(self, writer_provider: WriterProvider) -> Progress:
+        """Process all selected sources with one writer."""
         writer = writer_provider.open_worker(0)
         try:
             for scene in self._iter_scenes():
@@ -165,8 +109,8 @@ class SequentialExecutor(Executor, ProgressSource):
 
         return self.snapshot()
 
-    @override
     def snapshot(self) -> Progress:
+        """Return current sequential progress."""
         return self._accounting.snapshot(
             running=self._running,
             total_sources=self._total_sources,
@@ -174,12 +118,12 @@ class SequentialExecutor(Executor, ProgressSource):
             screening_enabled=self._screening_enabled,
         )
 
-    @override
     def cleanup_summary(self) -> CleanupSummary | None:
+        """Return final cleanup statistics."""
         return self._accounting.cleanup_summary()
 
-    @override
     def changed(self) -> threading.Event:
+        """Return the event signaled after progress changes."""
         return self._update_event
 
     def _iter_scenes(self) -> Iterator[Scene]:
@@ -196,7 +140,7 @@ class SequentialExecutor(Executor, ProgressSource):
             self._update_event.set()
 
 
-class ParallelExecutor(Executor, ProgressSource):
+class ParallelExecutor:
     """Parallel executor for internal runtime execution.
 
     Parameters
@@ -235,19 +179,14 @@ class ParallelExecutor(Executor, ProgressSource):
         self._num_sources: int | None = total_sources
         self._screening_enabled: bool = processor.screening_enabled()
         self._running: bool = False
-        self._cleanup_accumulator: CleanupSummaryAccumulator = CleanupSummaryAccumulator()
+        self._cleanup_accumulator: CleanupAccumulator = CleanupAccumulator()
         self._mp_context: BaseContext = mp_context or mp.get_context("spawn")
         self._shared: SharedResources = SharedResources.create(
             scene_limit=limit, mp_context=self._mp_context
         )
 
-    @property
-    @override
-    def progress(self) -> ProgressSource:
-        return self
-
-    @override
     def execute(self, writer_provider: WriterProvider) -> Progress:
+        """Process selected sources across the worker pool."""
         for cleanup_summary in self._execute_parallel(
             self._process_fn_write,
             self._processor.iter_sources(),
@@ -260,8 +199,8 @@ class ParallelExecutor(Executor, ProgressSource):
         writer_provider.finish_final()
         return self.snapshot()
 
-    @override
     def snapshot(self) -> Progress:
+        """Return current shared progress."""
         return self._shared.progress.snapshot(
             running=self._running,
             total_sources=self._num_sources,
@@ -269,12 +208,12 @@ class ParallelExecutor(Executor, ProgressSource):
             screening_enabled=self._screening_enabled,
         )
 
-    @override
     def changed(self) -> Event:
+        """Return the shared event signaled after progress changes."""
         return self._shared.progress.update_event
 
-    @override
     def cleanup_summary(self) -> CleanupSummary | None:
+        """Return merged cleanup statistics from all workers."""
         return self._cleanup_accumulator.freeze()
 
     @staticmethod
@@ -343,7 +282,7 @@ def _init_worker(
     with_finalize: bool = True,
 ) -> None:
     global _ctx  # noqa: PLW0603
-    worker_id = shared.registry.next_worker()
+    worker_id = shared.next_worker()
     shared.progress.worker_started()
     _ctx = WorkerRuntime(shared=shared, worker_id=worker_id, processor=processor)
     if with_finalize:

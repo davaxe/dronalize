@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Generic, overload
+from typing import TYPE_CHECKING, Any, Generic
 
 import numpy as np
 import numpy.typing as npt
@@ -32,32 +32,6 @@ class MapRecord(TypedDict, Generic[FloatScalarT]):
 MapRecordF32 = MapRecord[np.float32]
 MapRecordF64 = MapRecord[np.float64]
 AnyMapRecord = MapRecord[np.float32] | MapRecord[np.float64]
-
-
-@overload
-def encode_scene_record(
-    scene: Scene,
-    *,
-    dtype: type[np.float32],
-    recenter_position: bool = True,
-    trajectory_schema: TrajectorySchema | None = None,
-    category_mapping: dict[AgentCategory, int] | None = None,
-    default_observation_length: int | None = None,
-    dataset_id: int | None = None,
-) -> SceneRecord: ...
-
-
-@overload
-def encode_scene_record(
-    scene: Scene,
-    *,
-    dtype: type[np.float64],
-    recenter_position: bool = True,
-    trajectory_schema: TrajectorySchema | None = None,
-    category_mapping: dict[AgentCategory, int] | None = None,
-    default_observation_length: int | None = None,
-    dataset_id: int | None = None,
-) -> SceneRecord: ...
 
 
 def encode_scene_record(
@@ -152,30 +126,6 @@ def _resolve_dataset_id(dataset: str | None, *, explicit_dataset_id: int | None)
     return dataset_id_for_name(dataset)
 
 
-@overload
-def encode_split_scene_record(
-    scene: Scene,
-    *,
-    dtype: type[np.float32],
-    observation_length: int,
-    recenter_position: bool = True,
-    trajectory_schema: TrajectorySchema | None = None,
-    category_mapping: dict[AgentCategory, int] | None = None,
-) -> SplitSceneRecord: ...
-
-
-@overload
-def encode_split_scene_record(
-    scene: Scene,
-    *,
-    dtype: type[np.float64],
-    observation_length: int,
-    recenter_position: bool = True,
-    trajectory_schema: TrajectorySchema | None = None,
-    category_mapping: dict[AgentCategory, int] | None = None,
-) -> SplitSceneRecord: ...
-
-
 def encode_split_scene_record(
     scene: Scene,
     *,
@@ -196,14 +146,6 @@ def encode_split_scene_record(
     return record.split(observation_length)
 
 
-@overload
-def empty_map_record(dtype: type[np.float32]) -> MapRecordF32: ...
-
-
-@overload
-def empty_map_record(dtype: type[np.float64]) -> MapRecordF64: ...
-
-
 def empty_map_record(dtype: FloatDType) -> MapRecordF32 | MapRecordF64:
     """Return the canonical empty-map payload used by raw scene records."""
     map_dict: MapRecord[Any] = {
@@ -215,18 +157,6 @@ def empty_map_record(dtype: FloatDType) -> MapRecordF32 | MapRecordF64:
     return map_dict
 
 
-@overload
-def encode_map_from_scene(
-    scene: Scene, dtype: type[np.float32], offset: npt.NDArray[np.float64] | None = None
-) -> MapRecordF32: ...
-
-
-@overload
-def encode_map_from_scene(
-    scene: Scene, dtype: type[np.float64], offset: npt.NDArray[np.float64] | None = None
-) -> MapRecordF64: ...
-
-
 def encode_map_from_scene(
     scene: Scene, dtype: FloatDType, offset: npt.NDArray[np.float64] | None = None
 ) -> MapRecordF32 | MapRecordF64:
@@ -236,18 +166,6 @@ def encode_map_from_scene(
         return empty_map_record(dtype)
 
     return _map_graph_to_numpy(graph, dtype=dtype, offset=offset)
-
-
-@overload
-def _map_graph_to_numpy(
-    graph: MapGraph, dtype: type[np.float32], offset: npt.NDArray[np.float64] | None = None
-) -> MapRecordF32: ...
-
-
-@overload
-def _map_graph_to_numpy(
-    graph: MapGraph, dtype: type[np.float64], offset: npt.NDArray[np.float64] | None = None
-) -> MapRecordF64: ...
 
 
 def _map_graph_to_numpy(

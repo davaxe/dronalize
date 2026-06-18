@@ -22,10 +22,12 @@ from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from typing_extensions import override
 
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.optional import raise_missing_optional_dependency
+from dronalize.core.scene import get_trajectory_schema
 from dronalize.io.base import (
     DatasetWriter,
     RecordTransform,
@@ -47,9 +49,9 @@ except ModuleNotFoundError as error:
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable
 
+    from dronalize.config.models import OutputConfig
     from dronalize.core.categories import DatasetSplit
-    from dronalize.core.scene import Scene
-    from dronalize.runtime.types import OutputPlan
+    from dronalize.core.scene import Scene, TrajectorySchema
 
 
 class MDSDatasetWriter(DatasetWriter):
@@ -67,7 +69,7 @@ class MDSDatasetWriter(DatasetWriter):
     output_dir : Path
         The base output directory for the dataset. The writer will create split
         subdirectories such as `train` or `unsplit` as needed.
-    config : OutputPlan
+    config : OutputConfig
         The output configuration for the dataset, which controls encoding and
         MDS writer options.
     splits : Iterable[DatasetSplit], optional
@@ -102,7 +104,8 @@ class MDSDatasetWriter(DatasetWriter):
         self,
         output_dir: Path,
         *,
-        config: OutputPlan,
+        config: OutputConfig,
+        default_observation_length: int | None = None,
         splits: Iterable[DatasetSplit] | None,
         parallel: bool,
         parallel_group: int | str | None = None,
@@ -117,7 +120,9 @@ class MDSDatasetWriter(DatasetWriter):
             msg = "Custom MDS transforms require `mds_columns`."
             raise ValueError(msg)
         self._base_output_dir: Path = Path(output_dir)
-        self._config: OutputPlan = config
+        self._config: OutputConfig = config
+        self._trajectory_schema: TrajectorySchema = get_trajectory_schema(config.trajectory_schema)
+        self._default_observation_length: int | None = default_observation_length
         self._splits: tuple[DatasetSplit, ...] | None = (
             tuple(dict.fromkeys(splits)) if splits is not None else None
         )
@@ -126,7 +131,7 @@ class MDSDatasetWriter(DatasetWriter):
         self._record_transform: RecordTransform[dict[str, Any]] | None = record_transform
         self._scene_transform: SceneTransform[dict[str, Any]] | None = scene_transform
         self._mds_columns: dict[str, str] = (
-            mds_columns if mds_columns is not None else default_mds_columns(config.config.precision)
+            mds_columns if mds_columns is not None else default_mds_columns(config.precision)
         )
         self._writers: dict[DatasetSplit | None, MDSWriter] | None = None
 
@@ -138,7 +143,7 @@ class MDSDatasetWriter(DatasetWriter):
         splits: tuple[DatasetSplit, ...] | None,
         parallel: bool,
         parallel_group: int | str | None,
-        config: OutputPlan,
+        config: OutputConfig,
         mds_columns: dict[str, str],
     ) -> dict[DatasetSplit | None, MDSWriter]:
         writers: dict[DatasetSplit | None, MDSWriter] = {}
@@ -194,10 +199,10 @@ class MDSDatasetWriter(DatasetWriter):
 
         encoded_scene = encode_scene_record(
             scene,
-            dtype=self._config.precision(),
+            dtype=np.float32 if self._config.precision == "float32" else np.float64,
             recenter_position=self._config.recenter_positions,
-            trajectory_schema=self._config.trajectory_schema,
-            default_observation_length=self._config.default_observation_length,
+            trajectory_schema=self._trajectory_schema,
+            default_observation_length=self._default_observation_length,
         )
         if self._record_transform is not None:
             return dict(self._record_transform(encoded_scene))

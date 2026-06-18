@@ -521,43 +521,23 @@ def _distance_sq(src: Point, dst: Point) -> float:
     return (src[0] - dst[0]) ** 2 + (src[1] - dst[1]) ** 2
 
 
-class MapBuilder(Protocol):
-    """Minimal protocol for building a map graph."""
-
-    def build(
-        self, min_distance: float | None = None, interpolation_distance: float | None = None
-    ) -> MapGraph:
-        """Build the final `MapGraph`."""
-        ...
-
-
-class MapGeometrySource(Protocol):
-    """Semantic source for map geometry features."""
-
-    def iter_features(self) -> Iterable[MapFeature]:
-        """Yield semantic map features."""
-        ...
-
-    def edge_remap(self) -> Mapping[EdgeType, EdgeType]:
-        """Return edge remapping applied during compilation."""
-        ...
-
-
-class FeatureMapBuilder(MapBuilder, MapGeometrySource, ABC):
+class FeatureMapBuilder(ABC):
     """Base class for map builders that emit semantic geometry features."""
 
     @abstractmethod
-    @override
-    def iter_features(self) -> Iterable[MapFeature]: ...
+    def iter_features(self) -> Iterable[MapFeature]:
+        """Yield semantic map features to compile."""
+        ...
 
-    @override
     def edge_remap(self) -> Mapping[EdgeType, EdgeType]:
+        """Return optional edge-type remapping for compilation."""
+        _ = self
         return {}
 
-    @override
     def build(
         self, min_distance: float | None = None, interpolation_distance: float | None = None
     ) -> MapGraph:
+        """Compile this builder's features into a map graph."""
         options = MapBuildOptions.from_distances(
             min_distance=min_distance,
             interpolation_distance=interpolation_distance,

@@ -179,10 +179,7 @@ def resample(
     """
     resample_spec = spec or ResampleSpec()
     plan = _resolve_request(
-        resample_spec,
-        frame_column=frame_column,
-        group_by=group_by,
-        time_origin_by=time_origin_by,
+        resample_spec, frame_column=frame_column, group_by=group_by, time_origin_by=time_origin_by
     )
     match resample_spec.method:
         case ResampleMethod.LINEAR:

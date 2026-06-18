@@ -20,12 +20,7 @@ from dronalize.config.models import (
 from dronalize.config.parse import ProjectConfig, parse_config
 from dronalize.io.base import StorageBackend
 from dronalize.processing.models import SplitAssignmentPlan
-from dronalize.runtime.types import (
-    ExecutionPlan,
-    OutputPlan,
-    build_loader_plan,
-    resolve_effective_scene_window,
-)
+from dronalize.runtime.types import ExecutionPlan, build_loader_plan, resolve_effective_scene_window
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -81,10 +76,6 @@ def build_execution_plan(
         output_dir=request.output_dir,
         storage_backend=StorageBackend(storage_backend),
         runtime=resolved_config.runtime,
-        output=OutputPlan(
-            config=resolved_config.output,
-            default_observation_length=effective_default_observation_length,
-        ),
         loader=loader_request,
         assignment=assignment_request,
         map=loader_request.map,

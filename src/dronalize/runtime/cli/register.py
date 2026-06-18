@@ -114,7 +114,6 @@ def _normalize_dataset_descriptors(
         raise cli_usage_error(msg) from exc
 
     normalized_descriptors: list[DatasetDescriptor] = []
-
     for descriptor in iterator:
         if not isinstance(descriptor, DatasetDescriptor):
             msg = (

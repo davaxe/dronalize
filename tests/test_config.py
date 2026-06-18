@@ -8,13 +8,8 @@ import pytest
 
 from dronalize.config import ProjectConfig, RuntimeOverride, parse_config
 from dronalize.config.models import (
-    AgentRangeSpec,
     DatasetConfig,
-    ExcludeCategoriesSpec,
     MapEdgeTypeRules,
-    MinObservationsSpec,
-    RequireSceneFramesSpec,
-    RequireSceneWindowSpec,
     SceneExtentExtraction,
     ScreeningConfig,
     TrajectoryBufferExtraction,
@@ -311,7 +306,7 @@ def test_screening_extend_is_default(tmp_path: Path) -> None:
     assert resolved.screening.cleanup == {}
     assert resolved.screening.scenes == {}
     assert set(resolved.screening.agents) == {"observation_floor"}
-    assert isinstance(resolved.screening.agents["observation_floor"], MinObservationsSpec)
+    assert isinstance(resolved.screening.agents["observation_floor"], agent.MinObservations)
     assert resolved.screening.agents["observation_floor"].minimum == 8
 
 
@@ -353,10 +348,10 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
     assert set(resolved.screening.cleanup) == {"trim_static"}
     assert set(resolved.screening.scenes) == {"min_context", "context_window"}
     assert set(resolved.screening.agents) == {"observation_floor"}
-    assert isinstance(resolved.screening.cleanup["trim_static"], ExcludeCategoriesSpec)
-    assert isinstance(resolved.screening.scenes["min_context"], AgentRangeSpec)
-    assert isinstance(resolved.screening.scenes["context_window"], RequireSceneWindowSpec)
-    assert isinstance(resolved.screening.agents["observation_floor"], MinObservationsSpec)
+    assert isinstance(resolved.screening.cleanup["trim_static"], cleanup.ExcludeCategories)
+    assert isinstance(resolved.screening.scenes["min_context"], scene.AgentRange)
+    assert isinstance(resolved.screening.scenes["context_window"], scene.SceneRequireWindow)
+    assert isinstance(resolved.screening.agents["observation_floor"], agent.MinObservations)
     assert resolved.screening.agents["observation_floor"].minimum == 8
 
 
@@ -397,7 +392,7 @@ def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
     assert resolved.screening.cleanup == {}
     assert set(resolved.screening.scenes) == {"context_window"}
     assert resolved.screening.agents == {}
-    assert isinstance(resolved.screening.scenes["context_window"], RequireSceneWindowSpec)
+    assert isinstance(resolved.screening.scenes["context_window"], scene.SceneRequireWindow)
 
 
 def test_screening_remove_drops_names(tmp_path: Path) -> None:
@@ -446,9 +441,9 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
     assert set(resolved.screening.cleanup) == {"keep_cleanup"}
     assert set(resolved.screening.scenes) == {"keep_scene"}
     assert set(resolved.screening.agents) == {"keep_agent"}
-    assert isinstance(resolved.screening.cleanup["keep_cleanup"], ExcludeCategoriesSpec)
-    assert isinstance(resolved.screening.scenes["keep_scene"], RequireSceneFramesSpec)
-    assert isinstance(resolved.screening.agents["keep_agent"], MinObservationsSpec)
+    assert isinstance(resolved.screening.cleanup["keep_cleanup"], cleanup.ExcludeCategories)
+    assert isinstance(resolved.screening.scenes["keep_scene"], scene.SceneRequireFrames)
+    assert isinstance(resolved.screening.agents["keep_agent"], agent.MinObservations)
 
 
 def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
@@ -511,8 +506,8 @@ def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
     assert resolved.screening is not None
     assert set(resolved.screening.cleanup) == {"trim_static"}
     assert set(resolved.screening.scenes) == {"final_context"}
-    assert isinstance(resolved.screening.cleanup["trim_static"], ExcludeCategoriesSpec)
-    assert isinstance(resolved.screening.scenes["final_context"], AgentRangeSpec)
+    assert isinstance(resolved.screening.cleanup["trim_static"], cleanup.ExcludeCategories)
+    assert isinstance(resolved.screening.scenes["final_context"], scene.AgentRange)
     assert resolved.screening.scenes["final_context"].minimum == 3
     assert resolved.screening.agents == {}
 
@@ -579,7 +574,7 @@ def test_map_config_parses_trajectory_buffer(tmp_path: Path) -> None:
     assert resolved.map.extraction.radius == pytest.approx(6.5)
 
 
-def test_agent_specs_compile() -> None:
+def test_agent_rules_load() -> None:
     config = ScreeningConfig.model_validate({
         "agents": {
             "required_frames": {"rule": "frames", "frames": [0, 1, 2]},
@@ -606,19 +601,28 @@ def test_agent_specs_compile() -> None:
     assert compiled.agent_rules[2].require.relative == pytest.approx(0.75)
 
 
-def test_scene_specs_compile() -> None:
+def test_scene_rules_load() -> None:
     config = ScreeningConfig.model_validate({
-        "scenes": {"agent_bounds": {"rule": "agent_range", "minimum": 1, "maximum": 5}}
+        "scenes": {
+            "agent_bounds": {"rule": "agent_range", "minimum": 1, "maximum": 5},
+            "missing_frames": {
+                "rule": "max_missing_frames",
+                "maximum": 1,
+                "selector": {"categories": ["car"]},
+            },
+        }
     })
 
     compiled = ScreeningRuleSet.from_config(config)
 
-    assert len(compiled.scene_rules) == 1
+    assert len(compiled.scene_rules) == 2
     assert isinstance(compiled.scene_rules[0], scene.AgentRange)
     assert compiled.scene_rules[0].rule_id == "agent_bounds"
+    assert isinstance(compiled.scene_rules[1], scene.SceneMaxMissingFrames)
+    assert compiled.scene_rules[1].rule_id == "missing_frames"
 
 
-def test_cleanup_specs_compile_nested_agent_rules() -> None:
+def test_cleanup_rules_load_nested_agent_rules() -> None:
     config = ScreeningConfig.model_validate({
         "cleanup": {
             "keep_only_cars": {"rule": "include", "categories": ["car"]},
