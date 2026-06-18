@@ -128,6 +128,13 @@ SplitSegments = Annotated[
 Force = Annotated[
     bool, typer.Option("--force", "-f", help="Force processing without confirmation.")
 ]
+Overwrite = Annotated[
+    bool,
+    typer.Option(
+        "--overwrite/--no-overwrite",
+        help="Replace an existing non-empty output directory.",
+    ),
+]
 DatasetName = Annotated[
     str, typer.Argument(help="The name of the dataset to apply the command to.")
 ]
@@ -199,6 +206,7 @@ def process(
     gap: SplitGap = None,
     segments: SplitSegments = None,
     force: Force = False,
+    overwrite: Overwrite = False,
     plan_mode: Plan = False,
     include_map: IncludeMap = None,
 ) -> None:
@@ -223,6 +231,7 @@ def process(
             include_map=include_map,
             limit=limit,
             seed=seed,
+            overwrite=overwrite,
             input_dir_exists=not plan_mode,
         )
     )
@@ -284,7 +293,7 @@ def show_config(
         lambda: _resolve_cli_plan(
             dataset=dataset,
             input_dir=Path(),
-            output_dir=Path(),
+            output_dir=Path.cwd().parent / "__dronalize_config_output__",
             storage_backend=storage_backend,
             config=config,
             read=read,
@@ -375,6 +384,7 @@ def _resolve_cli_plan(
     include_map: bool | None,
     limit: int | None = None,
     seed: int | None = None,
+    overwrite: bool = False,
     input_dir_exists: bool = True,
 ) -> ExecutionPlan:
     from dronalize.runtime import ExecutionRequest, resolve_request
@@ -386,6 +396,7 @@ def _resolve_cli_plan(
             output_dir=output_dir,
             limit=limit,
             seed=seed,
+            overwrite=overwrite,
             storage_backend=storage_backend,
             config_path=config,
             overrides=RuntimeOverride.from_inputs(

@@ -22,6 +22,7 @@ class MDSRow(TypedDict):
     default_observation_length: int
     ego_agent_id: int
     position_offset: npt.NDArray[np.float64]
+    agent_ids: npt.NDArray[np.int64]
     agent_types: npt.NDArray[np.int32]
     screened_agent_mask: npt.NDArray[np.uint8]
     features: npt.NDArray[np.float32 | np.float64]
@@ -50,6 +51,7 @@ def encode_mds_row(record: SceneRecord) -> MDSRow:
         ),
         "ego_agent_id": -1 if record.ego_agent_id is None else int(record.ego_agent_id),
         "position_offset": record.position_offset,
+        "agent_ids": record.agent_ids,
         "agent_types": record.agent_types,
         "screened_agent_mask": record.screened_agent_mask.astype(np.uint8, copy=False),
         "features": record.features,
@@ -79,6 +81,7 @@ def decode_mds_row(row: Mapping[str, Any]) -> SceneRecord:
             else int(row["default_observation_length"])
         ),
         position_offset=np.asarray(row["position_offset"], dtype=np.float64),
+        agent_ids=np.asarray(row["agent_ids"], dtype=np.int64),
         agent_types=np.asarray(row["agent_types"], dtype=np.int32),
         screened_agent_mask=np.asarray(row["screened_agent_mask"], dtype=bool),
         features=np.asarray(row["features"]),
@@ -98,6 +101,7 @@ def mds_columns(dtype: str) -> dict[str, str]:
         "default_observation_length": "int",
         "ego_agent_id": "int",
         "position_offset": "ndarray:float64:2",
+        "agent_ids": "ndarray:int64",
         "agent_types": "ndarray:int32",
         "screened_agent_mask": "ndarray:uint8",
         "features": f"ndarray:{dtype}",

@@ -117,6 +117,7 @@ def _convert_full_to_hetero(record: TorchSceneRecord) -> HeteroData:
 
     data["agent"].features = record.features
     data["agent"].agent_time_mask = record.agent_time_mask
+    data["agent"].agent_id = record.agent_ids
     data["agent"].agent_type = record.agent_types
     data["agent"].screened_agent_mask = record.screened_agent_mask
     data["agent"].num_nodes = record.features.size(0)
@@ -134,6 +135,7 @@ def _convert_full_to_hetero(record: TorchSceneRecord) -> HeteroData:
         record.dataset_id,
         record.position_offset,
         default_observation_length=record.default_observation_length,
+        ego_agent_id=record.ego_agent_id,
     )
     return data
 
@@ -159,11 +161,13 @@ def _attach_common_metadata(
     position_offset: torch.Tensor,
     *,
     default_observation_length: int | None,
+    ego_agent_id: int | None,
 ) -> None:
     data.scene_number = int(scene_number)
-    data.dataset_id = dataset_id
+    data.dataset_id = -1 if dataset_id is None else int(dataset_id)
     data.position_offset = position_offset
     data.default_observation_length = default_observation_length
+    data.ego_agent_id = ego_agent_id
 
 
 def _pad_full_hetero_time_axes(record: HeteroData, *, horizon_frames: int) -> HeteroData:

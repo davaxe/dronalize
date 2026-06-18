@@ -136,6 +136,8 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
     horizon_frames = scene.horizon_frames
     feature_dim = int(record.features.shape[2])
 
+    _assert_shape(record.agent_ids, (n_agents,), "agent_ids")
+    _assert_dtype(record.agent_ids, np.int64, "agent_ids")
     _assert_shape(record.screened_agent_mask, (n_agents,), "screened_agent_mask")
     _assert_dtype(record.screened_agent_mask, np.bool_, "screened_agent_mask")
 
@@ -181,7 +183,7 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
 def _expected_dataset_id(dataset: str | None) -> int | None:
     if dataset is None:
         return None
-    return dataset_id_for_name(dataset) or 0
+    return dataset_id_for_name(dataset)
 
 
 @dataclass(frozen=True, slots=True)

@@ -187,6 +187,7 @@ class MapGraph:
             if edge_types is not None
             else np.ones(self.num_edges, dtype=np.int32)
         )
+        self._validate()
 
     @property
     def num_nodes(self) -> int:
@@ -197,6 +198,30 @@ class MapGraph:
     def num_edges(self) -> int:
         """Return the number of edges in the graph."""
         return int(self.edge_indices.shape[1])
+
+    def _validate(self) -> None:
+        if self.node_positions.ndim != 2 or self.node_positions.shape[1:] != (2,):
+            msg = f"node_positions must have shape (N, 2), got {self.node_positions.shape!r}"
+            raise ValueError(msg)
+        if self.edge_indices.ndim != 2 or self.edge_indices.shape[0] != 2:
+            msg = f"edge_indices must have shape (2, E), got {self.edge_indices.shape!r}"
+            raise ValueError(msg)
+        if self.node_types.shape != (self.num_nodes,):
+            msg = "node_types length must match the number of nodes"
+            raise ValueError(msg)
+        if self.edge_types.shape != (self.num_edges,):
+            msg = "edge_types length must match the number of edges"
+            raise ValueError(msg)
+        if not np.isfinite(self.node_positions).all():
+            msg = "node_positions must contain only finite values"
+            raise ValueError(msg)
+        if self.num_edges:
+            if self.num_nodes == 0:
+                msg = "edges cannot exist without nodes"
+                raise ValueError(msg)
+            if int(self.edge_indices.min()) < 0 or int(self.edge_indices.max()) >= self.num_nodes:
+                msg = "edge_indices contain node indices outside the graph"
+                raise ValueError(msg)
 
     def to_shared(self) -> shm.SharedMemory:
         """Serialize the `MapGraph` to a shared memory block, including dimensions.

@@ -212,6 +212,7 @@ class LocalRunAccounting:
     update_event: threading.Event | None = None
     source_count: int = 0
     candidate_count: int = 0
+    selected_count: int = 0
     written_count: int = 0
     screening_passed_count: int = 0
     screening_rejected_count: int = 0
@@ -246,19 +247,20 @@ class LocalRunAccounting:
         if self.limit_reached():
             return None
 
-        scene_number = self.written_count
-        self.written_count += 1
+        scene_number = self.selected_count
+        self.selected_count += 1
         self._changed()
         return scene_number
 
     def record_written(self, split: DatasetSplit | None) -> None:
-        """Record the split assignment for one written scene."""
+        """Record one successfully committed scene and its split."""
+        self.written_count += 1
         self.split_counts[split_key(split)] += 1
         self._changed()
 
     def limit_reached(self) -> bool:
         """Return whether the output scene limit has been reached."""
-        return self.limit is not None and self.written_count >= self.limit
+        return self.limit is not None and self.selected_count >= self.limit
 
     def cleanup_summary(self) -> CleanupSummary | None:
         """Return aggregated cleanup statistics."""
@@ -339,15 +341,15 @@ class SharedRunAccounting:
 
     def claim_scene_number(self) -> int | None:
         """Claim the next scene number from shared progress state."""
-        return self.progress.claim_written_scene(self.limit)
+        return self.progress.claim_selected_scene(self.limit)
 
     def record_written(self, split: DatasetSplit | None) -> None:
         """Record the split assignment for one written scene."""
-        self.progress.record_split(split)
+        self.progress.record_written_scene(split)
 
     def limit_reached(self) -> bool:
         """Return whether the shared output scene limit has been reached."""
-        return self.progress.written_scene_limit_reached(self.limit)
+        return self.progress.selected_scene_limit_reached(self.limit)
 
     def cleanup_summary(self) -> CleanupSummary | None:
         """Return worker-local cleanup statistics."""
@@ -377,9 +379,7 @@ def iter_scenes_from_source(
         if scene_number is None:
             return
 
-        scene = processor.materialize(candidate, scene_number)
-        accounting.record_written(scene.split_assignment)
-        yield scene
+        yield processor.materialize(candidate, scene_number)
     accounting.finish_source()
 
 

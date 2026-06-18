@@ -90,11 +90,15 @@ explicitly when needed:
 | `--assign` | Choose the output assignment mode such as `preserve-native`, `scene`, `source`, `time`, or `shuffled-time`. |
 | `--ratio`, `--gap`, `--segments` | Tune assignment behavior for compatible assignment modes. |
 | `--include-map/--no-map` | Force map inclusion on or off for datasets that support maps. |
+| `--overwrite/--no-overwrite` | Explicitly replace a non-empty output directory. Existing output is rejected by default. |
 
 ## Execute the run
 
 When the plan looks right, rerun the same command without `--plan`. If `--force` is omitted, the
 CLI prints the summary again and asks for confirmation before processing starts.
+
+The output directory must be empty unless `--overwrite` is supplied. Input and
+output directories must not overlap.
 
 After a successful run, check the output directory:
 

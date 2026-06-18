@@ -120,6 +120,7 @@ class ResamplePlan:
 
     frame_column: str
     group_by: tuple[str, ...]
+    time_origin_by: tuple[str, ...]
     segment_keys: tuple[str, ...]
     coordinates: tuple[str, ...]
     velocity_columns: tuple[str, ...]
@@ -148,6 +149,7 @@ def resample(
     *,
     frame_column: str = "frame",
     group_by: str | Sequence[str] | None = None,
+    time_origin_by: str | Sequence[str] | None = None,
 ) -> DataFrameT:
     """Resample trajectory data according to an explicit resampling spec.
 
@@ -165,6 +167,10 @@ def resample(
     group_by : str or sequence of str or None, optional
         Column or columns that define independent trajectories. When `None`,
         the full table is treated as one trajectory.
+    time_origin_by : str or sequence of str or None, optional
+        Column or columns that define a shared temporal origin. Frame indices
+        are normalized relative to the minimum frame in each origin group before
+        resampling. When omitted, `group_by` is used.
 
     Returns
     -------
@@ -172,7 +178,12 @@ def resample(
         Resampled table of the same eager/lazy type as `data`.
     """
     resample_spec = spec or ResampleSpec()
-    plan = _resolve_request(resample_spec, frame_column=frame_column, group_by=group_by)
+    plan = _resolve_request(
+        resample_spec,
+        frame_column=frame_column,
+        group_by=group_by,
+        time_origin_by=time_origin_by,
+    )
     match resample_spec.method:
         case ResampleMethod.LINEAR:
             return _linear_resample(data=data, spec=resample_spec, plan=plan)
@@ -193,10 +204,17 @@ def resample(
 
 
 def _resolve_request(
-    spec: ResampleSpec, *, frame_column: str, group_by: str | Sequence[str] | None
+    spec: ResampleSpec,
+    *,
+    frame_column: str,
+    group_by: str | Sequence[str] | None,
+    time_origin_by: str | Sequence[str] | None,
 ) -> ResamplePlan:
     """Normalize a resampling specification into an execution plan."""
     group_columns = normalize_group_by(group_by)
+    time_origin_columns = (
+        group_columns if time_origin_by is None else normalize_group_by(time_origin_by)
+    )
     velocity_columns = (
         tuple(_velocity_column_name(coordinate) for coordinate in spec.coordinates)
         if spec.emit_velocity
@@ -211,6 +229,7 @@ def _resolve_request(
     return ResamplePlan(
         frame_column=frame_column,
         group_by=group_columns,
+        time_origin_by=time_origin_columns,
         segment_keys=(*group_columns, SEGMENT_COLUMN),
         coordinates=spec.coordinates,
         velocity_columns=velocity_columns,
@@ -231,6 +250,14 @@ def _segment_data(
     return data.with_columns(expr.alias(SEGMENT_COLUMN))
 
 
+def _normalize_frame_origin(data: DataFrameT, plan: ResamplePlan) -> DataFrameT:
+    """Normalize frame indices relative to the configured temporal origin."""
+    origin = pl.col(plan.frame_column).min()
+    if plan.time_origin_by:
+        origin = origin.over(plan.time_origin_by)
+    return data.with_columns((pl.col(plan.frame_column) - origin).alias(plan.frame_column))
+
+
 def _packed_struct_expression(plan: ResamplePlan) -> pl.Expr:
     """Return a struct expression containing the columns resampling operates on."""
     return pl.struct(pl.col(column) for column in plan.packed_columns)
@@ -246,6 +273,7 @@ def _linear_resample(data: DataFrameT, spec: ResampleSpec, plan: ResamplePlan) -
     """Resample trajectory data using linear interpolation and carry-forward values."""
     if spec.no_resampling:
         return data
+    data = _normalize_frame_origin(data, plan)
     data = _segment_data(
         data, frame_column=plan.frame_column, group_by=plan.group_by, max_gap=spec.max_gap
     )
@@ -305,6 +333,7 @@ def _spline_resample(
     if spec.no_resampling and not plan.emit_velocity and not plan.emit_acceleration:
         return data.sort([*plan.group_by, plan.frame_column]).drop(SEGMENT_COLUMN, strict=False)
 
+    data = _normalize_frame_origin(data, plan)
     segmented = _segment_data(
         data, frame_column=plan.frame_column, group_by=plan.group_by, max_gap=spec.max_gap
     )

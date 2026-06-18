@@ -41,6 +41,10 @@ schema, horizon, and precision.
 
 ## Read from Pickle output
 
+!!! danger "Only read trusted pickle files"
+    Python pickle deserialization can execute arbitrary code. Do not use
+    `PickleReader` with files from untrusted or unverifiable sources.
+
 <!-- no-validate -->
 ```python
 from pathlib import Path
@@ -58,6 +62,10 @@ if manifest.default_observation_length is not None:
 ```
 
 For unsplit exports, use `split=None` (the default), which reads from `unsplit/`.
+
+`SceneRecord.agent_ids` maps each agent tensor row back to its source identifier.
+Built-in datasets also provide `dataset_id`; custom registered datasets may use
+`dataset_id = None`, in which case the manifest's `dataset` field is authoritative.
 
 ## Read from MDS output
 

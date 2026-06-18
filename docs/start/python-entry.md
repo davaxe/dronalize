@@ -64,6 +64,10 @@ result = execute_request(request)
 print(result.written_scenes)
 ```
 
+Execution rejects a non-empty output directory by default. Set
+`overwrite=True` on `ExecutionRequest` only when the existing output should be
+removed explicitly.
+
 Use `resolve_request()` when you want a dry planning step. Use `execute_request()` when you want to
 execute the request directly.
 

@@ -9,6 +9,7 @@ import pytest
 
 from dronalize.config.models import PassingRequirement, Tolerance
 from dronalize.core import AgentCategory
+from dronalize.core.functional.resample import ResampleSpec, resample
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 from dronalize.processing.screening import (
@@ -337,3 +338,34 @@ def test_weighted_assigner_rejects_invalid_weights() -> None:
 
     with pytest.raises(ValueError, match="At least one weight"):
         _ = StatelessWeightedAssigner(groups=["A", "B"], weights=[0.0, 0.0], seed=0)
+
+
+@pytest.mark.parametrize("start_frame", [0, 1, 2])
+def test_downsampling_uses_relative_frame_origin(start_frame: int) -> None:
+    frame = pl.DataFrame({
+        "id": [1, 1, 1],
+        "frame": [start_frame, start_frame + 1, start_frame + 2],
+        "x": [0.0, 1.0, 2.0],
+        "y": [0.0, 0.0, 0.0],
+    })
+
+    result = resample(frame, ResampleSpec(down=2), group_by="id")
+
+    assert result["frame"].to_list() == [0, 1]
+    assert result["x"].to_list() == [0.0, 2.0]
+
+
+def test_downsampling_can_share_scene_time_origin_across_agents() -> None:
+    frame = pl.DataFrame({
+        "id": [1, 1, 1, 2, 2],
+        "frame": [10, 11, 12, 11, 12],
+        "x": [0.0, 1.0, 2.0, 10.0, 11.0],
+        "y": [0.0] * 5,
+    })
+
+    result = resample(
+        frame, ResampleSpec(down=2), group_by="id", time_origin_by=()
+    ).sort("id", "frame")
+
+    assert result.filter(pl.col("id") == 1)["frame"].to_list() == [0, 1]
+    assert result.filter(pl.col("id") == 2)["frame"].to_list() == [1]

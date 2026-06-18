@@ -315,6 +315,9 @@ def _resample_output(frame: pl.LazyFrame, state: _TrajectoryProcessingState) -> 
         _compile_resample_config(state) or ResampleSpec(),
         frame_column=state.frame_column,
         group_by=group_by,
+        time_origin_by=(
+            state.scene_id_column if state.scene_id_column is not None else ()
+        ),
     )
 
 

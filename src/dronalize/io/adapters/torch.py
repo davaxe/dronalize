@@ -40,6 +40,8 @@ class TorchSceneRecord:
     """Default split point associated with this scene, if known."""
     position_offset: torch.Tensor
     """Global 2D translation offset with shape `(2,)`."""
+    agent_ids: torch.Tensor
+    """Source agent identifiers with shape `(N,)`."""
     agent_types: torch.Tensor
     """Integer-encoded agent types with shape `(N,)`."""
     features: torch.Tensor
@@ -56,6 +58,8 @@ class TorchSceneRecord:
     """Integer-encoded map node types with shape `(M,)`."""
     map_edge_types: torch.Tensor
     """Integer-encoded map edge types with shape `(E,)`."""
+    ego_agent_id: int | None
+    """Optional source identifier of the ego agent."""
 
     def split(self, observation_length: int) -> TorchSplitSceneRecord:
         """Split this full-horizon record into observation/prediction tensors."""
@@ -72,6 +76,7 @@ class TorchSceneRecord:
             dataset_id=self.dataset_id,
             default_observation_length=self.default_observation_length,
             position_offset=self.position_offset,
+            agent_ids=self.agent_ids,
             agent_types=self.agent_types,
             screened_agent_mask=self.screened_agent_mask,
             history_features=self.features[:, :observation_length],
@@ -82,6 +87,7 @@ class TorchSceneRecord:
             map_edge_indices=self.map_edge_indices,
             map_node_types=self.map_node_types,
             map_edge_types=self.map_edge_types,
+            ego_agent_id=self.ego_agent_id,
         )
 
 
@@ -93,6 +99,7 @@ class TorchSplitSceneRecord:
     dataset_id: int | None
     default_observation_length: int | None
     position_offset: torch.Tensor
+    agent_ids: torch.Tensor
     agent_types: torch.Tensor
     screened_agent_mask: torch.Tensor
     history_features: torch.Tensor
@@ -103,6 +110,7 @@ class TorchSplitSceneRecord:
     map_edge_indices: torch.Tensor
     map_node_types: torch.Tensor
     map_edge_types: torch.Tensor
+    ego_agent_id: int | None
 
 
 class TorchSceneDataset(Dataset[TorchSceneRecord], Generic[ReaderT]):
@@ -156,6 +164,7 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
         dataset_id=record.dataset_id,
         default_observation_length=record.default_observation_length,
         position_offset=torch.asarray(record.position_offset, copy=copy),
+        agent_ids=torch.asarray(record.agent_ids, copy=copy),
         agent_types=torch.asarray(record.agent_types, copy=copy),
         screened_agent_mask=torch.asarray(record.screened_agent_mask, copy=copy),
         features=torch.asarray(record.features, copy=copy),
@@ -164,4 +173,5 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
         map_edge_indices=torch.asarray(record.map_edge_indices, copy=copy),
         map_node_types=torch.asarray(record.map_node_types, copy=copy),
         map_edge_types=torch.asarray(record.map_edge_types, copy=copy),
+        ego_agent_id=record.ego_agent_id,
     )

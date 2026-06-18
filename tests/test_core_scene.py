@@ -122,3 +122,36 @@ def test_map_resolver_is_lazy() -> None:
 
     assert calls["count"] >= 2
     assert encoded.map_node_positions.shape == (2, 2)
+
+
+def test_scene_rejects_missing_schema_column() -> None:
+    frame = pl.DataFrame({
+        "frame": [0],
+        "id": [1],
+        "x": [0.0],
+        "agent_category": [AgentCategory.CAR],
+    })
+
+    with pytest.raises(TrajectorySchemaError, match="Missing fields"):
+        _ = Scene.create(frame, 0, horizon_frames=1, schema=POSITIONS_ONLY)
+
+
+def test_scene_rejects_duplicate_agent_frames() -> None:
+    frame = pl.DataFrame({
+        "frame": [0, 0],
+        "id": [1, 1],
+        "x": [0.0, 1.0],
+        "y": [0.0, 0.0],
+        "agent_category": [AgentCategory.CAR, AgentCategory.CAR],
+    })
+
+    with pytest.raises(ValueError, match="duplicate observations"):
+        _ = Scene.create(frame, 0, horizon_frames=1, schema=POSITIONS_ONLY)
+
+
+def test_map_graph_rejects_out_of_bounds_edges() -> None:
+    with pytest.raises(ValueError, match="outside the graph"):
+        _ = MapGraph(
+            node_positions=np.array([[0.0, 0.0]], dtype=np.float64),
+            edge_indices=np.array([[0], [1]], dtype=np.int32),
+        )
