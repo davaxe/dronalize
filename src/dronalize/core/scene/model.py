@@ -147,6 +147,7 @@ class Scene:
                 schema_name=self.schema.name,
             )
             raise TrajectorySchemaError(msg)
+        _validate_scene_frame(self.frame, horizon_frames=self.horizon_frames)
 
     def resolve_map(self) -> MapGraph | None:
         """Materialize the map graph associated with this scene, if available."""
@@ -271,8 +272,46 @@ def _cast_to_schema(data: pl.DataFrame, schema: pl.Schema) -> pl.DataFrame:
     """
     if _matches_physical_schema(data.schema, schema):
         return data
+    missing = [column for column in schema if column not in data.schema]
+    if missing:
+        msg = _get_schema_mismatch_message(actual=data.schema, expected=schema)
+        raise TrajectorySchemaError(msg)
     casts = [pl.col(col).cast(dtype) for col, dtype in schema.items() if data.schema[col] != dtype]
     return data if not casts else data.with_columns(casts)
+
+
+def _validate_scene_frame(data: pl.DataFrame, *, horizon_frames: int) -> None:
+    if data.is_empty():
+        msg = "Scene frame must contain at least one trajectory observation."
+        raise ValueError(msg)
+
+    required = ("frame", "id", "x", "y", "agent_category")
+    null_counts = data.select([
+        pl.col(column).is_null().any().alias(column) for column in required
+    ])
+    if any(bool(value) for value in null_counts.row(0)):
+        msg = "Scene frame contains null values in required trajectory columns."
+        raise ValueError(msg)
+
+    if not data.select(pl.col("x").is_finite().all() & pl.col("y").is_finite().all()).item():
+        msg = "Scene positions must contain only finite values."
+        raise ValueError(msg)
+
+    duplicates = data.select(pl.struct("id", "frame").is_duplicated().any()).item()
+    if duplicates:
+        msg = "Scene frame contains duplicate observations for an agent and frame."
+        raise ValueError(msg)
+
+    frame_min, frame_max = data.select(
+        pl.col("frame").min().alias("frame_min"),
+        pl.col("frame").max().alias("frame_max"),
+    ).row(0)
+    if int(frame_max) - int(frame_min) >= horizon_frames:
+        msg = (
+            "Scene frame span exceeds the declared horizon: "
+            f"frames {frame_min}..{frame_max}, horizon {horizon_frames}."
+        )
+        raise ValueError(msg)
 
 
 def _matches_physical_schema(actual: pl.Schema, expected: pl.Schema) -> bool:

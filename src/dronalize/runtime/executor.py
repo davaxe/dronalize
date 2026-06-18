@@ -156,6 +156,7 @@ class SequentialExecutor(Executor, ProgressSource):
         try:
             for scene in self._iter_scenes():
                 writer.write(scene)
+                self._accounting.record_written(scene.split_assignment)
         finally:
             try:
                 writer.finish_local()
@@ -293,6 +294,7 @@ class ParallelExecutor(Executor, ProgressSource):
 
         for scene in iter_scenes_from_source(_ctx.processor, source, accounting):
             _ctx.writer.write(scene)
+            accounting.record_written(scene.split_assignment)
 
         return accounting.cleanup_summary()
 

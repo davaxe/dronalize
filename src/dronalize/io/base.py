@@ -116,7 +116,7 @@ class DatasetWriter(Protocol):
     """Protocol for writing processed scenes to persisted storage."""
 
     def write(self, scene: Scene) -> None:
-        """Write one processed scene and return whether it was accepted."""
+        """Write one processed scene or raise if it cannot be committed."""
         ...
 
     def finish_local(self) -> None:

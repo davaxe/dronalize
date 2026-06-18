@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-FORMAT_VERSION: int = 2
+FORMAT_VERSION: int = 3
 MANIFEST_FILENAME: str = "manifest.json"
 logger = logging.getLogger(__name__)
 

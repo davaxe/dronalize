@@ -618,20 +618,19 @@ def effective_scene_window(config: ScenesConfig) -> tuple[int, int | None, float
 
     up = config.resample.up
     down = config.resample.down
-    ratio = up / down
-    horizon_resampled = _resample_length(config.horizon_frames, ratio)
+    horizon_resampled = _resample_length(config.horizon_frames, up=up, down=down)
     observation_resampled = (
         None
         if config.default_observation_length is None
-        else _resample_length(config.default_observation_length, ratio)
+        else _resample_length(config.default_observation_length, up=up, down=down)
     )
     return (horizon_resampled, observation_resampled, config.sample_time * down / up)
 
 
-def _resample_length(length: int, ratio: float) -> int:
+def _resample_length(length: int, *, up: int, down: int) -> int:
     if length <= 0:
         return 0
-    return int((length - 1) * ratio + 1)
+    return ((length - 1) * up) // down + 1
 
 
 class AgentSelectorConfig(ResolvedConfig):

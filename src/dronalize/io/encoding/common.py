@@ -129,6 +129,7 @@ def encode_scene_record(
     return SceneRecord(
         scene_number=scene.scene_number,
         position_offset=offset,
+        agent_ids=np.asarray(sorted_ids, dtype=np.int64),
         agent_types=agent_types,
         screened_agent_mask=screened_agent_mask,
         features=features,
@@ -148,7 +149,7 @@ def _resolve_dataset_id(dataset: str | None, *, explicit_dataset_id: int | None)
         return explicit_dataset_id
     if dataset is None:
         return None
-    return dataset_id_for_name(dataset) or 0
+    return dataset_id_for_name(dataset)
 
 
 @overload

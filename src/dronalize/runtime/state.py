@@ -134,6 +134,7 @@ class ProgressState:
     candidate_scene_counter: Synchronized[int]
     screening_passed_counter: Synchronized[int]
     screening_rejected_counter: Synchronized[int]
+    selected_scene_counter: Synchronized[int]
     written_scene_counter: Synchronized[int]
     cleanup_rows_total_counter: Synchronized[int]
     cleanup_rows_removed_counter: Synchronized[int]
@@ -154,6 +155,7 @@ class ProgressState:
             candidate_scene_counter=ctx.Value("i", 0),
             screening_passed_counter=ctx.Value("i", 0),
             screening_rejected_counter=ctx.Value("i", 0),
+            selected_scene_counter=ctx.Value("i", 0),
             written_scene_counter=ctx.Value("i", 0),
             cleanup_rows_total_counter=ctx.Value("i", 0),
             cleanup_rows_removed_counter=ctx.Value("i", 0),
@@ -228,22 +230,22 @@ class ProgressState:
         else:
             self._increment_and_notify(self.screening_rejected_counter)
 
-    def claim_written_scene(self, limit: int | None = None) -> int | None:
-        """Claim the next output scene number, respecting the optional limit."""
-        with self.written_scene_counter.get_lock():
-            if limit is not None and self.written_scene_counter.value >= limit:
+    def claim_selected_scene(self, limit: int | None = None) -> int | None:
+        """Claim the next selected scene number, respecting the optional limit."""
+        with self.selected_scene_counter.get_lock():
+            if limit is not None and self.selected_scene_counter.value >= limit:
                 return None
-            scene_number = self.written_scene_counter.value
-            self.written_scene_counter.value += 1
+            scene_number = self.selected_scene_counter.value
+            self.selected_scene_counter.value += 1
         self.update_event.set()
         return scene_number
 
-    def written_scene_limit_reached(self, limit: int | None = None) -> bool:
-        """Return whether the written-scene counter has reached ``limit``."""
+    def selected_scene_limit_reached(self, limit: int | None = None) -> bool:
+        """Return whether the selected-scene counter has reached ``limit``."""
         if limit is None:
             return False
-        with self.written_scene_counter.get_lock():
-            return self.written_scene_counter.value >= limit
+        with self.selected_scene_counter.get_lock():
+            return self.selected_scene_counter.value >= limit
 
     def record_cleanup(
         self, *, rows_total: int, rows_removed: int, agents_total: int, agents_removed: int
@@ -258,9 +260,11 @@ class ProgressState:
             _add_counter(counter, amount)
         self.update_event.set()
 
-    def record_split(self, split: DatasetSplit | None) -> None:
-        """Record the output split assignment for one written scene."""
-        self._increment_and_notify(self._split_counter(split))
+    def record_written_scene(self, split: DatasetSplit | None) -> None:
+        """Record one successfully committed scene and its output split."""
+        _add_counter(self.written_scene_counter, 1)
+        _add_counter(self._split_counter(split), 1)
+        self.update_event.set()
 
     def split_counts(self) -> SplitCounts:
         """Return current output split counts."""
@@ -287,6 +291,7 @@ class ProgressState:
             self.candidate_scene_counter,
             self.screening_passed_counter,
             self.screening_rejected_counter,
+            self.selected_scene_counter,
             self.written_scene_counter,
             self.cleanup_rows_total_counter,
             self.cleanup_rows_removed_counter,

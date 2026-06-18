@@ -41,9 +41,8 @@ classifiers = [
 [project.urls]
 Homepage = "https://github.com/davaxe/dronalize"
 Repository = "https://github.com/davaxe/dronalize"
-Documentation = "https://westny.github.io/dronalize/"
+Documentation = "https://davaxe.github.io/dronalize/"
 Issues = "https://github.com/davaxe/dronalize/issues"
-Changelog = "https://github.com/davaxe/dronalize/blob/main/CHANGELOG.md"
 
 [project.scripts]
 dronalize = "dronalize.__main__:main"

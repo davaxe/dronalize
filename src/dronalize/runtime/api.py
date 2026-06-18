@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import time
 from typing import TYPE_CHECKING
 
@@ -92,6 +93,7 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
         extra={"dataset": plan.dataset, "storage_backend": plan.storage_backend.value},
     )
 
+    _prepare_output_directory(plan)
     start_time = time.perf_counter()
     with open_execution_session(plan) as run:
         writer_provider = build_writer_provider(plan)
@@ -121,3 +123,23 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
             cleanup_summary=run.executor.cleanup_summary(),
             elapsed_time_seconds=time.perf_counter() - start_time,
         )
+
+
+def _prepare_output_directory(plan: ExecutionPlan) -> None:
+    output_dir = plan.output_dir
+    if not output_dir.exists():
+        return
+
+    try:
+        _ = next(output_dir.iterdir())
+    except StopIteration:
+        return
+
+    if not plan.overwrite:
+        msg = (
+            f"Output directory {output_dir} is not empty. "
+            "Choose an empty directory or enable overwrite explicitly."
+        )
+        raise FileExistsError(msg)
+
+    _ = shutil.rmtree(output_dir)

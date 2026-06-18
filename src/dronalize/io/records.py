@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 if TYPE_CHECKING:
-    import numpy as np
     import numpy.typing as npt
 
 
@@ -29,6 +30,8 @@ class SceneRecord:
     """
 
     # Agent data
+    agent_ids: npt.NDArray[np.int64]
+    """Source agent identifier for each tensor row, shape `(N,)`."""
     agent_types: npt.NDArray[np.int32]
     """Integer-encoded agent type for each agent, shape `(N,)`."""
     screened_agent_mask: npt.NDArray[np.bool_]
@@ -60,6 +63,10 @@ class SceneRecord:
     ego_agent_id: int | None = None
     """Optional agent ID of the ego vehicle, if known or applicable."""
 
+    def __post_init__(self) -> None:
+        """Validate record array shapes and core invariants."""
+        _validate_full_record(self)
+
     @property
     def horizon_frames(self) -> int:
         """Return the number of stored time steps."""
@@ -78,6 +85,7 @@ class SceneRecord:
         return SplitSceneRecord(
             scene_number=self.scene_number,
             position_offset=self.position_offset,
+            agent_ids=self.agent_ids,
             agent_types=self.agent_types,
             screened_agent_mask=self.screened_agent_mask,
             history_features=self.features[:, :observation_length],
@@ -89,6 +97,7 @@ class SceneRecord:
             map_node_types=self.map_node_types,
             map_edge_types=self.map_edge_types,
             dataset_id=self.dataset_id,
+            ego_agent_id=self.ego_agent_id,
         )
 
 
@@ -101,6 +110,8 @@ class SplitSceneRecord:
     """
 
     # Agent data
+    agent_ids: npt.NDArray[np.int64]
+    """Source agent identifier for each tensor row, shape `(N,)`."""
     agent_types: npt.NDArray[np.int32]
     """Integer-encoded agent type for each agent, shape `(N,)`."""
     screened_agent_mask: npt.NDArray[np.bool_]
@@ -134,6 +145,10 @@ class SplitSceneRecord:
     ego_agent_id: int | None = None
     """Optional agent ID of the ego vehicle, if known or applicable."""
 
+    def __post_init__(self) -> None:
+        """Validate split-record array shapes and core invariants."""
+        _validate_split_record(self)
+
     @property
     def observation_length(self) -> int:
         """Return the number of time steps in the observation tensors."""
@@ -143,3 +158,116 @@ class SplitSceneRecord:
     def future_length(self) -> int:
         """Return the number of time steps in the future tensors."""
         return int(self.future_features.shape[1])
+
+
+def _validate_full_record(record: SceneRecord) -> None:
+    if record.features.ndim != 3:
+        msg = f"`features` must have shape (N, T, F), got {record.features.shape!r}."
+        raise ValueError(msg)
+    if record.mask.shape != record.features.shape[:2]:
+        msg = (
+            f"`mask` must have shape {record.features.shape[:2]!r}, "
+            f"got {record.mask.shape!r}."
+        )
+        raise ValueError(msg)
+    _validate_agent_arrays(
+        num_agents=record.features.shape[0],
+        agent_ids=record.agent_ids,
+        agent_types=record.agent_types,
+        screened_agent_mask=record.screened_agent_mask,
+    )
+    _validate_common_arrays(
+        position_offset=record.position_offset,
+        map_node_positions=record.map_node_positions,
+        map_edge_indices=record.map_edge_indices,
+        map_node_types=record.map_node_types,
+        map_edge_types=record.map_edge_types,
+    )
+
+
+def _validate_split_record(record: SplitSceneRecord) -> None:
+    for name, features, mask in (
+        ("history", record.history_features, record.history_mask),
+        ("future", record.future_features, record.future_mask),
+    ):
+        if features.ndim != 3:
+            msg = f"`{name}_features` must have shape (N, T, F), got {features.shape!r}."
+            raise ValueError(msg)
+        if mask.shape != features.shape[:2]:
+            msg = f"`{name}_mask` must have shape {features.shape[:2]!r}, got {mask.shape!r}."
+            raise ValueError(msg)
+    if record.history_features.shape[0] != record.future_features.shape[0]:
+        msg = "History and future tensors must contain the same number of agents."
+        raise ValueError(msg)
+    if record.history_features.shape[2] != record.future_features.shape[2]:
+        msg = "History and future tensors must contain the same feature dimension."
+        raise ValueError(msg)
+    _validate_agent_arrays(
+        num_agents=record.history_features.shape[0],
+        agent_ids=record.agent_ids,
+        agent_types=record.agent_types,
+        screened_agent_mask=record.screened_agent_mask,
+    )
+    _validate_common_arrays(
+        position_offset=record.position_offset,
+        map_node_positions=record.map_node_positions,
+        map_edge_indices=record.map_edge_indices,
+        map_node_types=record.map_node_types,
+        map_edge_types=record.map_edge_types,
+    )
+
+
+def _validate_agent_arrays(
+    *,
+    num_agents: int,
+    agent_ids: npt.NDArray[np.int64],
+    agent_types: npt.NDArray[np.int32],
+    screened_agent_mask: npt.NDArray[np.bool_],
+) -> None:
+    expected = (num_agents,)
+    for name, array in (
+        ("agent_ids", agent_ids),
+        ("agent_types", agent_types),
+        ("screened_agent_mask", screened_agent_mask),
+    ):
+        if array.shape != expected:
+            msg = f"`{name}` must have shape {expected!r}, got {array.shape!r}."
+            raise ValueError(msg)
+    if np.unique(agent_ids).size != num_agents:
+        msg = "`agent_ids` must contain one unique identifier per tensor row."
+        raise ValueError(msg)
+
+
+def _validate_common_arrays(
+    *,
+    position_offset: npt.NDArray[np.float64],
+    map_node_positions: npt.NDArray[np.float32 | np.float64],
+    map_edge_indices: npt.NDArray[np.int32],
+    map_node_types: npt.NDArray[np.int32],
+    map_edge_types: npt.NDArray[np.int32],
+) -> None:
+    if position_offset.shape != (2,) or not np.isfinite(position_offset).all():
+        msg = f"`position_offset` must be a finite array with shape (2,), got {position_offset!r}."
+        raise ValueError(msg)
+    if map_node_positions.ndim != 2 or map_node_positions.shape[1:] != (2,):
+        msg = f"`map_node_positions` must have shape (M, 2), got {map_node_positions.shape!r}."
+        raise ValueError(msg)
+    if map_edge_indices.ndim != 2 or map_edge_indices.shape[0] != 2:
+        msg = f"`map_edge_indices` must have shape (2, E), got {map_edge_indices.shape!r}."
+        raise ValueError(msg)
+    if map_node_types.shape != (map_node_positions.shape[0],):
+        msg = "`map_node_types` length must match the number of map nodes."
+        raise ValueError(msg)
+    if map_edge_types.shape != (map_edge_indices.shape[1],):
+        msg = "`map_edge_types` length must match the number of map edges."
+        raise ValueError(msg)
+    if map_edge_indices.size:
+        if map_node_positions.shape[0] == 0:
+            msg = "Map edges cannot exist without map nodes."
+            raise ValueError(msg)
+        if (
+            int(map_edge_indices.min()) < 0
+            or int(map_edge_indices.max()) >= map_node_positions.shape[0]
+        ):
+            msg = "Map edge indices are outside the available map-node range."
+            raise ValueError(msg)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import fields
+from dataclasses import fields, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -132,6 +132,20 @@ class CleanupDemoLoader(SceneLoader[Path, DemoOptions]):
         return 1
 
 
+class StaleKinematicsDemoLoader(DemoLoader):
+    @override
+    def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
+        for loaded in super().load_source(source):
+            frame = loaded.frame.with_columns(
+                pl.lit(99.0).alias("vx"),
+                pl.lit(99.0).alias("vy"),
+                pl.lit(99.0).alias("ax"),
+                pl.lit(99.0).alias("ay"),
+                pl.lit(2.5).alias("yaw"),
+            )
+            yield replace(loaded, frame=frame)
+
+
 def demo_descriptor() -> DatasetDescriptor:
     return DatasetDescriptor(
         name="demo",
@@ -174,6 +188,25 @@ def cleanup_demo_descriptor() -> DatasetDescriptor:
         native_schema=CANONICAL,
         loader_options_model=DemoOptions,
         feature_support=DatasetFeatureSupport(map=False),
+    )
+
+
+def stale_kinematics_demo_descriptor() -> DatasetDescriptor:
+    return DatasetDescriptor(
+        name="stale-demo",
+        loader_cls=StaleKinematicsDemoLoader,
+        default_config=DatasetConfig(
+            scenes=ScenesConfig(
+                horizon_frames=3,
+                default_observation_length=2,
+                sample_time=1.0,
+                window=WindowConfig(step=1),
+                resample=ResampleConfig(up=1, down=2),
+            ),
+            loader_options={"batch_size": 2, "use_cache": False},
+        ),
+        native_schema=CANONICAL,
+        loader_options_model=DemoOptions,
     )
 
 

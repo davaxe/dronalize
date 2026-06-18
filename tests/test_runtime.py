@@ -30,11 +30,18 @@ from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.readers import PickleReader
 from dronalize.runtime import ExecutionRequest, OutputTransform, execute_request, resolve_request
 from dronalize.runtime.executor import open_execution_session
-from tests.support import DemoOptions, cleanup_demo_descriptor, demo_descriptor
+from dronalize.runtime.processor import RuntimeProcessor
+from tests.support import (
+    DemoOptions,
+    cleanup_demo_descriptor,
+    demo_descriptor,
+    stale_kinematics_demo_descriptor,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from dronalize.core.scene import Scene
     from dronalize.datasets import DatasetDescriptor
     from dronalize.io.records import SceneRecord
 
@@ -77,6 +84,20 @@ def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _create_null_writer(_worker_id: int) -> NullWriter:
     return NullWriter()
+
+
+class FailingWriter:
+    def write(self, scene: Scene) -> None:  # noqa: PLR6301
+        _ = scene
+        msg = "intentional writer failure"
+        raise RuntimeError(msg)
+
+    def finish_local(self) -> None:  # noqa: PLR6301
+        return
+
+
+def _create_failing_writer(_worker_id: int) -> FailingWriter:
+    return FailingWriter()
 
 
 def test_resolve_request_builds_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -160,6 +181,27 @@ def test_resolve_request_rejects_long_window(
         _ = resolve_request(_request(tmp_path))
 
 
+def test_resampling_recomputes_native_kinematics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    descriptor = stale_kinematics_demo_descriptor()
+    _patch_descriptor(monkeypatch, descriptor)
+    plan = resolve_request(_request(tmp_path, dataset=descriptor.name))
+    loader = descriptor.build_loader(root=plan.data_root, request=plan.loader)
+    processor = RuntimeProcessor.from_plan(plan, loader)
+    source = next(iter(processor.iter_sources()))
+    candidate = next(iter(processor.iter_candidates(source)))
+
+    scene = processor.materialize(candidate, scene_number=0)
+
+    assert scene.horizon_frames == 2
+    assert scene.frame["frame"].to_list() == [0, 1]
+    assert scene.frame["vx"].to_list() == pytest.approx([1.0, 1.0])
+    assert scene.frame["vy"].to_list() == pytest.approx([0.0, 0.0])
+    assert scene.frame["ax"].to_list() == pytest.approx([0.0, 0.0])
+    assert set(plan.manifest().derived_features) == {"vx", "vy", "ax", "ay", "yaw"}
+
+
 def test_resolve_request_rejects_window_policy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -224,6 +266,36 @@ def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mon
     assert manifest.default_observation_length == 2
 
 
+def test_execute_request_rejects_non_empty_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_get_demo_descriptor(monkeypatch)
+    request = _request(tmp_path)
+    request.output_dir.mkdir()
+    marker = request.output_dir / "old-data"
+    _ = marker.write_text("stale", encoding="utf-8")
+
+    with pytest.raises(FileExistsError, match="not empty"):
+        _ = execute_request(request, show_progress=False)
+
+    assert marker.exists()
+
+
+def test_execute_request_overwrites_output_when_explicit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_get_demo_descriptor(monkeypatch)
+    request = _request(tmp_path, overwrite=True)
+    request.output_dir.mkdir()
+    marker = request.output_dir / "old-data"
+    _ = marker.write_text("stale", encoding="utf-8")
+
+    result = execute_request(request, show_progress=False)
+
+    assert not marker.exists()
+    assert read_manifest(result.output_dir).dataset == "demo"
+
+
 def test_builtin_manifest_uses_global_dataset_name_table(tmp_path: Path) -> None:
     request = ExecutionRequest(
         dataset="a43",
@@ -257,7 +329,7 @@ def test_execute_request_applies_record_transform(
     result = execute_request(request)
     record = cast("dict[str, object]", PickleReader(result.output_dir, record_type=dict)[0])
 
-    assert record == {"scene_number": 0, "dataset_id": 0, "feature_shape": (1, 3, 7)}
+    assert record == {"scene_number": 0, "dataset_id": None, "feature_shape": (1, 3, 7)}
 
 
 def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -271,7 +343,7 @@ def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.M
     def transform(record: SceneRecord) -> dict[str, object]:
         return {
             "scene_number": record.scene_number,
-            "dataset_id": record.dataset_id,
+            "dataset_id": -1 if record.dataset_id is None else record.dataset_id,
             "feature_shape": record.features.shape,
         }
 
@@ -285,7 +357,7 @@ def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.M
     result = execute_request(request)
     reader = MDSReader(path=result.output_dir, convert_raw=dict)
     record = reader[0]
-    assert record == {"scene_number": 0, "dataset_id": 0, "feature_shape": [1, 3, 7]}
+    assert record == {"scene_number": 0, "dataset_id": -1, "feature_shape": [1, 3, 7]}
 
 
 def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -384,6 +456,22 @@ def test_execution_progress_reports_cleanup_counters(
     assert progress.cleanup.rows_removed == 3
     assert progress.cleanup.agents_total == 2
     assert progress.cleanup.agents_removed == 1
+
+
+def test_failed_writer_is_not_counted_as_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_get_demo_descriptor(monkeypatch)
+    plan = resolve_request(_request(tmp_path))
+    writer_provider = WorkerWriterProvider(_create_failing_writer)
+
+    with open_execution_session(plan) as run:
+        with pytest.raises(RuntimeError, match="intentional writer failure"):
+            _ = run.executor.execute(writer_provider)
+        progress = run.executor.progress.snapshot()
+
+    assert progress.stats.written_scenes == 0
+    assert progress.stats.split_counts["unsplit"] == 0
 
 
 @pytest.mark.parametrize(

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from dronalize.config.models import RuntimeOverride, effective_scene_window
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.scene.model import derived_trajectory_fields
-from dronalize.core.scene.schema import TrajectorySchema, get_trajectory_schema
+from dronalize.core.scene.schema import POSITIONS_ONLY, TrajectorySchema, get_trajectory_schema
 from dronalize.datasets.registry import dataset_id_for_name, dataset_names_by_id
 from dronalize.io.base import (
     RecordTransform,
@@ -165,6 +165,8 @@ class ExecutionPlan:
     """Optional maximum number of scenes to write."""
     seed: int | None = None
     """Optional seed used by deterministic runtime choices."""
+    overwrite: bool = False
+    """Whether execution may replace an existing non-empty output directory."""
 
     def __post_init__(self) -> None:
         """Validate the runtime plan after initialization."""
@@ -192,6 +194,9 @@ class ExecutionPlan:
     def manifest(self) -> DatasetManifest:
         """Return the dataset manifest for this plan."""
         export_config: OutputConfig = self.resolved_config.output
+        derivation_source = trajectory_schema_after_transforms(
+            self.descriptor.native_schema, self.resolved_config
+        )
         return DatasetManifest(
             dataset=self.dataset,
             dataset_names=(
@@ -216,7 +221,7 @@ class ExecutionPlan:
             derived_features=tuple(
                 field.to_str()
                 for field in derived_trajectory_fields(
-                    self.descriptor.native_schema,
+                    derivation_source,
                     self.output.trajectory_schema,
                     sample_time=self.resolved_config.scenes.sample_time,
                 )
@@ -316,6 +321,8 @@ class ExecutionRequest(BaseModel):
     """Optional maximum number of scenes to write."""
     seed: int | None = None
     """Optional seed used by deterministic runtime choices."""
+    overwrite: bool = False
+    """Whether execution may replace an existing non-empty output directory."""
     input_dir_exists: bool = True
     """Whether request resolution should require `input_dir` to exist."""
     output_transform: OutputTransform[object] | None = None
@@ -325,3 +332,20 @@ class ExecutionRequest(BaseModel):
 def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int | None, float]:
     """Return the effective scene window and `sample_time` for one resolved config."""
     return effective_scene_window(config.scenes)
+
+
+def trajectory_schema_after_transforms(
+    native_schema: TrajectorySchema, config: DatasetConfig
+) -> TrajectorySchema:
+    """Return fields that remain semantically valid after temporal transforms."""
+    resample = config.scenes.resample
+    if resample is None:
+        return native_schema
+    if (
+        resample.up == 1
+        and resample.down == 1
+        and not resample.emit_velocity
+        and not resample.emit_acceleration
+    ):
+        return native_schema
+    return POSITIONS_ONLY

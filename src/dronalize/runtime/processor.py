@@ -13,6 +13,7 @@ from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 from dronalize.processing.maps import MapReference, bind_map_provider
 from dronalize.processing.models import SplitAssignmentPlan, TrajectoryPipelinePlan
 from dronalize.processing.trajectory import build_trajectory_processing_stages
+from dronalize.runtime.types import trajectory_schema_after_transforms
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -139,7 +140,9 @@ class RuntimeProcessor:
         return cls(
             dataset=plan.dataset,
             loader=loader,
-            source_schema=plan.descriptor.native_schema,
+            source_schema=trajectory_schema_after_transforms(
+                plan.descriptor.native_schema, plan.resolved_config
+            ),
             target_schema=plan.output.trajectory_schema,
             horizon_frames=plan.effective_horizon_frames,
             sample_time=plan.effective_sample_time,

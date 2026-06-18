@@ -89,6 +89,7 @@ Persisted scene records always include map arrays.
 Semantic labels and encoded arrays use different names:
 
 - `agent_category` is the semantic DataFrame column before record encoding
+- `agent_ids` preserves the source identifier corresponding to each tensor row
 - `agent_types` is the encoded per-agent integer array in `SceneRecord`
 - `EdgeType` and map node types are semantic map labels during map construction
 - `map_edge_types` and `map_node_types` are encoded arrays in `SceneRecord`

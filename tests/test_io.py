@@ -47,6 +47,7 @@ def test_encode_scene_record_uses_passed_ids(scene: Scene) -> None:
     record = encode_scene_record(scene, dtype=np.float32)
 
     np.testing.assert_array_equal(record.screened_agent_mask, np.array([True, False]))
+    np.testing.assert_array_equal(record.agent_ids, np.array([10, 20], dtype=np.int64))
 
 
 def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
@@ -85,7 +86,7 @@ def test_pickle_writer_accepts_record_transform(tmp_path: Path, scene: Scene) ->
     record = reader[0]
 
     assert record.scene_number == scene.scene_number
-    assert record.dataset == 0
+    assert record.dataset is None
     assert record.source == "record"
     assert record.values.shape == (2, 1)
 
@@ -221,6 +222,15 @@ def test_mds_encoder_decoder_roundtrip(scene: Scene) -> None:
     assert_scene_record_equal(decoded, expected)
 
 
+def test_split_scene_record_preserves_identity(scene: Scene) -> None:
+    record = encode_scene_record(scene, dtype=np.float32)
+
+    split = record.split(2)
+
+    np.testing.assert_array_equal(split.agent_ids, record.agent_ids)
+    assert split.ego_agent_id == record.ego_agent_id
+
+
 def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     manifest = DatasetManifest(
         dataset="test_dataset",
@@ -326,7 +336,9 @@ def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     assert record.scene_number == expected.scene_number
     assert record.dataset_id == expected.dataset_id
     _assert_tensor_allclose(record.position_offset, expected.position_offset)
+    _assert_tensor_array_equal(record.agent_ids, expected.agent_ids)
     _assert_tensor_array_equal(record.agent_types, expected.agent_types)
+    assert record.ego_agent_id == expected.ego_agent_id
     _assert_tensor_array_equal(record.screened_agent_mask, expected.screened_agent_mask)
     _assert_tensor_allclose(record.features, expected.features)
     _assert_tensor_array_equal(record.agent_time_mask, expected.mask)
@@ -347,6 +359,8 @@ def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> Non
     assert split.scene_number == expected.scene_number
     assert split.dataset_id == expected.dataset_id
     _assert_tensor_allclose(split.position_offset, expected.position_offset)
+    _assert_tensor_array_equal(split.agent_ids, expected.agent_ids)
+    assert split.ego_agent_id == expected.ego_agent_id
     _assert_tensor_allclose(split.history_features, expected.features[:, :2])
     _assert_tensor_array_equal(split.history_mask, expected.mask[:, :2])
     _assert_tensor_allclose(split.future_features, expected.features[:, 2:])
@@ -362,9 +376,10 @@ def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     record = HeteroSceneDataset(reader).get(0)
 
     assert record.scene_number == expected.scene_number
-    assert record.dataset_id == expected.dataset_id
+    assert record.dataset_id == (-1 if expected.dataset_id is None else expected.dataset_id)
     _assert_tensor_allclose(record.position_offset, expected.position_offset)
     _assert_tensor_allclose(record["agent"].features, expected.features)
+    _assert_tensor_array_equal(record["agent"].agent_id, expected.agent_ids)
     _assert_tensor_array_equal(record["agent"].agent_time_mask, expected.mask)
     _assert_tensor_array_equal(record["agent"].agent_type, expected.agent_types)
     _assert_tensor_array_equal(record["agent"].screened_agent_mask, expected.screened_agent_mask)
@@ -374,6 +389,7 @@ def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
         record["map", "connects", "map"].edge_index, expected.map_edge_indices
     )
     _assert_tensor_array_equal(record["map", "connects", "map"].edge_type, expected.map_edge_types)
+    assert record.ego_agent_id == expected.ego_agent_id
 
 
 def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:

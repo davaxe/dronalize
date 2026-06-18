@@ -94,6 +94,7 @@ def build_execution_plan(
         output_transform=request.output_transform,
         limit=request.limit,
         seed=request.seed,
+        overwrite=request.overwrite,
         resolved_config=resolved_config,
     )
 
@@ -189,6 +190,15 @@ def _validate_output_path(request: ExecutionRequest) -> None:
     if request.output_dir.exists() and not request.output_dir.is_dir():
         msg = f"Output directory {request.output_dir} is not a directory."
         raise NotADirectoryError(msg)
+    input_path = request.input_dir.resolve()
+    output_path = request.output_dir.resolve()
+    if (
+        input_path == output_path
+        or input_path.is_relative_to(output_path)
+        or output_path.is_relative_to(input_path)
+    ):
+        msg = "Input and output directories must not overlap."
+        raise dronalize_exceptions.ConfigurationError(msg)
 
 
 def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBackend:
