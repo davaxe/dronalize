@@ -14,7 +14,7 @@ from dronalize.io.encoding import encode_scene_record
 from dronalize.io.encoding.mds import decode_mds_row, encode_mds_row
 from dronalize.io.manifest import write_manifest
 from dronalize.io.readers import PickleReader
-from tests.support import assert_scene_record_equal, output_plan
+from tests.support import assert_scene_record_equal, output_config
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -53,9 +53,11 @@ def test_encode_scene_record_uses_passed_ids(scene: Scene) -> None:
 def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
-    writer = PickleWriter(output_dir=output_dir, config=output_plan(), splits=None)
+    writer = PickleWriter(
+        output_dir=output_dir, config=output_config(), default_observation_length=2, splits=None
+    )
 
-    expected = encode_scene_record(scene, dtype=np.float32)
+    expected = encode_scene_record(scene, dtype=np.float32, default_observation_length=2)
     writer.write(scene)
     writer.finish_local()
 
@@ -77,7 +79,7 @@ def test_pickle_writer_accepts_record_transform(tmp_path: Path, scene: Scene) ->
         )
 
     writer = PickleWriter(
-        output_dir=output_dir, config=output_plan(), splits=None, record_transform=transform
+        output_dir=output_dir, config=output_config(), splits=None, record_transform=transform
     )
     writer.write(scene)
     writer.finish_local()
@@ -104,7 +106,7 @@ def test_pickle_writer_accepts_scene_transform(tmp_path: Path, scene: Scene) -> 
         )
 
     writer = PickleWriter(
-        output_dir=output_dir, config=output_plan(), splits=None, scene_transform=transform
+        output_dir=output_dir, config=output_config(), splits=None, scene_transform=transform
     )
     writer.write(scene)
     writer.finish_local()
@@ -121,7 +123,7 @@ def test_pickle_writer_rejects_multiple_transforms(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="record_transform"):
         _ = PickleWriter(
             output_dir=tmp_path,
-            config=output_plan(),
+            config=output_config(),
             splits=None,
             record_transform=lambda record: record,
             scene_transform=lambda scene: scene,
@@ -137,7 +139,7 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
     output_dir = tmp_path / "mds"
     writer = MDSDatasetWriter(
-        output_dir=output_dir, config=output_plan(), splits=None, parallel=False
+        output_dir=output_dir, config=output_config(), splits=None, parallel=False
     )
 
     expected = encode_scene_record(scene, dtype=np.float32)
@@ -178,7 +180,7 @@ def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene)
     output_dir = tmp_path / "mds"
     writer = MDSDatasetWriter(
         output_dir=output_dir,
-        config=output_plan(),
+        config=output_config(),
         splits=None,
         parallel=False,
         record_transform=transform,
@@ -206,7 +208,7 @@ def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> Non
     with pytest.raises(ValueError, match="mds_columns"):
         _ = MDSDatasetWriter(
             output_dir=tmp_path,
-            config=output_plan(),
+            config=output_config(),
             splits=None,
             parallel=False,
             record_transform=lambda record: {"scene_number": record.scene_number},
@@ -305,7 +307,7 @@ def test_manifest_rejects_bad_default_obs_length() -> None:
 def _build_pickle_reader(tmp_path: Path, scene: Scene) -> tuple[PickleReader, SceneRecord]:
     scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
-    writer = PickleWriter(output_dir=output_dir, config=output_plan(), splits=None)
+    writer = PickleWriter(output_dir=output_dir, config=output_config(), splits=None)
 
     expected = encode_scene_record(scene, dtype=np.float32)
     writer.write(scene)

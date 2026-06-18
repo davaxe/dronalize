@@ -12,7 +12,7 @@ import polars as pl
 from dronalize.datasets.registry import dataset_id_for_name
 from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.encoding.common import encode_scene_record
-from dronalize.runtime.executor import open_execution_session
+from dronalize.runtime.executor import open_executor
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -274,15 +274,15 @@ def assert_plan_scene_outputs(
         create_worker=functools.partial(
             _create_asserting_scene_writer,
             output_dir=plan.output_dir,
-            trajectory_schema=plan.output.trajectory_schema,
+            trajectory_schema=plan.trajectory_schema,
             artifact_dir=artifact_dir,
             dataset_name=dataset_name,
             scene_start=scene_start,
             scene_step=scene_step,
         )
     )
-    with open_execution_session(plan) as run:
-        progress = run.executor.execute(writer_provider)
+    with open_executor(plan) as executor:
+        progress = executor.execute(writer_provider)
 
     checked_scenes = sum(
         1 for _ in (plan.output_dir / ".integration-scene-assertions").glob("*.json")

@@ -286,9 +286,7 @@ def _validate_scene_frame(data: pl.DataFrame, *, horizon_frames: int) -> None:
         raise ValueError(msg)
 
     required = ("frame", "id", "x", "y", "agent_category")
-    null_counts = data.select([
-        pl.col(column).is_null().any().alias(column) for column in required
-    ])
+    null_counts = data.select([pl.col(column).is_null().any().alias(column) for column in required])
     if any(bool(value) for value in null_counts.row(0)):
         msg = "Scene frame contains null values in required trajectory columns."
         raise ValueError(msg)
@@ -303,8 +301,7 @@ def _validate_scene_frame(data: pl.DataFrame, *, horizon_frames: int) -> None:
         raise ValueError(msg)
 
     frame_min, frame_max = data.select(
-        pl.col("frame").min().alias("frame_min"),
-        pl.col("frame").max().alias("frame_max"),
+        pl.col("frame").min().alias("frame_min"), pl.col("frame").max().alias("frame_max")
     ).row(0)
     if int(frame_max) - int(frame_min) >= horizon_frames:
         msg = (

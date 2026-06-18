@@ -29,7 +29,7 @@ from dronalize.io.backends.null import NullWriter
 from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.readers import PickleReader
 from dronalize.runtime import ExecutionRequest, OutputTransform, execute_request, resolve_request
-from dronalize.runtime.executor import open_execution_session
+from dronalize.runtime.executor import open_executor
 from dronalize.runtime.processor import RuntimeProcessor
 from tests.support import (
     DemoOptions,
@@ -449,8 +449,8 @@ def test_execution_progress_reports_cleanup_counters(
     plan = resolve_request(_request(tmp_path, **request_kwargs))
     writer_provider = WorkerWriterProvider(_create_null_writer)
 
-    with open_execution_session(plan) as run:
-        progress = run.executor.execute(writer_provider)
+    with open_executor(plan) as executor:
+        progress = executor.execute(writer_provider)
 
     assert progress.cleanup.rows_total == 6
     assert progress.cleanup.rows_removed == 3
@@ -465,10 +465,10 @@ def test_failed_writer_is_not_counted_as_written(
     plan = resolve_request(_request(tmp_path))
     writer_provider = WorkerWriterProvider(_create_failing_writer)
 
-    with open_execution_session(plan) as run:
+    with open_executor(plan) as executor:
         with pytest.raises(RuntimeError, match="intentional writer failure"):
-            _ = run.executor.execute(writer_provider)
-        progress = run.executor.progress.snapshot()
+            _ = executor.execute(writer_provider)
+        progress = executor.snapshot()
 
     assert progress.stats.written_scenes == 0
     assert progress.stats.split_counts["unsplit"] == 0

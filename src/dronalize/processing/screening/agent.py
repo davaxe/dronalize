@@ -13,12 +13,13 @@ from dronalize.processing.screening.base import (
     AgentCheckRuleBase,
     FrameInput,
     FrameSet,
+    PassingRequirement,
     RuleId,
+    Tolerance,
     coerce_frame_set,
 )
 
 if TYPE_CHECKING:
-    from dronalize.config.models import PassingRequirement, Tolerance
     from dronalize.processing.screening.base import ScreeningContext
 
 

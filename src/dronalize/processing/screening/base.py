@@ -8,10 +8,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Annotated, ClassVar, Literal
 
 import polars as pl
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    model_validator,
+)
 from typing_extensions import override
 
-from dronalize.config.models import PassingRequirement, Tolerance  # noqa: TC001
 from dronalize.core.categories import AgentCategory, AgentCategoryInput, coerce_agent_categories
 
 if TYPE_CHECKING:
@@ -38,12 +44,16 @@ AgentSet = Annotated[
 """Set of agent categories."""
 
 
-class AgentCategorySelector(BaseModel):
+class ScreeningModel(BaseModel):
+    """Shared immutable model configuration for screening definitions."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
+
+
+class AgentCategorySelector(ScreeningModel):
     """Restrict a rule to agents matching category predicates."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    mode: Literal["include", "exclude"]
+    mode: Literal["include", "exclude"] = "include"
     categories: AgentSet
 
     @classmethod
@@ -62,6 +72,48 @@ class AgentCategorySelector(BaseModel):
     def exclude(cls, categories: AgentCategoryInput) -> AgentCategorySelector:
         """Create a selector that excludes the given categories from scope."""
         return cls.define("exclude", categories)
+
+
+class Tolerance(ScreeningModel):
+    """Optional tolerance thresholds for relaxed agent-rule checks."""
+
+    absolute: float | None = Field(default=None, gt=0.0)
+    relative: float | None = Field(default=None, gt=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _require_tolerance(self) -> Tolerance:
+        if self.absolute is None and self.relative is None:
+            msg = "at least one of absolute or relative must be set."
+            raise ValueError(msg)
+        return self
+
+
+class PassingRequirement(ScreeningModel):
+    """Minimum selected-agent pass thresholds for scene acceptance."""
+
+    absolute: int | None = Field(default=None, ge=1)
+    relative: float | None = Field(default=None, gt=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _require_threshold(self) -> PassingRequirement:
+        if self.absolute is None and self.relative is None:
+            msg = "at least one of absolute or relative must be set."
+            raise ValueError(msg)
+        return self
+
+
+class CountRange(ScreeningModel):
+    """Inclusive minimum/maximum integer range."""
+
+    minimum: int | None = None
+    maximum: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_range(self) -> CountRange:
+        if self.minimum is not None and self.maximum is not None and self.maximum < self.minimum:
+            msg = "maximum must be greater than or equal to minimum."
+            raise ValueError(msg)
+        return self
 
 
 @dataclass(slots=True, frozen=True)
@@ -121,10 +173,8 @@ class ScreeningContext:
 RuleId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9_]+$")]
 
 
-class Rule(BaseModel, ABC):  # pyright: ignore[reportUnsafeMultipleInheritance]: https://docs.pydantic.dev/1.10/usage/models/?utm_source=chatgpt.com#abstract-base-classes
+class Rule(ScreeningModel, ABC):
     """Base class shared by all screening rules."""
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
 
     enabled: bool = Field(default=True, repr=False)
     rule_id: RuleId | None = Field(default=None, repr=False)

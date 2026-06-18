@@ -7,14 +7,15 @@ from typing import TYPE_CHECKING
 import polars as pl
 import pytest
 
-from dronalize.config.models import PassingRequirement, Tolerance
 from dronalize.core import AgentCategory
 from dronalize.core.functional.resample import ResampleSpec, resample
 from dronalize.processing.columns import TrajectoryColumns
 from dronalize.processing.loading.assigner import StatelessWeightedAssigner
 from dronalize.processing.screening import (
     AgentCategorySelector,
+    PassingRequirement,
     ScreeningRuleSet,
+    Tolerance,
     agent,
     cleanup,
     scene,
@@ -363,9 +364,9 @@ def test_downsampling_can_share_scene_time_origin_across_agents() -> None:
         "y": [0.0] * 5,
     })
 
-    result = resample(
-        frame, ResampleSpec(down=2), group_by="id", time_origin_by=()
-    ).sort("id", "frame")
+    result = resample(frame, ResampleSpec(down=2), group_by="id", time_origin_by=()).sort(
+        "id", "frame"
+    )
 
     assert result.filter(pl.col("id") == 1)["frame"].to_list() == [0, 1]
     assert result.filter(pl.col("id") == 2)["frame"].to_list() == [1]

@@ -11,9 +11,7 @@ from typing_extensions import NotRequired, TypedDict, override
 
 from dronalize.config.models import (
     DatasetConfig,
-    ExcludeCategoriesSpec,
     LaneChangeConfig,
-    MinObservationsSpec,
     OutputConfig,
     ResampleConfig,
     ScenesConfig,
@@ -27,7 +25,8 @@ from dronalize.datasets import DatasetDescriptor, DatasetFeatureSupport
 from dronalize.io.records import SceneRecord
 from dronalize.processing.loading.base import SceneLoader
 from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, LoaderOptionsModel
-from dronalize.runtime.types import OutputPlan
+from dronalize.processing.screening.agent import MinObservations
+from dronalize.processing.screening.cleanup import ExcludeCategories
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -177,11 +176,7 @@ def cleanup_demo_descriptor() -> DatasetDescriptor:
                 window=WindowConfig(step=1),
             ),
             screening=ScreeningConfig(
-                cleanup={
-                    "trim_unimportant": ExcludeCategoriesSpec(
-                        categories=(AgentCategory.UNIMPORTANT,)
-                    )
-                }
+                cleanup={"trim_unimportant": ExcludeCategories.define(AgentCategory.UNIMPORTANT)}
             ),
             loader_options={"batch_size": 2, "use_cache": False},
         ),
@@ -220,17 +215,12 @@ def inherited_optional_blocks_descriptor() -> DatasetConfig:
             resample=ResampleConfig(up=2, down=1, method="cubic"),
             lane_change=LaneChangeConfig(persist=3),
         ),
-        screening=ScreeningConfig(agents={"min_obs": MinObservationsSpec(minimum=2)}),
+        screening=ScreeningConfig(agents={"min_obs": MinObservations(minimum=2)}),
     )
 
 
-def output_plan(default_observation_length: int | None = None) -> OutputPlan:
-    return OutputPlan(
-        config=OutputConfig(
-            trajectory_schema="canonical", precision="float32", recenter_positions=True
-        ),
-        default_observation_length=default_observation_length,
-    )
+def output_config() -> OutputConfig:
+    return OutputConfig(trajectory_schema="canonical", precision="float32", recenter_positions=True)
 
 
 def make_scene(*, passed_agent_ids: frozenset[int] | None = None) -> Scene:

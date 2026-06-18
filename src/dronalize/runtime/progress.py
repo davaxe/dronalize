@@ -6,7 +6,8 @@ import logging
 import random
 import threading
 import time
-from typing import TYPE_CHECKING, TypeVar
+from multiprocessing.synchronize import Event
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 import rich.progress as rp
 from rich import box
@@ -21,11 +22,22 @@ from dronalize.runtime.state import Progress, SplitCounts
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from dronalize.runtime.executor import ProgressSource
-
 T = TypeVar("T")
+AnyEvent = Event | threading.Event
 
 logger = logging.getLogger(__name__)
+
+
+class ProgressSource(Protocol):
+    """Minimal progress interface consumed by the optional display."""
+
+    def snapshot(self) -> Progress:
+        """Return a point-in-time progress snapshot."""
+        ...
+
+    def changed(self) -> AnyEvent:
+        """Return the event signaled after progress changes."""
+        ...
 
 
 class _ExecutorDisplay(RichCast):
@@ -154,7 +166,10 @@ class _ProgressMonitor:
         while not self._stop_event.is_set():
             if sleep is not None:
                 time.sleep(sleep)
-            progress = self._progress.wait_for_change()
+            event = self._progress.changed()
+            _ = event.wait()
+            event.clear()
+            progress = self._progress.snapshot()
             self._display.update(progress)
 
             if not progress.running:

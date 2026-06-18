@@ -5,31 +5,29 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from dronalize.config.models import (
-    ExcludeCategoriesSpec,
     LaneChangeConfig,
-    MinObservationsSpec,
-    PassingRequirement,
-    PruneByRuleSpec,
-    RequireFramesSpec,
     ResampleConfig,
     ScenesConfig,
     ScreeningConfig,
     WindowConfig,
 )
 from dronalize.datasets.registry import DatasetTemporalSupport, DatasetWindowingSupport, FrameBounds
+from dronalize.processing.screening.agent import AgentCheckRule, AgentRequireFrames, MinObservations
+from dronalize.processing.screening.base import PassingRequirement
+from dronalize.processing.screening.cleanup import CleanupRule, ExcludeCategories, PruneByRule
 
 if TYPE_CHECKING:
     from dronalize.config.base import ResampleMethod
-    from dronalize.config.models import AgentCheckSpec, CleanupSpec, SceneCheckSpec
     from dronalize.core.categories import AgentCategory
     from dronalize.datasets.registry import FrameBoundConfidence, SourceTemporalUnit
+    from dronalize.processing.screening.scene import SceneCheckRule
 
 
 def combine_screenings(*screenings: ScreeningConfig) -> ScreeningConfig:
     """Combine multiple screening configs by merging named rule maps."""
-    combined_cleanup: dict[str, CleanupSpec] = {}
-    combined_agent: dict[str, AgentCheckSpec] = {}
-    combined_scene: dict[str, SceneCheckSpec] = {}
+    combined_cleanup: dict[str, CleanupRule] = {}
+    combined_agent: dict[str, AgentCheckRule] = {}
+    combined_scene: dict[str, SceneCheckRule] = {}
     for screening in screenings:
         if screening.cleanup:
             combined_cleanup.update(screening.cleanup)
@@ -42,7 +40,7 @@ def combine_screenings(*screenings: ScreeningConfig) -> ScreeningConfig:
 
 def exclude_category_screening(*category: AgentCategory) -> ScreeningConfig:
     """Return a cleanup-only screening that excludes the given agent categories."""
-    return ScreeningConfig(cleanup={"category": ExcludeCategoriesSpec(categories=category)})
+    return ScreeningConfig(cleanup={"category": ExcludeCategories.define(category)})
 
 
 def minimum_observations_screening(
@@ -68,9 +66,7 @@ def minimum_observations_screening(
 
     """
     screening = ScreeningConfig(
-        cleanup={
-            "min_observations": PruneByRuleSpec(agent_rule=MinObservationsSpec(minimum=minimum))
-        }
+        cleanup={"min_observations": PruneByRule(agent_rule=MinObservations(minimum=minimum))}
     )
     if required_frame is None:
         return screening
@@ -92,7 +88,7 @@ def require_frames_screening(
         else None
     )
     return ScreeningConfig(
-        agents={"require_frames": RequireFramesSpec(frames=frames, require=require)}
+        agents={"require_frames": AgentRequireFrames.define(frames, require=require)}
     )
 
 

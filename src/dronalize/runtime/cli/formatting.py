@@ -58,7 +58,7 @@ def build_processing_summary_table(plan: ExecutionPlan) -> Table:
 
 def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
     """Return label/value rows for a resolved plan summary."""
-    output_config = plan.output.config
+    output_config = plan.output_config
     return (
         ("Dataset", plan.dataset),
         ("Input", str(plan.data_root)),

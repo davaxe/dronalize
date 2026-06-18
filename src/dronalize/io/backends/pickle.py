@@ -11,8 +11,10 @@ from __future__ import annotations
 import pickle  # noqa: S403
 from typing import TYPE_CHECKING
 
+import numpy as np
 from typing_extensions import override
 
+from dronalize.core.scene import get_trajectory_schema
 from dronalize.io.base import (
     DatasetWriter,
     RecordTransform,
@@ -26,9 +28,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
     from pathlib import Path
 
+    from dronalize.config.models import OutputConfig
     from dronalize.core.categories import DatasetSplit
-    from dronalize.core.scene import Scene
-    from dronalize.runtime.types import OutputPlan
+    from dronalize.core.scene import Scene, TrajectorySchema
 
 
 class PickleWriter(DatasetWriter):
@@ -45,7 +47,8 @@ class PickleWriter(DatasetWriter):
         output_dir: Path,
         identifier: str | int | None = None,
         *,
-        config: OutputPlan,
+        config: OutputConfig,
+        default_observation_length: int | None = None,
         splits: Iterable[DatasetSplit] | None = None,
         record_transform: RecordTransform[object] | None = None,
         scene_transform: SceneTransform[object] | None = None,
@@ -54,7 +57,9 @@ class PickleWriter(DatasetWriter):
             record_transform=record_transform, scene_transform=scene_transform
         )
         self._base_output_dir: Path = output_dir
-        self._config: OutputPlan = config
+        self._config: OutputConfig = config
+        self._trajectory_schema: TrajectorySchema = get_trajectory_schema(config.trajectory_schema)
+        self._default_observation_length: int | None = default_observation_length
         self._identifier: str = "UNNAMED" if identifier is None else str(identifier)
         self._record_transform: RecordTransform[object] | None = record_transform
         self._scene_transform: SceneTransform[object] | None = scene_transform
@@ -80,10 +85,10 @@ class PickleWriter(DatasetWriter):
 
         record = encode_scene_record(
             scene,
-            dtype=self._config.precision(),
+            dtype=np.float32 if self._config.precision == "float32" else np.float64,
             recenter_position=self._config.recenter_positions,
-            trajectory_schema=self._config.trajectory_schema,
-            default_observation_length=self._config.default_observation_length,
+            trajectory_schema=self._trajectory_schema,
+            default_observation_length=self._default_observation_length,
         )
         if self._record_transform is None:
             return record

@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import cached_property
 from pathlib import Path  # noqa: TC003 - Pydantic resolves this forward reference at runtime.
 from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
-import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from dronalize.config.models import RuntimeOverride, effective_scene_window
@@ -25,13 +23,7 @@ from dronalize.io.manifest import DatasetManifest, package_version, write_manife
 from dronalize.processing.models import LoaderPlan, ReadSelection, SplitAssignmentPlan
 
 if TYPE_CHECKING:
-    from dronalize.config.models import (
-        DatasetConfig,
-        MapConfig,
-        MDSOutputConfig,
-        OutputConfig,
-        RuntimeConfig,
-    )
+    from dronalize.config.models import DatasetConfig, MapConfig, OutputConfig, RuntimeConfig
     from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.processing.loading.models import LoaderOptionsModel
     from dronalize.runtime.state import ExecutionStats
@@ -89,37 +81,6 @@ class ExecutionResult:
     """Wall-clock execution time in seconds."""
 
 
-@dataclass(frozen=True)
-class OutputPlan:
-    """Plan for output configuration."""
-
-    config: OutputConfig
-    """Resolved output configuration used by the writer and manifest."""
-    default_observation_length: int | None = None
-    """Default split point to store on each output record, if known."""
-
-    def precision(self) -> type[np.float32 | np.float64]:
-        """Return the floating point precision for this output plan."""
-        if self.config.precision == "float32":
-            return np.float32
-        return np.float64
-
-    @property
-    def mds(self) -> MDSOutputConfig:
-        """Return the MDS output config for this output plan."""
-        return self.config.mds
-
-    @property
-    def recenter_positions(self) -> bool:
-        """Return whether this output plan requests recentering of agent positions."""
-        return self.config.recenter_positions
-
-    @cached_property
-    def trajectory_schema(self) -> TrajectorySchema:
-        """Return the trajectory schema for this output plan."""
-        return get_trajectory_schema(self.config.trajectory_schema)
-
-
 @dataclass(frozen=True, slots=True)
 class ExecutionPlan:
     """Fully resolved runtime plan produced from an execution request.
@@ -145,8 +106,6 @@ class ExecutionPlan:
     """Dataset config after defaults, config files, and overrides are merged."""
     runtime: RuntimeConfig
     """Resolved runtime execution settings."""
-    output: OutputPlan
-    """Resolved output settings and derived output schema."""
     loader: LoaderPlan
     """Loader-facing subset of the resolved configuration."""
     assignment: SplitAssignmentPlan
@@ -191,9 +150,19 @@ class ExecutionPlan:
         """Return the number of workers requested by the runtime plan."""
         return self.runtime.jobs
 
+    @property
+    def output_config(self) -> OutputConfig:
+        """Return the resolved output configuration."""
+        return self.resolved_config.output
+
+    @property
+    def trajectory_schema(self) -> TrajectorySchema:
+        """Return the resolved output trajectory schema."""
+        return get_trajectory_schema(self.output_config.trajectory_schema)
+
     def manifest(self) -> DatasetManifest:
         """Return the dataset manifest for this plan."""
-        export_config: OutputConfig = self.resolved_config.output
+        export_config = self.output_config
         derivation_source = trajectory_schema_after_transforms(
             self.descriptor.native_schema, self.resolved_config
         )
@@ -207,9 +176,9 @@ class ExecutionPlan:
             storage_backend=self.storage_backend.value,
             dronalize_version=package_version(),
             precision=export_config.precision,
-            feature_columns=self.output.trajectory_schema.feature_columns(),
-            trajectory_schema=self.output.trajectory_schema.name,
-            trajectory_schema_fields=self.output.trajectory_schema.semantic_fields(),
+            feature_columns=self.trajectory_schema.feature_columns(),
+            trajectory_schema=self.trajectory_schema.name,
+            trajectory_schema_fields=self.trajectory_schema.semantic_fields(),
             recenter_positions=export_config.recenter_positions,
             source_trajectory_schema=self.descriptor.native_schema.name,
             source_trajectory_schema_fields=self.descriptor.native_schema.semantic_fields(),
@@ -222,7 +191,7 @@ class ExecutionPlan:
                 field.to_str()
                 for field in derived_trajectory_fields(
                     derivation_source,
-                    self.output.trajectory_schema,
+                    self.trajectory_schema,
                     sample_time=self.resolved_config.scenes.sample_time,
                 )
             ),

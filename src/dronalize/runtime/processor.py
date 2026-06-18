@@ -143,7 +143,7 @@ class RuntimeProcessor:
             source_schema=trajectory_schema_after_transforms(
                 plan.descriptor.native_schema, plan.resolved_config
             ),
-            target_schema=plan.output.trajectory_schema,
+            target_schema=plan.trajectory_schema,
             horizon_frames=plan.effective_horizon_frames,
             sample_time=plan.effective_sample_time,
             split_assigner=SplitAssigner(plan.assignment),
