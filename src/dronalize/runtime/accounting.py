@@ -218,12 +218,7 @@ class LocalRunAccounting:
             processed_sources=self.source_count,
             candidate_scenes=self.candidate_count,
             written_scenes=self.written_count,
-            split_counts={
-                "test": self.split_counts["test"],
-                "train": self.split_counts["train"],
-                "unsplit": self.split_counts["unsplit"],
-                "val": self.split_counts["val"],
-            },
+            split_counts=self.split_counts.copy(),
             cleanup=self.cleanup.progress(),
             screening=ScreeningProgress(
                 enabled=screening_enabled,

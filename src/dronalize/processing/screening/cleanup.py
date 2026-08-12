@@ -9,7 +9,9 @@ from pydantic import Field, model_validator
 from typing_extensions import override
 
 from dronalize.core.categories import AgentCategoryInput, coerce_agent_categories
-from dronalize.processing.screening.agent import AgentCheckRule  # noqa: TC001
+from dronalize.processing.screening.agent import (
+    AgentCheckRule,  # ruff: ignore[typing-only-first-party-import]
+)
 from dronalize.processing.screening.base import AgentSet, CleanupRuleBase, RuleId
 
 if TYPE_CHECKING:

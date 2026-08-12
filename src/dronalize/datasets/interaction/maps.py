@@ -1,6 +1,6 @@
 """Map-graph builder for the INTERACTION dataset."""
 
-import xml.etree.ElementTree as ET  # noqa: S405
+import xml.etree.ElementTree as ET  # ruff: ignore[suspicious-xml-etree-import]
 
 from typing_extensions import override
 

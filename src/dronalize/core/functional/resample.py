@@ -110,7 +110,7 @@ class ResampleSpec:
 
     @property
     def no_resampling(self) -> bool:
-        """Return whether the specification keeps the original sampling rate."""
+        """Whether the specification keeps the original sampling rate."""
         return self.up == 1 and self.down == 1
 
 
@@ -129,17 +129,17 @@ class ResamplePlan:
 
     @property
     def emit_velocity(self) -> bool:
-        """Return whether the plan emits velocity columns."""
+        """Whether the plan emits velocity columns."""
         return len(self.velocity_columns) > 0
 
     @property
     def emit_acceleration(self) -> bool:
-        """Return whether the plan emits acceleration columns."""
+        """Whether the plan emits acceleration columns."""
         return len(self.acceleration_columns) > 0
 
     @property
     def packed_columns(self) -> tuple[str, ...]:
-        """Return the frame and coordinate columns packed before spline interpolation."""
+        """Frame and coordinate columns packed before spline interpolation."""
         return (self.frame_column, *self.coordinates)
 
 

@@ -1,7 +1,7 @@
 """Provides functionality to register custom datasets from CLI."""
 
 import importlib
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Iterable, Iterator
 from types import ModuleType
 from typing import cast
 
@@ -9,8 +9,6 @@ from dronalize.core.errors import CliError, cli_usage_error
 from dronalize.datasets import DatasetDescriptor, register_dataset
 
 _REGISTER_HOOK_NAME = "register_dronalize_datasets"
-
-DatasetHook = Callable[[], DatasetDescriptor | Iterable[DatasetDescriptor] | None]
 
 
 def register_custom_datasets(dataset_modules: list[str] | None) -> None:
@@ -35,19 +33,25 @@ def register_custom_datasets(dataset_modules: list[str] | None) -> None:
     Option 1 is the recommended approach for new dataset modules, as it provides
     a clear and explicit way to register datasets.
 
-    """  # noqa: D401
+    """  # ruff: ignore[non-imperative-mood]
     if not dataset_modules:
         return
 
     for module_name in dataset_modules:
         module = _import_dataset_module(module_name)
-        hook = _get_dataset_register_hook(module, module_name)
-
+        hook = getattr(module, _REGISTER_HOOK_NAME, None)
         if hook is None:
             continue
-
-        descriptors = _call_dataset_register_hook(hook, module_name)
-
+        if not callable(hook):
+            msg = f"Dataset module '{module_name}' defines non-callable {_REGISTER_HOOK_NAME}."
+            raise cli_usage_error(msg)
+        try:
+            descriptors = cast("DatasetDescriptor | Iterable[object] | None", hook())
+        except CliError:
+            raise
+        except Exception as exc:
+            msg = f"Dataset module '{module_name}' failed while registering datasets."
+            raise CliError(msg) from exc
         for descriptor in _normalize_dataset_descriptors(descriptors, module_name):
             register_dataset(descriptor)
 
@@ -69,41 +73,15 @@ def _import_dataset_module(module_name: str) -> ModuleType:
         raise cli_usage_error(msg) from exc
 
 
-def _get_dataset_register_hook(module: ModuleType, module_name: str) -> DatasetHook | None:
-    hook = getattr(module, _REGISTER_HOOK_NAME, None)
-
-    if hook is None:
-        return None
-
-    if not callable(hook):
-        msg = f"Dataset module '{module_name}' defines non-callable {_REGISTER_HOOK_NAME}."
-        raise cli_usage_error(msg)
-
-    # Assume it follows the expected signature, this will be validated when it
-    # is used.
-    return cast("DatasetHook", hook)
-
-
-def _call_dataset_register_hook(
-    hook: DatasetHook, module_name: str
-) -> DatasetDescriptor | Iterable[DatasetDescriptor] | None:
-    try:
-        return hook()
-    except CliError:
-        raise
-    except Exception as exc:
-        msg = f"Dataset module '{module_name}' failed while registering datasets."
-        raise CliError(msg) from exc
-
-
 def _normalize_dataset_descriptors(
     descriptors: DatasetDescriptor | Iterable[DatasetDescriptor | object] | None, module_name: str
-) -> Iterable[DatasetDescriptor]:
+) -> Iterator[DatasetDescriptor]:
     if descriptors is None:
-        return ()
+        return
 
     if isinstance(descriptors, DatasetDescriptor):
-        return (descriptors,)
+        yield descriptors
+        return
 
     try:
         iterator: Iterator[DatasetDescriptor | object] = iter(descriptors)
@@ -113,7 +91,6 @@ def _normalize_dataset_descriptors(
         )
         raise cli_usage_error(msg) from exc
 
-    normalized_descriptors: list[DatasetDescriptor] = []
     for descriptor in iterator:
         if not isinstance(descriptor, DatasetDescriptor):
             msg = (
@@ -122,6 +99,4 @@ def _normalize_dataset_descriptors(
             )
             raise cli_usage_error(msg)
 
-        normalized_descriptors.append(descriptor)
-
-    return normalized_descriptors
+        yield descriptor

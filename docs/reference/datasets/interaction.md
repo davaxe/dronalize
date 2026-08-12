@@ -11,14 +11,14 @@ INTERACTION is a benchmark for difficult multi-agent driving scenarios with stro
   <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 40 frames (default split after 10) @ 10.0 Hz |
-| Effective horizon | 40 frames (default split after 10) @ 10.0 Hz |
+| Configured horizon | 40 frames (benchmark origin 10) @ 10.0 Hz |
+| Effective horizon | 40 frames (benchmark origin 10) @ 10.0 Hz |
 | Source unit | Case |
 | Source bounds | 10-40 frames (observed) |
 | Resampling | None |

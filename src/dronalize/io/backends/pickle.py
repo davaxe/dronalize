@@ -8,7 +8,7 @@ when inspectability matters more than shard-based streaming.
 
 from __future__ import annotations
 
-import pickle  # noqa: S403
+import pickle  # ruff: ignore[suspicious-pickle-import]
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from dronalize.config.models import OutputConfig
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import Scene, TrajectorySchema
+    from dronalize.io.records import PredictionBounds
 
 
 class PickleWriter(DatasetWriter):
@@ -48,7 +49,7 @@ class PickleWriter(DatasetWriter):
         identifier: str | int | None = None,
         *,
         config: OutputConfig,
-        default_observation_length: int | None = None,
+        prediction_bounds: PredictionBounds | None = None,
         splits: Iterable[DatasetSplit] | None = None,
         record_transform: RecordTransform[object] | None = None,
         scene_transform: SceneTransform[object] | None = None,
@@ -59,7 +60,7 @@ class PickleWriter(DatasetWriter):
         self._base_output_dir: Path = output_dir
         self._config: OutputConfig = config
         self._trajectory_schema: TrajectorySchema = get_trajectory_schema(config.trajectory_schema)
-        self._default_observation_length: int | None = default_observation_length
+        self._prediction_bounds: PredictionBounds | None = prediction_bounds
         self._identifier: str = "UNNAMED" if identifier is None else str(identifier)
         self._record_transform: RecordTransform[object] | None = record_transform
         self._scene_transform: SceneTransform[object] | None = scene_transform
@@ -88,7 +89,7 @@ class PickleWriter(DatasetWriter):
             dtype=np.float32 if self._config.precision == "float32" else np.float64,
             recenter_position=self._config.recenter_positions,
             trajectory_schema=self._trajectory_schema,
-            default_observation_length=self._default_observation_length,
+            prediction_bounds=self._prediction_bounds,
         )
         if self._record_transform is None:
             return record

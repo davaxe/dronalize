@@ -11,14 +11,14 @@ nuScenes is a multimodal autonomous-driving benchmark that combines tracked acto
   <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 16 frames (default split after 4) @ 2.0 Hz |
-| Effective horizon | 76 frames (default split after 16) @ 10.0 Hz |
+| Configured horizon | 16 frames (benchmark origin 4) @ 2.0 Hz |
+| Effective horizon | 76 frames (benchmark origin 16) @ 10.0 Hz |
 | Source unit | Scene |
 | Source bounds | 32-41 frames (observed) |
 | Resampling | 5:1 (linear) |

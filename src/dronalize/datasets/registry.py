@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import ValidationError
 
+from dronalize.config.models import PredictionTaskConfig
 from dronalize.core.errors import (
     DatasetNotFoundError,
     DatasetRegistryError,
@@ -167,6 +168,10 @@ class DatasetDescriptor:
     temporal_support : DatasetTemporalSupport or None, optional
         Optional metadata describing source sequence lengths and generic
         windowing semantics.
+    tasks : Mapping[str, PredictionTaskConfig], optional
+        Named prediction tasks supported by this dataset.
+    default_task : str or None, optional
+        Named task selected when a request does not make an explicit choice.
     """
 
     name: str
@@ -179,6 +184,26 @@ class DatasetDescriptor:
     feature_support: DatasetFeatureSupport = DatasetFeatureSupport()
     split_support: DatasetSplitSupport = DatasetSplitSupport()
     temporal_support: DatasetTemporalSupport | None = None
+    tasks: Mapping[str, PredictionTaskConfig] = field(
+        default_factory=dict[str, PredictionTaskConfig]
+    )
+    """Named prediction tasks supported by this dataset."""
+    default_task: str | None = None
+    """Named prediction task selected by default, if any."""
+
+    def __post_init__(self) -> None:
+        """Validate descriptor-owned tasks against the default scene horizon."""
+        if self.default_task is not None and self.default_task not in self.tasks:
+            msg = f"Default task '{self.default_task}' is not defined for dataset '{self.name}'."
+            raise DatasetRegistryError(msg)
+        for name, task in self.tasks.items():
+            if task.prediction_end > self.default_config.scenes.horizon_frames:
+                msg = (
+                    f"Task '{name}' for dataset '{self.name}' ends at "
+                    f"{task.prediction_end}, beyond the default horizon of "
+                    f"{self.default_config.scenes.horizon_frames}."
+                )
+                raise DatasetRegistryError(msg)
 
     def parse_loader_options(self, payload: Mapping[str, object] | None) -> LoaderOptionsModel:
         """Parse and validate dataset-owned config from plain data."""
@@ -341,11 +366,10 @@ def get_dataset(name: str) -> DatasetDescriptor:
         logger.debug("Resolved dataset descriptor from in-memory registry", extra={"dataset": name})
         return _REGISTRY[name]
 
-    builtins = _builtin_datasets()
-    if name not in builtins:
+    if name not in _BUILTIN_DATASETS:
         raise DatasetNotFoundError(name, list_datasets())
 
-    builtin = builtins[name]
+    builtin = _BUILTIN_DATASETS[name]
     missing = _missing_optional_dependencies(builtin)
     if missing:
         raise _missing_dependency_error(
@@ -367,19 +391,15 @@ def list_datasets() -> list[str]:
     """
     builtin_names = {
         name
-        for name, builtin in _builtin_datasets().items()
+        for name, builtin in _BUILTIN_DATASETS.items()
         if not _missing_optional_dependencies(builtin)
     }
     return sorted(set(_REGISTRY) | builtin_names)
 
 
-def _builtin_datasets() -> dict[str, _BuiltinDatasetDescriptor]:
-    return _BUILTIN_DATASETS
-
-
 @functools.cache
 def _load_builtin_descriptor(name: str) -> DatasetDescriptor:
-    builtin = _builtin_datasets().get(name)
+    builtin = _BUILTIN_DATASETS.get(name)
     if builtin is None:
         raise DatasetNotFoundError(name, list_datasets())
 

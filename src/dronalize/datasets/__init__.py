@@ -14,7 +14,7 @@ Use
 when authoring dataset integrations that need run-scoped map-provider setup.
 """
 
-from dronalize.config.models import MapConfig, ScenesConfig
+from dronalize.config.models import MapConfig, PredictionTaskConfig, ScenesConfig
 from dronalize.datasets.registry import (
     DatasetDescriptor,
     DatasetFeatureSupport,
@@ -33,6 +33,7 @@ __all__ = [
     "DatasetWindowingSupport",
     "FrameBounds",
     "MapConfig",
+    "PredictionTaskConfig",
     "ScenesConfig",
     "get_dataset",
     "list_datasets",

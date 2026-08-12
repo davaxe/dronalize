@@ -163,7 +163,7 @@ class MappingPatch(ConfigBase, Generic[ValueT]):
 
     @model_validator(mode="before")
     @classmethod
-    def _normalize_compact_mapping_patch(cls, data: Any) -> Any:  # noqa: ANN401
+    def _normalize_compact_mapping_patch(cls, data: Any) -> Any:  # ruff: ignore[any-type]
         """Normalize input to allow compact syntax for simple mapping patches."""
         if not isinstance(data, Mapping):
             return data

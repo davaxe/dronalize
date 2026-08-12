@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Literal
 
 from dronalize.config.models import (
     LaneChangeConfig,
+    PredictionTaskConfig,
     ResampleConfig,
     ScenesConfig,
     ScreeningConfig,
@@ -136,7 +137,6 @@ def linear_resample(up: int, down: int = 1) -> ResampleConfig:
 def scenes_config(
     *,
     horizon_frames: int,
-    default_observation_length: int | None = None,
     sample_time: float,
     window_step: int | None = None,
     window_policy: Literal["strict", "anchored", "partial"] = "strict",
@@ -146,13 +146,22 @@ def scenes_config(
     """Build an explicit `ScenesConfig` while keeping descriptor defaults concise."""
     return ScenesConfig(
         horizon_frames=horizon_frames,
-        default_observation_length=default_observation_length,
         sample_time=sample_time,
         window=WindowConfig(step=window_step, policy=window_policy)
         if window_step is not None
         else None,
         resample=resample,
         lane_change=lane_change,
+    )
+
+
+def benchmark_task(
+    scenes: ScenesConfig, *, prediction_origin: int, prediction_end: int | None = None
+) -> PredictionTaskConfig:
+    """Build a benchmark prediction task using a descriptor's scene horizon."""
+    return PredictionTaskConfig(
+        prediction_origin=prediction_origin,
+        prediction_end=scenes.horizon_frames if prediction_end is None else prediction_end,
     )
 
 

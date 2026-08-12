@@ -56,7 +56,7 @@ class LyftLevel5Map:
 
     @cached_property
     def lanes(self) -> dict[str, Lane]:
-        """Get all lanes in the map."""
+        """All lanes in the map."""
         lanes: dict[str, Lane] = {}
         for el in self.elements:
             lane_id: str = _global_id_to_str(el.id)
@@ -69,7 +69,7 @@ class LyftLevel5Map:
 
     @cached_property
     def road_network_segments(self) -> dict[str, RoadNetworkSegment]:
-        """Get all road network segments in the map."""
+        """All road network segments in the map."""
         segments: dict[str, RoadNetworkSegment] = {}
         for el in self.elements:
             if el.element.HasField("segment"):
@@ -80,7 +80,7 @@ class LyftLevel5Map:
 
     @cached_property
     def traffic_control_elements(self) -> dict[str, TrafficControlElement]:
-        """Get all traffic control elements in the map."""
+        """All traffic control elements in the map."""
         elements: dict[str, TrafficControlElement] = {}
         for el in self.elements:
             if el.element.HasField("traffic_control_element"):
@@ -93,7 +93,7 @@ class LyftLevel5Map:
 
     @cached_property
     def road_network_nodes(self) -> dict[str, RoadNetworkNode]:
-        """Get all road network nodes in the map."""
+        """All road network nodes in the map."""
         nodes: dict[str, RoadNetworkNode] = {}
         for el in self.elements:
             if el.element.HasField("node"):
@@ -104,7 +104,7 @@ class LyftLevel5Map:
 
     @cached_property
     def junctions(self) -> dict[str, Junction]:
-        """Get all junctions in the map."""
+        """All junctions in the map."""
         junctions: dict[str, Junction] = {}
         for el in self.elements:
             if el.element.HasField("junction"):

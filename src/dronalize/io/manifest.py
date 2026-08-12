@@ -6,7 +6,7 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from importlib.metadata import PackageNotFoundError, version
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from dronalize.core.errors import ManifestCompatibilityError
 
@@ -17,6 +17,18 @@ if TYPE_CHECKING:
 FORMAT_VERSION: int = 1
 MANIFEST_FILENAME: str = "manifest.json"
 logger = logging.getLogger(__name__)
+
+
+@dataclass(slots=True, frozen=True)
+class PredictionTaskManifest:
+    """Configured and effective prediction bounds for one processed export."""
+
+    name: str | None
+    """Descriptor-owned task name, or ``None`` for a custom task."""
+    source_prediction_origin: int
+    source_prediction_end: int
+    prediction_origin: int
+    prediction_end: int
 
 
 @dataclass(slots=True, frozen=True)
@@ -48,8 +60,6 @@ class DatasetManifest:
     """Per-timestep feature columns stored in record tensors."""
     horizon_frames: int
     """Number of full-horizon frames per persisted record."""
-    default_observation_length: int | None
-    """Default observation length for split-on-read convenience, if known."""
     precision: str
     """Floating-point precision used for exported feature arrays."""
     recenter_positions: bool
@@ -60,6 +70,8 @@ class DatasetManifest:
     """Output `sample_time` interval in seconds after resampling."""
     original_sample_time: float
     """Dataset `sample_time` interval in seconds before resampling."""
+    prediction_task: PredictionTaskManifest | None = None
+    """Prediction task selected for this export, if any."""
     format_version: int = FORMAT_VERSION
     """Manifest schema version used for compatibility checks."""
     dataset_names: tuple[str, ...] = ()
@@ -72,15 +84,14 @@ class DatasetManifest:
         if self.horizon_frames <= 0:
             msg = f"`horizon_frames` must be positive, but got {self.horizon_frames}."
             raise ValueError(msg)
-        if (
-            self.default_observation_length is not None
-            and not 0 <= self.default_observation_length <= self.horizon_frames
-        ):
-            msg = (
-                "`default_observation_length` must be between 0 and "
-                f"{self.horizon_frames}, but got {self.default_observation_length}."
-            )
-            raise ValueError(msg)
+        task = self.prediction_task
+        if task is not None:
+            if not 0 < task.source_prediction_origin < task.source_prediction_end:
+                msg = "Invalid source prediction bounds in manifest."
+                raise ValueError(msg)
+            if not 0 < task.prediction_origin < task.prediction_end <= self.horizon_frames:
+                msg = "Invalid effective prediction bounds in manifest."
+                raise ValueError(msg)
 
     def to_json_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation of the manifest."""
@@ -106,18 +117,30 @@ class DatasetManifest:
             derived_features=tuple(payload.get("derived_features", ())),
             feature_columns=tuple(payload["feature_columns"]),
             horizon_frames=int(payload["horizon_frames"]),
-            default_observation_length=(
-                None
-                if payload.get("default_observation_length") is None
-                else int(payload["default_observation_length"])
-            ),
             precision=str(payload["precision"]),
             recenter_positions=bool(payload["recenter_positions"]),
             has_map=bool(payload["has_map"]),
             sample_time=float(payload["sample_time"]),
             original_sample_time=float(payload["original_sample_time"]),
+            prediction_task=_parse_prediction_task(payload.get("prediction_task")),
             dataset_names=tuple(payload.get("dataset_names", (payload["dataset"],))),
         )
+
+
+def _parse_prediction_task(payload: object) -> PredictionTaskManifest | None:
+    if payload is None:
+        return None
+    if not isinstance(payload, dict):
+        msg = "`prediction_task` must be an object or null."
+        raise TypeError(msg)
+    task_payload = cast("dict[str, Any]", payload)
+    return PredictionTaskManifest(
+        name=(None if task_payload.get("name") is None else str(task_payload["name"])),
+        source_prediction_origin=int(task_payload["source_prediction_origin"]),
+        source_prediction_end=int(task_payload["source_prediction_end"]),
+        prediction_origin=int(task_payload["prediction_origin"]),
+        prediction_end=int(task_payload["prediction_end"]),
+    )
 
 
 def package_version() -> str:

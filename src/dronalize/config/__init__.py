@@ -12,7 +12,7 @@ This module re-exports the main configuration models and utilities used by
 
 """
 
-from dronalize.config.models import RuntimeOverride
+from dronalize.config.models import PredictionTaskConfig, RuntimeOverride
 from dronalize.config.parse import ProjectConfig, parse_config
 
-__all__ = ["ProjectConfig", "RuntimeOverride", "parse_config"]
+__all__ = ["PredictionTaskConfig", "ProjectConfig", "RuntimeOverride", "parse_config"]

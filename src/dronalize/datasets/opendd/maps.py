@@ -77,7 +77,7 @@ class OpenDDMapBuilder(FeatureMapBuilder):
         _ = self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         table_names = [row[0] for row in self.cursor.fetchall()]
         map_table = table_names[0]
-        _ = self.cursor.execute(f"SELECT * FROM {map_table}")  # noqa: S608
+        _ = self.cursor.execute(f"SELECT * FROM {map_table}")  # ruff: ignore[hardcoded-sql-expression]
         rows = self.cursor.fetchall()
         for row in rows:
             map_data_row = MapDataRow.try_from_row(row)

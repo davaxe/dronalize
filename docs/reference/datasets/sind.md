@@ -11,14 +11,14 @@ SIND is a drone dataset for signalized intersections in China. It combines multi
   <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 70 frames (default split after 20) @ 10.0 Hz |
-| Effective horizon | 70 frames (default split after 20) @ 10.0 Hz |
+| Configured horizon | 70 frames (benchmark origin 20) @ 10.0 Hz |
+| Effective horizon | 70 frames (benchmark origin 20) @ 10.0 Hz |
 | Source unit | Recording |
 | Source bounds | 4715-16023 frames (observed) |
 | Resampling | None |

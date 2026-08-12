@@ -55,7 +55,7 @@ class ReadSelection:
 
     @property
     def strategy(self) -> str:
-        """Return the read strategy name."""
+        """Read strategy name."""
         return self.config.strategy
 
 
@@ -113,17 +113,17 @@ class SplitAssignmentPlan:
 
     @property
     def gap(self) -> int | None:
-        """Return the configured temporal assignment gap, if any."""
+        """Configured temporal assignment gap, if any."""
         return getattr(self.config, "gap", None)
 
     @property
     def segments(self) -> int | None:
-        """Return the configured shuffled-time segment count, if any."""
+        """Configured shuffled-time segment count, if any."""
         return getattr(self.config, "segments", None)
 
     @property
     def strategy(self) -> str:
-        """Return the assignment strategy name."""
+        """Assignment strategy name."""
         return self.config.strategy
 
 
@@ -139,13 +139,8 @@ class LoaderPlan:
 
     @property
     def horizon_frames(self) -> int:
-        """Return the number of frames per scene horizon."""
+        """Number of frames per scene horizon."""
         return self.scenes.horizon_frames
-
-    @property
-    def default_observation_length(self) -> int | None:
-        """Return the default reader/adaptor split point, if configured."""
-        return self.scenes.default_observation_length
 
 
 @dataclass(frozen=True, slots=True)

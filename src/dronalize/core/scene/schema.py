@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence  # noqa: TC003
+from collections.abc import Sequence  # ruff: ignore[typing-only-standard-library-import]
 from dataclasses import dataclass
 from enum import IntFlag, auto
 from typing import TYPE_CHECKING, Final, Literal, cast
@@ -38,11 +38,6 @@ class TrajectoryField(IntFlag):
     AY = auto()
     YAW = auto()
     AGENT_CATEGORY = auto()
-
-    @classmethod
-    def check(cls, value: str) -> bool:
-        """Return True if the value is a valid trajectory field identifier."""
-        return value.upper() in cls.__members__
 
     @classmethod
     def from_str(cls, value: str) -> TrajectoryField:
@@ -123,23 +118,16 @@ class TrajectorySchema:
 
     @property
     def physical(self) -> pl.Schema:
-        """Return the canonical physical dataframe schema for this field set."""
+        """Canonical physical dataframe schema for this field set."""
         return pl.Schema({field.to_str(): _FIELD_DTYPES[field] for field in self.ordered_fields()})
 
     def ordered_fields(self) -> tuple[TrajectoryField, ...]:
-        """Return semantic fields in canonical dataframe order."""
+        """Semantic fields in canonical dataframe order."""
         return tuple(self.fields.fields())
 
     def has(self, *fields: TrajectoryField | str) -> bool:
         """Return whether all requested semantic fields are present."""
         return _contains_fields(self.fields, _resolve_fields(fields))
-
-    def dtype_for(self, field: TrajectoryField | str) -> pl.DataType | None:
-        """Return the canonical dtype for a semantic field if present."""
-        trajectory_field = _as_trajectory_field(field)
-        if not _contains_fields(self.fields, trajectory_field):
-            return None
-        return _FIELD_DTYPES[trajectory_field]
 
     def column_for(self, field: TrajectoryField | str) -> str | None:
         """Return the canonical physical column name for a semantic field."""
@@ -164,12 +152,8 @@ class TrajectorySchema:
 
     @property
     def feature_dim(self) -> int:
-        """Return the number of per-agent tensor features."""
+        """Number of per-agent tensor features."""
         return len(self.feature_fields())
-
-    def field_items(self) -> tuple[tuple[str, pl.DataType], ...]:
-        """Return the field-name and dtype tuples."""
-        return tuple((field.to_str(), _FIELD_DTYPES[field]) for field in self.ordered_fields())
 
 
 def _as_trajectory_field(field: TrajectoryField | str) -> TrajectoryField:

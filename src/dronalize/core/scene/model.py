@@ -232,7 +232,7 @@ def _convert_frame(
     semantic = _derive_missing_fields(
         semantic, source=source, target=target, sample_time=sample_time
     )
-    return semantic.select([pl.col(field).cast(dtype) for field, dtype in target.field_items()])
+    return semantic.select([pl.col(field).cast(dtype) for field, dtype in target.physical.items()])
 
 
 def _to_semantic_frame(data: pl.DataFrame, schema: TrajectorySchema) -> pl.DataFrame:

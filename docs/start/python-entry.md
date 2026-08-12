@@ -31,9 +31,14 @@ from dronalize.datasets import get_dataset
 
 descriptor = get_dataset("a43")
 project = parse_config(Path("dronalize.toml"))
-resolved = project.resolve_dataset_config("a43", descriptor.default_config)
+resolved = project.resolve_dataset_config(
+    "a43",
+    descriptor.default_config,
+    named_tasks=descriptor.tasks,
+    default_task=descriptor.default_task,
+)
 
-print(resolved.scenes.horizon_frames, resolved.scenes.default_observation_length)
+print(resolved.scenes.horizon_frames, resolved.task)
 print(resolved.output.precision)
 print(resolved.read.strategy)
 print(resolved.assign.strategy)

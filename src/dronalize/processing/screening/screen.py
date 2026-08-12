@@ -20,7 +20,9 @@ from dronalize.processing.screening.base import (
     rule_name,
 )
 from dronalize.processing.screening.cleanup import CleanupRule, PruneByRule
-from dronalize.processing.screening.scene import SceneCheckRule  # noqa: TC001
+from dronalize.processing.screening.scene import (
+    SceneCheckRule,  # ruff: ignore[typing-only-first-party-import]
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence

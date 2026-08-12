@@ -9,6 +9,7 @@ from dronalize.datasets.registry import (
 )
 from dronalize.datasets.shared.highway_builder import HighwayLaneMapBuilder, LaneDescription
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     lane_change_sampling,
     minimum_observations_screening,
     scenes_config,
@@ -29,12 +30,11 @@ _SELECT_EXPR = (
 _DEFAULT_CONFIG = DatasetConfig(
     scenes=scenes_config(
         horizon_frames=70,
-        default_observation_length=20,
         sample_time=0.1,
         window_step=25,
         lane_change=lane_change_sampling(required_lane_changes=3, negative_keep_every=3),
     ),
-    screening=minimum_observations_screening(2, required_frame=19),
+    screening=minimum_observations_screening(2),
     map=MapConfig(extraction=FullMapExtraction()),
 )
 
@@ -65,6 +65,8 @@ DATASET_DESCRIPTORS = {
         name="i80",
         loader_cls=NGSimLoader,
         default_config=_DEFAULT_CONFIG,
+        tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=20)},
+        default_task="benchmark",
         native_schema=NGSimLoader.native_trajectory_schema(),
         map_provider_factory=ngsim_resources(
             LaneDescription(ids=list(range(1, 8)), direction=[True] * 7)
@@ -79,6 +81,8 @@ DATASET_DESCRIPTORS = {
         name="us101",
         loader_cls=NGSimLoader,
         default_config=_DEFAULT_CONFIG,
+        tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=20)},
+        default_task="benchmark",
         native_schema=NGSimLoader.native_trajectory_schema(),
         map_provider_factory=ngsim_resources(
             LaneDescription(ids=list(range(1, 9)), direction=[True] * 8)

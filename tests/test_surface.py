@@ -13,6 +13,8 @@ from dronalize.core import AgentCategory, DatasetSplit, EdgeType
 from dronalize.core.maps import MapGraph, SharedMapGraph
 from dronalize.io import (
     DatasetManifest,
+    PredictionBounds,
+    PredictionTaskManifest,
     SplitSceneRecord,
     StorageBackend,
     manifest_path,
@@ -70,6 +72,8 @@ def test_core_and_runtime_exports_present() -> None:
 
 def test_io_and_config_exports_present() -> None:
     assert DatasetManifest is not None
+    assert PredictionBounds is not None
+    assert PredictionTaskManifest is not None
     assert SplitSceneRecord is not None
     assert DatasetWriter is not None
     assert manifest_path is not None
@@ -86,8 +90,12 @@ def test_reader_and_adapter_exports_declared() -> None:
     assert "DatasetReader" in io_readers.__all__
     assert "MDSReaderInitArgs" in io_readers.__all__
     assert "IterableTorchSceneDataset" in io_adapters.__all__
+    assert "IterableTorchForecastDataset" in io_adapters.__all__
+    assert "TorchForecastDataset" in io_adapters.__all__
     assert "TorchSplitSceneRecord" in io_adapters.__all__
     assert "IterableHeteroSceneDataset" in io_adapters.__all__
+    assert "IterableHeteroForecastDataset" in io_adapters.__all__
+    assert "HeteroForecastDataset" in io_adapters.__all__
     assert "HeteroSceneDataset" in io_adapters.__all__
 
 

@@ -301,7 +301,7 @@ def save_scene_artifacts(
 
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
-        import dronalize_viz as dviz  # pyright: ignore[reportMissingImports]  # noqa: PLC0415
+        import dronalize_viz as dviz  # pyright: ignore[reportMissingImports]  # ruff: ignore[import-outside-top-level]
 
         dviz.trajectory_figure(scene).save(out_dir / "trajectory.html")
 

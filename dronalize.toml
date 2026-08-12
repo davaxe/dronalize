@@ -97,7 +97,6 @@ uses = ["basic_screening", "high_precision"]
 
 [datasets.a43.scenes]
 horizon_frames = 80
-default_observation_length = 20
 sample_time = 0.1
 
 [datasets.a43.scenes.window]

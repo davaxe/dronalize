@@ -8,6 +8,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     linear_resample,
     minimum_observations_screening,
     scenes_config,
@@ -26,20 +27,20 @@ _open_nuscenes_resources = named_shared_map_resources_factory(
 )
 
 
+_DEFAULT_CONFIG = DatasetConfig(
+    scenes=scenes_config(
+        horizon_frames=16, sample_time=0.5, window_step=1, resample=linear_resample(up=5)
+    ),
+    screening=minimum_observations_screening(2),
+    map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
+)
+
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="nuscenes",
     loader_cls=NuScenesLoader,
-    default_config=DatasetConfig(
-        scenes=scenes_config(
-            horizon_frames=16,
-            default_observation_length=4,
-            sample_time=0.5,
-            window_step=1,
-            resample=linear_resample(up=5),
-        ),
-        screening=minimum_observations_screening(2, required_frame=3),
-        map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
-    ),
+    default_config=_DEFAULT_CONFIG,
+    tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=4)},
+    default_task="benchmark",
     loader_options_model=NuScenesLoaderOptions,
     native_schema=NuScenesLoader.native_trajectory_schema(),
     map_provider_factory=_open_nuscenes_resources,

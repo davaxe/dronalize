@@ -7,14 +7,11 @@ import pytest
 
 from dronalize.config import RuntimeOverride
 from dronalize.datasets import DatasetDescriptor, get_dataset, list_datasets
-from dronalize.datasets.registry import (
-    _builtin_datasets,  # pyright: ignore[reportPrivateUsage]
-    dataset_id_for_name,
-    dataset_names_by_id,
-)
+from dronalize.datasets.registry import dataset_id_for_name, dataset_names_by_id
 from dronalize.io import StorageBackend
 from dronalize.processing.screening.agent import AgentRequireFrames
 from dronalize.runtime import ExecutionRequest, resolve_request
+from dronalize.runtime.types import build_loader_plan
 from tests.support import demo_descriptor
 from tests.support_integration import assert_plan_scene_outputs
 
@@ -33,25 +30,28 @@ def test_builtin_dataset_ids_are_unique() -> None:
     names = dataset_names_by_id()
 
     assert len(names) == len(set(names))
-    assert set(names) == set(_builtin_datasets())
     for expected_id, name in enumerate(names):
         assert dataset_id_for_name(name) == expected_id
 
 
 @pytest.mark.parametrize("name", list_datasets())
-def test_builtin_screening_requires_observation_end(name: str) -> None:
+def test_builtin_default_benchmark_task_requires_history_endpoint(name: str) -> None:
     descriptor = get_dataset(name)
-    screening = descriptor.default_config.screening
+    assert descriptor.default_config.task is None
+    assert descriptor.default_task == "benchmark"
+    task = descriptor.tasks["benchmark"]
+    config = descriptor.default_config.model_copy(update={"task": task})
+    task = config.task
+    assert task is not None
+    loader = build_loader_plan(descriptor=descriptor, resolved_config=config, include_map=False)
+    screening = loader.screening
 
     assert screening is not None
     assert "min_observations" in screening.cleanup
-    assert "require_frames" in screening.agents
-    rule = screening.agents["require_frames"]
+    assert "prediction_history_endpoint" in screening.agents
+    rule = screening.agents["prediction_history_endpoint"]
     assert isinstance(rule, AgentRequireFrames)
-    assert descriptor.default_config.scenes.default_observation_length is not None
-    assert rule.frames == frozenset({
-        descriptor.default_config.scenes.default_observation_length - 1
-    })
+    assert rule.frames == frozenset({task.prediction_origin - 1})
     assert rule.require is not None
     assert rule.require.absolute == 1
     assert rule.require.relative is None

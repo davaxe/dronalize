@@ -18,14 +18,14 @@ The Lyft Level 5 motion prediction dataset is a large-scale self-driving benchma
     pip install dronalize[lyft]
     ```
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 70 frames (default split after 20) @ 10.0 Hz |
-| Effective horizon | 70 frames (default split after 20) @ 10.0 Hz |
+| Configured horizon | 70 frames (benchmark origin 20) @ 10.0 Hz |
+| Effective horizon | 70 frames (benchmark origin 20) @ 10.0 Hz |
 | Source unit | Scene |
 | Source bounds | 152-250 frames (observed) |
 | Resampling | None |

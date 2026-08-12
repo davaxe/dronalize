@@ -9,6 +9,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     lane_change_sampling,
     linear_resample,
     minimum_observations_screening,
@@ -23,21 +24,24 @@ _open_ad4che_resources = map_provider_resources_factory(
     )
 )
 
+_DEFAULT_CONFIG = DatasetConfig(
+    scenes=scenes_config(
+        horizon_frames=211,
+        sample_time=1 / 30,
+        window_step=25,
+        resample=linear_resample(up=1, down=3),
+        lane_change=lane_change_sampling(required_lane_changes=5, negative_keep_every=3),
+    ),
+    map=MapConfig(extraction=FullMapExtraction(), interpolation_distance=8),
+    screening=minimum_observations_screening(6),
+)
+
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="ad4che",
     loader_cls=AD4CHELoader,
-    default_config=DatasetConfig(
-        scenes=scenes_config(
-            horizon_frames=211,
-            default_observation_length=61,
-            sample_time=1 / 30,
-            window_step=25,
-            resample=linear_resample(up=1, down=3),
-            lane_change=lane_change_sampling(required_lane_changes=5, negative_keep_every=3),
-        ),
-        map=MapConfig(extraction=FullMapExtraction(), interpolation_distance=8),
-        screening=minimum_observations_screening(6, required_frame=60),
-    ),
+    default_config=_DEFAULT_CONFIG,
+    tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=61)},
+    default_task="benchmark",
     native_schema=AD4CHELoader.native_trajectory_schema(),
     split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
     feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),

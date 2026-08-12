@@ -19,7 +19,8 @@ class MDSRow(TypedDict):
 
     scene_number: int
     dataset_id: int
-    default_observation_length: int
+    prediction_origin: int
+    prediction_end: int
     ego_agent_id: int
     position_offset: npt.NDArray[np.float64]
     agent_ids: npt.NDArray[np.int64]
@@ -44,11 +45,8 @@ def encode_mds_row(record: SceneRecord) -> MDSRow:
     return {
         "scene_number": int(record.scene_number),
         "dataset_id": -1 if record.dataset_id is None else int(record.dataset_id),
-        "default_observation_length": (
-            -1
-            if record.default_observation_length is None
-            else int(record.default_observation_length)
-        ),
+        "prediction_origin": -1 if record.prediction_origin is None else record.prediction_origin,
+        "prediction_end": -1 if record.prediction_end is None else record.prediction_end,
         "ego_agent_id": -1 if record.ego_agent_id is None else int(record.ego_agent_id),
         "position_offset": record.position_offset,
         "agent_ids": record.agent_ids,
@@ -75,10 +73,11 @@ def decode_mds_row(row: Mapping[str, Any]) -> SceneRecord:
         scene_number=int(row["scene_number"]),
         ego_agent_id=(None if int(row.get("ego_agent_id", -1)) < 0 else int(row["ego_agent_id"])),
         dataset_id=(None if int(row.get("dataset_id", -1)) < 0 else int(row["dataset_id"])),
-        default_observation_length=(
-            None
-            if int(row.get("default_observation_length", -1)) < 0
-            else int(row["default_observation_length"])
+        prediction_origin=(
+            None if int(row.get("prediction_origin", -1)) < 0 else int(row["prediction_origin"])
+        ),
+        prediction_end=(
+            None if int(row.get("prediction_end", -1)) < 0 else int(row["prediction_end"])
         ),
         position_offset=np.asarray(row["position_offset"], dtype=np.float64),
         agent_ids=np.asarray(row["agent_ids"], dtype=np.int64),
@@ -98,7 +97,8 @@ def mds_columns(dtype: str) -> dict[str, str]:
     return {
         "scene_number": "int",
         "dataset_id": "int",
-        "default_observation_length": "int",
+        "prediction_origin": "int",
+        "prediction_end": "int",
         "ego_agent_id": "int",
         "position_offset": "ndarray:float64:2",
         "agent_ids": "ndarray:int64",

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import dronalize.core.errors as dronalize_exceptions
 from dronalize.config.models import (
     AssignConfig,
+    DatasetConfig,
     NoAssign,
     PreserveNativeAssign,
     ReadConfig,
@@ -25,7 +26,7 @@ from dronalize.runtime.types import ExecutionPlan, build_loader_plan, resolve_ef
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.config.models import DatasetConfig, RuntimeOverride
+    from dronalize.config.models import RuntimeOverride
     from dronalize.datasets.registry import DatasetDescriptor
     from dronalize.runtime.types import ExecutionRequest
 
@@ -41,24 +42,18 @@ def build_execution_plan(
     _validate_output_path(request)
     include_map = request.include_map
     storage_backend = _resolve_storage_backend(request.storage_backend)
-    resolved_config = _resolve_dataset_config(
+    resolved_config, selected_task = _resolve_dataset_config(
         descriptor=descriptor, config_path=request.config_path, cli_override=request.overrides
     )
-    if not _validate_read_support(descriptor, resolved_config.read):
-        msg = f"Dataset {descriptor.name} does not support the requested read configuration."
-        raise dronalize_exceptions.ConfigurationError(msg)
-    if not _validate_assignment_support(descriptor, resolved_config.assign):
-        msg = f"Dataset {descriptor.name} does not support the requested assignment configuration."
-        raise dronalize_exceptions.ConfigurationError(msg)
-    if not _validate_feature_support(descriptor, resolved_config):
-        msg = f"Dataset {descriptor.name} does not support lane-change sampling."
-        raise dronalize_exceptions.ConfigurationError(msg)
+    _validate_read_support(descriptor, resolved_config.read)
+    _validate_assignment_support(descriptor, resolved_config.assign)
+    _validate_feature_support(descriptor, resolved_config)
     _validate_temporal_support(descriptor, resolved_config)
     loader_request = build_loader_plan(
         descriptor=descriptor, resolved_config=resolved_config, include_map=include_map
     )
     assignment_request = SplitAssignmentPlan.from_config(resolved_config.assign, seed=request.seed)
-    effective_horizon_frames, effective_default_observation_length, effective_sample_time = (
+    effective_horizon_frames, effective_prediction_bounds, effective_sample_time = (
         resolve_effective_scene_window(resolved_config)
     )
     logger.debug(
@@ -72,6 +67,7 @@ def build_execution_plan(
     )
     return ExecutionPlan(
         descriptor=descriptor,
+        selected_task=selected_task,
         data_root=request.input_dir,
         output_dir=request.output_dir,
         storage_backend=StorageBackend(storage_backend),
@@ -80,7 +76,7 @@ def build_execution_plan(
         assignment=assignment_request,
         map=loader_request.map,
         effective_horizon_frames=effective_horizon_frames,
-        effective_default_observation_length=effective_default_observation_length,
+        effective_prediction_bounds=effective_prediction_bounds,
         effective_sample_time=effective_sample_time,
         output_transform=request.output_transform,
         limit=request.limit,
@@ -90,47 +86,47 @@ def build_execution_plan(
     )
 
 
-def _validate_read_support(descriptor: DatasetDescriptor, config: ReadConfig | None) -> bool:
-    if config is None:
-        return True
-    match config:
-        case ReadNative(splits=splits) if splits is not None:
-            supported = descriptor.supported_native_splits
-            if not supported:
-                return False
-            return set(splits).issubset(supported)
-        case ReadNative(splits=None):
-            return bool(descriptor.supported_native_splits)
-        case _:
-            return True
+def _validate_read_support(descriptor: DatasetDescriptor, config: ReadConfig | None) -> None:
+    if not isinstance(config, ReadNative):
+        return
+    supported = descriptor.supported_native_splits
+    if supported and (config.splits is None or set(config.splits).issubset(supported)):
+        return
+    msg = f"Dataset {descriptor.name} does not support the requested read configuration."
+    raise dronalize_exceptions.ConfigurationError(msg)
 
 
 def _validate_assignment_support(
     descriptor: DatasetDescriptor, config: AssignConfig | None
-) -> bool:
+) -> None:
     if config is None:
-        return True
+        return
     support = descriptor.split_support
     match config:
         case NoAssign():
-            return True
+            supported = True
         case PreserveNativeAssign():
-            return bool(descriptor.supported_native_splits)
+            supported = bool(descriptor.supported_native_splits)
         case TimeBlockAssign() | ShuffledTimeBlockAssign():
-            return support.time_block
+            supported = support.time_block
         case SceneAssign():
-            return support.scene
+            supported = support.scene
         case SourceAssign():
-            return support.source
+            supported = support.source
+    if not supported:
+        msg = f"Dataset {descriptor.name} does not support the requested assignment configuration."
+        raise dronalize_exceptions.ConfigurationError(msg)
 
 
-def _validate_feature_support(descriptor: DatasetDescriptor, config: DatasetConfig) -> bool:
+def _validate_feature_support(descriptor: DatasetDescriptor, config: DatasetConfig) -> None:
     if config.scenes.lane_change is None:
-        return True
+        return
     if config.scenes.window is None:
         msg = "Lane-change sampling requires window sampling to be enabled."
         raise dronalize_exceptions.ConfigurationError(msg)
-    return descriptor.feature_support.lane_change_sampling
+    if not descriptor.feature_support.lane_change_sampling:
+        msg = f"Dataset {descriptor.name} does not support lane-change sampling."
+        raise dronalize_exceptions.ConfigurationError(msg)
 
 
 def _validate_temporal_support(descriptor: DatasetDescriptor, config: DatasetConfig) -> None:
@@ -204,10 +200,23 @@ def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBa
 
 def _resolve_dataset_config(
     *, descriptor: DatasetDescriptor, config_path: Path | None, cli_override: RuntimeOverride
-) -> DatasetConfig:
+) -> tuple[DatasetConfig, str | None]:
     project = parse_config(config_path) if config_path else ProjectConfig()
     defaults = descriptor.default_config
-    config = project.resolve_dataset_config(descriptor.name, defaults)
+    selected_task = descriptor.default_task
+
+    config = project.resolve_dataset_config(
+        descriptor.name,
+        defaults,
+        named_tasks=descriptor.tasks,
+        default_task=descriptor.default_task,
+    )
+    project_task = project.task_selection_for(descriptor.name)
+    if isinstance(project_task, str):
+        selected_task = project_task
+    elif project_task is not None:
+        selected_task = None
+
     config = cli_override.merge_into(config)
     logger.debug("Resolved dataset config", extra={"dataset": descriptor.name})
-    return config
+    return config, selected_task

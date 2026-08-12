@@ -1,4 +1,4 @@
-# ruff: noqa: RUF067
+# ruff: file-ignore[non-empty-init-module]
 """Top-level package namespace for the `dronalize` library.
 
 This module is intentionally small. It does not provide convenience aliases

@@ -117,6 +117,16 @@ class ManifestCompatibilityError(ValueError, DronalizeError):
         self.supported_version: int = supported_version
 
 
+class MissingPredictionBoundsError(ValueError, DronalizeError):
+    """Raised when a forecast view is requested for a task-free record."""
+
+    def __init__(self, scene_number: int) -> None:
+        super().__init__(
+            f"Scene {scene_number} has no prediction bounds; provide an explicit override."
+        )
+        self.scene_number: int = scene_number
+
+
 class UnsupportedStorageBackendError(ValueError, DronalizeError):
     """Raised when an unknown storage backend is requested."""
 

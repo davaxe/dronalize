@@ -1,4 +1,4 @@
-# ruff: noqa: D102
+# ruff: file-ignore[undocumented-public-method]
 """Runtime progress models and multiprocessing execution state."""
 
 from __future__ import annotations
@@ -83,11 +83,6 @@ class Progress:
     scene_limit: int | None = None
     active_workers: int = 0
     stats: ExecutionStats = field(default_factory=ExecutionStats)
-
-    @classmethod
-    def empty(cls) -> Progress:
-        """Return an empty progress snapshot."""
-        return cls()
 
     @property
     def split_counts(self) -> SplitCounts:
@@ -179,21 +174,17 @@ class ProgressState:
             candidate_scenes=self.candidate_scene_counter.value,
             written_scenes=self.written_scene_counter.value,
             split_counts=self.split_counts(),
-            cleanup=self.cleanup_progress(),
+            cleanup=CleanupProgress(
+                rows_total=self.cleanup_rows_total_counter.value,
+                rows_removed=self.cleanup_rows_removed_counter.value,
+                agents_total=self.cleanup_agents_total_counter.value,
+                agents_removed=self.cleanup_agents_removed_counter.value,
+            ),
             screening=ScreeningProgress(
                 enabled=screening_enabled,
                 passed=self.screening_passed_counter.value,
                 rejected=self.screening_rejected_counter.value,
             ),
-        )
-
-    def cleanup_progress(self) -> CleanupProgress:
-        """Return cleanup counters as a lightweight progress object."""
-        return CleanupProgress(
-            rows_total=self.cleanup_rows_total_counter.value,
-            rows_removed=self.cleanup_rows_removed_counter.value,
-            agents_total=self.cleanup_agents_total_counter.value,
-            agents_removed=self.cleanup_agents_removed_counter.value,
         )
 
     def record_processed_source(self) -> None:

@@ -16,6 +16,7 @@ from dronalize.config.models import DatasetConfig, ScenesConfig, WindowConfig
 from dronalize.core import AgentCategory
 from dronalize.core.scene import POSITIONS_ONLY, TrajectorySchema
 from dronalize.datasets import DatasetDescriptor, register_dataset
+from dronalize.datasets.shared.presets import benchmark_task
 from dronalize.processing.loading import DatasetSource, LoadedSourceFrame, SceneLoader
 from dronalize.runtime import ExecutionRequest, resolve_request
 
@@ -62,17 +63,14 @@ class MiniCsvLoader(SceneLoader[str]):
         return POSITIONS_ONLY
 
 
+_SCENES = ScenesConfig(horizon_frames=3, sample_time=0.1, window=WindowConfig(step=1))
+
 MINI_CSV_SPEC = DatasetDescriptor(
     name="mini-csv",
     loader_cls=MiniCsvLoader,
-    default_config=DatasetConfig(
-        scenes=ScenesConfig(
-            horizon_frames=3,
-            default_observation_length=2,
-            sample_time=0.1,
-            window=WindowConfig(step=1),
-        )
-    ),
+    default_config=DatasetConfig(scenes=_SCENES),
+    tasks={"benchmark": benchmark_task(_SCENES, prediction_origin=2)},
+    default_task="benchmark",
     native_schema=MiniCsvLoader.native_trajectory_schema(),
 )
 

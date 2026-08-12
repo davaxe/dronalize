@@ -11,14 +11,14 @@ The View-of-Delft prediction dataset is an urban mixed-traffic benchmark with a 
   <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 35 frames (default split after 5) @ 10.0 Hz |
-| Effective horizon | 35 frames (default split after 5) @ 10.0 Hz |
+| Configured horizon | 35 frames (benchmark origin 5) @ 10.0 Hz |
+| Effective horizon | 35 frames (benchmark origin 5) @ 10.0 Hz |
 | Source unit | Recording |
 | Source bounds | 36-784 frames (observed) |
 | Resampling | None |

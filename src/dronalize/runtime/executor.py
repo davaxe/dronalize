@@ -66,7 +66,7 @@ def _build_executor(
     if plan.parallel:
         logger.debug("Using parallel executor", extra={"dataset": plan.dataset})
         return ParallelExecutor(
-            processor, workers=plan.workers, chunksize=plan.runtime.chunksize, limit=plan.limit
+            processor, workers=plan.runtime.jobs, chunksize=plan.runtime.chunksize, limit=plan.limit
         )
     logger.debug("Using sequential executor", extra={"dataset": plan.dataset})
     return SequentialExecutor(processor, limit=plan.limit)
@@ -281,7 +281,7 @@ def _init_worker(
     *,
     with_finalize: bool = True,
 ) -> None:
-    global _ctx  # noqa: PLW0603
+    global _ctx  # ruff: ignore[global-statement]
     worker_id = shared.next_worker()
     shared.progress.worker_started()
     _ctx = WorkerRuntime(shared=shared, worker_id=worker_id, processor=processor)
@@ -296,7 +296,7 @@ def _init_worker(
 def _init_write_worker(
     shared: SharedResources, processor: RuntimeProcessor, writer_provider: WriterProvider
 ) -> None:
-    global _ctx  # noqa: PLW0602
+    global _ctx  # ruff: ignore[global-variable-not-assigned]
     _init_worker(shared, processor, with_finalize=False)
     writer: DatasetWriter | None = None
     try:

@@ -7,8 +7,28 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from dronalize.core.errors import MissingPredictionBoundsError
+
 if TYPE_CHECKING:
     import numpy.typing as npt
+
+
+@dataclass(frozen=True, slots=True)
+class PredictionBounds:
+    """Half-open prediction bounds for one stored scene horizon."""
+
+    prediction_origin: int
+    prediction_end: int
+
+    def validate(self, *, horizon_frames: int) -> None:
+        """Validate the bounds against a stored horizon."""
+        if not 0 < self.prediction_origin < self.prediction_end <= horizon_frames:
+            msg = (
+                "Prediction bounds must satisfy "
+                f"0 < origin < end <= {horizon_frames}, got "
+                f"[{self.prediction_origin}, {self.prediction_end})."
+            )
+            raise ValueError(msg)
 
 
 @dataclass(slots=True)
@@ -16,9 +36,8 @@ class SceneRecord:
     """Canonical persisted full-horizon scene record.
 
     A `SceneRecord` contains one contiguous trajectory horizon for all agents in
-    a scene. It deliberately does not encode an observation/prediction split;
-    consumers that need split tensors can derive a [`SplitSceneRecord`][] with
-    [`SceneRecord.split`][].
+    a scene. It may carry prediction bounds but stores no duplicated split
+    tensors; consumers derive those with [`SceneRecord.split`][].
 
     Conventions:
 
@@ -58,8 +77,10 @@ class SceneRecord:
     """Global 2D translation offset with shape `(2,)`."""
     dataset_id: int | None = None
     """Integer dataset identifier associated with this record, if known."""
-    default_observation_length: int | None = None
-    """Default split point for reader/adaptor convenience, if known."""
+    prediction_origin: int | None = None
+    """First prediction frame for this record, if a task was selected."""
+    prediction_end: int | None = None
+    """Exclusive prediction endpoint for this record, if a task was selected."""
     ego_agent_id: int | None = None
     """Optional agent ID of the ego vehicle, if known or applicable."""
 
@@ -69,18 +90,33 @@ class SceneRecord:
 
     @property
     def horizon_frames(self) -> int:
-        """Return the number of stored time steps."""
+        """Number of stored time steps."""
         return int(self.features.shape[1])
 
-    def split(self, observation_length: int) -> SplitSceneRecord:
-        """Split the full horizon into observation and prediction tensors."""
-        total_length = self.horizon_frames
-        if observation_length < 0 or observation_length > total_length:
-            msg = (
-                f"`observation_length` must be between 0 and {total_length}, "
-                f"but got {observation_length}."
+    @property
+    def prediction_bounds(self) -> PredictionBounds | None:
+        """Persisted prediction bounds, if both are present."""
+        if self.prediction_origin is None or self.prediction_end is None:
+            return None
+        return PredictionBounds(self.prediction_origin, self.prediction_end)
+
+    def split(
+        self, prediction_origin: int | None = None, prediction_end: int | None = None
+    ) -> SplitSceneRecord:
+        """Create a forecast view using explicit or persisted prediction bounds."""
+        if prediction_origin is None:
+            bounds = self.prediction_bounds
+            if bounds is None:
+                raise MissingPredictionBoundsError(self.scene_number)
+            if prediction_end is not None:
+                msg = "`prediction_end` cannot be provided without `prediction_origin`."
+                raise ValueError(msg)
+        else:
+            bounds = PredictionBounds(
+                prediction_origin=prediction_origin,
+                prediction_end=self.horizon_frames if prediction_end is None else prediction_end,
             )
-            raise ValueError(msg)
+        bounds.validate(horizon_frames=self.horizon_frames)
 
         return SplitSceneRecord(
             scene_number=self.scene_number,
@@ -88,15 +124,17 @@ class SceneRecord:
             agent_ids=self.agent_ids,
             agent_types=self.agent_types,
             screened_agent_mask=self.screened_agent_mask,
-            history_features=self.features[:, :observation_length],
-            history_mask=self.mask[:, :observation_length],
-            future_features=self.features[:, observation_length:],
-            future_mask=self.mask[:, observation_length:],
+            history_features=self.features[:, : bounds.prediction_origin],
+            history_mask=self.mask[:, : bounds.prediction_origin],
+            future_features=self.features[:, bounds.prediction_origin : bounds.prediction_end],
+            future_mask=self.mask[:, bounds.prediction_origin : bounds.prediction_end],
             map_node_positions=self.map_node_positions,
             map_edge_indices=self.map_edge_indices,
             map_node_types=self.map_node_types,
             map_edge_types=self.map_edge_types,
             dataset_id=self.dataset_id,
+            prediction_origin=bounds.prediction_origin,
+            prediction_end=bounds.prediction_end,
             ego_agent_id=self.ego_agent_id,
         )
 
@@ -142,6 +180,10 @@ class SplitSceneRecord:
     """Global 2D translation offset applied to scene coordinates, shape `(2,)`."""
     dataset_id: int | None = None
     """Integer dataset identifier associated with this record, if known."""
+    prediction_origin: int | None = None
+    """First prediction frame used to create this view."""
+    prediction_end: int | None = None
+    """Exclusive prediction endpoint used to create this view."""
     ego_agent_id: int | None = None
     """Optional agent ID of the ego vehicle, if known or applicable."""
 
@@ -151,12 +193,12 @@ class SplitSceneRecord:
 
     @property
     def observation_length(self) -> int:
-        """Return the number of time steps in the observation tensors."""
+        """Number of time steps in the observation tensors."""
         return int(self.history_features.shape[1])
 
     @property
     def future_length(self) -> int:
-        """Return the number of time steps in the future tensors."""
+        """Number of time steps in the future tensors."""
         return int(self.future_features.shape[1])
 
 
@@ -167,6 +209,9 @@ def _validate_full_record(record: SceneRecord) -> None:
     if record.mask.shape != record.features.shape[:2]:
         msg = f"`mask` must have shape {record.features.shape[:2]!r}, got {record.mask.shape!r}."
         raise ValueError(msg)
+    _validate_optional_prediction_bounds(
+        record.prediction_origin, record.prediction_end, horizon_frames=record.horizon_frames
+    )
     _validate_agent_arrays(
         num_agents=record.features.shape[0],
         agent_ids=record.agent_ids,
@@ -180,6 +225,16 @@ def _validate_full_record(record: SceneRecord) -> None:
         map_node_types=record.map_node_types,
         map_edge_types=record.map_edge_types,
     )
+
+
+def _validate_optional_prediction_bounds(
+    prediction_origin: int | None, prediction_end: int | None, *, horizon_frames: int
+) -> None:
+    if (prediction_origin is None) != (prediction_end is None):
+        msg = "`prediction_origin` and `prediction_end` must either both be set or both be absent."
+        raise ValueError(msg)
+    if prediction_origin is not None and prediction_end is not None:
+        PredictionBounds(prediction_origin, prediction_end).validate(horizon_frames=horizon_frames)
 
 
 def _validate_split_record(record: SplitSceneRecord) -> None:
@@ -199,6 +254,11 @@ def _validate_split_record(record: SplitSceneRecord) -> None:
     if record.history_features.shape[2] != record.future_features.shape[2]:
         msg = "History and future tensors must contain the same feature dimension."
         raise ValueError(msg)
+    _validate_optional_prediction_bounds(
+        record.prediction_origin,
+        record.prediction_end,
+        horizon_frames=record.observation_length + record.future_length,
+    )
     _validate_agent_arrays(
         num_agents=record.history_features.shape[0],
         agent_ids=record.agent_ids,
