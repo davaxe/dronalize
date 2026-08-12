@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from dronalize.config.models import OutputConfig
     from dronalize.core.categories import DatasetSplit
     from dronalize.core.scene import Scene, TrajectorySchema
+    from dronalize.io.records import PredictionBounds
 
 
 class MDSDatasetWriter(DatasetWriter):
@@ -105,7 +106,7 @@ class MDSDatasetWriter(DatasetWriter):
         output_dir: Path,
         *,
         config: OutputConfig,
-        default_observation_length: int | None = None,
+        prediction_bounds: PredictionBounds | None = None,
         splits: Iterable[DatasetSplit] | None,
         parallel: bool,
         parallel_group: int | str | None = None,
@@ -122,7 +123,7 @@ class MDSDatasetWriter(DatasetWriter):
         self._base_output_dir: Path = Path(output_dir)
         self._config: OutputConfig = config
         self._trajectory_schema: TrajectorySchema = get_trajectory_schema(config.trajectory_schema)
-        self._default_observation_length: int | None = default_observation_length
+        self._prediction_bounds: PredictionBounds | None = prediction_bounds
         self._splits: tuple[DatasetSplit, ...] | None = (
             tuple(dict.fromkeys(splits)) if splits is not None else None
         )
@@ -202,7 +203,7 @@ class MDSDatasetWriter(DatasetWriter):
             dtype=np.float32 if self._config.precision == "float32" else np.float64,
             recenter_position=self._config.recenter_positions,
             trajectory_schema=self._trajectory_schema,
-            default_observation_length=self._default_observation_length,
+            prediction_bounds=self._prediction_bounds,
         )
         if self._record_transform is not None:
             return dict(self._record_transform(encoded_scene))

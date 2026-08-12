@@ -57,7 +57,7 @@ class _ExecutorDisplay(RichCast):
             expand=False,
         )
         self.task_id: rp.TaskID = self.progress.add_task("run", total=0)
-        self.state: Progress = Progress.empty()
+        self.state: Progress = Progress()
 
     def update(self, progress_state: Progress) -> None:
         completed, total = _progress_bar_counts(progress_state)
@@ -241,5 +241,5 @@ def _percent(part: int, total: int) -> float:
 
 
 def _random_spinner_name() -> str:
-    number = random.randint(1, 12)  # noqa: S311
+    number = random.randint(1, 12)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
     return f"dots{number}" if number > 1 else "dots"

@@ -8,6 +8,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     combine_screenings,
     exclude_category_screening,
     minimum_observations_screening,
@@ -24,20 +25,21 @@ _open_lyft_resources = single_shared_map_resource_factory(
 )
 
 
+_DEFAULT_CONFIG = DatasetConfig(
+    scenes=scenes_config(horizon_frames=70, sample_time=0.1, window_step=20),
+    screening=combine_screenings(
+        minimum_observations_screening(2), exclude_category_screening(AgentCategory.UNKNOWN)
+    ),
+    map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
+    loader_options=LyftLoaderOptions().model_dump(),
+)
+
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="lyft",
     loader_cls=LyftLoader,
-    default_config=DatasetConfig(
-        scenes=scenes_config(
-            horizon_frames=70, default_observation_length=20, sample_time=0.1, window_step=20
-        ),
-        screening=combine_screenings(
-            minimum_observations_screening(2, required_frame=19),
-            exclude_category_screening(AgentCategory.UNKNOWN),
-        ),
-        map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
-        loader_options=LyftLoaderOptions().model_dump(),
-    ),
+    default_config=_DEFAULT_CONFIG,
+    tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=20)},
+    default_task="benchmark",
     native_schema=LyftLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     loader_options_model=LyftLoaderOptions,

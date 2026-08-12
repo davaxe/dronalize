@@ -10,6 +10,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     minimum_observations_screening,
     scenes_config,
     temporal_support,
@@ -30,13 +31,17 @@ _open_interaction_resources = named_shared_map_resources_factory(
 )
 
 
+_DEFAULT_CONFIG = DatasetConfig(
+    scenes=scenes_config(horizon_frames=40, sample_time=0.1),
+    screening=minimum_observations_screening(2),
+)
+
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="interaction",
     loader_cls=InteractionLoader,
-    default_config=DatasetConfig(
-        scenes=scenes_config(horizon_frames=40, default_observation_length=10, sample_time=0.1),
-        screening=minimum_observations_screening(2, required_frame=9),
-    ),
+    default_config=_DEFAULT_CONFIG,
+    tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=10)},
+    default_task="benchmark",
     native_schema=InteractionLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),
     map_provider_factory=_open_interaction_resources,

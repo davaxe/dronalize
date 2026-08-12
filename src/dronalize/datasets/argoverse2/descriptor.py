@@ -8,6 +8,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     minimum_observations_screening,
     scenes_config,
     temporal_support,
@@ -20,15 +21,19 @@ _open_argoverse2_resources = map_provider_resources_factory(
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 
+_DEFAULT_CONFIG = DatasetConfig(
+    scenes=scenes_config(horizon_frames=110, sample_time=0.1),
+    screening=minimum_observations_screening(2),
+    map=MapConfig(extraction=FullMapExtraction()),
+    loader_options=Argoverse2LoaderOptions().model_dump(),
+)
+
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="argoverse2",
     loader_cls=Argoverse2Loader,
-    default_config=DatasetConfig(
-        scenes=scenes_config(horizon_frames=110, default_observation_length=50, sample_time=0.1),
-        screening=minimum_observations_screening(2, required_frame=49),
-        map=MapConfig(extraction=FullMapExtraction()),
-        loader_options=Argoverse2LoaderOptions().model_dump(),
-    ),
+    default_config=_DEFAULT_CONFIG,
+    tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=50)},
+    default_task="benchmark",
     native_schema=Argoverse2Loader.native_trajectory_schema(),
     supported_native_splits=_NATIVE_SPLITS,
     loader_options_model=Argoverse2LoaderOptions,

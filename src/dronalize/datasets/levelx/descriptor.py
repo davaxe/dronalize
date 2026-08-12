@@ -8,6 +8,7 @@ from dronalize.datasets.registry import (
 )
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     lane_change_sampling,
     linear_resample,
     minimum_observations_screening,
@@ -39,7 +40,6 @@ def _levelx_config(*, lane_change: bool = False) -> DatasetConfig:
     return DatasetConfig(
         scenes=scenes_config(
             horizon_frames=175,
-            default_observation_length=50,
             sample_time=1 / 25,
             window_step=25,
             resample=linear_resample(up=2, down=5),
@@ -47,7 +47,7 @@ def _levelx_config(*, lane_change: bool = False) -> DatasetConfig:
             if lane_change
             else None,
         ),
-        screening=minimum_observations_screening(2, required_frame=49),
+        screening=minimum_observations_screening(2),
         map=MapConfig(extraction=FullMapExtraction()),
     )
 
@@ -56,13 +56,12 @@ def _highd_config() -> DatasetConfig:
     return DatasetConfig(
         scenes=scenes_config(
             horizon_frames=175,
-            default_observation_length=50,
             sample_time=1 / 25,
             window_step=25,
             resample=linear_resample(up=2, down=5),
             lane_change=lane_change_sampling(required_lane_changes=3, negative_keep_every=3),
         ),
-        screening=minimum_observations_screening(2, required_frame=49),
+        screening=minimum_observations_screening(2),
         map=MapConfig(extraction=FullMapExtraction(), interpolation_distance=10),
     )
 
@@ -80,6 +79,8 @@ def _levelx_spec(
         name=name,
         loader_cls=loader_cls,
         default_config=default_config,
+        tasks={"benchmark": benchmark_task(default_config.scenes, prediction_origin=50)},
+        default_task="benchmark",
         native_schema=StandardLevelXLoader.native_trajectory_schema(),
         map_provider_factory=_open_levelx_osm_resources,
         feature_support=DatasetFeatureSupport(
@@ -95,11 +96,15 @@ def _levelx_spec(
     )
 
 
+_HIGHD_CONFIG = _highd_config()
+
 DATASET_DESCRIPTORS = {
     "highd": DatasetDescriptor(
         name="highd",
         loader_cls=HighDLoader,
-        default_config=_highd_config(),
+        default_config=_HIGHD_CONFIG,
+        tasks={"benchmark": benchmark_task(_HIGHD_CONFIG.scenes, prediction_origin=50)},
+        default_task="benchmark",
         native_schema=HighDLoader.native_trajectory_schema(),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, source=True),

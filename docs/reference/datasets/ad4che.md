@@ -18,14 +18,14 @@ AD4CHE is an aerial congestion dataset for highway and expressway traffic in Chi
     pip install dronalize[ad4che]
     ```
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 211 frames (default split after 61) @ 30.0 Hz |
-| Effective horizon | 71 frames (default split after 21) @ 10.0 Hz |
+| Configured horizon | 211 frames (benchmark origin 61) @ 30.0 Hz |
+| Effective horizon | 71 frames (benchmark origin 21) @ 10.0 Hz |
 | Source unit | Recording |
 | Source bounds | 1136-9821 frames (observed) |
 | Resampling | 1:3 (linear) |

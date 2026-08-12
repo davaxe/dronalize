@@ -1,4 +1,4 @@
-# ruff: noqa: PLC0415
+# ruff: file-ignore[import-outside-top-level]
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -8,7 +8,7 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from dronalize.io import DatasetManifest, read_manifest
+from dronalize.io import DatasetManifest, PredictionBounds, PredictionTaskManifest, read_manifest
 from dronalize.io.backends.pickle import PickleWriter
 from dronalize.io.encoding import encode_scene_record
 from dronalize.io.encoding.mds import decode_mds_row, encode_mds_row
@@ -35,11 +35,11 @@ class CustomPickleRecord:
     source: str
 
 
-def test_split_scene_record_rejects_bad_length(scene: Scene) -> None:
+def test_split_scene_record_rejects_bad_bounds(scene: Scene) -> None:
     record = encode_scene_record(scene, dtype=np.float64)
 
-    with pytest.raises(ValueError, match="observation_length"):
-        _ = record.split(observation_length=record.horizon_frames + 1)
+    with pytest.raises(ValueError, match="Prediction bounds"):
+        _ = record.split(record.horizon_frames + 1)
 
 
 def test_encode_scene_record_uses_passed_ids(scene: Scene) -> None:
@@ -54,10 +54,15 @@ def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
     writer = PickleWriter(
-        output_dir=output_dir, config=output_config(), default_observation_length=2, splits=None
+        output_dir=output_dir,
+        config=output_config(),
+        prediction_bounds=PredictionBounds(2, 3),
+        splits=None,
     )
 
-    expected = encode_scene_record(scene, dtype=np.float32, default_observation_length=2)
+    expected = encode_scene_record(
+        scene, dtype=np.float32, prediction_bounds=PredictionBounds(2, 3)
+    )
     writer.write(scene)
     writer.finish_local()
 
@@ -153,6 +158,45 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     assert_scene_record_equal(reader[0], expected)
 
 
+def test_mds_reader_combines_streams_with_per_row_prediction_bounds(
+    tmp_path: Path, scene: Scene
+) -> None:
+    pytest.importorskip("streaming")
+    from streaming import Stream
+
+    from dronalize.io.backends.mds import MDSDatasetWriter
+    from dronalize.io.readers import MDSReader
+
+    roots: list[Path] = []
+    for index, bounds in enumerate((PredictionBounds(1, 3), PredictionBounds(2, 3))):
+        root = tmp_path / f"stream-{index}"
+        writer = MDSDatasetWriter(
+            output_dir=root,
+            config=output_config(),
+            prediction_bounds=bounds,
+            splits=None,
+            parallel=False,
+        )
+        writer.write(replace(scene, scene_number=index))
+        writer.finish_local()
+        roots.append(root)
+
+    reader = MDSReader(
+        streams=[Stream(local=str(root), split="unsplit") for root in roots],
+        shuffle=True,
+        batch_size=1,
+    )
+    records = list(reader)
+
+    assert {(record.prediction_origin, record.prediction_end) for record in records} == {
+        (1, 3),
+        (2, 3),
+    }
+    assert {
+        (record.split().observation_length, record.split().future_length) for record in records
+    } == {(1, 2), (2, 1)}
+
+
 def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("streaming")
     scene = replace(scene, dataset="demo")
@@ -217,7 +261,9 @@ def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> Non
 
 def test_mds_encoder_decoder_roundtrip(scene: Scene) -> None:
     scene = replace(scene, dataset="demo")
-    expected = encode_scene_record(scene, dtype=np.float32, default_observation_length=2)
+    expected = encode_scene_record(
+        scene, dtype=np.float32, prediction_bounds=PredictionBounds(2, 3)
+    )
     record = encode_mds_row(expected)
     decoded = decode_mds_row(record)
 
@@ -256,12 +302,18 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
         derived_features=("vx", "vy", "yaw"),
         feature_columns=("x", "y", "vx", "vy", "ax", "ay", "yaw"),
         horizon_frames=10,
-        default_observation_length=4,
         precision="float32",
         recenter_positions=True,
         has_map=True,
         sample_time=0.1,
         original_sample_time=0.1,
+        prediction_task=PredictionTaskManifest(
+            name="benchmark",
+            source_prediction_origin=4,
+            source_prediction_end=10,
+            prediction_origin=4,
+            prediction_end=10,
+        ),
     )
 
     write_manifest(tmp_path, manifest)
@@ -271,8 +323,8 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     assert loaded.dataset_names == ("test_dataset",)
 
 
-def test_manifest_rejects_bad_default_obs_length() -> None:
-    with pytest.raises(ValueError, match="default_observation_length"):
+def test_manifest_rejects_bad_prediction_bounds() -> None:
+    with pytest.raises(ValueError, match="effective prediction bounds"):
         _ = DatasetManifest(
             dataset="test_dataset",
             storage_backend="pickle",
@@ -295,21 +347,31 @@ def test_manifest_rejects_bad_default_obs_length() -> None:
             derived_features=("vx", "vy", "yaw"),
             feature_columns=("x", "y", "vx", "vy", "ax", "ay", "yaw"),
             horizon_frames=10,
-            default_observation_length=11,
             precision="float32",
             recenter_positions=True,
             has_map=True,
             sample_time=0.1,
             original_sample_time=0.1,
+            prediction_task=PredictionTaskManifest(
+                name=None,
+                source_prediction_origin=4,
+                source_prediction_end=11,
+                prediction_origin=4,
+                prediction_end=11,
+            ),
         )
 
 
-def _build_pickle_reader(tmp_path: Path, scene: Scene) -> tuple[PickleReader, SceneRecord]:
+def _build_pickle_reader(
+    tmp_path: Path, scene: Scene, *, bounds: PredictionBounds | None = None
+) -> tuple[PickleReader, SceneRecord]:
     scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
-    writer = PickleWriter(output_dir=output_dir, config=output_config(), splits=None)
+    writer = PickleWriter(
+        output_dir=output_dir, config=output_config(), prediction_bounds=bounds, splits=None
+    )
 
-    expected = encode_scene_record(scene, dtype=np.float32)
+    expected = encode_scene_record(scene, dtype=np.float32, prediction_bounds=bounds)
     writer.write(scene)
     writer.finish_local()
 
@@ -333,7 +395,9 @@ def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     from dronalize.io.adapters.torch import TorchSceneDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
-    record = TorchSceneDataset(reader)[0]
+    dataset = TorchSceneDataset(reader)
+    record = dataset[0]
+    assert next(iter(dataset)).scene_number == record.scene_number
 
     assert record.scene_number == expected.scene_number
     assert record.dataset_id == expected.dataset_id
@@ -370,12 +434,39 @@ def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> Non
     _assert_tensor_array_equal(split.map_edge_indices, expected.map_edge_indices)
 
 
+def test_torch_forecast_dataset_uses_row_bounds_and_explicit_override(
+    tmp_path: Path, scene: Scene
+) -> None:
+    pytest.importorskip("torch")
+    from dronalize.io.adapters.torch import TorchForecastDataset
+
+    reader, expected = _build_pickle_reader(tmp_path, scene, bounds=PredictionBounds(2, 3))
+    split = TorchForecastDataset(reader)[0]
+    _assert_tensor_allclose(split.history_features, expected.features[:, :2])
+    _assert_tensor_allclose(split.future_features, expected.features[:, 2:3])
+
+    overridden = TorchForecastDataset(reader, bounds=PredictionBounds(1, 2))[0]
+    _assert_tensor_allclose(overridden.history_features, expected.features[:, :1])
+    _assert_tensor_allclose(overridden.future_features, expected.features[:, 1:2])
+
+
+def test_torch_forecast_dataset_rejects_task_free_record(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch")
+    from dronalize.io.adapters.torch import TorchForecastDataset
+
+    reader, _ = _build_pickle_reader(tmp_path, scene)
+    with pytest.raises(ValueError, match="no prediction bounds"):
+        _ = TorchForecastDataset(reader)[0]
+
+
 def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
     from dronalize.io.adapters.pyg import HeteroSceneDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
-    record = HeteroSceneDataset(reader).get(0)
+    dataset = HeteroSceneDataset(reader)
+    record = dataset.get(0)
+    assert next(iter(dataset)).scene_number == record.scene_number
 
     assert record.scene_number == expected.scene_number
     assert record.dataset_id == (-1 if expected.dataset_id is None else expected.dataset_id)
@@ -408,3 +499,21 @@ def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:
     batch = collate_hetero_with_time_padding([shorter, record])
 
     assert int(batch["agent"].features.size(1)) == int(record["agent"].features.size(1))
+
+
+def test_pyg_forecast_collate_aligns_history_and_future(tmp_path: Path, scene: Scene) -> None:
+    pytest.importorskip("torch_geometric")
+    from dronalize.io.adapters.pyg import (
+        HeteroForecastDataset,
+        collate_forecast_hetero_with_time_padding,
+    )
+
+    reader, _ = _build_pickle_reader(tmp_path, scene)
+    short_history = HeteroForecastDataset(reader, bounds=PredictionBounds(1, 3)).get(0)
+    long_history = HeteroForecastDataset(reader, bounds=PredictionBounds(2, 3)).get(0)
+    batch = collate_forecast_hetero_with_time_padding([short_history, long_history])
+
+    assert tuple(batch["agent"].history_features.shape[1:]) == (2, 7)
+    assert tuple(batch["agent"].future_features.shape[1:]) == (2, 7)
+    assert not bool(batch["agent"].history_mask[:2, 0].any())
+    assert not bool(batch["agent"].future_mask[2:, 1].any())

@@ -34,7 +34,8 @@ def _write(path: Path, body: str) -> Path:
 
 def _dataset_config(*, screening: dict[str, object] | None = None) -> DatasetConfig:
     payload: dict[str, object] = {
-        "scenes": {"horizon_frames": 2, "default_observation_length": 1, "sample_time": 0.1}
+        "scenes": {"horizon_frames": 2, "sample_time": 0.1},
+        "task": {"prediction_origin": 1, "prediction_end": 2},
     }
     if screening is not None:
         payload["screening"] = screening
@@ -71,8 +72,11 @@ def test_parse_config_parses_window(tmp_path: Path) -> None:
             """
             [datasets.demo.scenes]
             horizon_frames = 8
-            default_observation_length = 3
             sample_time = 0.1
+
+            [datasets.demo.task]
+            prediction_origin = 3
+            prediction_end = 8
 
             [datasets.demo.scenes.window]
             step = 2
@@ -86,6 +90,64 @@ def test_parse_config_parses_window(tmp_path: Path) -> None:
     assert resolved.scenes.window is not None
     assert resolved.scenes.window.step == 2
     assert resolved.scenes.window.policy == "partial"
+    assert resolved.task is not None
+    assert resolved.task.prediction_origin == 3
+    assert resolved.task.prediction_end == 8
+
+
+def test_dataset_config_can_clear_inherited_prediction_task(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo]
+            task = "none"
+            """,
+        )
+    )
+
+    assert cfg.resolve_dataset_config("demo", _dataset_config()).task is None
+
+
+def test_inline_prediction_task_must_be_complete(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="prediction_end"):
+        _ = parse_config(
+            _write(
+                tmp_path,
+                """
+                [datasets.demo.task]
+                prediction_origin = 1
+                """,
+            )
+        )
+
+
+def test_project_defaults_cannot_select_named_dataset_task(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="dataset-specific"):
+        _ = parse_config(
+            _write(
+                tmp_path,
+                """
+                [defaults]
+                task = "benchmark"
+                """,
+            )
+        )
+
+
+def test_direct_resolution_requires_named_task_context(tmp_path: Path) -> None:
+    cfg = parse_config(
+        _write(
+            tmp_path,
+            """
+            [datasets.demo]
+            task = "benchmark"
+            """,
+        )
+    )
+
+    with pytest.raises(ConfigurationError, match=r"requires.*named_tasks"):
+        _ = cfg.resolve_dataset_config("demo", _dataset_config())
 
 
 def test_resolve_applies_defaults_without_dataset(tmp_path: Path) -> None:
@@ -173,7 +235,8 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
         _ = cfg.resolve_dataset_config(
             "demo",
             DatasetConfig.model_validate({
-                "scenes": {"horizon_frames": 2, "default_observation_length": 1, "sample_time": 0.1}
+                "scenes": {"horizon_frames": 2, "sample_time": 0.1},
+                "task": {"prediction_origin": 1, "prediction_end": 2},
             }),
         )
 

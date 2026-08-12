@@ -27,7 +27,7 @@ from dronalize.io import read_manifest
 manifest = read_manifest(Path("output"))
 print(manifest.feature_columns)
 print(manifest.trajectory_schema_fields)
-print(manifest.horizon_frames, manifest.default_observation_length)
+print(manifest.horizon_frames, manifest.prediction_task)
 ```
 
 Reading the manifest up front with
@@ -56,8 +56,8 @@ print(len(reader))
 scene = reader[0]
 print(scene.features.shape, scene.mask.shape)
 
-if manifest.default_observation_length is not None:
-    split = scene.split(manifest.default_observation_length)
+if scene.prediction_bounds is not None:
+    split = scene.split()
     print(split.history_features.shape, split.future_features.shape)
 ```
 
@@ -86,6 +86,26 @@ print(scene.features.shape, scene.mask.shape)
 
 For unsplit exports, use `split=None` (default), which reads from `unsplit/`.
 
+Mosaic streams can be combined directly. Prediction bounds travel with each row, so shuffling does
+not lose the task boundary:
+
+<!-- no-validate -->
+```python
+from streaming import Stream
+from dronalize.io.readers import MDSReader
+
+reader = MDSReader(
+    streams=[
+        Stream(local="processed/argoverse1", split="train"),
+        Stream(local="processed/eth", split="train"),
+    ],
+    batch_size=32,
+    shuffle=True,
+)
+
+sample = next(iter(reader)).split()
+```
+
 ## Torch and PyG adapters
 
 On top of the readers, `dronalize` provides optional adapters:
@@ -94,24 +114,21 @@ On top of the readers, `dronalize` provides optional adapters:
   Torch tensor records
 - [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) for full-horizon
   PyTorch Geometric `HeteroData`
+- `TorchForecastDataset` and `HeteroForecastDataset` for task-aware history/future views
 
 Use these when your training stack expects framework-native dataset objects.
 
-For supervised train/target layouts, split records in your own dataset transform so naming and
-mask conventions match your model:
+Forecast adapters use the bounds stored in each row, including when Mosaic combines and shuffles
+streams with different task definitions. Explicit bounds replace row metadata when training all
+streams with one common task:
 
 <!-- no-validate -->
 ```python
-def split_hetero(record):
-    observation_length = record.default_observation_length
-    if observation_length is None:
-        msg = "This record does not define a default observation length."
-        raise ValueError(msg)
-    record["agent"].x = record["agent"].features[:, :observation_length]
-    record["agent"].x_mask = record["agent"].agent_time_mask[:, :observation_length]
-    record["agent"].y = record["agent"].features[:, observation_length:]
-    record["agent"].y_mask = record["agent"].agent_time_mask[:, observation_length:]
-    return record
+from dronalize.io import PredictionBounds
+from dronalize.io.adapters import HeteroForecastDataset
+
+dataset = HeteroForecastDataset(reader)
+common_task = HeteroForecastDataset(reader, bounds=PredictionBounds(20, 50))
 ```
 
 ## Choosing a reader setup

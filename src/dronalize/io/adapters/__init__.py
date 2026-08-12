@@ -28,38 +28,40 @@ from dronalize.core.optional import lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
     from dronalize.io.adapters.pyg import (
+        HeteroForecastDataset,
         HeteroSceneDataset,
+        IterableHeteroForecastDataset,
         IterableHeteroSceneDataset,
+        collate_forecast_hetero_with_time_padding,
         collate_hetero_with_time_padding,
     )
     from dronalize.io.adapters.torch import (
+        IterableTorchForecastDataset,
         IterableTorchSceneDataset,
+        TorchForecastDataset,
         TorchSceneDataset,
         TorchSceneRecord,
         TorchSplitSceneRecord,
     )
 
 __all__ = [
+    "HeteroForecastDataset",
     "HeteroSceneDataset",
+    "IterableHeteroForecastDataset",
     "IterableHeteroSceneDataset",
+    "IterableTorchForecastDataset",
     "IterableTorchSceneDataset",
+    "TorchForecastDataset",
     "TorchSceneDataset",
     "TorchSceneRecord",
     "TorchSplitSceneRecord",
+    "collate_forecast_hetero_with_time_padding",
     "collate_hetero_with_time_padding",
 ]
 
 __lazy_exports__: dict[str, tuple[str, str]] = {
-    "IterableTorchSceneDataset": ("dronalize.io.adapters.torch", "IterableTorchSceneDataset"),
-    "TorchSceneDataset": ("dronalize.io.adapters.torch", "TorchSceneDataset"),
-    "TorchSceneRecord": ("dronalize.io.adapters.torch", "TorchSceneRecord"),
-    "TorchSplitSceneRecord": ("dronalize.io.adapters.torch", "TorchSplitSceneRecord"),
-    "HeteroSceneDataset": ("dronalize.io.adapters.pyg", "HeteroSceneDataset"),
-    "IterableHeteroSceneDataset": ("dronalize.io.adapters.pyg", "IterableHeteroSceneDataset"),
-    "collate_hetero_with_time_padding": (
-        "dronalize.io.adapters.pyg",
-        "collate_hetero_with_time_padding",
-    ),
+    name: ("dronalize.io.adapters.torch" if "Torch" in name else "dronalize.io.adapters.pyg", name)
+    for name in __all__
 }
 
 

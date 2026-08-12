@@ -69,13 +69,13 @@ class Argoverse2Map:
 
     @cached_property
     def segments(self) -> dict[int, LaneSegment]:
-        """Get the lane segments from the JSON data."""
+        """Lane segments from the JSON data."""
         segments_data: dict[str, dict[str, Any]] = self.json_data.get("lane_segments", [])
         return {segment["id"]: LaneSegment.from_dict(segment) for segment in segments_data.values()}
 
     @cached_property
     def pedestrian_crossings(self) -> dict[int, PedestrianCrossing]:
-        """Get the pedestrian crossings from the JSON data."""
+        """Pedestrian crossings from the JSON data."""
         crossings_data: dict[str, dict[str, Any]] = self.json_data.get("pedestrian_crossings", [])
         return {
             crossing["id"]: PedestrianCrossing.from_dict(crossing)

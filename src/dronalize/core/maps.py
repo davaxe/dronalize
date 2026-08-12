@@ -191,12 +191,12 @@ class MapGraph:
 
     @property
     def num_nodes(self) -> int:
-        """Return the number of nodes in the graph."""
+        """Number of nodes in the graph."""
         return int(self.node_positions.shape[0])
 
     @property
     def num_edges(self) -> int:
-        """Return the number of edges in the graph."""
+        """Number of edges in the graph."""
         return int(self.edge_indices.shape[1])
 
     def _validate(self) -> None:

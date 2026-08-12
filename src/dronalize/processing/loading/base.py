@@ -184,7 +184,7 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
         `selection.native_split=None` represents all sources exposed by the
         loader. Native-split datasets may also support selection of one
         concrete native partition via `selection.native_split`.
-        """  # noqa: DOC202
+        """  # ruff: ignore[docstring-extraneous-returns]
         _ = split
         msg = (
             f"{self.__class__.__name__} does not implement DatasetSource enumeration"

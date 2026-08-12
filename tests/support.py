@@ -13,6 +13,7 @@ from dronalize.config.models import (
     DatasetConfig,
     LaneChangeConfig,
     OutputConfig,
+    PredictionTaskConfig,
     ResampleConfig,
     ScenesConfig,
     ScreeningConfig,
@@ -150,12 +151,8 @@ def demo_descriptor() -> DatasetDescriptor:
         name="demo",
         loader_cls=DemoLoader,
         default_config=DatasetConfig(
-            scenes=ScenesConfig(
-                horizon_frames=3,
-                default_observation_length=2,
-                sample_time=1.0,
-                window=WindowConfig(step=1),
-            ),
+            scenes=ScenesConfig(horizon_frames=3, sample_time=1.0, window=WindowConfig(step=1)),
+            task=PredictionTaskConfig(prediction_origin=2, prediction_end=3),
             loader_options={"batch_size": 2, "use_cache": False},
         ),
         native_schema=CANONICAL,
@@ -169,12 +166,8 @@ def cleanup_demo_descriptor() -> DatasetDescriptor:
         name="cleanup-demo",
         loader_cls=CleanupDemoLoader,
         default_config=DatasetConfig(
-            scenes=ScenesConfig(
-                horizon_frames=3,
-                default_observation_length=2,
-                sample_time=1.0,
-                window=WindowConfig(step=1),
-            ),
+            scenes=ScenesConfig(horizon_frames=3, sample_time=1.0, window=WindowConfig(step=1)),
+            task=PredictionTaskConfig(prediction_origin=2, prediction_end=3),
             screening=ScreeningConfig(
                 cleanup={"trim_unimportant": ExcludeCategories.define(AgentCategory.UNIMPORTANT)}
             ),
@@ -193,11 +186,11 @@ def stale_kinematics_demo_descriptor() -> DatasetDescriptor:
         default_config=DatasetConfig(
             scenes=ScenesConfig(
                 horizon_frames=3,
-                default_observation_length=2,
                 sample_time=1.0,
                 window=WindowConfig(step=1),
                 resample=ResampleConfig(up=1, down=2),
             ),
+            task=PredictionTaskConfig(prediction_origin=2, prediction_end=3),
             loader_options={"batch_size": 2, "use_cache": False},
         ),
         native_schema=CANONICAL,
@@ -209,12 +202,12 @@ def inherited_optional_blocks_descriptor() -> DatasetConfig:
     return DatasetConfig(
         scenes=ScenesConfig(
             horizon_frames=3,
-            default_observation_length=2,
             sample_time=1.0,
             window=WindowConfig(step=2),
             resample=ResampleConfig(up=2, down=1, method="cubic"),
             lane_change=LaneChangeConfig(persist=3),
         ),
+        task=PredictionTaskConfig(prediction_origin=2, prediction_end=3),
         screening=ScreeningConfig(agents={"min_obs": MinObservations(minimum=2)}),
     )
 

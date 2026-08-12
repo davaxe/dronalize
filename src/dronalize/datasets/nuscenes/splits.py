@@ -1,5 +1,5 @@
 # fmt: off
-# ruff: noqa: E501
+# ruff: file-ignore[line-too-long]
 from typing import Final
 
 from dronalize.core.categories import DatasetSplit

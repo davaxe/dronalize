@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from dronalize.datasets.registry import get_dataset
 from dronalize.io.backends.provider import build_writer_provider
+from dronalize.io.manifest import write_manifest
 from dronalize.runtime.executor import open_executor
 from dronalize.runtime.progress import execute_with_rich_progress
 from dronalize.runtime.resolve import build_execution_plan
@@ -101,7 +102,7 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
             executor, lambda: executor.execute(writer_provider), enable=show_progress
         )
         logger.debug("Execution complete, writing manifests", extra={"dataset": plan.dataset})
-        plan.write_manifests()
+        write_manifest(plan.output_dir, plan.manifest())
         logger.info(
             "Finished plan",
             extra={

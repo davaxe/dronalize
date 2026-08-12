@@ -18,6 +18,7 @@ from dronalize.config.models import (
     ReadNative,
     SceneExtentExtraction,
     TrajectoryBufferExtraction,
+    effective_prediction_bounds,
     effective_scene_window,
 )
 from dronalize.core.categories import DatasetSplit, EdgeType
@@ -61,6 +62,15 @@ def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
     output_config = plan.output_config
     return (
         ("Dataset", plan.dataset),
+        ("Task", plan.selected_task or ("custom" if plan.resolved_config.task else "none")),
+        (
+            "Prediction bounds",
+            "none"
+            if plan.effective_prediction_bounds is None
+            else (
+                f"[{plan.effective_prediction_bounds[0]}, {plan.effective_prediction_bounds[1]})"
+            ),
+        ),
         ("Input", str(plan.data_root)),
         ("Output", str(plan.output_dir)),
         ("Backend", plan.storage_backend.value),
@@ -140,7 +150,7 @@ def _dataset_inspect_sections(descriptor: DatasetDescriptor) -> tuple[Section, .
     map_config = default_config.map if descriptor.feature_support.map else None
     output_config = default_config.output
     schema = descriptor.native_schema
-    effective_horizon, _, effective_sample_time = effective_scene_window(scenes)
+    effective_horizon, effective_sample_time = effective_scene_window(scenes)
 
     sections: list[Section] = [
         (
@@ -173,6 +183,7 @@ def _dataset_inspect_sections(descriptor: DatasetDescriptor) -> tuple[Section, .
             ),
         ),
         ("Temporal", _temporal_support_rows(descriptor.temporal_support, scenes)),
+        ("Prediction tasks", _task_rows(descriptor)),
         (
             "Output",
             (
@@ -188,6 +199,20 @@ def _dataset_inspect_sections(descriptor: DatasetDescriptor) -> tuple[Section, .
     if descriptor.loader_options_model.model_fields:
         sections.append(("Loader options", tuple(_loader_option_rows(descriptor))))
     return tuple(sections)
+
+
+def _task_rows(descriptor: DatasetDescriptor) -> tuple[Row, ...]:
+    if not descriptor.tasks:
+        return (("Available", "none"),)
+    rows: list[Row] = []
+    for name, task in sorted(descriptor.tasks.items()):
+        config = descriptor.default_config.model_copy(update={"task": task})
+        bounds = effective_prediction_bounds(config)
+        value = "task-free" if bounds is None else f"prediction [{bounds[0]}, {bounds[1]})"
+        if name == descriptor.default_task:
+            value = f"{value} (default)"
+        rows.append((name, value))
+    return tuple(rows)
 
 
 def _detail_table(title: str, rows: Iterable[Row]) -> Table:

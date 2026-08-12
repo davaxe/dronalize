@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path  # noqa: TC003 - Pydantic resolves this forward reference at runtime.
+from pathlib import (
+    Path,  # ruff: ignore[typing-only-standard-library-import] - Pydantic resolves this forward reference at runtime.
+)
 from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from dronalize.config.models import RuntimeOverride, effective_scene_window
+from dronalize.config.models import (
+    PredictionTaskConfig,
+    RuntimeOverride,
+    ScreeningConfig,
+    effective_prediction_bounds,
+    effective_scene_window,
+)
 from dronalize.core.errors import ConfigurationError
 from dronalize.core.scene.model import derived_trajectory_fields
 from dronalize.core.scene.schema import POSITIONS_ONLY, TrajectorySchema, get_trajectory_schema
@@ -19,8 +27,10 @@ from dronalize.io.base import (
     StorageBackend,
     validate_transform_choice,
 )
-from dronalize.io.manifest import DatasetManifest, package_version, write_manifest
+from dronalize.io.manifest import DatasetManifest, PredictionTaskManifest, package_version
 from dronalize.processing.models import LoaderPlan, ReadSelection, SplitAssignmentPlan
+from dronalize.processing.screening.agent import AgentRequireFrames
+from dronalize.processing.screening.base import PassingRequirement
 
 if TYPE_CHECKING:
     from dronalize.config.models import DatasetConfig, MapConfig, OutputConfig, RuntimeConfig
@@ -96,6 +106,8 @@ class ExecutionPlan:
 
     descriptor: DatasetDescriptor
     """Resolved dataset descriptor."""
+    selected_task: str | None
+    """Named descriptor prediction task selected for this run, if any."""
     data_root: Path
     """Input dataset root."""
     output_dir: Path
@@ -114,8 +126,8 @@ class ExecutionPlan:
     """Resolved map configuration, or `None` when map output is disabled."""
     effective_horizon_frames: int
     """Horizon frame count after resampling/window configuration is applied."""
-    effective_default_observation_length: int | None
-    """Default reader/adaptor split point after resampling, if configured."""
+    effective_prediction_bounds: tuple[int, int] | None
+    """Half-open prediction bounds after resampling, if configured."""
     effective_sample_time: float
     """Effective `sample_time` interval in seconds after resampling is applied."""
     output_transform: OutputTransform[object] | None = None
@@ -137,27 +149,22 @@ class ExecutionPlan:
 
     @property
     def dataset(self) -> str:
-        """Return the dataset key for this plan."""
+        """Dataset key for this plan."""
         return self.descriptor.name
 
     @property
     def parallel(self) -> bool:
-        """Return whether the runtime plan requests parallel execution."""
+        """Whether the runtime plan requests parallel execution."""
         return self.runtime.jobs > 1
 
     @property
-    def workers(self) -> int:
-        """Return the number of workers requested by the runtime plan."""
-        return self.runtime.jobs
-
-    @property
     def output_config(self) -> OutputConfig:
-        """Return the resolved output configuration."""
+        """Resolved output configuration."""
         return self.resolved_config.output
 
     @property
     def trajectory_schema(self) -> TrajectorySchema:
-        """Return the resolved output trajectory schema."""
+        """Resolved output trajectory schema."""
         return get_trajectory_schema(self.output_config.trajectory_schema)
 
     def manifest(self) -> DatasetManifest:
@@ -165,6 +172,19 @@ class ExecutionPlan:
         export_config = self.output_config
         derivation_source = trajectory_schema_after_transforms(
             self.descriptor.native_schema, self.resolved_config
+        )
+        source_task = self.resolved_config.task
+        effective_bounds = self.effective_prediction_bounds
+        prediction_task = (
+            None
+            if source_task is None or effective_bounds is None
+            else PredictionTaskManifest(
+                name=self.selected_task,
+                source_prediction_origin=source_task.prediction_origin,
+                source_prediction_end=source_task.prediction_end,
+                prediction_origin=effective_bounds[0],
+                prediction_end=effective_bounds[1],
+            )
         )
         return DatasetManifest(
             dataset=self.dataset,
@@ -185,7 +205,7 @@ class ExecutionPlan:
             sample_time=self.effective_sample_time,
             original_sample_time=self.resolved_config.scenes.sample_time,
             horizon_frames=self.effective_horizon_frames,
-            default_observation_length=self.effective_default_observation_length,
+            prediction_task=prediction_task,
             has_map=self.map is not None,
             derived_features=tuple(
                 field.to_str()
@@ -196,16 +216,6 @@ class ExecutionPlan:
                 )
             ),
         )
-
-    def manifest_roots(self) -> tuple[Path, ...]:
-        """Return directories that should receive the generated manifest."""
-        return (self.output_dir,)
-
-    def write_manifests(self) -> None:
-        """Persist the compiled manifest to all configured targets."""
-        manifest = self.manifest()
-        for root in self.manifest_roots():
-            write_manifest(root, manifest)
 
 
 PayloadT = TypeVar("PayloadT")
@@ -247,15 +257,30 @@ def build_loader_plan(
         if (include_map is False or not descriptor.feature_support.map)
         else resolved_config.map
     )
+    screening = _screening_with_task_endpoint(resolved_config.screening, resolved_config.task)
     return LoaderPlan(
         scenes=resolved_config.scenes,
-        screening=resolved_config.screening,
+        screening=screening,
         read=ReadSelection.from_config(
             resolved_config.read, supported_native_splits=descriptor.supported_native_splits
         ),
         loader_options=loader_options,
         map=map_config,
     )
+
+
+def _screening_with_task_endpoint(
+    screening: ScreeningConfig | None, task: PredictionTaskConfig | None
+) -> ScreeningConfig | None:
+    if task is None or not task.require_history_endpoint:
+        return screening
+
+    base = screening or ScreeningConfig()
+    agents = dict(base.agents)
+    agents["prediction_history_endpoint"] = AgentRequireFrames.define(
+        [task.prediction_origin - 1], require=PassingRequirement(absolute=1)
+    )
+    return ScreeningConfig(cleanup=base.cleanup, scenes=base.scenes, agents=agents)
 
 
 class ExecutionRequest(BaseModel):
@@ -298,9 +323,12 @@ class ExecutionRequest(BaseModel):
     """Customized output transform configuration."""
 
 
-def resolve_effective_scene_window(config: DatasetConfig) -> tuple[int, int | None, float]:
-    """Return the effective scene window and `sample_time` for one resolved config."""
-    return effective_scene_window(config.scenes)
+def resolve_effective_scene_window(
+    config: DatasetConfig,
+) -> tuple[int, tuple[int, int] | None, float]:
+    """Return the effective horizon, prediction bounds, and sample time."""
+    horizon, sample_time = effective_scene_window(config.scenes)
+    return horizon, effective_prediction_bounds(config), sample_time
 
 
 def trajectory_schema_after_transforms(

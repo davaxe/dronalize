@@ -11,14 +11,14 @@ Argoverse 2 expands the original Argoverse benchmark into a broader forecasting 
   <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 110 frames (default split after 50) @ 10.0 Hz |
-| Effective horizon | 110 frames (default split after 50) @ 10.0 Hz |
+| Configured horizon | 110 frames (benchmark origin 50) @ 10.0 Hz |
+| Effective horizon | 110 frames (benchmark origin 50) @ 10.0 Hz |
 | Source unit | Scenario |
 | Source bounds | 50-110 frames (observed) |
 | Resampling | None |

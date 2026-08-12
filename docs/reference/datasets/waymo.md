@@ -18,14 +18,14 @@ The Waymo Open Motion Dataset is a large-scale benchmark for interactive motion 
     pip install dronalize[waymo]
     ``` 
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 91 frames (default split after 11) @ 10.0 Hz |
-| Effective horizon | 91 frames (default split after 11) @ 10.0 Hz |
+| Configured horizon | 91 frames (benchmark origin 11) @ 10.0 Hz |
+| Effective horizon | 91 frames (benchmark origin 11) @ 10.0 Hz |
 | Source unit | Scenario |
 | Source bounds | 11-91 frames (documented) |
 | Resampling | None |

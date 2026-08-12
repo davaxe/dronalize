@@ -28,6 +28,7 @@ from dronalize.io import StorageBackend, read_manifest
 from dronalize.io.backends.null import NullWriter
 from dronalize.io.base import WorkerWriterProvider
 from dronalize.io.readers import PickleReader
+from dronalize.processing.screening.agent import AgentRequireFrames
 from dronalize.runtime import ExecutionRequest, OutputTransform, execute_request, resolve_request
 from dronalize.runtime.executor import open_executor
 from dronalize.runtime.processor import RuntimeProcessor
@@ -64,9 +65,9 @@ def _cli_app_and_runner() -> tuple[Any, Any]:
     pytest.importorskip("typer")
     pytest.importorskip("rich")
 
-    from typer.testing import CliRunner  # noqa: PLC0415
+    from typer.testing import CliRunner  # ruff: ignore[import-outside-top-level]
 
-    import dronalize.runtime.cli.app as cli_app  # noqa: PLC0415
+    import dronalize.runtime.cli.app as cli_app  # ruff: ignore[import-outside-top-level]
 
     return cli_app.app, CliRunner()
 
@@ -87,12 +88,12 @@ def _create_null_writer(_worker_id: int) -> NullWriter:
 
 
 class FailingWriter:
-    def write(self, scene: Scene) -> None:  # noqa: PLR6301
+    def write(self, scene: Scene) -> None:  # ruff: ignore[no-self-use]
         _ = scene
         msg = "intentional writer failure"
         raise RuntimeError(msg)
 
-    def finish_local(self) -> None:  # noqa: PLR6301
+    def finish_local(self) -> None:  # ruff: ignore[no-self-use]
         return
 
 
@@ -111,7 +112,7 @@ def test_resolve_request_builds_plan(tmp_path: Path, monkeypatch: pytest.MonkeyP
     assert dataset_options.batch_size == 2
     assert plan.map is None
     assert plan.effective_horizon_frames == 3
-    assert plan.effective_default_observation_length == 2
+    assert plan.effective_prediction_bounds == (2, 3)
 
 
 def test_resolve_request_rejects_unknown_backend(
@@ -187,6 +188,7 @@ def test_resampling_recomputes_native_kinematics(
     descriptor = stale_kinematics_demo_descriptor()
     _patch_descriptor(monkeypatch, descriptor)
     plan = resolve_request(_request(tmp_path, dataset=descriptor.name))
+    assert plan.effective_prediction_bounds == (1, 2)
     loader = descriptor.build_loader(root=plan.data_root, request=plan.loader)
     processor = RuntimeProcessor.from_plan(plan, loader)
     source = next(iter(processor.iter_sources()))
@@ -263,7 +265,9 @@ def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mon
         "agent_category",
     )
     assert manifest.horizon_frames == 3
-    assert manifest.default_observation_length == 2
+    assert manifest.prediction_task is not None
+    assert manifest.prediction_task.prediction_origin == 2
+    assert manifest.prediction_task.prediction_end == 3
 
 
 def test_execute_request_rejects_non_empty_output(
@@ -309,6 +313,123 @@ def test_builtin_manifest_uses_global_dataset_name_table(tmp_path: Path) -> None
     assert plan.manifest().dataset_names == dataset_names_by_id()
 
 
+def test_builtin_benchmark_task_is_selected_by_default(tmp_path: Path) -> None:
+    request = ExecutionRequest(
+        dataset="waymo",
+        input_dir=tmp_path / "input",
+        output_dir=tmp_path / "output",
+        storage_backend=StorageBackend.NULL,
+        input_dir_exists=False,
+    )
+    plan = resolve_request(request)
+    assert plan.selected_task == "benchmark"
+    assert plan.effective_prediction_bounds == (11, 91)
+    manifest_task = plan.manifest().prediction_task
+    assert manifest_task is not None
+    assert manifest_task.name == "benchmark"
+    assert manifest_task.prediction_origin == 11
+    assert manifest_task.prediction_end == 91
+
+
+def test_resolve_request_rejects_unknown_task(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    _ = config_path.write_text(
+        """
+[datasets.argoverse1]
+task = "missing"
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigurationError, match="Unknown task 'missing'"):
+        _ = resolve_request(
+            ExecutionRequest(
+                dataset="argoverse1",
+                input_dir=tmp_path / "input",
+                output_dir=tmp_path / "output",
+                config_path=config_path,
+                input_dir_exists=False,
+            )
+        )
+
+
+def test_project_can_select_named_task_explicitly(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    _ = config_path.write_text(
+        """
+[datasets.argoverse1]
+task = "benchmark"
+""",
+        encoding="utf-8",
+    )
+    plan = resolve_request(
+        ExecutionRequest(
+            dataset="argoverse1",
+            input_dir=tmp_path / "input",
+            output_dir=tmp_path / "output",
+            config_path=config_path,
+            input_dir_exists=False,
+        )
+    )
+
+    assert plan.selected_task == "benchmark"
+    assert plan.effective_prediction_bounds == (20, 50)
+
+
+def test_project_can_disable_default_task(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    _ = config_path.write_text(
+        """
+[datasets.waymo]
+task = "none"
+""",
+        encoding="utf-8",
+    )
+    plan = resolve_request(
+        ExecutionRequest(
+            dataset="waymo",
+            input_dir=tmp_path / "input",
+            output_dir=tmp_path / "output",
+            config_path=config_path,
+            input_dir_exists=False,
+        )
+    )
+
+    assert plan.selected_task is None
+    assert plan.effective_prediction_bounds is None
+    assert plan.manifest().prediction_task is None
+
+
+def test_inline_dataset_task_replaces_default_named_task(tmp_path: Path) -> None:
+    config_path = tmp_path / "config.toml"
+    _ = config_path.write_text(
+        """
+[datasets.argoverse1.task]
+prediction_origin = 10
+prediction_end = 30
+""",
+        encoding="utf-8",
+    )
+    plan = resolve_request(
+        ExecutionRequest(
+            dataset="argoverse1",
+            input_dir=tmp_path / "input",
+            output_dir=tmp_path / "output",
+            config_path=config_path,
+            input_dir_exists=False,
+        )
+    )
+    assert plan.selected_task is None
+    assert plan.effective_prediction_bounds == (10, 30)
+    manifest_task = plan.manifest().prediction_task
+    assert manifest_task is not None
+    assert manifest_task.name is None
+    endpoint = plan.loader.screening
+    assert endpoint is not None
+    rule = endpoint.agents["prediction_history_endpoint"]
+    assert isinstance(rule, AgentRequireFrames)
+    assert rule.frames == frozenset({9})
+
+
 def test_execute_request_applies_record_transform(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -336,7 +457,7 @@ def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.M
     pytest.importorskip(
         "streaming", reason="Requires streaming package for custom MDS output record format"
     )
-    from dronalize.io.readers import MDSReader  # noqa: PLC0415
+    from dronalize.io.readers import MDSReader  # ruff: ignore[import-outside-top-level]
 
     _patch_get_demo_descriptor(monkeypatch)
 
@@ -386,7 +507,9 @@ def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
     manifest = read_manifest(output_dir)
     assert manifest.horizon_frames == 3
-    assert manifest.default_observation_length == 2
+    assert manifest.prediction_task is not None
+    assert manifest.prediction_task.prediction_origin == 2
+    assert manifest.prediction_task.prediction_end == 3
     assert manifest.dataset_names == ("demo",)
 
 
@@ -508,6 +631,16 @@ def test_cli_help_smoke() -> None:
     result = runner.invoke(app, ["--help"])
 
     assert result.exit_code == 0
+
+
+def test_process_cli_has_no_task_overrides() -> None:
+    app, runner = _cli_app_and_runner()
+    result = runner.invoke(app, ["process", "--help"])
+
+    assert result.exit_code == 0
+    assert "--task" not in result.output
+    assert "--prediction-origin" not in result.output
+    assert "--prediction-end" not in result.output
 
 
 def test_inspect_reports_temporal_support() -> None:

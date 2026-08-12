@@ -41,8 +41,11 @@ uses = ["fast"]
 
 [datasets.a43.scenes]
 horizon_frames = 80
-default_observation_length = 20
 sample_time = 0.1
+
+[datasets.a43.task]
+prediction_origin = 20
+prediction_end = 80
 
 [datasets.a43.output]
 trajectory_schema = "positions_velocity_yaw"
@@ -65,6 +68,7 @@ roots are:
 | --- | --- |
 | [`runtime`](runtime/) | Worker count and executor chunking. |
 | [`scenes`](scenes/) | Scene window length, sampling time, and related settings. |
+| [`task`](scenes/#prediction-tasks) | Named task, complete custom bounds, or `"none"`. |
 | [`screening`](screening/) | Scene + agent screening and cleanup. |
 | [`read`](read/) | Raw input selection, including dataset-native partition reads. |
 | [`assign`](assign/) | Output split assignment, ratios, and temporal assignment parameters. |
@@ -150,8 +154,11 @@ compression = "zstd:3"
 
 [datasets.a43.scenes]
 horizon_frames = 80
-default_observation_length = 20
 sample_time = 0.1
+
+[datasets.a43.task]
+prediction_origin = 20
+prediction_end = 80
 
 [datasets.a43.map.extraction]
 mode = "circle"

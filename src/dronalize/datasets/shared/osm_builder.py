@@ -1,4 +1,4 @@
-import xml.etree.ElementTree as ET  # noqa: S405
+import xml.etree.ElementTree as ET  # ruff: ignore[suspicious-xml-etree-import]
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -118,7 +118,7 @@ class OSMMapBuilder(FeatureMapBuilder):
     @override
     def iter_features(self) -> Iterable[PathFeature]:
         self._nodes = {}
-        context = ET.iterparse(self._osm_file, events=("start", "end"))  # noqa: S314
+        context = ET.iterparse(self._osm_file, events=("start", "end"))  # ruff: ignore[suspicious-xml-element-tree-usage]
         iterator = iter(context)
         _, root = next(iterator)
 

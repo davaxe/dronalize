@@ -23,11 +23,19 @@ runtime and CLI share one canonical configuration surface.
 """
 
 from dronalize.io.base import RecordTransform, SceneTransform, StorageBackend
-from dronalize.io.manifest import DatasetManifest, manifest_path, read_manifest, write_manifest
-from dronalize.io.records import SceneRecord, SplitSceneRecord
+from dronalize.io.manifest import (
+    DatasetManifest,
+    PredictionTaskManifest,
+    manifest_path,
+    read_manifest,
+    write_manifest,
+)
+from dronalize.io.records import PredictionBounds, SceneRecord, SplitSceneRecord
 
 __all__ = [
     "DatasetManifest",
+    "PredictionBounds",
+    "PredictionTaskManifest",
     "RecordTransform",
     "SceneRecord",
     "SceneTransform",

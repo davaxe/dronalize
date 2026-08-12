@@ -11,14 +11,14 @@ ETH is one of the classic pedestrian trajectory benchmarks used in socially awar
   <div class="summary-item"><span># Records</span><strong>processed scene records planned</strong></div>
 </div>
 
-## Default processing profile
+## Default prediction task
 
-Default processing settings for this dataset.
+The `benchmark` prediction task is selected automatically. In the project config, select it explicitly with `task = "benchmark"` or disable prediction bounds with `task = "none"`.
 
 | Setting | Default |
 | ------- | ------- |
-| Configured horizon | 20 frames (default split after 8) @ 2.5 Hz |
-| Effective horizon | 77 frames (default split after 29) @ 10.0 Hz |
+| Configured horizon | 20 frames (benchmark origin 8) @ 2.5 Hz |
+| Effective horizon | 77 frames (benchmark origin 29) @ 10.0 Hz |
 | Source unit | Recording |
 | Source bounds | 89-1440 frames (observed) |
 | Resampling | 4:1 (linear) |

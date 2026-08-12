@@ -76,7 +76,7 @@ The backend decides what goes inside each split directory:
 - `null` writes no scene files
 
 The manifest is written as JSON at the output root. It records the produced splits, storage backend,
-feature columns, trajectory schema fields, numeric precision, horizon, default observation length,
+feature columns, trajectory schema fields, numeric precision, horizon, optional prediction task,
 and map availability for the run.
 
 ## Maps in persisted records

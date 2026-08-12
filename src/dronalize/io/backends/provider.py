@@ -18,6 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from dronalize.io.base import StorageBackend, WorkerWriterProvider, WriterProvider
+from dronalize.io.records import PredictionBounds
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -38,11 +39,11 @@ def build_writer_provider(plan: ExecutionPlan) -> WriterProvider:
         case StorageBackend.PICKLE:
             return _build_pickle_writer_provider(plan)
         case StorageBackend.NULL:
-            return _build_null_writer_provider(plan)
+            return WorkerWriterProvider(create_worker=_create_null_writer)
 
 
 def _build_mds_writer_provider(plan: ExecutionPlan) -> WriterProvider:
-    from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
+    from dronalize.io.backends.mds import MDSDatasetWriter  # ruff: ignore[import-outside-top-level]
 
     output_transform = plan.output_transform
     splits = _output_splits(plan)
@@ -51,7 +52,7 @@ def _build_mds_writer_provider(plan: ExecutionPlan) -> WriterProvider:
             _create_mds_writer,
             output_dir=plan.output_dir,
             config=plan.output_config,
-            default_observation_length=plan.effective_default_observation_length,
+            prediction_bounds=_prediction_bounds(plan),
             splits=splits,
             parallel=plan.parallel,
             record_transform=(
@@ -82,19 +83,19 @@ def _create_mds_writer(
     *,
     output_dir: Path,
     config: OutputConfig,
-    default_observation_length: int | None,
+    prediction_bounds: PredictionBounds | None,
     splits: tuple[DatasetSplit, ...] | None,
     parallel: bool,
     record_transform: RecordTransform[dict[str, Any]] | None,
     scene_transform: SceneTransform[dict[str, Any]] | None,
     mds_columns: dict[str, str] | None,
 ) -> DatasetWriter:
-    from dronalize.io.backends.mds import MDSDatasetWriter  # noqa: PLC0415
+    from dronalize.io.backends.mds import MDSDatasetWriter  # ruff: ignore[import-outside-top-level]
 
     return MDSDatasetWriter(
         output_dir=output_dir,
         config=config,
-        default_observation_length=default_observation_length,
+        prediction_bounds=prediction_bounds,
         splits=splits,
         parallel=parallel,
         parallel_group=worker_id,
@@ -104,13 +105,8 @@ def _create_mds_writer(
     )
 
 
-def _build_null_writer_provider(plan: ExecutionPlan) -> WriterProvider:
-    _ = plan
-    return WorkerWriterProvider(create_worker=_create_null_writer)
-
-
 def _create_null_writer(worker_id: int) -> DatasetWriter:
-    from dronalize.io.backends.null import NullWriter  # noqa: PLC0415
+    from dronalize.io.backends.null import NullWriter  # ruff: ignore[import-outside-top-level]
 
     _ = worker_id
     return NullWriter()
@@ -123,7 +119,7 @@ def _build_pickle_writer_provider(plan: ExecutionPlan) -> WriterProvider:
             _create_pickle_writer,
             output_dir=plan.output_dir,
             config=plan.output_config,
-            default_observation_length=plan.effective_default_observation_length,
+            prediction_bounds=_prediction_bounds(plan),
             splits=_output_splits(plan),
             record_transform=None
             if output_transform is None
@@ -138,18 +134,18 @@ def _create_pickle_writer(
     *,
     output_dir: Path,
     config: OutputConfig,
-    default_observation_length: int | None,
+    prediction_bounds: PredictionBounds | None,
     splits: tuple[DatasetSplit, ...] | None,
     record_transform: RecordTransform[object] | None,
     scene_transform: SceneTransform[object] | None,
 ) -> DatasetWriter:
-    from dronalize.io.backends.pickle import PickleWriter  # noqa: PLC0415
+    from dronalize.io.backends.pickle import PickleWriter  # ruff: ignore[import-outside-top-level]
 
     return PickleWriter(
         output_dir=output_dir,
         identifier=worker_id,
         config=config,
-        default_observation_length=default_observation_length,
+        prediction_bounds=prediction_bounds,
         splits=splits,
         record_transform=record_transform,
         scene_transform=scene_transform,
@@ -158,3 +154,8 @@ def _create_pickle_writer(
 
 def _output_splits(plan: ExecutionPlan) -> tuple[DatasetSplit, ...] | None:
     return plan.assignment.output_splits(input_native_splits=plan.loader.read.native_splits)
+
+
+def _prediction_bounds(plan: ExecutionPlan) -> PredictionBounds | None:
+    bounds = plan.effective_prediction_bounds
+    return None if bounds is None else PredictionBounds(*bounds)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import pickle  # noqa: S403
+import pickle  # ruff: ignore[suspicious-pickle-import]
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -36,7 +36,7 @@ class PickleReader(DatasetReader[RecordT]):
     @override
     def __getitem__(self, at: int) -> RecordT:
         with self._files[at].open("rb") as file:
-            record = pickle.load(file)  # noqa: S301
+            record = pickle.load(file)  # ruff: ignore[suspicious-pickle-usage]
         if not isinstance(record, self._record_type):
             msg = f"Expected pickled SceneRecord, but got {type(record).__name__}."
             raise TypeError(msg)

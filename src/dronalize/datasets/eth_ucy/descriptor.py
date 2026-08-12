@@ -3,6 +3,7 @@ from dronalize.core.categories import DatasetSplit
 from dronalize.datasets.eth_ucy.loader import EthUcyLoader
 from dronalize.datasets.registry import DatasetDescriptor, DatasetSplitSupport
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     linear_resample,
     minimum_observations_screening,
     scenes_config,
@@ -12,13 +13,9 @@ from dronalize.datasets.shared.presets import (
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 _DEFAULT_CONFIG = DatasetConfig(
     scenes=scenes_config(
-        horizon_frames=20,
-        default_observation_length=8,
-        sample_time=0.4,
-        window_step=1,
-        resample=linear_resample(up=4),
+        horizon_frames=20, sample_time=0.4, window_step=1, resample=linear_resample(up=4)
     ),
-    screening=minimum_observations_screening(2, required_frame=7),
+    screening=minimum_observations_screening(2),
 )
 
 
@@ -35,6 +32,8 @@ def _descriptor(name: str) -> DatasetDescriptor:
         name=name,
         loader_cls=EthUcyLoader,
         default_config=_DEFAULT_CONFIG,
+        tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=8)},
+        default_task="benchmark",
         native_schema=EthUcyLoader.native_trajectory_schema(),
         supported_native_splits=_NATIVE_SPLITS,
         split_support=DatasetSplitSupport(scene=True, source=True),

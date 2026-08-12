@@ -5,7 +5,11 @@
 
 ## ::: dronalize.io.DatasetManifest
 
+## ::: dronalize.io.PredictionTaskManifest
+
 ## ::: dronalize.io.StorageBackend
+
+## ::: dronalize.io.PredictionBounds
 
 ## ::: dronalize.io.SceneRecord
 

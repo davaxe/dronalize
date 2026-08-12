@@ -12,7 +12,7 @@ from typing_extensions import TypedDict
 from dronalize.core.categories import AgentCategory
 from dronalize.core.typing import FloatScalarT
 from dronalize.datasets.registry import dataset_id_for_name
-from dronalize.io.records import SceneRecord, SplitSceneRecord
+from dronalize.io.records import PredictionBounds, SceneRecord, SplitSceneRecord
 
 if TYPE_CHECKING:
     from dronalize.core.maps import MapGraph
@@ -41,7 +41,7 @@ def encode_scene_record(
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-    default_observation_length: int | None = None,
+    prediction_bounds: PredictionBounds | None = None,
     dataset_id: int | None = None,
 ) -> SceneRecord:
     """Encode one scene into the canonical full-horizon `SceneRecord`."""
@@ -113,7 +113,10 @@ def encode_scene_record(
         map_node_types=map_record["map_node_types"],
         map_edge_types=map_record["map_edge_types"],
         dataset_id=_resolve_dataset_id(scene.dataset, explicit_dataset_id=dataset_id),
-        default_observation_length=default_observation_length,
+        prediction_origin=(
+            None if prediction_bounds is None else prediction_bounds.prediction_origin
+        ),
+        prediction_end=None if prediction_bounds is None else prediction_bounds.prediction_end,
         ego_agent_id=scene.ego_agent_id,
     )
 
@@ -130,7 +133,8 @@ def encode_split_scene_record(
     scene: Scene,
     *,
     dtype: FloatDType,
-    observation_length: int,
+    prediction_origin: int,
+    prediction_end: int | None = None,
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
@@ -143,7 +147,7 @@ def encode_split_scene_record(
         trajectory_schema=trajectory_schema,
         category_mapping=category_mapping,
     )
-    return record.split(observation_length)
+    return record.split(prediction_origin, prediction_end)
 
 
 def empty_map_record(dtype: FloatDType) -> MapRecordF32 | MapRecordF64:

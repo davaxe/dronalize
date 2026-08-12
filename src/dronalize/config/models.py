@@ -22,12 +22,20 @@ from dronalize.config.base import (
 )
 from dronalize.core.categories import DatasetSplit, EdgeType, EdgeTypeLike, coerce_edge_types
 from dronalize.core.errors import ConfigurationError
-from dronalize.core.functional.window import WindowPolicy  # noqa: TC001
+from dronalize.core.functional.window import (
+    WindowPolicy,  # ruff: ignore[typing-only-first-party-import]
+)
 from dronalize.core.scene import CANONICAL, TrajectorySchema
 from dronalize.core.scene.schema import TrajectorySchemaDefinition
-from dronalize.processing.screening.agent import AgentCheckRule  # noqa: TC001
-from dronalize.processing.screening.cleanup import CleanupRule  # noqa: TC001
-from dronalize.processing.screening.scene import SceneCheckRule  # noqa: TC001
+from dronalize.processing.screening.agent import (
+    AgentCheckRule,  # ruff: ignore[typing-only-first-party-import]
+)
+from dronalize.processing.screening.cleanup import (
+    CleanupRule,  # ruff: ignore[typing-only-first-party-import]
+)
+from dronalize.processing.screening.scene import (
+    SceneCheckRule,  # ruff: ignore[typing-only-first-party-import]
+)
 
 if TYPE_CHECKING:
     from dronalize.core.typing import T
@@ -503,17 +511,6 @@ class ScenesConfig(ResolvedConfig):
 
     horizon_frames: int = Field(gt=0)
     """Number of frames included in each scene horizon."""
-    default_observation_length: int | None = Field(default=None, ge=0)
-    """Optional default split point for reader/adaptor convenience.
-
-    This is provided for datasets that have a natural split between observation
-    and prediction frames, but it is not required for correct operation. If set,
-    this value will be used as the default observation length for any reader or
-    adaptor that supports a separate observation/prediction split, but it can be
-    overridden at the reader or adaptor level if needed. If not set, readers and
-    adaptors will need to be configured with an explicit observation length or
-    callable to determine the split point.
-    """
     sample_time: float = Field(gt=0)
     """Time interval between consecutive frames in seconds."""
     window: WindowConfig | None = Field(default=None)
@@ -523,27 +520,12 @@ class ScenesConfig(ResolvedConfig):
     lane_change: LaneChangeConfig | None = Field(default=None)
     """Optional lane-change-aware sampling configuration."""
 
-    @model_validator(mode="after")
-    def _validate(self) -> ScenesConfig:
-        if (
-            self.default_observation_length is not None
-            and self.default_observation_length > self.horizon_frames
-        ):
-            msg = (
-                "`default_observation_length` must be less than or equal to "
-                f"`horizon_frames` ({self.horizon_frames})."
-            )
-            raise ConfigurationError(msg)
-        return self
-
 
 class ScenesPatch(ConfigPatch[ScenesConfig]):
     """Patch model for overriding scene construction settings."""
 
     horizon_frames: int | None = None
     """Replacement number of frames per scene horizon."""
-    default_observation_length: int | None = None
-    """Replacement default reader/adaptor split point."""
     sample_time: float | None = None
     """Replacement frame interval in seconds."""
     window: Clearable[WindowPatch] = None
@@ -562,11 +544,6 @@ class ScenesPatch(ConfigPatch[ScenesConfig]):
                 "horizon_frames",
                 self.horizon_frames,
                 target.horizon_frames if target is not None else None,
-            ),
-            default_observation_length=(
-                self.default_observation_length
-                if self.default_observation_length is not None
-                else (target.default_observation_length if target is not None else None)
             ),
             sample_time=_resolve_required(
                 "sample_time", self.sample_time, target.sample_time if target is not None else None
@@ -605,20 +582,15 @@ def _apply_optional_block(
     return patch.merge_into(target)
 
 
-def effective_scene_window(config: ScenesConfig) -> tuple[int, int | None, float]:
-    """Return horizon frames, default observation length, and `sample_time` after resampling."""
+def effective_scene_window(config: ScenesConfig) -> tuple[int, float]:
+    """Return horizon frames and `sample_time` after resampling."""
     if config.resample is None:
-        return config.horizon_frames, config.default_observation_length, config.sample_time
+        return config.horizon_frames, config.sample_time
 
     up = config.resample.up
     down = config.resample.down
     horizon_resampled = _resample_length(config.horizon_frames, up=up, down=down)
-    observation_resampled = (
-        None
-        if config.default_observation_length is None
-        else _resample_length(config.default_observation_length, up=up, down=down)
-    )
-    return (horizon_resampled, observation_resampled, config.sample_time * down / up)
+    return (horizon_resampled, config.sample_time * down / up)
 
 
 def _resample_length(length: int, *, up: int, down: int) -> int:
@@ -660,10 +632,33 @@ class ScreeningPatch(ConfigPatch[ScreeningConfig]):
         )
 
 
+class PredictionTaskConfig(ResolvedConfig):
+    """Forecasting bounds expressed in source-frame indices.
+
+    Bounds use half-open indexing: history occupies ``[0, prediction_origin)``
+    and supervised prediction occupies ``[prediction_origin, prediction_end)``.
+    """
+
+    prediction_origin: int = Field(gt=0)
+    """Index of the first frame to predict."""
+    prediction_end: int = Field(gt=0)
+    """Exclusive end index of the supervised prediction interval."""
+    require_history_endpoint: bool = True
+    """Require an eligible agent at the final history frame."""
+
+    @model_validator(mode="after")
+    def _validate_order(self) -> PredictionTaskConfig:
+        if self.prediction_origin >= self.prediction_end:
+            msg = "`prediction_origin` must be less than `prediction_end`."
+            raise ConfigurationError(msg)
+        return self
+
+
 class DatasetConfig(ResolvedConfig):
     """Full dataset/profile-style configuration schema."""
 
     scenes: ScenesConfig
+    task: PredictionTaskConfig | None = None
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
     screening: ScreeningConfig | None = Field(default=None)
     output: OutputConfig = Field(default_factory=OutputConfig)
@@ -671,6 +666,16 @@ class DatasetConfig(ResolvedConfig):
     read: ReadConfig = Field(default_factory=ReadAll)
     assign: AssignConfig = Field(default_factory=NoAssign)
     loader_options: dict[str, Any] | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def _validate_task_horizon(self) -> DatasetConfig:
+        if self.task is not None and self.task.prediction_end > self.scenes.horizon_frames:
+            msg = (
+                "`task.prediction_end` must be less than or equal to "
+                f"`scenes.horizon_frames` ({self.scenes.horizon_frames})."
+            )
+            raise ConfigurationError(msg)
+        return self
 
 
 class DatasetConfigPatchBase(ConfigBase):
@@ -697,6 +702,8 @@ class DatasetConfigPatch(DatasetConfigPatchBase, ConfigPatch[DatasetConfig]):
     """
 
     full_config_type: type[DatasetConfig] = DatasetConfig
+    task: Clearable[PredictionTaskConfig] = None
+    """Complete replacement prediction task, or ``clear`` to remove it."""
 
     @override
     def merge_into(self, target: DatasetConfig | None) -> DatasetConfig:
@@ -706,6 +713,7 @@ class DatasetConfigPatch(DatasetConfigPatchBase, ConfigPatch[DatasetConfig]):
 
         return DatasetConfig(
             scenes=self.scenes.merge_into(target.scenes) if self.scenes else target.scenes,
+            task=_replace_prediction_task(self.task, target.task),
             runtime=self.runtime.merge_into(target.runtime) if self.runtime else target.runtime,
             screening=apply_optional(self.screening, target.screening),
             loader_options=_apply_loader_options_patch(self.loader_options, target.loader_options),
@@ -714,6 +722,33 @@ class DatasetConfigPatch(DatasetConfigPatchBase, ConfigPatch[DatasetConfig]):
             read=self.read if self.read is not None else target.read,
             assign=self.assign if self.assign is not None else target.assign,
         )
+
+
+def _replace_prediction_task(
+    replacement: PredictionTaskConfig | Clear | None, target: PredictionTaskConfig | None
+) -> PredictionTaskConfig | None:
+    if replacement is None:
+        return target
+    if isinstance(replacement, Clear):
+        return None
+    return replacement
+
+
+def effective_prediction_bounds(config: DatasetConfig) -> tuple[int, int] | None:
+    """Return half-open prediction bounds after optional temporal resampling."""
+    task = config.task
+    if task is None:
+        return None
+    resample = config.scenes.resample
+    if resample is None:
+        return task.prediction_origin, task.prediction_end
+
+    origin = _resample_length(task.prediction_origin, up=resample.up, down=resample.down)
+    end = _resample_length(task.prediction_end, up=resample.up, down=resample.down)
+    if origin >= end:
+        msg = "Temporal resampling collapses the configured prediction interval."
+        raise ConfigurationError(msg)
+    return origin, end
 
 
 def _apply_loader_options_patch(
@@ -853,7 +888,6 @@ class RuntimeOverride(ConfigBase):
         cls._validate_assign_inputs(
             assign_strategy=assign_strategy, ratio=ratio, gap=gap, segments=segments
         )
-
         read_data = {"strategy": read_strategy, "splits": read_split}
         read_data = {k: v for k, v in read_data.items() if v is not None}
         read_config = (

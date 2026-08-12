@@ -5,7 +5,6 @@ The scenes config describes how raw trajectory data becomes model-ready scenes. 
 | Key | Type | Description | Default |
 |---|---|---|---|
 | `horizon_frames` | `int` | Configured scene-window length before optional resampling. | `dataset default` |
-| `default_observation_length` | `int` or omitted | Optional default observation length for reader/adaptor convenience. | `dataset default` |
 | `sample_time` | `float` | Time between frames before resampling. | `dataset default` |
 | `window` | `table` or `"clear"` | Sliding-window extraction settings. Use `"clear"` to disable an inherited window block. | `inherited` |
 | `resample` | `table` or `"clear"` | Temporal resampling and interpolation settings. Use `"clear"` to disable an inherited resample block. | `inherited` |
@@ -25,15 +24,33 @@ For many datasets, the most important loader settings are only these:
 ```toml
 [datasets.a43.scenes]
 horizon_frames = 80
-default_observation_length = 20
 sample_time = 0.1
+
+[datasets.a43.task]
+prediction_origin = 20
+prediction_end = 80
 ```
 
 That defines one scene window as:
 
 - `80` total frames
-- a default observation/prediction split after frame `20`
+- a prediction interval covering frames `[20, 80)`
 - sampled at `0.1` seconds per frame
+
+## Prediction tasks
+
+Prediction tasks are optional and separate from scene construction. Bounds are half-open source
+frame indices: history is `[0, prediction_origin)` and supervised future is
+`[prediction_origin, prediction_end)`. A descriptor's `default_task` is selected automatically, so
+its resolved bounds are persisted without requiring additional configuration.
+
+For a custom task, provide both bounds directly. This replaces the inherited task as one atomic
+value. Set `task = "none"` on the dataset entry to remove the default task. After resampling,
+resolved bounds are written into every persisted row so mixed MDS streams remain independently
+interpretable.
+
+Task selection and custom bounds are configured in the project config file. The CLI applies that
+file with `--config` but does not expose task-specific overrides.
 
 ## `[scenes.window]` section
 
@@ -58,7 +75,6 @@ Example:
 ```toml
 [datasets.a43.scenes]
 horizon_frames = 80
-default_observation_length = 20
 
 [datasets.a43.scenes.window]
 step = 2
@@ -126,8 +142,11 @@ run without window extraction.
 ```toml
 [datasets.a43.scenes]
 horizon_frames = 80
-default_observation_length = 20
 sample_time = 0.1
+
+[datasets.a43.task]
+prediction_origin = 20
+prediction_end = 80
 
 [datasets.a43.scenes.window]
 step = 2

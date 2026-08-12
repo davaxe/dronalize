@@ -6,6 +6,7 @@ from dronalize.datasets.registry import (
     DatasetSplitSupport,
 )
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     minimum_observations_screening,
     scenes_config,
     temporal_support,
@@ -22,16 +23,18 @@ _open_vod_resources = single_shared_map_resource_factory(
 )
 
 
+_DEFAULT_CONFIG = DatasetConfig(
+    scenes=scenes_config(horizon_frames=35, sample_time=0.1, window_step=5),
+    screening=minimum_observations_screening(2),
+    map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
+)
+
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="vod",
     loader_cls=VodLoader,
-    default_config=DatasetConfig(
-        scenes=scenes_config(
-            horizon_frames=35, default_observation_length=5, sample_time=0.1, window_step=5
-        ),
-        screening=minimum_observations_screening(2, required_frame=4),
-        map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
-    ),
+    default_config=_DEFAULT_CONFIG,
+    tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=5)},
+    default_task="benchmark",
     loader_options_model=VodLoaderOptions,
     native_schema=VodLoader.native_trajectory_schema(),
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST),

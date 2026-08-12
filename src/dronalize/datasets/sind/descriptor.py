@@ -6,6 +6,7 @@ from dronalize.datasets.registry import (
 )
 from dronalize.datasets.shared.osm_builder import OSMMapBuilder
 from dronalize.datasets.shared.presets import (
+    benchmark_task,
     minimum_observations_screening,
     scenes_config,
     temporal_support,
@@ -26,16 +27,18 @@ _open_sind_resources = named_shared_map_resources_factory(
 )
 
 
+_DEFAULT_CONFIG = DatasetConfig(
+    scenes=scenes_config(horizon_frames=70, sample_time=0.1, window_step=25),
+    screening=minimum_observations_screening(2),
+    map=MapConfig(extraction=FullMapExtraction()),
+)
+
 DATASET_DESCRIPTOR = DatasetDescriptor(
     name="sind",
     loader_cls=SindLoader,
-    default_config=DatasetConfig(
-        scenes=scenes_config(
-            horizon_frames=70, default_observation_length=20, sample_time=0.1, window_step=25
-        ),
-        screening=minimum_observations_screening(2, required_frame=19),
-        map=MapConfig(extraction=FullMapExtraction()),
-    ),
+    default_config=_DEFAULT_CONFIG,
+    tasks={"benchmark": benchmark_task(_DEFAULT_CONFIG.scenes, prediction_origin=20)},
+    default_task="benchmark",
     native_schema=SindLoader.native_trajectory_schema(),
     map_provider_factory=_open_sind_resources,
     feature_support=DatasetFeatureSupport(map=True),

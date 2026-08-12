@@ -43,7 +43,7 @@ class TrajectoryProcessingStages:
 
     @property
     def columns(self) -> TrajectoryColumns:
-        """Return the trajectory column mapping used by screening."""
+        """Trajectory column mapping used by screening."""
         return self.state.columns
 
     def iter_prescreen_frames(self, frame: pl.LazyFrame | pl.DataFrame) -> Iterator[pl.DataFrame]:
