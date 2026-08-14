@@ -39,7 +39,8 @@ def test_schema_definition_normalizes_order() -> None:
 def test_schema_rejects_missing_base_fields() -> None:
     with pytest.raises(TrajectorySchemaError, match="base fields"):
         _ = TrajectorySchema.define(
-            "invalid", fields=(TrajectoryField.FRAME, TrajectoryField.ID, TrajectoryField.X)
+            "invalid",
+            fields=(TrajectoryField.FRAME, TrajectoryField.ID, TrajectoryField.X),
         )
 
 

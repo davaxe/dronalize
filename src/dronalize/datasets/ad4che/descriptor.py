@@ -20,8 +20,9 @@ from dronalize.datasets.shared.resources import map_provider_resources_factory
 
 _open_ad4che_resources = map_provider_resources_factory(
     create=lambda root, map_config: AD4CHEMapProvider(
-        root=Path(root) / "AD4CHE_Data_V1.0", config=map_config
-    )
+        root=Path(root) / "AD4CHE_Data_V1.0",
+        config=map_config,
+    ),
 )
 
 _DEFAULT_CONFIG = DatasetConfig(
@@ -46,7 +47,10 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
     feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
     temporal_support=temporal_support(
-        source_unit="recording", min_frames=1136, max_frames=9821, enabled_by_default=True
+        source_unit="recording",
+        min_frames=1136,
+        max_frames=9821,
+        enabled_by_default=True,
     ),
     map_provider_factory=_open_ad4che_resources,
 )

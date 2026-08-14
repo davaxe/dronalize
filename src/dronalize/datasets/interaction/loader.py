@@ -31,7 +31,9 @@ class InteractionLoader(SceneLoader[Path]):
             return
         for file in sorted(data_dir.glob("*.csv")):
             yield DatasetSource(
-                identifier=file.stem, payload=file, map_key=file.stem.rstrip(self._strip(file.stem))
+                identifier=file.stem,
+                payload=file,
+                map_key=file.stem.rstrip(self._strip(file.stem)),
             )
 
     @staticmethod
@@ -85,7 +87,7 @@ class InteractionLoader(SceneLoader[Path]):
         if split is DatasetSplit.VAL:
             return self._count_sources(self.root / "val")
         return self._count_sources(self.root / "test_multi-agent") + self._count_sources(
-            self.root / "test_conditional-multi-agent"
+            self.root / "test_conditional-multi-agent",
         )
 
     @classmethod
@@ -104,7 +106,7 @@ class InteractionLoader(SceneLoader[Path]):
                 pl
                 .when((pl.col("vx") ** 2 + pl.col("vy") ** 2).sqrt() < 4)
                 .then(AgentCategory.PEDESTRIAN.value)
-                .otherwise(AgentCategory.BICYCLE.value)
+                .otherwise(AgentCategory.BICYCLE.value),
             )
             .otherwise(AgentCategory.UNKNOWN.value)
         )

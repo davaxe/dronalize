@@ -42,7 +42,8 @@ if TYPE_CHECKING:
 
 
 EdgeTypes = Annotated[
-    frozenset[EdgeType], BeforeValidator(lambda v: coerce_edge_types(v, frozenset))
+    frozenset[EdgeType],
+    BeforeValidator(lambda v: coerce_edge_types(v, frozenset)),
 ]
 
 FloatDType = type[np.float32] | type[np.float64]
@@ -322,7 +323,8 @@ class MapEdgeTypeRules(ResolvedConfig):
     @field_validator("remap", mode="before")
     @classmethod
     def _coerce_remap_keys_and_values(
-        cls, v: dict[EdgeTypeLike, EdgeTypeLike]
+        cls,
+        v: dict[EdgeTypeLike, EdgeTypeLike],
     ) -> dict[EdgeType, EdgeType]:
         return {EdgeType.from_value(k): EdgeType.from_value(val) for k, val in v.items()}
 
@@ -502,7 +504,9 @@ class LaneChangePatch(ConfigPatch[LaneChangeConfig]):
     negative_keep_every: int | None = None
     """Replacement negative scene-window retention interval."""
     full_config_type: type[LaneChangeConfig] = Field(
-        default=LaneChangeConfig, init=False, repr=False
+        default=LaneChangeConfig,
+        init=False,
+        repr=False,
     )
 
 
@@ -546,16 +550,21 @@ class ScenesPatch(ConfigPatch[ScenesConfig]):
                 target.horizon_frames if target is not None else None,
             ),
             sample_time=_resolve_required(
-                "sample_time", self.sample_time, target.sample_time if target is not None else None
+                "sample_time",
+                self.sample_time,
+                target.sample_time if target is not None else None,
             ),
             window=_apply_optional_block(
-                self.window, target.window if target is not None else None
+                self.window,
+                target.window if target is not None else None,
             ),
             resample=_apply_optional_block(
-                self.resample, target.resample if target is not None else None
+                self.resample,
+                target.resample if target is not None else None,
             ),
             lane_change=_apply_optional_block(
-                self.lane_change, target.lane_change if target is not None else None
+                self.lane_change,
+                target.lane_change if target is not None else None,
             ),
         )
 
@@ -572,7 +581,8 @@ ConfigT = TypeVar("ConfigT", bound=ConfigBase)
 
 
 def _apply_optional_block(
-    patch: Clearable[ConfigPatch[ConfigT]], target: ConfigT | None
+    patch: Clearable[ConfigPatch[ConfigT]],
+    target: ConfigT | None,
 ) -> ConfigT | None:
     """Apply a patch to an optional nested config block."""
     if patch is None:
@@ -725,7 +735,8 @@ class DatasetConfigPatch(DatasetConfigPatchBase, ConfigPatch[DatasetConfig]):
 
 
 def _replace_prediction_task(
-    replacement: PredictionTaskConfig | Clear | None, target: PredictionTaskConfig | None
+    replacement: PredictionTaskConfig | Clear | None,
+    target: PredictionTaskConfig | None,
 ) -> PredictionTaskConfig | None:
     if replacement is None:
         return target
@@ -752,7 +763,8 @@ def effective_prediction_bounds(config: DatasetConfig) -> tuple[int, int] | None
 
 
 def _apply_loader_options_patch(
-    patch: Clearable[DictPatch], target: dict[str, Any] | None
+    patch: Clearable[DictPatch],
+    target: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
     if patch is None:
         return target
@@ -778,7 +790,10 @@ class RuntimeOverride(ConfigBase):
     def to_dataset_patch(self) -> DatasetConfigPatch:
         """Convert CLI/programmatic runtime inputs into a dataset patch."""
         return DatasetConfigPatch(
-            runtime=self.runtime, read=self.read, assign=self.assign, output=self.output
+            runtime=self.runtime,
+            read=self.read,
+            assign=self.assign,
+            output=self.output,
         )
 
     def merge_into(self, target: DatasetConfig) -> DatasetConfig:
@@ -787,7 +802,9 @@ class RuntimeOverride(ConfigBase):
 
     @staticmethod
     def _validate_read_inputs(
-        *, read_strategy: ReadStrategy | None, read_split: list[DatasetSplit] | None
+        *,
+        read_strategy: ReadStrategy | None,
+        read_split: list[DatasetSplit] | None,
     ) -> None:
         if read_split is None:
             return
@@ -886,7 +903,10 @@ class RuntimeOverride(ConfigBase):
         """
         cls._validate_read_inputs(read_strategy=read_strategy, read_split=read_split)
         cls._validate_assign_inputs(
-            assign_strategy=assign_strategy, ratio=ratio, gap=gap, segments=segments
+            assign_strategy=assign_strategy,
+            ratio=ratio,
+            gap=gap,
+            segments=segments,
         )
         read_data = {"strategy": read_strategy, "splits": read_split}
         read_data = {k: v for k, v in read_data.items() if v is not None}

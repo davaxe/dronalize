@@ -44,7 +44,7 @@ class NGSimLoader(SceneLoader):
                 })
                 .alias("agent_category"),
                 pl.col("Lane_ID").alias("lane_id"),
-            )
+            ),
         )
 
     @override

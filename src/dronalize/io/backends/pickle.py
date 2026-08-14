@@ -55,7 +55,8 @@ class PickleWriter(DatasetWriter):
         scene_transform: SceneTransform[object] | None = None,
     ) -> None:
         validate_transform_choice(
-            record_transform=record_transform, scene_transform=scene_transform
+            record_transform=record_transform,
+            scene_transform=scene_transform,
         )
         self._base_output_dir: Path = output_dir
         self._config: OutputConfig = config

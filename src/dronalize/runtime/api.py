@@ -99,7 +99,9 @@ def execute_plan(plan: ExecutionPlan, *, show_progress: bool = True) -> Executio
     with open_executor(plan) as executor:
         writer_provider = build_writer_provider(plan)
         progress = execute_with_rich_progress(
-            executor, lambda: executor.execute(writer_provider), enable=show_progress
+            executor,
+            lambda: executor.execute(writer_provider),
+            enable=show_progress,
         )
         logger.debug("Execution complete, writing manifests", extra={"dataset": plan.dataset})
         write_manifest(plan.output_dir, plan.manifest())

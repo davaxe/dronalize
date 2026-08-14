@@ -115,7 +115,8 @@ class MDSDatasetWriter(DatasetWriter):
         mds_columns: dict[str, str] | None = None,
     ) -> None:
         validate_transform_choice(
-            record_transform=record_transform, scene_transform=scene_transform
+            record_transform=record_transform,
+            scene_transform=scene_transform,
         )
         if (record_transform is not None or scene_transform is not None) and mds_columns is None:
             msg = "Custom MDS transforms require `mds_columns`."
@@ -221,12 +222,17 @@ class MDSDatasetWriter(DatasetWriter):
     def finish_final(self) -> None:
         """Finalize dataset-wide MDS output after all workers finish."""
         self.finish_dataset(
-            output_dir=self._base_output_dir, splits=self._splits, parallel=self._parallel
+            output_dir=self._base_output_dir,
+            splits=self._splits,
+            parallel=self._parallel,
         )
 
     @staticmethod
     def finish_dataset(
-        *, output_dir: Path, splits: Iterable[DatasetSplit] | None, parallel: bool
+        *,
+        output_dir: Path,
+        splits: Iterable[DatasetSplit] | None,
+        parallel: bool,
     ) -> None:
         """Finalize dataset-wide MDS output after all workers finish."""
         if not parallel:

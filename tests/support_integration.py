@@ -44,7 +44,10 @@ def _assert_finite(array: npt.NDArray[np.floating[Any]], name: str) -> None:
 
 
 def _assert_edge_index_bounds(
-    edge_indices: npt.NDArray[np.int32], num_nodes: int, *, name: str
+    edge_indices: npt.NDArray[np.int32],
+    num_nodes: int,
+    *,
+    name: str,
 ) -> None:
     if edge_indices.shape[1] == 0:
         return
@@ -222,7 +225,9 @@ class AssertingSceneWriter:
         graph = scene.resolve_map()
         assert_basic_map_sanity(graph, expect_map=scene.has_map())
         record = encode_scene_record(
-            scene, dtype=np.float32, trajectory_schema=self._trajectory_schema
+            scene,
+            dtype=np.float32,
+            trajectory_schema=self._trajectory_schema,
         )
         assert_record_sanity(record, scene)
         if self._artifact_dir is not None:
@@ -279,7 +284,7 @@ def assert_plan_scene_outputs(
             dataset_name=dataset_name,
             scene_start=scene_start,
             scene_step=scene_step,
-        )
+        ),
     )
     with open_executor(plan) as executor:
         progress = executor.execute(writer_provider)
@@ -295,7 +300,10 @@ def assert_plan_scene_outputs(
 
 
 def save_scene_artifacts(
-    scene: Scene, graph: MapGraph | None, out_dir: Path, dataset_name: str
+    scene: Scene,
+    graph: MapGraph | None,
+    out_dir: Path,
+    dataset_name: str,
 ) -> None:
     """Save scene artifacts like trajectories and maps for debugging."""
 

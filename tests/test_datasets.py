@@ -89,7 +89,11 @@ ALL_CASES_DEFAULT: dict[str, DatasetCase] = {
 @pytest.mark.parametrize("case", ALL_CASES_DEFAULT.values(), ids=ALL_CASES_DEFAULT.keys())
 @pytest.mark.parametrize("jobs", [1, 2], ids=["jobs=1", "jobs=2"])
 def test_dataset_raw_data_processing(
-    case: DatasetCase, jobs: int, raw_data_root: Path, artifact_dir: Path, tmp_path: Path
+    case: DatasetCase,
+    jobs: int,
+    raw_data_root: Path,
+    artifact_dir: Path,
+    tmp_path: Path,
 ) -> None:
     if not (raw_data_root / case.path_rel_root).exists():
         pytest.skip(f"Dataset root not found: {raw_data_root / case.path_rel_root}")
@@ -119,7 +123,9 @@ def test_dataset_raw_data_processing(
 
 @pytest.mark.parametrize("jobs", [1, 4], ids=["jobs=1", "jobs=4"])
 def test_datasets_mocked_registry_smoke(
-    jobs: int, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    jobs: int,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("dronalize.runtime.api.get_dataset", lambda _: demo_descriptor())  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
 

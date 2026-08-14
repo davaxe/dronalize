@@ -164,7 +164,8 @@ _EdgeCollectionT = TypeVar("_EdgeCollectionT", bound=Collection[EdgeType])
 
 
 def coerce_agent_categories(
-    value: AgentCategoryInput, collection: Callable[[Iterable[AgentCategory]], _AgentCollectionT]
+    value: AgentCategoryInput,
+    collection: Callable[[Iterable[AgentCategory]], _AgentCollectionT],
 ) -> _AgentCollectionT:
     """Convert one or many agent-category values into a normalized collection."""
     values = [value] if isinstance(value, (str, int, AgentCategory)) else value
@@ -172,7 +173,8 @@ def coerce_agent_categories(
 
 
 def coerce_edge_types(
-    value: EdgeTypeInput, collection: Callable[[Iterable[EdgeType]], _EdgeCollectionT]
+    value: EdgeTypeInput,
+    collection: Callable[[Iterable[EdgeType]], _EdgeCollectionT],
 ) -> _EdgeCollectionT:
     """Convert one or many edge-type values into a normalized collection."""
     values = [value] if isinstance(value, (str, int, EdgeType)) else value

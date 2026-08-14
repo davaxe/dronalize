@@ -45,7 +45,9 @@ def exclude_category_screening(*category: AgentCategory) -> ScreeningConfig:
 
 
 def minimum_observations_screening(
-    minimum: int, *, required_frame: int | None = None
+    minimum: int,
+    *,
+    required_frame: int | None = None,
 ) -> ScreeningConfig:
     """Return the standard screening used by built-in dataset descriptors.
 
@@ -67,7 +69,7 @@ def minimum_observations_screening(
 
     """
     screening = ScreeningConfig(
-        cleanup={"min_observations": PruneByRule(agent_rule=MinObservations(minimum=minimum))}
+        cleanup={"min_observations": PruneByRule(agent_rule=MinObservations(minimum=minimum))},
     )
     if required_frame is None:
         return screening
@@ -75,12 +77,15 @@ def minimum_observations_screening(
         msg = "required_frame must be non-negative."
         raise ValueError(msg)
     return combine_screenings(
-        screening, require_frames_screening(required_frame, require_absolute=1)
+        screening,
+        require_frames_screening(required_frame, require_absolute=1),
     )
 
 
 def require_frames_screening(
-    *frames: int, require_absolute: int | None = None, require_relative: float | None = None
+    *frames: int,
+    require_absolute: int | None = None,
+    require_relative: float | None = None,
 ) -> ScreeningConfig:
     """Return an agent-screening config that requires specific frames."""
     require = (
@@ -89,7 +94,7 @@ def require_frames_screening(
         else None
     )
     return ScreeningConfig(
-        agents={"require_frames": AgentRequireFrames.define(frames, require=require)}
+        agents={"require_frames": AgentRequireFrames.define(frames, require=require)},
     )
 
 
@@ -156,7 +161,10 @@ def scenes_config(
 
 
 def benchmark_task(
-    scenes: ScenesConfig, *, prediction_origin: int, prediction_end: int | None = None
+    scenes: ScenesConfig,
+    *,
+    prediction_origin: int,
+    prediction_end: int | None = None,
 ) -> PredictionTaskConfig:
     """Build a benchmark prediction task using a descriptor's scene horizon."""
     return PredictionTaskConfig(

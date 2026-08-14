@@ -82,7 +82,8 @@ class _ExecutorDisplay(RichCast):
 
     def _main_stats_markup(self) -> str:
         source_part = _source_progress_text(
-            processed=self.state.stats.processed_sources, total=self.state.total_sources
+            processed=self.state.stats.processed_sources,
+            total=self.state.total_sources,
         )
         return (
             f"[bold cyan]Workers:[/bold cyan] {self._visible_workers}"
@@ -177,7 +178,10 @@ class _ProgressMonitor:
 
 
 def execute_with_rich_progress(
-    progress: ProgressSource, run: Callable[[], T], *, enable: bool = True
+    progress: ProgressSource,
+    run: Callable[[], T],
+    *,
+    enable: bool = True,
 ) -> T:
     """Run an executor callback while rendering a Rich progress display."""
     if not enable:

@@ -13,7 +13,10 @@ if TYPE_CHECKING:
 
 
 def yaw_from_velocity(
-    data: DataFrameT, vx_col: str = "vx", vy_col: str = "vy", yaw_col: str = "yaw"
+    data: DataFrameT,
+    vx_col: str = "vx",
+    vy_col: str = "vy",
+    yaw_col: str = "yaw",
 ) -> DataFrameT:
     """Estimate yaw from velocity vectors."""
     return data.with_columns(yaw_from_velocity_expr(vx_col, vy_col, yaw_col))
@@ -25,7 +28,10 @@ def yaw_from_velocity_expr(vx_col: str = "vx", vy_col: str = "vy", yaw_col: str 
 
 
 def yaw_from_position(
-    data: DataFrameT, x_col: str = "x", y_col: str = "y", yaw_col: str = "yaw"
+    data: DataFrameT,
+    x_col: str = "x",
+    y_col: str = "y",
+    yaw_col: str = "yaw",
 ) -> DataFrameT:
     """Estimate yaw from position differences."""
     return data.with_columns(yaw_from_position_expr(x_col, y_col, yaw_col))
@@ -69,7 +75,8 @@ def derivative(
 
     for i in range(1, order + 1):
         rename_list = derivative_rename.get(
-            i, [f"d{i}_{original_root}" for original_root in columns]
+            i,
+            [f"d{i}_{original_root}" for original_root in columns],
         )
 
         next_order_exprs: list[pl.Expr] = []

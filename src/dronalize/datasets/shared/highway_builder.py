@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
+import numpy as np
 import polars as pl
 from scipy.interpolate import UnivariateSpline
 from typing_extensions import override
@@ -88,10 +89,11 @@ class HighwayLaneMapBuilder(FeatureMapBuilder):
                 lane_id: idx for idx, lane_id in enumerate(lane_description.ids)
             }
             data = data.with_columns(
-                pl.col(self._lane_id_col).replace_strict(mapping).alias(self._lane_id_col)
+                pl.col(self._lane_id_col).replace_strict(mapping).alias(self._lane_id_col),
             )
             lane_description = LaneDescription(
-                ids=list(range(len(lane_description.ids))), direction=lane_description.direction
+                ids=list(range(len(lane_description.ids))),
+                direction=lane_description.direction,
             )
 
         lane_centers = self._get_lane_centers(data, bin_size=self._bin_size)
@@ -160,7 +162,9 @@ class HighwayLaneMapBuilder(FeatureMapBuilder):
         avg_half_width = (
             borders
             .join(
-                centers, left_on=["left_lane", "long_bin"], right_on=[self._lane_id_col, "long_bin"]
+                centers,
+                left_on=["left_lane", "long_bin"],
+                right_on=[self._lane_id_col, "long_bin"],
             )
             .select((pl.col("border_lat") - pl.col("lat_center")).abs())
             .collect()
@@ -173,7 +177,7 @@ class HighwayLaneMapBuilder(FeatureMapBuilder):
             pl.col(self._lane_id_col).max().alias("max_id"),
         ]).filter(
             (pl.col(self._lane_id_col) == pl.col("min_id"))
-            | (pl.col(self._lane_id_col) == pl.col("max_id"))
+            | (pl.col(self._lane_id_col) == pl.col("max_id")),
         )
 
         return extreme_lanes.select([
@@ -192,7 +196,9 @@ class HighwayLaneMapBuilder(FeatureMapBuilder):
 
     @staticmethod
     def _get_border_type(
-        left: LaneId, right: LaneId, lane_description: LaneDescription | None
+        left: LaneId,
+        right: LaneId,
+        lane_description: LaneDescription | None,
     ) -> EdgeType:
         if lane_description is not None:
             left_idx = lane_description.ids.index(left)
@@ -221,6 +227,7 @@ def _smooth_lines(
         y = unique_group[y_col].to_numpy()
         x = unique_group[x_col].to_numpy()
         spline = UnivariateSpline(y, x, s=smoothing_factor)
-        return group.with_columns(pl.Series(x_col, spline(group[y_col].to_numpy())))
+        smoothed_x = np.asarray(spline(group[y_col].to_numpy()), dtype=np.float64)
+        return group.with_columns(pl.Series(x_col, smoothed_x))
 
     return eager_df.group_by(group_col).map_groups(_apply_spline)

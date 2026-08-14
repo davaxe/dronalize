@@ -144,10 +144,15 @@ class ProjectConfig(ConfigBase):
         """
         if default_task is not None:
             dataset_config = _resolve_named_task(
-                dataset=dataset, name=default_task, config=dataset_config, named_tasks=named_tasks
+                dataset=dataset,
+                name=default_task,
+                config=dataset_config,
+                named_tasks=named_tasks,
             )
         dataset_config = self._apply_entry(
-            entry=self.defaults, target=dataset_config, context="defaults"
+            entry=self.defaults,
+            target=dataset_config,
+            context="defaults",
         )
         resolved = self._apply_entry(
             entry=self.datasets.get(dataset) if self.datasets else None,
@@ -158,11 +163,18 @@ class ProjectConfig(ConfigBase):
         if not isinstance(selection, str):
             return resolved
         return _resolve_named_task(
-            dataset=dataset, name=selection, config=resolved, named_tasks=named_tasks
+            dataset=dataset,
+            name=selection,
+            config=resolved,
+            named_tasks=named_tasks,
         )
 
     def _apply_entry(
-        self, *, entry: DatasetConfigEntry | None, target: DatasetConfig, context: str
+        self,
+        *,
+        entry: DatasetConfigEntry | None,
+        target: DatasetConfig,
+        context: str,
     ) -> DatasetConfig:
         if entry is None:
             return target

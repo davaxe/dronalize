@@ -113,10 +113,10 @@ class LevelXDataLoader(SceneLoader[LevelXSourceData]):
         tracks = source.payload.path / f"{source.identifier:0>2}_tracks.csv"
         meta = source.payload.path / f"{source.identifier:0>2}_tracksMeta.csv"
         meta_df = pl.scan_csv(meta, schema_overrides=self.meta_schema()).select(
-            *self.meta_data_select()
+            *self.meta_data_select(),
         )
         tracks_df = pl.scan_csv(tracks, schema_overrides=self.track_schema()).select(
-            *self.track_data_select()
+            *self.track_data_select(),
         )
         combined = tracks_df.join(meta_df, left_on="id", right_on="id")
         combined = combined.with_columns(
@@ -147,10 +147,15 @@ class StandardLevelXLoader(LevelXDataLoader):
     """Loader for LevelX datasets that store recordings under a ``data`` directory."""
 
     def __init__(
-        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
+        self,
+        data_root: Path | str,
+        request: LoaderPlan,
+        map_provider: MapProvider | None = None,
     ) -> None:
         super().__init__(
-            data_root=Path(data_root) / "data", request=request, map_provider=map_provider
+            data_root=Path(data_root) / "data",
+            request=request,
+            map_provider=map_provider,
         )
 
 
@@ -176,10 +181,15 @@ class HighDLoader(LevelXDataLoader):
     """Loader for the highD dataset."""
 
     def __init__(
-        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
+        self,
+        data_root: Path | str,
+        request: LoaderPlan,
+        map_provider: MapProvider | None = None,
     ) -> None:
         super().__init__(
-            data_root=Path(data_root) / "data", request=request, map_provider=map_provider
+            data_root=Path(data_root) / "data",
+            request=request,
+            map_provider=map_provider,
         )
 
     @staticmethod

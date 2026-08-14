@@ -15,7 +15,7 @@ from dronalize.datasets.shared.presets import (
 from dronalize.datasets.shared.resources import map_provider_resources_factory
 
 _open_a43_resources = map_provider_resources_factory(
-    create=lambda _root, map_config: A43MapProvider(map_config)
+    create=lambda _root, map_config: A43MapProvider(map_config),
 )
 
 _DEFAULT_CONFIG = DatasetConfig(
@@ -34,7 +34,10 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, time_block=True),
     temporal_support=temporal_support(
-        source_unit="recording", min_frames=52123, max_frames=52123, enabled_by_default=True
+        source_unit="recording",
+        min_frames=52123,
+        max_frames=52123,
+        enabled_by_default=True,
     ),
     map_provider_factory=_open_a43_resources,
 )

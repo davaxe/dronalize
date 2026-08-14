@@ -23,7 +23,8 @@ _open_argoverse1_resources = named_shared_map_resources_factory(
         ("PIT", root / "hd_maps" / "map_files" / "pruned_argoverse_PIT_10314_vector_map.xml"),
     ),
     build_map=lambda path, config: Argoverse1MapBuilder.from_xml_file(path).build(
-        config.min_distance, config.interpolation_distance
+        config.min_distance,
+        config.interpolation_distance,
     ),
 )
 
@@ -48,6 +49,9 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     split_support=DatasetSplitSupport(scene=True),
     feature_support=DatasetFeatureSupport(map=True),
     temporal_support=temporal_support(
-        source_unit="scenario", min_frames=20, max_frames=50, enabled_by_default=False
+        source_unit="scenario",
+        min_frames=20,
+        max_frames=50,
+        enabled_by_default=False,
     ),
 )

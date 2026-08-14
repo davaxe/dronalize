@@ -58,7 +58,9 @@ class AgentCategorySelector(ScreeningModel):
 
     @classmethod
     def define(
-        cls, mode: Literal["include", "exclude"], categories: AgentCategoryInput
+        cls,
+        mode: Literal["include", "exclude"],
+        categories: AgentCategoryInput,
     ) -> AgentCategorySelector:
         """Create a selector from flexible category inputs."""
         return cls(mode=mode, categories=coerce_agent_categories(categories, frozenset))
@@ -166,7 +168,7 @@ class ScreeningContext:
     def retained_agent_count(self, selector: AgentCategorySelector | None = None) -> pl.Expr:
         """Return the number of retained agents in the current scene."""
         return self.over_scene_window(
-            pl.col(self.columns.agent_id).filter(self.selector_mask(selector)).n_unique()
+            pl.col(self.columns.agent_id).filter(self.selector_mask(selector)).n_unique(),
         )
 
 

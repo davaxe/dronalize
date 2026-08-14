@@ -42,7 +42,10 @@ class ReadSelection:
 
     @classmethod
     def from_config(
-        cls, read: ReadConfig, *, supported_native_splits: tuple[DatasetSplit, ...] | None = None
+        cls,
+        read: ReadConfig,
+        *,
+        supported_native_splits: tuple[DatasetSplit, ...] | None = None,
     ) -> ReadSelection:
         """Build a read scope from the public read configuration."""
         match read:
@@ -102,7 +105,9 @@ class SplitAssignmentPlan:
         return self.strategy == "preserve-native"
 
     def output_splits(
-        self, *, input_native_splits: tuple[DatasetSplit, ...] | None = None
+        self,
+        *,
+        input_native_splits: tuple[DatasetSplit, ...] | None = None,
     ) -> tuple[DatasetSplit, ...] | None:
         """Return the split directories expected for this assignment plan."""
         if isinstance(self.config, NoAssign):

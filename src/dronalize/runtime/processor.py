@@ -65,11 +65,17 @@ class SplitAssigner:
 
         if request is not None and request.uses_weighted_assignment():
             self._weighted_assigner = StatelessWeightedAssigner(
-                request.active_splits(), request.active_weights(), seed=request.seed
+                request.active_splits(),
+                request.active_weights(),
+                seed=request.seed,
             )
 
     def assign(
-        self, *, source: DatasetSource[Any], stable_identifier: SceneIdentifier, frame: pl.DataFrame
+        self,
+        *,
+        source: DatasetSource[Any],
+        stable_identifier: SceneIdentifier,
+        frame: pl.DataFrame,
     ) -> DatasetSplit | None:
         """Assign split to scene candidate."""
         if self.request is None:
@@ -101,13 +107,16 @@ class SplitAssigner:
             raise SplitAssignmentError(msg) from exc
 
     def _resolve_scene_split(
-        self, source: DatasetSource[Any], stable_identifier: SceneIdentifier
+        self,
+        source: DatasetSource[Any],
+        stable_identifier: SceneIdentifier,
     ) -> DatasetSplit | None:
         if self._weighted_assigner is None:
             return None
 
         return self._weighted_assigner.assign(
-            stable_identifier.source_local_scene_index, str(source.identifier)
+            stable_identifier.source_local_scene_index,
+            str(source.identifier),
         )
 
     def _resolve_source_split(self, source: DatasetSource[Any]) -> DatasetSplit | None:
@@ -129,19 +138,24 @@ class RuntimeProcessor:
     sample_time: float
     split_assigner: SplitAssigner
     _processing_stages: TrajectoryProcessingStages | None = field(
-        default=None, init=False, repr=False
+        default=None,
+        init=False,
+        repr=False,
     )
 
     @classmethod
     def from_plan(
-        cls, plan: ExecutionPlan, loader: SceneLoader[Any, LoaderOptionsModel]
+        cls,
+        plan: ExecutionPlan,
+        loader: SceneLoader[Any, LoaderOptionsModel],
     ) -> RuntimeProcessor:
         """Create processor from execution plan and scene loader."""
         return cls(
             dataset=plan.dataset,
             loader=loader,
             source_schema=trajectory_schema_after_transforms(
-                plan.descriptor.native_schema, plan.resolved_config
+                plan.descriptor.native_schema,
+                plan.resolved_config,
             ),
             target_schema=plan.trajectory_schema,
             horizon_frames=plan.effective_horizon_frames,
@@ -245,7 +259,8 @@ class RuntimeProcessor:
         return self._processing_stages
 
     def _resolve_scene_map(
-        self, candidate: SceneCandidate
+        self,
+        candidate: SceneCandidate,
     ) -> tuple[str | None, MapResolver | None]:
         if self.loader.map_config is None:
             return None, None
@@ -264,7 +279,8 @@ class RuntimeProcessor:
 
     @staticmethod
     def _effective_source(
-        source: DatasetSource[Any], data: LoadedSourceFrame
+        source: DatasetSource[Any],
+        data: LoadedSourceFrame,
     ) -> DatasetSource[Any]:
         if data.source_split is None:
             return source

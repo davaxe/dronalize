@@ -22,14 +22,18 @@ _open_nuscenes_resources = named_shared_map_resources_factory(
         for path in (root / "nuScenes-map-expansion-v1.3" / "expansion").glob("*.json")
     ),
     build_map=lambda path, config: NuScenesMapBuilder.from_json_file(path).build(
-        config.min_distance, config.interpolation_distance
+        config.min_distance,
+        config.interpolation_distance,
     ),
 )
 
 
 _DEFAULT_CONFIG = DatasetConfig(
     scenes=scenes_config(
-        horizon_frames=16, sample_time=0.5, window_step=1, resample=linear_resample(up=5)
+        horizon_frames=16,
+        sample_time=0.5,
+        window_step=1,
+        resample=linear_resample(up=5),
     ),
     screening=minimum_observations_screening(2),
     map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
@@ -48,6 +52,9 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     supported_native_splits=(DatasetSplit.TRAIN, DatasetSplit.VAL),
     split_support=DatasetSplitSupport(scene=True, source=True),
     temporal_support=temporal_support(
-        source_unit="scene", min_frames=32, max_frames=41, enabled_by_default=True
+        source_unit="scene",
+        min_frames=32,
+        max_frames=41,
+        enabled_by_default=True,
     ),
 )

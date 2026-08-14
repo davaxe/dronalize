@@ -66,7 +66,12 @@ def sliding_window(
         data = data.sort([*group_keys, sliding_col] if group_keys else sliding_col)
 
     windows = _create_windows(
-        data, window_size, step_size, sliding_col=sliding_col, policy=policy, group_by=group_keys
+        data,
+        window_size,
+        step_size,
+        sliding_col=sliding_col,
+        policy=policy,
+        group_by=group_keys,
     )
     return _explode_windows(windows, sliding_col, group_keys, offset_sliding_col=offset_sliding_col)
 
@@ -81,7 +86,12 @@ def _create_windows(
     group_by: list[str],
 ) -> DataFrameT:
     window_index = _create_window_index(
-        data, window_size, step_size, sliding_col=sliding_col, policy=policy, group_by=group_by
+        data,
+        window_size,
+        step_size,
+        sliding_col=sliding_col,
+        policy=policy,
+        group_by=group_by,
     )
 
     lower_bound = pl.max_horizontal(pl.lit(0), pl.col(sliding_col) - window_size + 1)
@@ -94,8 +104,8 @@ def _create_windows(
         .with_row_index(_WINDOW_ROW_ORDER_COLUMN)
         .with_columns(
             pl.int_ranges(first_window_start, last_window_start + step_size, step_size).alias(
-                _WINDOW_START_COLUMN
-            )
+                _WINDOW_START_COLUMN,
+            ),
         )
         .explode(_WINDOW_START_COLUMN)
     )
@@ -122,7 +132,10 @@ def _create_window_index(
         aggs.append(pl.col(_WINDOW_GROUP_MAX_COLUMN).alias(_WINDOW_GROUP_MAX_COLUMN))
 
     grouped = data.group_by_dynamic(
-        sliding_col, every=f"{step_size}i", period=f"{window_size}i", group_by=group_by or None
+        sliding_col,
+        every=f"{step_size}i",
+        period=f"{window_size}i",
+        group_by=group_by or None,
     ).agg(*aggs)
 
     if policy == "strict":
@@ -134,7 +147,8 @@ def _create_window_index(
         grouped = grouped.filter(span == window_size)
     elif policy == "anchored":
         grouped = grouped.filter(
-            (pl.col(sliding_col) + window_size - 1) <= pl.col(_WINDOW_GROUP_MAX_COLUMN).list.first()
+            (pl.col(sliding_col) + window_size - 1)
+            <= pl.col(_WINDOW_GROUP_MAX_COLUMN).list.first(),
         )
 
     return (

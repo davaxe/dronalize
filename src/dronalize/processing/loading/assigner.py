@@ -89,7 +89,8 @@ def _hash_to_unit_interval(seed: int, *values: int | str) -> float:
 
 
 def _prepare_groups_and_weights(
-    groups: Sequence[T_co], weights: Sequence[float] | None
+    groups: Sequence[T_co],
+    weights: Sequence[float] | None,
 ) -> tuple[list[T_co], npt.NDArray[np.float64]]:
     """Validate and normalize assigner groups and weights."""
     normalized_groups = list(dict.fromkeys(groups))

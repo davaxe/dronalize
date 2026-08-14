@@ -35,7 +35,10 @@ class Argoverse1Loader(SceneLoader[list[Path], Argoverse1LoaderOptions]):
     """Loader for Argoverse 1 forecasting trajectories."""
 
     def __init__(
-        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
+        self,
+        data_root: Path | str,
+        request: LoaderPlan,
+        map_provider: MapProvider | None = None,
     ) -> None:
         super().__init__(data_root=data_root, request=request, map_provider=map_provider)
         self._train_dir: Path = self.root / "forecasting_train_v1.1" / "train" / "data"
@@ -87,7 +90,7 @@ class Argoverse1Loader(SceneLoader[list[Path], Argoverse1LoaderOptions]):
                 group
                 .filter(pl.col("agent_category") == AgentCategory.CAR)
                 .select(pl.col("id").first())
-                .item()
+                .item(),
             )
             yield LoadedSourceFrame(
                 frame=group.drop("file_id", "OBJECT_TYPE").lazy(),
@@ -114,7 +117,8 @@ class Argoverse1Loader(SceneLoader[list[Path], Argoverse1LoaderOptions]):
         files = sorted(data_dir.glob("*.csv"))
         for start in range(0, len(files), self.loader_options.file_batch_size):
             yield DatasetSource(
-                identifier=start, payload=files[start : start + self.loader_options.file_batch_size]
+                identifier=start,
+                payload=files[start : start + self.loader_options.file_batch_size],
             )
 
     def _count_sources(self, data_dir: Path) -> int:

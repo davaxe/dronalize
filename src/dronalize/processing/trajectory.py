@@ -70,7 +70,9 @@ class TrajectoryProcessingStages:
             frames = (current,)
         else:
             frames = _iter_grouped_lazyframes(
-                current, self.state.scene_id_column, drop_group_cols=False
+                current,
+                self.state.scene_id_column,
+                drop_group_cols=False,
             )
 
         if self.state.drop_columns:
@@ -257,17 +259,18 @@ def _attach_scene_id(frame: pl.LazyFrame, state: _TrajectoryProcessingState) -> 
             .col("_scene_row_order")
             .min()
             .over(list(state.scene_key_columns))
-            .alias("_scene_first_row")
+            .alias("_scene_first_row"),
         )
         .with_columns(
-            (pl.col("_scene_first_row").rank("dense") - 1).cast(pl.UInt32).alias(scene_id_column)
+            (pl.col("_scene_first_row").rank("dense") - 1).cast(pl.UInt32).alias(scene_id_column),
         )
         .drop("_scene_row_order", "_scene_first_row")
     )
 
 
 def _iter_candidate_frames(
-    frame: pl.LazyFrame, state: _TrajectoryProcessingState
+    frame: pl.LazyFrame,
+    state: _TrajectoryProcessingState,
 ) -> Iterable[pl.LazyFrame]:
     if state.scene_id_column is None:
         return (frame,)
@@ -275,7 +278,8 @@ def _iter_candidate_frames(
 
 
 def _filter_lane_change_scenes(
-    frame: pl.LazyFrame, state: _TrajectoryProcessingState
+    frame: pl.LazyFrame,
+    state: _TrajectoryProcessingState,
 ) -> pl.LazyFrame:
     config = state.scenes.lane_change
     if config is None or not _uses_lane_change_sampling(state.plan):
@@ -298,7 +302,7 @@ def _filter_lane_change_scenes(
             .col(_LANE_CHANGE_EVENT_COLUMN)
             .sum()
             .over(scene_id_column)
-            .alias(_SCENE_LANE_CHANGE_COUNT_COLUMN)
+            .alias(_SCENE_LANE_CHANGE_COUNT_COLUMN),
         )
         .filter(is_positive | keep_negative)
         .select(pl.all().exclude(_LANE_CHANGE_EVENT_COLUMN, _SCENE_LANE_CHANGE_COUNT_COLUMN))
@@ -337,7 +341,10 @@ def _compile_resample_config(state: _TrajectoryProcessingState) -> ResampleSpec 
 
 
 def _iter_grouped_lazyframes(
-    frame: pl.LazyFrame, *by: str, drop_group_cols: bool = True, batch_size: int = 100_000
+    frame: pl.LazyFrame,
+    *by: str,
+    drop_group_cols: bool = True,
+    batch_size: int = 100_000,
 ) -> Iterator[pl.LazyFrame]:
     by_tuple = tuple(by)
     if not by_tuple:
@@ -355,14 +362,16 @@ def _iter_grouped_lazyframes(
 
         last_key = batch.select(*by_tuple).tail(1).row(0, named=True)
         last_key_mask = pl.all_horizontal(
-            *(pl.col(column).eq_missing(value) for column, value in last_key.items())
+            *(pl.col(column).eq_missing(value) for column, value in last_key.items()),
         )
         complete = batch.filter(~last_key_mask)
         pending = batch.filter(last_key_mask)
 
         if not complete.is_empty():
             yield from _yield_partitions(
-                complete, by_tuple=by_tuple, drop_group_cols=drop_group_cols
+                complete,
+                by_tuple=by_tuple,
+                drop_group_cols=drop_group_cols,
             )
 
     if pending is not None and not pending.is_empty():
@@ -370,10 +379,16 @@ def _iter_grouped_lazyframes(
 
 
 def _yield_partitions(
-    frame: pl.DataFrame, *, by_tuple: tuple[str, ...], drop_group_cols: bool
+    frame: pl.DataFrame,
+    *,
+    by_tuple: tuple[str, ...],
+    drop_group_cols: bool,
 ) -> Iterator[pl.LazyFrame]:
     for part in frame.partition_by(
-        *by_tuple, maintain_order=True, as_dict=False, include_key=not drop_group_cols
+        *by_tuple,
+        maintain_order=True,
+        as_dict=False,
+        include_key=not drop_group_cols,
     ):
         yield part.lazy()
 
@@ -451,7 +466,7 @@ def _finalize_split_frame(
                 pl
                 .struct(*(pl.col(column) for column in partition_keys))
                 .hash()
-                .alias(partition_column)
+                .alias(partition_column),
             )
         else:
             new_cols.append(pl.col(partition_source_column).alias(partition_column))

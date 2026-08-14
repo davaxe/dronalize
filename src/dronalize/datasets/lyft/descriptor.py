@@ -20,7 +20,8 @@ from dronalize.datasets.shared.resources import single_shared_map_resource_facto
 _open_lyft_resources = single_shared_map_resource_factory(
     map_path=lambda root: root / "semantic_map" / "semantic_map.pb",
     build_map=lambda path, config: LyftMapBuilder.from_files(
-        path, path.with_name("meta.json")
+        path,
+        path.with_name("meta.json"),
     ).build(config.min_distance, config.interpolation_distance),
 )
 
@@ -28,7 +29,8 @@ _open_lyft_resources = single_shared_map_resource_factory(
 _DEFAULT_CONFIG = DatasetConfig(
     scenes=scenes_config(horizon_frames=70, sample_time=0.1, window_step=20),
     screening=combine_screenings(
-        minimum_observations_screening(2), exclude_category_screening(AgentCategory.UNKNOWN)
+        minimum_observations_screening(2),
+        exclude_category_screening(AgentCategory.UNKNOWN),
     ),
     map=MapConfig(extraction=TrajectoryBufferExtraction(radius=25)),
     loader_options=LyftLoaderOptions().model_dump(),
@@ -47,6 +49,9 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
     temporal_support=temporal_support(
-        source_unit="scene", min_frames=152, max_frames=250, enabled_by_default=True
+        source_unit="scene",
+        min_frames=152,
+        max_frames=250,
+        enabled_by_default=True,
     ),
 )

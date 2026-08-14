@@ -101,7 +101,10 @@ class ResampleSpec:
         return self._with_update(sample_time=sample_time)
 
     def with_emit(
-        self, *, acceleration: bool | None = None, velocity: bool | None = None
+        self,
+        *,
+        acceleration: bool | None = None,
+        velocity: bool | None = None,
     ) -> ResampleSpec:
         """Return a copy with different derivative emission settings."""
         emit_velocity = self.emit_velocity if velocity is None else velocity
@@ -179,7 +182,10 @@ def resample(
     """
     resample_spec = spec or ResampleSpec()
     plan = _resolve_request(
-        resample_spec, frame_column=frame_column, group_by=group_by, time_origin_by=time_origin_by
+        resample_spec,
+        frame_column=frame_column,
+        group_by=group_by,
+        time_origin_by=time_origin_by,
     )
     match resample_spec.method:
         case ResampleMethod.LINEAR:
@@ -236,7 +242,11 @@ def _resolve_request(
 
 
 def _segment_data(
-    data: DataFrameT, *, frame_column: str, group_by: Sequence[str], max_gap: int
+    data: DataFrameT,
+    *,
+    frame_column: str,
+    group_by: Sequence[str],
+    max_gap: int,
 ) -> DataFrameT:
     """Annotate contiguous trajectory segments separated by gaps larger than `max_gap`."""
     data = data.sort([*group_by, frame_column])
@@ -272,7 +282,10 @@ def _linear_resample(data: DataFrameT, spec: ResampleSpec, plan: ResamplePlan) -
         return data
     data = _normalize_frame_origin(data, plan)
     data = _segment_data(
-        data, frame_column=plan.frame_column, group_by=plan.group_by, max_gap=spec.max_gap
+        data,
+        frame_column=plan.frame_column,
+        group_by=plan.group_by,
+        max_gap=spec.max_gap,
     )
 
     if spec.up > 1:
@@ -285,14 +298,17 @@ def _linear_resample(data: DataFrameT, spec: ResampleSpec, plan: ResamplePlan) -
 
 def _downsample_dataframe(data: DataFrameT, *, factor: int, frame_column: str) -> DataFrameT:
     return data.filter(pl.col(frame_column) % factor == 0).with_columns(
-        (pl.col(frame_column) // factor).alias(frame_column)
+        (pl.col(frame_column) // factor).alias(frame_column),
     )
 
 
 def _upsample_dataframe(data: DataFrameT, *, factor: int, plan: ResamplePlan) -> DataFrameT:
     scaled = data.with_columns((pl.col(plan.frame_column) * factor).alias(plan.frame_column))
     frame_range = pl.int_range(
-        pl.col(plan.frame_column).min(), pl.col(plan.frame_column).max() + 1, step=1, dtype=pl.Int64
+        pl.col(plan.frame_column).min(),
+        pl.col(plan.frame_column).max() + 1,
+        step=1,
+        dtype=pl.Int64,
     ).alias(plan.frame_column)
 
     if plan.segment_keys:
@@ -332,7 +348,10 @@ def _spline_resample(
 
     data = _normalize_frame_origin(data, plan)
     segmented = _segment_data(
-        data, frame_column=plan.frame_column, group_by=plan.group_by, max_gap=spec.max_gap
+        data,
+        frame_column=plan.frame_column,
+        group_by=plan.group_by,
+        max_gap=spec.max_gap,
     )
 
     return (
@@ -368,14 +387,16 @@ def _output_dtype(plan: ResamplePlan) -> dict[str, type[pl.DataType]]:
 
 
 def _cubic_spline_interpolator_factory(
-    time_old: npt.NDArray[np.float64], coordinates_old: npt.NDArray[np.float64]
+    time_old: npt.NDArray[np.float64],
+    coordinates_old: npt.NDArray[np.float64],
 ) -> Interpolator:
     """Build a natural cubic-spline interpolator for one trajectory segment."""
     return CubicSpline(time_old, coordinates_old, axis=0, bc_type="natural")
 
 
 def _pchip_interpolator_factory(
-    time_old: npt.NDArray[np.float64], coordinates_old: npt.NDArray[np.float64]
+    time_old: npt.NDArray[np.float64],
+    coordinates_old: npt.NDArray[np.float64],
 ) -> Interpolator:
     """Build a monotone PCHIP interpolator for one trajectory segment."""
     return PchipInterpolator(time_old, coordinates_old, axis=0)
@@ -407,7 +428,12 @@ def _resample_segment(
 
 
 def _resample_single_point(
-    name: str, df: pl.DataFrame, plan: ResamplePlan, *, up: int, down: int
+    name: str,
+    df: pl.DataFrame,
+    plan: ResamplePlan,
+    *,
+    up: int,
+    down: int,
 ) -> pl.Series:
     frames_old = df[plan.frame_column].to_numpy().astype(np.float64, copy=False)
     coordinates_old = df.select(tuple(plan.coordinates)).to_numpy().astype(np.float64, copy=False)
@@ -445,19 +471,19 @@ def _resample_multi_point(
     interpolator = interpolator_factory(time_old, coordinates_old)
 
     out: dict[str, object] = {
-        plan.frame_column: np.arange(n_new, dtype=np.int64) + int(frame_old[0] * up / down)
+        plan.frame_column: np.arange(n_new, dtype=np.int64) + int(frame_old[0] * up / down),
     }
-    coordinates_new = interpolator(time_new)
+    coordinates_new = np.asarray(interpolator(time_new), dtype=np.float64)
     for index, column in enumerate(plan.coordinates):
         out[column] = coordinates_new[:, index]
 
     if plan.emit_velocity:
-        velocity = interpolator(time_new, nu=1)
+        velocity = np.asarray(interpolator(time_new, nu=1), dtype=np.float64)
         for index, column in enumerate(plan.velocity_columns):
             out[column] = velocity[:, index]
 
     if plan.emit_acceleration:
-        acceleration = interpolator(time_new, nu=2)
+        acceleration = np.asarray(interpolator(time_new, nu=2), dtype=np.float64)
         for index, column in enumerate(plan.acceleration_columns):
             out[column] = acceleration[:, index]
 

@@ -116,7 +116,8 @@ def test_resolve_request_builds_plan(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 
 def test_resolve_request_rejects_unknown_backend(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
 
@@ -125,7 +126,8 @@ def test_resolve_request_rejects_unknown_backend(
 
 
 def test_resolve_request_rejects_lane_change(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
     config_path = tmp_path / "dronalize.toml"
@@ -142,7 +144,8 @@ persist = 3
 
 
 def test_resolve_request_requires_window_for_lane_change(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     descriptor = replace(
         demo_descriptor(),
@@ -166,7 +169,8 @@ persist = 3
 
 
 def test_resolve_request_rejects_long_window(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     descriptor = replace(
         demo_descriptor(),
@@ -183,7 +187,8 @@ def test_resolve_request_rejects_long_window(
 
 
 def test_resampling_recomputes_native_kinematics(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     descriptor = stale_kinematics_demo_descriptor()
     _patch_descriptor(monkeypatch, descriptor)
@@ -205,7 +210,8 @@ def test_resampling_recomputes_native_kinematics(
 
 
 def test_resolve_request_rejects_window_policy(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     descriptor = replace(
         demo_descriptor(),
@@ -213,7 +219,8 @@ def test_resolve_request_rejects_window_policy(
             source_unit="scene",
             source_frame_bounds=FrameBounds(max_frames=10, confidence="documented"),
             windowing=DatasetWindowingSupport(
-                enabled_by_default=True, supported_policies=("strict",)
+                enabled_by_default=True,
+                supported_policies=("strict",),
             ),
         ),
     )
@@ -271,7 +278,8 @@ def test_execute_request_writes_manifest(tmp_path: Path, monkeypatch: pytest.Mon
 
 
 def test_execute_request_rejects_non_empty_output(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
     request = _request(tmp_path)
@@ -286,7 +294,8 @@ def test_execute_request_rejects_non_empty_output(
 
 
 def test_execute_request_overwrites_output_when_explicit(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
     request = _request(tmp_path, overwrite=True)
@@ -315,7 +324,7 @@ def test_builtin_manifest_uses_global_dataset_name_table(tmp_path: Path) -> None
 
 def test_builtin_benchmark_task_is_selected_by_default(tmp_path: Path) -> None:
     request = ExecutionRequest(
-        dataset="waymo",
+        dataset="argoverse1",
         input_dir=tmp_path / "input",
         output_dir=tmp_path / "output",
         storage_backend=StorageBackend.NULL,
@@ -323,12 +332,12 @@ def test_builtin_benchmark_task_is_selected_by_default(tmp_path: Path) -> None:
     )
     plan = resolve_request(request)
     assert plan.selected_task == "benchmark"
-    assert plan.effective_prediction_bounds == (11, 91)
+    assert plan.effective_prediction_bounds == (20, 50)
     manifest_task = plan.manifest().prediction_task
     assert manifest_task is not None
     assert manifest_task.name == "benchmark"
-    assert manifest_task.prediction_origin == 11
-    assert manifest_task.prediction_end == 91
+    assert manifest_task.prediction_origin == 20
+    assert manifest_task.prediction_end == 50
 
 
 def test_resolve_request_rejects_unknown_task(tmp_path: Path) -> None:
@@ -348,7 +357,7 @@ task = "missing"
                 output_dir=tmp_path / "output",
                 config_path=config_path,
                 input_dir_exists=False,
-            )
+            ),
         )
 
 
@@ -368,7 +377,7 @@ task = "benchmark"
             output_dir=tmp_path / "output",
             config_path=config_path,
             input_dir_exists=False,
-        )
+        ),
     )
 
     assert plan.selected_task == "benchmark"
@@ -379,19 +388,19 @@ def test_project_can_disable_default_task(tmp_path: Path) -> None:
     config_path = tmp_path / "config.toml"
     _ = config_path.write_text(
         """
-[datasets.waymo]
+[datasets.argoverse1]
 task = "none"
 """,
         encoding="utf-8",
     )
     plan = resolve_request(
         ExecutionRequest(
-            dataset="waymo",
+            dataset="argoverse1",
             input_dir=tmp_path / "input",
             output_dir=tmp_path / "output",
             config_path=config_path,
             input_dir_exists=False,
-        )
+        ),
     )
 
     assert plan.selected_task is None
@@ -416,7 +425,7 @@ prediction_end = 30
             output_dir=tmp_path / "output",
             config_path=config_path,
             input_dir_exists=False,
-        )
+        ),
     )
     assert plan.selected_task is None
     assert plan.effective_prediction_bounds == (10, 30)
@@ -431,7 +440,8 @@ prediction_end = 30
 
 
 def test_execute_request_applies_record_transform(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
 
@@ -444,7 +454,9 @@ def test_execute_request_applies_record_transform(
 
     output_transform = OutputTransform(record_transform=transform)
     request = _request(
-        tmp_path, storage_backend=StorageBackend.PICKLE, output_transform=output_transform
+        tmp_path,
+        storage_backend=StorageBackend.PICKLE,
+        output_transform=output_transform,
     )
 
     result = execute_request(request)
@@ -455,7 +467,8 @@ def test_execute_request_applies_record_transform(
 
 def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip(
-        "streaming", reason="Requires streaming package for custom MDS output record format"
+        "streaming",
+        reason="Requires streaming package for custom MDS output record format",
     )
     from dronalize.io.readers import MDSReader  # ruff: ignore[import-outside-top-level]
 
@@ -473,7 +486,9 @@ def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.M
         mds_columns={"scene_number": "int", "dataset_id": "int", "feature_shape": "json"},
     )
     request = _request(
-        tmp_path, storage_backend=StorageBackend.MDS, output_transform=output_transform
+        tmp_path,
+        storage_backend=StorageBackend.MDS,
+        output_transform=output_transform,
     )
     result = execute_request(request)
     reader = MDSReader(path=result.output_dir, convert_raw=dict)
@@ -514,7 +529,8 @@ def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 
 def test_execute_request_reports_cleanup_summary(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_descriptor(monkeypatch, cleanup_demo_descriptor())
 
@@ -535,7 +551,8 @@ def test_execute_request_reports_cleanup_summary(
 
 
 def test_parallel_execution_reports_cleanup_summary(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_descriptor(monkeypatch, cleanup_demo_descriptor())
 
@@ -561,7 +578,9 @@ def test_parallel_execution_reports_cleanup_summary(
 
 @pytest.mark.parametrize("jobs", [None, 2], ids=["sequential", "parallel"])
 def test_execution_progress_reports_cleanup_counters(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, jobs: int | None
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    jobs: int | None,
 ) -> None:
     _patch_descriptor(monkeypatch, cleanup_demo_descriptor())
 
@@ -582,7 +601,8 @@ def test_execution_progress_reports_cleanup_counters(
 
 
 def test_failed_writer_is_not_counted_as_written(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
     plan = resolve_request(_request(tmp_path))
@@ -656,7 +676,8 @@ def test_inspect_reports_temporal_support() -> None:
 
 
 def test_cli_imports_dataset_module_before_lookup(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module_path = tmp_path / "custom_datasets.py"
     _ = module_path.write_text(
@@ -676,10 +697,12 @@ def test_cli_imports_dataset_module_before_lookup(
     try:
         app, runner = _cli_app_and_runner()
         available_result = runner.invoke(
-            app, ["--dataset-module", "custom_datasets", "available", "--no-details"]
+            app,
+            ["--dataset-module", "custom_datasets", "available", "--no-details"],
         )
         inspect_result = runner.invoke(
-            app, ["--dataset-module", "custom_datasets", "inspect", "cli_demo"]
+            app,
+            ["--dataset-module", "custom_datasets", "inspect", "cli_demo"],
         )
     finally:
         _ = _REGISTRY.pop("cli_demo", None)
@@ -699,7 +722,10 @@ def test_cli_imports_dataset_module_before_lookup(
     ],
 )
 def test_cli_rejects_invalid_dataset_module_hook(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, module_body: str, expected: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    module_body: str,
+    expected: str,
 ) -> None:
     module_path = tmp_path / "bad_datasets.py"
     _ = module_path.write_text(module_body, encoding="utf-8")

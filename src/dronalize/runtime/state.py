@@ -220,7 +220,12 @@ class ProgressState:
             return self.selected_scene_counter.value >= limit
 
     def record_cleanup(
-        self, *, rows_total: int, rows_removed: int, agents_total: int, agents_removed: int
+        self,
+        *,
+        rows_total: int,
+        rows_removed: int,
+        agents_total: int,
+        agents_removed: int,
     ) -> None:
         """Record cleanup row/agent totals for one candidate scene."""
         for counter, amount in (
@@ -301,7 +306,10 @@ class SharedResources:
 
     @classmethod
     def create(
-        cls, *, scene_limit: int | None = None, mp_context: BaseContext | None = None
+        cls,
+        *,
+        scene_limit: int | None = None,
+        mp_context: BaseContext | None = None,
     ) -> SharedResources:
         ctx = mp_context or mp.get_context()
         return cls(

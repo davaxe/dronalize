@@ -122,7 +122,7 @@ def cumulative_blocks(
 
     partition = pl.sum_horizontal(*[(offset >= end).cast(pl.Int64) for end in ends[:-1]])
     data = data.with_columns(
-        pl.when(in_partition).then(partition).otherwise(None).alias(partition_column)
+        pl.when(in_partition).then(partition).otherwise(None).alias(partition_column),
     )
 
     if offset_time_column:
@@ -130,7 +130,7 @@ def cumulative_blocks(
             pl.when(pl.col(partition_column) == i).then(start) for i, start in enumerate(starts)
         ])
         data = data.with_columns(
-            (pl.col(time_column) - min_t - start_expr).cast(pl.Int64).alias(time_column)
+            (pl.col(time_column) - min_t - start_expr).cast(pl.Int64).alias(time_column),
         )
 
     if remove_gap and gap > 0:
@@ -234,10 +234,10 @@ def _assign_weighted_groups(
         pl
         .struct(*[pl.col(name) for name in key_columns])
         .hash(seed=hash_seed)
-        .alias("_shuffle_key")
+        .alias("_shuffle_key"),
     )
     shuffled_groups = shuffled_groups.sort(
-        [*groups_by, "_shuffle_key"] if groups_by else "_shuffle_key"
+        [*groups_by, "_shuffle_key"] if groups_by else "_shuffle_key",
     )
     assignment_frames: list[pl.DataFrame] = []
     grouped_frames = (
@@ -249,7 +249,7 @@ def _assign_weighted_groups(
         counts = _allocate_group_counts(frame.height, weights)
         values = [group for group, count in enumerate(counts) for _ in range(count)]
         assignment_frames.append(
-            frame.with_columns(pl.Series(name=assignment_column, values=values))
+            frame.with_columns(pl.Series(name=assignment_column, values=values)),
         )
 
     assignments = pl.concat(assignment_frames).select(*key_columns, assignment_column)
@@ -260,7 +260,7 @@ def _assign_weighted_groups(
 
     if assignment_column != out_col:
         result = result.with_columns(pl.col(assignment_column).alias(out_col)).drop(
-            assignment_column
+            assignment_column,
         )
     return result
 
@@ -276,7 +276,8 @@ def _allocate_group_counts(total_items: int, weights: Sequence[float]) -> list[i
     remaining = total_items - sum(counts)
 
     fractional_order = sorted(
-        range(len(weights)), key=lambda index: (-(exact_counts[index] - counts[index]), index)
+        range(len(weights)),
+        key=lambda index: (-(exact_counts[index] - counts[index]), index),
     )
     for index in fractional_order[:remaining]:
         counts[index] += 1

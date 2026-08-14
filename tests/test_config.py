@@ -56,7 +56,7 @@ def test_parse_config_parses_profiles(tmp_path: Path) -> None:
             [datasets.demo]
             uses = ["fast"]
             """,
-        )
+        ),
     )
 
     assert isinstance(cfg, ProjectConfig)
@@ -82,7 +82,7 @@ def test_parse_config_parses_window(tmp_path: Path) -> None:
             step = 2
             policy = "partial"
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", _dataset_config())
@@ -103,7 +103,7 @@ def test_dataset_config_can_clear_inherited_prediction_task(tmp_path: Path) -> N
             [datasets.demo]
             task = "none"
             """,
-        )
+        ),
     )
 
     assert cfg.resolve_dataset_config("demo", _dataset_config()).task is None
@@ -118,7 +118,7 @@ def test_inline_prediction_task_must_be_complete(tmp_path: Path) -> None:
                 [datasets.demo.task]
                 prediction_origin = 1
                 """,
-            )
+            ),
         )
 
 
@@ -131,7 +131,7 @@ def test_project_defaults_cannot_select_named_dataset_task(tmp_path: Path) -> No
                 [defaults]
                 task = "benchmark"
                 """,
-            )
+            ),
         )
 
 
@@ -143,7 +143,7 @@ def test_direct_resolution_requires_named_task_context(tmp_path: Path) -> None:
             [datasets.demo]
             task = "benchmark"
             """,
-        )
+        ),
     )
 
     with pytest.raises(ConfigurationError, match=r"requires.*named_tasks"):
@@ -166,7 +166,7 @@ def test_resolve_applies_defaults_without_dataset(tmp_path: Path) -> None:
             [defaults.output.mds]
             compression = "zstd:3"
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", _dataset_config())
@@ -192,7 +192,7 @@ def test_resolve_applies_defaults_before_dataset(tmp_path: Path) -> None:
             [datasets.demo.runtime]
             jobs = 2
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", _dataset_config())
@@ -212,7 +212,7 @@ def test_defaults_can_use_profiles(tmp_path: Path) -> None:
             [defaults]
             uses = ["common"]
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", _dataset_config())
@@ -228,7 +228,7 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
             [datasets.demo]
             uses = ["missing"]
             """,
-        )
+        ),
     )
 
     with pytest.raises(ConfigurationError, match="Profile 'missing' not found"):
@@ -249,7 +249,7 @@ def test_resolve_raises_for_missing_defaults_profile(tmp_path: Path) -> None:
             [defaults]
             uses = ["missing"]
             """,
-        )
+        ),
     )
 
     with pytest.raises(ConfigurationError, match="Profile 'missing' not found for defaults"):
@@ -321,7 +321,8 @@ def test_runtime_override_requires_native_read_for_splits() -> None:
     ids=["strategy-required", "ratio-strategy", "gap-strategy", "segments-required"],
 )
 def test_runtime_override_rejects_bad_assignment_inputs(
-    kwargs: dict[str, object], match: str
+    kwargs: dict[str, object],
+    match: str,
 ) -> None:
     with pytest.raises(ConfigurationError, match=match):
         _ = RuntimeOverride.from_inputs(**kwargs)  # pyright: ignore[reportArgumentType]
@@ -340,7 +341,7 @@ def test_resolve_disables_inherited_optional_blocks(tmp_path: Path) -> None:
             resample = "clear"
             lane_change = "clear"
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", inherited_optional_blocks_descriptor())
@@ -360,7 +361,7 @@ def test_screening_extend_is_default(tmp_path: Path) -> None:
             rule = "min_observations"
             minimum = 8
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", _dataset_config())
@@ -393,7 +394,7 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
             rule = "min_observations"
             minimum = 8
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config(
@@ -403,7 +404,7 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
                 "cleanup": {"trim_static": {"rule": "exclude", "categories": ["STATIC_OBJECT"]}},
                 "scenes": {"min_context": {"rule": "agent_range", "minimum": 2}},
                 "agents": {"observation_floor": {"rule": "min_observations", "minimum": 4}},
-            }
+            },
         ),
     )
 
@@ -437,7 +438,7 @@ def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
             start_frame = 0
             end_frame = 3
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config(
@@ -447,7 +448,7 @@ def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
                 "cleanup": {"trim_static": {"rule": "exclude", "categories": ["STATIC_OBJECT"]}},
                 "scenes": {"min_context": {"rule": "agent_range", "minimum": 2}},
                 "agents": {"observation_floor": {"rule": "min_observations", "minimum": 4}},
-            }
+            },
         ),
     )
 
@@ -477,7 +478,7 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
 
 
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config(
@@ -496,7 +497,7 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
                     "shared": {"rule": "min_observations", "minimum": 4},
                     "keep_agent": {"rule": "min_observations", "minimum": 2},
                 },
-            }
+            },
         ),
     )
 
@@ -561,7 +562,7 @@ def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
             rule = "agent_range"
             minimum = 3
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", _dataset_config())
@@ -592,7 +593,7 @@ def test_map_config_parses_scene_extent(tmp_path: Path) -> None:
             [datasets.demo.map.edge_types.remap]
             LINE_THIN_DOUBLE = "LINE_THIN"
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", _dataset_config())
@@ -628,7 +629,7 @@ def test_map_config_parses_trajectory_buffer(tmp_path: Path) -> None:
             mode = "trajectory_buffer"
             radius = 6.5
             """,
-        )
+        ),
     )
 
     resolved = cfg.resolve_dataset_config("demo", _dataset_config())
@@ -647,7 +648,7 @@ def test_agent_rules_load() -> None:
                 "maximum": 1,
                 "require": {"absolute": 2, "relative": 0.75},
             },
-        }
+        },
     })
 
     compiled = ScreeningRuleSet.from_config(config)
@@ -673,7 +674,7 @@ def test_scene_rules_load() -> None:
                 "maximum": 1,
                 "selector": {"categories": ["car"]},
             },
-        }
+        },
     })
 
     compiled = ScreeningRuleSet.from_config(config)
@@ -693,7 +694,7 @@ def test_cleanup_rules_load_nested_agent_rules() -> None:
                 "rule": "prune_by",
                 "agent_rule": {"rule": "min_observations", "minimum": 3},
             },
-        }
+        },
     })
 
     compiled = ScreeningRuleSet.from_config(config)
@@ -717,8 +718,8 @@ def test_prune_by_config_rejects_nested_require() -> None:
                         "minimum": 3,
                         "require": {"absolute": 1},
                     },
-                }
-            }
+                },
+            },
         })
 
 
@@ -726,8 +727,8 @@ def test_require_must_define_threshold() -> None:
     with pytest.raises(ValueError, match="at least one"):
         ScreeningConfig.model_validate({
             "agents": {
-                "observation_floor": {"rule": "min_observations", "minimum": 3, "require": {}}
-            }
+                "observation_floor": {"rule": "min_observations", "minimum": 3, "require": {}},
+            },
         })
 
 

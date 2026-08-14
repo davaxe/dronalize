@@ -69,12 +69,15 @@ DATASET_DESCRIPTORS = {
         default_task="benchmark",
         native_schema=NGSimLoader.native_trajectory_schema(),
         map_provider_factory=ngsim_resources(
-            LaneDescription(ids=list(range(1, 8)), direction=[True] * 7)
+            LaneDescription(ids=list(range(1, 8)), direction=[True] * 7),
         ),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, time_block=True),
         temporal_support=temporal_support(
-            source_unit="recording", min_frames=7887, max_frames=8738, enabled_by_default=True
+            source_unit="recording",
+            min_frames=7887,
+            max_frames=8738,
+            enabled_by_default=True,
         ),
     ),
     "us101": DatasetDescriptor(
@@ -85,12 +88,15 @@ DATASET_DESCRIPTORS = {
         default_task="benchmark",
         native_schema=NGSimLoader.native_trajectory_schema(),
         map_provider_factory=ngsim_resources(
-            LaneDescription(ids=list(range(1, 9)), direction=[True] * 8)
+            LaneDescription(ids=list(range(1, 9)), direction=[True] * 8),
         ),
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, time_block=True),
         temporal_support=temporal_support(
-            source_unit="recording", min_frames=7180, max_frames=8899, enabled_by_default=True
+            source_unit="recording",
+            min_frames=7180,
+            max_frames=8899,
+            enabled_by_default=True,
         ),
     ),
 }

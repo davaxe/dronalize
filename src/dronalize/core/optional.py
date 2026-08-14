@@ -10,7 +10,10 @@ if TYPE_CHECKING:
 
 
 def raise_missing_optional_dependency(
-    error: ModuleNotFoundError, *, feature: str, extra: str
+    error: ModuleNotFoundError,
+    *,
+    feature: str,
+    extra: str,
 ) -> NoReturn:
     """Raise a friendlier import error for optional storage features."""
     msg = (

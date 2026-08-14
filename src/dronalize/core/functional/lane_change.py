@@ -77,7 +77,7 @@ def valid_lane_change(
             agent_id_column=agent_id_column,
             lane_id_column=lane_id_column,
             group_by=group_keys,
-        ).alias(valid_column)
+        ).alias(valid_column),
     )
 
 
@@ -160,5 +160,5 @@ def valid_lane_change_expr(
     ]
 
     return pl.all_horizontal([changed_now, *before_conditions, *after_conditions]).fill_null(
-        value=False
+        value=False,
     )

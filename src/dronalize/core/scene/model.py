@@ -191,14 +191,20 @@ def convert_scene(scene: Scene, target: TrajectorySchema = CANONICAL) -> Scene:
     return replace(
         scene,
         frame=_convert_frame(
-            scene.frame, source=scene.schema, target=target, sample_time=scene.sample_time
+            scene.frame,
+            source=scene.schema,
+            target=target,
+            sample_time=scene.sample_time,
         ),
         schema=target,
     )
 
 
 def derived_trajectory_fields(
-    source: TrajectorySchema, target: TrajectorySchema, *, sample_time: float | None
+    source: TrajectorySchema,
+    target: TrajectorySchema,
+    *,
+    sample_time: float | None,
 ) -> tuple[TrajectoryField, ...]:
     """Return target schema fields that would be materialized by conversion.
 
@@ -230,7 +236,10 @@ def _convert_frame(
     """Convert a data frame from one trajectory schema to another."""
     semantic = _to_semantic_frame(data, source).sort(["id", "frame"])
     semantic = _derive_missing_fields(
-        semantic, source=source, target=target, sample_time=sample_time
+        semantic,
+        source=source,
+        target=target,
+        sample_time=sample_time,
     )
     return semantic.select([pl.col(field).cast(dtype) for field, dtype in target.physical.items()])
 
@@ -301,7 +310,8 @@ def _validate_scene_frame(data: pl.DataFrame, *, horizon_frames: int) -> None:
         raise ValueError(msg)
 
     frame_min, frame_max = data.select(
-        pl.col("frame").min().alias("frame_min"), pl.col("frame").max().alias("frame_max")
+        pl.col("frame").min().alias("frame_min"),
+        pl.col("frame").max().alias("frame_max"),
     ).row(0)
     if int(frame_max) - int(frame_min) >= horizon_frames:
         msg = (
@@ -316,7 +326,9 @@ def _matches_physical_schema(actual: pl.Schema, expected: pl.Schema) -> bool:
 
 
 def _get_schema_mismatch_message(
-    actual: pl.Schema, expected: pl.Schema, schema_name: str | None = None
+    actual: pl.Schema,
+    expected: pl.Schema,
+    schema_name: str | None = None,
 ) -> str:
     missing = [col for col in expected if col not in actual]
     mismatched = {

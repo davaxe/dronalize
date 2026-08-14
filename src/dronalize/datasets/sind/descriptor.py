@@ -22,7 +22,9 @@ _open_sind_resources = named_shared_map_resources_factory(
         ("Tianjin", root / "Tianjin" / "map_relink_law_save.osm"),
     ),
     build_map=lambda path, config: OSMMapBuilder(
-        path, force_zone_from_origin=(0, 0), local_origin_latlon=(0, 0)
+        path,
+        force_zone_from_origin=(0, 0),
+        local_origin_latlon=(0, 0),
     ).build(config.min_distance, config.interpolation_distance),
 )
 
@@ -44,6 +46,9 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
     temporal_support=temporal_support(
-        source_unit="recording", min_frames=4715, max_frames=16023, enabled_by_default=True
+        source_unit="recording",
+        min_frames=4715,
+        max_frames=16023,
+        enabled_by_default=True,
     ),
 )

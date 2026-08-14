@@ -26,7 +26,8 @@ def _interaction_map_paths(root: Path) -> list[tuple[str, Path]]:
 _open_interaction_resources = named_shared_map_resources_factory(
     named_paths=_interaction_map_paths,
     build_map=lambda path, config: InteractionMapBuilder(path).build(
-        config.min_distance, config.interpolation_distance
+        config.min_distance,
+        config.interpolation_distance,
     ),
 )
 
@@ -48,6 +49,9 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
     temporal_support=temporal_support(
-        source_unit="case", min_frames=10, max_frames=40, enabled_by_default=False
+        source_unit="case",
+        min_frames=10,
+        max_frames=40,
+        enabled_by_default=False,
     ),
 )

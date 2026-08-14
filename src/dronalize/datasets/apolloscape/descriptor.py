@@ -11,7 +11,10 @@ from dronalize.datasets.shared.presets import (
 
 _DEFAULT_CONFIG = DatasetConfig(
     scenes=scenes_config(
-        horizon_frames=10, sample_time=0.5, window_step=1, resample=linear_resample(up=5)
+        horizon_frames=10,
+        sample_time=0.5,
+        window_step=1,
+        resample=linear_resample(up=5),
     ),
     screening=minimum_observations_screening(2),
 )
@@ -25,6 +28,9 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     native_schema=ApolloScapeLoader.native_trajectory_schema(),
     split_support=DatasetSplitSupport(scene=True, source=True),
     temporal_support=temporal_support(
-        source_unit="recording", min_frames=37, max_frames=119, enabled_by_default=True
+        source_unit="recording",
+        min_frames=37,
+        max_frames=119,
+        enabled_by_default=True,
     ),
 )

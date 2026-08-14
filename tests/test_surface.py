@@ -147,10 +147,15 @@ def _documented_python_params() -> list[tuple[str, str, str]]:
 
 
 @pytest.mark.parametrize(
-    ("block_id", "relative_path", "snippet"), _documented_config_params(), ids=lambda value: value
+    ("block_id", "relative_path", "snippet"),
+    _documented_config_params(),
+    ids=lambda value: value,
 )
 def test_documented_config_examples_validate(
-    tmp_path: Path, block_id: str, relative_path: str, snippet: str
+    tmp_path: Path,
+    block_id: str,
+    relative_path: str,
+    snippet: str,
 ) -> None:
     """Test that TOML code blocks in the docs can be parsed as valid config."""
     _ = block_id
@@ -161,10 +166,16 @@ def test_documented_config_examples_validate(
 
 
 @pytest.mark.parametrize(
-    ("block_id", "relative_path", "snippet"), _documented_python_params(), ids=lambda value: value
+    ("block_id", "relative_path", "snippet"),
+    _documented_python_params(),
+    ids=lambda value: value,
 )
 def test_documented_python_examples_run(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, block_id: str, relative_path: str, snippet: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block_id: str,
+    relative_path: str,
+    snippet: str,
 ) -> None:
     """Test that Python code blocks in the docs run without error."""
     _ = relative_path

@@ -16,7 +16,7 @@ from dronalize.datasets.waymo.loader import WaymoLoader
 from dronalize.datasets.waymo.maps import WaymoEmbeddedMapProvider
 
 _open_waymo_resources = map_provider_resources_factory(
-    create=lambda _root, map_config: WaymoEmbeddedMapProvider(map_config)
+    create=lambda _root, map_config: WaymoEmbeddedMapProvider(map_config),
 )
 
 _DEFAULT_CONFIG = DatasetConfig(
