@@ -59,16 +59,20 @@ class CleanupRemovalAccumulator:
         self.total_rows_removed += summary.total_rows_removed
         self.total_agents_removed += summary.total_agents_removed
         self.min_rows_removed = _min_optional(
-            self.min_rows_removed, summary.min_rows_removed_per_scene
+            self.min_rows_removed,
+            summary.min_rows_removed_per_scene,
         )
         self.max_rows_removed = _max_optional(
-            self.max_rows_removed, summary.max_rows_removed_per_scene
+            self.max_rows_removed,
+            summary.max_rows_removed_per_scene,
         )
         self.min_agents_removed = _min_optional(
-            self.min_agents_removed, summary.min_agents_removed_per_scene
+            self.min_agents_removed,
+            summary.min_agents_removed_per_scene,
         )
         self.max_agents_removed = _max_optional(
-            self.max_agents_removed, summary.max_agents_removed_per_scene
+            self.max_agents_removed,
+            summary.max_agents_removed_per_scene,
         )
 
     def freeze(self) -> CleanupRemovalSummary | None:
@@ -109,7 +113,8 @@ class CleanupAccumulator:
         for rule_stats in stats.by_rule:
             accumulator = self.by_rule.setdefault(rule_stats.rule_name, CleanupRemovalAccumulator())
             accumulator.record(
-                rows_removed=rule_stats.rows_removed, agents_removed=rule_stats.agents_removed
+                rows_removed=rule_stats.rows_removed,
+                agents_removed=rule_stats.agents_removed,
             )
         self.rows_total += stats.rows_before
         self.rows_removed += stats.rows_removed

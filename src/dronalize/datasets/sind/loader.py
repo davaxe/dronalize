@@ -28,7 +28,9 @@ class SindLoader(SceneLoader):
         for region in sorted(p for p in self.root.iterdir() if p.is_dir()):
             for data_dir in sorted(p for p in region.iterdir() if p.is_dir()):
                 yield DatasetSource(
-                    identifier=data_dir.name, payload=data_dir, map_key=str(region.name)
+                    identifier=data_dir.name,
+                    payload=data_dir,
+                    map_key=str(region.name),
                 )
 
     @override
@@ -55,7 +57,8 @@ class SindLoader(SceneLoader):
         )
 
         pedestrian_df = pl.scan_csv(
-            pedestrian_data_path, schema_overrides=_PEDESTRIAN_SCHEMA
+            pedestrian_data_path,
+            schema_overrides=_PEDESTRIAN_SCHEMA,
         ).select(
             pl
             .col("track_id")

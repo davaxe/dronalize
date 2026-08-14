@@ -51,7 +51,7 @@ class EthUcyLoader(SceneLoader):
                 ((pl.col("frame") - pl.col("frame").min()) // 10).cast(pl.Int32),
                 pl.col("id").cast(pl.Int32),
                 agent_category=pl.lit(AgentCategory.PEDESTRIAN),
-            )
+            ),
         )
 
     @classmethod

@@ -185,7 +185,7 @@ class DatasetDescriptor:
     split_support: DatasetSplitSupport = DatasetSplitSupport()
     temporal_support: DatasetTemporalSupport | None = None
     tasks: Mapping[str, PredictionTaskConfig] = field(
-        default_factory=dict[str, PredictionTaskConfig]
+        default_factory=dict[str, PredictionTaskConfig],
     )
     """Named prediction tasks supported by this dataset."""
     default_task: str | None = None
@@ -223,11 +223,17 @@ class DatasetDescriptor:
             yield map_provider
 
     def build_loader(
-        self, *, root: Path, request: LoaderPlan, map_provider: MapProvider | None = None
+        self,
+        *,
+        root: Path,
+        request: LoaderPlan,
+        map_provider: MapProvider | None = None,
     ) -> SceneLoader[Any, Any]:
         """Construct one loader instance for this dataset descriptor."""
         return self.loader_cls.from_loader_request(
-            data_root=root, request=request, map_provider=map_provider
+            data_root=root,
+            request=request,
+            map_provider=map_provider,
         )
 
 
@@ -264,31 +270,49 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetDescriptor] = {
     "argoverse1": _builtin("dronalize.datasets.argoverse1"),
     "argoverse2": _builtin("dronalize.datasets.argoverse2"),
     "eth": _builtin(
-        "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="eth"
+        "dronalize.datasets.eth_ucy",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="eth",
     ),
     "hotel": _builtin(
-        "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="hotel"
+        "dronalize.datasets.eth_ucy",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="hotel",
     ),
     "univ": _builtin(
-        "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="univ"
+        "dronalize.datasets.eth_ucy",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="univ",
     ),
     "zara1": _builtin(
-        "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="zara1"
+        "dronalize.datasets.eth_ucy",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="zara1",
     ),
     "zara2": _builtin(
-        "dronalize.datasets.eth_ucy", export_name="DATASET_DESCRIPTORS", export_key="zara2"
+        "dronalize.datasets.eth_ucy",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="zara2",
     ),
     "exid": _builtin(
-        "dronalize.datasets.levelx", export_name="DATASET_DESCRIPTORS", export_key="exid"
+        "dronalize.datasets.levelx",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="exid",
     ),
     "highd": _builtin(
-        "dronalize.datasets.levelx", export_name="DATASET_DESCRIPTORS", export_key="highd"
+        "dronalize.datasets.levelx",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="highd",
     ),
     "i80": _builtin(
-        "dronalize.datasets.ngsim", export_name="DATASET_DESCRIPTORS", export_key="i80"
+        "dronalize.datasets.ngsim",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="i80",
     ),
     "ind": _builtin(
-        "dronalize.datasets.levelx", export_name="DATASET_DESCRIPTORS", export_key="ind"
+        "dronalize.datasets.levelx",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="ind",
     ),
     "interaction": _builtin("dronalize.datasets.interaction"),
     "lyft": _builtin(
@@ -299,18 +323,26 @@ _BUILTIN_DATASETS: dict[str, _BuiltinDatasetDescriptor] = {
     "nuscenes": _builtin("dronalize.datasets.nuscenes"),
     "opendd": _builtin("dronalize.datasets.opendd"),
     "round": _builtin(
-        "dronalize.datasets.levelx", export_name="DATASET_DESCRIPTORS", export_key="round"
+        "dronalize.datasets.levelx",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="round",
     ),
     "sind": _builtin("dronalize.datasets.sind"),
     "unid": _builtin(
-        "dronalize.datasets.levelx", export_name="DATASET_DESCRIPTORS", export_key="unid"
+        "dronalize.datasets.levelx",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="unid",
     ),
     "us101": _builtin(
-        "dronalize.datasets.ngsim", export_name="DATASET_DESCRIPTORS", export_key="us101"
+        "dronalize.datasets.ngsim",
+        export_name="DATASET_DESCRIPTORS",
+        export_key="us101",
     ),
     "vod": _builtin("dronalize.datasets.vod"),
     "waymo": _builtin(
-        "dronalize.datasets.waymo", optional_dependencies=("google.protobuf",), extra="waymo"
+        "dronalize.datasets.waymo",
+        optional_dependencies=("google.protobuf",),
+        extra="waymo",
     ),
 }
 
@@ -373,7 +405,9 @@ def get_dataset(name: str) -> DatasetDescriptor:
     missing = _missing_optional_dependencies(builtin)
     if missing:
         raise _missing_dependency_error(
-            subject=f"Dataset '{name}'", builtin=builtin, missing=missing
+            subject=f"Dataset '{name}'",
+            builtin=builtin,
+            missing=missing,
         )
 
     logger.debug("Resolved dataset descriptor from built-in registry", extra={"dataset": name})
@@ -442,7 +476,10 @@ def _has_module(module_name: str) -> bool:
 
 
 def _missing_dependency_error(
-    *, subject: str, builtin: _BuiltinDatasetDescriptor, missing: tuple[str, ...]
+    *,
+    subject: str,
+    builtin: _BuiltinDatasetDescriptor,
+    missing: tuple[str, ...],
 ) -> MissingOptionalDependencyError:
     install_target = f"dronalize[{builtin.extra}]" if builtin.extra else None
     install_hint = f"Install {install_target} to use it." if install_target else ""
@@ -452,5 +489,7 @@ def _missing_dependency_error(
         f"{missing_str}. {install_hint}"
     )
     return MissingOptionalDependencyError(
-        msg, dependencies=tuple(missing), install_target=install_target
+        msg,
+        dependencies=tuple(missing),
+        install_target=install_target,
     )

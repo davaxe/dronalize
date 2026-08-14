@@ -67,7 +67,8 @@ def from_latlon(
 
     """
     latitude_array, longitude_array = np.broadcast_arrays(
-        np.asarray(latitude, dtype=np.float64), np.asarray(longitude, dtype=np.float64)
+        np.asarray(latitude, dtype=np.float64),
+        np.asarray(longitude, dtype=np.float64),
     )
 
     if not _in_bounds(latitude_array, -80, 84):
@@ -168,7 +169,11 @@ def _to_native(value: FloatArray) -> float | FloatArray:
 
 
 def _in_bounds(
-    values: FloatArray, lower: float, upper: float, *, upper_strict: bool = False
+    values: FloatArray,
+    lower: float,
+    upper: float,
+    *,
+    upper_strict: bool = False,
 ) -> bool:
     minimum = float(np.min(values))
     maximum = float(np.max(values))

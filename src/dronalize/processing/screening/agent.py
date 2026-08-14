@@ -141,7 +141,9 @@ class MinConsecutiveFrames(AgentCheckRuleBase):
     """Require a minimum longest consecutive run per agent."""
 
     rule: Literal["min_consecutive_frames"] = Field(
-        "min_consecutive_frames", repr=False, init=False
+        "min_consecutive_frames",
+        repr=False,
+        init=False,
     )
     minimum: int = Field(ge=1)
 
@@ -154,7 +156,7 @@ class MinConsecutiveFrames(AgentCheckRuleBase):
         new_run = prev_frame.is_null() | (frame_diff != 1)
         row_idx = ctx.over_agent_window(frame_col.cum_count())
         run_start_idx = ctx.over_agent_window(
-            pl.when(new_run).then(row_idx).otherwise(None).forward_fill()
+            pl.when(new_run).then(row_idx).otherwise(None).forward_fill(),
         )
         streak_len = row_idx - run_start_idx + 1
         longest_run = ctx.over_agent_window(streak_len.max())
@@ -203,7 +205,10 @@ class MinSpan(AgentCheckRuleBase):
 
 
 def invalid_agent_tolerance_expr(
-    tolerance: Tolerance | None, *, invalid_agents: pl.Expr, invalid_fraction: pl.Expr
+    tolerance: Tolerance | None,
+    *,
+    invalid_agents: pl.Expr,
+    invalid_fraction: pl.Expr,
 ) -> pl.Expr:
     """Return the scene-pass expression for a configured invalid-agent tolerance."""
     if tolerance is None:
@@ -213,12 +218,16 @@ def invalid_agent_tolerance_expr(
     if tolerance.absolute is not None and tolerance.relative is None:
         return invalid_agents <= tolerance.absolute
     return pl.all_horizontal(
-        invalid_agents <= tolerance.absolute, invalid_fraction <= tolerance.relative
+        invalid_agents <= tolerance.absolute,
+        invalid_fraction <= tolerance.relative,
     )
 
 
 def passing_requirement_expr(
-    requirement: PassingRequirement | None, *, passing_agents: pl.Expr, passing_fraction: pl.Expr
+    requirement: PassingRequirement | None,
+    *,
+    passing_agents: pl.Expr,
+    passing_fraction: pl.Expr,
 ) -> pl.Expr:
     """Return the scene-pass expression for configured passing-agent requirements."""
     if requirement is None:
@@ -228,7 +237,8 @@ def passing_requirement_expr(
     if requirement.absolute is not None and requirement.relative is None:
         return passing_agents >= requirement.absolute
     return pl.all_horizontal(
-        passing_agents >= requirement.absolute, passing_fraction >= requirement.relative
+        passing_agents >= requirement.absolute,
+        passing_fraction >= requirement.relative,
     )
 
 

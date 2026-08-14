@@ -111,7 +111,8 @@ def _dump_patch_value(value: object) -> PatchDumpValue:
 
 
 def deep_merge(
-    base: MutableMapping[str, object], patch: Mapping[str, object]
+    base: MutableMapping[str, object],
+    patch: Mapping[str, object],
 ) -> MutableMapping[str, object]:
     """Recursively merge two mappings.
 
@@ -135,7 +136,8 @@ TargetT = TypeVar("TargetT", bound=ConfigBase)
 
 
 def apply_optional(
-    patch: ConfigPatch[TargetT] | Clear | None, target: TargetT | None
+    patch: ConfigPatch[TargetT] | Clear | None,
+    target: TargetT | None,
 ) -> TargetT | None:
     """Apply a patch to an optional config block."""
     if patch is None:
@@ -214,5 +216,7 @@ def _clear_shorthand(value: object) -> object:
 T = TypeVar("T")
 
 Clearable = TypeAliasType(
-    "Clearable", Annotated[T | Clear | None, BeforeValidator(_clear_shorthand)], type_params=(T,)
+    "Clearable",
+    Annotated[T | Clear | None, BeforeValidator(_clear_shorthand)],
+    type_params=(T,),
 )

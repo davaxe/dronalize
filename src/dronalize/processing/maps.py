@@ -156,13 +156,18 @@ def extract_fn(extraction: MapExtraction) -> MapExtractor:
 
 
 def extract_based_on_scene(
-    map_graph: MapGraph, scene: Scene, extraction: MapExtraction
+    map_graph: MapGraph,
+    scene: Scene,
+    extraction: MapExtraction,
 ) -> MapGraph:
     """Extract a subgraph based on the scene and extraction configuration."""
     center_x = scene.frame.select("x").mean().item()
     center_y = scene.frame.select("y").mean().item()
     return extract(
-        map_graph, center=(center_x, center_y), extraction=extraction, relevant_positions=scene
+        map_graph,
+        center=(center_x, center_y),
+        extraction=extraction,
+        relevant_positions=scene,
     )
 
 
@@ -202,7 +207,9 @@ def extract(
                 msg = "relevant_positions must be provided for SceneExtentExtraction"
                 raise ValueError(msg)
             return graph.extract_extent_for_positions(
-                relevant_positions, padding, use_bbox=shape == "bounding_box"
+                relevant_positions,
+                padding,
+                use_bbox=shape == "bounding_box",
             )
         case FullMapExtraction():
             return graph
@@ -317,7 +324,9 @@ class InterpolationStage(IntEnum):
 
 
 def interpolate_position(
-    src: Point, dst: Point, target_distance: float | None = None
+    src: Point,
+    dst: Point,
+    target_distance: float | None = None,
 ) -> list[tuple[InterpolationStage, int, Point]]:
     """Interpolate positions between *src* and *dst*."""
     dx = dst[0] - src[0]
@@ -375,7 +384,9 @@ class MapGraphCompiler:
         edge_indices = np.array([self._edge_src, self._edge_dst], dtype=np.int32)
         edge_types = np.array(self._edge_types, dtype=np.int32)
         return MapGraph(
-            edge_indices=edge_indices, node_positions=node_positions, edge_types=edge_types
+            edge_indices=edge_indices,
+            node_positions=node_positions,
+            edge_types=edge_types,
         )
 
     def _compile_path(self, feature: PathFeature) -> None:
@@ -384,7 +395,8 @@ class MapGraphCompiler:
             return
 
         edge_types = _normalize_edge_types(
-            feature.edge_types, len(points) - 1 + int(feature.closed)
+            feature.edge_types,
+            len(points) - 1 + int(feature.closed),
         )
         retained_points, retained_edge_types = _filter_path_points(
             points=points,
@@ -427,7 +439,8 @@ class MapGraphCompiler:
                 msg = f"Duplicate path key {feature.key!r}."
                 raise ValueError(msg)
             self._paths_by_key[feature.key] = _CompiledPath(
-                start_node=first_node, end_node=end_node
+                start_node=first_node,
+                end_node=end_node,
             )
 
     def _add_interpolated_edge(
@@ -442,7 +455,9 @@ class MapGraphCompiler:
     ) -> None:
         prev_id = src_id
         for stage, _, point in interpolate_position(
-            src_point, dst_point, target_distance=interpolation_distance
+            src_point,
+            dst_point,
+            target_distance=interpolation_distance,
         ):
             new_id = dst_id if stage == InterpolationStage.LAST else self._add_node(*point)
             self._add_edge(prev_id, new_id, edge_type)
@@ -467,7 +482,8 @@ class MapGraphCompiler:
 
 
 def _normalize_edge_types(
-    edge_types: EdgeType | tuple[EdgeType, ...], n_edges: int
+    edge_types: EdgeType | tuple[EdgeType, ...],
+    n_edges: int,
 ) -> list[EdgeType]:
     if isinstance(edge_types, EdgeType):
         return [edge_types] * n_edges
@@ -483,7 +499,11 @@ def _normalize_edge_types(
 
 
 def _filter_path_points(
-    *, points: list[Point], edge_types: list[EdgeType], closed: bool, min_distance: float
+    *,
+    points: list[Point],
+    edge_types: list[EdgeType],
+    closed: bool,
+    min_distance: float,
 ) -> tuple[list[Point], list[EdgeType]]:
     if len(points) < 2:
         return points[:1], []
@@ -535,7 +555,9 @@ class FeatureMapBuilder(ABC):
         return {}
 
     def build(
-        self, min_distance: float | None = None, interpolation_distance: float | None = None
+        self,
+        min_distance: float | None = None,
+        interpolation_distance: float | None = None,
     ) -> MapGraph:
         """Compile this builder's features into a map graph."""
         options = MapBuildOptions.from_distances(

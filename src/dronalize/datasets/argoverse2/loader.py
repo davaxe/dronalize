@@ -39,7 +39,8 @@ class Argoverse2Loader(SceneLoader[list[Path], Argoverse2LoaderOptions]):
         parquet_files = sorted(data_dir.glob("*/*.parquet"))
         for i in range(0, len(parquet_files), self.loader_options.file_batch_size):
             yield DatasetSource(
-                identifier=i, payload=parquet_files[i : i + self.loader_options.file_batch_size]
+                identifier=i,
+                payload=parquet_files[i : i + self.loader_options.file_batch_size],
             )
 
     @override

@@ -109,7 +109,7 @@ class DatasetManifest:
             storage_backend=str(payload["storage_backend"]),
             dronalize_version=str(payload["dronalize_version"]),
             source_trajectory_schema=str(
-                payload.get("source_trajectory_schema", payload["trajectory_schema"])
+                payload.get("source_trajectory_schema", payload["trajectory_schema"]),
             ),
             source_trajectory_schema_fields=tuple(payload["source_trajectory_schema_fields"]),
             trajectory_schema=str(payload["trajectory_schema"]),
@@ -172,7 +172,8 @@ def write_manifest(root: Path, manifest: DatasetManifest) -> None:
     root.mkdir(parents=True, exist_ok=True)
     logger.debug("Writing manifest", extra={"root": str(root), "format_version": FORMAT_VERSION})
     _ = manifest_path(root).write_text(
-        json.dumps(manifest.to_json_dict(), indent=2), encoding="utf-8"
+        json.dumps(manifest.to_json_dict(), indent=2),
+        encoding="utf-8",
     )
 
 

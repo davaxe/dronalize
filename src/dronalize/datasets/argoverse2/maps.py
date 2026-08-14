@@ -39,17 +39,22 @@ class Argoverse2MapProvider(MapProvider):
         if key is None:
             return None
         map_graph = _load_argoverse2_map(
-            str(key), self.config.min_distance, self.config.interpolation_distance
+            str(key),
+            self.config.min_distance,
+            self.config.interpolation_distance,
         )
         return extract_configured_map(map_graph, scene, self.config)
 
 
 @functools.lru_cache(maxsize=10)
 def _load_argoverse2_map(
-    key: str, min_distance: float | None, interpolation_distance: float | None
+    key: str,
+    min_distance: float | None,
+    interpolation_distance: float | None,
 ) -> MapGraph:
     return Argoverse2MapBuilder.from_json_file(Path(key)).build(
-        min_distance=min_distance, interpolation_distance=interpolation_distance
+        min_distance=min_distance,
+        interpolation_distance=interpolation_distance,
     )
 
 
@@ -220,10 +225,12 @@ class Argoverse2MapBuilder(FeatureMapBuilder):
         """Yield map features from pedestrian crossings and lane boundaries."""
         for crossing in self.map.pedestrian_crossings.values():
             yield PathFeature(
-                points=tuple(crossing.first_edge), edge_types=EdgeType.PEDESTRIAN_MARKING
+                points=tuple(crossing.first_edge),
+                edge_types=EdgeType.PEDESTRIAN_MARKING,
             )
             yield PathFeature(
-                points=tuple(crossing.second_edge), edge_types=EdgeType.PEDESTRIAN_MARKING
+                points=tuple(crossing.second_edge),
+                edge_types=EdgeType.PEDESTRIAN_MARKING,
             )
 
         for segment in self.map.segments.values():
@@ -239,7 +246,8 @@ class Argoverse2MapBuilder(FeatureMapBuilder):
 
     @staticmethod
     def _lane_segment_points(
-        segment: LaneSegment, side: Literal["left", "right"]
+        segment: LaneSegment,
+        side: Literal["left", "right"],
     ) -> tuple[list[Point], EdgeType] | None:
         boundary = segment.left_boundary if side == "left" else segment.right_boundary
         if boundary is None:

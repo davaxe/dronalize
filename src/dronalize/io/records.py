@@ -101,7 +101,9 @@ class SceneRecord:
         return PredictionBounds(self.prediction_origin, self.prediction_end)
 
     def split(
-        self, prediction_origin: int | None = None, prediction_end: int | None = None
+        self,
+        prediction_origin: int | None = None,
+        prediction_end: int | None = None,
     ) -> SplitSceneRecord:
         """Create a forecast view using explicit or persisted prediction bounds."""
         if prediction_origin is None:
@@ -210,7 +212,9 @@ def _validate_full_record(record: SceneRecord) -> None:
         msg = f"`mask` must have shape {record.features.shape[:2]!r}, got {record.mask.shape!r}."
         raise ValueError(msg)
     _validate_optional_prediction_bounds(
-        record.prediction_origin, record.prediction_end, horizon_frames=record.horizon_frames
+        record.prediction_origin,
+        record.prediction_end,
+        horizon_frames=record.horizon_frames,
     )
     _validate_agent_arrays(
         num_agents=record.features.shape[0],
@@ -228,7 +232,10 @@ def _validate_full_record(record: SceneRecord) -> None:
 
 
 def _validate_optional_prediction_bounds(
-    prediction_origin: int | None, prediction_end: int | None, *, horizon_frames: int
+    prediction_origin: int | None,
+    prediction_end: int | None,
+    *,
+    horizon_frames: int,
 ) -> None:
     if (prediction_origin is None) != (prediction_end is None):
         msg = "`prediction_origin` and `prediction_end` must either both be set or both be absent."

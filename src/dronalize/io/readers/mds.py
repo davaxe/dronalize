@@ -94,7 +94,9 @@ class MDSReader(IterableDatasetReader[RecordT], DatasetReader[RecordT]):
 
         if path is not None:
             self._backend: StreamingDataset = StreamingDataset(
-                local=path.as_posix(), split=split_directory_name(split), **reader_args
+                local=path.as_posix(),
+                split=split_directory_name(split),
+                **reader_args,
             )
         else:
             self._backend = StreamingDataset(streams=streams, **reader_args)
@@ -115,7 +117,8 @@ class MDSReader(IterableDatasetReader[RecordT], DatasetReader[RecordT]):
 
     @override
     def __getitem__(
-        self, at: int | slice | list[int] | npt.NDArray[np.int64]
+        self,
+        at: int | slice | list[int] | npt.NDArray[np.int64],
     ) -> RecordT | list[RecordT]:
         """Return one or more decoded scene records.
 

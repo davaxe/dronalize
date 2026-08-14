@@ -50,7 +50,7 @@ class LyftLevel5Map:
             self.meta: dict[str, Any] = json.load(file)
 
         self._ecef_to_world: npt.NDArray[np.float64] = np.linalg.inv(
-            np.array(self.meta["world_to_ecef"], dtype=np.float64)
+            np.array(self.meta["world_to_ecef"], dtype=np.float64),
         )
         self.elements: Sequence[proto.MapElement] = map_fragment.elements
 
@@ -61,7 +61,9 @@ class LyftLevel5Map:
         for el in self.elements:
             lane_id: str = _global_id_to_str(el.id)
             lane = Lane.from_proto_lane(
-                lane_id, el.element.lane, transformation=self._ecef_to_world
+                lane_id,
+                el.element.lane,
+                transformation=self._ecef_to_world,
             )
             lanes[_global_id_to_str(el.id)] = lane
 
@@ -85,7 +87,8 @@ class LyftLevel5Map:
         for el in self.elements:
             if el.element.HasField("traffic_control_element"):
                 element = TrafficControlElement.from_proto_traffic_control_element(
-                    el.element.traffic_control_element, transformation=self._ecef_to_world
+                    el.element.traffic_control_element,
+                    transformation=self._ecef_to_world,
                 )
                 elements[_global_id_to_str(el.id)] = element
 
@@ -329,7 +332,8 @@ class RoadNetworkSegment:
 
     @classmethod
     def from_proto_road_network_segment(
-        cls, segment: proto.RoadNetworkSegment
+        cls,
+        segment: proto.RoadNetworkSegment,
     ) -> RoadNetworkSegment:
         """Create a `RoadNetworkSegment` instance from a protobuf version."""
         return cls(
@@ -470,17 +474,24 @@ class Lane:
 
     @classmethod
     def from_proto_lane(
-        cls, lane_id: str, lane: proto.Lane, transformation: npt.NDArray[np.float64] | None = None
+        cls,
+        lane_id: str,
+        lane: proto.Lane,
+        transformation: npt.NDArray[np.float64] | None = None,
     ) -> Lane:
         """Create a `Lane` instance from a protobuf message."""
         return cls(
             id=lane_id,
             parent_segment_or_junction=_global_id_to_str(lane.parent_segment_or_junction),
             left_boundary=LaneBoundary.from_proto_lane_boundary(
-                lane.left_boundary, lane.geo_frame, transformation
+                lane.left_boundary,
+                lane.geo_frame,
+                transformation,
             ),
             right_boundary=LaneBoundary.from_proto_lane_boundary(
-                lane.right_boundary, lane.geo_frame, transformation
+                lane.right_boundary,
+                lane.geo_frame,
+                transformation,
             ),
             travel_direction=TravelDirection(lane.orientation_in_parent_segment),
             lane_successors=[_global_id_to_str(successor) for successor in lane.lanes_ahead],
@@ -633,7 +644,11 @@ def transform(
 
 
 def _enu_to_ecef(
-    e: float, n: float, u: float, lat: float, lon: float
+    e: float,
+    n: float,
+    u: float,
+    lat: float,
+    lon: float,
 ) -> tuple[float, float, float]:
     x0, y0, z0 = _geodetic_to_ecef(lat, lon, 0.0)
     dx, dy, dz = _enu_to_uvw(e, n, u, lat, lon)
@@ -662,7 +677,11 @@ def _geodetic_to_ecef(lat: float, lon: float, alt: float) -> tuple[float, float,
 
 
 def _enu_to_uvw(
-    east: float, north: float, up: float, lat: float, lon: float
+    east: float,
+    north: float,
+    up: float,
+    lat: float,
+    lon: float,
 ) -> tuple[float, float, float]:
     cos_lat = math.cos(lat)
     sin_lat = math.sin(lat)

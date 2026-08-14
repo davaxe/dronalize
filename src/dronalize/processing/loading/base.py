@@ -49,7 +49,11 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
     """
 
     def __init__(
-        self, *, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
+        self,
+        *,
+        data_root: Path | str,
+        request: LoaderPlan,
+        map_provider: MapProvider | None = None,
     ) -> None:
         self.root: Path = Path(data_root)
         self.request: LoaderPlan = request
@@ -74,7 +78,10 @@ class SceneLoader(ABC, Generic[SourceT, _LoaderOptionsT]):
 
     @classmethod
     def from_loader_request(
-        cls, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
+        cls,
+        data_root: Path | str,
+        request: LoaderPlan,
+        map_provider: MapProvider | None = None,
     ) -> Self:
         """Construct a concrete loader instance from the unified request interface.
 

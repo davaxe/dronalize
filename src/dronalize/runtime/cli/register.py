@@ -74,7 +74,8 @@ def _import_dataset_module(module_name: str) -> ModuleType:
 
 
 def _normalize_dataset_descriptors(
-    descriptors: DatasetDescriptor | Iterable[DatasetDescriptor | object] | None, module_name: str
+    descriptors: DatasetDescriptor | Iterable[DatasetDescriptor | object] | None,
+    module_name: str,
 ) -> Iterator[DatasetDescriptor]:
     if descriptors is None:
         return

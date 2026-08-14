@@ -43,7 +43,7 @@ class A43Loader(SceneLoader[Path]):
                     (((pl.col("tseconds") - pl.col("t0")) / self._dt) + 0.5 + self._eps)
                     .floor()
                     .cast(pl.Int64)
-                )
+                ),
             )
             .select(
                 pl.col("ID").alias("id"),
@@ -60,7 +60,7 @@ class A43Loader(SceneLoader[Path]):
                     "Bus": AgentCategory.BUS,
                 })
                 .alias("agent_category"),
-            )
+            ),
         )
 
     @override

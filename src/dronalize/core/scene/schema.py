@@ -110,7 +110,10 @@ class TrajectorySchema:
 
     @classmethod
     def define(
-        cls, name: str, *, fields: TrajectoryField | Iterable[TrajectoryField | str]
+        cls,
+        name: str,
+        *,
+        fields: TrajectoryField | Iterable[TrajectoryField | str],
     ) -> TrajectorySchema:
         """Construct a schema from semantic field identifiers."""
         fields = _resolve_fields(fields)
@@ -183,17 +186,20 @@ _BASE_FIELDS: Final[TrajectoryField] = (
 )
 
 POSITIONS_ONLY: Final[TrajectorySchema] = TrajectorySchema.define(
-    "positions_only", fields=_BASE_FIELDS
+    "positions_only",
+    fields=_BASE_FIELDS,
 )
 """Built-in schema containing only positions and the required identifier fields."""
 
 POSITIONS_YAW: Final[TrajectorySchema] = TrajectorySchema.define(
-    "positions_yaw", fields=_BASE_FIELDS | TrajectoryField.YAW
+    "positions_yaw",
+    fields=_BASE_FIELDS | TrajectoryField.YAW,
 )
 """Built-in schema extending positions with yaw orientation."""
 
 POSITIONS_VELOCITY: Final[TrajectorySchema] = TrajectorySchema.define(
-    "positions_velocity", fields=_BASE_FIELDS | TrajectoryField.VX | TrajectoryField.VY
+    "positions_velocity",
+    fields=_BASE_FIELDS | TrajectoryField.VX | TrajectoryField.VY,
 )
 """Built-in schema extending positions with planar velocity components."""
 

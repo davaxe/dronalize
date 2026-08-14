@@ -26,13 +26,14 @@ _open_levelx_osm_resources = named_shared_map_resources_factory(
         for map_path in (root / "maps" / "lanelets").rglob("*.osm")
     ),
     build_map=lambda path, config: OSMMapBuilder(path).build(
-        config.min_distance, config.interpolation_distance
+        config.min_distance,
+        config.interpolation_distance,
     ),
 )
 
 
 _open_highd_resources = map_provider_resources_factory(
-    create=lambda _root, map_config: HighDMapProvider(map_config)
+    create=lambda _root, map_config: HighDMapProvider(map_config),
 )
 
 
@@ -84,7 +85,8 @@ def _levelx_spec(
         native_schema=StandardLevelXLoader.native_trajectory_schema(),
         map_provider_factory=_open_levelx_osm_resources,
         feature_support=DatasetFeatureSupport(
-            map=True, lane_change_sampling=lane_change_sampling_support
+            map=True,
+            lane_change_sampling=lane_change_sampling_support,
         ),
         split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
         temporal_support=temporal_support(
@@ -109,12 +111,19 @@ DATASET_DESCRIPTORS = {
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
         split_support=DatasetSplitSupport(scene=True, source=True),
         temporal_support=temporal_support(
-            source_unit="recording", min_frames=9729, max_frames=31274, enabled_by_default=True
+            source_unit="recording",
+            min_frames=9729,
+            max_frames=31274,
+            enabled_by_default=True,
         ),
         map_provider_factory=_open_highd_resources,
     ),
     "ind": _levelx_spec(
-        "ind", StandardLevelXLoader, _levelx_config(), min_frames=16192, max_frames=33207
+        "ind",
+        StandardLevelXLoader,
+        _levelx_config(),
+        min_frames=16192,
+        max_frames=33207,
     ),
     "exid": _levelx_spec(
         "exid",
@@ -125,9 +134,17 @@ DATASET_DESCRIPTORS = {
         max_frames=43534,
     ),
     "round": _levelx_spec(
-        "round", StandardLevelXLoader, _levelx_config(), min_frames=11024, max_frames=31240
+        "round",
+        StandardLevelXLoader,
+        _levelx_config(),
+        min_frames=11024,
+        max_frames=31240,
     ),
     "unid": _levelx_spec(
-        "unid", StandardLevelXLoader, _levelx_config(), min_frames=8095, max_frames=28658
+        "unid",
+        StandardLevelXLoader,
+        _levelx_config(),
+        min_frames=8095,
+        max_frames=28658,
     ),
 }

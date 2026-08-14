@@ -59,7 +59,8 @@ class CategoryRange(SceneCheckRuleBase):
     @field_validator("ranges", mode="before")
     @classmethod
     def _coerce_categories(
-        cls, ranges: dict[AgentCategoryLike, CountRange]
+        cls,
+        ranges: dict[AgentCategoryLike, CountRange],
     ) -> dict[AgentCategory, CountRange]:
         return {AgentCategory.from_value(category): value for category, value in ranges.items()}
 

@@ -54,19 +54,25 @@ def open_executor(plan: ExecutionPlan) -> Generator[SequentialExecutor | Paralle
     with plan.descriptor.open_resources(plan.data_root, plan.loader) as map_provider:
         logger.debug("Opening executor", extra={"dataset": plan.dataset})
         loader = plan.descriptor.build_loader(
-            root=plan.data_root, request=plan.loader, map_provider=map_provider
+            root=plan.data_root,
+            request=plan.loader,
+            map_provider=map_provider,
         )
         processor = RuntimeProcessor.from_plan(plan, loader)
         yield _build_executor(plan, processor)
 
 
 def _build_executor(
-    plan: ExecutionPlan, processor: RuntimeProcessor
+    plan: ExecutionPlan,
+    processor: RuntimeProcessor,
 ) -> SequentialExecutor | ParallelExecutor:
     if plan.parallel:
         logger.debug("Using parallel executor", extra={"dataset": plan.dataset})
         return ParallelExecutor(
-            processor, workers=plan.runtime.jobs, chunksize=plan.runtime.chunksize, limit=plan.limit
+            processor,
+            workers=plan.runtime.jobs,
+            chunksize=plan.runtime.chunksize,
+            limit=plan.limit,
         )
     logger.debug("Using sequential executor", extra={"dataset": plan.dataset})
     return SequentialExecutor(processor, limit=plan.limit)
@@ -91,7 +97,8 @@ class SequentialExecutor:
         self._update_event: threading.Event = threading.Event()
         self._running: bool = False
         self._accounting: LocalRunAccounting = LocalRunAccounting(
-            limit=limit, update_event=self._update_event
+            limit=limit,
+            update_event=self._update_event,
         )
 
     def execute(self, writer_provider: WriterProvider) -> Progress:
@@ -182,7 +189,8 @@ class ParallelExecutor:
         self._cleanup_accumulator: CleanupAccumulator = CleanupAccumulator()
         self._mp_context: BaseContext = mp_context or mp.get_context("spawn")
         self._shared: SharedResources = SharedResources.create(
-            scene_limit=limit, mp_context=self._mp_context
+            scene_limit=limit,
+            mp_context=self._mp_context,
         )
 
     def execute(self, writer_provider: WriterProvider) -> Progress:
@@ -226,7 +234,8 @@ class ParallelExecutor:
             raise ValueError(msg)
 
         accounting = SharedRunAccounting(
-            progress=_ctx.shared.progress, limit=_ctx.shared.scene_limit
+            progress=_ctx.shared.progress,
+            limit=_ctx.shared.scene_limit,
         )
         if accounting.limit_reached():
             return None
@@ -294,7 +303,9 @@ def _init_worker(
 
 
 def _init_write_worker(
-    shared: SharedResources, processor: RuntimeProcessor, writer_provider: WriterProvider
+    shared: SharedResources,
+    processor: RuntimeProcessor,
+    writer_provider: WriterProvider,
 ) -> None:
     global _ctx  # ruff: ignore[global-variable-not-assigned]
     _init_worker(shared, processor, with_finalize=False)

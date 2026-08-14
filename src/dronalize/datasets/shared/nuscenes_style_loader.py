@@ -39,7 +39,10 @@ class NuScenesStyleLoader(SceneLoader[str, NuScenesStyleLoaderOptions]):
     bad_first_step_threshold_meters: ClassVar[float | None] = None
 
     def __init__(
-        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
+        self,
+        data_root: Path | str,
+        request: LoaderPlan,
+        map_provider: MapProvider | None = None,
     ) -> None:
         super().__init__(data_root=data_root, request=request, map_provider=map_provider)
         self._schemas: dict[str, pl.Schema | None] = _SCHEMAS
@@ -68,7 +71,7 @@ class NuScenesStyleLoader(SceneLoader[str, NuScenesStyleLoaderOptions]):
                     identifier=self.source_identifier_from_scene_row(row),
                     payload=self.source_data_from_scene_row(row),
                     map_key=log_to_map.get(str(row["log_token"])),
-                )
+                ),
             )
         return sources
 
@@ -94,7 +97,8 @@ class NuScenesStyleLoader(SceneLoader[str, NuScenesStyleLoaderOptions]):
             for regex in self.loader_options.drop_full_category_regex
         )
         yield LoadedSourceFrame(
-            scenes.filter(*filters).drop(["status", "full_category", "full_status"]), ego_agent_id=0
+            scenes.filter(*filters).drop(["status", "full_category", "full_status"]),
+            ego_agent_id=0,
         )
 
     @classmethod
@@ -132,7 +136,10 @@ class NuScenesStyleLoader(SceneLoader[str, NuScenesStyleLoaderOptions]):
         return tuple(starmap(self.root.joinpath, self.metadata_dir_parts))
 
     def prepare_timeline(
-        self, timeline_lf: pl.LazyFrame, sample_data_lf: pl.LazyFrame, ego_pose_lf: pl.LazyFrame
+        self,
+        timeline_lf: pl.LazyFrame,
+        sample_data_lf: pl.LazyFrame,
+        ego_pose_lf: pl.LazyFrame,
     ) -> pl.LazyFrame:
         """Apply dataset-specific timeline cleanup before track extraction."""
         if self.bad_first_step_threshold_meters is None:
@@ -183,7 +190,9 @@ def load_cached_table(name: str, base_dir: Path, schema: pl.Schema | None = None
 
 
 def build_scene_timeline(
-    sample_lf: pl.LazyFrame, scene_lf: pl.LazyFrame, log_lf: pl.LazyFrame
+    sample_lf: pl.LazyFrame,
+    scene_lf: pl.LazyFrame,
+    log_lf: pl.LazyFrame,
 ) -> pl.LazyFrame:
     """Join nuScenes-style `sample`, `scene`, and `log` source tables into a timeline."""
     return (
@@ -204,7 +213,7 @@ def build_scene_timeline(
 def renumber_scene_timeline(timeline_lf: pl.LazyFrame) -> pl.LazyFrame:
     """Assign dense zero-based frame indices within each scene."""
     return timeline_lf.with_columns(
-        pl.col("timestamp").rank("dense").over("scene_token").sub(1).cast(pl.Int64).alias("frame")
+        pl.col("timestamp").rank("dense").over("scene_token").sub(1).cast(pl.Int64).alias("frame"),
     )
 
 
@@ -238,14 +247,14 @@ def drop_first_samples_with_large_ego_jump(
         .with_columns(
             ((pl.col("next_x") - pl.col("x")).pow(2) + (pl.col("next_y") - pl.col("y")).pow(2))
             .sqrt()
-            .alias("next_displacement")
+            .alias("next_displacement"),
         )
         .filter((pl.col("frame") == 0) & pl.col("next_displacement").gt(threshold_meters))
         .select("sample_token")
     )
 
     return timeline_lf.join(bad_first_samples_lf, on="sample_token", how="anti").pipe(
-        renumber_scene_timeline
+        renumber_scene_timeline,
     )
 
 
@@ -289,10 +298,12 @@ def extract_agent_tracks(
 ) -> pl.LazyFrame:
     """Extract annotated agent positions aligned to the shared scene timeline."""
     attr_lookup = attribute_lf.select(
-        pl.col("token").alias("attr_token"), pl.col("name").alias("attr_name")
+        pl.col("token").alias("attr_token"),
+        pl.col("name").alias("attr_name"),
     )
     cat_lookup = category_lf.select(
-        pl.col("token").alias("cat_token"), pl.col("name").alias("cat_name")
+        pl.col("token").alias("cat_token"),
+        pl.col("name").alias("cat_name"),
     )
     raw_agents = (
         annotation_lf
@@ -302,7 +313,7 @@ def extract_agent_tracks(
         .with_columns(pl.col("attribute_tokens").list.first().alias("first_attr_token"))
         .join(attr_lookup, left_on="first_attr_token", right_on="attr_token", how="left")
         .with_columns(
-            pl.col("instance_token").rank("dense").over("scene_token").cast(pl.Int32).alias("id")
+            pl.col("instance_token").rank("dense").over("scene_token").cast(pl.Int32).alias("id"),
         )
         .select(
             *("scene_token", "scene_name", "map", "frame", "id"),

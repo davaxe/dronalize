@@ -88,7 +88,9 @@ def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
 
 
 def build_available_datasets_table(
-    descriptors: Sequence[DatasetDescriptor], *, details: bool
+    descriptors: Sequence[DatasetDescriptor],
+    *,
+    details: bool,
 ) -> Table:
     """Build a rich table showing the available dataset registry entries."""
     table = Table(
@@ -239,7 +241,10 @@ def _section_table(title: str, sections: Iterable[Section]) -> Table:
         row_count = len(rows)
         for index, (label, value) in enumerate(rows):
             table.add_row(
-                section if index == 0 else "", label, value, end_section=index == row_count - 1
+                section if index == 0 else "",
+                label,
+                value,
+                end_section=index == row_count - 1,
             )
     return table
 
@@ -293,7 +298,8 @@ def _format_windowing(config: ScenesConfig) -> str:
 
 
 def _temporal_support_rows(
-    support: DatasetTemporalSupport | None, scenes: ScenesConfig
+    support: DatasetTemporalSupport | None,
+    scenes: ScenesConfig,
 ) -> tuple[Row, ...]:
     if support is None:
         return (
@@ -399,12 +405,12 @@ def _format_map_edge_types(map_config: MapConfig) -> str:
     if edge_types.include is not None:
         parts.append(
             "include="
-            + ",".join(sorted(_format_edge_type_value(value) for value in edge_types.include))
+            + ",".join(sorted(_format_edge_type_value(value) for value in edge_types.include)),
         )
     if edge_types.exclude:
         parts.append(
             "exclude="
-            + ",".join(sorted(_format_edge_type_value(value) for value in edge_types.exclude))
+            + ",".join(sorted(_format_edge_type_value(value) for value in edge_types.exclude)),
         )
     if edge_types.remap:
         remaps = sorted(
@@ -447,7 +453,9 @@ def _read_config_rows(read_config: ReadConfig) -> tuple[Row, ...]:
 
 
 def _read_rows(
-    read_config: ReadConfig, *, native_splits: Sequence[DatasetSplit] | None = None
+    read_config: ReadConfig,
+    *,
+    native_splits: Sequence[DatasetSplit] | None = None,
 ) -> tuple[Row, ...]:
     rows: list[Row] = [("Strategy", read_config.strategy)]
     match read_config:
@@ -460,10 +468,12 @@ def _read_rows(
 
 
 def _assignment_request_rows(
-    assignment: SplitAssignmentPlan, read: ReadSelection | None = None
+    assignment: SplitAssignmentPlan,
+    read: ReadSelection | None = None,
 ) -> tuple[Row, ...]:
     return _assignment_rows(
-        assignment.config, native_splits=None if read is None else read.native_splits
+        assignment.config,
+        native_splits=None if read is None else read.native_splits,
     )
 
 
@@ -472,7 +482,9 @@ def _assign_config_rows(assign_config: AssignConfig) -> tuple[Row, ...]:
 
 
 def _assignment_rows(
-    assign_config: AssignConfig, *, native_splits: Sequence[DatasetSplit] | None = None
+    assign_config: AssignConfig,
+    *,
+    native_splits: Sequence[DatasetSplit] | None = None,
 ) -> tuple[Row, ...]:
     rows: list[Row] = [("Strategy", assign_config.strategy)]
     if isinstance(assign_config, NoAssign):
@@ -521,7 +533,9 @@ def _inline_config_rows(rows: Sequence[Row]) -> str:
 
 
 def _format_splits(
-    splits: Sequence[DatasetSplit] | frozenset[DatasetSplit] | None, *, empty: str
+    splits: Sequence[DatasetSplit] | frozenset[DatasetSplit] | None,
+    *,
+    empty: str,
 ) -> str:
     return (
         empty

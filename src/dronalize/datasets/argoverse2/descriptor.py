@@ -16,7 +16,7 @@ from dronalize.datasets.shared.presets import (
 from dronalize.datasets.shared.resources import map_provider_resources_factory
 
 _open_argoverse2_resources = map_provider_resources_factory(
-    create=lambda _root, map_config: Argoverse2MapProvider(map_config)
+    create=lambda _root, map_config: Argoverse2MapProvider(map_config),
 )
 
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
@@ -40,7 +40,10 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True),
     temporal_support=temporal_support(
-        source_unit="scenario", min_frames=50, max_frames=110, enabled_by_default=False
+        source_unit="scenario",
+        min_frames=50,
+        max_frames=110,
+        enabled_by_default=False,
     ),
     map_provider_factory=_open_argoverse2_resources,
 )

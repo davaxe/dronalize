@@ -395,10 +395,10 @@ class Lane:
             polygon=str(data["polygon_token"]),
             lane_type=_resolve_lane_type(data.get("lane_type")),
             left_lane_divider_segments=_parse_segment_divider(
-                data.get("left_lane_divider_segments", [])
+                data.get("left_lane_divider_segments", []),
             ),
             right_lane_divider_segments=_parse_segment_divider(
-                data.get("right_lane_divider_segments", [])
+                data.get("right_lane_divider_segments", []),
             ),
         )
 
@@ -515,7 +515,8 @@ class NuScenesMapBuilder(FeatureMapBuilder):
         for road_divider in self.map.road_dividers.values():
             line: Line = self.map.lines[road_divider.line]
             yield PathFeature(
-                points=tuple(self._node_points(line.nodes)), edge_types=EdgeType.LINE_THICK
+                points=tuple(self._node_points(line.nodes)),
+                edge_types=EdgeType.LINE_THICK,
             )
 
     def _lane_divider_features(self) -> Iterable[PathFeature]:
@@ -591,7 +592,8 @@ class NuScenesMapBuilder(FeatureMapBuilder):
             )
 
     def _extract_edges(
-        self, segments: list[tuple[str, SegmentDividerType]]
+        self,
+        segments: list[tuple[str, SegmentDividerType]],
     ) -> tuple[list[Point], list[EdgeType]]:
         return (
             [self.map_nodes[n_id].as_point() for n_id, _ in segments],

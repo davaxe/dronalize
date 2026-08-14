@@ -59,7 +59,8 @@ def _build_mds_writer_provider(plan: ExecutionPlan) -> WriterProvider:
                 None
                 if output_transform is None
                 else cast(
-                    "RecordTransform[dict[str, Any]] | None", output_transform.record_transform
+                    "RecordTransform[dict[str, Any]] | None",
+                    output_transform.record_transform,
                 )
             ),
             scene_transform=(
@@ -125,7 +126,7 @@ def _build_pickle_writer_provider(plan: ExecutionPlan) -> WriterProvider:
             if output_transform is None
             else output_transform.record_transform,
             scene_transform=None if output_transform is None else output_transform.scene_transform,
-        )
+        ),
     )
 
 

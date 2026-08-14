@@ -82,7 +82,9 @@ def _rules_for_context(context: ConversionContext) -> tuple[DerivationRule, ...]
 
 @functools.lru_cache(maxsize=32)
 def plan_derivations(
-    available_fields: TrajectoryField, required_fields: TrajectoryField, context: ConversionContext
+    available_fields: TrajectoryField,
+    required_fields: TrajectoryField,
+    context: ConversionContext,
 ) -> tuple[DerivationRule, ...] | None:
     """Return the lowest-cost derivation plan for reaching the required fields."""
     context = ConversionContext(context.sample_time, context.group_by)
@@ -161,7 +163,12 @@ def _velocity_from_position(data: pl.LazyFrame, context: ConversionContext) -> p
 
 def _acceleration_from_velocity(data: pl.LazyFrame, context: ConversionContext) -> pl.LazyFrame:
     return _apply_derivative(
-        data, context, x_col="vx", y_col="vy", order=1, rename={1: ["ax", "ay"]}
+        data,
+        context,
+        x_col="vx",
+        y_col="vy",
+        order=1,
+        rename={1: ["ax", "ay"]},
     )
 
 

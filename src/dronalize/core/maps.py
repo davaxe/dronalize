@@ -249,7 +249,10 @@ class MapGraph:
         offset = 0
         for arr in arrays_to_serialize:
             target_arr: npt.NDArray[Any] = np.ndarray(
-                arr.shape, dtype=arr.dtype, buffer=shared.buf, offset=offset
+                arr.shape,
+                dtype=arr.dtype,
+                buffer=shared.buf,
+                offset=offset,
             )
             np.copyto(target_arr, arr)
             offset += arr.nbytes
@@ -327,7 +330,9 @@ class MapGraph:
         )
 
     def extract_radius(
-        self, center: tuple[float, float] | npt.NDArray[np.floating[Any]] | None, radius: float
+        self,
+        center: tuple[float, float] | npt.NDArray[np.floating[Any]] | None,
+        radius: float,
     ) -> MapGraph:
         """Extract a subgraph within a specified radius from a center point.
 
@@ -440,7 +445,9 @@ class MapGraph:
         return self.extract_bounding_box(center, half_w, half_h)
 
     def extract_trajectory_buffer(
-        self, relevant_positions: npt.NDArray[np.floating[Any]], radius: float
+        self,
+        relevant_positions: npt.NDArray[np.floating[Any]],
+        radius: float,
     ) -> MapGraph:
         """Extract nodes within a fixed radius of any relevant position.
 
@@ -482,7 +489,10 @@ class MapGraph:
         return self._subgraph_from_mask(within_mask)
 
     def filter_edges(
-        self, edge_mask: npt.NDArray[np.bool_], *, prune_unreferenced_nodes: bool = True
+        self,
+        edge_mask: npt.NDArray[np.bool_],
+        *,
+        prune_unreferenced_nodes: bool = True,
     ) -> MapGraph:
         """Return a graph with only the selected edges.
 
@@ -574,7 +584,8 @@ class MapGraph:
 
 
 def _extract_subgraph(
-    node_mask: npt.NDArray[np.bool_], edge_indices: npt.NDArray[np.int32]
+    node_mask: npt.NDArray[np.bool_],
+    edge_indices: npt.NDArray[np.int32],
 ) -> tuple[npt.NDArray[np.int32], npt.NDArray[np.bool_]]:
     """Extract a subgraph given a boolean node mask.
 

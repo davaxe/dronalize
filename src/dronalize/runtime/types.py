@@ -171,7 +171,8 @@ class ExecutionPlan:
         """Return the dataset manifest for this plan."""
         export_config = self.output_config
         derivation_source = trajectory_schema_after_transforms(
-            self.descriptor.native_schema, self.resolved_config
+            self.descriptor.native_schema,
+            self.resolved_config,
         )
         source_task = self.resolved_config.task
         effective_bounds = self.effective_prediction_bounds
@@ -241,16 +242,20 @@ class OutputTransform(Generic[PayloadT]):
     def __post_init__(self) -> None:
         """Validate that only one transform mode is configured."""
         validate_transform_choice(
-            record_transform=self.record_transform, scene_transform=self.scene_transform
+            record_transform=self.record_transform,
+            scene_transform=self.scene_transform,
         )
 
 
 def build_loader_plan(
-    *, descriptor: DatasetDescriptor, resolved_config: DatasetConfig, include_map: bool | None
+    *,
+    descriptor: DatasetDescriptor,
+    resolved_config: DatasetConfig,
+    include_map: bool | None,
 ) -> LoaderPlan:
     """Compile the loader-facing request for one resolved dataset config."""
     loader_options: LoaderOptionsModel = descriptor.parse_loader_options(
-        resolved_config.loader_options
+        resolved_config.loader_options,
     )
     map_config = (
         None
@@ -262,7 +267,8 @@ def build_loader_plan(
         scenes=resolved_config.scenes,
         screening=screening,
         read=ReadSelection.from_config(
-            resolved_config.read, supported_native_splits=descriptor.supported_native_splits
+            resolved_config.read,
+            supported_native_splits=descriptor.supported_native_splits,
         ),
         loader_options=loader_options,
         map=map_config,
@@ -270,7 +276,8 @@ def build_loader_plan(
 
 
 def _screening_with_task_endpoint(
-    screening: ScreeningConfig | None, task: PredictionTaskConfig | None
+    screening: ScreeningConfig | None,
+    task: PredictionTaskConfig | None,
 ) -> ScreeningConfig | None:
     if task is None or not task.require_history_endpoint:
         return screening
@@ -278,7 +285,8 @@ def _screening_with_task_endpoint(
     base = screening or ScreeningConfig()
     agents = dict(base.agents)
     agents["prediction_history_endpoint"] = AgentRequireFrames.define(
-        [task.prediction_origin - 1], require=PassingRequirement(absolute=1)
+        [task.prediction_origin - 1],
+        require=PassingRequirement(absolute=1),
     )
     return ScreeningConfig(cleanup=base.cleanup, scenes=base.scenes, agents=agents)
 
@@ -294,7 +302,9 @@ class ExecutionRequest(BaseModel):
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(
-        frozen=True, extra="forbid", arbitrary_types_allowed=True
+        frozen=True,
+        extra="forbid",
+        arbitrary_types_allowed=True,
     )
 
     dataset: str
@@ -332,7 +342,8 @@ def resolve_effective_scene_window(
 
 
 def trajectory_schema_after_transforms(
-    native_schema: TrajectorySchema, config: DatasetConfig
+    native_schema: TrajectorySchema,
+    config: DatasetConfig,
 ) -> TrajectorySchema:
     """Return fields that remain semantically valid after temporal transforms."""
     resample = config.scenes.resample

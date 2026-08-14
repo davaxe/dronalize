@@ -61,7 +61,9 @@ def test_pickle_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     )
 
     expected = encode_scene_record(
-        scene, dtype=np.float32, prediction_bounds=PredictionBounds(2, 3)
+        scene,
+        dtype=np.float32,
+        prediction_bounds=PredictionBounds(2, 3),
     )
     writer.write(scene)
     writer.finish_local()
@@ -84,7 +86,10 @@ def test_pickle_writer_accepts_record_transform(tmp_path: Path, scene: Scene) ->
         )
 
     writer = PickleWriter(
-        output_dir=output_dir, config=output_config(), splits=None, record_transform=transform
+        output_dir=output_dir,
+        config=output_config(),
+        splits=None,
+        record_transform=transform,
     )
     writer.write(scene)
     writer.finish_local()
@@ -111,7 +116,10 @@ def test_pickle_writer_accepts_scene_transform(tmp_path: Path, scene: Scene) -> 
         )
 
     writer = PickleWriter(
-        output_dir=output_dir, config=output_config(), splits=None, scene_transform=transform
+        output_dir=output_dir,
+        config=output_config(),
+        splits=None,
+        scene_transform=transform,
     )
     writer.write(scene)
     writer.finish_local()
@@ -144,7 +152,10 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
     output_dir = tmp_path / "mds"
     writer = MDSDatasetWriter(
-        output_dir=output_dir, config=output_config(), splits=None, parallel=False
+        output_dir=output_dir,
+        config=output_config(),
+        splits=None,
+        parallel=False,
     )
 
     expected = encode_scene_record(scene, dtype=np.float32)
@@ -159,7 +170,8 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
 
 def test_mds_reader_combines_streams_with_per_row_prediction_bounds(
-    tmp_path: Path, scene: Scene
+    tmp_path: Path,
+    scene: Scene,
 ) -> None:
     pytest.importorskip("streaming")
     from streaming import Stream
@@ -262,7 +274,9 @@ def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> Non
 def test_mds_encoder_decoder_roundtrip(scene: Scene) -> None:
     scene = replace(scene, dataset="demo")
     expected = encode_scene_record(
-        scene, dtype=np.float32, prediction_bounds=PredictionBounds(2, 3)
+        scene,
+        dtype=np.float32,
+        prediction_bounds=PredictionBounds(2, 3),
     )
     record = encode_mds_row(expected)
     decoded = decode_mds_row(record)
@@ -363,12 +377,18 @@ def test_manifest_rejects_bad_prediction_bounds() -> None:
 
 
 def _build_pickle_reader(
-    tmp_path: Path, scene: Scene, *, bounds: PredictionBounds | None = None
+    tmp_path: Path,
+    scene: Scene,
+    *,
+    bounds: PredictionBounds | None = None,
 ) -> tuple[PickleReader, SceneRecord]:
     scene = replace(scene, dataset="demo")
     output_dir = tmp_path / "pickle"
     writer = PickleWriter(
-        output_dir=output_dir, config=output_config(), prediction_bounds=bounds, splits=None
+        output_dir=output_dir,
+        config=output_config(),
+        prediction_bounds=bounds,
+        splits=None,
     )
 
     expected = encode_scene_record(scene, dtype=np.float32, prediction_bounds=bounds)
@@ -435,7 +455,8 @@ def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> Non
 
 
 def test_torch_forecast_dataset_uses_row_bounds_and_explicit_override(
-    tmp_path: Path, scene: Scene
+    tmp_path: Path,
+    scene: Scene,
 ) -> None:
     pytest.importorskip("torch")
     from dronalize.io.adapters.torch import TorchForecastDataset
@@ -479,7 +500,8 @@ def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     _assert_tensor_allclose(record["map"].x, expected.map_node_positions)
     _assert_tensor_array_equal(record["map"].node_type, expected.map_node_types)
     _assert_tensor_array_equal(
-        record["map", "connects", "map"].edge_index, expected.map_edge_indices
+        record["map", "connects", "map"].edge_index,
+        expected.map_edge_indices,
     )
     _assert_tensor_array_equal(record["map", "connects", "map"].edge_type, expected.map_edge_types)
     assert record.ego_agent_id == expected.ego_agent_id

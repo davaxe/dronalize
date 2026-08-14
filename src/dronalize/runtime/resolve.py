@@ -35,7 +35,9 @@ logger = logging.getLogger(__name__)
 
 
 def build_execution_plan(
-    *, descriptor: DatasetDescriptor, request: ExecutionRequest
+    *,
+    descriptor: DatasetDescriptor,
+    request: ExecutionRequest,
 ) -> ExecutionPlan:
     """Build a full runtime plan from a public execution request."""
     _validate_input_path(request)
@@ -43,14 +45,18 @@ def build_execution_plan(
     include_map = request.include_map
     storage_backend = _resolve_storage_backend(request.storage_backend)
     resolved_config, selected_task = _resolve_dataset_config(
-        descriptor=descriptor, config_path=request.config_path, cli_override=request.overrides
+        descriptor=descriptor,
+        config_path=request.config_path,
+        cli_override=request.overrides,
     )
     _validate_read_support(descriptor, resolved_config.read)
     _validate_assignment_support(descriptor, resolved_config.assign)
     _validate_feature_support(descriptor, resolved_config)
     _validate_temporal_support(descriptor, resolved_config)
     loader_request = build_loader_plan(
-        descriptor=descriptor, resolved_config=resolved_config, include_map=include_map
+        descriptor=descriptor,
+        resolved_config=resolved_config,
+        include_map=include_map,
     )
     assignment_request = SplitAssignmentPlan.from_config(resolved_config.assign, seed=request.seed)
     effective_horizon_frames, effective_prediction_bounds, effective_sample_time = (
@@ -97,7 +103,8 @@ def _validate_read_support(descriptor: DatasetDescriptor, config: ReadConfig | N
 
 
 def _validate_assignment_support(
-    descriptor: DatasetDescriptor, config: AssignConfig | None
+    descriptor: DatasetDescriptor,
+    config: AssignConfig | None,
 ) -> None:
     if config is None:
         return
@@ -193,13 +200,17 @@ def _resolve_storage_backend(storage_backend: StorageBackend | str) -> StorageBa
         resolved: StorageBackend = StorageBackend(storage_backend)
     except ValueError as exc:
         raise dronalize_exceptions.UnsupportedStorageBackendError(
-            storage_backend, tuple(sb.value for sb in StorageBackend)
+            storage_backend,
+            tuple(sb.value for sb in StorageBackend),
         ) from exc
     return resolved
 
 
 def _resolve_dataset_config(
-    *, descriptor: DatasetDescriptor, config_path: Path | None, cli_override: RuntimeOverride
+    *,
+    descriptor: DatasetDescriptor,
+    config_path: Path | None,
+    cli_override: RuntimeOverride,
 ) -> tuple[DatasetConfig, str | None]:
     project = parse_config(config_path) if config_path else ProjectConfig()
     defaults = descriptor.default_config

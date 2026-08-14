@@ -40,17 +40,22 @@ class OpenDDMapProvider(MapProvider):
             return None
 
         map_graph = _load_opendd_map(
-            str(key), self.config.min_distance, self.config.interpolation_distance
+            str(key),
+            self.config.min_distance,
+            self.config.interpolation_distance,
         )
         return extract_configured_map(map_graph, scene, self.config)
 
 
 @functools.lru_cache(maxsize=8)
 def _load_opendd_map(
-    key: str, min_distance: float | None, interpolation_distance: float | None
+    key: str,
+    min_distance: float | None,
+    interpolation_distance: float | None,
 ) -> MapGraph:
     return OpenDDMapBuilder(Path(key)).build(
-        min_distance=min_distance, interpolation_distance=interpolation_distance
+        min_distance=min_distance,
+        interpolation_distance=interpolation_distance,
     )
 
 

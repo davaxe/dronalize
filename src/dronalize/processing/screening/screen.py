@@ -144,7 +144,9 @@ def _named_rules(entries: dict[str, RuleT]) -> tuple[RuleT, ...]:
 
 
 def screen_data(
-    data: pl.DataFrame, scene_screening: ScreeningRuleSet | None, columns: TrajectoryColumns
+    data: pl.DataFrame,
+    scene_screening: ScreeningRuleSet | None,
+    columns: TrajectoryColumns,
 ) -> ScreeningResult:
     """Apply screening to one candidate scene and return structured metadata."""
     if scene_screening is None:
@@ -165,7 +167,8 @@ def screen_data(
 
 
 def _prepare_screening_frame(
-    data: pl.DataFrame, columns: TrajectoryColumns
+    data: pl.DataFrame,
+    columns: TrajectoryColumns,
 ) -> tuple[pl.DataFrame, ScreeningContext, str]:
     ctx = _build_context(columns=columns, scene_group_by=None)
     relative_frame_column = _temporary_column_name(data, RELATIVE_FRAME_COLUMN)
@@ -174,7 +177,9 @@ def _prepare_screening_frame(
 
 
 def _apply_cleanup_result(
-    data: pl.DataFrame, rules: tuple[CleanupRuleBase, ...], ctx: ScreeningContext
+    data: pl.DataFrame,
+    rules: tuple[CleanupRuleBase, ...],
+    ctx: ScreeningContext,
 ) -> tuple[pl.DataFrame, CleanupSceneStats | None]:
     if not rules:
         return data, None
@@ -195,7 +200,7 @@ def _apply_cleanup_result(
                 rows_after=frame.height,
                 agents_before=agents_before,
                 agents_after=_agent_count(frame, ctx),
-            )
+            ),
         )
 
     return frame, CleanupSceneStats(
@@ -208,7 +213,9 @@ def _apply_cleanup_result(
 
 
 def _filter_cleanup_rule(
-    frame: pl.DataFrame, rule: CleanupRuleBase, ctx: ScreeningContext
+    frame: pl.DataFrame,
+    rule: CleanupRuleBase,
+    ctx: ScreeningContext,
 ) -> pl.DataFrame:
     if frame.is_empty():
         return frame
@@ -223,7 +230,9 @@ def _filter_cleanup_rule(
 
 
 def _evaluate_scene_rules(
-    frame: pl.DataFrame, rules: tuple[SceneCheckRuleBase, ...], ctx: ScreeningContext
+    frame: pl.DataFrame,
+    rules: tuple[SceneCheckRuleBase, ...],
+    ctx: ScreeningContext,
 ) -> tuple[bool, ...]:
     if frame.is_empty():
         return tuple(False for _ in rules)
@@ -231,7 +240,9 @@ def _evaluate_scene_rules(
 
 
 def _evaluate_agent_rules(
-    frame: pl.DataFrame, rules: tuple[AgentCheckRuleBase, ...], ctx: ScreeningContext
+    frame: pl.DataFrame,
+    rules: tuple[AgentCheckRuleBase, ...],
+    ctx: ScreeningContext,
 ) -> tuple[tuple[bool, ...], frozenset[int] | None]:
     if frame.is_empty():
         return tuple(False for _ in rules), frozenset()
@@ -252,7 +263,7 @@ def _evaluate_agent_rules(
         .lazy()
         .with_columns(_and_all(agent_pass_exprs).alias(agent_rule_valid_column))
         .with_columns(
-            ctx.over_agent_window(pl.col(agent_rule_valid_column).any()).alias(passed_agent_column)
+            ctx.over_agent_window(pl.col(agent_rule_valid_column).any()).alias(passed_agent_column),
         )
         .select(pl.col(ctx.columns.agent_id), pl.col(passed_agent_column))
         .collect()
@@ -315,13 +326,13 @@ def _agent_rule_exprs(rule: AgentCheckRuleBase, ctx: ScreeningContext) -> tuple[
 
     agent_pass = pl.when(scope).then(rule.predicate_expr(ctx)).otherwise(pl.lit(value=True))
     invalid_agents = ctx.over_scene_window(
-        pl.col(ctx.columns.agent_id).filter(scope & ~agent_pass).n_unique()
+        pl.col(ctx.columns.agent_id).filter(scope & ~agent_pass).n_unique(),
     )
     invalid_fraction = (
         pl.when(scoped_agent_count > 0).then(invalid_agents / scoped_agent_count).otherwise(0.0)
     )
     passing_agents = ctx.over_scene_window(
-        pl.col(ctx.columns.agent_id).filter(scope & agent_pass).n_unique()
+        pl.col(ctx.columns.agent_id).filter(scope & agent_pass).n_unique(),
     )
     passing_fraction = (
         pl.when(scoped_agent_count > 0).then(passing_agents / scoped_agent_count).otherwise(0.0)
@@ -330,7 +341,9 @@ def _agent_rule_exprs(rule: AgentCheckRuleBase, ctx: ScreeningContext) -> tuple[
         pl.lit(value=True)
         if rule.tolerance is None and rule.require is not None
         else invalid_agent_tolerance_expr(
-            rule.tolerance, invalid_agents=invalid_agents, invalid_fraction=invalid_fraction
+            rule.tolerance,
+            invalid_agents=invalid_agents,
+            invalid_fraction=invalid_fraction,
         )
     )
     tolerance_pass = (
@@ -339,7 +352,9 @@ def _agent_rule_exprs(rule: AgentCheckRuleBase, ctx: ScreeningContext) -> tuple[
     scene_pass = pl.all_horizontal(
         tolerance_pass,
         passing_requirement_expr(
-            rule.require, passing_agents=passing_agents, passing_fraction=passing_fraction
+            rule.require,
+            passing_agents=passing_agents,
+            passing_fraction=passing_fraction,
         ),
     )
     return agent_pass, scene_pass

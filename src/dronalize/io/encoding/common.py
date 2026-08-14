@@ -88,7 +88,8 @@ def encode_scene_record(
     raw_categories = type_df["agent_category"].to_numpy()
     if category_mapping:
         agent_types = np.array(
-            [category_mapping.get(AgentCategory(c), -1) for c in raw_categories], dtype=np.int32
+            [category_mapping.get(AgentCategory(c), -1) for c in raw_categories],
+            dtype=np.int32,
         )
     else:
         agent_types = raw_categories.astype(np.int32)
@@ -96,7 +97,8 @@ def encode_scene_record(
     screened_agent_mask = np.ones((num_agents,), dtype=bool)
     if scene.passed_agent_ids is not None:
         screened_agent_mask = np.array(
-            [agent_id in scene.passed_agent_ids for agent_id in sorted_ids], dtype=bool
+            [agent_id in scene.passed_agent_ids for agent_id in sorted_ids],
+            dtype=bool,
         )
 
     map_record = encode_map_from_scene(scene, dtype=dtype, offset=offset)
@@ -162,7 +164,9 @@ def empty_map_record(dtype: FloatDType) -> MapRecordF32 | MapRecordF64:
 
 
 def encode_map_from_scene(
-    scene: Scene, dtype: FloatDType, offset: npt.NDArray[np.float64] | None = None
+    scene: Scene,
+    dtype: FloatDType,
+    offset: npt.NDArray[np.float64] | None = None,
 ) -> MapRecordF32 | MapRecordF64:
     """Resolve one scene map and convert it to the canonical raw-record layout."""
     graph = scene.resolve_map()
@@ -173,7 +177,9 @@ def encode_map_from_scene(
 
 
 def _map_graph_to_numpy(
-    graph: MapGraph, dtype: FloatDType, offset: npt.NDArray[np.float64] | None = None
+    graph: MapGraph,
+    dtype: FloatDType,
+    offset: npt.NDArray[np.float64] | None = None,
 ) -> MapRecordF32 | MapRecordF64:
     """Convert a `MapGraph` to one canonical NumPy map payload."""
     node_positions = graph.node_positions - offset if offset is not None else graph.node_positions

@@ -49,7 +49,7 @@ class MiniCsvLoader(SceneLoader[str]):
             pl
             .col("category")
             .replace_strict({"car": AgentCategory.CAR, "pedestrian": AgentCategory.PEDESTRIAN})
-            .alias("agent_category")
+            .alias("agent_category"),
         )
         yield LoadedSourceFrame(frame)
 

@@ -66,7 +66,10 @@ class AD4CHEMapBuilder(FeatureMapBuilder):
     """Map builder for the AD4CHE dataset."""
 
     def __init__(
-        self, map_image_path: Path, pixel_to_meter: float = PIXEL_TO_METER, spatial_ds: float = 4.0
+        self,
+        map_image_path: Path,
+        pixel_to_meter: float = PIXEL_TO_METER,
+        spatial_ds: float = 4.0,
     ) -> None:
         if not map_image_path.is_file():
             msg = f"Map image file does not exist: {map_image_path}"
@@ -108,7 +111,8 @@ def _get_black_border_pixels(gray_image: npt.NDArray[np.uint8]) -> npt.NDArray[n
 
 
 def _spatial_downsample_polyline(
-    polyline: npt.NDArray[np.float64], d_min: float = 1
+    polyline: npt.NDArray[np.float64],
+    d_min: float = 1,
 ) -> npt.NDArray[np.float64]:
     if len(polyline) < 2:
         return polyline

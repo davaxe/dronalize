@@ -16,7 +16,7 @@ from dronalize.datasets.shared.presets import (
 from dronalize.datasets.shared.resources import map_provider_resources_factory
 
 _opendd_resources = map_provider_resources_factory(
-    create=lambda _root, map_config: OpenDDMapProvider(map_config)
+    create=lambda _root, map_config: OpenDDMapProvider(map_config),
 )
 
 _DEFAULT_CONFIG = DatasetConfig(
@@ -40,7 +40,10 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, source=True, time_block=True),
     temporal_support=temporal_support(
-        source_unit="recording", min_frames=456, max_frames=16916, enabled_by_default=True
+        source_unit="recording",
+        min_frames=456,
+        max_frames=16916,
+        enabled_by_default=True,
     ),
     map_provider_factory=_opendd_resources,
 )

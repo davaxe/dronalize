@@ -53,7 +53,8 @@ class OSMMapBuilder(FeatureMapBuilder):
         if force_zone_from_origin is not None:
             zone_lat, zone_lon = force_zone_from_origin
             _, _, self._force_zone_number, self._force_zone_letter = utils.from_latlon(
-                zone_lat, zone_lon
+                zone_lat,
+                zone_lon,
             )
 
         if local_origin_latlon is not None:
@@ -70,7 +71,11 @@ class OSMMapBuilder(FeatureMapBuilder):
         return EdgeType.from_str(way.tags.get("type"), way.tags.get("subtype"))
 
     def _process_node(
-        self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element
+        self,
+        elem: ET.Element,
+        x_offset: float,
+        y_offset: float,
+        root: ET.Element,
     ) -> None:
         """Process an OSM node element."""
         node_id = int(elem.attrib["id"])

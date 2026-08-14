@@ -47,10 +47,12 @@ ReadStrategy = Literal["all", "native"]
 AssignStrategy = Literal["none", "preserve-native", "scene", "source", "time", "shuffled-time"]
 
 InputDir = Annotated[
-    Path, typer.Option("--input", "-i", help="Directory containing the raw dataset.")
+    Path,
+    typer.Option("--input", "-i", help="Directory containing the raw dataset."),
 ]
 OutputDir = Annotated[
-    Path, typer.Option("--output", "-o", help="Directory to save the processed dataset.")
+    Path,
+    typer.Option("--output", "-o", help="Directory to save the processed dataset."),
 ]
 Read = Annotated[
     ReadStrategy | None,
@@ -75,7 +77,8 @@ Assign = Annotated[
     ),
 ]
 Config = Annotated[
-    Path | None, typer.Option("--config", "-c", help="Path to the optional configuration file.")
+    Path | None,
+    typer.Option("--config", "-c", help="Path to the optional configuration file."),
 ]
 Jobs = Annotated[
     int | None,
@@ -86,22 +89,27 @@ Jobs = Annotated[
     ),
 ]
 Progress = Annotated[
-    bool, typer.Option("--progress/--no-progress", help="Show progress during processing.")
+    bool,
+    typer.Option("--progress/--no-progress", help="Show progress during processing."),
 ]
 Limit = Annotated[
-    int | None, typer.Option("--limit", "-l", help="Limit the number of scenes to process.")
+    int | None,
+    typer.Option("--limit", "-l", help="Limit the number of scenes to process."),
 ]
 Seed = Annotated[
     int | None,
     typer.Option(
-        "--seed", help="Random seed used by split assignment and other randomized operations."
+        "--seed",
+        help="Random seed used by split assignment and other randomized operations.",
     ),
 ]
 StorageBackendOption = Annotated[
-    str, typer.Option("--storage-backend", "--sb", help="Storage backend for processed data.")
+    str,
+    typer.Option("--storage-backend", "--sb", help="Storage backend for processed data."),
 ]
 TrajectorySchema = Annotated[
-    str | None, typer.Option("--scene-schema", help="Scene schema to persist in exported output.")
+    str | None,
+    typer.Option("--scene-schema", help="Scene schema to persist in exported output."),
 ]
 SplitRatio = Annotated[
     tuple[float, float, float] | None,
@@ -114,7 +122,9 @@ SplitRatio = Annotated[
 SplitGap = Annotated[
     int | None,
     typer.Option(
-        "--gap", help="Gap inserted between time partitions.", rich_help_panel="Assign splits"
+        "--gap",
+        help="Gap inserted between time partitions.",
+        rich_help_panel="Assign splits",
     ),
 ]
 SplitSegments = Annotated[
@@ -126,22 +136,27 @@ SplitSegments = Annotated[
     ),
 ]
 Force = Annotated[
-    bool, typer.Option("--force", "-f", help="Force processing without confirmation.")
+    bool,
+    typer.Option("--force", "-f", help="Force processing without confirmation."),
 ]
 Overwrite = Annotated[
     bool,
     typer.Option(
-        "--overwrite/--no-overwrite", help="Replace an existing non-empty output directory."
+        "--overwrite/--no-overwrite",
+        help="Replace an existing non-empty output directory.",
     ),
 ]
 DatasetName = Annotated[
-    str, typer.Argument(help="The name of the dataset to apply the command to.")
+    str,
+    typer.Argument(help="The name of the dataset to apply the command to."),
 ]
 Plan = Annotated[
-    bool, typer.Option("--plan/--no-plan", help="Show the processing plan without executing it.")
+    bool,
+    typer.Option("--plan/--no-plan", help="Show the processing plan without executing it."),
 ]
 IncludeMap = Annotated[
-    bool | None, typer.Option("--include-map/--no-map", help="Include the map (if available).")
+    bool | None,
+    typer.Option("--include-map/--no-map", help="Include the map (if available)."),
 ]
 DatasetModule = Annotated[
     list[str] | None,
@@ -172,7 +187,8 @@ def global_options(
     ] = None,
     dataset_module: DatasetModule = None,
     log_level: Annotated[
-        str, typer.Option("--log-level", envvar="DRONALIZE_LOG_LEVEL", help="Python logging level.")
+        str,
+        typer.Option("--log-level", envvar="DRONALIZE_LOG_LEVEL", help="Python logging level."),
     ] = "WARNING",
 ) -> None:
     """Global CLI options."""
@@ -232,7 +248,7 @@ def process(
             seed=seed,
             overwrite=overwrite,
             input_dir_exists=not plan_mode,
-        )
+        ),
     )
 
     if plan_mode:
@@ -305,7 +321,7 @@ def show_config(
             segments=segments,
             include_map=include_map,
             input_dir_exists=False,
-        )
+        ),
     )
     rprint("\n[bold]Resolved Config:[/bold]")
     rprint(plan.resolved_config)
@@ -410,5 +426,5 @@ def _resolve_cli_plan(
             ),
             include_map=include_map,
             input_dir_exists=input_dir_exists,
-        )
+        ),
     )

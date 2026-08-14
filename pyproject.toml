@@ -138,26 +138,22 @@ preview = true
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "D203",
-    "D213",
-    "COM812",
-    "PLR2004",
-    "DOC201",
-    "DOC501",
-    "TRY003",
-    "D100",
-    "PLR0904",
-    "TD002",
-    "TD003",
-    "PLR0913",
-    "PLR0917",
-    "PLR0914",
-    "DOC402",
-    "CPY001",
-    "D104",
-    "TD005",
-    "PLC2801",
-    "D101",
+    "multi-line-summary-second-line",
+    "missing-trailing-comma",
+    "magic-value-comparison",
+    "docstring-missing-returns",
+    "docstring-missing-exception",
+    "undocumented-public-module",
+    "missing-todo-author",
+    "missing-todo-link",
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-locals",
+    "docstring-missing-yields",
+    "missing-copyright-notice",
+    "undocumented-public-package",
+    "missing-todo-description",
+    "undocumented-public-class",
 ]
 pydocstyle = { convention = "numpy" }
 
@@ -165,12 +161,12 @@ pydocstyle = { convention = "numpy" }
 ban-relative-imports = "all"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["D", "INP001", "S101", "PLC2701"]
-"examples/**/*.py" = ["D", "INP001", "S101", "PLC2701", "T201"]
+"tests/**/*.py" = ["D", "implicit-namespace-package", "assert", "import-private-name"]
+"examples/**/*.py" = ["D", "implicit-namespace-package", "assert", "import-private-name", "print"]
 
 [tool.ruff.format]
 quote-style = "double"
-skip-magic-trailing-comma = true
+skip-magic-trailing-comma = false
 
 [tool.ruff.lint.isort]
 split-on-trailing-comma = false

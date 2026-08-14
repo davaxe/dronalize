@@ -18,7 +18,8 @@ from dronalize.datasets.vod.maps import VodMapBuilder
 _open_vod_resources = single_shared_map_resource_factory(
     map_path=lambda root: root / "maps" / "expansion" / "delft.json",
     build_map=lambda path, config: VodMapBuilder.from_json_file(path).build(
-        config.min_distance, config.interpolation_distance
+        config.min_distance,
+        config.interpolation_distance,
     ),
 )
 
@@ -42,6 +43,9 @@ DATASET_DESCRIPTOR = DatasetDescriptor(
     feature_support=DatasetFeatureSupport(map=True),
     split_support=DatasetSplitSupport(scene=True, source=False, time_block=True),
     temporal_support=temporal_support(
-        source_unit="recording", min_frames=36, max_frames=784, enabled_by_default=True
+        source_unit="recording",
+        min_frames=36,
+        max_frames=784,
+        enabled_by_default=True,
     ),
 )

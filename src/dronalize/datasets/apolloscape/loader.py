@@ -31,7 +31,10 @@ class ApolloScapeLoader(SceneLoader):
     def load_source(self, source: DatasetSource[Path]) -> Iterable[LoadedSourceFrame]:
         yield LoadedSourceFrame(
             pl.scan_csv(
-                source.payload, has_header=False, schema=_DATA_SCHEMA, separator=" "
+                source.payload,
+                has_header=False,
+                schema=_DATA_SCHEMA,
+                separator=" ",
             ).select(
                 *("frame", "id", "x", "y", "yaw"),
                 pl.col("agent_category").replace_strict({
@@ -41,7 +44,7 @@ class ApolloScapeLoader(SceneLoader):
                     4: AgentCategory.BICYCLE.value,
                     5: AgentCategory.UNKNOWN.value,
                 }),
-            )
+            ),
         )
 
     @override

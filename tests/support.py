@@ -61,7 +61,8 @@ class DemoLoader(SceneLoader[Path, DemoOptions]):
     @override
     def iter_sources(self) -> Iterable[DatasetSource[Path]]:
         yield DatasetSource(
-            identifier="DatasetSource-1", payload=self.root / "DatasetSource.parquet"
+            identifier="DatasetSource-1",
+            payload=self.root / "DatasetSource.parquet",
         )
 
     @override
@@ -97,7 +98,8 @@ class CleanupDemoLoader(SceneLoader[Path, DemoOptions]):
     @override
     def iter_sources(self) -> Iterable[DatasetSource[Path]]:
         yield DatasetSource(
-            identifier="cleanup-source-1", payload=self.root / "cleanup-source.parquet"
+            identifier="cleanup-source-1",
+            payload=self.root / "cleanup-source.parquet",
         )
 
     @override
@@ -169,7 +171,7 @@ def cleanup_demo_descriptor() -> DatasetDescriptor:
             scenes=ScenesConfig(horizon_frames=3, sample_time=1.0, window=WindowConfig(step=1)),
             task=PredictionTaskConfig(prediction_origin=2, prediction_end=3),
             screening=ScreeningConfig(
-                cleanup={"trim_unimportant": ExcludeCategories.define(AgentCategory.UNIMPORTANT)}
+                cleanup={"trim_unimportant": ExcludeCategories.define(AgentCategory.UNIMPORTANT)},
             ),
             loader_options={"batch_size": 2, "use_cache": False},
         ),
@@ -304,7 +306,7 @@ class DataFramePresets(TypedDict):
 def scene_df_presets() -> DataFramePresets:
     return {
         "single_agent": lambda: make_scene_df(
-            AgentData(id=1, x=[0.0, 1.0, 2.0], y=[0.0, 0.0, 0.0], category="car", frame=[0, 1, 2])
+            AgentData(id=1, x=[0.0, 1.0, 2.0], y=[0.0, 0.0, 0.0], category="car", frame=[0, 1, 2]),
         ),
         "single_agent_windowed": lambda: make_scene_df(
             AgentData(
@@ -313,7 +315,7 @@ def scene_df_presets() -> DataFramePresets:
                 y=[0.0, 0.0, 0.0, 0.0],
                 category="car",
                 frame=[0, 1, 2, 3],
-            )
+            ),
         ),
         "single_agent_time_split": lambda: make_scene_df(
             AgentData(
@@ -322,7 +324,7 @@ def scene_df_presets() -> DataFramePresets:
                 y=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
                 category="car",
                 frame=[0, 1, 2, 3, 4, 5, 6, 7],
-            )
+            ),
         ),
         "lane_change_sequences": lambda: pl.DataFrame({
             "sequence": [

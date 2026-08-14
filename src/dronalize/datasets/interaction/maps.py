@@ -12,7 +12,11 @@ class InteractionMapBuilder(OSMMapBuilder):
 
     @override
     def _process_node(
-        self, elem: ET.Element, x_offset: float, y_offset: float, root: ET.Element
+        self,
+        elem: ET.Element,
+        x_offset: float,
+        y_offset: float,
+        root: ET.Element,
     ) -> None:
         node_id = int(elem.attrib["id"])
         x = float(elem.attrib["x"])

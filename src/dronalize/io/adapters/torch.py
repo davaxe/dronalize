@@ -14,7 +14,9 @@ try:
     from typing_extensions import override
 except ModuleNotFoundError as error:
     raise_missing_optional_dependency(
-        error, feature="The Torch scene dataset adapter", extra="torch"
+        error,
+        feature="The Torch scene dataset adapter",
+        extra="torch",
     )
 
 
@@ -65,7 +67,9 @@ class TorchSceneRecord:
     """Optional source identifier of the ego agent."""
 
     def split(
-        self, prediction_origin: int | None = None, prediction_end: int | None = None
+        self,
+        prediction_origin: int | None = None,
+        prediction_end: int | None = None,
     ) -> TorchSplitSceneRecord:
         """Create a forecast view using explicit or persisted prediction bounds."""
         total_length = int(self.features.size(1))
@@ -78,7 +82,8 @@ class TorchSceneRecord:
             bounds = PredictionBounds(self.prediction_origin, self.prediction_end)
         else:
             bounds = PredictionBounds(
-                prediction_origin, total_length if prediction_end is None else prediction_end
+                prediction_origin,
+                total_length if prediction_end is None else prediction_end,
             )
         bounds.validate(horizon_frames=total_length)
 
@@ -167,7 +172,11 @@ class TorchForecastDataset(Dataset[TorchSplitSceneRecord], Generic[ReaderT]):
     """Map-style Torch forecast view over full-horizon scene records."""
 
     def __init__(
-        self, reader: ReaderT, *, bounds: PredictionBounds | None = None, copy: bool = True
+        self,
+        reader: ReaderT,
+        *,
+        bounds: PredictionBounds | None = None,
+        copy: bool = True,
     ) -> None:
         super().__init__()
         self.dataset: TorchSceneDataset[ReaderT] = TorchSceneDataset(reader, copy=copy)
@@ -183,16 +192,22 @@ class TorchForecastDataset(Dataset[TorchSplitSceneRecord], Generic[ReaderT]):
 
 
 class IterableTorchForecastDataset(
-    IterableDataset[TorchSplitSceneRecord], Generic[IterableReaderT]
+    IterableDataset[TorchSplitSceneRecord],
+    Generic[IterableReaderT],
 ):
     """Iterable Torch forecast view over full-horizon scene records."""
 
     def __init__(
-        self, reader: IterableReaderT, *, bounds: PredictionBounds | None = None, copy: bool = True
+        self,
+        reader: IterableReaderT,
+        *,
+        bounds: PredictionBounds | None = None,
+        copy: bool = True,
     ) -> None:
         super().__init__()
         self.dataset: IterableTorchSceneDataset[IterableReaderT] = IterableTorchSceneDataset(
-            reader, copy=copy
+            reader,
+            copy=copy,
         )
         self.bounds: PredictionBounds | None = bounds
 
@@ -207,7 +222,8 @@ class IterableTorchForecastDataset(
 
 
 def _split_torch_record(
-    record: TorchSceneRecord, bounds: PredictionBounds | None
+    record: TorchSceneRecord,
+    bounds: PredictionBounds | None,
 ) -> TorchSplitSceneRecord:
     if bounds is None:
         return record.split()

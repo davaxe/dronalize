@@ -43,7 +43,9 @@ class HighDMapProvider(MapProvider):
         span = max_x - min_x
 
         builder = HighDMapBuilder(
-            Path(str(key)), min_x - span * self.margin_fraction, max_x + span * self.margin_fraction
+            Path(str(key)),
+            min_x - span * self.margin_fraction,
+            max_x + span * self.margin_fraction,
         )
         map_graph = builder.build(
             min_distance=self.config.min_distance,

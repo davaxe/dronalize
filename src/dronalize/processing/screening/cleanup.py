@@ -47,7 +47,10 @@ class ExcludeCategories(CleanupRuleBase):
 
     @classmethod
     def define(
-        cls, categories: AgentCategoryInput, *, rule_id: RuleId | None = None
+        cls,
+        categories: AgentCategoryInput,
+        *,
+        rule_id: RuleId | None = None,
     ) -> ExcludeCategories:
         """Alternate constructor that accepts one or many category values."""
         return cls(categories=coerce_agent_categories(categories, frozenset), rule_id=rule_id)
@@ -66,7 +69,10 @@ class IncludeCategories(CleanupRuleBase):
 
     @classmethod
     def define(
-        cls, categories: AgentCategoryInput, *, rule_id: RuleId | None = None
+        cls,
+        categories: AgentCategoryInput,
+        *,
+        rule_id: RuleId | None = None,
     ) -> IncludeCategories:
         """Alternate constructor that accepts one or many category values."""
         return cls(categories=coerce_agent_categories(categories, frozenset), rule_id=rule_id)
@@ -78,7 +84,8 @@ class IncludeCategories(CleanupRuleBase):
 
 
 CleanupRule = Annotated[
-    PruneByRule | ExcludeCategories | IncludeCategories, Field(discriminator="rule")
+    PruneByRule | ExcludeCategories | IncludeCategories,
+    Field(discriminator="rule"),
 ]
 """Discriminated union of executable cleanup-rule types.
 

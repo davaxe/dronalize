@@ -85,7 +85,7 @@ class OpenDDLoader(SceneLoader[tuple[Path, str]]):
                     )
                     .alias("agent_category"),
                 )
-                .drop("CLASS", "TIMESTAMP")
+                .drop("CLASS", "TIMESTAMP"),
             )
 
     @classmethod
@@ -103,7 +103,7 @@ def _list_table_names(db_path: Path) -> list[str]:
 def _count_tables(db_path: Path) -> int:
     with sqlite3.connect(db_path) as connection:
         row = connection.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type='table';"
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table';",
         ).fetchone()
     return row[0] if row is not None else 0
 

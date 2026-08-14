@@ -59,7 +59,10 @@ class LyftLoader(SceneLoader[_Source, LyftLoaderOptions]):
     """Loader for Lyft Level 5 scenes stored in Zarr format."""
 
     def __init__(
-        self, data_root: Path | str, request: LoaderPlan, map_provider: MapProvider | None = None
+        self,
+        data_root: Path | str,
+        request: LoaderPlan,
+        map_provider: MapProvider | None = None,
     ) -> None:
         super().__init__(data_root=data_root, request=request, map_provider=map_provider)
         self._data: dict[DatasetSplit, _ArrayData] = {}
@@ -98,7 +101,8 @@ class LyftLoader(SceneLoader[_Source, LyftLoaderOptions]):
     @override
     def count_sources_for(self, split: DatasetSplit) -> int | None:
         return self._source_count(
-            self._get_arrays(split).total_scenes, self.loader_options.scene_batch_size
+            self._get_arrays(split).total_scenes,
+            self.loader_options.scene_batch_size,
         )
 
     @staticmethod
@@ -194,7 +198,8 @@ def _scene_to_polars(
 
     scene_agents = agents[intervals[0, 0] - agent_offset : intervals[-1, 1] - agent_offset]
     safe_indices = np.minimum(
-        np.argmax(scene_agents["label_probabilities"], axis=1), len(_CATEGORY_LOOKUP) - 1
+        np.argmax(scene_agents["label_probabilities"], axis=1),
+        len(_CATEGORY_LOOKUP) - 1,
     )
     agent_df = pl.DataFrame({
         "frame": np.repeat(np.arange(n_frames), counts).astype(np.int32),

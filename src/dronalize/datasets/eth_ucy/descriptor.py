@@ -13,7 +13,10 @@ from dronalize.datasets.shared.presets import (
 _NATIVE_SPLITS = (DatasetSplit.TRAIN, DatasetSplit.VAL, DatasetSplit.TEST)
 _DEFAULT_CONFIG = DatasetConfig(
     scenes=scenes_config(
-        horizon_frames=20, sample_time=0.4, window_step=1, resample=linear_resample(up=4)
+        horizon_frames=20,
+        sample_time=0.4,
+        window_step=1,
+        resample=linear_resample(up=4),
     ),
     screening=minimum_observations_screening(2),
 )

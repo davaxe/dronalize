@@ -46,7 +46,11 @@ class HeteroSceneDataset(PyGDataset, Dataset[HeteroData], Generic[ReaderT]):
     """
 
     def __init__(
-        self, reader: ReaderT, *, copy: bool = True, transform: HeteroDataTransform | None = None
+        self,
+        reader: ReaderT,
+        *,
+        copy: bool = True,
+        transform: HeteroDataTransform | None = None,
     ) -> None:
         super().__init__(transform=transform)
         self.dataset: TorchSceneDataset[ReaderT] = TorchSceneDataset(reader, copy=copy)
@@ -76,7 +80,8 @@ class IterableHeteroSceneDataset(IterableDataset[HeteroData], Generic[IterableRe
         super().__init__()
         self._transform: HeteroDataTransform | None = transform
         self.dataset: IterableTorchSceneDataset[IterableReaderT] = IterableTorchSceneDataset(
-            reader, copy=copy
+            reader,
+            copy=copy,
         )
 
     @override
@@ -106,7 +111,9 @@ class HeteroForecastDataset(PyGDataset, Dataset[HeteroData], Generic[ReaderT]):
     ) -> None:
         super().__init__(transform=transform)
         self.dataset: TorchForecastDataset[ReaderT] = TorchForecastDataset(
-            reader, bounds=bounds, copy=copy
+            reader,
+            bounds=bounds,
+            copy=copy,
         )
 
     @override
@@ -132,7 +139,9 @@ class IterableHeteroForecastDataset(IterableDataset[HeteroData], Generic[Iterabl
         super().__init__()
         self._transform: HeteroDataTransform | None = transform
         self.dataset: IterableTorchForecastDataset[IterableReaderT] = IterableTorchForecastDataset(
-            reader, bounds=bounds, copy=copy
+            reader,
+            bounds=bounds,
+            copy=copy,
         )
 
     @override
@@ -192,7 +201,9 @@ def _convert_forecast_to_hetero(record: TorchSplitSceneRecord) -> HeteroData:
 
 
 def _hetero_with_common_data(
-    record: TorchSceneRecord | TorchSplitSceneRecord, *, num_agents: int
+    record: TorchSceneRecord | TorchSplitSceneRecord,
+    *,
+    num_agents: int,
 ) -> HeteroData:
     data = HeteroData()
     data["agent"].agent_id = record.agent_ids
@@ -216,29 +227,44 @@ def _hetero_with_common_data(
 def _pad_full_hetero_time_axes(record: HeteroData, *, horizon_frames: int) -> HeteroData:
     padded = record.clone()
     padded["agent"].features = _pad_along_dim(
-        record["agent"].features, target=horizon_frames, dim=1
+        record["agent"].features,
+        target=horizon_frames,
+        dim=1,
     )
     padded["agent"].agent_time_mask = _pad_along_dim(
-        record["agent"].agent_time_mask, target=horizon_frames, dim=1
+        record["agent"].agent_time_mask,
+        target=horizon_frames,
+        dim=1,
     )
     return padded
 
 
 def _pad_forecast_hetero_time_axes(
-    record: HeteroData, *, history_frames: int, future_frames: int
+    record: HeteroData,
+    *,
+    history_frames: int,
+    future_frames: int,
 ) -> HeteroData:
     padded = record.clone()
     padded["agent"].history_features = _pad_left_along_dim(
-        record["agent"].history_features, target=history_frames, dim=1
+        record["agent"].history_features,
+        target=history_frames,
+        dim=1,
     )
     padded["agent"].history_mask = _pad_left_along_dim(
-        record["agent"].history_mask, target=history_frames, dim=1
+        record["agent"].history_mask,
+        target=history_frames,
+        dim=1,
     )
     padded["agent"].future_features = _pad_along_dim(
-        record["agent"].future_features, target=future_frames, dim=1
+        record["agent"].future_features,
+        target=future_frames,
+        dim=1,
     )
     padded["agent"].future_mask = _pad_along_dim(
-        record["agent"].future_mask, target=future_frames, dim=1
+        record["agent"].future_mask,
+        target=future_frames,
+        dim=1,
     )
     return padded
 
