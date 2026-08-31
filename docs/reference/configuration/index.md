@@ -1,6 +1,6 @@
 # Configuration reference
 
-This reference describes the TOML configuration surface used by `dronalize`. The file is validated before processing starts, with structured schema checks handling field types, nested table shapes, and section-specific requirements so you can catch configuration issues early.
+This reference describes the TOML configuration surface used by `prejectory`. The file is validated before processing starts, with structured schema checks handling field types, nested table shapes, and section-specific requirements so you can catch configuration issues early.
 
 Dataset-specific defaults, capabilities, and dataset-owned configuration behavior are documented in the [dataset reference](../datasets/).
 

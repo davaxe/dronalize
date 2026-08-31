@@ -1,18 +1,18 @@
-# ::: dronalize.io.adapters
+# ::: prejectory.io.adapters
     options:
         members: false
         show_root_full_path: true
         
-## ::: dronalize.io.adapters.TorchSceneDataset
+## ::: prejectory.io.adapters.TorchSceneDataset
 
-## ::: dronalize.io.adapters.IterableTorchSceneDataset
+## ::: prejectory.io.adapters.IterableTorchSceneDataset
 
-## ::: dronalize.io.adapters.TorchSceneRecord
+## ::: prejectory.io.adapters.TorchSceneRecord
 
-## ::: dronalize.io.adapters.TorchSplitSceneRecord
+## ::: prejectory.io.adapters.TorchSplitSceneRecord
 
-## ::: dronalize.io.adapters.HeteroSceneDataset
+## ::: prejectory.io.adapters.HeteroSceneDataset
 
-## ::: dronalize.io.adapters.IterableHeteroSceneDataset
+## ::: prejectory.io.adapters.IterableHeteroSceneDataset
 
-## ::: dronalize.io.adapters.collate_hetero_with_time_padding
+## ::: prejectory.io.adapters.collate_hetero_with_time_padding

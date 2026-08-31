@@ -1,6 +1,6 @@
 # Dataset reference
 
-This section gives a high-level reference for the datasets supported by `dronalize`. Each page summarizes what a dataset is, the kind of traffic it captures, the expected structure on disk, and where to find the original paper or dataset source.
+This section gives a high-level reference for the datasets supported by `prejectory`. Each page summarizes what a dataset is, the kind of traffic it captures, the expected structure on disk, and where to find the original paper or dataset source.
 
 ## At a glance
 
@@ -22,5 +22,5 @@ The supported datasets span several common trajectory-prediction settings:
 
 ## Other information
 
-In addition to this reference, use `dronalize inspect <dataset>` and
-`dronalize split-support <dataset>` to get current information from the code.
+In addition to this reference, use `prejectory inspect <dataset>` and
+`prejectory split-support <dataset>` to get current information from the code.

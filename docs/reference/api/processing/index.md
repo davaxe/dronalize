@@ -1,4 +1,4 @@
-# ::: dronalize.processing
+# ::: prejectory.processing
     options:
         members: false
         show_root_full_path: true

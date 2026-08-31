@@ -1,5 +1,5 @@
-## ::: dronalize.datasets.list_datasets
+## ::: prejectory.datasets.list_datasets
 
-## ::: dronalize.datasets.get_dataset
+## ::: prejectory.datasets.get_dataset
 
-## ::: dronalize.datasets.register_dataset
+## ::: prejectory.datasets.register_dataset

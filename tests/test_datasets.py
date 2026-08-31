@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from dronalize.config import RuntimeOverride
-from dronalize.datasets import DatasetDescriptor, get_dataset, list_datasets
-from dronalize.datasets.registry import dataset_id_for_name, dataset_names_by_id
-from dronalize.io import StorageBackend
-from dronalize.processing.screening.agent import AgentRequireFrames
-from dronalize.runtime import ExecutionRequest, resolve_request
-from dronalize.runtime.types import build_loader_plan
+from prejectory.config import RuntimeOverride
+from prejectory.datasets import DatasetDescriptor, get_dataset, list_datasets
+from prejectory.datasets.registry import dataset_id_for_name, dataset_names_by_id
+from prejectory.io import StorageBackend
+from prejectory.processing.screening.agent import AgentRequireFrames
+from prejectory.runtime import ExecutionRequest, resolve_request
+from prejectory.runtime.types import build_loader_plan
 from tests.support import demo_descriptor
 from tests.support_integration import assert_plan_scene_outputs
 
@@ -127,7 +127,7 @@ def test_datasets_mocked_registry_smoke(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr("dronalize.runtime.api.get_dataset", lambda _: demo_descriptor())  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
+    monkeypatch.setattr("prejectory.runtime.api.get_dataset", lambda _: demo_descriptor())  # pyright: ignore[reportUnknownArgumentType, reportUnknownLambdaType]
 
     input_dir = tmp_path / "input"
     output_dir = tmp_path / "output"

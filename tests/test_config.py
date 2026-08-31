@@ -6,20 +6,20 @@ from typing import TYPE_CHECKING
 import polars as pl
 import pytest
 
-from dronalize.config import ProjectConfig, RuntimeOverride, parse_config
-from dronalize.config.models import (
+from prejectory.config import ProjectConfig, RuntimeOverride, parse_config
+from prejectory.config.models import (
     DatasetConfig,
     MapEdgeTypeRules,
     SceneExtentExtraction,
     ScreeningConfig,
     TrajectoryBufferExtraction,
 )
-from dronalize.core import AgentCategory
-from dronalize.core.categories import DatasetSplit, EdgeType
-from dronalize.core.errors import ConfigurationError
-from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.screening import ScreeningRuleSet, agent, cleanup, scene
-from dronalize.processing.screening.screen import screen_data
+from prejectory.core import AgentCategory
+from prejectory.core.categories import DatasetSplit, EdgeType
+from prejectory.core.errors import ConfigurationError
+from prejectory.processing.columns import TrajectoryColumns
+from prejectory.processing.screening import ScreeningRuleSet, agent, cleanup, scene
+from prejectory.processing.screening.screen import screen_data
 from tests.support import inherited_optional_blocks_descriptor
 
 if TYPE_CHECKING:

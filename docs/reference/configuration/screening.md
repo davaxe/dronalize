@@ -49,7 +49,7 @@ That rule name is also the name used for merge behavior and removal.
 
 The following agent categories are supported in `categories` fields. String
 values are case-insensitive, and the corresponding integer values are also
-accepted. See [`AgentCategory`](../api/core/index.md#dronalize.core.AgentCategory) for enum details.
+accepted. See [`AgentCategory`](../api/core/index.md#prejectory.core.AgentCategory) for enum details.
 
 | Enum | String representation | Integer value | Description |
 |---|---|---:|---|

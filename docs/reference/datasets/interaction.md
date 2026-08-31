@@ -39,7 +39,7 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `car` | `CAR` |
 | `pedestrian/bicycle` with speed `< 2 m/s` | `PEDESTRIAN` |
@@ -48,7 +48,7 @@ Expected raw data layout for this loader.
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | Not applicable | Not applicable |
 
@@ -57,7 +57,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support interaction
+prejectory split-support interaction
 ```
 
 ## References

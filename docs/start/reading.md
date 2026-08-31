@@ -1,18 +1,18 @@
 # Reading data
 
-`dronalize` readers expose one common in-memory record model across storage backends. This means
+`prejectory` readers expose one common in-memory record model across storage backends. This means
 you can switch between `pickle` and `mds` without changing your downstream scene-processing code.
 
 ## Reader model
 
-Framework-neutral readers return [`SceneRecord`](../reference/api/io/index.md#dronalize.io.SceneRecord)
+Framework-neutral readers return [`SceneRecord`](../reference/api/io/index.md#prejectory.io.SceneRecord)
 objects with:
 
 - scene id and position offset
 - full-horizon agent features and masks
 - optional map graph arrays
 
-Use [`SceneRecord.split`](../reference/api/io/index.md#dronalize.io.SceneRecord.split)
+Use [`SceneRecord.split`](../reference/api/io/index.md#prejectory.io.SceneRecord.split)
 when a model needs explicit observation and prediction tensors.
 
 Use the same post-processing logic regardless of backend.
@@ -22,7 +22,7 @@ Use the same post-processing logic regardless of backend.
 <!-- no-validate -->
 ```python
 from pathlib import Path
-from dronalize.io import read_manifest
+from prejectory.io import read_manifest
 
 manifest = read_manifest(Path("output"))
 print(manifest.feature_columns)
@@ -31,7 +31,7 @@ print(manifest.horizon_frames, manifest.prediction_task)
 ```
 
 Reading the manifest up front with
-[`read_manifest()`](../reference/api/io/index.md#dronalize.io.read_manifest) is the easiest way to verify
+[`read_manifest()`](../reference/api/io/index.md#prejectory.io.read_manifest) is the easiest way to verify
 schema, horizon, and precision.
 
 !!! tip "Readable manifest"
@@ -48,7 +48,7 @@ schema, horizon, and precision.
 <!-- no-validate -->
 ```python
 from pathlib import Path
-from dronalize.io.readers import PickleReader
+from prejectory.io.readers import PickleReader
 
 reader = PickleReader(Path("output"), split="train")
 
@@ -70,12 +70,12 @@ Built-in datasets also provide `dataset_id`; custom registered datasets may use
 ## Read from MDS output
 
 !!! warning "MDS requires extra dependencies"
-    Install the MDS extra before using MDS readers: `pip install dronalize[mds]`.
+    Install the MDS extra before using MDS readers: `pip install prejectory[mds]`.
 
 <!-- no-validate -->
 ```python
 from pathlib import Path
-from dronalize.io.readers import MDSReader
+from prejectory.io.readers import MDSReader
 
 reader = MDSReader(path=Path("output"), split="train")
 
@@ -92,7 +92,7 @@ not lose the task boundary:
 <!-- no-validate -->
 ```python
 from streaming import Stream
-from dronalize.io.readers import MDSReader
+from prejectory.io.readers import MDSReader
 
 reader = MDSReader(
     streams=[
@@ -108,11 +108,11 @@ sample = next(iter(reader)).split()
 
 ## Torch and PyG adapters
 
-On top of the readers, `dronalize` provides optional adapters:
+On top of the readers, `prejectory` provides optional adapters:
 
-- [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) for full-horizon
+- [`TorchSceneDataset`](../reference/api/io/adapters.md#prejectory.io.adapters.TorchSceneDataset) for full-horizon
   Torch tensor records
-- [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) for full-horizon
+- [`HeteroSceneDataset`](../reference/api/io/adapters.md#prejectory.io.adapters.HeteroSceneDataset) for full-horizon
   PyTorch Geometric `HeteroData`
 - `TorchForecastDataset` and `HeteroForecastDataset` for task-aware history/future views
 
@@ -124,8 +124,8 @@ streams with one common task:
 
 <!-- no-validate -->
 ```python
-from dronalize.io import PredictionBounds
-from dronalize.io.adapters import HeteroForecastDataset
+from prejectory.io import PredictionBounds
+from prejectory.io.adapters import HeteroForecastDataset
 
 dataset = HeteroForecastDataset(reader)
 common_task = HeteroForecastDataset(reader, bounds=PredictionBounds(20, 50))
@@ -133,9 +133,9 @@ common_task = HeteroForecastDataset(reader, bounds=PredictionBounds(20, 50))
 
 ## Choosing a reader setup
 
-- Use [`PickleReader`](../reference/api/io/readers.md#dronalize.io.readers.PickleReader) for simple local
+- Use [`PickleReader`](../reference/api/io/readers.md#prejectory.io.readers.PickleReader) for simple local
   workflows and easy inspection.
-- Use [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) for larger-scale or
+- Use [`MDSReader`](../reference/api/io/readers.md#prejectory.io.readers.MDSReader) for larger-scale or
   streaming-oriented training pipelines.
 - Keep reader-side code backend-neutral by depending on the shared
-  [`SceneRecord`](../reference/api/io/index.md#dronalize.io.SceneRecord) contract.
+  [`SceneRecord`](../reference/api/io/index.md#prejectory.io.SceneRecord) contract.

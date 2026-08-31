@@ -1417,7 +1417,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dronalize"
+name = "prejectory"
 version = "0.1.0.dev1"
 source = { editable = "." }
 dependencies = [

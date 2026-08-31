@@ -1,46 +1,46 @@
-# ::: dronalize.core
+# ::: prejectory.core
     options:
         members: false
         show_root_full_path: true
 
-## ::: dronalize.core.Scene
+## ::: prejectory.core.Scene
 
-## ::: dronalize.core.MapResolver
+## ::: prejectory.core.MapResolver
 
-## ::: dronalize.core.MapGraph
+## ::: prejectory.core.MapGraph
 
-## ::: dronalize.core.SharedMapGraph
+## ::: prejectory.core.SharedMapGraph
 
-## ::: dronalize.core.TrajectorySchema
+## ::: prejectory.core.TrajectorySchema
 
-## ::: dronalize.core.TrajectoryField
+## ::: prejectory.core.TrajectoryField
 
-## ::: dronalize.core.AgentCategory
+## ::: prejectory.core.AgentCategory
 
-## ::: dronalize.core.DatasetSplit
+## ::: prejectory.core.DatasetSplit
 
-## ::: dronalize.core.EdgeType
+## ::: prejectory.core.EdgeType
 
-## ::: dronalize.core.AgentCategoryLike
+## ::: prejectory.core.AgentCategoryLike
 
-## ::: dronalize.core.AgentCategoryInput
+## ::: prejectory.core.AgentCategoryInput
 
-## ::: dronalize.core.get_trajectory_schema
+## ::: prejectory.core.get_trajectory_schema
 
-## ::: dronalize.core.available_trajectory_schema_names
+## ::: prejectory.core.available_trajectory_schema_names
 
-## ::: dronalize.core.available_trajectory_schemas
+## ::: prejectory.core.available_trajectory_schemas
 
-## ::: dronalize.core.TRAJECTORY_SCHEMAS
+## ::: prejectory.core.TRAJECTORY_SCHEMAS
 
-## ::: dronalize.core.CANONICAL
+## ::: prejectory.core.CANONICAL
 
-## ::: dronalize.core.POSITIONS_ONLY
+## ::: prejectory.core.POSITIONS_ONLY
 
-## ::: dronalize.core.POSITIONS_YAW
+## ::: prejectory.core.POSITIONS_YAW
 
-## ::: dronalize.core.POSITIONS_VELOCITY
+## ::: prejectory.core.POSITIONS_VELOCITY
 
-## ::: dronalize.core.POSITIONS_VELOCITY_YAW
+## ::: prejectory.core.POSITIONS_VELOCITY_YAW
 
-## ::: dronalize.core.POSITIONS_VELOCITY_ACCELERATION
+## ::: prejectory.core.POSITIONS_VELOCITY_ACCELERATION

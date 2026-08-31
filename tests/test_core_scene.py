@@ -4,10 +4,10 @@ import numpy as np
 import polars as pl
 import pytest
 
-from dronalize.core import AgentCategory
-from dronalize.core.errors import TrajectorySchemaError
-from dronalize.core.maps import MapGraph
-from dronalize.core.scene import (
+from prejectory.core import AgentCategory
+from prejectory.core.errors import TrajectorySchemaError
+from prejectory.core.maps import MapGraph
+from prejectory.core.scene import (
     CANONICAL,
     POSITIONS_ONLY,
     POSITIONS_YAW,
@@ -15,7 +15,7 @@ from dronalize.core.scene import (
     TrajectoryField,
     TrajectorySchema,
 )
-from dronalize.io.encoding import encode_scene_record
+from prejectory.io.encoding import encode_scene_record
 
 
 def test_schema_definition_normalizes_order() -> None:

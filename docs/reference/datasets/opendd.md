@@ -39,7 +39,7 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `Car` | `CAR` |
 | `Medium Vehicle` | `CAR` |
@@ -52,7 +52,7 @@ Expected raw data layout for this loader.
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `CURB` | `CURB` |
 | `CURB_TRAVERSABLE` | `CURB` |
@@ -68,7 +68,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support opendd
+prejectory split-support opendd
 ```
 
 ## References

@@ -39,7 +39,7 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `vehicle.car` | `CAR` |
 | `vehicle.ego.car` | `CAR` |
@@ -69,7 +69,7 @@ Expected raw data layout for this loader.
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `SegmentDividerType.NIL` | `VIRTUAL` |
 | `SegmentDividerType.SINGLE_SOLID_WHITE` | `LINE_THIN` |
@@ -84,7 +84,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support nuscenes
+prejectory split-support nuscenes
 ```
 
 ## References

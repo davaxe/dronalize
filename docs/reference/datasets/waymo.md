@@ -15,7 +15,7 @@ The Waymo Open Motion Dataset is a large-scale benchmark for interactive motion 
     This dataset requires the `waymo` extra to be installed. You can do this with pip (or your package manager of choice):
 
     ```bash
-    pip install dronalize[waymo]
+    pip install prejectory[waymo]
     ``` 
 
 ## Default prediction task
@@ -46,7 +46,7 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `0` | `UNKNOWN` |
 | `1` | `CAR` |
@@ -56,7 +56,7 @@ Expected raw data layout for this loader.
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `RoadLine.TYPE_UNKNOWN` | `VIRTUAL` |
 | `RoadLine.TYPE_BROKEN_SINGLE_WHITE` | `LINE_THIN_DASHED` |
@@ -80,7 +80,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support waymo
+prejectory split-support waymo
 ```
 
 ## References

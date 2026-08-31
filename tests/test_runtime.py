@@ -6,32 +6,32 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from dronalize.config import RuntimeOverride
-from dronalize.core.errors import (
+from prejectory.config import RuntimeOverride
+from prejectory.core.errors import (
     CliError,
     ConfigurationError,
     DatasetNotFoundError,
     UnsupportedStorageBackendError,
 )
-from dronalize.datasets import (
+from prejectory.datasets import (
     DatasetFeatureSupport,
     DatasetTemporalSupport,
     DatasetWindowingSupport,
     FrameBounds,
     list_datasets,
 )
-from dronalize.datasets.registry import (
+from prejectory.datasets.registry import (
     _REGISTRY,  # pyright: ignore[reportPrivateUsage]
     dataset_names_by_id,
 )
-from dronalize.io import StorageBackend, read_manifest
-from dronalize.io.backends.null import NullWriter
-from dronalize.io.base import WorkerWriterProvider
-from dronalize.io.readers import PickleReader
-from dronalize.processing.screening.agent import AgentRequireFrames
-from dronalize.runtime import ExecutionRequest, OutputTransform, execute_request, resolve_request
-from dronalize.runtime.executor import open_executor
-from dronalize.runtime.processor import RuntimeProcessor
+from prejectory.io import StorageBackend, read_manifest
+from prejectory.io.backends.null import NullWriter
+from prejectory.io.base import WorkerWriterProvider
+from prejectory.io.readers import PickleReader
+from prejectory.processing.screening.agent import AgentRequireFrames
+from prejectory.runtime import ExecutionRequest, OutputTransform, execute_request, resolve_request
+from prejectory.runtime.executor import open_executor
+from prejectory.runtime.processor import RuntimeProcessor
 from tests.support import (
     DemoOptions,
     cleanup_demo_descriptor,
@@ -42,9 +42,9 @@ from tests.support import (
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core.scene import Scene
-    from dronalize.datasets import DatasetDescriptor
-    from dronalize.io.records import SceneRecord
+    from prejectory.core.scene import Scene
+    from prejectory.datasets import DatasetDescriptor
+    from prejectory.io.records import SceneRecord
 
 
 def _request(tmp_path: Path, **kwargs: object) -> ExecutionRequest:
@@ -67,7 +67,7 @@ def _cli_app_and_runner() -> tuple[Any, Any]:
 
     from typer.testing import CliRunner  # ruff: ignore[import-outside-top-level]
 
-    import dronalize.runtime.cli.app as cli_app  # ruff: ignore[import-outside-top-level]
+    import prejectory.runtime.cli.app as cli_app  # ruff: ignore[import-outside-top-level]
 
     return cli_app.app, CliRunner()
 
@@ -76,7 +76,7 @@ def _patch_descriptor(monkeypatch: pytest.MonkeyPatch, descriptor: DatasetDescri
     def provider(_name: str) -> DatasetDescriptor:
         return descriptor
 
-    monkeypatch.setattr("dronalize.runtime.api.get_dataset", provider)
+    monkeypatch.setattr("prejectory.runtime.api.get_dataset", provider)
 
 
 def _patch_get_demo_descriptor(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -130,7 +130,7 @@ def test_resolve_request_rejects_lane_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _patch_get_demo_descriptor(monkeypatch)
-    config_path = tmp_path / "dronalize.toml"
+    config_path = tmp_path / "prejectory.toml"
     _ = config_path.write_text(
         """
 [datasets.demo.scenes.lane_change]
@@ -152,7 +152,7 @@ def test_resolve_request_requires_window_for_lane_change(
         feature_support=DatasetFeatureSupport(map=True, lane_change_sampling=True),
     )
     _patch_descriptor(monkeypatch, descriptor)
-    config_path = tmp_path / "dronalize.toml"
+    config_path = tmp_path / "prejectory.toml"
     _ = config_path.write_text(
         """
 [datasets.demo.scenes]
@@ -470,7 +470,7 @@ def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.M
         "streaming",
         reason="Requires streaming package for custom MDS output record format",
     )
-    from dronalize.io.readers import MDSReader  # ruff: ignore[import-outside-top-level]
+    from prejectory.io.readers import MDSReader  # ruff: ignore[import-outside-top-level]
 
     _patch_get_demo_descriptor(monkeypatch)
 
@@ -686,7 +686,7 @@ def test_cli_imports_dataset_module_before_lookup(
             "from tests.support import demo_descriptor\n"
             "\n"
             "\n"
-            "def register_dronalize_datasets():\n"
+            "def register_prejectory_datasets():\n"
             '    return replace(demo_descriptor(), name="cli_demo")\n'
         ),
         encoding="utf-8",
@@ -716,9 +716,9 @@ def test_cli_imports_dataset_module_before_lookup(
 @pytest.mark.parametrize(
     ("module_body", "expected"),
     [
-        ("register_dronalize_datasets = 1\n", "non-callable"),
-        ("def register_dronalize_datasets():\n    return 1\n", "unsupported value"),
-        ("def register_dronalize_datasets():\n    return [1]\n", "returned int"),
+        ("register_prejectory_datasets = 1\n", "non-callable"),
+        ("def register_prejectory_datasets():\n    return 1\n", "unsupported value"),
+        ("def register_prejectory_datasets():\n    return [1]\n", "returned int"),
     ],
 )
 def test_cli_rejects_invalid_dataset_module_hook(

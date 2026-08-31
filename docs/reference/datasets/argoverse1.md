@@ -39,14 +39,14 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `OBJECT_TYPE = AV` | `CAR` |
 | `OBJECT_TYPE = OTHERS` | `UNKNOWN` |
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | Non-intersection lane segment with left and right neighbors | `LINE_THIN` |
 | Non-intersection lane segment without left or right neighbors | `LINE_THIN` |
@@ -58,7 +58,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support argoverse1
+prejectory split-support argoverse1
 ```
 
 ## References

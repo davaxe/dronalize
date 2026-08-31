@@ -7,10 +7,10 @@ The current CLI exposes five commands: `available`, `inspect`, `show-config`, `s
 ## Inspect the registry
 
 ```bash
-dronalize available
-dronalize available --no-details
-dronalize inspect a43
-dronalize split-support a43
+prejectory available
+prejectory available --no-details
+prejectory inspect a43
+prejectory split-support a43
 ```
 
 `available` lists the datasets that are usable in the current environment. `inspect` shows a
@@ -30,7 +30,7 @@ Use `available --no-details` for a compact registry listing.
 ## Preview the resolved config
 
 ```bash
-dronalize show-config a43 --config config.toml
+prejectory show-config a43 --config config.toml
 ```
 
 `show-config` resolves the same dataset defaults, profile fragments, dataset entry, and CLI
@@ -45,7 +45,7 @@ effective `scenes`, `screening`, `read`, `assign`, `map`, `output`, and `loader_
 === ":material-linux: Bash"
 
     ```bash
-    dronalize process a43 \
+    prejectory process a43 \
         --input data/a43/raw \
         --output data/a43/processed \
         --plan
@@ -54,7 +54,7 @@ effective `scenes`, `screening`, `read`, `assign`, `map`, `output`, and `loader_
 === ":fontawesome-brands-windows: PowerShell"
 
     ```ps1
-    dronalize process a43 `
+    prejectory process a43 `
         --input data/a43/raw `
         --output data/a43/processed `
         --plan
@@ -65,14 +65,14 @@ dataset, paths, backend, worker count, schema, map usage, read strategy, assignm
 any loader options that affect the run.
 
 Add `--config config.toml` when you have a project config file. Add read or assignment overrides
-only after checking `dronalize split-support <dataset>`; for example, `a43` does not support
+only after checking `prejectory split-support <dataset>`; for example, `a43` does not support
 `preserve-native` because it has no native partitions.
 
 The `process` command currently defaults to the `pickle` backend. Choose a different backend
 explicitly when needed:
 
 - `pickle` for the simplest persisted output with no extra dependency
-- `mds` for Mosaic Streaming shards, which requires `dronalize[mds]`
+- `mds` for Mosaic Streaming shards, which requires `prejectory[mds]`
 - `null` to execute the pipeline without writing any dataset files
 
 ## Useful options

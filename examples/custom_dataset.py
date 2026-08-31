@@ -1,4 +1,4 @@
-"""Minimal custom dataset integration for dronalize.
+"""Minimal custom dataset integration for prejectory.
 
 The raw dataset is one CSV file with the required `positions_only` trajectory
 fields: `frame`, `id`, `x`, `y`, and `agent_category`.
@@ -12,13 +12,13 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from dronalize.config.models import DatasetConfig, ScenesConfig, WindowConfig
-from dronalize.core import AgentCategory
-from dronalize.core.scene import POSITIONS_ONLY, TrajectorySchema
-from dronalize.datasets import DatasetDescriptor, register_dataset
-from dronalize.datasets.shared.presets import benchmark_task
-from dronalize.processing.loading import DatasetSource, LoadedSourceFrame, SceneLoader
-from dronalize.runtime import ExecutionRequest, resolve_request
+from prejectory.config.models import DatasetConfig, ScenesConfig, WindowConfig
+from prejectory.core import AgentCategory
+from prejectory.core.scene import POSITIONS_ONLY, TrajectorySchema
+from prejectory.datasets import DatasetDescriptor, register_dataset
+from prejectory.datasets.shared.presets import benchmark_task
+from prejectory.processing.loading import DatasetSource, LoadedSourceFrame, SceneLoader
+from prejectory.runtime import ExecutionRequest, resolve_request
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -75,7 +75,7 @@ MINI_CSV_SPEC = DatasetDescriptor(
 )
 
 
-def register_dronalize_datasets() -> DatasetDescriptor:
+def register_prejectory_datasets() -> DatasetDescriptor:
     """CLI hook used to register dataset."""
     return MINI_CSV_SPEC
 

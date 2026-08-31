@@ -40,14 +40,14 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `Car` | `CAR` |
 | `Truck` | `TRUCK` |
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | First or last entry in `upperLaneMarkings` | `ROAD_BORDER` |
 | Interior entry in `upperLaneMarkings` | `LINE_THIN_DASHED` |
@@ -59,7 +59,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support highd
+prejectory split-support highd
 ```
 
 ## References

@@ -1,6 +1,6 @@
 # Installation
 
-The base `dronalize` package is intentionally small. Install it first, then add optional extras for the CLI, MDS storage, Torch/PyG adapters, or dataset-specific loaders when needed. The `viz` extra is currently reserved for future visualization support.
+The base `prejectory` package is intentionally small. Install it first, then add optional extras for the CLI, MDS storage, Torch/PyG adapters, or dataset-specific loaders when needed. The `viz` extra is currently reserved for future visualization support.
 
 ## Requirements
 
@@ -10,7 +10,7 @@ The base `dronalize` package is intentionally small. Install it first, then add 
 ## Install the base package
 
 ```bash
-pip install dronalize
+pip install prejectory
 ```
 
 The base package includes:
@@ -19,7 +19,7 @@ The base package includes:
 - the processing pipeline
 - built-in scene and schema types
 - the `pickle` storage backend
-- the framework-neutral [`PickleReader`](../reference/api/io/readers.md#dronalize.io.readers.PickleReader)
+- the framework-neutral [`PickleReader`](../reference/api/io/readers.md#prejectory.io.readers.PickleReader)
 
 It does **not** include the CLI, MDS backend, Torch adapters, PyTorch Geometric adapters, any visualization implementation, or dataset-specific optional dependencies.
 
@@ -28,16 +28,16 @@ It does **not** include the CLI, MDS backend, Torch adapters, PyTorch Geometric 
 Use extras to enable additional functionality.
 
 ```bash
-pip install "dronalize[cli]"
-pip install "dronalize[cli,mds]"
-pip install "dronalize[torch]"
-pip install "dronalize[pyg]"
+pip install "prejectory[cli]"
+pip install "prejectory[cli,mds]"
+pip install "prejectory[torch]"
+pip install "prejectory[pyg]"
 ```
 
 You can combine extras in one command:
 
 ```bash
-pip install "dronalize[cli,mds,torch,pyg]"
+pip install "prejectory[cli,mds,torch,pyg]"
 ```
 
 ## Available extras
@@ -45,9 +45,9 @@ pip install "dronalize[cli,mds,torch,pyg]"
 | Extra | Adds |
 | --- | --- |
 | `cli` | Typer/Rich command-line interface |
-| `mds` | MDS writer backend and [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) |
-| `torch` | Torch dataset adapters such as [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) |
-| `pyg` | PyTorch Geometric adapters such as [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) |
+| `mds` | MDS writer backend and [`MDSReader`](../reference/api/io/readers.md#prejectory.io.readers.MDSReader) |
+| `torch` | Torch dataset adapters such as [`TorchSceneDataset`](../reference/api/io/adapters.md#prejectory.io.adapters.TorchSceneDataset) |
+| `pyg` | PyTorch Geometric adapters such as [`HeteroSceneDataset`](../reference/api/io/adapters.md#prejectory.io.adapters.HeteroSceneDataset) |
 | `viz` | Reserved placeholder extra for future visualization support. It currently adds no dependencies. |
 | `waymo` | Optional dependencies for the Waymo dataset |
 | `lyft` | Optional dependencies for the Lyft dataset |
@@ -57,20 +57,20 @@ pip install "dronalize[cli,mds,torch,pyg]"
 
 | Use case | Command |
 | --- | --- |
-| Basic processing with pickle output | `pip install dronalize` |
-| CLI workflows | `pip install "dronalize[cli]"` |
-| MDS output and reading | `pip install "dronalize[cli,mds]"` |
-| Torch training pipelines | `pip install "dronalize[torch]"` |
-| PyG graph pipelines | `pip install "dronalize[pyg]"` |
+| Basic processing with pickle output | `pip install prejectory` |
+| CLI workflows | `pip install "prejectory[cli]"` |
+| MDS output and reading | `pip install "prejectory[cli,mds]"` |
+| Torch training pipelines | `pip install "prejectory[torch]"` |
+| PyG graph pipelines | `pip install "prejectory[pyg]"` |
 
 ## Readers and adapters
 
 | API | Required extra |
 | --- | --- |
-| [`PickleReader`](../reference/api/io/readers.md#dronalize.io.readers.PickleReader) | none |
-| [`MDSReader`](../reference/api/io/readers.md#dronalize.io.readers.MDSReader) | `mds` |
-| [`TorchSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.TorchSceneDataset) | `torch` |
-| [`HeteroSceneDataset`](../reference/api/io/adapters.md#dronalize.io.adapters.HeteroSceneDataset) | `pyg` |
+| [`PickleReader`](../reference/api/io/readers.md#prejectory.io.readers.PickleReader) | none |
+| [`MDSReader`](../reference/api/io/readers.md#prejectory.io.readers.MDSReader) | `mds` |
+| [`TorchSceneDataset`](../reference/api/io/adapters.md#prejectory.io.adapters.TorchSceneDataset) | `torch` |
+| [`HeteroSceneDataset`](../reference/api/io/adapters.md#prejectory.io.adapters.HeteroSceneDataset) | `pyg` |
 
 ## Dataset-specific dependencies
 
@@ -82,13 +82,13 @@ Most built-in datasets are available with the base install. Some datasets requir
 | `lyft` | `lyft` |
 | `ad4che` | `ad4che` |
 
-The dataset registry only exposes datasets whose dependencies are installed. As a result, `dronalize available` reflects the datasets supported by your current environment.
+The dataset registry only exposes datasets whose dependencies are installed. As a result, `prejectory available` reflects the datasets supported by your current environment.
 
 For example:
 
 ```bash
-pip install "dronalize[cli,waymo]"
-dronalize available
+pip install "prejectory[cli,waymo]"
+prejectory available
 ```
 
 ## Verify the installation
@@ -96,30 +96,30 @@ dronalize available
 For the base package:
 
 ```bash
-python -c "import dronalize"
+python -c "import prejectory"
 ```
 
 For the CLI:
 
 ```bash
-dronalize available
-dronalize inspect a43
+prejectory available
+prejectory inspect a43
 ```
 
 For the MDS reader:
 
 ```bash
-python -c "from dronalize.io.readers import MDSReader"
+python -c "from prejectory.io.readers import MDSReader"
 ```
 
 For Torch adapters:
 
 ```bash
-python -c "from dronalize.io.adapters import TorchSceneDataset"
+python -c "from prejectory.io.adapters import TorchSceneDataset"
 ```
 
 For full-horizon PyG adapters:
 
 ```bash
-python -c "from dronalize.io.adapters import HeteroSceneDataset"
+python -c "from prejectory.io.adapters import HeteroSceneDataset"
 ```

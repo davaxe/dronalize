@@ -9,20 +9,20 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from dronalize.datasets.registry import dataset_id_for_name
-from dronalize.io.base import WorkerWriterProvider
-from dronalize.io.encoding.common import encode_scene_record
-from dronalize.runtime.executor import open_executor
+from prejectory.datasets.registry import dataset_id_for_name
+from prejectory.io.base import WorkerWriterProvider
+from prejectory.io.encoding.common import encode_scene_record
+from prejectory.runtime.executor import open_executor
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from dronalize.core.maps import MapGraph
-    from dronalize.core.scene import Scene
-    from dronalize.core.scene.schema import TrajectorySchema
-    from dronalize.io import SceneRecord
-    from dronalize.runtime.state import Progress
-    from dronalize.runtime.types import ExecutionPlan
+    from prejectory.core.maps import MapGraph
+    from prejectory.core.scene import Scene
+    from prejectory.core.scene.schema import TrajectorySchema
+    from prejectory.io import SceneRecord
+    from prejectory.runtime.state import Progress
+    from prejectory.runtime.types import ExecutionPlan
 
 
 def _assert_shape(array: npt.NDArray[Any], expected: tuple[int, ...], name: str) -> None:
@@ -309,7 +309,7 @@ def save_scene_artifacts(
 
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
-        import dronalize_viz as dviz  # pyright: ignore[reportMissingImports]  # ruff: ignore[import-outside-top-level]
+        import prejectory_viz as dviz  # pyright: ignore[reportMissingImports]  # ruff: ignore[import-outside-top-level]
 
         dviz.trajectory_figure(scene).save(out_dir / "trajectory.html")
 

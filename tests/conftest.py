@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from dronalize.core.scene import Scene
+from prejectory.core.scene import Scene
 from tests.support import DataFramePresets, make_scene
 from tests.support import scene_df_presets as _scene_df_presets
 

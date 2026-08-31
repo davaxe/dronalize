@@ -39,13 +39,13 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | Any tracked actor | `PEDESTRIAN` |
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | Not applicable | Not applicable |
 
@@ -54,7 +54,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support eth
+prejectory split-support eth
 ```
 
 ## References

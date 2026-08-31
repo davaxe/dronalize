@@ -1,6 +1,6 @@
 # Citation
 
-If `dronalize` contributes to academic work, cite the accompanying paper listed in the repository README. This page keeps the citation easy to copy while the broader research pages remain out of scope for the first documentation pass.
+If `prejectory` contributes to academic work, cite the accompanying paper listed in the repository README. This page keeps the citation easy to copy while the broader research pages remain out of scope for the first documentation pass.
 
 ## Recommended citation
 

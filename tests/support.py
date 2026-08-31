@@ -9,7 +9,7 @@ import polars as pl
 from pydantic import Field
 from typing_extensions import NotRequired, TypedDict, override
 
-from dronalize.config.models import (
+from prejectory.config.models import (
     DatasetConfig,
     LaneChangeConfig,
     OutputConfig,
@@ -19,15 +19,19 @@ from dronalize.config.models import (
     ScreeningConfig,
     WindowConfig,
 )
-from dronalize.core.categories import AgentCategory, AgentCategoryLike
-from dronalize.core.maps import MapGraph
-from dronalize.core.scene import CANONICAL, Scene, TrajectorySchema
-from dronalize.datasets import DatasetDescriptor, DatasetFeatureSupport
-from dronalize.io.records import SceneRecord
-from dronalize.processing.loading.base import SceneLoader
-from dronalize.processing.loading.models import DatasetSource, LoadedSourceFrame, LoaderOptionsModel
-from dronalize.processing.screening.agent import MinObservations
-from dronalize.processing.screening.cleanup import ExcludeCategories
+from prejectory.core.categories import AgentCategory, AgentCategoryLike
+from prejectory.core.maps import MapGraph
+from prejectory.core.scene import CANONICAL, Scene, TrajectorySchema
+from prejectory.datasets import DatasetDescriptor, DatasetFeatureSupport
+from prejectory.io.records import SceneRecord
+from prejectory.processing.loading.base import SceneLoader
+from prejectory.processing.loading.models import (
+    DatasetSource,
+    LoadedSourceFrame,
+    LoaderOptionsModel,
+)
+from prejectory.processing.screening.agent import MinObservations
+from prejectory.processing.screening.cleanup import ExcludeCategories
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence

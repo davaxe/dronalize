@@ -7,15 +7,15 @@ hide:
 <div class="landing" markdown>
 
 <div class="hero">
-  <img alt="Dronalize logo" src="assets/dronalize-header.png" class="hero__image">
+  <img alt="Prejectory logo" src="assets/prejectory-header.png" class="hero__image">
   <p class="hero__eyebrow">Trajectory preprocessing toolkit</p>
 
   <div class="hero__badges">
-    <a class="hero__badge" href="https://pypi.org/project/dronalize/">
-      <img alt="PyPI" src="https://img.shields.io/pypi/v/dronalize">
+    <a class="hero__badge" href="https://pypi.org/project/prejectory/">
+      <img alt="PyPI" src="https://img.shields.io/pypi/v/prejectory">
     </a>
-    <a class="hero__badge" href="https://pypi.org/project/dronalize/">
-      <img alt="Python versions" src="https://img.shields.io/pypi/pyversions/dronalize">
+    <a class="hero__badge" href="https://pypi.org/project/prejectory/">
+      <img alt="Python versions" src="https://img.shields.io/pypi/pyversions/prejectory">
     </a>
     <a class="hero__badge" href="https://www.apache.org/licenses/LICENSE-2.0">
       <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-2F2F2F.svg">
@@ -26,17 +26,17 @@ hide:
   </div>
 </div>
 
-`dronalize` is a toolbox designed to streamline the development process for researchers working with trajectory datasets in behavior prediction problems. Originally developed for drone-captured bird’s-eye-view datasets, it has since evolved to support a wide range of popular benchmarks in motion forecasting.
+`prejectory` is a toolbox designed to streamline the development process for researchers working with trajectory datasets in behavior prediction problems. Originally developed for drone-captured bird’s-eye-view datasets, it has since evolved to support a wide range of popular benchmarks in motion forecasting.
 
 The package can be installed via `pip` or `uv`:
 ```sh
-pip install dronalize
+pip install prejectory
 ```
 
 or using `uv`:
 
 ```sh
-uv pip install dronalize
+uv pip install prejectory
 ```
 
 ## Navigation
@@ -47,7 +47,7 @@ uv pip install dronalize
 
     ---
 
-    Install `dronalize` and the optional extras needed for your datasets, readers, and training stack.
+    Install `prejectory` and the optional extras needed for your datasets, readers, and training stack.
 
 
 -   [:material-terminal:{ .lg .middle } __First CLI run__](start/first-run-cli/)

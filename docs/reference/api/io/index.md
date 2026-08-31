@@ -1,22 +1,22 @@
-# ::: dronalize.io
+# ::: prejectory.io
     options:
         members: false
         show_root_full_path: true
 
-## ::: dronalize.io.DatasetManifest
+## ::: prejectory.io.DatasetManifest
 
-## ::: dronalize.io.PredictionTaskManifest
+## ::: prejectory.io.PredictionTaskManifest
 
-## ::: dronalize.io.StorageBackend
+## ::: prejectory.io.StorageBackend
 
-## ::: dronalize.io.PredictionBounds
+## ::: prejectory.io.PredictionBounds
 
-## ::: dronalize.io.SceneRecord
+## ::: prejectory.io.SceneRecord
 
-## ::: dronalize.io.SplitSceneRecord
+## ::: prejectory.io.SplitSceneRecord
 
-## ::: dronalize.io.read_manifest
+## ::: prejectory.io.read_manifest
 
-## ::: dronalize.io.manifest_path
+## ::: prejectory.io.manifest_path
 
-## ::: dronalize.io.write_manifest
+## ::: prejectory.io.write_manifest

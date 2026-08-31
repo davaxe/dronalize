@@ -1,16 +1,16 @@
-# ::: dronalize.processing.maps
+# ::: prejectory.processing.maps
     options:
         members: false
         show_root_full_path: true
 
-## ::: dronalize.processing.maps.MapReference
+## ::: prejectory.processing.maps.MapReference
 
-## ::: dronalize.processing.maps.MapProvider
+## ::: prejectory.processing.maps.MapProvider
 
-## ::: dronalize.processing.maps.SharedMapProvider
+## ::: prejectory.processing.maps.SharedMapProvider
 
-## ::: dronalize.processing.maps.FeatureMapBuilder
+## ::: prejectory.processing.maps.FeatureMapBuilder
 
-## ::: dronalize.processing.maps.PathFeature
+## ::: prejectory.processing.maps.PathFeature
 
-## ::: dronalize.processing.maps.PointFeature
+## ::: prejectory.processing.maps.PointFeature

@@ -1,10 +1,10 @@
-# ::: dronalize.config
+# ::: prejectory.config
     options:
         members: false
         show_root_full_path: true
 
-## ::: dronalize.config.ProjectConfig
+## ::: prejectory.config.ProjectConfig
 
-## ::: dronalize.config.RuntimeOverride
+## ::: prejectory.config.RuntimeOverride
 
-## ::: dronalize.config.parse_config
+## ::: prejectory.config.parse_config

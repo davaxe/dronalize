@@ -15,7 +15,7 @@ The Lyft Level 5 motion prediction dataset is a large-scale self-driving benchma
     This dataset requires the `lyft` extra to be installed. You can do this with pip (or your package manager of choice):
 
     ```bash
-    pip install dronalize[lyft]
+    pip install prejectory[lyft]
     ```
 
 ## Default prediction task
@@ -46,7 +46,7 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `label_probabilities argmax = 0` | `UNIMPORTANT` |
 | `label_probabilities argmax = 1` | `UNKNOWN` |
@@ -68,7 +68,7 @@ Expected raw data layout for this loader.
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `UNKNOWN` | `NONE` |
 | `NONE` | `VIRTUAL` |
@@ -89,7 +89,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support lyft
+prejectory split-support lyft
 ```
 
 ## References

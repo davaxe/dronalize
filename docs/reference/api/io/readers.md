@@ -1,13 +1,13 @@
-# ::: dronalize.io.readers
+# ::: prejectory.io.readers
     options:
         members: false
         show_root_full_path: true
 
 
-## ::: dronalize.io.readers.DatasetReader
+## ::: prejectory.io.readers.DatasetReader
 
-## ::: dronalize.io.readers.PickleReader
+## ::: prejectory.io.readers.PickleReader
 
-## ::: dronalize.io.readers.MDSReaderInitArgs
+## ::: prejectory.io.readers.MDSReaderInitArgs
 
-## ::: dronalize.io.readers.MDSReader
+## ::: prejectory.io.readers.MDSReader

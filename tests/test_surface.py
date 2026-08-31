@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-import dronalize
-from dronalize import datasets, io, processing, runtime
-from dronalize.config import ProjectConfig, RuntimeOverride, parse_config
-from dronalize.core import AgentCategory, DatasetSplit, EdgeType
-from dronalize.core.maps import MapGraph, SharedMapGraph
-from dronalize.io import (
+import prejectory
+from prejectory import datasets, io, processing, runtime
+from prejectory.config import ProjectConfig, RuntimeOverride, parse_config
+from prejectory.core import AgentCategory, DatasetSplit, EdgeType
+from prejectory.core.maps import MapGraph, SharedMapGraph
+from prejectory.io import (
     DatasetManifest,
     PredictionBounds,
     PredictionTaskManifest,
@@ -21,10 +21,10 @@ from dronalize.io import (
     read_manifest,
     write_manifest,
 )
-from dronalize.io import adapters as io_adapters
-from dronalize.io import readers as io_readers
-from dronalize.io.base import DatasetWriter
-from dronalize.runtime import (
+from prejectory.io import adapters as io_adapters
+from prejectory.io import readers as io_readers
+from prejectory.io.base import DatasetWriter
+from prejectory.runtime import (
     ExecutionPlan,
     ExecutionRequest,
     ExecutionResult,
@@ -42,7 +42,7 @@ PYTHON_INFO_STRINGS = {"py", "python"}
 
 
 def test_root_namespace_is_small() -> None:
-    assert dronalize.__all__ == []
+    assert prejectory.__all__ == []
 
 
 def test_main_namespaces_exposed() -> None:
@@ -100,7 +100,7 @@ def test_reader_and_adapter_exports_declared() -> None:
 
 
 def test_runtime_executors_not_root_exports() -> None:
-    runtime_module = __import__("dronalize.runtime", fromlist=["ParallelExecutor"])
+    runtime_module = __import__("prejectory.runtime", fromlist=["ParallelExecutor"])
     assert not hasattr(runtime_module, "ParallelExecutor")
     assert not hasattr(runtime_module, "SequentialExecutor")
 
@@ -186,7 +186,7 @@ def test_documented_python_examples_run(
 
 
 def test_config_file_parses() -> None:
-    path = Path("dronalize.toml")
+    path = Path("prejectory.toml")
     _ = parse_config(path)
 
 

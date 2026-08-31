@@ -9,7 +9,7 @@ task = "benchmark"
 ```
 
 Set `task` to another available name to replace the default selection, or use `task = "none"` for
-task-free output. Run `dronalize inspect <dataset>` to list named tasks and their effective bounds.
+task-free output. Run `prejectory inspect <dataset>` to list named tasks and their effective bounds.
 
 An inline task is a complete custom replacement, not a patch over the named task:
 
@@ -31,4 +31,4 @@ Example for a dataset that supports loader options:
 file_batch_size = 8
 ```
 
-Use `dronalize inspect <dataset>` to see whether a dataset exposes loader options and which option keys it supports by default. The [dataset reference](../datasets/) also documents dataset-specific config when relevant.
+Use `prejectory inspect <dataset>` to see whether a dataset exposes loader options and which option keys it supports by default. The [dataset reference](../datasets/) also documents dataset-specific config when relevant.

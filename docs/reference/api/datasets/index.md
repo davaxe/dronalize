@@ -1,4 +1,4 @@
-# ::: dronalize.datasets
+# ::: prejectory.datasets
 
     options:
         members: false

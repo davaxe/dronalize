@@ -15,7 +15,7 @@ AD4CHE is an aerial congestion dataset for highway and expressway traffic in Chi
     This dataset requires the `ad4che` extra to be installed. You can do this with pip (or your package manager of choice):
 
     ```bash
-    pip install dronalize[ad4che]
+    pip install prejectory[ad4che]
     ```
 
 ## Default prediction task
@@ -47,7 +47,7 @@ Expected raw data layout for this loader.
 
 ### Agent categories
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | `car` | `CAR` |
 | `truck` | `TRUCK` |
@@ -55,7 +55,7 @@ Expected raw data layout for this loader.
 
 ### Map types
 
-| Dataset type | Dronalize type |
+| Dataset type | Prejectory type |
 | ------------ | -------------- |
 | Extracted lane-image border contour | `LINE_THICK_DASHED` |
 
@@ -64,7 +64,7 @@ Expected raw data layout for this loader.
 Use the CLI for current native split and assignment support.
 
 ```bash
-dronalize split-support ad4che
+prejectory split-support ad4che
 ```
 
 ## References

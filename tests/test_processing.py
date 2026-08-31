@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 import polars as pl
 import pytest
 
-from dronalize.core import AgentCategory
-from dronalize.core.functional.resample import ResampleSpec, resample
-from dronalize.processing.columns import TrajectoryColumns
-from dronalize.processing.loading.assigner import StatelessWeightedAssigner
-from dronalize.processing.screening import (
+from prejectory.core import AgentCategory
+from prejectory.core.functional.resample import ResampleSpec, resample
+from prejectory.processing.columns import TrajectoryColumns
+from prejectory.processing.loading.assigner import StatelessWeightedAssigner
+from prejectory.processing.screening import (
     AgentCategorySelector,
     PassingRequirement,
     ScreeningRuleSet,
@@ -20,7 +20,7 @@ from dronalize.processing.screening import (
     cleanup,
     scene,
 )
-from dronalize.processing.screening.screen import screen_data
+from prejectory.processing.screening.screen import screen_data
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

@@ -1,12 +1,12 @@
 # Python entry
 
 The Python surface is organized around explicit package namespaces. In practice, most code starts
-with `dronalize.datasets`, `dronalize.config`, and `dronalize.runtime`.
+with `prejectory.datasets`, `prejectory.config`, and `prejectory.runtime`.
 
 ## Inspect a dataset programmatically
 
 ```python
-from dronalize.datasets import get_dataset
+from prejectory.datasets import get_dataset
 
 descriptor = get_dataset("a43")
 print(descriptor.name)
@@ -26,11 +26,11 @@ print(descriptor.supported_native_splits)
 ```python
 from pathlib import Path
 
-from dronalize.config import parse_config
-from dronalize.datasets import get_dataset
+from prejectory.config import parse_config
+from prejectory.datasets import get_dataset
 
 descriptor = get_dataset("a43")
-project = parse_config(Path("dronalize.toml"))
+project = parse_config(Path("prejectory.toml"))
 resolved = project.resolve_dataset_config(
     "a43",
     descriptor.default_config,
@@ -53,7 +53,7 @@ applied.
 ```python
 from pathlib import Path
 
-from dronalize.runtime import ExecutionRequest, execute_request, resolve_request
+from prejectory.runtime import ExecutionRequest, execute_request, resolve_request
 
 request = ExecutionRequest(
     dataset="a43",
@@ -78,14 +78,14 @@ execute the request directly.
 
 ## Schema and record helpers
 
-The `dronalize.core` package exports the scene, map, schema, and category types commonly used by
+The `prejectory.core` package exports the scene, map, schema, and category types commonly used by
 downstream code:
 
 ```python
-from dronalize.core import CANONICAL, MapGraph, Scene, get_trajectory_schema
+from prejectory.core import CANONICAL, MapGraph, Scene, get_trajectory_schema
 ```
 
 For persisted outputs:
 
-- `dronalize.io.readers` provides framework-neutral readers
-- `dronalize.io.adapters` provides optional Torch and PyG dataset adapters
+- `prejectory.io.readers` provides framework-neutral readers
+- `prejectory.io.adapters` provides optional Torch and PyG dataset adapters

@@ -1,6 +1,6 @@
 # Outputs and schemas
 
-Output decisions in `dronalize` are easiest to understand as two separate choices: what each scene
+Output decisions in `prejectory` are easiest to understand as two separate choices: what each scene
 contains, and how those scenes are stored on disk.
 
 For exact configuration keys, see the [output reference](../reference/configuration/output.md).
@@ -50,7 +50,7 @@ The built-in backends are:
 | Backend  | Purpose                                                                                         |
 | -------- | ----------------------------------------------------------------------------------------------- |
 | `pickle` | Writes one pickled `SceneRecord` per scene. No extra dependency.                                |
-| `mds`    | Writes Mosaic Streaming shards and `index.json` files. Requires `dronalize[mds]`.               |
+| `mds`    | Writes Mosaic Streaming shards and `index.json` files. Requires `prejectory[mds]`.               |
 | `null`   | Runs the full pipeline but does not persist scene data. Useful for validation and benchmarking. |
 
 Two defaults are easy to miss:

@@ -1,7 +1,7 @@
-## ::: dronalize.datasets.DatasetDescriptor
+## ::: prejectory.datasets.DatasetDescriptor
 
-## ::: dronalize.datasets.DatasetFeatureSupport
+## ::: prejectory.datasets.DatasetFeatureSupport
 
-## ::: dronalize.datasets.registry.DatasetSplitSupport
+## ::: prejectory.datasets.registry.DatasetSplitSupport
 
-## ::: dronalize.datasets.shared.resources.MapProviderFactory
+## ::: prejectory.datasets.shared.resources.MapProviderFactory

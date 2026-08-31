@@ -4,12 +4,12 @@ The public Python API is organized around shallow package namespaces. Prefer the
 code:
 
 ```python
-from dronalize.config import parse_config
-from dronalize.core import Scene, MapGraph, AgentCategory, get_trajectory_schema
-from dronalize.datasets import get_dataset, list_datasets
-from dronalize.runtime import ExecutionRequest, execute_request, resolve_request
-from dronalize.io import SceneRecord, read_manifest
-from dronalize.io.readers import PickleReader
+from prejectory.config import parse_config
+from prejectory.core import Scene, MapGraph, AgentCategory, get_trajectory_schema
+from prejectory.datasets import get_dataset, list_datasets
+from prejectory.runtime import ExecutionRequest, execute_request, resolve_request
+from prejectory.io import SceneRecord, read_manifest
+from prejectory.io.readers import PickleReader
 ```
 
 The pages in this section document symbols intended for direct use. Internal runtime executors,

@@ -2,7 +2,7 @@
 
 ## v2.0.0 - June 2026
 
-Major redesign of `dronalize`: move the project from a clonable research/template
+Major redesign of `prejectory`: move the project from a clonable research/template
 repository with preprocessing scripts, models, metrics, and training entry points into
 an installable trajectory data processing library with a shared runtime, typed
 configuration, dataset registry, and documented Python and CLI surfaces.
@@ -10,9 +10,9 @@ configuration, dataset registry, and documented Python and CLI surfaces.
 ### Breaking changes
 
 - Replace the old top-level `preprocessing`, `datamodules`, `models`, `metrics`, and
-  training-script layout with the package-based `src/dronalize` library structure.
+  training-script layout with the package-based `src/prejectory` library structure.
 - Remove the bundled model-development and evaluation stack from the package scope so
-  `dronalize` now focuses on dataset ingestion, scene construction, map handling, export,
+  `prejectory` now focuses on dataset ingestion, scene construction, map handling, export,
   and reading processed data.
 - Replace dataset-specific preprocessing scripts and YAML config files with registered
   dataset integrations, shared loader interfaces, and TOML-based runtime configuration.
@@ -31,10 +31,10 @@ configuration, dataset registry, and documented Python and CLI surfaces.
   registration through `--dataset-module`.
 - Add a dataset registry built around `DatasetDescriptor`, with built-in integrations for the
   supported datasets and a documented path for custom dataset loaders.
-- Add shared scene, schema, category, split, and map domain models under `dronalize.core`.
+- Add shared scene, schema, category, split, and map domain models under `prejectory.core`.
 - Add a shared processing pipeline for scene windowing, resampling, split assignment,
   lane-change sampling, screening, map extraction, and output writing.
-- Add a storage and reading layer under `dronalize.io`, including manifests,
+- Add a storage and reading layer under `prejectory.io`, including manifests,
   backend-neutral `SceneRecord` data, `pickle`, `mds`, and `null` backends, readers, and
   optional Torch/PyG adapters.
 - Add layered TOML configuration with reusable profiles, dataset-local overrides, and

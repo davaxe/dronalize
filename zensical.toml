@@ -1,12 +1,12 @@
 [project]
-site_name = "dronalize"
-site_url = "https://davaxe.github.io/dronalize/"
+site_name = "prejectory"
+site_url = "https://davaxe.github.io/prejectory/"
 site_description = "CLI-first preprocessing and scene generation for motion forecasting datasets."
 site_author = "Theodor Westny, David Axelsson"
 docs_dir = "docs"
 site_dir = "site"
-repo_url = "https://github.com/davaxe/dronalize"
-repo_name = "davaxe/dronalize"
+repo_url = "https://github.com/davaxe/prejectory"
+repo_name = "davaxe/prejectory"
 extra_css = ["stylesheets/extra.css"]
 nav = [
   { Home = "index.md" },
@@ -145,7 +145,7 @@ toggle.icon = "lucide/sun"
 toggle.name = "Switch to light mode"
 
 [project.plugins.mkdocstrings.handlers.python]
-paths = ["src/dronalize"]
+paths = ["src/prejectory"]
 
 [project.plugins.mkdocstrings.handlers.python.options]
 allow_inspection = true

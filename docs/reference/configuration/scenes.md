@@ -15,7 +15,7 @@ are dataset-specific rather than global.
 
 For dataset-specific defaults, known source-sequence bounds before windowing, and dataset-owned
 loader behavior, see the [dataset reference](../datasets/) or run
-`dronalize inspect <dataset>`.
+`prejectory inspect <dataset>`.
 
 ## Most common setup
 

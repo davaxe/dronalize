@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dronalize"
+name = "prejectory"
 version = "0.1.0.dev1"
 description = "Trajectory data processing toolkit for autonomous driving datasets"
 authors = [
@@ -39,16 +39,16 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/davaxe/dronalize"
-Repository = "https://github.com/davaxe/dronalize"
-Documentation = "https://davaxe.github.io/dronalize/"
-Issues = "https://github.com/davaxe/dronalize/issues"
+Homepage = "https://github.com/davaxe/prejectory"
+Repository = "https://github.com/davaxe/prejectory"
+Documentation = "https://davaxe.github.io/prejectory/"
+Issues = "https://github.com/davaxe/prejectory/issues"
 
 [project.scripts]
-dronalize = "dronalize.__main__:main"
+prejectory = "prejectory.__main__:main"
 
 [project.optional-dependencies]
-# viz = ["dronalize-viz"]
+# viz = ["prejectory-viz"]
 lyft = ["zarr<3", "numcodecs<=0.13.1", "protobuf>=4.25.8"]
 waymo = ["protobuf>=4.25.8"]
 ad4che = ["opencv-python"]
@@ -93,7 +93,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/dronalize"]
+packages = ["src/prejectory"]
 
 [tool.hatch.build.targets.sdist]
 exclude = ["tests", "examples"]
@@ -115,7 +115,7 @@ filterwarnings = [
 [tool.coverage.run]
 branch = true
 omit = [
-    "src/dronalize/datasets/*/protos/*.py",
+    "src/prejectory/datasets/*/protos/*.py",
 ]
 
 [tool.ty.src]
@@ -197,4 +197,4 @@ reportPrivateImportUsage = false
 reportUnknownMemberType = false
 
 # [tool.uv.sources]
-# dronalize-viz = { path = "../dronalize-viz", editable = true }
+# prejectory-viz = { path = "../prejectory-viz", editable = true }

@@ -1,7 +1,7 @@
-## ::: dronalize.runtime.ExecutionRequest
+## ::: prejectory.runtime.ExecutionRequest
 
-## ::: dronalize.runtime.ExecutionPlan
+## ::: prejectory.runtime.ExecutionPlan
 
-## ::: dronalize.runtime.ExecutionResult
+## ::: prejectory.runtime.ExecutionResult
 
-## ::: dronalize.runtime.OutputTransform
+## ::: prejectory.runtime.OutputTransform

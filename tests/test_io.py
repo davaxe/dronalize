@@ -8,12 +8,13 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
-from dronalize.io import DatasetManifest, PredictionBounds, PredictionTaskManifest, read_manifest
-from dronalize.io.backends.pickle import PickleWriter
-from dronalize.io.encoding import encode_scene_record
-from dronalize.io.encoding.mds import decode_mds_row, encode_mds_row
-from dronalize.io.manifest import write_manifest
-from dronalize.io.readers import PickleReader
+from prejectory.core.errors import ManifestCompatibilityError
+from prejectory.io import DatasetManifest, PredictionBounds, PredictionTaskManifest, read_manifest
+from prejectory.io.backends.pickle import PickleWriter
+from prejectory.io.encoding import encode_scene_record
+from prejectory.io.encoding.mds import decode_mds_row, encode_mds_row
+from prejectory.io.manifest import write_manifest
+from prejectory.io.readers import PickleReader
 from tests.support import assert_scene_record_equal, output_config
 
 if TYPE_CHECKING:
@@ -21,8 +22,8 @@ if TYPE_CHECKING:
 
     import torch
 
-    from dronalize.core.scene import Scene
-    from dronalize.io.records import SceneRecord
+    from prejectory.core.scene import Scene
+    from prejectory.io.records import SceneRecord
 
 NDArrayAny = npt.NDArray[Any]
 
@@ -147,8 +148,8 @@ def test_mds_writer_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("streaming")
     scene = replace(scene, dataset="demo")
 
-    from dronalize.io.backends.mds import MDSDatasetWriter
-    from dronalize.io.readers import MDSReader
+    from prejectory.io.backends.mds import MDSDatasetWriter
+    from prejectory.io.readers import MDSReader
 
     output_dir = tmp_path / "mds"
     writer = MDSDatasetWriter(
@@ -176,8 +177,8 @@ def test_mds_reader_combines_streams_with_per_row_prediction_bounds(
     pytest.importorskip("streaming")
     from streaming import Stream
 
-    from dronalize.io.backends.mds import MDSDatasetWriter
-    from dronalize.io.readers import MDSReader
+    from prejectory.io.backends.mds import MDSDatasetWriter
+    from prejectory.io.readers import MDSReader
 
     roots: list[Path] = []
     for index, bounds in enumerate((PredictionBounds(1, 3), PredictionBounds(2, 3))):
@@ -213,8 +214,8 @@ def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene)
     pytest.importorskip("streaming")
     scene = replace(scene, dataset="demo")
 
-    from dronalize.io.backends.mds import MDSDatasetWriter
-    from dronalize.io.readers import MDSReader
+    from prejectory.io.backends.mds import MDSDatasetWriter
+    from prejectory.io.readers import MDSReader
 
     def transform(record: SceneRecord) -> dict[str, Any]:
         observation_length = 1
@@ -259,7 +260,7 @@ def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene)
 def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> None:
     pytest.importorskip("streaming")
 
-    from dronalize.io.backends.mds import MDSDatasetWriter
+    from prejectory.io.backends.mds import MDSDatasetWriter
 
     with pytest.raises(ValueError, match="mds_columns"):
         _ = MDSDatasetWriter(
@@ -297,7 +298,7 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     manifest = DatasetManifest(
         dataset="test_dataset",
         storage_backend="pickle",
-        dronalize_version="2.0.0",
+        prejectory_version="2.0.0",
         source_trajectory_schema="positions_only",
         source_trajectory_schema_fields=("frame", "id", "x", "y", "agent_category"),
         trajectory_schema="canonical",
@@ -337,12 +338,17 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
     assert loaded.dataset_names == ("test_dataset",)
 
 
+def test_manifest_rejects_legacy_pre_rename_format() -> None:
+    with pytest.raises(ManifestCompatibilityError, match=r"version '1'.*Supported version: 2"):
+        _ = DatasetManifest.from_json_dict({"format_version": 1})
+
+
 def test_manifest_rejects_bad_prediction_bounds() -> None:
     with pytest.raises(ValueError, match="effective prediction bounds"):
         _ = DatasetManifest(
             dataset="test_dataset",
             storage_backend="pickle",
-            dronalize_version="2.0.0",
+            prejectory_version="2.0.0",
             source_trajectory_schema="positions_only",
             source_trajectory_schema_fields=("frame", "id", "x", "y", "agent_category"),
             trajectory_schema="canonical",
@@ -412,7 +418,7 @@ def _assert_tensor_array_equal(tensor: torch.Tensor, expected: NDArrayAny) -> No
 
 def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch")
-    from dronalize.io.adapters.torch import TorchSceneDataset
+    from prejectory.io.adapters.torch import TorchSceneDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
     dataset = TorchSceneDataset(reader)
@@ -436,7 +442,7 @@ def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
 def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch")
-    from dronalize.io.adapters.torch import TorchSceneDataset
+    from prejectory.io.adapters.torch import TorchSceneDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
     record = TorchSceneDataset(reader)[0]
@@ -459,7 +465,7 @@ def test_torch_forecast_dataset_uses_row_bounds_and_explicit_override(
     scene: Scene,
 ) -> None:
     pytest.importorskip("torch")
-    from dronalize.io.adapters.torch import TorchForecastDataset
+    from prejectory.io.adapters.torch import TorchForecastDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene, bounds=PredictionBounds(2, 3))
     split = TorchForecastDataset(reader)[0]
@@ -473,7 +479,7 @@ def test_torch_forecast_dataset_uses_row_bounds_and_explicit_override(
 
 def test_torch_forecast_dataset_rejects_task_free_record(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch")
-    from dronalize.io.adapters.torch import TorchForecastDataset
+    from prejectory.io.adapters.torch import TorchForecastDataset
 
     reader, _ = _build_pickle_reader(tmp_path, scene)
     with pytest.raises(ValueError, match="no prediction bounds"):
@@ -482,7 +488,7 @@ def test_torch_forecast_dataset_rejects_task_free_record(tmp_path: Path, scene: 
 
 def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
-    from dronalize.io.adapters.pyg import HeteroSceneDataset
+    from prejectory.io.adapters.pyg import HeteroSceneDataset
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
     dataset = HeteroSceneDataset(reader)
@@ -509,7 +515,7 @@ def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
 
 def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
-    from dronalize.io.adapters.pyg import HeteroSceneDataset, collate_hetero_with_time_padding
+    from prejectory.io.adapters.pyg import HeteroSceneDataset, collate_hetero_with_time_padding
 
     reader, _ = _build_pickle_reader(tmp_path, scene)
     record = HeteroSceneDataset(reader).get(0)
@@ -525,7 +531,7 @@ def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:
 
 def test_pyg_forecast_collate_aligns_history_and_future(tmp_path: Path, scene: Scene) -> None:
     pytest.importorskip("torch_geometric")
-    from dronalize.io.adapters.pyg import (
+    from prejectory.io.adapters.pyg import (
         HeteroForecastDataset,
         collate_forecast_hetero_with_time_padding,
     )

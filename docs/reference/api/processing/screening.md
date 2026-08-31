@@ -1,14 +1,14 @@
-# ::: dronalize.processing.screening
+# ::: prejectory.processing.screening
   options:
     members: false
     show_root_full_path: true
 
-## ::: dronalize.processing.screening.ScreeningRuleSet
+## ::: prejectory.processing.screening.ScreeningRuleSet
 
-## ::: dronalize.processing.screening.AgentCategorySelector
+## ::: prejectory.processing.screening.AgentCategorySelector
 
-## ::: dronalize.processing.screening.agent.AgentCheckRule
+## ::: prejectory.processing.screening.agent.AgentCheckRule
 
-## ::: dronalize.processing.screening.scene.SceneCheckRule
+## ::: prejectory.processing.screening.scene.SceneCheckRule
 
-## ::: dronalize.processing.screening.cleanup.CleanupRule
+## ::: prejectory.processing.screening.cleanup.CleanupRule
