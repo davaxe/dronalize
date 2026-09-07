@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "prejectory"
-version = "0.1.0.dev1"
+version = "0.1.0.dev0"
 description = "Trajectory data processing toolkit for autonomous driving datasets"
 authors = [
     { name = "Theodor Westny", email = "theodor.westny@liu.se" },
