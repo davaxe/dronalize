@@ -10,7 +10,14 @@ The public runtime surface is organized around four steps:
 
 from __future__ import annotations
 
-from prejectory.runtime.api import execute_plan, execute_request, resolve_request
+from prejectory.runtime.api import execute_plan, execute_request, plan, resolve_request, run
+from prejectory.runtime.state import (
+    CleanupProgress,
+    ExecutionStats,
+    Progress,
+    ScreeningProgress,
+    SplitCounts,
+)
 from prejectory.runtime.types import (
     CleanupRemovalSummary,
     CleanupSummary,
@@ -21,13 +28,20 @@ from prejectory.runtime.types import (
 )
 
 __all__ = [
+    "CleanupProgress",
     "CleanupRemovalSummary",
     "CleanupSummary",
     "ExecutionPlan",
     "ExecutionRequest",
     "ExecutionResult",
+    "ExecutionStats",
     "OutputTransform",
+    "Progress",
+    "ScreeningProgress",
+    "SplitCounts",
     "execute_plan",
     "execute_request",
+    "plan",
     "resolve_request",
+    "run",
 ]

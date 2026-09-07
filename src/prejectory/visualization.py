@@ -1,7 +1,7 @@
 """Visualization utilities.
 
 This module re-exports selected visualization symbols from the
-``prejectory-viz`` package for convenient access through the main package API.
+`prejectory-viz` package for convenient access through the main package API.
 
 This module requires the visualization extra to be installed, for example:
 

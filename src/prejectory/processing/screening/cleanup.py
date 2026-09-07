@@ -9,9 +9,7 @@ from pydantic import Field, model_validator
 from typing_extensions import override
 
 from prejectory.core.categories import AgentCategoryInput, coerce_agent_categories
-from prejectory.processing.screening.agent import (
-    AgentCheckRule,  # ruff: ignore[typing-only-first-party-import]
-)
+from prejectory.processing.screening.agent import AgentCheckRule  # ruff: ignore[typing-only-first-party-import]
 from prejectory.processing.screening.base import AgentSet, CleanupRuleBase, RuleId
 
 if TYPE_CHECKING:

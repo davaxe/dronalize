@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pickle  # ruff: ignore[suspicious-pickle-import]
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -11,8 +12,6 @@ from prejectory.io.base import DatasetReader, RecordT, split_directory_name
 from prejectory.io.records import SceneRecord
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from prejectory.core.categories import DatasetSplit
 
 
@@ -21,12 +20,18 @@ class PickleReader(DatasetReader[RecordT]):
 
     def __init__(
         self,
-        path: Path,
+        path: str | Path,
         split: DatasetSplit | str | None = None,
         record_type: type[RecordT] = SceneRecord,
     ) -> None:
         self._record_type: type[RecordT] = record_type
-        self._path: Path = path / split_directory_name(split)
+        self._path: Path = Path(path) / split_directory_name(split)
+        if not self._path.exists():
+            msg = f"Dataset split directory does not exist: {self._path}"
+            raise FileNotFoundError(msg)
+        if not self._path.is_dir():
+            msg = f"Dataset split path is not a directory: {self._path}"
+            raise NotADirectoryError(msg)
         self._files: tuple[Path, ...] = tuple(sorted(self._path.glob("*.pkl")))
 
     @override

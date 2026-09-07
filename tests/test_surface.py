@@ -7,15 +7,15 @@ from pathlib import Path
 import pytest
 
 import prejectory
-from prejectory import datasets, io, processing, runtime
-from prejectory.config import ProjectConfig, RuntimeOverride, parse_config
-from prejectory.core import AgentCategory, DatasetSplit, EdgeType
+from prejectory import config, core, datasets, io, processing, runtime
+from prejectory.config import DatasetConfigPatch, ProjectConfig, parse_config
+from prejectory.core import AgentCategory, DatasetSplit, EdgeType, errors
 from prejectory.core.maps import MapGraph, SharedMapGraph
 from prejectory.io import (
     DatasetManifest,
+    ForecastRecord,
     PredictionBounds,
     PredictionTaskManifest,
-    SplitSceneRecord,
     StorageBackend,
     manifest_path,
     read_manifest,
@@ -42,7 +42,7 @@ PYTHON_INFO_STRINGS = {"py", "python"}
 
 
 def test_root_namespace_is_small() -> None:
-    assert prejectory.__all__ == []
+    assert set(prejectory.__all__) == {"ExecutionRequest", "plan", "run", "open_dataset"}
 
 
 def test_main_namespaces_exposed() -> None:
@@ -74,13 +74,13 @@ def test_io_and_config_exports_present() -> None:
     assert DatasetManifest is not None
     assert PredictionBounds is not None
     assert PredictionTaskManifest is not None
-    assert SplitSceneRecord is not None
+    assert ForecastRecord is not None
     assert DatasetWriter is not None
     assert manifest_path is not None
     assert read_manifest is not None
     assert write_manifest is not None
     assert ProjectConfig is not None
-    assert RuntimeOverride is not None
+    assert DatasetConfigPatch is not None
     assert parse_config is not None
 
 
@@ -92,7 +92,7 @@ def test_reader_and_adapter_exports_declared() -> None:
     assert "IterableTorchSceneDataset" in io_adapters.__all__
     assert "IterableTorchForecastDataset" in io_adapters.__all__
     assert "TorchForecastDataset" in io_adapters.__all__
-    assert "TorchSplitSceneRecord" in io_adapters.__all__
+    assert "TorchForecastRecord" in io_adapters.__all__
     assert "IterableHeteroSceneDataset" in io_adapters.__all__
     assert "IterableHeteroForecastDataset" in io_adapters.__all__
     assert "HeteroForecastDataset" in io_adapters.__all__
@@ -115,6 +115,22 @@ def test_documented_runtime_imports_match_api() -> None:
     assert not hasattr(runtime, "process_dataset")
     assert not hasattr(runtime, "resolve_job")
     assert ExecutionRequest.model_fields["storage_backend"].default == StorageBackend.PICKLE
+
+
+def test_canonical_exports_cover_public_workflows() -> None:
+    assert prejectory.plan is runtime.plan is runtime.resolve_request
+    assert prejectory.run is runtime.run
+    assert prejectory.open_dataset is io.open_dataset
+    assert datasets.DatasetSplitSupport is not None
+    assert io.IterableDatasetReader is io_readers.IterableDatasetReader
+    assert "to_torch_scene_record" in io_adapters.__all__
+    assert runtime.ExecutionStats is not None
+    assert runtime.Progress is not None
+    assert issubclass(errors.ConfigurationError, errors.PrejectoryError)
+    assert not hasattr(config, "RuntimeOverride")
+    assert not hasattr(datasets, "MapConfig")
+    assert not hasattr(core, "TRAJECTORY_SCHEMAS")
+    assert not hasattr(io, "SplitSceneRecord")
 
 
 def _documented_code_params(language: str | set[str]) -> list[tuple[str, str, str]]:

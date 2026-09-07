@@ -12,10 +12,40 @@ objects with:
 - full-horizon agent features and masks
 - optional map graph arrays
 
-Use [`SceneRecord.split`](../reference/api/io/index.md#prejectory.io.SceneRecord.split)
+Use [`SceneRecord.forecast`](../reference/api/io/index.md#prejectory.io.SceneRecord.forecast)
 when a model needs explicit observation and prediction tensors.
 
 Use the same post-processing logic regardless of backend.
+
+## Open a dataset
+
+`open_dataset()` reads the manifest, selects the backend, checks partitions and record counts,
+and returns records together with their metadata. It accepts string and `Path` inputs.
+
+<!-- no-validate -->
+```python
+from prejectory import open_dataset
+
+dataset = open_dataset("output")  # All available partitions, in manifest order.
+print(dataset.manifest.feature_columns)
+print(dataset.manifest.split_counts)
+record = dataset[0]
+print(record.features.shape, record.valid_mask.shape)
+forecast = record.forecast()  # Uses the record's prediction task.
+```
+
+Omit `split` to read all partitions, or use `split="train"`, `"val"`, `"test"`, or `"unsplit"`.
+Missing paths and unknown partitions raise errors; an existing empty partition has length zero.
+Both iteration and integer indexing (including negative indices) are supported. MDS iteration
+preserves backend worker partitioning. Use the backend-specific readers below for remote streams
+or advanced backend settings; their default `split=None` continues to mean `unsplit/`.
+
+Forecast views share their arrays with the original record. To override bounds, use
+`record.forecast(PredictionBounds(origin, end))`, with half-open bounds in stored frames.
+Task-free records require explicit bounds. NumPy and Torch records both use `valid_mask`;
+forecast records use `history_mask` and `future_mask`.
+
+Only open trusted pickle exports: unpickling can execute code.
 
 ## Read the manifest first
 
@@ -54,10 +84,10 @@ reader = PickleReader(Path("output"), split="train")
 
 print(len(reader))
 scene = reader[0]
-print(scene.features.shape, scene.mask.shape)
+print(scene.features.shape, scene.valid_mask.shape)
 
 if scene.prediction_bounds is not None:
-    split = scene.split()
+    split = scene.forecast()
     print(split.history_features.shape, split.future_features.shape)
 ```
 
@@ -81,7 +111,7 @@ reader = MDSReader(path=Path("output"), split="train")
 
 print(len(reader))
 scene = reader[0]
-print(scene.features.shape, scene.mask.shape)
+print(scene.features.shape, scene.valid_mask.shape)
 ```
 
 For unsplit exports, use `split=None` (default), which reads from `unsplit/`.
@@ -103,7 +133,7 @@ reader = MDSReader(
     shuffle=True,
 )
 
-sample = next(iter(reader)).split()
+sample = next(iter(reader)).forecast()
 ```
 
 ## Torch and PyG adapters
@@ -133,9 +163,50 @@ common_task = HeteroForecastDataset(reader, bounds=PredictionBounds(20, 50))
 
 ## Choosing a reader setup
 
+- Use `open_dataset()` for ordinary local exports with manifest validation.
+
 - Use [`PickleReader`](../reference/api/io/readers.md#prejectory.io.readers.PickleReader) for simple local
   workflows and easy inspection.
 - Use [`MDSReader`](../reference/api/io/readers.md#prejectory.io.readers.MDSReader) for larger-scale or
   streaming-oriented training pipelines.
 - Keep reader-side code backend-neutral by depending on the shared
   [`SceneRecord`](../reference/api/io/index.md#prejectory.io.SceneRecord) contract.
+
+## Custom payloads
+
+Custom persisted output must declare a format ID and version. The manifest's trajectory metadata
+describes the canonical input to a record transform; the payload's layout is owned by its format.
+A scene transform also owns conversion, recentering, precision, and schema semantics.
+
+```python
+from prejectory.io import SceneRecord
+from prejectory.runtime import OutputTransform
+
+
+def scene_number(record: SceneRecord) -> dict[str, int]:
+    return {"number": record.scene_number}
+
+
+output = OutputTransform(
+    record_transform=scene_number,
+    format_id="example.scene-number",
+    format_version=1,
+)
+```
+
+Pass `output_transform=output` on the request. For MDS, also provide
+`mds_columns={"number": "int"}`. Planning validates this requirement and backend dependencies.
+Multiprocess runs require transforms defined as importable top-level callables.
+
+<!-- no-validate -->
+```python
+from prejectory import open_dataset
+from prejectory.io import read_manifest
+
+manifest = read_manifest("output")
+assert (manifest.payload_format, manifest.payload_version) == ("example.scene-number", 1)
+numbers = open_dataset("output", decoder=lambda payload: int(payload["number"]))
+```
+
+Custom formats always require an explicit decoder. It receives the unpickled payload for pickle,
+or the raw row for MDS. No decoder registry or implicit imports are used.

@@ -2,7 +2,7 @@
 
 ## Import guide
 
-```python
+``python
 from prejectory.processing import screening
 from prejectory.processing.screening import (
     AgentCategorySelector,
@@ -10,19 +10,17 @@ from prejectory.processing.screening import (
     ScreeningRuleSet,
     Tolerance,
 )
-```
+``
 
 This package is organized around three kinds of public symbols:
 
 - root-level screen containers such as
   [`ScreeningRuleSet`][prejectory.processing.screening.ScreeningRuleSet]
-- helper functions such as
-  [`screen_scene`][prejectory.processing.screening.screen_scene]
 - tolerance models for agent-rule aggregation
 - grouped rule families exposed through the
-  [`cleanup`][prejectory.processing.screening.cleanup],
-  [`scene`][prejectory.processing.screening.scene], and
-  [`agent`][prejectory.processing.screening.agent] submodules
+  `cleanup`,
+  `scene`, and
+  `agent` submodules
 
 This keeps the common screening API discoverable without flattening every rule
 type into one package namespace.
@@ -30,7 +28,7 @@ type into one package namespace.
 ## Related modules
 
 - [`prejectory.processing`][] for higher-level processing config
-- [`prejectory.processing.screening.agent`][] for agent-rule definitions
+- `prejectory.processing.screening.agent` for agent-rule definitions
 """
 
 from prejectory.processing.screening import agent, cleanup, scene

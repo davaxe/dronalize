@@ -230,7 +230,7 @@ CANONICAL: Final[TrajectorySchema] = TrajectorySchema.define(
 )
 """Most feature-complete built-in trajectory schema exported by the package."""
 
-TRAJECTORY_SCHEMAS: Final[dict[str, TrajectorySchema]] = {
+_TRAJECTORY_SCHEMAS: Final[dict[str, TrajectorySchema]] = {
     schema.name: schema
     for schema in (
         POSITIONS_ONLY,
@@ -246,12 +246,12 @@ TRAJECTORY_SCHEMAS: Final[dict[str, TrajectorySchema]] = {
 
 def available_trajectory_schemas() -> tuple[TrajectorySchema, ...]:
     """Return all registered built-in trajectory schemas in stable display order."""
-    return tuple(TRAJECTORY_SCHEMAS.values())
+    return tuple(_TRAJECTORY_SCHEMAS.values())
 
 
 def available_trajectory_schema_names() -> tuple[str, ...]:
     """Return all registered built-in trajectory schema names."""
-    return tuple(TRAJECTORY_SCHEMAS)
+    return tuple(_TRAJECTORY_SCHEMAS)
 
 
 class TrajectorySchemaDefinition(TypedDict):
@@ -271,8 +271,8 @@ def get_trajectory_schema(
     if isinstance(schema, dict):
         return TrajectorySchema.define(schema["name"], fields=schema["fields"])
 
-    if schema in TRAJECTORY_SCHEMAS:
-        return TRAJECTORY_SCHEMAS[schema]
+    if schema in _TRAJECTORY_SCHEMAS:
+        return _TRAJECTORY_SCHEMAS[schema]
 
     msg = f"Unknown trajectory schema '{schema}'."
     raise TrajectorySchemaError(msg)

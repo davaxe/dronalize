@@ -76,7 +76,7 @@ class CleanupRemovalAccumulator:
         )
 
     def freeze(self) -> CleanupRemovalSummary | None:
-        """Return an immutable summary, or ``None`` if no observations exist."""
+        """Return an immutable summary, or `None` if no observations exist."""
         if self.scene_count == 0:
             return None
 
@@ -133,7 +133,7 @@ class CleanupAccumulator:
             accumulator.merge(rule_summary)
 
     def freeze(self) -> CleanupSummary | None:
-        """Return an immutable cleanup summary, or ``None`` if no stats exist."""
+        """Return an immutable cleanup summary, or `None` if no stats exist."""
         overall = self.overall.freeze()
         if overall is None:
             return None
@@ -194,7 +194,7 @@ class LocalRunAccounting:
         self._changed()
 
     def claim_scene_number(self) -> int | None:
-        """Claim the next scene number, or return ``None`` at the limit."""
+        """Claim the next scene number, or return `None` at the limit."""
         if self.limit_reached():
             return None
 
@@ -256,7 +256,7 @@ class LocalRunAccounting:
 
 @dataclass(slots=True)
 class SharedRunAccounting:
-    """Multiprocessing accounting backed by ``ProgressState``."""
+    """Multiprocessing accounting backed by `ProgressState`."""
 
     progress: ProgressState
     limit: int | None = None

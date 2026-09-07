@@ -1,3 +1,5 @@
+# ruff: file-ignore[private-member-access] - Internal plan/config consumers.
+# pyright: reportPrivateUsage=false
 # pyright: standard
 from __future__ import annotations
 
@@ -6,7 +8,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 import pytest
 
-from prejectory.config import ProjectConfig, RuntimeOverride, parse_config
+from prejectory.config import ProjectConfig, parse_config
 from prejectory.config.models import (
     DatasetConfig,
     MapEdgeTypeRules,
@@ -20,6 +22,7 @@ from prejectory.core.errors import ConfigurationError
 from prejectory.processing.columns import TrajectoryColumns
 from prejectory.processing.screening import ScreeningRuleSet, agent, cleanup, scene
 from prejectory.processing.screening.screen import screen_data
+from prejectory.runtime.cli.inputs import config_overrides
 from tests.support import inherited_optional_blocks_descriptor
 
 if TYPE_CHECKING:
@@ -85,7 +88,7 @@ def test_parse_config_parses_window(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+    resolved = cfg._resolve_config("demo", _dataset_config())
 
     assert resolved.scenes.window is not None
     assert resolved.scenes.window.step == 2
@@ -106,7 +109,7 @@ def test_dataset_config_can_clear_inherited_prediction_task(tmp_path: Path) -> N
         ),
     )
 
-    assert cfg.resolve_dataset_config("demo", _dataset_config()).task is None
+    assert cfg._resolve_config("demo", _dataset_config()).task is None
 
 
 def test_inline_prediction_task_must_be_complete(tmp_path: Path) -> None:
@@ -147,7 +150,7 @@ def test_direct_resolution_requires_named_task_context(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ConfigurationError, match=r"requires.*named_tasks"):
-        _ = cfg.resolve_dataset_config("demo", _dataset_config())
+        _ = cfg._resolve_config("demo", _dataset_config())
 
 
 def test_resolve_applies_defaults_without_dataset(tmp_path: Path) -> None:
@@ -169,7 +172,7 @@ def test_resolve_applies_defaults_without_dataset(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+    resolved = cfg._resolve_config("demo", _dataset_config())
 
     assert resolved.runtime.jobs == 8
     assert resolved.output.trajectory_schema == "canonical"
@@ -195,7 +198,7 @@ def test_resolve_applies_defaults_before_dataset(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+    resolved = cfg._resolve_config("demo", _dataset_config())
 
     assert resolved.runtime.jobs == 2
     assert resolved.output.mds.compression == "zstd:3"
@@ -215,7 +218,7 @@ def test_defaults_can_use_profiles(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+    resolved = cfg._resolve_config("demo", _dataset_config())
 
     assert resolved.runtime.jobs == 8
 
@@ -232,7 +235,7 @@ def test_resolve_raises_for_missing_profile(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ConfigurationError, match="Profile 'missing' not found"):
-        _ = cfg.resolve_dataset_config(
+        _ = cfg._resolve_config(
             "demo",
             DatasetConfig.model_validate({
                 "scenes": {"horizon_frames": 2, "sample_time": 0.1},
@@ -253,7 +256,7 @@ def test_resolve_raises_for_missing_defaults_profile(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ConfigurationError, match="Profile 'missing' not found for defaults"):
-        _ = cfg.resolve_dataset_config("demo", _dataset_config())
+        _ = cfg._resolve_config("demo", _dataset_config())
 
 
 def test_parse_config_rejects_invalid_toml(tmp_path: Path) -> None:
@@ -270,7 +273,7 @@ def test_parse_config_rejects_invalid_toml(tmp_path: Path) -> None:
 
 
 def test_runtime_override_sets_present_sections() -> None:
-    override = RuntimeOverride.from_inputs(
+    override = config_overrides(
         assign_strategy="scene",
         read_split=None,
         jobs=3,
@@ -286,7 +289,7 @@ def test_runtime_override_sets_present_sections() -> None:
     assert override.output.trajectory_schema == "canonical"
     assert override.assign is not None
 
-    empty = RuntimeOverride.from_inputs(
+    empty = config_overrides(
         read_strategy=None,
         read_split=None,
         assign_strategy=None,
@@ -304,7 +307,7 @@ def test_runtime_override_sets_present_sections() -> None:
 
 def test_runtime_override_requires_native_read_for_splits() -> None:
     with pytest.raises(ConfigurationError, match="read_split"):
-        _ = RuntimeOverride.from_inputs(read_split=[DatasetSplit.TRAIN])
+        _ = config_overrides(read_split=[DatasetSplit.TRAIN])
 
 
 @pytest.mark.parametrize(
@@ -325,7 +328,7 @@ def test_runtime_override_rejects_bad_assignment_inputs(
     match: str,
 ) -> None:
     with pytest.raises(ConfigurationError, match=match):
-        _ = RuntimeOverride.from_inputs(**kwargs)  # pyright: ignore[reportArgumentType]
+        _ = config_overrides(**kwargs)  # pyright: ignore[reportArgumentType]
 
 
 def test_resolve_disables_inherited_optional_blocks(tmp_path: Path) -> None:
@@ -344,7 +347,7 @@ def test_resolve_disables_inherited_optional_blocks(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", inherited_optional_blocks_descriptor())
+    resolved = cfg._resolve_config("demo", inherited_optional_blocks_descriptor())
 
     assert resolved.screening is None
     assert resolved.scenes.window is None
@@ -364,7 +367,7 @@ def test_screening_extend_is_default(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+    resolved = cfg._resolve_config("demo", _dataset_config())
 
     assert resolved.screening is not None
     assert resolved.screening.cleanup == {}
@@ -397,7 +400,7 @@ def test_screening_extend_merges_namespaces(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config(
+    resolved = cfg._resolve_config(
         "demo",
         _dataset_config(
             screening={
@@ -441,7 +444,7 @@ def test_screening_replace_discards_inherited(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config(
+    resolved = cfg._resolve_config(
         "demo",
         _dataset_config(
             screening={
@@ -481,7 +484,7 @@ def test_screening_remove_drops_names(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config(
+    resolved = cfg._resolve_config(
         "demo",
         _dataset_config(
             screening={
@@ -565,7 +568,7 @@ def test_screening_profiles_resolve_before_dataset(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+    resolved = cfg._resolve_config("demo", _dataset_config())
 
     assert resolved.screening is not None
     assert set(resolved.screening.cleanup) == {"trim_static"}
@@ -596,7 +599,7 @@ def test_map_config_parses_scene_extent(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+    resolved = cfg._resolve_config("demo", _dataset_config())
 
     assert isinstance(resolved.map.extraction, SceneExtentExtraction)
     assert resolved.map.extraction.padding == pytest.approx(1.25)
@@ -632,7 +635,7 @@ def test_map_config_parses_trajectory_buffer(tmp_path: Path) -> None:
         ),
     )
 
-    resolved = cfg.resolve_dataset_config("demo", _dataset_config())
+    resolved = cfg._resolve_config("demo", _dataset_config())
 
     assert isinstance(resolved.map.extraction, TrajectoryBufferExtraction)
     assert resolved.map.extraction.radius == pytest.approx(6.5)

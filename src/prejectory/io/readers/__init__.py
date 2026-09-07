@@ -6,9 +6,10 @@ storage-agnostic in-memory representations of scene records.
 
 ## Import guide
 
-```python
-from prejectory.io.readers import DatasetReader, MDSReader, MDSReaderInitArgs, PickleReader
-```
+``python
+from prejectory.io.readers import DatasetReader, IterableDatasetReader
+from prejectory.io.readers import MDSReader, MDSReaderInitArgs, PickleReader
+``
 
 ## Related modules
 
@@ -24,13 +25,20 @@ from typing import TYPE_CHECKING
 from prejectory.core.optional import lazy_dir, resolve_lazy_export
 
 if TYPE_CHECKING:
-    from prejectory.io.base import DatasetReader
+    from prejectory.io.base import DatasetReader, IterableDatasetReader
     from prejectory.io.readers.mds import MDSReader, MDSReaderInitArgs
     from prejectory.io.readers.pickle import PickleReader
 
-__all__ = ["DatasetReader", "MDSReader", "MDSReaderInitArgs", "PickleReader"]
+__all__ = [
+    "DatasetReader",
+    "IterableDatasetReader",
+    "MDSReader",
+    "MDSReaderInitArgs",
+    "PickleReader",
+]
 
 __lazy_exports__: dict[str, tuple[str, str]] = {
+    "IterableDatasetReader": ("prejectory.io.base", "IterableDatasetReader"),
     "DatasetReader": ("prejectory.io.base", "DatasetReader"),
     "MDSReader": ("prejectory.io.readers.mds", "MDSReader"),
     "MDSReaderInitArgs": ("prejectory.io.readers.mds", "MDSReaderInitArgs"),

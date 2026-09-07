@@ -4,17 +4,14 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from importlib.metadata import PackageNotFoundError, version
-from typing import TYPE_CHECKING, Any, cast
+from pathlib import Path
+from typing import Any, cast
 
 from prejectory.core.errors import ManifestCompatibilityError
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
-
-FORMAT_VERSION: int = 2
+FORMAT_VERSION: int = 3
 MANIFEST_FILENAME: str = "manifest.json"
 logger = logging.getLogger(__name__)
 
@@ -24,7 +21,7 @@ class PredictionTaskManifest:
     """Configured and effective prediction bounds for one processed export."""
 
     name: str | None
-    """Descriptor-owned task name, or ``None`` for a custom task."""
+    """Descriptor-owned task name, or `None` for a custom task."""
     source_prediction_origin: int
     source_prediction_end: int
     prediction_origin: int
@@ -38,6 +35,8 @@ class DatasetManifest:
     The manifest records the shape and schema contract of one processed export.
     Reader and adapter code use it to understand feature columns, temporal
     horizons, coordinate handling, map availability, and manifest compatibility.
+    For custom payload formats, trajectory metadata describes the requested
+    canonical representation; the format ID/version owns the actual payload layout.
     """
 
     dataset: str
@@ -77,8 +76,29 @@ class DatasetManifest:
     dataset_names: tuple[str, ...] = ()
     """Dataset names indexed by the integer dataset ids stored in records."""
 
+    payload_format: str = "prejectory.scene"
+    """Record encoding identifier; other formats require an explicit decoder."""
+    payload_version: int = 1
+    """Version of the payload format, independent of the manifest schema."""
+    split_counts: dict[str, int] = field(default_factory=dict)
+    """Available output partitions and their committed record counts."""
+
+    @property
+    def splits(self) -> tuple[str, ...]:
+        """Available partitions in their persisted iteration order."""
+        return tuple(self.split_counts)
+
     def __post_init__(self) -> None:
         """Validate temporal manifest fields."""
+        if not self.payload_format.strip() or self.payload_version < 1:
+            msg = "Payload format must be named and its version positive."
+            raise ValueError(msg)
+        if any(name not in {"unsplit", "train", "val", "test"} for name in self.split_counts):
+            msg = "Manifest contains an unknown output split."
+            raise ValueError(msg)
+        if any(type(count) is not int or count < 0 for count in self.split_counts.values()):
+            msg = "Manifest split counts must be non-negative integers."
+            raise ValueError(msg)
         if not self.dataset_names:
             object.__setattr__(self, "dataset_names", (self.dataset,))
         if self.horizon_frames <= 0:
@@ -107,6 +127,9 @@ class DatasetManifest:
             dataset=str(payload["dataset"]),
             format_version=format_version,
             storage_backend=str(payload["storage_backend"]),
+            payload_format=str(payload["payload_format"]),
+            payload_version=int(payload["payload_version"]),
+            split_counts=dict(payload["split_counts"]),
             prejectory_version=str(payload["prejectory_version"]),
             source_trajectory_schema=str(
                 payload.get("source_trajectory_schema", payload["trajectory_schema"]),
@@ -151,12 +174,12 @@ def package_version() -> str:
         return "0+unknown"
 
 
-def manifest_path(root: Path) -> Path:
+def manifest_path(root: str | Path) -> Path:
     """Return the manifest path for one storage root.
 
     Parameters
     ----------
-    root: Path
+    root: str | Path
         The root directory of the processed dataset.
 
     Returns
@@ -164,11 +187,12 @@ def manifest_path(root: Path) -> Path:
     Path
         The path to the manifest file.
     """
-    return root / MANIFEST_FILENAME
+    return Path(root) / MANIFEST_FILENAME
 
 
-def write_manifest(root: Path, manifest: DatasetManifest) -> None:
+def write_manifest(root: str | Path, manifest: DatasetManifest) -> None:
     """Write the storage manifest for one output root."""
+    root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     logger.debug("Writing manifest", extra={"root": str(root), "format_version": FORMAT_VERSION})
     _ = manifest_path(root).write_text(
@@ -177,12 +201,12 @@ def write_manifest(root: Path, manifest: DatasetManifest) -> None:
     )
 
 
-def read_manifest(root: Path) -> DatasetManifest:
+def read_manifest(root: str | Path) -> DatasetManifest:
     """Read and parse the storage manifest for one output root.
 
     Parameters
     ----------
-    root: Path
+    root: str | Path
         The root directory of the processed dataset.
 
     Returns

@@ -21,9 +21,9 @@ from prejectory.processing.maps import (
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
+    from prejectory.config import MapConfig
     from prejectory.core.maps import MapGraph
     from prejectory.core.scene.model import Scene
-    from prejectory.datasets import MapConfig
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import Field, field_validator, model_validator
@@ -16,7 +17,8 @@ from prejectory.core.errors import ConfigurationError
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
-    from pathlib import Path
+
+    from prejectory.datasets.registry import DatasetDescriptor
 
 if sys.version_info >= (3, 11):
     import tomllib  # pyright: ignore[reportUnreachable]
@@ -24,7 +26,7 @@ else:
     import tomli as tomllib
 
 
-def parse_config(path: Path) -> ProjectConfig:
+def parse_config(path: str | Path) -> ProjectConfig:
     """Parse configuration from a TOML file.
 
     !!! note "Completeness of the returned config"
@@ -47,6 +49,7 @@ def parse_config(path: Path) -> ProjectConfig:
     ProjectConfig
         The parsed configuration, validated and ready for dataset-specific resolution.
     """
+    path = Path(path)
     with path.open("rb") as handle:
         try:
             data = tomllib.load(handle)
@@ -61,7 +64,7 @@ class DatasetConfigEntry(DatasetConfigPatchBase):
 
     uses: tuple[str, ...] | None = None
     task: PredictionTaskConfig | Clear | str | None = None
-    """Named task, complete inline task, or ``none`` for task-free output."""
+    """Named task, complete inline task, or `none` for task-free output."""
 
     @field_validator("task", mode="before")
     @classmethod
@@ -92,7 +95,7 @@ class ProjectConfig(ConfigBase):
     `resolve` method.
 
     To load a `ProjectConfig` from a TOML file, use the
-    [`parse_config`][prejectory.config.reader.parse_config] function.
+    [`parse_config`][prejectory.config.parse_config] function.
 
     """
 
@@ -121,7 +124,19 @@ class ProjectConfig(ConfigBase):
                 selection = entry.task
         return selection
 
-    def resolve_dataset_config(
+    def resolve_dataset_config(self, dataset: str | DatasetDescriptor) -> DatasetConfig:
+        """Apply project configuration to a dataset name or descriptor's defaults."""
+        from prejectory.datasets.registry import get_dataset  # ruff: ignore[import-outside-top-level]
+
+        descriptor = get_dataset(dataset) if isinstance(dataset, str) else dataset
+        return self._resolve_config(
+            descriptor.name,
+            descriptor.default_config,
+            named_tasks=descriptor.tasks,
+            default_task=descriptor.default_task,
+        )
+
+    def _resolve_config(
         self,
         dataset: str,
         dataset_config: DatasetConfig,

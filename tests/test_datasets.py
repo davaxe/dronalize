@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from prejectory.config import RuntimeOverride
+from prejectory.config import DatasetConfigPatch, RuntimePatch
 from prejectory.datasets import DatasetDescriptor, get_dataset, list_datasets
 from prejectory.datasets.registry import dataset_id_for_name, dataset_names_by_id
 from prejectory.io import StorageBackend
@@ -106,7 +106,7 @@ def test_dataset_raw_data_processing(
         input_dir=raw_data_root / case.dataset,
         output_dir=tmp_path,
         storage_backend=StorageBackend.NULL,
-        overrides=RuntimeOverride.from_inputs(jobs=jobs),
+        overrides=DatasetConfigPatch(runtime=RuntimePatch(jobs=jobs)),
         limit=case.max_scenes * case.scene_step + case.scene_start,
         include_map=jobs == 1,
     )
@@ -138,7 +138,7 @@ def test_datasets_mocked_registry_smoke(
         input_dir=input_dir,
         output_dir=output_dir,
         storage_backend=StorageBackend.NULL,
-        overrides=RuntimeOverride.from_inputs(jobs=jobs),
+        overrides=DatasetConfigPatch(runtime=RuntimePatch(jobs=jobs)),
         include_map=False,
         limit=2,
     )

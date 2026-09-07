@@ -19,9 +19,9 @@ try:
         IterableReaderT,
         ReaderT,
         TorchForecastDataset,
+        TorchForecastRecord,
         TorchSceneDataset,
         TorchSceneRecord,
-        TorchSplitSceneRecord,
     )
 except ModuleNotFoundError as error:
     raise_missing_optional_dependency(error, feature="The PyG scene dataset adapter", extra="pyg")
@@ -42,7 +42,7 @@ class HeteroSceneDataset(PyGDataset, Dataset[HeteroData], Generic[ReaderT]):
 
     Each record is a `HeteroData` object with `agent` and `map` node stores and
     a `("map", "connects", "map")` edge store. Agent trajectories are exposed
-    as `agent.features` with a matching `agent.agent_time_mask`.
+    as `agent.features` with a matching `agent.valid_mask`.
     """
 
     def __init__(
@@ -187,11 +187,11 @@ def collate_forecast_hetero_with_time_padding(records: Sequence[HeteroData]) -> 
 def _convert_full_to_hetero(record: TorchSceneRecord) -> HeteroData:
     data = _hetero_with_common_data(record, num_agents=record.features.size(0))
     data["agent"].features = record.features
-    data["agent"].agent_time_mask = record.agent_time_mask
+    data["agent"].valid_mask = record.valid_mask
     return data
 
 
-def _convert_forecast_to_hetero(record: TorchSplitSceneRecord) -> HeteroData:
+def _convert_forecast_to_hetero(record: TorchForecastRecord) -> HeteroData:
     data = _hetero_with_common_data(record, num_agents=record.history_features.size(0))
     data["agent"].history_features = record.history_features
     data["agent"].history_mask = record.history_mask
@@ -201,7 +201,7 @@ def _convert_forecast_to_hetero(record: TorchSplitSceneRecord) -> HeteroData:
 
 
 def _hetero_with_common_data(
-    record: TorchSceneRecord | TorchSplitSceneRecord,
+    record: TorchSceneRecord | TorchForecastRecord,
     *,
     num_agents: int,
 ) -> HeteroData:
@@ -231,8 +231,8 @@ def _pad_full_hetero_time_axes(record: HeteroData, *, horizon_frames: int) -> He
         target=horizon_frames,
         dim=1,
     )
-    padded["agent"].agent_time_mask = _pad_along_dim(
-        record["agent"].agent_time_mask,
+    padded["agent"].valid_mask = _pad_along_dim(
+        record["agent"].valid_mask,
         target=horizon_frames,
         dim=1,
     )

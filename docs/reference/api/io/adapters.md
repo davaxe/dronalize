@@ -9,10 +9,12 @@
 
 ## ::: prejectory.io.adapters.TorchSceneRecord
 
-## ::: prejectory.io.adapters.TorchSplitSceneRecord
+## ::: prejectory.io.adapters.TorchForecastRecord
 
 ## ::: prejectory.io.adapters.HeteroSceneDataset
 
 ## ::: prejectory.io.adapters.IterableHeteroSceneDataset
 
 ## ::: prejectory.io.adapters.collate_hetero_with_time_padding
+
+## ::: prejectory.io.adapters.to_torch_scene_record

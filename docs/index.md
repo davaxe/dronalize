@@ -29,9 +29,9 @@ hide:
 `prejectory` is a toolbox designed to streamline the development process for researchers working with trajectory datasets in behavior prediction problems. Originally developed for drone-captured bird’s-eye-view datasets, it has since evolved to support a wide range of popular benchmarks in motion forecasting.
 
 The package can be installed via `pip` or `uv`:
-```sh
+``sh
 pip install prejectory
-```
+``
 
 or using `uv`:
 

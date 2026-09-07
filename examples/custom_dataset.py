@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import polars as pl
 from typing_extensions import override
 
-from prejectory.config.models import DatasetConfig, ScenesConfig, WindowConfig
+from prejectory.config import DatasetConfig, ScenesConfig, WindowConfig
 from prejectory.core import AgentCategory
 from prejectory.core.scene import POSITIONS_ONLY, TrajectorySchema
 from prejectory.datasets import DatasetDescriptor, register_dataset
@@ -103,6 +103,6 @@ if __name__ == "__main__":
     plan = resolve_request(request)
     # Inspect that the plan matches expectations
     print(f"dataset: {plan.dataset}")
-    print(f"input: {plan.data_root}")
+    print(f"input: {plan.input_dir}")
     print(f"output: {plan.output_dir}")
-    print(f"schema: {plan.descriptor.native_schema.name}")
+    print(f"schema: {plan.trajectory_schema.name}")

@@ -1,3 +1,5 @@
+# ruff: file-ignore[private-member-access] - Internal plan/config consumers.
+# pyright: reportPrivateUsage=false
 """Internal runtime executors."""
 
 from __future__ import annotations
@@ -51,11 +53,11 @@ class WorkerRuntime:
 @contextmanager
 def open_executor(plan: ExecutionPlan) -> Generator[SequentialExecutor | ParallelExecutor]:
     """Open the executor and dataset resources for one plan."""
-    with plan.descriptor.open_resources(plan.data_root, plan.loader) as map_provider:
+    with plan._descriptor.open_resources(plan.input_dir, plan._loader) as map_provider:
         logger.debug("Opening executor", extra={"dataset": plan.dataset})
-        loader = plan.descriptor.build_loader(
-            root=plan.data_root,
-            request=plan.loader,
+        loader = plan._descriptor.build_loader(
+            root=plan.input_dir,
+            request=plan._loader,
             map_provider=map_provider,
         )
         processor = RuntimeProcessor.from_plan(plan, loader)
@@ -70,8 +72,8 @@ def _build_executor(
         logger.debug("Using parallel executor", extra={"dataset": plan.dataset})
         return ParallelExecutor(
             processor,
-            workers=plan.runtime.jobs,
-            chunksize=plan.runtime.chunksize,
+            workers=plan.config.runtime.jobs,
+            chunksize=plan.config.runtime.chunksize,
             limit=plan.limit,
         )
     logger.debug("Using sequential executor", extra={"dataset": plan.dataset})

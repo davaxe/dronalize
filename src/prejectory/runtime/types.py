@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import (
-    Path,  # ruff: ignore[typing-only-standard-library-import] - Pydantic resolves this forward reference at runtime.
-)
+from dataclasses import dataclass, field
+from pathlib import Path  # ruff: ignore[typing-only-standard-library-import] - Pydantic resolves this forward reference at runtime.
 from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from prejectory.config.models import (
+    DatasetConfigPatch,
     PredictionTaskConfig,
-    RuntimeOverride,
     ScreeningConfig,
     effective_prediction_bounds,
     effective_scene_window,
 )
+from prejectory.config.parse import ProjectConfig  # ruff: ignore[typing-only-first-party-import] - Pydantic resolves the request model at runtime.
 from prejectory.core.errors import ConfigurationError
 from prejectory.core.scene.model import derived_trajectory_fields
 from prejectory.core.scene.schema import POSITIONS_ONLY, TrajectorySchema, get_trajectory_schema
@@ -33,8 +32,9 @@ from prejectory.processing.screening.agent import AgentRequireFrames
 from prejectory.processing.screening.base import PassingRequirement
 
 if TYPE_CHECKING:
-    from prejectory.config.models import DatasetConfig, MapConfig, OutputConfig, RuntimeConfig
+    from prejectory.config.models import DatasetConfig, OutputConfig
     from prejectory.datasets.registry import DatasetDescriptor
+    from prejectory.io.records import PredictionBounds
     from prejectory.processing.loading.models import LoaderOptionsModel
     from prejectory.runtime.state import ExecutionStats
 
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 class CleanupRemovalSummary:
     """Aggregate cleanup-removal statistics over candidate scenes with cleanup stats.
 
-    Cleanup is recorded before screening rejection is applied, so ``scene_count``
+    Cleanup is recorded before screening rejection is applied, so `scene_count`
     does not necessarily match the number of written scenes.
     """
 
@@ -70,8 +70,8 @@ class CleanupSummary:
 class ExecutionResult:
     """Final result of one dataset execution.
 
-    ``stats`` is the canonical source, scene, split, screening, and cleanup
-    progress-counter payload. ``cleanup_summary`` contains the heavier final
+    `stats` is the canonical source, scene, split, screening, and cleanup
+    progress-counter payload. `cleanup_summary` contains the heavier final
     diagnostic cleanup summary.
     """
 
@@ -79,7 +79,7 @@ class ExecutionResult:
     """Dataset that was executed."""
     output_dir: Path
     """Directory where output was written."""
-    storage_backend: StorageBackend | str
+    storage_backend: StorageBackend
     """Storage backend used for writing output."""
     stats: ExecutionStats
     """Final source, scene, split, screening, and cleanup counters."""
@@ -89,6 +89,11 @@ class ExecutionResult:
     """Final cleanup summary over candidate scenes with cleanup statistics."""
     elapsed_time_seconds: float
     """Wall-clock execution time in seconds."""
+
+    @property
+    def written_scenes(self) -> int:
+        """Number of scenes successfully written."""
+        return self.stats.written_scenes
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,29 +109,25 @@ class ExecutionPlan:
 
     """
 
-    descriptor: DatasetDescriptor
+    _descriptor: DatasetDescriptor = field(repr=False)
     """Resolved dataset descriptor."""
     selected_task: str | None
     """Named descriptor prediction task selected for this run, if any."""
-    data_root: Path
+    input_dir: Path
     """Input dataset root."""
     output_dir: Path
     """Output dataset root."""
     storage_backend: StorageBackend
     """Storage backend selected for writing output records."""
-    resolved_config: DatasetConfig
+    config: DatasetConfig
     """Dataset config after defaults, config files, and overrides are merged."""
-    runtime: RuntimeConfig
-    """Resolved runtime execution settings."""
-    loader: LoaderPlan
+    _loader: LoaderPlan = field(repr=False)
     """Loader-facing subset of the resolved configuration."""
-    assignment: SplitAssignmentPlan
+    _assignment: SplitAssignmentPlan = field(repr=False)
     """Compiled split-assignment request."""
-    map: MapConfig | None
-    """Resolved map configuration, or `None` when map output is disabled."""
     effective_horizon_frames: int
     """Horizon frame count after resampling/window configuration is applied."""
-    effective_prediction_bounds: tuple[int, int] | None
+    effective_prediction_bounds: PredictionBounds | None
     """Half-open prediction bounds after resampling, if configured."""
     effective_sample_time: float
     """Effective `sample_time` interval in seconds after resampling is applied."""
@@ -139,6 +140,24 @@ class ExecutionPlan:
     overwrite: bool = False
     """Whether execution may replace an existing non-empty output directory."""
 
+    diagnostics: tuple[str, ...] = ()
+    """Planning warnings that do not prevent execution."""
+
+    @property
+    def include_map(self) -> bool:
+        """Whether this run includes map data."""
+        return self._loader.map is not None
+
+    def summary(self) -> str:
+        """Return a concise, framework-neutral description of the resolved run."""
+        task = self.selected_task or ("custom" if self.config.task else "none")
+        return (
+            f"{self.dataset}: {self.input_dir} -> {self.output_dir}\n"
+            f"{self.storage_backend.value}; task={task}; "
+            f"{self.effective_horizon_frames} frames at {self.effective_sample_time:g}s; "
+            f"{self.config.runtime.jobs} worker(s)"
+        )
+
     def __post_init__(self) -> None:
         """Validate the runtime plan after initialization."""
         if self.limit == 0:
@@ -150,17 +169,17 @@ class ExecutionPlan:
     @property
     def dataset(self) -> str:
         """Dataset key for this plan."""
-        return self.descriptor.name
+        return self._descriptor.name
 
     @property
     def parallel(self) -> bool:
         """Whether the runtime plan requests parallel execution."""
-        return self.runtime.jobs > 1
+        return self.config.runtime.jobs > 1
 
     @property
     def output_config(self) -> OutputConfig:
         """Resolved output configuration."""
-        return self.resolved_config.output
+        return self.config.output
 
     @property
     def trajectory_schema(self) -> TrajectorySchema:
@@ -171,10 +190,10 @@ class ExecutionPlan:
         """Return the dataset manifest for this plan."""
         export_config = self.output_config
         derivation_source = trajectory_schema_after_transforms(
-            self.descriptor.native_schema,
-            self.resolved_config,
+            self._descriptor.native_schema,
+            self.config,
         )
-        source_task = self.resolved_config.task
+        source_task = self.config.task
         effective_bounds = self.effective_prediction_bounds
         prediction_task = (
             None
@@ -183,8 +202,8 @@ class ExecutionPlan:
                 name=self.selected_task,
                 source_prediction_origin=source_task.prediction_origin,
                 source_prediction_end=source_task.prediction_end,
-                prediction_origin=effective_bounds[0],
-                prediction_end=effective_bounds[1],
+                prediction_origin=effective_bounds.prediction_origin,
+                prediction_end=effective_bounds.prediction_end,
             )
         )
         return DatasetManifest(
@@ -195,25 +214,31 @@ class ExecutionPlan:
                 else (self.dataset,)
             ),
             storage_backend=self.storage_backend.value,
+            payload_format="prejectory.scene"
+            if self.output_transform is None
+            else self.output_transform.format_id,
+            payload_version=1
+            if self.output_transform is None
+            else self.output_transform.format_version,
             prejectory_version=package_version(),
             precision=export_config.precision,
             feature_columns=self.trajectory_schema.feature_columns(),
             trajectory_schema=self.trajectory_schema.name,
             trajectory_schema_fields=self.trajectory_schema.semantic_fields(),
             recenter_positions=export_config.recenter_positions,
-            source_trajectory_schema=self.descriptor.native_schema.name,
-            source_trajectory_schema_fields=self.descriptor.native_schema.semantic_fields(),
+            source_trajectory_schema=self._descriptor.native_schema.name,
+            source_trajectory_schema_fields=self._descriptor.native_schema.semantic_fields(),
             sample_time=self.effective_sample_time,
-            original_sample_time=self.resolved_config.scenes.sample_time,
+            original_sample_time=self.config.scenes.sample_time,
             horizon_frames=self.effective_horizon_frames,
             prediction_task=prediction_task,
-            has_map=self.map is not None,
+            has_map=self.include_map,
             derived_features=tuple(
                 field.to_str()
                 for field in derived_trajectory_fields(
                     derivation_source,
                     self.trajectory_schema,
-                    sample_time=self.resolved_config.scenes.sample_time,
+                    sample_time=self.config.scenes.sample_time,
                 )
             ),
         )
@@ -236,11 +261,24 @@ class OutputTransform(Generic[PayloadT]):
     """Optional transform from canonical `SceneRecord` to persisted payload."""
     scene_transform: SceneTransform[PayloadT] | None = None
     """Optional transform from runtime `Scene` to persisted payload."""
+    format_id: str = field(kw_only=True)
+    """Payload format identifier. Custom decoders are selected explicitly."""
+    format_version: int = 1
+    """Version of the custom payload format."""
     mds_columns: dict[str, str] | None = None
     """MDS column schema required when custom rows are written to MDS."""
 
     def __post_init__(self) -> None:
         """Validate that only one transform mode is configured."""
+        if self.record_transform is None and self.scene_transform is None:
+            msg = "OutputTransform requires a record_transform or scene_transform."
+            raise ConfigurationError(msg)
+        if not self.format_id.strip() or self.format_id == "prejectory.scene":
+            msg = "Custom output needs a non-empty, non-reserved format_id."
+            raise ConfigurationError(msg)
+        if self.format_version < 1:
+            msg = "Custom output format_version must be positive."
+            raise ConfigurationError(msg)
         validate_transform_choice(
             record_transform=self.record_transform,
             scene_transform=self.scene_transform,
@@ -315,10 +353,12 @@ class ExecutionRequest(BaseModel):
     """Directory where processed output should be written."""
     storage_backend: StorageBackend | str = StorageBackend.PICKLE
     """Output storage backend. Built-in values are `pickle` and `mds`."""
-    config_path: Path | None = None
-    """Optional TOML config file applied on top of the dataset defaults."""
-    overrides: RuntimeOverride = Field(default_factory=RuntimeOverride)
+    config: ProjectConfig | Path | str | None = None
+    """Project configuration or TOML path, layered on dataset defaults."""
+    overrides: DatasetConfigPatch = Field(default_factory=DatasetConfigPatch)
     """Programmatic runtime overrides applied after the config file."""
+    task: str | PredictionTaskConfig | None = None
+    """Omit to inherit, use a name or inline task to replace, or None to disable."""
     include_map: bool | None = None
     """Override for map output. `None` uses the resolved dataset config."""
     limit: int | None = None

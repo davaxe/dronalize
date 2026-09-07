@@ -145,20 +145,20 @@ def assert_record_sanity(record: SceneRecord, scene: Scene) -> None:
     _assert_dtype(record.screened_agent_mask, np.bool_, "screened_agent_mask")
 
     _assert_ndim(record.features, 3, "features")
-    _assert_ndim(record.mask, 2, "mask")
+    _assert_ndim(record.valid_mask, 2, "mask")
 
     assert record.features.shape[0] == n_agents, "features agent dim mismatch"
-    assert record.mask.shape[0] == n_agents, "mask agent dim mismatch"
+    assert record.valid_mask.shape[0] == n_agents, "mask agent dim mismatch"
 
     assert record.features.shape[1] == horizon_frames, "features time dim must match scene horizon"
-    assert record.mask.shape[1] == horizon_frames, "mask time dim must match scene horizon"
+    assert record.valid_mask.shape[1] == horizon_frames, "mask time dim must match scene horizon"
 
     assert feature_dim > 0, "feature dimension must be > 0"
 
-    _assert_dtype(record.mask, np.bool_, "mask")
+    _assert_dtype(record.valid_mask, np.bool_, "mask")
 
-    if record.mask.any():
-        assert np.isfinite(record.features[record.mask]).all(), (
+    if record.valid_mask.any():
+        assert np.isfinite(record.features[record.valid_mask]).all(), (
             "features contain NaN/Inf at valid mask positions"
         )
 

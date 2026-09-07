@@ -51,7 +51,7 @@ class TorchSceneRecord:
     """Integer-encoded agent types with shape `(N,)`."""
     features: torch.Tensor
     """Full-horizon agent features with shape `(N, T, F)`."""
-    agent_time_mask: torch.Tensor
+    valid_mask: torch.Tensor
     """Validity mask for `features`, shape `(N, T)`."""
     screened_agent_mask: torch.Tensor
     """Mask of agents that passed screening, shape `(N,)`."""
@@ -66,28 +66,19 @@ class TorchSceneRecord:
     ego_agent_id: int | None
     """Optional source identifier of the ego agent."""
 
-    def split(
-        self,
-        prediction_origin: int | None = None,
-        prediction_end: int | None = None,
-    ) -> TorchSplitSceneRecord:
-        """Create a forecast view using explicit or persisted prediction bounds."""
-        total_length = int(self.features.size(1))
-        if prediction_origin is None:
+    def forecast(self, bounds: PredictionBounds | None = None) -> TorchForecastRecord:
+        """Return history/future views sharing storage with this record.
+
+        Bounds use stored (post-resampling) frames. Omitting them uses the
+        record's prediction task; task-free records need explicit bounds.
+        """
+        if bounds is None:
             if self.prediction_origin is None or self.prediction_end is None:
                 raise MissingPredictionBoundsError(self.scene_number)
-            if prediction_end is not None:
-                msg = "`prediction_end` cannot be provided without `prediction_origin`."
-                raise ValueError(msg)
             bounds = PredictionBounds(self.prediction_origin, self.prediction_end)
-        else:
-            bounds = PredictionBounds(
-                prediction_origin,
-                total_length if prediction_end is None else prediction_end,
-            )
-        bounds.validate(horizon_frames=total_length)
+        bounds.validate(horizon_frames=int(self.features.size(1)))
 
-        return TorchSplitSceneRecord(
+        return TorchForecastRecord(
             scene_number=self.scene_number,
             dataset_id=self.dataset_id,
             prediction_origin=bounds.prediction_origin,
@@ -97,9 +88,9 @@ class TorchSceneRecord:
             agent_types=self.agent_types,
             screened_agent_mask=self.screened_agent_mask,
             history_features=self.features[:, : bounds.prediction_origin],
-            history_mask=self.agent_time_mask[:, : bounds.prediction_origin],
+            history_mask=self.valid_mask[:, : bounds.prediction_origin],
             future_features=self.features[:, bounds.prediction_origin : bounds.prediction_end],
-            future_mask=self.agent_time_mask[:, bounds.prediction_origin : bounds.prediction_end],
+            future_mask=self.valid_mask[:, bounds.prediction_origin : bounds.prediction_end],
             map_node_positions=self.map_node_positions,
             map_edge_indices=self.map_edge_indices,
             map_node_types=self.map_node_types,
@@ -109,7 +100,7 @@ class TorchSceneRecord:
 
 
 @dataclass(slots=True)
-class TorchSplitSceneRecord:
+class TorchForecastRecord:
     """Torch-backed equivalent of a split scene record."""
 
     scene_number: int
@@ -168,7 +159,7 @@ class IterableTorchSceneDataset(IterableDataset[TorchSceneRecord], Generic[Itera
         return len(self.reader)
 
 
-class TorchForecastDataset(Dataset[TorchSplitSceneRecord], Generic[ReaderT]):
+class TorchForecastDataset(Dataset[TorchForecastRecord], Generic[ReaderT]):
     """Map-style Torch forecast view over full-horizon scene records."""
 
     def __init__(
@@ -187,12 +178,12 @@ class TorchForecastDataset(Dataset[TorchSplitSceneRecord], Generic[ReaderT]):
         return len(self.dataset)
 
     @override
-    def __getitem__(self, index: int) -> TorchSplitSceneRecord:
-        return _split_torch_record(self.dataset[index], self.bounds)
+    def __getitem__(self, index: int) -> TorchForecastRecord:
+        return self.dataset[index].forecast(self.bounds)
 
 
 class IterableTorchForecastDataset(
-    IterableDataset[TorchSplitSceneRecord],
+    IterableDataset[TorchForecastRecord],
     Generic[IterableReaderT],
 ):
     """Iterable Torch forecast view over full-horizon scene records."""
@@ -212,22 +203,13 @@ class IterableTorchForecastDataset(
         self.bounds: PredictionBounds | None = bounds
 
     @override
-    def __iter__(self) -> Iterator[TorchSplitSceneRecord]:
+    def __iter__(self) -> Iterator[TorchForecastRecord]:
         for record in self.dataset:
-            yield _split_torch_record(record, self.bounds)
+            yield record.forecast(self.bounds)
 
     def __len__(self) -> int:
         """Report the number of records exposed by the wrapped reader."""
         return len(self.dataset)
-
-
-def _split_torch_record(
-    record: TorchSceneRecord,
-    bounds: PredictionBounds | None,
-) -> TorchSplitSceneRecord:
-    if bounds is None:
-        return record.split()
-    return record.split(bounds.prediction_origin, bounds.prediction_end)
 
 
 def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSceneRecord:
@@ -244,7 +226,7 @@ def to_torch_scene_record(record: SceneRecord, *, copy: bool = True) -> TorchSce
         agent_types=torch.asarray(record.agent_types, copy=copy),
         screened_agent_mask=torch.asarray(record.screened_agent_mask, copy=copy),
         features=torch.asarray(record.features, copy=copy),
-        agent_time_mask=torch.asarray(record.mask, copy=copy),
+        valid_mask=torch.asarray(record.valid_mask, copy=copy),
         map_node_positions=torch.asarray(record.map_node_positions, copy=copy),
         map_edge_indices=torch.asarray(record.map_edge_indices, copy=copy),
         map_node_types=torch.asarray(record.map_node_types, copy=copy),

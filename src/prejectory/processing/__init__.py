@@ -2,9 +2,9 @@
 
 ## Import guide
 
-```python
+``python
 from prejectory.processing import maps, screening
-```
+``
 
 Use this package as a lightweight namespace for the focused processing
 subpackages:

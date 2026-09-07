@@ -13,7 +13,6 @@ from rich import print as rprint
 from rich.panel import Panel
 
 from prejectory import __version__
-from prejectory.config.models import RuntimeOverride
 from prejectory.core.categories import DatasetSplit
 from prejectory.core.errors import (
     CliError,
@@ -32,6 +31,7 @@ from prejectory.runtime.cli.formatting import (
     build_processing_summary_table,
     build_split_support_tables,
 )
+from prejectory.runtime.cli.inputs import config_overrides
 from prejectory.runtime.cli.register import register_custom_datasets
 
 if TYPE_CHECKING:
@@ -324,7 +324,7 @@ def show_config(
         ),
     )
     rprint("\n[bold]Resolved Config:[/bold]")
-    rprint(plan.resolved_config)
+    rprint(plan.config)
 
 
 @app.command()
@@ -413,8 +413,8 @@ def _resolve_cli_plan(
             seed=seed,
             overwrite=overwrite,
             storage_backend=storage_backend,
-            config_path=config,
-            overrides=RuntimeOverride.from_inputs(
+            config=config,
+            overrides=config_overrides(
                 read_strategy=read,
                 read_split=read_split,
                 assign_strategy=assign,

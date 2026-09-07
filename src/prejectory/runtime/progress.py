@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-import logging
 import random
-import threading
-import time
-from multiprocessing.synchronize import Event
-from typing import TYPE_CHECKING, Protocol, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 import rich.progress as rp
 from rich import box
@@ -17,27 +13,13 @@ from rich.panel import Panel
 from rich.text import Text
 from typing_extensions import override
 
+from prejectory.runtime.observer import ProgressSource, observe_execution
 from prejectory.runtime.state import Progress, SplitCounts
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 T = TypeVar("T")
-AnyEvent = Event | threading.Event
-
-logger = logging.getLogger(__name__)
-
-
-class ProgressSource(Protocol):
-    """Minimal progress interface consumed by the optional display."""
-
-    def snapshot(self) -> Progress:
-        """Return a point-in-time progress snapshot."""
-        ...
-
-    def changed(self) -> AnyEvent:
-        """Return the event signaled after progress changes."""
-        ...
 
 
 class _ExecutorDisplay(RichCast):
@@ -130,77 +112,22 @@ class _ExecutorDisplay(RichCast):
         return self.state.active_workers if self.state.running else 0
 
 
-class _ProgressMonitor:
-    """Background monitor that pushes executor snapshots into a Rich display."""
-
-    def __init__(self, progress: ProgressSource, display: _ExecutorDisplay) -> None:
-        self._progress: ProgressSource = progress
-        self._display: _ExecutorDisplay = display
-        self._stop_event: threading.Event = threading.Event()
-        self._error: BaseException | None = None
-
-    def thread(self) -> threading.Thread:
-        return threading.Thread(target=self._work, daemon=True)
-
-    def stop(self) -> None:
-        self._stop_event.set()
-        self._progress.changed().set()
-
-    def raise_if_failed(self) -> None:
-        if self._error is not None:
-            msg = "Rich progress monitor failed."
-            raise RuntimeError(msg) from self._error
-
-    def _wait_for_start(self, timeout: float | None) -> bool:
-        if not self._progress.changed().wait(timeout):
-            return False
-        self._progress.changed().clear()
-        self._display.update(self._progress.snapshot())
-        return True
-
-    def _work(self, timeout: float | None = 20, sleep: float | None = 0.5) -> None:
-        if not self._wait_for_start(timeout):
-            msg = "Timed out waiting for executor to start."
-            self._error = TimeoutError(msg)
-            return
-
-        while not self._stop_event.is_set():
-            if sleep is not None:
-                time.sleep(sleep)
-            event = self._progress.changed()
-            _ = event.wait()
-            event.clear()
-            progress = self._progress.snapshot()
-            self._display.update(progress)
-
-            if not progress.running:
-                return
-
-
 def execute_with_rich_progress(
     progress: ProgressSource,
     run: Callable[[], T],
     *,
-    enable: bool = True,
+    on_progress: Callable[[Progress], None] | None = None,
 ) -> T:
-    """Run an executor callback while rendering a Rich progress display."""
-    if not enable:
-        return run()
-
+    """Render progress and deliver optional callbacks through the same observer."""
     display = _ExecutorDisplay()
-    monitor = _ProgressMonitor(progress, display)
-    thread = monitor.thread()
+
+    def update(snapshot: Progress) -> None:
+        display.update(snapshot)
+        if on_progress is not None:
+            on_progress(snapshot)
 
     with Live(display, refresh_per_second=4, transient=False):
-        thread.start()
-        try:
-            result = run()
-        finally:
-            monitor.stop()
-            thread.join()
-
-    monitor.raise_if_failed()
-    return result
+        return observe_execution(progress, run, update)
 
 
 def _progress_bar_counts(progress: Progress) -> tuple[int, int | None]:

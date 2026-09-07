@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, overload
 
 from typing_extensions import TypedDict, Unpack, override
@@ -17,7 +18,6 @@ except ModuleNotFoundError as error:
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator, Mapping, Sequence
-    from pathlib import Path
 
     import numpy as np
     import numpy.typing as npt
@@ -74,27 +74,32 @@ class MDSReader(IterableDatasetReader[RecordT], DatasetReader[RecordT]):
         Prejectory MDS encoding scheme.
     reader_args : MDSReaderInitArgs, optional
         Additional keyword arguments forwarded to the `StreamingDataset`
-        constructor.
+        constructor. `batch_size` defaults to 1 for direct iteration; set it to
+        match your DataLoader when training.
     """
 
     def __init__(
         self,
         *,
-        path: Path | None = None,
+        path: str | Path | None = None,
         split: DatasetSplit | str | None = None,
         streams: Sequence[Stream] | None = None,
         convert_raw: Callable[[Mapping[str, Any]], RecordT] = decode_mds_row,
         **reader_args: Unpack[MDSReaderInitArgs],
     ) -> None:
         super().__init__()
+        _ = reader_args.setdefault("batch_size", 1)
         self._convert_record: Callable[[Mapping[str, Any]], RecordT] = convert_raw
+        if path is not None and streams is not None:
+            msg = "Provide either path or streams, not both."
+            raise ValueError(msg)
         if path is None and streams is None:
             msg = "Either `path` or `streams` must be provided."
             raise ValueError(msg)
 
         if path is not None:
             self._backend: StreamingDataset = StreamingDataset(
-                local=path.as_posix(),
+                local=Path(path).as_posix(),
                 split=split_directory_name(split),
                 **reader_args,
             )

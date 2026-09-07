@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Python API simplification
+
+- Add `prejectory.plan`, `run`, and manifest-aware `open_dataset`.
+- Replace request `config_path` with `config` (TOML path or `ProjectConfig`). Replace
+  `RuntimeOverride` with `DatasetConfigPatch`; CLI flag conversion is internal.
+- Simplify `ProjectConfig.resolve_dataset_config` to accept a dataset name or descriptor.
+- Add request task selection: omitted inherits, a name/inline task replaces, `None` disables.
+- Rename plan `data_root` to `input_dir` and `resolved_config` to `config`; expose absolute
+  paths, a summary, and diagnostics. Compiled descriptor/loader/assignment fields are private.
+  Use `plan.config.runtime` and `plan.include_map` for execution settings and map availability.
+- Rename `SceneRecord.mask` and Torch/PyG `agent_time_mask` to `valid_mask`.
+  Replace `split(origin, end)` with `forecast(PredictionBounds(origin, end))` and rename
+  `SplitSceneRecord`/`TorchSplitSceneRecord` to `ForecastRecord`/`TorchForecastRecord`.
+- Plan prediction bounds now use `PredictionBounds` rather than a tuple.
+- Export configuration models from `prejectory.config`, descriptor split support from
+  `prejectory.datasets`, counters/progress from `prejectory.runtime`, reader contracts from
+  `prejectory.io`, and exceptions from `prejectory.errors`. Remove dataset configuration aliases
+  and the mutable public `TRAJECTORY_SCHEMAS` registry.
+- Python execution is quiet by default, with optional Rich rendering and progress callbacks.
+  `ExecutionResult.written_scenes` forwards the canonical `stats` counter.
+- Stage output before publication; failed overwrites preserve the previous export.
+- Manifest format is now **3**, with payload ID/version and available split counts.
+  Regenerate existing exports: older manifests and renamed pickle record layouts are not
+  compatible. MDS retains the physical `mask` column while exposing `valid_mask` in Python.
+- Custom `OutputTransform` requires `format_id` and a transform; readers require an explicit
+  decoder. Custom MDS output also requires columns, validated during planning.
+
 ## v2.0.0 - June 2026
 
 Major redesign of `prejectory`: move the project from a clonable research/template

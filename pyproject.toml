@@ -81,7 +81,6 @@ build = [
 docs = [
     "mkdocstrings[python]>=1.0.3",
     "zensical>=0.0.30",
-    "mike @ git+https://github.com/squidfunk/mike.git",
 ]
 
 dev = [

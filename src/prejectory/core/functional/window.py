@@ -107,7 +107,7 @@ def _create_windows(
                 _WINDOW_START_COLUMN,
             ),
         )
-        .explode(_WINDOW_START_COLUMN)
+        .explode(_WINDOW_START_COLUMN, empty_as_null=True)
     )
     return expanded.join(window_index, on=window_columns, how="inner")
 

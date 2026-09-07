@@ -1,3 +1,5 @@
+# ruff: file-ignore[private-member-access] - Internal plan/config consumers.
+# pyright: reportPrivateUsage=false
 """Presentation helpers for the optional prejectory CLI."""
 
 from __future__ import annotations
@@ -62,28 +64,29 @@ def summarize_plan(plan: ExecutionPlan) -> tuple[Row, ...]:
     output_config = plan.output_config
     return (
         ("Dataset", plan.dataset),
-        ("Task", plan.selected_task or ("custom" if plan.resolved_config.task else "none")),
+        ("Task", plan.selected_task or ("custom" if plan.config.task else "none")),
         (
             "Prediction bounds",
             "none"
             if plan.effective_prediction_bounds is None
             else (
-                f"[{plan.effective_prediction_bounds[0]}, {plan.effective_prediction_bounds[1]})"
+                f"[{plan.effective_prediction_bounds.prediction_origin}, "
+                f"{plan.effective_prediction_bounds.prediction_end})"
             ),
         ),
-        ("Input", str(plan.data_root)),
+        ("Input", str(plan.input_dir)),
         ("Output", str(plan.output_dir)),
         ("Backend", plan.storage_backend.value),
-        ("Workers", str(plan.runtime.jobs)),
+        ("Workers", str(plan.config.runtime.jobs)),
         ("Limit", "none" if plan.limit is None else str(plan.limit)),
         ("Schema", get_trajectory_schema(output_config.trajectory_schema).name),
-        ("Map", _format_flag(enabled=plan.map is not None)),
-        ("Read", _inline_config_rows(_read_request_rows(plan.loader.read))),
+        ("Map", _format_flag(enabled=plan.include_map)),
+        ("Read", _inline_config_rows(_read_request_rows(plan._loader.read))),
         (
             "Assign",
-            _inline_config_rows(_assignment_request_rows(plan.assignment, plan.loader.read)),
+            _inline_config_rows(_assignment_request_rows(plan._assignment, plan._loader.read)),
         ),
-        ("Options", _format_options(plan.loader.loader_options)),
+        ("Options", _format_options(plan._loader.loader_options)),
     )
 
 

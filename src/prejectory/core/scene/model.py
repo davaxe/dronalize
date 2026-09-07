@@ -27,7 +27,7 @@ MapResolver = Callable[["Scene"], MapGraph | None]
 
 Resolvers are attached to [`Scene`][prejectory.core.scene.Scene] instances so
 map loading can be deferred until a consumer explicitly requests it through
-[`Scene.resolve_map()`][prejectory.core.scene.Scene.resolve_map].
+`Scene.resolve_map()`.
 """
 
 

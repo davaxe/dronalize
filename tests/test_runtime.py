@@ -1,3 +1,5 @@
+# ruff: file-ignore[private-member-access] - Internal plan/config consumers.
+# pyright: reportPrivateUsage=false
 from __future__ import annotations
 
 import sys
@@ -6,7 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from prejectory.config import RuntimeOverride
+from prejectory.config import DatasetConfigPatch, RuntimePatch
 from prejectory.core.errors import (
     CliError,
     ConfigurationError,
@@ -20,11 +22,8 @@ from prejectory.datasets import (
     FrameBounds,
     list_datasets,
 )
-from prejectory.datasets.registry import (
-    _REGISTRY,  # pyright: ignore[reportPrivateUsage]
-    dataset_names_by_id,
-)
-from prejectory.io import StorageBackend, read_manifest
+from prejectory.datasets.registry import _REGISTRY, dataset_names_by_id
+from prejectory.io import PredictionBounds, StorageBackend, read_manifest
 from prejectory.io.backends.null import NullWriter
 from prejectory.io.base import WorkerWriterProvider
 from prejectory.io.readers import PickleReader
@@ -108,11 +107,11 @@ def test_resolve_request_builds_plan(tmp_path: Path, monkeypatch: pytest.MonkeyP
 
     assert plan.dataset == "demo"
     assert plan.storage_backend == StorageBackend.NULL
-    dataset_options = cast("DemoOptions", plan.loader.loader_options)
+    dataset_options = cast("DemoOptions", plan._loader.loader_options)
     assert dataset_options.batch_size == 2
-    assert plan.map is None
+    assert not plan.include_map
     assert plan.effective_horizon_frames == 3
-    assert plan.effective_prediction_bounds == (2, 3)
+    assert plan.effective_prediction_bounds == PredictionBounds(2, 3)
 
 
 def test_resolve_request_rejects_unknown_backend(
@@ -140,7 +139,7 @@ persist = 3
     )
 
     with pytest.raises(ConfigurationError, match="does not support lane-change sampling"):
-        _ = resolve_request(_request(tmp_path, config_path=config_path))
+        _ = resolve_request(_request(tmp_path, config=config_path))
 
 
 def test_resolve_request_requires_window_for_lane_change(
@@ -165,7 +164,7 @@ persist = 3
     )
 
     with pytest.raises(ConfigurationError, match="requires window sampling"):
-        _ = resolve_request(_request(tmp_path, config_path=config_path))
+        _ = resolve_request(_request(tmp_path, config=config_path))
 
 
 def test_resolve_request_rejects_long_window(
@@ -193,8 +192,8 @@ def test_resampling_recomputes_native_kinematics(
     descriptor = stale_kinematics_demo_descriptor()
     _patch_descriptor(monkeypatch, descriptor)
     plan = resolve_request(_request(tmp_path, dataset=descriptor.name))
-    assert plan.effective_prediction_bounds == (1, 2)
-    loader = descriptor.build_loader(root=plan.data_root, request=plan.loader)
+    assert plan.effective_prediction_bounds == PredictionBounds(1, 2)
+    loader = descriptor.build_loader(root=plan.input_dir, request=plan._loader)
     processor = RuntimeProcessor.from_plan(plan, loader)
     source = next(iter(processor.iter_sources()))
     candidate = next(iter(processor.iter_candidates(source)))
@@ -236,7 +235,7 @@ policy = "partial"
     )
 
     with pytest.raises(ConfigurationError, match="does not support window policy 'partial'"):
-        _ = resolve_request(_request(tmp_path, config_path=config_path))
+        _ = resolve_request(_request(tmp_path, config=config_path))
 
 
 def test_execute_request_surfaces_unknown_dataset(tmp_path: Path) -> None:
@@ -332,7 +331,7 @@ def test_builtin_benchmark_task_is_selected_by_default(tmp_path: Path) -> None:
     )
     plan = resolve_request(request)
     assert plan.selected_task == "benchmark"
-    assert plan.effective_prediction_bounds == (20, 50)
+    assert plan.effective_prediction_bounds == PredictionBounds(20, 50)
     manifest_task = plan.manifest().prediction_task
     assert manifest_task is not None
     assert manifest_task.name == "benchmark"
@@ -355,7 +354,7 @@ task = "missing"
                 dataset="argoverse1",
                 input_dir=tmp_path / "input",
                 output_dir=tmp_path / "output",
-                config_path=config_path,
+                config=config_path,
                 input_dir_exists=False,
             ),
         )
@@ -375,13 +374,13 @@ task = "benchmark"
             dataset="argoverse1",
             input_dir=tmp_path / "input",
             output_dir=tmp_path / "output",
-            config_path=config_path,
+            config=config_path,
             input_dir_exists=False,
         ),
     )
 
     assert plan.selected_task == "benchmark"
-    assert plan.effective_prediction_bounds == (20, 50)
+    assert plan.effective_prediction_bounds == PredictionBounds(20, 50)
 
 
 def test_project_can_disable_default_task(tmp_path: Path) -> None:
@@ -398,7 +397,7 @@ task = "none"
             dataset="argoverse1",
             input_dir=tmp_path / "input",
             output_dir=tmp_path / "output",
-            config_path=config_path,
+            config=config_path,
             input_dir_exists=False,
         ),
     )
@@ -423,16 +422,16 @@ prediction_end = 30
             dataset="argoverse1",
             input_dir=tmp_path / "input",
             output_dir=tmp_path / "output",
-            config_path=config_path,
+            config=config_path,
             input_dir_exists=False,
         ),
     )
     assert plan.selected_task is None
-    assert plan.effective_prediction_bounds == (10, 30)
+    assert plan.effective_prediction_bounds == PredictionBounds(10, 30)
     manifest_task = plan.manifest().prediction_task
     assert manifest_task is not None
     assert manifest_task.name is None
-    endpoint = plan.loader.screening
+    endpoint = plan._loader.screening
     assert endpoint is not None
     rule = endpoint.agents["prediction_history_endpoint"]
     assert isinstance(rule, AgentRequireFrames)
@@ -452,7 +451,7 @@ def test_execute_request_applies_record_transform(
             "feature_shape": record.features.shape,
         }
 
-    output_transform = OutputTransform(record_transform=transform)
+    output_transform = OutputTransform(format_id="test.custom", record_transform=transform)
     request = _request(
         tmp_path,
         storage_backend=StorageBackend.PICKLE,
@@ -482,6 +481,7 @@ def test_execute_request_writes_custom_mds(tmp_path: Path, monkeypatch: pytest.M
         }
 
     output_transform = OutputTransform(
+        format_id="test.custom",
         record_transform=transform,
         mds_columns={"scene_number": "int", "dataset_id": "int", "feature_shape": "json"},
     )
@@ -509,7 +509,7 @@ def test_parallel_execution_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
         input_dir=input_dir,
         output_dir=output_dir,
         storage_backend=StorageBackend.NULL,
-        overrides=RuntimeOverride.from_inputs(jobs=2),
+        overrides=DatasetConfigPatch(runtime=RuntimePatch(jobs=2)),
     )
 
     result = execute_request(request)
@@ -565,7 +565,7 @@ def test_parallel_execution_reports_cleanup_summary(
         input_dir=input_dir,
         output_dir=output_dir,
         storage_backend=StorageBackend.NULL,
-        overrides=RuntimeOverride.from_inputs(jobs=2),
+        overrides=DatasetConfigPatch(runtime=RuntimePatch(jobs=2)),
     )
 
     result = execute_request(request)
@@ -586,7 +586,7 @@ def test_execution_progress_reports_cleanup_counters(
 
     request_kwargs: dict[str, object] = {"dataset": "cleanup-demo"}
     if jobs is not None:
-        request_kwargs["overrides"] = RuntimeOverride.from_inputs(jobs=jobs)
+        request_kwargs["overrides"] = DatasetConfigPatch(runtime=RuntimePatch(jobs=jobs))
 
     plan = resolve_request(_request(tmp_path, **request_kwargs))
     writer_provider = WorkerWriterProvider(_create_null_writer)

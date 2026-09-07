@@ -2,9 +2,9 @@
 
 ## Import guide
 
-```python
+``python
 from prejectory.io.adapters import HeteroSceneDataset, TorchSceneDataset
-```
+``
 
 This package groups higher-level dataset adapters for downstream ML code. The
 exports are loaded lazily so optional dependencies such as Torch or
@@ -39,9 +39,10 @@ if TYPE_CHECKING:
         IterableTorchForecastDataset,
         IterableTorchSceneDataset,
         TorchForecastDataset,
+        TorchForecastRecord,
         TorchSceneDataset,
         TorchSceneRecord,
-        TorchSplitSceneRecord,
+        to_torch_scene_record,
     )
 
 __all__ = [
@@ -52,16 +53,19 @@ __all__ = [
     "IterableTorchForecastDataset",
     "IterableTorchSceneDataset",
     "TorchForecastDataset",
+    "TorchForecastRecord",
     "TorchSceneDataset",
     "TorchSceneRecord",
-    "TorchSplitSceneRecord",
     "collate_forecast_hetero_with_time_padding",
     "collate_hetero_with_time_padding",
+    "to_torch_scene_record",
 ]
 
 __lazy_exports__: dict[str, tuple[str, str]] = {
     name: (
-        "prejectory.io.adapters.torch" if "Torch" in name else "prejectory.io.adapters.pyg",
+        "prejectory.io.adapters.torch"
+        if "Torch" in name or name == "to_torch_scene_record"
+        else "prejectory.io.adapters.pyg",
         name,
     )
     for name in __all__

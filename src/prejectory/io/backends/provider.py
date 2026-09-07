@@ -1,3 +1,5 @@
+# ruff: file-ignore[private-member-access] - Internal plan/config consumers.
+# pyright: reportPrivateUsage=false
 """Registry-driven writer backend resolution.
 
 The runtime keeps backend selection separate from scene encoding. A resolved
@@ -18,7 +20,6 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from prejectory.io.base import StorageBackend, WorkerWriterProvider, WriterProvider
-from prejectory.io.records import PredictionBounds
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     from prejectory.config.models import OutputConfig
     from prejectory.core.categories import DatasetSplit
     from prejectory.io.base import DatasetWriter, RecordTransform, SceneTransform
+    from prejectory.io.records import PredictionBounds
     from prejectory.runtime.types import ExecutionPlan
 
 logger = logging.getLogger(__name__)
@@ -43,9 +45,7 @@ def build_writer_provider(plan: ExecutionPlan) -> WriterProvider:
 
 
 def _build_mds_writer_provider(plan: ExecutionPlan) -> WriterProvider:
-    from prejectory.io.backends.mds import (  # ruff: ignore[import-outside-top-level]
-        MDSDatasetWriter,
-    )
+    from prejectory.io.backends.mds import MDSDatasetWriter  # ruff: ignore[import-outside-top-level]
 
     output_transform = plan.output_transform
     splits = _output_splits(plan)
@@ -93,9 +93,7 @@ def _create_mds_writer(
     scene_transform: SceneTransform[dict[str, Any]] | None,
     mds_columns: dict[str, str] | None,
 ) -> DatasetWriter:
-    from prejectory.io.backends.mds import (  # ruff: ignore[import-outside-top-level]
-        MDSDatasetWriter,
-    )
+    from prejectory.io.backends.mds import MDSDatasetWriter  # ruff: ignore[import-outside-top-level]
 
     return MDSDatasetWriter(
         output_dir=output_dir,
@@ -158,9 +156,8 @@ def _create_pickle_writer(
 
 
 def _output_splits(plan: ExecutionPlan) -> tuple[DatasetSplit, ...] | None:
-    return plan.assignment.output_splits(input_native_splits=plan.loader.read.native_splits)
+    return plan._assignment.output_splits(input_native_splits=plan._loader.read.native_splits)
 
 
 def _prediction_bounds(plan: ExecutionPlan) -> PredictionBounds | None:
-    bounds = plan.effective_prediction_bounds
-    return None if bounds is None else PredictionBounds(*bounds)
+    return plan.effective_prediction_bounds

@@ -124,10 +124,6 @@ features = [
 logo = "lucide/waypoints"
 repo = "fontawesome/brands/github"
 
-[project.extra.version]
-provider = "mike"
-
-
 [[project.theme.palette]]
 media = "(prefers-color-scheme: light)"
 scheme = "default"

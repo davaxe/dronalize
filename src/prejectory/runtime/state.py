@@ -74,7 +74,7 @@ class ExecutionStats:
 class Progress:
     """Immutable live progress snapshot.
 
-    ``stats`` is the canonical counter payload. Convenience properties expose the
+    `stats` is the canonical counter payload. Convenience properties expose the
     same values directly for concise display and API code.
     """
 
@@ -102,7 +102,7 @@ class ProgressState:
     """Multiprocessing-safe mutable progress state.
 
     This class owns shared progress mutation. Executors should expose immutable
-    ``Progress`` snapshots instead of reading counters directly.
+    `Progress` snapshots instead of reading counters directly.
     """
 
     active_workers: Synchronized[int]
@@ -213,7 +213,7 @@ class ProgressState:
         return scene_number
 
     def selected_scene_limit_reached(self, limit: int | None = None) -> bool:
-        """Return whether the selected-scene counter has reached ``limit``."""
+        """Return whether the selected-scene counter has reached `limit`."""
         if limit is None:
             return False
         with self.selected_scene_counter.get_lock():

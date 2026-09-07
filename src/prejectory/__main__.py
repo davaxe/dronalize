@@ -15,7 +15,7 @@ def _is_missing_cli_dependency(exc: ModuleNotFoundError) -> bool:
 def main() -> None:
     """Run the optional CLI if its dependencies are installed."""
     try:
-        from prejectory.runtime.cli.app import main as cli_main  # ruff: ignore[import-outside-top-level, unsorted-imports]
+        from prejectory.runtime.cli.app import main as cli_main  # ruff: ignore[import-outside-top-level]
     except ModuleNotFoundError as exc:
         if _is_missing_cli_dependency(exc):
             raise ModuleNotFoundError(_CLI_INSTALL_HINT) from exc

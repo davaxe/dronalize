@@ -14,10 +14,10 @@ Use
 when authoring dataset integrations that need run-scoped map-provider setup.
 """
 
-from prejectory.config.models import MapConfig, PredictionTaskConfig, ScenesConfig
 from prejectory.datasets.registry import (
     DatasetDescriptor,
     DatasetFeatureSupport,
+    DatasetSplitSupport,
     DatasetTemporalSupport,
     DatasetWindowingSupport,
     FrameBounds,
@@ -29,12 +29,10 @@ from prejectory.datasets.registry import (
 __all__ = [
     "DatasetDescriptor",
     "DatasetFeatureSupport",
+    "DatasetSplitSupport",
     "DatasetTemporalSupport",
     "DatasetWindowingSupport",
     "FrameBounds",
-    "MapConfig",
-    "PredictionTaskConfig",
-    "ScenesConfig",
     "get_dataset",
     "list_datasets",
     "register_dataset",

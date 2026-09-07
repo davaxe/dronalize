@@ -2,10 +2,10 @@
 
 ## Import guide
 
-```python
+``python
 from prejectory.core.scene import Scene, TrajectorySchema, TrajectoryField
 from prejectory.core.scene import CANONICAL, get_trajectory_schema
-```
+``
 
 This package is the main home for scene-facing domain types:
 
@@ -37,7 +37,6 @@ from prejectory.core.scene.schema import (
     POSITIONS_VELOCITY_ACCELERATION,
     POSITIONS_VELOCITY_YAW,
     POSITIONS_YAW,
-    TRAJECTORY_SCHEMAS,
     TrajectoryField,
     TrajectorySchema,
     available_trajectory_schema_names,
@@ -52,7 +51,6 @@ __all__ = [
     "POSITIONS_VELOCITY_ACCELERATION",
     "POSITIONS_VELOCITY_YAW",
     "POSITIONS_YAW",
-    "TRAJECTORY_SCHEMAS",
     "MapResolver",
     "Scene",
     "TrajectoryField",

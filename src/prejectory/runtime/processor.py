@@ -1,3 +1,5 @@
+# ruff: file-ignore[private-member-access] - Internal plan/config consumers.
+# pyright: reportPrivateUsage=false
 """Runtime DatasetSource processing and scene materialization."""
 
 from __future__ import annotations
@@ -154,13 +156,13 @@ class RuntimeProcessor:
             dataset=plan.dataset,
             loader=loader,
             source_schema=trajectory_schema_after_transforms(
-                plan.descriptor.native_schema,
-                plan.resolved_config,
+                plan._descriptor.native_schema,
+                plan.config,
             ),
             target_schema=plan.trajectory_schema,
             horizon_frames=plan.effective_horizon_frames,
             sample_time=plan.effective_sample_time,
-            split_assigner=SplitAssigner(plan.assignment),
+            split_assigner=SplitAssigner(plan._assignment),
         )
 
     def iter_sources(self) -> Iterable[DatasetSource[Any]]:

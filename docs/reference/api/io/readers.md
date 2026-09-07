@@ -11,3 +11,5 @@
 ## ::: prejectory.io.readers.MDSReaderInitArgs
 
 ## ::: prejectory.io.readers.MDSReader
+
+## ::: prejectory.io.IterableDatasetReader

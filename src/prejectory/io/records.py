@@ -37,7 +37,8 @@ class SceneRecord:
 
     A `SceneRecord` contains one contiguous trajectory horizon for all agents in
     a scene. It may carry prediction bounds but stores no duplicated split
-    tensors; consumers derive those with [`SceneRecord.split`][].
+    tensors; consumers derive those with
+    [`SceneRecord.forecast`][prejectory.io.SceneRecord.forecast].
 
     Conventions:
 
@@ -57,7 +58,7 @@ class SceneRecord:
     """Mask indicating which agents passed screening, shape `(N,)`."""
     features: npt.NDArray[np.float32 | np.float64]
     """Contiguous per-agent trajectory features, shape `(N, T, F)`."""
-    mask: npt.NDArray[np.bool_]
+    valid_mask: npt.NDArray[np.bool_]
     """Validity mask for `features`, shape `(N, T)`."""
 
     # Map data
@@ -100,36 +101,28 @@ class SceneRecord:
             return None
         return PredictionBounds(self.prediction_origin, self.prediction_end)
 
-    def split(
-        self,
-        prediction_origin: int | None = None,
-        prediction_end: int | None = None,
-    ) -> SplitSceneRecord:
-        """Create a forecast view using explicit or persisted prediction bounds."""
-        if prediction_origin is None:
-            bounds = self.prediction_bounds
-            if bounds is None:
+    def forecast(self, bounds: PredictionBounds | None = None) -> ForecastRecord:
+        """Return history/future views sharing storage with this record.
+
+        Bounds use stored (post-resampling) frames. Omitting them uses the
+        record's prediction task; task-free records need explicit bounds.
+        """
+        if bounds is None:
+            if self.prediction_origin is None or self.prediction_end is None:
                 raise MissingPredictionBoundsError(self.scene_number)
-            if prediction_end is not None:
-                msg = "`prediction_end` cannot be provided without `prediction_origin`."
-                raise ValueError(msg)
-        else:
-            bounds = PredictionBounds(
-                prediction_origin=prediction_origin,
-                prediction_end=self.horizon_frames if prediction_end is None else prediction_end,
-            )
+            bounds = PredictionBounds(self.prediction_origin, self.prediction_end)
         bounds.validate(horizon_frames=self.horizon_frames)
 
-        return SplitSceneRecord(
+        return ForecastRecord(
             scene_number=self.scene_number,
             position_offset=self.position_offset,
             agent_ids=self.agent_ids,
             agent_types=self.agent_types,
             screened_agent_mask=self.screened_agent_mask,
             history_features=self.features[:, : bounds.prediction_origin],
-            history_mask=self.mask[:, : bounds.prediction_origin],
+            history_mask=self.valid_mask[:, : bounds.prediction_origin],
             future_features=self.features[:, bounds.prediction_origin : bounds.prediction_end],
-            future_mask=self.mask[:, bounds.prediction_origin : bounds.prediction_end],
+            future_mask=self.valid_mask[:, bounds.prediction_origin : bounds.prediction_end],
             map_node_positions=self.map_node_positions,
             map_edge_indices=self.map_edge_indices,
             map_node_types=self.map_node_types,
@@ -142,7 +135,7 @@ class SceneRecord:
 
 
 @dataclass(slots=True)
-class SplitSceneRecord:
+class ForecastRecord:
     """Convenience scene record with explicit observation/prediction tensors.
 
     This type is intended for online reader/adaptor use. It is not the canonical
@@ -208,8 +201,11 @@ def _validate_full_record(record: SceneRecord) -> None:
     if record.features.ndim != 3:
         msg = f"`features` must have shape (N, T, F), got {record.features.shape!r}."
         raise ValueError(msg)
-    if record.mask.shape != record.features.shape[:2]:
-        msg = f"`mask` must have shape {record.features.shape[:2]!r}, got {record.mask.shape!r}."
+    if record.valid_mask.shape != record.features.shape[:2]:
+        msg = (
+            f"`valid_mask` must have shape {record.features.shape[:2]!r}, "
+            f"got {record.valid_mask.shape!r}."
+        )
         raise ValueError(msg)
     _validate_optional_prediction_bounds(
         record.prediction_origin,
@@ -244,7 +240,7 @@ def _validate_optional_prediction_bounds(
         PredictionBounds(prediction_origin, prediction_end).validate(horizon_frames=horizon_frames)
 
 
-def _validate_split_record(record: SplitSceneRecord) -> None:
+def _validate_split_record(record: ForecastRecord) -> None:
     for name, features, mask in (
         ("history", record.history_features, record.history_mask),
         ("future", record.future_features, record.future_mask),

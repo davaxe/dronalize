@@ -12,7 +12,7 @@ from typing_extensions import TypedDict
 from prejectory.core.categories import AgentCategory
 from prejectory.core.typing import FloatScalarT
 from prejectory.datasets.registry import dataset_id_for_name
-from prejectory.io.records import PredictionBounds, SceneRecord, SplitSceneRecord
+from prejectory.io.records import ForecastRecord, PredictionBounds, SceneRecord
 
 if TYPE_CHECKING:
     from prejectory.core.maps import MapGraph
@@ -109,7 +109,7 @@ def encode_scene_record(
         agent_types=agent_types,
         screened_agent_mask=screened_agent_mask,
         features=features,
-        mask=mask,
+        valid_mask=mask,
         map_node_positions=map_record["map_node_positions"],
         map_edge_indices=map_record["map_edge_indices"],
         map_node_types=map_record["map_node_types"],
@@ -140,7 +140,7 @@ def encode_split_scene_record(
     recenter_position: bool = True,
     trajectory_schema: TrajectorySchema | None = None,
     category_mapping: dict[AgentCategory, int] | None = None,
-) -> SplitSceneRecord:
+) -> ForecastRecord:
     """Encode one scene and split it into observation/prediction tensors."""
     record = encode_scene_record(
         scene,
@@ -149,7 +149,11 @@ def encode_split_scene_record(
         trajectory_schema=trajectory_schema,
         category_mapping=category_mapping,
     )
-    return record.split(prediction_origin, prediction_end)
+    return record.forecast(
+        PredictionBounds(
+            prediction_origin, record.horizon_frames if prediction_end is None else prediction_end
+        )
+    )
 
 
 def empty_map_record(dtype: FloatDType) -> MapRecordF32 | MapRecordF64:

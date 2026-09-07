@@ -13,10 +13,18 @@
 
 ## ::: prejectory.io.SceneRecord
 
-## ::: prejectory.io.SplitSceneRecord
+## ::: prejectory.io.ForecastRecord
 
 ## ::: prejectory.io.read_manifest
 
 ## ::: prejectory.io.manifest_path
 
 ## ::: prejectory.io.write_manifest
+
+## ::: prejectory.io.open_dataset
+
+## ::: prejectory.io.OpenedDataset
+
+## ::: prejectory.io.RecordTransform
+
+## ::: prejectory.io.SceneTransform

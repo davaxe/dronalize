@@ -144,7 +144,7 @@ class LevelXDataLoader(SceneLoader[LevelXSourceData]):
 
 
 class StandardLevelXLoader(LevelXDataLoader):
-    """Loader for LevelX datasets that store recordings under a ``data`` directory."""
+    """Loader for LevelX datasets that store recordings under a `data` directory."""
 
     def __init__(
         self,

@@ -40,7 +40,7 @@ def test_split_scene_record_rejects_bad_bounds(scene: Scene) -> None:
     record = encode_scene_record(scene, dtype=np.float64)
 
     with pytest.raises(ValueError, match="Prediction bounds"):
-        _ = record.split(record.horizon_frames + 1)
+        _ = record.forecast(PredictionBounds(record.horizon_frames + 1, record.horizon_frames + 2))
 
 
 def test_encode_scene_record_uses_passed_ids(scene: Scene) -> None:
@@ -206,7 +206,8 @@ def test_mds_reader_combines_streams_with_per_row_prediction_bounds(
         (2, 3),
     }
     assert {
-        (record.split().observation_length, record.split().future_length) for record in records
+        (record.forecast().observation_length, record.forecast().future_length)
+        for record in records
     } == {(1, 2), (2, 1)}
 
 
@@ -223,8 +224,8 @@ def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene)
             "scene_number": int(record.scene_number),
             "history": record.features[:, :observation_length],
             "future": record.features[:, observation_length:],
-            "history_mask": record.mask[:, :observation_length].astype(np.uint8, copy=False),
-            "future_mask": record.mask[:, observation_length:].astype(np.uint8, copy=False),
+            "history_mask": record.valid_mask[:, :observation_length].astype(np.uint8, copy=False),
+            "future_mask": record.valid_mask[:, observation_length:].astype(np.uint8, copy=False),
         }
 
     columns = {
@@ -253,8 +254,8 @@ def test_mds_writer_accepts_transform_with_columns(tmp_path: Path, scene: Scene)
     assert int(raw["scene_number"]) == scene.scene_number
     np.testing.assert_allclose(raw["history"], expected.features[:, :1])
     np.testing.assert_allclose(raw["future"], expected.features[:, 1:])
-    np.testing.assert_array_equal(raw["history_mask"], expected.mask[:, :1].astype(np.uint8))
-    np.testing.assert_array_equal(raw["future_mask"], expected.mask[:, 1:].astype(np.uint8))
+    np.testing.assert_array_equal(raw["history_mask"], expected.valid_mask[:, :1].astype(np.uint8))
+    np.testing.assert_array_equal(raw["future_mask"], expected.valid_mask[:, 1:].astype(np.uint8))
 
 
 def test_mds_writer_requires_columns_for_custom_transform(tmp_path: Path) -> None:
@@ -288,7 +289,7 @@ def test_mds_encoder_decoder_roundtrip(scene: Scene) -> None:
 def test_split_scene_record_preserves_identity(scene: Scene) -> None:
     record = encode_scene_record(scene, dtype=np.float32)
 
-    split = record.split(2)
+    split = record.forecast(PredictionBounds(2, int(record.features.shape[1])))
 
     np.testing.assert_array_equal(split.agent_ids, record.agent_ids)
     assert split.ego_agent_id == record.ego_agent_id
@@ -339,7 +340,7 @@ def test_manifest_write_and_read_roundtrip(tmp_path: Path) -> None:
 
 
 def test_manifest_rejects_legacy_pre_rename_format() -> None:
-    with pytest.raises(ManifestCompatibilityError, match=r"version '1'.*Supported version: 2"):
+    with pytest.raises(ManifestCompatibilityError, match=r"version '1'.*Supported version: 3"):
         _ = DatasetManifest.from_json_dict({"format_version": 1})
 
 
@@ -433,7 +434,7 @@ def test_torch_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     assert record.ego_agent_id == expected.ego_agent_id
     _assert_tensor_array_equal(record.screened_agent_mask, expected.screened_agent_mask)
     _assert_tensor_allclose(record.features, expected.features)
-    _assert_tensor_array_equal(record.agent_time_mask, expected.mask)
+    _assert_tensor_array_equal(record.valid_mask, expected.valid_mask)
     _assert_tensor_allclose(record.map_node_positions, expected.map_node_positions)
     _assert_tensor_array_equal(record.map_edge_indices, expected.map_edge_indices)
     _assert_tensor_array_equal(record.map_node_types, expected.map_node_types)
@@ -446,7 +447,7 @@ def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> Non
 
     reader, expected = _build_pickle_reader(tmp_path, scene)
     record = TorchSceneDataset(reader)[0]
-    split = record.split(2)
+    split = record.forecast(PredictionBounds(2, int(record.features.shape[1])))
 
     assert split.scene_number == expected.scene_number
     assert split.dataset_id == expected.dataset_id
@@ -454,9 +455,9 @@ def test_torch_scene_record_splits_features(tmp_path: Path, scene: Scene) -> Non
     _assert_tensor_array_equal(split.agent_ids, expected.agent_ids)
     assert split.ego_agent_id == expected.ego_agent_id
     _assert_tensor_allclose(split.history_features, expected.features[:, :2])
-    _assert_tensor_array_equal(split.history_mask, expected.mask[:, :2])
+    _assert_tensor_array_equal(split.history_mask, expected.valid_mask[:, :2])
     _assert_tensor_allclose(split.future_features, expected.features[:, 2:])
-    _assert_tensor_array_equal(split.future_mask, expected.mask[:, 2:])
+    _assert_tensor_array_equal(split.future_mask, expected.valid_mask[:, 2:])
     _assert_tensor_array_equal(split.map_edge_indices, expected.map_edge_indices)
 
 
@@ -500,7 +501,7 @@ def test_pyg_dataset_roundtrip(tmp_path: Path, scene: Scene) -> None:
     _assert_tensor_allclose(record.position_offset, expected.position_offset)
     _assert_tensor_allclose(record["agent"].features, expected.features)
     _assert_tensor_array_equal(record["agent"].agent_id, expected.agent_ids)
-    _assert_tensor_array_equal(record["agent"].agent_time_mask, expected.mask)
+    _assert_tensor_array_equal(record["agent"].valid_mask, expected.valid_mask)
     _assert_tensor_array_equal(record["agent"].agent_type, expected.agent_types)
     _assert_tensor_array_equal(record["agent"].screened_agent_mask, expected.screened_agent_mask)
     _assert_tensor_allclose(record["map"].x, expected.map_node_positions)
@@ -522,7 +523,7 @@ def test_pyg_collate_pads_full_horizon(tmp_path: Path, scene: Scene) -> None:
 
     shorter = record.clone()
     shorter["agent"].features = shorter["agent"].features[:, :1, :]
-    shorter["agent"].agent_time_mask = shorter["agent"].agent_time_mask[:, :1]
+    shorter["agent"].valid_mask = shorter["agent"].valid_mask[:, :1]
 
     batch = collate_hetero_with_time_padding([shorter, record])
 

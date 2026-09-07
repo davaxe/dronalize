@@ -31,7 +31,6 @@
 
 ## ::: prejectory.core.available_trajectory_schemas
 
-## ::: prejectory.core.TRAJECTORY_SCHEMAS
 
 ## ::: prejectory.core.CANONICAL
 

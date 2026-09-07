@@ -45,7 +45,7 @@ Use `--plan` first to resolve the run without writing output. When the summary l
 ```python
 from pathlib import Path
 
-from prejectory.runtime import ExecutionRequest, execute_request, resolve_request
+from prejectory import ExecutionRequest, plan, run, open_dataset
 
 request = ExecutionRequest(
     dataset="a43",
@@ -54,11 +54,14 @@ request = ExecutionRequest(
     storage_backend="pickle",
 )
 
-plan = resolve_request(request)
-print(plan.effective_sample_time)
+resolved = plan(request)
+print(resolved.summary())
 
-result = execute_request(request)
+result = run(resolved)
 print(result.written_scenes)
+
+dataset = open_dataset(result.output_dir)
+print(dataset.manifest.feature_columns)
 ```
 
 The public Python surface is intentionally explicit:

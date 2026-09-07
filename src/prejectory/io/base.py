@@ -46,9 +46,9 @@ class StorageBackend(str, Enum):
     ??? warning "Extra dependencies"
         Using MDS requires installing the `prejectory[mds]` extra:
 
-        ```sh
+        ``sh
         pip install prejectory[mds]
-        ```
+        ``
     """
     PICKLE = "pickle"
     """Pickle storage backend. Requires no extra dependencies."""
