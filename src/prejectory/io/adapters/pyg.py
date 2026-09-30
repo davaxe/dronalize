@@ -1,4 +1,8 @@
-"""PyTorch Geometric adapters built on top of generic Torch scene datasets."""
+"""PyTorch Geometric adapters built on top of generic Torch scene datasets.
+
+Ego metadata is batch-safe: `ego_agent_id` uses -1 when absent and
+`has_ego_agent_id` indicates whether the source provided an ID.
+"""
 
 from __future__ import annotations
 
@@ -220,7 +224,11 @@ def _hetero_with_common_data(
     data.position_offset = record.position_offset
     data.prediction_origin = record.prediction_origin
     data.prediction_end = record.prediction_end
-    data.ego_agent_id = record.ego_agent_id
+    # PyG removes attributes assigned None. Keep identical keys across scenes
+    # so datasets with and without ego metadata can share a batch. The mask
+    # distinguishes missing metadata even if -1 is a valid source agent ID.
+    data.ego_agent_id = -1 if record.ego_agent_id is None else record.ego_agent_id
+    data.has_ego_agent_id = record.ego_agent_id is not None
     return data
 
 
